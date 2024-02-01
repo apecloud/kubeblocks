@@ -103,16 +103,22 @@ var _ = Describe("ComponentVersion Controller", func() {
 				SetServiceVersion(serviceVersion("")) // use empty revision as init service version
 			for _, app := range []string{appName, appNameSamePrefix} {
 				// use empty revision as init image tag
-				f = f.SetRuntime(&corev1.Container{Name: app, Image: appImage(name, releaseId(""))})
+				f = f.SetRuntime(&corev1.Container{Name: app, Image: appImage(app, releaseId(""))})
 			}
 			objs = append(objs, f.Create(&testCtx).GetObject())
+		}
+		for _, obj := range objs {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(obj),
+				func(g Gomega, compDef *appsv1alpha1.ComponentDefinition) {
+					g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
+				})).Should(Succeed())
 		}
 		return objs
 	}
 
 	createCompVersionObj := func() *appsv1alpha1.ComponentVersion {
 		By("create a default ComponentVersion obj with multiple releases")
-		return testapps.NewComponentVersionFactory(compVersionName).
+		obj := testapps.NewComponentVersionFactory(compVersionName).
 			SetSpec(appsv1alpha1.ComponentVersionSpec{
 				CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
 					{
@@ -175,17 +181,32 @@ var _ = Describe("ComponentVersion Controller", func() {
 						Changes:        "publish a new service version",
 						ServiceVersion: serviceVersion("v2"),
 						Images: map[string]string{
-							appName: appImage(appName, releaseId("r5")),
-							// appNameSamePrefix: appImage(appNameSamePrefix, releaseId("r5")),
+							appName:           appImage(appName, releaseId("r5")),
+							appNameSamePrefix: appImage(appNameSamePrefix, releaseId("r5")),
 						},
 					},
 				},
 			}).
 			Create(&testCtx).
 			GetObject()
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(obj),
+			func(g Gomega, compVersion *appsv1alpha1.ComponentVersion) {
+				g.Expect(compVersion.Status.ObservedGeneration).Should(Equal(compVersion.Generation))
+			})).Should(Succeed())
+
+		return obj
 	}
 
-	Context("provision & termination", func() {
+	updateNcheckCompDefinitionImages := func(compDef *appsv1alpha1.ComponentDefinition, serviceVersion string, r0, r1 string) {
+		Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId(""))))
+		Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId(""))))
+		Expect(updateCompDefinitionImages4ServiceVersion(testCtx.Ctx, testCtx.Cli, compDef, serviceVersion)).Should(Succeed())
+		Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
+		Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId(r0))))
+		Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId(r1))))
+	}
+
+	Context("reconcile component version", func() {
 		BeforeEach(func() {
 			// compDefinitionObjs = createCompDefinitionObjs()
 			createCompDefinitionObjs()
@@ -204,7 +225,6 @@ var _ = Describe("ComponentVersion Controller", func() {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(serviceVersions, ",")))
-					g.Expect(cmpv.Labels).Should(HaveLen(len(compDefNames)))
 					for i := 0; i < len(compDefNames); i++ {
 						g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
 					}
@@ -247,20 +267,14 @@ var _ = Describe("ComponentVersion Controller", func() {
 				compVersion.Spec.CompatibilityRules[0].CompDefs = []string{compDefName("v2")}
 			})).Should(Succeed())
 
-			isV1CompDefinition := func(s string) bool {
-				return strings.HasPrefix(s, compDefName("v1"))
-			}
-			v1CompDefinitionCnt := generics.CountFunc(compDefNames, isV1CompDefinition)
-
 			By("checking the object available")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compVersionObj),
 				func(g Gomega, cmpv *appsv1alpha1.ComponentVersion) {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(serviceVersions, ",")))
-					g.Expect(cmpv.Labels).Should(HaveLen(len(compDefNames) - v1CompDefinitionCnt))
 					for i := 0; i < len(compDefNames); i++ {
-						if isV1CompDefinition(compDefNames[i]) {
+						if strings.HasPrefix(compDefNames[i], compDefName("v1")) {
 							g.Expect(cmpv.Labels).ShouldNot(HaveKey(compDefNames[i]))
 						} else {
 							g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
@@ -284,9 +298,8 @@ var _ = Describe("ComponentVersion Controller", func() {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(serviceVersions, ",")))
-					g.Expect(cmpv.Labels).Should(HaveLen(len(compDefNames) - v1CompDefinitionCnt))
 					for i := 0; i < len(compDefNames); i++ {
-						if isV1CompDefinition(compDefNames[i]) {
+						if strings.HasPrefix(compDefNames[i], compDefName("v1")) {
 							g.Expect(cmpv.Labels).ShouldNot(HaveKey(compDefNames[i]))
 						} else {
 							g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
@@ -309,7 +322,6 @@ var _ = Describe("ComponentVersion Controller", func() {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(serviceVersions, ",")))
-					g.Expect(cmpv.Labels).Should(HaveLen(len(compDefNames)))
 					for i := 0; i < len(compDefNames); i++ {
 						g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
 					}
@@ -349,7 +361,6 @@ var _ = Describe("ComponentVersion Controller", func() {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join([]string{serviceVersion("v0"), serviceVersion("v2")}, ",")))
-					g.Expect(cmpv.Labels).Should(HaveLen(len(compDefNames)))
 					for i := 0; i < len(compDefNames); i++ {
 						g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
 					}
@@ -357,7 +368,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 		})
 	})
 
-	FContext("component definition and service version", func() {
+	Context("resolve component definition, service version and images", func() {
 		BeforeEach(func() {
 			// compDefinitionObjs = createCompDefinitionObjs()
 			createCompDefinitionObjs()
@@ -368,192 +379,199 @@ var _ = Describe("ComponentVersion Controller", func() {
 			cleanEnv()
 		})
 
-		It("match from definition", func() {
-			// use empty revision of service version
-			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.0"), serviceVersion(""))
-			Expect(err).Should(Succeed())
-			Expect(compDef.Name).Should(Equal(compDefName("v1.0")))
-			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			// empty revision of image tag
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId(""))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId(""))))
-		})
-
-		It("exact match", func() {
+		It("full match", func() {
+			By("with definition v1.0 and service version v0")
 			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.0"), serviceVersion("v0"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v0")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r4"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r4"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
 
+			By("with definition v1.1 and service version v0")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.1"), serviceVersion("v0"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.1")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v0")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r4"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r4"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
 
+			By("with definition v2.0 and service version v0")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v2.0"), serviceVersion("v0"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v0")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r4"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r4"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
 
+			By("with definition v1.0 and service version v1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.0"), serviceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r3"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r2"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
+			By("with definition v1.1 and service version v1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.1"), serviceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.1")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r3"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r2"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
+			By("with definition v2.0 and service version v1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v2.0"), serviceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r3"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r2"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
+			By("with definition v3.0 and service version v2")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v3.0"), serviceVersion("v2"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v3.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r5"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r5"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
 		})
 
 		It("w/o service version", func() {
+			By("with definition v1.0")
 			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.0"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r3"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r2"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
+			By("with definition v1.1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.1"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.1")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r3"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r2"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
+			By("with definition v2.0")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v2.0"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r3"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r2"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
+			By("with definition v3.0")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v3.0"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v3.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r5"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r5"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
 		})
 
 		It("prefix match definition", func() {
+			By("with definition prefix and service version v0")
 			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefinitionName, serviceVersion("v0"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v0")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r4"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r4"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
 
+			By("with definition prefix and service version v1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefinitionName, serviceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r3"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r2"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
+			By("with definition prefix and service version v2")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefinitionName, serviceVersion("v2"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v3.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r5"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r5"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
 
-			// v1 prefix
+			By("with definition v1 prefix and service version v0")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1"), serviceVersion("v0"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.1")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v0")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r4"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r4"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
 
-			// v2 prefix
+			By("with definition v2 prefix and service version v1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v2"), serviceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r3"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r2"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 		})
 
 		It("prefix match definition and w/o service version", func() {
+			By("with definition prefix")
 			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefinitionName, "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v3.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r5"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r5"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
 
-			// v1 prefix
+			By("with definition v1 prefix")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.1")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r3"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r2"))))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
-			// v2 prefix
+			By("with definition v2 prefix")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v2"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-			Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId("r3"))))
-			Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId("r2"))))
-		})
-	})
-
-	Context("component definition images", func() {
-		BeforeEach(func() {
-			// compDefinitionObjs = createCompDefinitionObjs()
-			createCompDefinitionObjs()
-			compVersionObj = createCompVersionObj()
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 		})
 
-		AfterEach(func() {
-			cleanEnv()
+		It("match from definition", func() {
+			By("with definition v1.0 and service version empty revision")
+			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.0"), serviceVersion(""))
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal(compDefName("v1.0")))
+			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("")))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "", "") // empty revision of image tag
+		})
+
+		It("resolve images from definition and version", func() {
+			By("create new definition v4.0 with service version v3")
+			compDefObj := testapps.NewComponentDefinitionFactory(compDefName("v4.0")).
+				SetServiceVersion(serviceVersion("v3")).
+				SetRuntime(&corev1.Container{Name: appName, Image: appImage(appName, releaseId(""))}).
+				SetRuntime(&corev1.Container{Name: appNameSamePrefix, Image: appImage(appNameSamePrefix, releaseId(""))}).
+				Create(&testCtx).
+				GetObject()
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
+				func(g Gomega, compDef *appsv1alpha1.ComponentDefinition) {
+					g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
+				})).Should(Succeed())
+
+			By("new release for the definition")
+			compVersionKey := client.ObjectKeyFromObject(compVersionObj)
+			Eventually(testapps.GetAndChangeObj(&testCtx, compVersionKey, func(compVersion *appsv1alpha1.ComponentVersion) {
+				release := appsv1alpha1.ComponentVersionRelease{
+					Name:           releaseId("r6"),
+					Changes:        "publish a new service version",
+					ServiceVersion: serviceVersion("v3"),
+					Images: map[string]string{
+						appName: appImage(appName, releaseId("r6")),
+						// not provide image for this app
+						// appNameSamePrefix: appImage(appNameSamePrefix, releaseId("r6")),
+					},
+				}
+				rule := appsv1alpha1.ComponentVersionCompatibilityRule{
+					CompDefs: []string{compDefName("v4")}, // use prefix
+					Releases: []string{releaseId("r6")},
+				}
+				compVersion.Spec.CompatibilityRules = append(compVersion.Spec.CompatibilityRules, rule)
+				compVersion.Spec.Releases = append(compVersion.Spec.Releases, release)
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, compVersionKey, func(g Gomega, compVersion *appsv1alpha1.ComponentVersion) {
+				g.Expect(compVersion.Status.ObservedGeneration).Should(Equal(compVersion.Generation))
+			})).Should(Succeed())
+
+			By("with definition v4.0 and service version v3")
+			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v4.0"), serviceVersion("v3"))
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal(compDefName("v4.0")))
+			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v3")))
+			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r6", "") // app is r6 and another one is ""
 		})
 	})
 })

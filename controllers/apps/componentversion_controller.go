@@ -22,12 +22,12 @@ package apps
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,6 +43,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+)
+
+const (
+	compatibleDefinitionsKey = "componentversion.kubeblocks.io/compatible-definitions"
 )
 
 // ComponentVersionReconciler reconciles a ComponentVersion object
@@ -131,10 +135,10 @@ func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 		return *res, err
 	}
 
-	if compVersion.Status.ObservedGeneration == compVersion.Generation &&
-		slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, compVersion.Status.Phase) {
-		return intctrlutil.Reconciled()
-	}
+	// if compVersion.Status.ObservedGeneration == compVersion.Generation &&
+	//	slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, compVersion.Status.Phase) {
+	//	return intctrlutil.Reconciled()
+	// }
 
 	releaseToCompDefinitions, err := r.buildReleaseToCompDefinitionMapping(r.Client, rctx, compVersion)
 	if err != nil {
@@ -166,24 +170,16 @@ func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 
 func (r *ComponentVersionReconciler) buildReleaseToCompDefinitionMapping(cli client.Client, rctx intctrlutil.RequestCtx,
 	compVersion *appsv1alpha1.ComponentVersion) (map[string]map[string]*appsv1alpha1.ComponentDefinition, error) {
-	compDefs := make(map[string]*appsv1alpha1.ComponentDefinition)
+	compDefs := make(map[string][]*appsv1alpha1.ComponentDefinition)
 	for _, rule := range compVersion.Spec.CompatibilityRules {
 		for _, compDef := range rule.CompDefs {
 			if _, ok := compDefs[compDef]; ok {
 				continue
 			}
-			cmpd := &appsv1alpha1.ComponentDefinition{}
-			key := types.NamespacedName{
-				Name: compDef, // TODO: wildcard
-			}
-			err := cli.Get(rctx.Ctx, key, cmpd)
-			switch {
-			case err != nil && !apierrors.IsNotFound(err):
+			var err error
+			compDefs[compDef], err = listCompDefinitionsWithPrefix(rctx.Ctx, cli, compDef)
+			if err != nil {
 				return nil, err
-			case err != nil:
-				compDefs[compDef] = nil
-			default:
-				compDefs[compDef] = cmpd
 			}
 		}
 	}
@@ -193,11 +189,13 @@ func (r *ComponentVersionReconciler) buildReleaseToCompDefinitionMapping(cli cli
 			if _, ok := releaseToCompDefinitions[release]; !ok {
 				releaseToCompDefinitions[release] = map[string]*appsv1alpha1.ComponentDefinition{}
 			}
-			for _, compDef := range rule.CompDefs {
-				if _, ok := releaseToCompDefinitions[release][compDef]; ok {
-					continue
+			for _, compDefName := range rule.CompDefs {
+				for i, compDef := range compDefs[compDefName] {
+					if _, ok := releaseToCompDefinitions[release][compDef.Name]; ok {
+						continue
+					}
+					releaseToCompDefinitions[release][compDef.Name] = compDefs[compDefName][i]
 				}
-				releaseToCompDefinitions[release][compDef] = compDefs[compDef]
 			}
 		}
 	}
@@ -253,23 +251,34 @@ func (r *ComponentVersionReconciler) supportedServiceVersions(compVersion *appsv
 
 func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Client, rctx intctrlutil.RequestCtx,
 	compVersion *appsv1alpha1.ComponentVersion, releaseToCompDefinitions map[string]map[string]*appsv1alpha1.ComponentDefinition) error {
-	updated := false
-	if compVersion.Labels == nil {
-		compVersion.Labels = make(map[string]string)
+	if compVersion.Annotations == nil {
+		compVersion.Annotations = make(map[string]string)
 	}
+	compatibleDefs := strings.Split(compVersion.Annotations[compatibleDefinitionsKey], ",")
+
+	labels := make(map[string]string)
 	for _, compDefs := range releaseToCompDefinitions {
 		for name := range compDefs {
-			if _, ok := compVersion.Labels[name]; ok {
-				continue
-			}
-			compVersion.Labels[name] = name
-			updated = true
+			labels[name] = name
 		}
 	}
-	if updated {
-		return cli.Update(rctx.Ctx, compVersion)
+	labelKeys := maps.Keys(labels)
+	slices.Sort(labelKeys)
+
+	// nothing changed
+	if reflect.DeepEqual(compatibleDefs, labelKeys) {
+		return nil
 	}
-	return nil
+
+	compatibleDefsSet := sets.New(compatibleDefs...)
+	for k, v := range compVersion.Labels {
+		if !compatibleDefsSet.Has(k) {
+			labels[k] = v // add non-definition labels back
+		}
+	}
+	compVersion.Labels = labels
+	compVersion.Annotations[compatibleDefinitionsKey] = strings.Join(labelKeys, ",")
+	return cli.Update(rctx.Ctx, compVersion)
 }
 
 func (r *ComponentVersionReconciler) validate(compVersion *appsv1alpha1.ComponentVersion,

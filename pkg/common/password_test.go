@@ -27,12 +27,12 @@ const (
 	N = 10000
 )
 
-func testGeneratorGenerateWithSeed(t *testing.T) {
+func testGeneratorGeneratePasswordWithSeed(t *testing.T) {
 	seed := "mock-seed-for-generate-the same-password"
 	resultSeedFirstTime := ""
 	resultSeedEachTime := ""
 	for i := 0; i < N; i++ {
-		res, err := GenerateWithSeed(10, 5, 0, false, seed)
+		res, err := GeneratePasswordWithSeed(10, 5, 0, false, seed)
 		if err != nil {
 			t.Error(err)
 		}
@@ -46,6 +46,6 @@ func testGeneratorGenerateWithSeed(t *testing.T) {
 	}
 }
 
-func TestGeneratorGenerateWithSeed(t *testing.T) {
-	testGeneratorGenerateWithSeed(t)
+func TestGeneratorGeneratePasswordWithSeed(t *testing.T) {
+	testGeneratorGeneratePasswordWithSeed(t)
 }

@@ -142,7 +142,7 @@ func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.Syst
 		config = account.PasswordGenerationPolicy
 	)
 	if len(config.Seed) > 0 {
-		passwd, _ = common.GenerateWithSeed((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, config.Seed)
+		passwd, _ = common.GeneratePasswordWithSeed((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, config.Seed)
 	} else {
 		passwd, _ = password.Generate((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, false)
 	}

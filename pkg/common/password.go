@@ -51,8 +51,8 @@ var (
 	ErrExceedsTotalLength = errors.New("number of digits and symbols must be less than total length")
 )
 
-// GenerateWithSeed generates a password with the given requirements and seed.
-func GenerateWithSeed(length, numDigits, numSymbols int, noUpper bool, seed string) (string, error) {
+// GeneratePasswordWithSeed generates a password with the given requirements and seed.
+func GeneratePasswordWithSeed(length, numDigits, numSymbols int, noUpper bool, seed string) (string, error) {
 	if len(seed) == 0 {
 		utilrand.Seed(time.Now().UnixNano())
 	} else {

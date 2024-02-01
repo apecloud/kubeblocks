@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"strings"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -128,20 +127,15 @@ func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for compName := range updateCompSet {
 		runningComp, getErr := getRunningCompObject(transCtx, cluster, compName)
-		if getErr != nil && !apierrors.IsNotFound(getErr) {
+		if getErr != nil {
 			return getErr
 		}
 		comp, buildErr := component.BuildComponent(cluster, protoCompSpecMap[compName], protoCompLabelsMap[compName])
 		if buildErr != nil {
 			return buildErr
 		}
-		if getErr != nil { // non-exist
-			// to be backwards compatible with old API versions, for components that are already running but don't have a component CR, component CR needs to be generated.
-			graphCli.Create(dag, comp)
-		} else {
-			if newCompObj := copyAndMergeComponent(runningComp, comp); newCompObj != nil {
-				graphCli.Update(dag, runningComp, newCompObj)
-			}
+		if newCompObj := copyAndMergeComponent(runningComp, comp); newCompObj != nil {
+			graphCli.Update(dag, runningComp, newCompObj)
 		}
 	}
 	return nil

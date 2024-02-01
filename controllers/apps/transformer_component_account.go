@@ -20,16 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
 	"fmt"
 	"strings"
 
-	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -104,11 +100,6 @@ func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransform
 		if password, err = t.getPasswordFromSecret(ctx, account); err != nil {
 			return nil, err
 		}
-	case len(account.Seed) > 0:
-		var err error
-		if password, err = t.buildPasswordFromSeed(account.Seed); err != nil {
-			return nil, err
-		}
 	default:
 		password = t.buildPassword(ctx, account)
 	}
@@ -130,17 +121,6 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 	return secret.Data[constant.AccountPasswdForSecret], nil
 }
 
-func (t *componentAccountTransformer) buildPasswordFromSeed(seed string) ([]byte, error) {
-	h := sha256.New()
-	_, err := h.Write([]byte(seed))
-	if err != nil {
-		return nil, err
-	}
-	uSeed := binary.BigEndian.Uint64(h.Sum(nil))
-	rand.Seed(int64(uSeed))
-	return []byte(rand.String(16)), nil
-}
-
 func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account appsv1alpha1.SystemAccount) []byte {
 	if !account.InitAccount {
 		return t.generatePassword(account)
@@ -156,8 +136,15 @@ func (t *componentAccountTransformer) buildPassword(ctx *componentTransformConte
 }
 
 func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.SystemAccount) []byte {
-	config := account.PasswordGenerationPolicy
-	passwd, _ := password.Generate((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, false)
+	var (
+		passwd string
+		config = account.PasswordGenerationPolicy
+	)
+	if len(config.Seed) > 0 {
+		passwd, _ = common.GenerateWithSeed((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, config.Seed)
+	} else {
+		passwd, _ = common.Generate((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, false)
+	}
 	switch config.LetterCase {
 	case appsv1alpha1.UpperCases:
 		passwd = strings.ToUpper(passwd)

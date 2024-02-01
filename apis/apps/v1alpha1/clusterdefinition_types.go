@@ -113,6 +113,10 @@ type PasswordConfig struct {
 	// +kubebuilder:default=MixedCases
 	// +optional
 	LetterCase LetterCase `json:"letterCase,omitempty"`
+	// seed specifies the seed used to generate the account's password.
+	// Cannot be updated.
+	// +optional
+	Seed string `json:"seed,omitempty"`
 }
 
 // SystemAccountConfig specifies how to create and delete system accounts.

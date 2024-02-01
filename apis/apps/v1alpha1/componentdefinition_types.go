@@ -299,11 +299,6 @@ type SystemAccount struct {
 	// Cannot be updated.
 	// +optional
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
-
-	// Seed specifies the seed used to generate the account's password.
-	// Cannot be updated.
-	// +optional
-	Seed string `json:"seed,omitempty"`
 }
 
 // RoleArbitrator defines how to arbitrate the role of replicas.

@@ -59,12 +59,16 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
-		// component controller does not handle the nodeport service if the feature gate is not enabled.
+		// component controller does not handle the nodeport service if the feature gate is not enabled.the default behavior is 'ignored'.
 		if t.skipNodePortService(cluster, transCtx.CompDef, synthesizeComp, &service) {
 			continue
 		}
-		// component controller does not handle the pod ordinal service if the feature gate is not enabled.
+		// component controller does not handle the pod ordinal service if the feature gate is not enabled.the default behavior is 'ignored'.
 		if t.skipPodOrdinalService(cluster, synthesizeComp, &service) {
+			continue
+		}
+		// component controller does not handle the clusterIp service if the feature gate is not enabled. the default behavior is 'created'.
+		if t.skipClusterIPService(cluster, synthesizeComp, &service) {
 			continue
 		}
 
@@ -124,7 +128,7 @@ func (t *componentServiceTransformer) skipNodePortService(cluster *appsv1alpha1.
 	if cluster == nil || cluster.Annotations == nil {
 		return true
 	}
-	enableNodePortSvcCompList, ok := cluster.Annotations[constant.NodePortSvcAnnotationKey]
+	enableNodePortSvcCompList, ok := cluster.Annotations[constant.EnabledNodePortSvcAnnotationKey]
 	if !ok {
 		return true
 	}
@@ -155,7 +159,7 @@ func (t *componentServiceTransformer) skipPodOrdinalService(cluster *appsv1alpha
 	if cluster == nil || cluster.Annotations == nil {
 		return true
 	}
-	enablePodOrdinalSvcCompList, ok := cluster.Annotations[constant.PodOrdinalSvcAnnotationKey]
+	enablePodOrdinalSvcCompList, ok := cluster.Annotations[constant.EnabledPodOrdinalSvcAnnotationKey]
 	if !ok {
 		return true
 	}
@@ -165,6 +169,31 @@ func (t *componentServiceTransformer) skipPodOrdinalService(cluster *appsv1alpha
 		}
 	}
 	return true
+}
+
+func (t *componentServiceTransformer) skipClusterIPService(cluster *appsv1alpha1.Cluster,
+	synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
+	if compService == nil {
+		return true
+	}
+	// if Service type is not ClusterIp, it should not be skipped.
+	if compService.Spec.Type != corev1.ServiceTypeClusterIP {
+		return false
+	}
+	// if Service type is ClusterIp, but the feature gate annotation does not declare which components are disabled, it should be created.
+	if cluster == nil || cluster.Annotations == nil {
+		return false
+	}
+	disabledClusterIPSvcCompList, ok := cluster.Annotations[constant.DisabledClusterIPSvcAnnotationKey]
+	if !ok {
+		return false
+	}
+	for _, compName := range strings.Split(disabledClusterIPSvcCompList, ",") {
+		if compName == synthesizeComp.Name {
+			return true
+		}
+	}
+	return false
 }
 
 func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,

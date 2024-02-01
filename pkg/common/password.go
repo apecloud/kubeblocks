@@ -65,11 +65,6 @@ func GeneratePasswordWithSeed(length, numDigits, numSymbols int, noUpper bool, s
 		utilrand.Seed(int64(uSeed))
 	}
 
-	letters := LowerLetters
-	if !noUpper {
-		letters += UpperLetters
-	}
-
 	chars := length - numDigits - numSymbols
 	if chars < 0 {
 		return "", ErrExceedsTotalLength

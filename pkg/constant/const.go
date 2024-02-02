@@ -255,7 +255,6 @@ const (
 
 const (
 	// Container port name
-	SyncerHTTPPortName                 = "syncer-port"
 	LorryHTTPPortName                  = "lorry-http-port"
 	LorryGRPCPortName                  = "lorry-grpc-port"
 	LorryContainerName                 = "lorry"

@@ -55,7 +55,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 		compDefName = func(r string) string {
 			return fmt.Sprintf("%s-%s", compDefinitionName, r)
 		}
-		releaseId = func(r string) string {
+		releaseID = func(r string) string {
 			return fmt.Sprintf("%s-%s", releasePrefix, r)
 		}
 		serviceVersion = func(r string) string {
@@ -103,7 +103,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 				SetServiceVersion(serviceVersion("")) // use empty revision as init service version
 			for _, app := range []string{appName, appNameSamePrefix} {
 				// use empty revision as init image tag
-				f = f.SetRuntime(&corev1.Container{Name: app, Image: appImage(app, releaseId(""))})
+				f = f.SetRuntime(&corev1.Container{Name: app, Image: appImage(app, releaseID(""))})
 			}
 			objs = append(objs, f.Create(&testCtx).GetObject())
 		}
@@ -124,65 +124,65 @@ var _ = Describe("ComponentVersion Controller", func() {
 					{
 						// use prefix
 						CompDefs: []string{compDefName("v1"), compDefName("v2")},
-						Releases: []string{releaseId("r0"), releaseId("r1"), releaseId("r2"), releaseId("r3"), releaseId("r4")},
+						Releases: []string{releaseID("r0"), releaseID("r1"), releaseID("r2"), releaseID("r3"), releaseID("r4")},
 					},
 					{
 						// use prefix
 						CompDefs: []string{compDefName("v3")},
-						Releases: []string{releaseId("r5")},
+						Releases: []string{releaseID("r5")},
 					},
 				},
 				Releases: []appsv1alpha1.ComponentVersionRelease{
 					{
-						Name:           releaseId("r0"),
+						Name:           releaseID("r0"),
 						Changes:        "init release",
 						ServiceVersion: serviceVersion("v0"),
 						Images: map[string]string{
-							appName:           appImage(appName, releaseId("r0")),
-							appNameSamePrefix: appImage(appNameSamePrefix, releaseId("r0")),
+							appName:           appImage(appName, releaseID("r0")),
+							appNameSamePrefix: appImage(appNameSamePrefix, releaseID("r0")),
 						},
 					},
 					{
-						Name:           releaseId("r1"),
+						Name:           releaseID("r1"),
 						Changes:        "update app image",
 						ServiceVersion: serviceVersion("v0"),
 						Images: map[string]string{
-							appName: appImage(appName, releaseId("r1")),
+							appName: appImage(appName, releaseID("r1")),
 						},
 					},
 					{
-						Name:           releaseId("r2"),
+						Name:           releaseID("r2"),
 						Changes:        "publish a new service version",
 						ServiceVersion: serviceVersion("v1"),
 						Images: map[string]string{
-							appName:           appImage(appName, releaseId("r2")),
-							appNameSamePrefix: appImage(appNameSamePrefix, releaseId("r2")),
+							appName:           appImage(appName, releaseID("r2")),
+							appNameSamePrefix: appImage(appNameSamePrefix, releaseID("r2")),
 						},
 					},
 					{
-						Name:           releaseId("r3"),
+						Name:           releaseID("r3"),
 						Changes:        "update app image",
 						ServiceVersion: serviceVersion("v1"),
 						Images: map[string]string{
-							appName: appImage(appName, releaseId("r3")),
+							appName: appImage(appName, releaseID("r3")),
 						},
 					},
 					{
-						Name:           releaseId("r4"),
+						Name:           releaseID("r4"),
 						Changes:        "update all app images for previous service version",
 						ServiceVersion: serviceVersion("v0"),
 						Images: map[string]string{
-							appName:           appImage(appName, releaseId("r4")),
-							appNameSamePrefix: appImage(appNameSamePrefix, releaseId("r4")),
+							appName:           appImage(appName, releaseID("r4")),
+							appNameSamePrefix: appImage(appNameSamePrefix, releaseID("r4")),
 						},
 					},
 					{
-						Name:           releaseId("r5"),
+						Name:           releaseID("r5"),
 						Changes:        "publish a new service version",
 						ServiceVersion: serviceVersion("v2"),
 						Images: map[string]string{
-							appName:           appImage(appName, releaseId("r5")),
-							appNameSamePrefix: appImage(appNameSamePrefix, releaseId("r5")),
+							appName:           appImage(appName, releaseID("r5")),
+							appNameSamePrefix: appImage(appNameSamePrefix, releaseID("r5")),
 						},
 					},
 				},
@@ -198,12 +198,12 @@ var _ = Describe("ComponentVersion Controller", func() {
 	}
 
 	updateNcheckCompDefinitionImages := func(compDef *appsv1alpha1.ComponentDefinition, serviceVersion string, r0, r1 string) {
-		Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId(""))))
-		Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId(""))))
+		Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseID(""))))
+		Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseID(""))))
 		Expect(updateCompDefinitionImages4ServiceVersion(testCtx.Ctx, testCtx.Cli, compDef, serviceVersion)).Should(Succeed())
 		Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
-		Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseId(r0))))
-		Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseId(r1))))
+		Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseID(r0))))
+		Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseID(r1))))
 	}
 
 	Context("reconcile component version", func() {
@@ -533,8 +533,8 @@ var _ = Describe("ComponentVersion Controller", func() {
 			By("create new definition v4.0 with service version v3")
 			compDefObj := testapps.NewComponentDefinitionFactory(compDefName("v4.0")).
 				SetServiceVersion(serviceVersion("v3")).
-				SetRuntime(&corev1.Container{Name: appName, Image: appImage(appName, releaseId(""))}).
-				SetRuntime(&corev1.Container{Name: appNameSamePrefix, Image: appImage(appNameSamePrefix, releaseId(""))}).
+				SetRuntime(&corev1.Container{Name: appName, Image: appImage(appName, releaseID(""))}).
+				SetRuntime(&corev1.Container{Name: appNameSamePrefix, Image: appImage(appNameSamePrefix, releaseID(""))}).
 				Create(&testCtx).
 				GetObject()
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
@@ -546,18 +546,18 @@ var _ = Describe("ComponentVersion Controller", func() {
 			compVersionKey := client.ObjectKeyFromObject(compVersionObj)
 			Eventually(testapps.GetAndChangeObj(&testCtx, compVersionKey, func(compVersion *appsv1alpha1.ComponentVersion) {
 				release := appsv1alpha1.ComponentVersionRelease{
-					Name:           releaseId("r6"),
+					Name:           releaseID("r6"),
 					Changes:        "publish a new service version",
 					ServiceVersion: serviceVersion("v3"),
 					Images: map[string]string{
-						appName: appImage(appName, releaseId("r6")),
+						appName: appImage(appName, releaseID("r6")),
 						// not provide image for this app
-						// appNameSamePrefix: appImage(appNameSamePrefix, releaseId("r6")),
+						// appNameSamePrefix: appImage(appNameSamePrefix, releaseID("r6")),
 					},
 				}
 				rule := appsv1alpha1.ComponentVersionCompatibilityRule{
 					CompDefs: []string{compDefName("v4")}, // use prefix
-					Releases: []string{releaseId("r6")},
+					Releases: []string{releaseID("r6")},
 				}
 				compVersion.Spec.CompatibilityRules = append(compVersion.Spec.CompatibilityRules, rule)
 				compVersion.Spec.Releases = append(compVersion.Spec.Releases, release)

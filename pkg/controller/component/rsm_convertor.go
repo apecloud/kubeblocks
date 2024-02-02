@@ -88,8 +88,16 @@ func (c *rsmMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
 type rsmPodManagementPolicyConvertor struct{}
 
 func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
-	// componentDefinition does not define PodManagementPolicy and StatefulSetUpdateStrategy.
-	// The Parallel strategy is used by default here. If necessary, the componentDefinition API can be expanded later
+	// ComponentDefinition does not define PodManagementPolicy and StatefulSetUpdateStrategy, which need to be considered in the future
+
+	// TODO(xingran): the following code is for compatibility with the behaviour of RSM in 0.7, and may be refactored in the future
+	synthesizedComp, err := parseRSMConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	if synthesizedComp.UpdateStrategy == nil {
+		return appsv1.OrderedReadyPodManagement, nil
+	}
 	return appsv1.ParallelPodManagement, nil
 }
 

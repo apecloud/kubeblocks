@@ -100,9 +100,14 @@ jobs:
     needs: update-release-kbcli
     if: ${{ github.event.action== 'released' || inputs.sync_flag == 'sealos' }}
     uses: apecloud/apecloud-cd/.github/workflows/comment-issue.yml@v0.1.16
+    strategy:
+      fail-fast: false
+      matrix:
+        app-name: [ "kubeblocks", "kubeblocks-apecloud-mysql", "kubeblocks-postgresql",
+                    "kubeblocks-mongodb", "kubeblocks-redis", "kubeblocks-kafka" ]
     with:
       GITHUB_REPO: "${{ vars.SEALOS_ISSUE_REPO }}"
       ISSUE_NUMBER: "${{ vars.SEALOS_ISSUE_NUMBER }}"
-      ISSUE_COMMENT_BODY: "/imagebuild_apps kubeblocks ${{ needs.update-release-kbcli.outputs.release-version }}"
+      ISSUE_COMMENT_BODY: "/imagebuild_apps ${{ matrix.app-name }} ${{ needs.update-release-kbcli.outputs.release-version }}"
       APECD_REF: "v0.1.16"
     secrets: inherit

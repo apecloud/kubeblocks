@@ -365,8 +365,12 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		return appsv1alpha1.UnknownBuiltinActionHandler
 	}
 
-	if synthesizeComp.LifecycleActions.RoleProbe != nil && synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
-		return *synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
+	if synthesizeComp.LifecycleActions.RoleProbe != nil {
+		if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
+			return *synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
+		} else {
+			return appsv1alpha1.CustomActionHandler
+		}
 	}
 
 	actions := []*appsv1alpha1.LifecycleActionHandler{
@@ -382,13 +386,19 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
+	hasAction := false
 	for _, action := range actions {
-		if action != nil && action.BuiltinHandler != nil {
-			return *action.BuiltinHandler
+		if action != nil {
+			hasAction = true
+			if action.BuiltinHandler != nil {
+				return *action.BuiltinHandler
+			}
 		}
 	}
-
-	return appsv1alpha1.CustomActionHandler
+	if hasAction {
+		return appsv1alpha1.CustomActionHandler
+	}
+	return appsv1alpha1.UnknownBuiltinActionHandler
 }
 
 func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedComponent) (map[string][]string, string, string) {

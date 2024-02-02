@@ -453,6 +453,7 @@ type Action struct {
 	// TargetPodSelector defines the way that how to select the target Pod where the action will be performed,
 	// if there may not have a target replica by default.
 	// Cannot be updated.
+	// +kubebuilder:default=Any
 	// +optional
 	TargetPodSelector TargetPodSelector `json:"targetPodSelector,omitempty"`
 

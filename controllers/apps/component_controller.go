@@ -140,7 +140,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// handle component system accounts
 			&componentAccountTransformer{},
 			// provision component system accounts
-			&componentAccountProvisionTransformer{},
+			// &componentAccountProvisionTransformer{},
 			// handle tls volume and cert
 			&componentTLSTransformer{},
 			// handle component custom volumes

@@ -20,14 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/sethvargo/go-password/password"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -37,83 +38,18 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// customizedEngine helps render jobs.
-type customizedEngine struct {
-	cluster       *appsv1alpha1.Cluster
-	componentName string
-	image         string
-	command       []string
-	args          []string
-	envVarList    []corev1.EnvVar
-}
-
-func (e *customizedEngine) getImage() string {
-	return e.image
-}
-
-func (e *customizedEngine) getEnvs() []corev1.EnvVar {
-	return e.envVarList
-}
-
-// getPodCommand shows how to execute the sql statement.
-// for instance, mysql -h - demo-cluster-replicasets-1 -e  "create user username IDENTIFIED by 'passwd';"
-func (e customizedEngine) getCommand() []string {
-	return e.command
-}
-
-// getPodCommand shows how to execute the sql statement.
-// for instance, mysql -h - demo-cluster-replicasets-1 -e  "create user username IDENTIFIED by 'passwd';"
-func (e *customizedEngine) getArgs() []string {
-	return e.args
-}
-
-func newCustomizedEngine(execConfig *appsv1alpha1.CmdExecutorConfig, dbcluster *appsv1alpha1.Cluster, compName string) *customizedEngine {
-	return &customizedEngine{
-		cluster:       dbcluster,
-		componentName: compName,
-		image:         execConfig.Image,
-		command:       execConfig.Command,
-		args:          execConfig.Args,
-		envVarList:    execConfig.Env,
-	}
-}
-
-func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccountSpec, placeholders map[string]string) {
-	mergedPlaceholders := componetutil.GetEnvReplacementMapForConnCredential(clusterName)
-	for k, v := range placeholders {
-		mergedPlaceholders[k] = v
-	}
-
-	// replace systemAccounts.cmdExecutorConfig.env[].valueFrom.secretKeyRef.name variables
-	cmdConfig := sysAccounts.CmdExecutorConfig
-	if cmdConfig != nil {
-		cmdConfig.Env = componetutil.ReplaceSecretEnvVars(mergedPlaceholders, cmdConfig.Env)
-	}
-
-	accounts := sysAccounts.Accounts
-	for _, acc := range accounts {
-		if acc.ProvisionPolicy.Type == appsv1alpha1.ReferToExisting {
-			// replace systemAccounts.accounts[*].provisionPolicy.secretRef.name variables
-			secretRef := acc.ProvisionPolicy.SecretRef
-			name := componetutil.ReplaceNamedVars(mergedPlaceholders, secretRef.Name, 1, false)
-			if name != secretRef.Name {
-				secretRef.Name = name
-			}
+func renderJob(jobName string, action *appsv1alpha1.Action, compKey *compUniqueKey, statement []string, pod *corev1.Pod) *batchv1.Job {
+	// place statements and endpoints before user defined envs.
+	envs := make([]corev1.EnvVar, 0)
+	// inject envs from pod.container[0]
+	podsEnvs := pod.Spec.Containers[0].Env
+	for _, env := range podsEnvs {
+		// ignore envs start with KB_
+		if strings.HasPrefix(env.Name, "KB_") {
+			continue
 		}
+		envs = append(envs, env)
 	}
-}
-
-// getLabelsForSecretsAndJobs constructs matching labels for secrets and jobs.
-// This is consistent with that of secrets created during cluster initialization.
-func getLabelsForSecretsAndJobs(key componentUniqueKey) client.MatchingLabels {
-	return client.MatchingLabels{
-		constant.AppInstanceLabelKey:    key.clusterName,
-		constant.KBAppComponentLabelKey: key.componentName,
-		constant.AppManagedByLabelKey:   constant.AppName,
-	}
-}
-
-func renderJob(jobName string, engine *customizedEngine, key componentUniqueKey, statement []string, endpoint string) *batchv1.Job {
 	// inject one more system env variables
 	statementEnv := corev1.EnvVar{
 		Name:  kbAccountStmtEnvName,
@@ -121,21 +57,19 @@ func renderJob(jobName string, engine *customizedEngine, key componentUniqueKey,
 	}
 	endpointEnv := corev1.EnvVar{
 		Name:  kbAccountEndPointEnvName,
-		Value: endpoint,
+		Value: pod.Status.PodIP,
 	}
-	// place statements and endpoints before user defined envs.
-	envs := make([]corev1.EnvVar, 0, 2+len(engine.getEnvs()))
 	envs = append(envs, statementEnv, endpointEnv)
-	if len(engine.getEnvs()) > 0 {
-		envs = append(envs, engine.getEnvs()...)
+	if len(action.Env) > 0 {
+		envs = append(envs, action.Env...)
 	}
 
 	jobContainer := corev1.Container{
 		Name:            jobName,
-		Image:           engine.getImage(),
+		Image:           action.Image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command:         engine.getCommand(),
-		Args:            engine.getArgs(),
+		Command:         action.Exec.Command,
+		Args:            action.Exec.Args,
 		Env:             envs,
 	}
 
@@ -143,13 +77,13 @@ func renderJob(jobName string, engine *customizedEngine, key componentUniqueKey,
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: key.namespace,
+			Namespace: compKey.namespace,
 			Name:      jobName,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: key.namespace,
+					Namespace: compKey.namespace,
 					Name:      jobName},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -162,148 +96,78 @@ func renderJob(jobName string, engine *customizedEngine, key componentUniqueKey,
 	return job
 }
 
-func renderSecretWithPwd(key componentUniqueKey, username, passwd string) *corev1.Secret {
-	secretData := map[string][]byte{
-		constant.AccountNameForSecret:   []byte(username),
-		constant.AccountPasswdForSecret: []byte(passwd),
-	}
+func getTargetPods(ctx context.Context, r client.Client, action *appsv1alpha1.Action, roles []appsv1alpha1.ReplicaRole, compKey *compUniqueKey) (*corev1.PodList, error) {
 
-	ml := getLabelsForSecretsAndJobs(key)
-	ml[constant.ClusterAccountLabelKey] = username
-	return renderSecret(key, username, ml, secretData)
-}
+	podList := &corev1.PodList{}
+	labels := constant.GetComponentWellKnownLabels(compKey.clusterName, compKey.compName)
 
-func renderSecretByCopy(key componentUniqueKey, username string, fromSecret *corev1.Secret) *corev1.Secret {
-	ml := getLabelsForSecretsAndJobs(key)
-	ml[constant.ClusterAccountLabelKey] = username
-	return renderSecret(key, username, ml, fromSecret.Data)
-}
-
-func renderSecret(key componentUniqueKey, username string, labels client.MatchingLabels, data map[string][]byte) *corev1.Secret {
-	// secret labels and secret finalizers should be consistent with that of Cluster secret created by Cluster Controller.
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:  key.namespace,
-			Name:       constant.GenerateAccountSecretName(key.clusterName, key.componentName, username),
-			Labels:     labels,
-			Finalizers: []string{constant.DBClusterFinalizerName},
-		},
-		Data: data,
-	}
-	return secret
-}
-
-func retrieveEndpoints(scope appsv1alpha1.ProvisionScope, svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) []string {
-	// parse endpoints
-	endpoints := make([]string, 0)
-	if scope == appsv1alpha1.AnyPods {
-		for _, ss := range svcEP.Subsets {
-			for _, add := range ss.Addresses {
-				endpoints = append(endpoints, add.IP)
-				break
+	switch action.TargetPodSelector {
+	case appsv1alpha1.RoleSelector:
+		if roles == nil {
+			return nil, fmt.Errorf("no roles found in component definition")
+		}
+		roleName := ""
+		for _, role := range roles {
+			if role.Serviceable && role.Writable {
+				roleName = role.Name
 			}
 		}
-	} else {
-		for _, ss := range headlessEP.Subsets {
-			for _, add := range ss.Addresses {
-				endpoints = append(endpoints, add.IP)
+		if roleName == "" {
+			return nil, fmt.Errorf("no writable role found in component definition")
+		}
+
+		labels[constant.RoleLabelKey] = roleName
+		if err := r.List(ctx, podList, client.InNamespace(compKey.namespace), client.MatchingLabels(labels)); err != nil {
+			return nil, err
+		}
+		return podList, nil
+	case appsv1alpha1.AnyReplica, appsv1alpha1.AllReplicas:
+		if err := r.List(ctx, podList, client.InNamespace(compKey.namespace), client.MatchingLabels(labels)); err != nil {
+			return nil, err
+		}
+		if action.TargetPodSelector == appsv1alpha1.AllReplicas {
+			return podList, nil
+		}
+
+		for _, p := range podList.Items {
+			if p.Status.Phase == corev1.PodRunning {
+				return &corev1.PodList{Items: []corev1.Pod{p}}, nil
 			}
 		}
+		return nil, fmt.Errorf("no running pod found for component %s", compKey.compName)
 	}
-	return endpoints
+	return nil, fmt.Errorf("unsupported target pod selector")
 }
 
-func getAcctFromSecretAndJobs(secrets *corev1.SecretList, jobs *batchv1.JobList) (detectedFacts appsv1alpha1.KBAccountType) {
-	detectedFacts = appsv1alpha1.KBAccountInvalid
-	// parse account name from secret's label
-	for _, secret := range secrets.Items {
-		if accountName, exists := secret.ObjectMeta.Labels[constant.ClusterAccountLabelKey]; exists {
-			updateFacts(appsv1alpha1.AccountName(accountName), &detectedFacts)
-		}
-	}
-	// parse account name from job's label
-	for _, job := range jobs.Items {
-		if accountName, exists := job.ObjectMeta.Labels[constant.ClusterAccountLabelKey]; exists {
-			updateFacts(appsv1alpha1.AccountName(accountName), &detectedFacts)
-		}
-	}
-	return
-}
-
-func updateFacts(accountName appsv1alpha1.AccountName, detectedFacts *appsv1alpha1.KBAccountType) {
-	switch accountName {
-	case appsv1alpha1.AdminAccount:
-		*detectedFacts |= appsv1alpha1.KBAccountAdmin
-	case appsv1alpha1.DataprotectionAccount:
-		*detectedFacts |= appsv1alpha1.KBAccountDataprotection
-	case appsv1alpha1.ProbeAccount:
-		*detectedFacts |= appsv1alpha1.KBAccountProbe
-	case appsv1alpha1.MonitorAccount:
-		*detectedFacts |= appsv1alpha1.KBAccountMonitor
-	case appsv1alpha1.ReplicatorAccount:
-		*detectedFacts |= appsv1alpha1.KBAccountReplicator
-	}
-}
-
-func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.PasswordConfig,
-	accountConfig appsv1alpha1.SystemAccountConfig, strategy updateStrategy) ([]string, string) {
-	// generated password with mixedcases = true
-	passwd, _ := password.Generate((int)(passConfig.Length), (int)(passConfig.NumDigits), (int)(passConfig.NumSymbols), false, false)
-	// refine password to upper or lower cases w.r.t configuration
-	switch passConfig.LetterCase {
-	case appsv1alpha1.UpperCases:
-		passwd = strings.ToUpper(passwd)
-	case appsv1alpha1.LowerCases:
-		passwd = strings.ToLower(passwd)
-	}
-
-	userName := (string)(accountConfig.Name)
+func getCreationStmtForAccount(userName string, passwd string, stmts string, strategy updateStrategy) []string {
 
 	namedVars := getEnvReplacementMapForAccount(userName, passwd)
 
 	execStmts := make([]string, 0)
 
-	statements := accountConfig.ProvisionPolicy.Statements
+	// if strategy == inPlaceUpdate && len(statements.UpdateStatement) == 0 {
+	// 	// if update statement is empty, use reCreate strategy, which will drop and create the account.
+	// 	strategy = reCreate
+	// 	klog.Warningf("account %s in cluster %s exists, but its update statement is not set, will use %s strategy to update account.", userName, key.clusterName, strategy)
+	// }
 
-	if strategy == inPlaceUpdate && len(statements.UpdateStatement) == 0 {
-		// if update statement is empty, use reCreate strategy, which will drop and create the account.
-		strategy = reCreate
-		klog.Warningf("account %s in cluster %s exists, but its update statement is not set, will use %s strategy to update account.", userName, key.clusterName, strategy)
-	}
-
-	if strategy == inPlaceUpdate {
-		// use update statement
-		stmt := componetutil.ReplaceNamedVars(namedVars, statements.UpdateStatement, -1, true)
-		execStmts = append(execStmts, stmt)
-	} else {
-		// drop if exists + create if not exists
-		if len(statements.DeletionStatement) > 0 {
-			stmt := componetutil.ReplaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
-			execStmts = append(execStmts, stmt)
-		}
-		stmt := componetutil.ReplaceNamedVars(namedVars, statements.CreationStatement, -1, true)
-		execStmts = append(execStmts, stmt)
-	}
+	// if strategy == inPlaceUpdate {
+	// 	// use update statement
+	// 	stmt := componetutil.ReplaceNamedVars(namedVars, statements.UpdateStatement, -1, true)
+	// 	execStmts = append(execStmts, stmt)
+	// } else {
+	// 	// drop if exists + create if not exists
+	// 	if len(statements.DeletionStatement) > 0 {
+	// 		stmt := componetutil.ReplaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
+	// 		execStmts = append(execStmts, stmt)
+	// 	}
+	// 	stmt := componetutil.ReplaceNamedVars(namedVars, statements.CreationStatement, -1, true)
+	// 	execStmts = append(execStmts, stmt)
+	// }
 	// secret := renderSecretWithPwd(key, userName, passwd)
-	return execStmts, passwd
-}
-
-func getAllSysAccounts() []appsv1alpha1.AccountName {
-	return []appsv1alpha1.AccountName{
-		appsv1alpha1.AdminAccount,
-		appsv1alpha1.DataprotectionAccount,
-		appsv1alpha1.ProbeAccount,
-		appsv1alpha1.MonitorAccount,
-		appsv1alpha1.ReplicatorAccount,
-	}
-}
-
-func getDefaultAccounts() appsv1alpha1.KBAccountType {
-	accountID := appsv1alpha1.KBAccountInvalid
-	for _, name := range getAllSysAccounts() {
-		accountID |= name.GetAccountID()
-	}
-	return accountID
+	stmt := componetutil.ReplaceNamedVars(namedVars, stmts, -1, true)
+	execStmts = append(execStmts, stmt)
+	return execStmts
 }
 
 func getDebugMode(annotatedDebug string) bool {
@@ -311,11 +175,11 @@ func getDebugMode(annotatedDebug string) bool {
 	return viper.GetBool(systemAccountsDebugMode) || debugOn
 }
 
-func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, compKey componentUniqueKey, account appsv1alpha1.AccountName) error {
+func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, accountName string) error {
 	debugModeOn := getDebugMode(cluster.Annotations[debugClusterAnnotationKey])
 	// add label
-	ml := getLabelsForSecretsAndJobs(compKey)
-	ml[constant.ClusterAccountLabelKey] = (string)(account)
+	ml := client.MatchingLabels(constant.GetComponentWellKnownLabels(cluster.Name, getCompNameShort(comp)))
+	ml[constant.ClusterAccountLabelKey] = accountName
 	job.ObjectMeta.Labels = ml
 
 	// if debug mode is on, jobs will retain after execution.
@@ -326,35 +190,19 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 		job.Spec.TTLSecondsAfterFinished = &defaultTTLZero
 	}
 
-	// add toleration
-	clusterComp := cluster.Spec.GetComponentByName(compKey.componentName)
-	tolerations, err := componetutil.BuildTolerations(cluster, clusterComp)
-	if err != nil {
-		return err
+	// build tolerations
+	tolerations := cluster.Spec.Tolerations
+	if len(comp.Spec.Tolerations) != 0 {
+		tolerations = comp.Spec.Tolerations
+	}
+	// build data plane tolerations from config
+	var dpTolerations []corev1.Toleration
+	if val := viper.GetString(constant.CfgKeyDataPlaneTolerations); val != "" {
+		if err := json.Unmarshal([]byte(val), &dpTolerations); err != nil {
+			return err
+		}
+		tolerations = append(tolerations, dpTolerations...)
 	}
 	job.Spec.Template.Spec.Tolerations = tolerations
-
 	return nil
-}
-
-// completeExecConfig overrides the image of execConfig if version is not nil.
-func completeExecConfig(execConfig *appsv1alpha1.CmdExecutorConfig, version *appsv1alpha1.ClusterComponentVersion) {
-	if version == nil || version.SystemAccountSpec == nil || version.SystemAccountSpec.CmdExecutorConfig == nil {
-		return
-	}
-	sysAccountSpec := version.SystemAccountSpec
-	if len(sysAccountSpec.CmdExecutorConfig.Image) > 0 {
-		execConfig.Image = sysAccountSpec.CmdExecutorConfig.Image
-	}
-
-	// envs from sysAccountSpec will override the envs from execConfig
-	if sysAccountSpec.CmdExecutorConfig.Env == nil {
-		return
-	}
-	if len(sysAccountSpec.CmdExecutorConfig.Env) == 0 {
-		// clean up envs
-		execConfig.Env = nil
-	} else {
-		execConfig.Env = sysAccountSpec.CmdExecutorConfig.Env
-	}
 }

@@ -95,6 +95,7 @@ const (
 	ReadyWithoutPrimaryKey                   = "kubeblocks.io/ready-without-primary"
 	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
+	ComponentAccountProvisionKey             = "account.kubeblocks.io/provision-status"
 	KBAppClusterUIDLabelKey                  = "apps.kubeblocks.io/cluster-uid"
 	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
 	KBAppShardingNameLabelKey                = "apps.kubeblocks.io/sharding-name"
@@ -302,6 +303,16 @@ const (
 const (
 	AccountNameForSecret   = "username"
 	AccountPasswdForSecret = "password"
+)
+
+const (
+	AccountInited          = "Inited"
+	AccountProvisioning    = "Provisioning"
+	AccountProvisioned     = "Provisioned"
+	AccountProvisionFailed = "ProvisionFailed"
+)
+const (
+	ComponentStatusDefaultPodName = "Unknown"
 )
 
 const (

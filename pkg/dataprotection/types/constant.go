@@ -90,6 +90,8 @@ const (
 	DPDBPort = "DP_DB_PORT"
 	// DPTargetPodName the target pod name
 	DPTargetPodName = "DP_TARGET_POD_NAME"
+	// DPTargetPodRole the target pod role
+	DPTargetPodRole = "DP_TARGET_POD_ROLE"
 	// DPBackupBasePath the base path for backup data in the storage
 	DPBackupBasePath = "DP_BACKUP_BASE_PATH"
 	// DPBackupName backup CR name
@@ -102,6 +104,8 @@ const (
 	DPBackupInfoFile = "DP_BACKUP_INFO_FILE"
 	// DPTimeFormat golang time format string
 	DPTimeFormat = "DP_TIME_FORMAT"
+	// DPTimeZone golang time zone string
+	DPTimeZone = "DP_TIME_ZONE"
 	// DPBackupStopTime backup stop time
 	DPBackupStopTime = "DP_BACKUP_STOP_TIME" // backup stop time
 	// DPDatasafedBinPath the path containing the datasafed binary
@@ -115,6 +119,7 @@ const (
 )
 
 const (
+	BackupKind             = "Backup"
 	RestoreKind            = "Restore"
 	DataprotectionAPIGroup = "dataprotection.kubeblocks.io"
 	KopiaRepoFolderName    = "kopia"

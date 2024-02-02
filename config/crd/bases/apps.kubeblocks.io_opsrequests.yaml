@@ -605,7 +605,8 @@ spec:
                 - message: forbidden to update spec.restoreFrom
                   rule: self == oldSelf
               restoreSpec:
-                description: restoreSpec defines how to restore the cluster.
+                description: restoreSpec defines how to restore the cluster. note
+                  that this restore operation will roll back cluster services.
                 properties:
                   backupName:
                     description: backupName is the name of the backup.

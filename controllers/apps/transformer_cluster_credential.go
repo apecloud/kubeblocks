@@ -54,8 +54,8 @@ func (t *clusterConnCredentialTransformer) Transform(ctx graph.TransformContext,
 }
 
 func (t *clusterConnCredentialTransformer) isLegacyCluster(transCtx *clusterTransformContext) bool {
-	for _, comp := range transCtx.ComponentSpecs {
-		compDef, ok := transCtx.ComponentDefs[comp.ComponentDef]
+	for _, compSpec := range transCtx.ComponentSpecs {
+		compDef, ok := transCtx.ComponentDefs[compSpec.ComponentDef]
 		if ok && (len(compDef.UID) > 0 || !compDef.CreationTimestamp.IsZero()) {
 			return false
 		}

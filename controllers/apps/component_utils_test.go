@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -143,37 +142,6 @@ var _ = Describe("Component Utils", func() {
 				Expect(gvk.Kind).Should(Equal("StatefulSet"))
 			})
 		})
-
-		// TODO(xingran: add test case for updateCustomLabelToObjs func
-		Context("updateCustomLabelToPods func", func() {
-			It("should work well", func() {
-				_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
-					clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
-				sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
-				pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
-				mockLabelKey := "mock-label-key"
-				mockLabelPlaceHolderValue := fmt.Sprintf("%s-%s",
-					constant.EnvPlaceHolder(constant.KBEnvClusterName), constant.EnvPlaceHolder(constant.KBEnvCompName))
-				customLabels := map[string]string{
-					mockLabelKey: mockLabelPlaceHolderValue,
-				}
-				comp := &component.SynthesizedComponent{
-					Name:   consensusCompName,
-					Labels: customLabels,
-				}
-
-				dag := graph.NewDAG()
-				dag.AddVertex(&model.ObjectVertex{Obj: pods[0], Action: model.ActionUpdatePtr()})
-				Expect(UpdateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
-				graphCli := model.NewGraphClient(k8sClient)
-				podList := graphCli.FindAll(dag, &corev1.Pod{})
-				Expect(podList).Should(HaveLen(3))
-				for _, pod := range podList {
-					Expect(pod.GetLabels()).ShouldNot(BeNil())
-					Expect(pod.GetLabels()[mockLabelKey]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, comp.Name)))
-				}
-			})
-		})
 	})
 
 	Context("test mergeServiceAnnotations", func() {
@@ -219,6 +187,36 @@ var _ = Describe("Component Utils", func() {
 				GetObject()
 			controllerutil.ResolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
 			Expect(reflect.DeepEqual(pod.Spec, ppod.Spec)).Should(BeTrue())
+		})
+	})
+
+	// TODO(xingran: add test case for updateCustomLabelToObjs func
+	Context("updateCustomLabelToPods func", func() {
+		It("should work well", func() {
+			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
+				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
+			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
+			pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
+			mockLabelKey := "mock-label-key"
+			mockLabelValue := "mock-label-value"
+			customLabels := map[string]string{
+				mockLabelKey: mockLabelValue,
+			}
+			comp := &component.SynthesizedComponent{
+				Name:   consensusCompName,
+				Labels: customLabels,
+			}
+
+			dag := graph.NewDAG()
+			dag.AddVertex(&model.ObjectVertex{Obj: pods[0], Action: model.ActionUpdatePtr()})
+			Expect(UpdateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
+			graphCli := model.NewGraphClient(k8sClient)
+			podList := graphCli.FindAll(dag, &corev1.Pod{})
+			Expect(podList).Should(HaveLen(3))
+			for _, pod := range podList {
+				Expect(pod.GetLabels()).ShouldNot(BeNil())
+				Expect(pod.GetLabels()[mockLabelKey]).Should(Equal(mockLabelValue))
+			}
 		})
 	})
 })

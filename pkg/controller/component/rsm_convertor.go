@@ -76,11 +76,39 @@ type rsmMembershipReconfigurationConvertor struct{}
 // rsmMemberUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.MemberUpdateStrategy.
 type rsmMemberUpdateStrategyConvertor struct{}
 
+func (c *rsmMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
+	synthesizeComp, err := parseRSMConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	return getMemberUpdateStrategy(synthesizeComp), nil
+}
+
 // rsmPodManagementPolicyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.PodManagementPolicy.
 type rsmPodManagementPolicyConvertor struct{}
 
+func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
+	// componentDefinition does not define PodManagementPolicy and StatefulSetUpdateStrategy.
+	// The Parallel strategy is used by default here. If necessary, the componentDefinition API can be expanded later
+	return appsv1.ParallelPodManagement, nil
+}
+
 // rsmUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.UpdateStrategy.
 type rsmUpdateStrategyConvertor struct{}
+
+func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseRSMConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	if getMemberUpdateStrategy(synthesizedComp) != nil {
+		// appsv1.OnDeleteStatefulSetStrategyType is the default value if member update strategy is set.
+		return appsv1.StatefulSetUpdateStrategy{
+			Type: appsv1.OnDeleteStatefulSetStrategyType,
+		}, nil
+	}
+	return nil, nil
+}
 
 // parseRSMConvertorArgs parses the args of rsm convertor.
 func parseRSMConvertorArgs(args ...any) (*SynthesizedComponent, error) {
@@ -89,6 +117,27 @@ func parseRSMConvertorArgs(args ...any) (*SynthesizedComponent, error) {
 		return nil, errors.New("args[0] not a SynthesizedComponent object")
 	}
 	return synthesizeComp, nil
+}
+
+func getMemberUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.MemberUpdateStrategy {
+	if synthesizedComp.UpdateStrategy == nil {
+		return nil
+	}
+	var (
+		serial                   = workloads.SerialUpdateStrategy
+		parallelUpdate           = workloads.ParallelUpdateStrategy
+		bestEffortParallelUpdate = workloads.BestEffortParallelUpdateStrategy
+	)
+	switch *synthesizedComp.UpdateStrategy {
+	case appsv1alpha1.SerialStrategy:
+		return &serial
+	case appsv1alpha1.ParallelStrategy:
+		return &parallelUpdate
+	case appsv1alpha1.BestEffortParallelStrategy:
+		return &bestEffortParallelUpdate
+	default:
+		return nil
+	}
 }
 
 // rsmServiceConvertor converts the given object into ReplicatedStateMachine.Spec.Service.
@@ -227,39 +276,6 @@ func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
 }
 
 func (c *rsmMembershipReconfigurationConvertor) convert(args ...any) (any, error) {
-	// synthesizeComp, err := parseRSMConvertorArgs(args...)
-	return "", nil // TODO
-}
-
-func (c *rsmMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
-	synthesizeComp, err := parseRSMConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-	var memberUpdateStrategy *workloads.MemberUpdateStrategy
-	if synthesizeComp.UpdateStrategy != nil {
-		switch *synthesizeComp.UpdateStrategy {
-		case appsv1alpha1.SerialStrategy:
-			memberSerialUpdateStrategy := workloads.SerialUpdateStrategy
-			memberUpdateStrategy = &memberSerialUpdateStrategy
-		case appsv1alpha1.ParallelStrategy:
-			memberParallelUpdateStrategy := workloads.ParallelUpdateStrategy
-			memberUpdateStrategy = &memberParallelUpdateStrategy
-		case appsv1alpha1.BestEffortParallelStrategy:
-			memberBestEffortParallelUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
-			memberUpdateStrategy = &memberBestEffortParallelUpdateStrategy
-		}
-	}
-	return memberUpdateStrategy, nil
-}
-
-func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
-	// componentDefinition does not define PodManagementPolicy and StatefulSetUpdateStrategy.
-	// The Parallel strategy is used by default here. If necessary, the componentDefinition API can be expanded later
-	return appsv1.ParallelPodManagement, nil
-}
-
-func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	// synthesizeComp, err := parseRSMConvertorArgs(args...)
 	return "", nil // TODO
 }

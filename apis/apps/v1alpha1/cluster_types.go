@@ -57,16 +57,24 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Required
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
-	// List of componentSpecs you want to replace in ClusterDefinition and ClusterVersion. It will replace the field in ClusterDefinition's and ClusterVersion's component if type is matching.
+	// List of ShardingSpec which is used to define components with a sharding topology structure that make up a cluster.
+	// ShardingSpecs and ComponentSpecs cannot both be empty at the same time.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	// +optional
+	ShardingSpecs []ShardingSpec `json:"shardingSpecs,omitempty"`
+
+	// List of componentSpec which is used to define the components that make up a cluster.
+	// ComponentSpecs and ShardingSpecs cannot both be empty at the same time.
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="duplicated component"
 	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, has(c.componentDef))) == 0) || self.all(x, size(self.filter(c, has(c.componentDef))) == size(self))",message="two kinds of definition API can not be used simultaneously"
+	// +optional
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// services defines the services to access a cluster.
@@ -278,23 +286,52 @@ type ClusterStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// ShardingSpec defines the sharding spec.
+type ShardingSpec struct {
+	// name defines sharding name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
+	// The name is also used to generate the name of the underlying components with the naming pattern <ShardingSpec.Name>-<ShardID>.
+	// At the same time, the name of component template defined in ShardingSpec.Template.Name will be ignored.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=15
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	Name string `json:"name"`
+
+	// template defines the component template.
+	// A ShardingSpec generates a set of components (also called shards) based on the component template, and this group of components or shards have the same specifications and definitions.
+	// +kubebuilder:validation:Required
+	Template ClusterComponentSpec `json:"template"`
+
+	// shards indicates the number of component, and these components have the same specifications and definitions.
+	// It should be noted that the number of replicas for each component should be defined by template.replicas.
+	// Moreover, the logical relationship between these components should be maintained by the components themselves,
+	// KubeBlocks only provides the following capabilities for managing the lifecycle of sharding:
+	// 1. When the number of shards increases, the postProvision Action defined in the ComponentDefinition will be executed if the conditions are met.
+	// 2. When the number of shards decreases, the preTerminate Action defined in the ComponentDefinition will be executed if the conditions are met.
+	//    Additionally, the resources and data associated with the corresponding Component will be deleted as well.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=2048
+	Shards int32 `json:"shards,omitempty"`
+}
+
 // ClusterComponentSpec defines the cluster component spec.
 // +kubebuilder:validation:XValidation:rule="has(self.componentDefRef) || has(self.componentDef)",message="either componentDefRef or componentDef should be provided"
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
+// //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
+// //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
-	// name defines cluster's component name, this name is also part of Service DNS name, so this name will
-	// comply with IANA Service Naming rule.
-	// +kubebuilder:validation:Required
+	// name defines cluster's component name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
+	// When ClusterComponentSpec is referenced as a template, name is optional. Otherwise, it is required.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	// +optional
 	Name string `json:"name"`
 
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to comply with IANA Service Naming rule.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
+	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
@@ -302,11 +339,12 @@ type ClusterComponentSpec struct {
 	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
+	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
+	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
@@ -381,6 +419,7 @@ type ClusterComponentSpec struct {
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// updateStrategy defines the update strategy for the component.
+	// Not supported.
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 

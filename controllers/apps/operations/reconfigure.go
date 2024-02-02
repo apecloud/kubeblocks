@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -88,9 +89,9 @@ func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedC
 	}
 }
 
-func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, configSpec appsv1alpha1.ConfigurationItem, componentName string) (*intctrlutil.Fetcher, error) {
+func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, configSpec appsv1alpha1.ConfigurationItem, componentName string) (*configctrl.Fetcher, error) {
 	ops := &opsRes.OpsRequest.Spec
-	fetcher := intctrlutil.NewResourceFetcher(&intctrlutil.ResourceCtx{
+	fetcher := configctrl.NewResourceFetcher(&configctrl.ResourceCtx{
 		Context:       reqCtx.Ctx,
 		Client:        cli,
 		Namespace:     opsRes.Cluster.Namespace,
@@ -297,7 +298,7 @@ func syncStatus(reconfiguringStatus *appsv1alpha1.ReconfiguringStatus,
 	return err
 }
 
-func reconfiguringPhase(resource *intctrlutil.Fetcher,
+func reconfiguringPhase(resource *configctrl.Fetcher,
 	detail appsv1alpha1.ConfigurationItemDetail,
 	status *appsv1alpha1.ConfigurationItemDetailStatus) appsv1alpha1.ConfigurationPhase {
 	if status.ReconcileDetail == nil || status.ReconcileDetail.CurrentRevision != status.UpdateRevision {

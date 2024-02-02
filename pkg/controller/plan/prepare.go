@@ -26,12 +26,11 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // RenderConfigNScriptFiles generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
 // and generates configManager sidecar for the reconfigure operation.
-func RenderConfigNScriptFiles(resourceCtx *intctrlutil.ResourceCtx,
+func RenderConfigNScriptFiles(resourceCtx *configuration.ResourceCtx,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,

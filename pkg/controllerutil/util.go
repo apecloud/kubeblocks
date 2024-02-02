@@ -99,8 +99,8 @@ func IsNil(i interface{}) bool {
 	return false
 }
 
-// MergeMetadataMap merges two map[string]string, the targetMap will be updated.
-func MergeMetadataMap(originalMap map[string]string, targetMap *map[string]string) {
+// MergeMetadataMapInplace merges two map[string]string, the targetMap will be updated.
+func MergeMetadataMapInplace(originalMap map[string]string, targetMap *map[string]string) {
 	if targetMap == nil || originalMap == nil {
 		return
 	}
@@ -113,6 +113,22 @@ func MergeMetadataMap(originalMap map[string]string, targetMap *map[string]strin
 			(*targetMap)[k] = v
 		}
 	}
+}
+
+// MergeMetadataMaps merges targetMaps into originalMap if item not exist in originalMap and return the merged map.
+func MergeMetadataMaps(originalMap map[string]string, targetMaps ...map[string]string) map[string]string {
+	mergeMap := map[string]string{}
+	for k, v := range originalMap {
+		mergeMap[k] = v
+	}
+	for _, targetMap := range targetMaps {
+		for k, v := range targetMap {
+			if _, ok := mergeMap[k]; !ok {
+				mergeMap[k] = v
+			}
+		}
+	}
+	return mergeMap
 }
 
 var innerScheme, _ = appsv1alpha1.SchemeBuilder.Build()

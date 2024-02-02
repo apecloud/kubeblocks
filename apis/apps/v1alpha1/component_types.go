@@ -34,6 +34,7 @@ type ComponentSpec struct {
 	CompDef string `json:"compDef"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
+	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
@@ -56,7 +57,7 @@ type ComponentSpec struct {
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Component replicas. The default value is used in ClusterDefinition spec if not specified.
+	// Replicas specifies the desired number of replicas for the component's workload.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
@@ -64,10 +65,6 @@ type ComponentSpec struct {
 
 	// +optional
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
-
-	//// Services expose endpoints that can be accessed by clients.
-	//// +optional
-	// Services []ClusterComponentService `json:"services,omitempty"`
 
 	// monitor is a switch to enable monitoring and is set as false by default.
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
@@ -77,23 +74,23 @@ type ComponentSpec struct {
 	// +optional
 	Monitor bool `json:"monitor,omitempty"`
 
-	// enabledLogs indicates which log file takes effect in the database cluster.
-	// element is the log type which is defined in ComponentDefinition logConfig.name,
-	// and will set relative variables about this log type in database kernel.
+	// enabledLogs indicates which log file takes effect in the database cluster,
+	// element is the log type which is defined in ComponentDefinition logConfig.name.
 	// +listType=set
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
-
-	// +optional
-	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// serviceAccountName is the name of the ServiceAccount that running component depends on.
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
+	// Affinity specifies the scheduling constraints for the component's workload.
+	// If specified, it will override the cluster-wide affinity.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
+	// Tolerations specify the tolerations for the component's workload.
+	// If specified, they will override the cluster-wide toleration settings.
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 

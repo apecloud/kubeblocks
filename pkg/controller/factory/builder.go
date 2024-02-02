@@ -30,6 +30,7 @@ import (
 
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -66,6 +67,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 		labels = constant.GetKBWellKnownLabels(clusterDefName, clusterName, compName)
 		compDefLabel = constant.GetClusterCompDefLabel(clusterCompDefName)
 	}
+	mergeLabels := intctrlutil.MergeMetadataMaps(labels, compDefLabel, synthesizedComp.Labels)
 
 	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
 	podBuilder := builder.NewPodBuilder("", "").
@@ -81,11 +83,11 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	rsmBuilder := builder.NewReplicatedStateMachineBuilder(namespace, rsmName).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.ClusterGeneration).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp)).
-		AddLabelsInMap(labels).
-		AddLabelsInMap(compDefLabel).
+		AddLabelsInMap(mergeLabels).
 		AddMatchLabelsInMap(labels).
 		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
 		SetReplicas(synthesizedComp.Replicas).
+		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
 		SetRsmTransformPolicy(synthesizedComp.RsmTransformPolicy).
 		SetNodeAssignment(synthesizedComp.NodesAssignment).
 		SetTemplate(template)
@@ -183,6 +185,11 @@ func randomString(length int) string {
 	return rand.String(length)
 }
 
+func strongRandomString(length int) string {
+	str, _ := password.Generate(length, 1, 1, false, false)
+	return str
+}
+
 func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
 	synthesizedComp *component.SynthesizedComponent) *corev1.Secret {
 	wellKnownLabels := constant.GetKBWellKnownLabels(clusterDefinition.Name, cluster.Name, "")
@@ -264,6 +271,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
 	uuidHex := hex.EncodeToString(uuidBytes)
 	randomPassword := randomString(8)
+	strongRandomPasswd := strongRandomString(16)
 	restorePassword := getRestorePassword()
 	// check if a connection password is specified during recovery.
 	// if exists, replace the random password
@@ -271,12 +279,13 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		randomPassword = restorePassword
 	}
 	m := map[string]string{
-		"$(RANDOM_PASSWD)": randomPassword,
-		"$(UUID)":          uuidStr,
-		"$(UUID_B64)":      uuidB64,
-		"$(UUID_STR_B64)":  uuidStrB64,
-		"$(UUID_HEX)":      uuidHex,
-		"$(SVC_FQDN)":      constant.GenerateDefaultComponentServiceName(cluster.Name, synthesizedComp.Name),
+		"$(RANDOM_PASSWD)":        randomPassword,
+		"$(STRONG_RANDOM_PASSWD)": strongRandomPasswd,
+		"$(UUID)":                 uuidStr,
+		"$(UUID_B64)":             uuidB64,
+		"$(UUID_STR_B64)":         uuidStrB64,
+		"$(UUID_HEX)":             uuidHex,
+		"$(SVC_FQDN)":             constant.GenerateDefaultComponentServiceName(cluster.Name, synthesizedComp.Name),
 		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(cluster.Name, synthesizedComp.Name),
 		"$(HEADLESS_SVC_FQDN)":                                 constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, synthesizedComp.Name),
 	}

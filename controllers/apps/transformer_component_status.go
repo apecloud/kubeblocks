@@ -225,7 +225,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	}
 
 	// patch the current componentSpec workload's custom labels
-	// TODO(xingran): should be move this to rsm controller, and add custom annotations support. then add a independent transformer to deal with component level custom labels and annotations.
+	// TODO(xingran): should move this to rsm controller, and add custom annotations support. then add a independent transformer to deal with component level custom labels and annotations.
 	if err := UpdateCustomLabelToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
 		r.reqCtx.Event(r.cluster, corev1.EventTypeWarning, "Component Controller PatchWorkloadCustomLabelFailed", err.Error())
 		return err
@@ -269,7 +269,7 @@ func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool,
 
 	hasPodAvailable := false
 	for _, pod := range pods {
-		if !podutils.IsPodAvailable(pod, 0, metav1.Time{Time: time.Now()}) {
+		if !podutils.IsPodAvailable(pod, r.runningRSM.Spec.MinReadySeconds, metav1.Time{Time: time.Now()}) {
 			continue
 		}
 		if shouldCheckRole && hasLeaderRoleLabel(pod) {
@@ -290,6 +290,7 @@ func (r *componentStatusHandler) isRSMRunning() (bool, error) {
 	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
 		return false, err
 	} else if !isLatestRevision {
+		r.reqCtx.Log.Info("rsm underlying workload is not the latest revision")
 		return false, nil
 	}
 

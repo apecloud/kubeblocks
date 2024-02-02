@@ -25,14 +25,13 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type configOperator struct {
 	ReconcileCtx
 }
 
-func NewConfigReconcileTask(resourceCtx *intctrlutil.ResourceCtx,
+func NewConfigReconcileTask(resourceCtx *ResourceCtx,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,

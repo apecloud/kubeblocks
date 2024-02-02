@@ -28,6 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // ClusterAPINormalizationTransformer handles cluster and component API conversion.
@@ -43,19 +44,35 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 
 	// build all component specs
 	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	transCtx.ShardingComponentSpecs = make(map[string][]*appsv1alpha1.ClusterComponentSpec, 0)
+	transCtx.Labels = make(map[string]map[string]string, 0)
 	cluster := transCtx.Cluster
-
-	// validate componentDef and componentDefRef
-	if err := validateComponentDefNComponentDefRef(cluster); err != nil {
-		return err
-	}
 
 	for i := range cluster.Spec.ComponentSpecs {
 		clusterComSpec := cluster.Spec.ComponentSpecs[i]
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
 	}
+	for i := range cluster.Spec.ShardingSpecs {
+		shardingSpec := cluster.Spec.ShardingSpecs[i]
+		genShardingCompSpecList, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &shardingSpec)
+		if err != nil {
+			return err
+		}
+		transCtx.ShardingComponentSpecs[shardingSpec.Name] = genShardingCompSpecList
+		for j := range genShardingCompSpecList {
+			genShardCompSpec := genShardingCompSpecList[j]
+			transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, genShardCompSpec)
+			transCtx.Labels[genShardCompSpec.Name] = constant.GetShardingNameLabel(shardingSpec.Name)
+		}
+	}
+
 	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)
+	}
+
+	// validate componentDef and componentDefRef
+	if err := validateComponentDefNComponentDefRef(transCtx); err != nil {
+		return err
 	}
 
 	// build all component definitions referenced
@@ -81,12 +98,12 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	return nil
 }
 
-func validateComponentDefNComponentDefRef(cluster *appsv1alpha1.Cluster) error {
-	if len(cluster.Spec.ComponentSpecs) == 0 {
+func validateComponentDefNComponentDefRef(transCtx *clusterTransformContext) error {
+	if len(transCtx.ComponentSpecs) == 0 {
 		return nil
 	}
 	hasCompDef := false
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
+	for _, compSpec := range transCtx.ComponentSpecs {
 		if len(compSpec.ComponentDefRef) == 0 && len(compSpec.ComponentDef) == 0 {
 			return fmt.Errorf("componentDef and componentDefRef cannot be both empty")
 		}

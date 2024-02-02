@@ -59,7 +59,7 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, nil, err
 	}
-	clusterCompSpec, err := getClusterCompSpec4Component(clusterDef, cluster, comp)
+	clusterCompSpec, err := getClusterCompSpec4Component(reqCtx.Ctx, cli, clusterDef, cluster, comp)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -107,7 +107,7 @@ func BuildSynthesizedComponentWrapper4Test(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	comp, err := BuildComponent(cluster, clusterCompSpec)
+	comp, err := BuildComponent(cluster, clusterCompSpec, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -155,15 +155,14 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		LogConfigs:         compDefObj.Spec.LogConfigs,
 		ConfigTemplates:    compDefObj.Spec.Configs,
 		ScriptTemplates:    compDefObj.Spec.Scripts,
-		Labels:             compDefObj.Spec.Labels,
 		Roles:              compDefObj.Spec.Roles,
 		UpdateStrategy:     compDefObj.Spec.UpdateStrategy,
+		MinReadySeconds:    compDefObj.Spec.MinReadySeconds,
 		PolicyRules:        compDefObj.Spec.PolicyRules,
 		LifecycleActions:   compDefObj.Spec.LifecycleActions,
 		SystemAccounts:     compDefObj.Spec.SystemAccounts,
 		RoleArbitrator:     compDefObj.Spec.RoleArbitrator,
 		Replicas:           comp.Spec.Replicas,
-		EnabledLogs:        comp.Spec.EnabledLogs,
 		TLSConfig:          comp.Spec.TLSConfig,
 		ServiceAccountName: comp.Spec.ServiceAccountName,
 		Nodes:              comp.Spec.Nodes,
@@ -193,6 +192,9 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
+	// build labels
+	buildLabels(compDef, comp, synthesizeComp)
+
 	// build volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
 
@@ -208,8 +210,9 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	buildServiceAccountName(synthesizeComp)
 
 	// build lorryContainer
+	// TODO(xingran): buildLorryContainers relies on synthesizeComp.CharacterType and synthesizeComp.WorkloadType, which will be deprecated in the future.
 	if err := buildLorryContainers(reqCtx, synthesizeComp, clusterCompSpec); err != nil {
-		reqCtx.Log.Error(err, "build probe container failed.")
+		reqCtx.Log.Error(err, "build lorry containers failed.")
 		return nil, err
 	}
 
@@ -254,6 +257,32 @@ func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1al
 		}
 	}
 	return mapping
+}
+
+// buildLabels builds labels for synthesizedComponent.
+func buildLabels(compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) {
+	replaceKBEnvPlaceholderTokens := func(clusterName, uid, componentName, strToReplace string) string {
+		builtInEnvMap := GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
+		return ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
+	}
+
+	labels := make(map[string]string)
+	if compDef.Labels == nil && comp.Labels == nil {
+		return
+	}
+
+	for k, v := range compDef.Spec.Labels {
+		resolveKey := replaceKBEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, k)
+		resolveValue := replaceKBEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, v)
+		labels[resolveKey] = resolveValue
+	}
+
+	// override labels from component
+	for k, v := range comp.Labels {
+		labels[k] = v
+	}
+
+	synthesizeComp.Labels = labels
 }
 
 // buildAffinitiesAndTolerations builds affinities and tolerations for component.

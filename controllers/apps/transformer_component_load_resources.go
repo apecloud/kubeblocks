@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 
+	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -60,7 +62,7 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	transCtx.Cluster = cluster
 
 	generated := false
-	generated, err = isGeneratedComponent(cluster, comp)
+	generated, err = isGeneratedComponent(transCtx.Context, transCtx.Client, cluster, comp)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
@@ -128,23 +130,40 @@ func (t *componentLoadResourcesTransformer) getNCheckCompDef(transCtx *component
 	return compDef, nil
 }
 
-func isGeneratedComponent(cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component) (bool, error) {
+// isGeneratedComponent checks if the component is generated from componentDefRef.
+// TODO: remove the dependency on cluster.Spec
+func isGeneratedComponent(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (bool, error) {
 	compName, err := component.ShortName(cluster.Name, comp.Name)
 	if err != nil {
 		return false, err
 	}
+
+	validateCompDef := func(compDefName string) (bool, error) {
+		if len(compDefName) > 0 {
+			if compDefName != comp.Spec.CompDef {
+				err = fmt.Errorf("component definitions referred in cluster and component are different: %s vs %s",
+					compDefName, comp.Spec.CompDef)
+			}
+			return false, err
+		}
+		return true, nil
+	}
+
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name == compName {
-			if len(compSpec.ComponentDef) > 0 {
-				if compSpec.ComponentDef != comp.Spec.CompDef {
-					err = fmt.Errorf("component definitions referred in cluster and component are different: %s vs %s",
-						compSpec.ComponentDef, comp.Spec.CompDef)
-				}
-				return false, err
-			}
-			return true, nil
+			return validateCompDef(compSpec.ComponentDef)
 		}
 	}
+
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		shardCompNames, err := ictrlutil.ListShardingCompNames(ctx, cli, cluster, &shardingSpec)
+		if err != nil {
+			return false, err
+		}
+		if slices.Contains(shardCompNames, compName) {
+			return validateCompDef(shardingSpec.Template.ComponentDef)
+		}
+	}
+
 	return true, fmt.Errorf("component %s is not found in cluster %s", compName, cluster.Name)
 }

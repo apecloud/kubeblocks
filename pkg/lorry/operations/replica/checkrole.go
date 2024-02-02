@@ -141,7 +141,7 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 	}
 
 	if err != nil {
-		s.logger.Info("executing checkRole error", "error", err)
+		s.logger.Info("executing checkRole error", "error", err.Error())
 		// do not return err, as it will cause readinessprobe to fail
 		err = nil
 		if s.CheckRoleFailedCount%s.FailedEventReportFrequency == 0 {

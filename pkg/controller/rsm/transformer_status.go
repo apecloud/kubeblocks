@@ -63,7 +63,7 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 			}
 			fliteredPods := FilterActivePods(pods.Items)
 			rsm.Status.Replicas = int32(len(fliteredPods))
-			readyReplicasCount, availableReplicasCount := calculateStatus(fliteredPods)
+			readyReplicasCount, availableReplicasCount := calculateStatus(rsm, fliteredPods)
 			rsm.Status.ReadyReplicas = int32(readyReplicasCount)
 			rsm.Status.AvailableReplicas = int32(availableReplicasCount)
 			rsm.Status.UpdatedReplicas = rsm.Status.Replicas
@@ -103,13 +103,13 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return nil
 }
 
-func calculateStatus(pods []*corev1.Pod) (int, int) {
+func calculateStatus(rsm *v1alpha1.ReplicatedStateMachine, pods []*corev1.Pod) (int, int) {
 	readyReplicasCount := 0
 	availableReplicasCount := 0
 	for _, pod := range pods {
 		if podutils.IsPodReady(pod) {
 			readyReplicasCount++
-			if podutils.IsPodAvailable(pod, 0, metav1.Now()) {
+			if podutils.IsPodAvailable(pod, rsm.Spec.MinReadySeconds, metav1.Now()) {
 				availableReplicasCount++
 			}
 		}

@@ -9,6 +9,8 @@ spec:
     value: /var/lib/mysql
   - name: IMAGE_TAG
     value: latest
+  - name: DP_TIME_FORMAT
+    value: "2006-01-02 15:04:05"
   backup:
     backupData:
       image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup:$(IMAGE_TAG)

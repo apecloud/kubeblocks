@@ -29,13 +29,12 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	probing "github.com/prometheus-community/pro-bing"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	dcs3 "github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Ha struct {
@@ -222,13 +221,7 @@ func (ha *Ha) Start() {
 	}
 
 	if !ha.disableDNSChecker {
-		isPodReady, err := ha.IsPodReady()
-		for err != nil || !isPodReady {
-			ha.logger.Info("Waiting for dns resolution to be ready")
-			time.Sleep(3 * time.Second)
-			isPodReady, err = ha.IsPodReady()
-		}
-		ha.logger.Info("dns resolution is ready")
+		util.WaitForPodReady(false)
 	}
 
 	ha.logger.Info(fmt.Sprintf("cluster: %v", cluster))
@@ -243,6 +236,8 @@ func (ha *Ha) Start() {
 			if err != nil {
 				ha.logger.Error(err, "Cluster initialize failed")
 			}
+		} else if err != nil {
+			ha.logger.Info("Initialize the database cluster Failed.", "error", err.Error())
 		}
 		time.Sleep(5 * time.Second)
 		isInitialized, err = ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
@@ -328,7 +323,8 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs3.Cluster) boo
 
 		if candidate == currentMemberName {
 			ha.logger.Info("manual switchover to current member", "member", candidate)
-			return true
+			isCurrentLagging, _ := ha.dbManager.IsMemberLagging(ctx, cluster, currentMember)
+			return !isCurrentLagging
 		}
 
 		if candidate != "" {
@@ -423,44 +419,17 @@ func (ha *Ha) DeleteCurrentMember(ctx context.Context, cluster *dcs3.Cluster) er
 	return ha.dcs.UpdateHaConfig()
 }
 
-// IsPodReady checks if pod is ready, it can successfully resolve domain
-func (ha *Ha) IsPodReady() (bool, error) {
-	domain := viper.GetString("KB_POD_FQDN")
-	pinger, err := probing.NewPinger(domain)
-	if err != nil {
-		ha.logger.Error(err, "new pinger failed")
-		return false, err
-	}
-
-	pinger.Count = 3
-	pinger.Timeout = 3 * time.Second
-	pinger.Interval = 500 * time.Millisecond
-	err = pinger.Run()
-	if err != nil {
-		// For container runtimes like Containerd, unprivileged users can't send icmp echo packets.
-		// As a temporary workaround, special handling is being implemented to bypass this limitation.
-		if strings.Contains(err.Error(), "socket: permission denied") {
-			ha.logger.Info("ping failed, socket: permission denied, but temporarily return true")
-			return true, nil
-		}
-		ha.logger.Error(err, fmt.Sprintf("ping domain:%s failed", domain))
-		return false, err
-	}
-
-	return true, nil
-}
-
 func (ha *Ha) isMinimumLag(ctx context.Context, cluster *dcs3.Cluster, member *dcs3.Member) bool {
 	isCurrentLagging, currentLag := ha.dbManager.IsMemberLagging(ctx, cluster, member)
-	if !isCurrentLagging {
-		return true
+	if isCurrentLagging {
+		return false
 	}
 
 	for _, m := range cluster.Members {
 		if m.Name != member.Name {
 			isLagging, lag := ha.dbManager.IsMemberLagging(ctx, cluster, &m)
 			// There are other members with smaller lag
-			if !isLagging || lag < currentLag {
+			if !isLagging && lag < currentLag {
 				return false
 			}
 		}

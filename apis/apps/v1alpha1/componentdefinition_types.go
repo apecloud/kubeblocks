@@ -205,6 +205,14 @@ type ComponentDefinitionSpec struct {
 	// Cannot be updated.
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
+
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	// +optional
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 }
 
 // ComponentDefinitionStatus defines the observed state of ComponentDefinition.

@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -57,8 +58,9 @@ const (
 
 type Deleter struct {
 	ctrlutil.RequestCtx
-	Client client.Client
-	Scheme *runtime.Scheme
+	Client    client.Client
+	Scheme    *runtime.Scheme
+	actionSet *dpv1alpha1.ActionSet
 }
 
 // DeleteBackupFiles builds a job to delete backup files, and returns the deletion status.
@@ -293,6 +295,7 @@ func (d *Deleter) getPreDeleteAction(backupMethod *dpv1alpha1.BackupMethod) (*dp
 	if err != nil {
 		return nil, err
 	}
+	d.actionSet = actionSet
 	return actionSet.Spec.Backup.PreDeleteBackup, nil
 }
 
@@ -311,14 +314,18 @@ func (d *Deleter) doPreDeleteAction(
 	}
 	// create pre-delete action
 	runAsUser := int64(0)
+	envVars := []corev1.EnvVar{
+		{Name: dptypes.DPBackupBasePath, Value: backupFilePath},
+		{Name: dptypes.DPBackupName, Value: backup.Name},
+	}
+	if d.actionSet != nil {
+		envVars = append(envVars, d.actionSet.Spec.Env...)
+	}
 	container := corev1.Container{
-		Name:    backup.Name,
-		Command: preDeleteAction.Command,
-		Image:   preDeleteAction.Image,
-		Env: []corev1.EnvVar{
-			{Name: dptypes.DPBackupBasePath, Value: backupFilePath},
-			{Name: dptypes.DPBackupName, Value: backup.Name},
-		},
+		Name:            backup.Name,
+		Command:         preDeleteAction.Command,
+		Image:           common.Expand(preDeleteAction.Image, common.MappingFuncFor(utils.CovertEnvToMap(envVars))),
+		Env:             envVars,
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		SecurityContext: &corev1.SecurityContext{
 			AllowPrivilegeEscalation: boolptr.False(),
@@ -376,7 +383,7 @@ func BuildDeleteBackupFilesJobKey(backup *dpv1alpha1.Backup, isPreDelete bool) c
 	}
 	jobName := fmt.Sprintf("%s-%s%s%s", backup.UID[:8], preDeletePrefix, deleteBackupFilesJobNamePrefix, backup.Name)
 	if len(jobName) > 63 {
-		jobName = jobName[:63]
+		jobName = strings.TrimSuffix(jobName[:63], "-")
 	}
 	return client.ObjectKey{Namespace: backup.Namespace, Name: jobName}
 }

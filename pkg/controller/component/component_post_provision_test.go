@@ -122,7 +122,7 @@ var _ = Describe("Component PostProvision Test", func() {
 			Expect(synthesizeComp.LifecycleActions).ShouldNot(BeNil())
 			Expect(synthesizeComp.LifecycleActions.PostProvision).Should(BeNil())
 
-			comp, err := BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
+			comp, err := BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil)
 			comp.UID = cluster.UID
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())

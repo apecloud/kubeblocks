@@ -234,13 +234,13 @@ func (r *ClusterDefinitionReconciler) validateTopologyOrders(topology appsv1alph
 	}
 
 	if !validate(topology.Orders.StartupOrder) {
-		return fmt.Errorf("there are components not defined in startup order")
+		return fmt.Errorf("the components in startup order are different from those from definition")
 	}
 	if !validate(topology.Orders.ShutdownOrder) {
-		return fmt.Errorf("there are components not defined in shutdown order")
+		return fmt.Errorf("the components in shutdown order are different from those from definition")
 	}
 	if !validate(topology.Orders.UpdateOrder) {
-		return fmt.Errorf("there are components not defined in update order")
+		return fmt.Errorf("the components in update order are different from those from definition")
 	}
 	return nil
 }
@@ -274,7 +274,7 @@ func (r *ClusterDefinitionReconciler) validateTopologyComponent(compDefs map[str
 	comp appsv1alpha1.ClusterTopologyComponent) error {
 	// TODO: service version
 	defs, ok := compDefs[comp.Name]
-	if !ok {
+	if !ok || len(defs) == 0 {
 		return fmt.Errorf("there is no matched definitions found for the topology component %s", comp.Name)
 	}
 

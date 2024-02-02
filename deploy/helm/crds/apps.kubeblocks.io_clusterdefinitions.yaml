@@ -9982,7 +9982,6 @@ spec:
                       forbidden otherwise
                     rule: 'has(self.workloadType) && self.workloadType == ''Consensus''
                       ? (has(self.consensusSpec) || has(self.rsmSpec)) : !has(self.consensusSpec)'
-                minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:
                 - name
@@ -10157,8 +10156,6 @@ spec:
                 maxLength: 24
                 pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                 type: string
-            required:
-            - componentDefs
             type: object
           status:
             description: ClusterDefinitionStatus defines the observed state of ClusterDefinition

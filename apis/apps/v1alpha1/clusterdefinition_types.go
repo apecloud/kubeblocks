@@ -37,13 +37,12 @@ type ClusterDefinitionSpec struct {
 	Type string `json:"type,omitempty"`
 
 	// componentDefs provides cluster components definitions.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Connection credential template used for creating a connection credential

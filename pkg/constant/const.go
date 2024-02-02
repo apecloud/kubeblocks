@@ -292,9 +292,10 @@ const (
 	Primary   = "primary"
 	Secondary = "secondary"
 
-	Leader   = "leader"
-	Follower = "follower"
-	Learner  = "learner"
+	Leader    = "leader"
+	Follower  = "follower"
+	Learner   = "learner"
+	Candidate = "candidate"
 )
 
 // username and password are keys in created secrets for others to refer to.

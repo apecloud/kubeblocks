@@ -42,7 +42,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
@@ -125,18 +124,18 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("component", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
-	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
-	cluster := &appsv1alpha1.Cluster{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
+	comp := &appsv1alpha1.Component{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, comp); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	// cluster is under deletion, do nothing
-	if !cluster.GetDeletionTimestamp().IsZero() {
-		reqCtx.Log.V(1).Info("Cluster is under deletion.", "cluster", req.NamespacedName)
+	// component is under deletion, do nothing
+	if !comp.GetDeletionTimestamp().IsZero() {
+		reqCtx.Log.V(1).Info("Component is under deletion.", "component", req.NamespacedName)
 		// get sysaccount jobs for this cluster and delete them
 		jobs := &batchv1.JobList{}
 		options := client.ListOptions{}
@@ -158,43 +157,23 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// wait till the cluster is running
-	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
-		reqCtx.Log.V(1).Info("Cluster is not ready yet", "cluster", req.NamespacedName)
+	if comp.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
+		reqCtx.Log.V(1).Info("Component is not ready yet", "component", req.NamespacedName)
 		return intctrlutil.Reconciled()
 	}
 
-	if common.IsCompactMode(cluster.Annotations) {
-		reqCtx.Log.V(1).Info("Cluster is in compact mode, no need to create accounts related secrets", "cluster", req.NamespacedName)
-		return intctrlutil.Reconciled()
-	}
-
-	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
-	clusterDefNS := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
-	if err := r.Client.Get(reqCtx.Ctx, clusterDefNS, clusterdefinition); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
-	}
-
-	clusterVersion := &appsv1alpha1.ClusterVersion{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, clusterVersion); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
-	}
-
-	componentVersions := clusterVersion.Spec.GetDefNameMappingComponents()
+	cluster := &appsv1alpha1.Cluster{}
+	clusterName := comp.
 
 	// process accounts for each component
-	processAccountsForComponent := func(compDef *appsv1alpha1.ClusterComponentDefinition, compDecl *appsv1alpha1.ClusterComponentSpec,
+	processAccountsForComponent := func(compDef *appsv1alpha1.ComponentDefinition, compDecl *appsv1alpha1.ClusterComponentSpec,
 		svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) error {
 		var (
-			err                 error
-			toCreate            appsv1alpha1.KBAccountType
-			detectedK8SFacts    appsv1alpha1.KBAccountType
-			detectedEngineFacts appsv1alpha1.KBAccountType
-			engine              *customizedEngine
-			compKey             = componentUniqueKey{
-				namespace:     cluster.Namespace,
-				clusterName:   cluster.Name,
-				componentName: compDecl.Name,
-				characterType: compDef.CharacterType,
+			err     error
+			engine  *customizedEngine
+			compKey = componentUniqueKey{
+				namespace:     comp.Namespace,
+				componentName: comp.Name,
 			}
 		)
 
@@ -259,6 +238,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	} // end of processAccountForComponent
 
 	reconcileCounter := 0
+
 	existsOps := existsOperations(cluster)
 	// for each component in the cluster
 	for _, compDecl := range cluster.Spec.ComponentSpecs {
@@ -296,7 +276,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 // SetupWithManager sets up the controller with the Manager.
 func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.Cluster{}).
+		For(&appsv1alpha1.Component{}).
 		Owns(&corev1.Secret{}).
 		Watches(&batchv1.Job{}, r.jobCompletionHandler()).
 		Complete(r)

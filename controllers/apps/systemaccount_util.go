@@ -39,7 +39,6 @@ import (
 
 // customizedEngine helps render jobs.
 type customizedEngine struct {
-	cluster       *appsv1alpha1.Cluster
 	componentName string
 	image         string
 	command       []string
@@ -69,7 +68,6 @@ func (e *customizedEngine) getArgs() []string {
 
 func newCustomizedEngine(execConfig *appsv1alpha1.CmdExecutorConfig, dbcluster *appsv1alpha1.Cluster, compName string) *customizedEngine {
 	return &customizedEngine{
-		cluster:       dbcluster,
 		componentName: compName,
 		image:         execConfig.Image,
 		command:       execConfig.Command,
@@ -298,13 +296,13 @@ func getAllSysAccounts() []appsv1alpha1.AccountName {
 	}
 }
 
-func getDefaultAccounts() appsv1alpha1.KBAccountType {
-	accountID := appsv1alpha1.KBAccountInvalid
-	for _, name := range getAllSysAccounts() {
-		accountID |= name.GetAccountID()
-	}
-	return accountID
-}
+// func getDefaultAccounts() appsv1alpha1.KBAccountType {
+// 	accountID := appsv1alpha1.KBAccountInvalid
+// 	for _, name := range getAllSysAccounts() {
+// 		accountID |= name.GetAccountID()
+// 	}
+// 	return accountID
+// }
 
 func getDebugMode(annotatedDebug string) bool {
 	debugOn, _ := strconv.ParseBool(annotatedDebug)

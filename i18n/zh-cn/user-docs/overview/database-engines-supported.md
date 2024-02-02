@@ -92,6 +92,12 @@ KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用
 | xinference                            | 1.16.0                            | ✔️      | N/A    | N/A          | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | zookeeper                             | 3.7.1                             | ✔️      | ✔️      | ✔️            | ✔️          | ✔️       | N/A            | ✔️    | ✔️      | N/A                         | N/A     | N/A      | N/A        | N/A     |
 
+:::note
+
+升级功能是指 KubeBlocks 支持数据库内核小版本升级，例如，将 PostgreSQL 从 v12.14 升级至 v12.15。
+
+:::
+
 ## 使用引擎
 
 ### 使用索引安装引擎

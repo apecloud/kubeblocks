@@ -388,7 +388,8 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 			return nil, err
 		}
 
-		serviceVersions := sets.New[string]()
+		// add definition's service version as default, in case there is no component versions provided
+		serviceVersions := sets.New[string](compDef.Spec.ServiceVersion)
 		for _, compVersion := range compVersions {
 			serviceVersions = serviceVersions.Union(compatibleServiceVersions4Definition(compDef, compVersion))
 		}
@@ -448,8 +449,12 @@ func compatibleServiceVersions4Definition(compDef *appsv1alpha1.ComponentDefinit
 
 // TODO
 func compareServiceVersion(required, provide string) bool {
-	ret, err := version.MustParseSemantic(required).Compare(provide)
-	return err == nil && ret == 0
+	v, err1 := version.ParseSemantic(required)
+	if err1 != nil {
+		return false
+	}
+	ret, err2 := v.Compare(provide)
+	return err2 == nil && ret == 0
 }
 
 // updateCompDefinitionImages4ServiceVersion resolves and updates images for the component definition.

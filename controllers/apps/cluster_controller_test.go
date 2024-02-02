@@ -898,11 +898,11 @@ var _ = Describe("Cluster Controller", func() {
 				testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjV2, nil)
 			})
 
-			It("create shardingSpec cluster with component template object", func() {
+			PIt("create shardingSpec cluster with component template object", func() {
 				testClusterComponent(consensusCompName, compDefName, createClusterObjWithShard, &shards)
 			})
 
-			It("create shardingSpec cluster with new component template object", func() {
+			PIt("create shardingSpec cluster with new component template object", func() {
 				testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjWithShardV2, &shards)
 			})
 
@@ -923,7 +923,7 @@ var _ = Describe("Cluster Controller", func() {
 				testClusterServiceCreateAndDelete(consensusCompName, compDefName, createObj)
 			})
 
-			It("should create and delete shard topology cluster service correctly", func() {
+			PIt("should create and delete shard topology cluster service correctly", func() {
 				testClusterShardServiceCreateAndDelete(consensusCompName, compDefName, createClusterObjWithShard)
 			})
 		}

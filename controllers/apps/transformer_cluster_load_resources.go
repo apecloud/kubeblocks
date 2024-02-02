@@ -66,7 +66,10 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 }
 
 func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1alpha1.Cluster) error {
-	if withClusterTopology(cluster) || withLegacyClusterDef(cluster) || withSimplifiedClusterAPI(cluster) {
+	if withClusterTopology(cluster) ||
+		withUserDefinedTopology(cluster) ||
+		withLegacyClusterDef(cluster) ||
+		withSimplifiedClusterAPI(cluster) {
 		return nil
 	}
 	return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d, legacy comps: %d, new comps: %d, simplified API: %v",
@@ -135,7 +138,11 @@ func validateClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition, cluster
 }
 
 func withClusterTopology(cluster *appsv1alpha1.Cluster) bool {
-	return len(cluster.Spec.ClusterDefRef) > 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
+	return len(cluster.Spec.ClusterDefRef) > 0 && len(cluster.Spec.Topology) > 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
+}
+
+func withUserDefinedTopology(cluster *appsv1alpha1.Cluster) bool {
+	return len(cluster.Spec.Topology) == 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
 }
 
 func withLegacyClusterDef(cluster *appsv1alpha1.Cluster) bool {

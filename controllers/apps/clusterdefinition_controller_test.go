@@ -161,12 +161,11 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		})
 
 		It("should stop proceeding the status of clusterDefinition if configmap is invalid or doesn't exist", func() {
-			By("check the reconciler won't update Status.ObservedGeneration if configmap doesn't exist.")
-			// should use Consistently here, since cd.Status.ObservedGeneration is initialized to be zero,
-			// we must watch the value for a while to tell it's not changed by the reconciler.
-			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+			By("check the reconciler set the status phase as unavailable if configmap doesn't exist.")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 				func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
-					g.Expect(cd.Status.ObservedGeneration).To(BeEquivalentTo(0))
+					g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
+					g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
 				})).Should(Succeed())
 
 			assureCfgTplConfigMapObj()
@@ -174,7 +173,8 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			By("check the reconciler update Status.ObservedGeneration after configmap is created.")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 				func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
-					g.Expect(cd.Status.ObservedGeneration).To(BeEquivalentTo(1))
+					g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
+					g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 
 					// check labels and finalizers
 					g.Expect(cd.Finalizers).ShouldNot(BeEmpty())

@@ -118,7 +118,7 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 }
 
 func isGeneratedComponent(cluster *appsv1alpha1.Cluster) (bool, error) {
-	if withClusterTopology(cluster) {
+	if withClusterTopology(cluster) || withUserDefinedTopology(cluster) {
 		return false, nil
 	}
 	if withLegacyClusterDef(cluster) || withSimplifiedClusterAPI(cluster) {

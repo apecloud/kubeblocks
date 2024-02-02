@@ -80,6 +80,9 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTra
 	if withClusterTopology(cluster) {
 		return t.buildCompSpecs4ClusterTopology(transCtx.ClusterDef, cluster)
 	}
+	if withUserDefinedTopology(cluster) {
+		return t.buildCompSpecs4UserDefinedTopology(cluster)
+	}
 	if withLegacyClusterDef(cluster) {
 		return t.buildCompSpecs4LegacyCluster(cluster)
 	}
@@ -143,11 +146,18 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4ClusterTopology(clus
 	return compSpecs
 }
 
+func (t *ClusterAPINormalizationTransformer) buildCompSpecs4UserDefinedTopology(cluster *appsv1alpha1.Cluster) []*appsv1alpha1.ClusterComponentSpec {
+	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	for i := range cluster.Spec.ComponentSpecs {
+		compSpecs = append(compSpecs, cluster.Spec.ComponentSpecs[i].DeepCopy())
+	}
+	return compSpecs
+}
+
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs4LegacyCluster(cluster *appsv1alpha1.Cluster) []*appsv1alpha1.ClusterComponentSpec {
 	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	for i := range cluster.Spec.ComponentSpecs {
-		clusterComSpec := cluster.Spec.ComponentSpecs[i]
-		compSpecs = append(compSpecs, &clusterComSpec)
+		compSpecs = append(compSpecs, cluster.Spec.ComponentSpecs[i].DeepCopy())
 	}
 	return compSpecs
 }

@@ -43,6 +43,7 @@ spec:
     {{ `{{- if not $endpoint }}` }}
       {{ `{{- $endpoint = (printf "https://storage.googleapis.com") }}` }}
     {{ `{{- end }}` }}
+    endpoint = {{ `{{ $endpoint }}` }}
     region = {{ `{{ index .Parameters "region" }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
     no_check_bucket = true

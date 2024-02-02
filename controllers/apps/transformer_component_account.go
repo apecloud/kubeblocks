@@ -95,12 +95,13 @@ func (t *componentAccountTransformer) checkAccountSecretExist(ctx graph.Transfor
 func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransformContext,
 	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) (*corev1.Secret, error) {
 	var password []byte
-	if account.SecretRef != nil {
+	switch {
+	case account.SecretRef != nil:
 		var err error
 		if password, err = t.getPasswordFromSecret(ctx, account); err != nil {
 			return nil, err
 		}
-	} else {
+	default:
 		password = t.buildPassword(ctx, account)
 	}
 	return t.buildAccountSecretWithPassword(synthesizeComp, account, password), nil
@@ -136,8 +137,15 @@ func (t *componentAccountTransformer) buildPassword(ctx *componentTransformConte
 }
 
 func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.SystemAccount) []byte {
-	config := account.PasswordGenerationPolicy
-	passwd, _ := password.Generate((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, false)
+	var (
+		passwd string
+		config = account.PasswordGenerationPolicy
+	)
+	if len(config.Seed) > 0 {
+		passwd, _ = common.GeneratePasswordWithSeed((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, config.Seed)
+	} else {
+		passwd, _ = password.Generate((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, false)
+	}
 	switch config.LetterCase {
 	case appsv1alpha1.UpperCases:
 		passwd = strings.ToUpper(passwd)

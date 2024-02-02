@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,11 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -56,16 +52,17 @@ type SystemAccountReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// componentUniqueKey is used internally to uniquely identify a component, by namespace-clusterName-componentName.
-type componentUniqueKey struct {
-	namespace     string
-	clusterName   string
-	componentName string
-	characterType string
-}
-
 // updateStrategy is used to specify the update strategy for a component.
 type updateStrategy int8
+
+type accountNameSet map[string]struct{}
+
+type compUniqueKey struct {
+	namespace    string
+	clusterName  string
+	compName     string
+	compFullName string
+}
 
 const (
 	inPlaceUpdate updateStrategy = 1
@@ -87,9 +84,8 @@ const (
 
 // ENABLE_DEBUG_SYSACCOUNTS is used for debug only.
 const (
-	systemAccountsDebugMode       string = "ENABLE_DEBUG_SYSACCOUNTS"
-	systemAccountPasswdAnnotation string = "passwd"
-	systemAccountjobPrefix               = "sysacc"
+	systemAccountsDebugMode = "ENABLE_DEBUG_SYSACCOUNTS"
+	systemAccountjobPrefix  = "sysacc"
 )
 
 var (
@@ -106,6 +102,9 @@ func init() {
 // clusterdefinition, backuppolicy, jobs, secrets
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch;
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/status,verbs=get
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
 // +kubebuilder:rbac:groups=batch,resources=jobs/finalizers,verbs=update
@@ -125,27 +124,32 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("component", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
-	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
-	cluster := &appsv1alpha1.Cluster{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
+	// get component
+	comp := &appsv1alpha1.Component{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, comp); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	// cluster is under deletion, do nothing
-	if !cluster.GetDeletionTimestamp().IsZero() {
-		reqCtx.Log.V(1).Info("Cluster is under deletion.", "cluster", req.NamespacedName)
+	// get cluster object
+	clusterName, err := getClusterName(comp)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	cluster := &appsv1alpha1.Cluster{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: comp.Namespace, Name: clusterName}, cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	// component or cluster is under deletion, delete all sysaccount jobs
+	if !comp.GetDeletionTimestamp().IsZero() || !cluster.GetDeletionTimestamp().IsZero() {
+		reqCtx.Log.V(1).Info("Component is under deletion.", "component", req.NamespacedName)
 		// get sysaccount jobs for this cluster and delete them
 		jobs := &batchv1.JobList{}
-		options := client.ListOptions{}
-
-		client.InNamespace(reqCtx.Req.Namespace).ApplyToList(&options)
-		client.MatchingLabels{constant.AppInstanceLabelKey: reqCtx.Req.Name}.ApplyToList(&options)
-		client.HasLabels{constant.ClusterAccountLabelKey}.ApplyToList(&options)
-
-		if err := r.Client.List(reqCtx.Ctx, jobs, &options); err != nil {
+		ml := client.MatchingLabels(constant.GetComponentWellKnownLabels(cluster.Name, getCompNameShort(comp)))
+		if err := r.Client.List(reqCtx.Ctx, jobs, ml); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 
@@ -157,146 +161,88 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.Reconciled()
 	}
 
-	// wait till the cluster is running
-	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
-		reqCtx.Log.V(1).Info("Cluster is not ready yet", "cluster", req.NamespacedName)
+	// get componentdefintion
+	cmpdName := comp.Spec.CompDef
+	if len(cmpdName) == 0 {
+		reqCtx.Log.V(1).Info("Component does not have a ComponentDefinition", "component", req.NamespacedName)
 		return intctrlutil.Reconciled()
 	}
 
-	if common.IsCompactMode(cluster.Annotations) {
-		reqCtx.Log.V(1).Info("Cluster is in compact mode, no need to create accounts related secrets", "cluster", req.NamespacedName)
+	cmpd := &appsv1alpha1.ComponentDefinition{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: cmpdName}, cmpd); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	// skip if the component does not support system accounts
+	if cmpd.Spec.LifecycleActions.AccountProvision == nil || len(cmpd.Spec.SystemAccounts) == 0 {
+		reqCtx.Log.V(1).Info("ComponentDefinition does not support system accounts", "component", req.NamespacedName)
 		return intctrlutil.Reconciled()
 	}
 
-	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
-	clusterDefNS := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
-	if err := r.Client.Get(reqCtx.Ctx, clusterDefNS, clusterdefinition); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
+	if cmpd.Spec.LifecycleActions.AccountProvision.CustomHandler == nil {
+		reqCtx.Log.V(1).Info("ComponentDefinition does not have a custom handler for account provision", "component", req.NamespacedName)
+		return intctrlutil.Reconciled()
+	}
+	// wait till the component is running
+	if !passPreCondition(reqCtx.Ctx, r.Client, cluster, comp, cmpd) {
+		reqCtx.Log.V(1).Info("Component is not ready yet", "component", req.NamespacedName)
+		return intctrlutil.Reconciled()
 	}
 
-	clusterVersion := &appsv1alpha1.ClusterVersion{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, clusterVersion); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
+	// request if the cluster is doing operations
+	if existsOps := existsOperations(cluster); existsOps {
+		return intctrlutil.RequeueAfter(10, reqCtx.Log, "requeue", comp.Name)
 	}
 
-	componentVersions := clusterVersion.Spec.GetDefNameMappingComponents()
-
-	// process accounts for each component
-	processAccountsForComponent := func(compDef *appsv1alpha1.ClusterComponentDefinition, compDecl *appsv1alpha1.ClusterComponentSpec,
-		svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) error {
-		var (
-			err                 error
-			toCreate            appsv1alpha1.KBAccountType
-			detectedK8SFacts    appsv1alpha1.KBAccountType
-			detectedEngineFacts appsv1alpha1.KBAccountType
-			engine              *customizedEngine
-			compKey             = componentUniqueKey{
-				namespace:     cluster.Namespace,
-				clusterName:   cluster.Name,
-				componentName: compDecl.Name,
-				characterType: compDef.CharacterType,
-			}
-		)
-
-		// expectations: collect accounts from default setting, cluster and cluster definition.
-		toCreate = getDefaultAccounts()
-		reqCtx.Log.V(1).Info("accounts to create", "cluster", req.NamespacedName, "accounts", toCreate)
-
-		// facts: accounts have been created, in form of k8s secrets.
-		if detectedK8SFacts, err = r.getAccountFacts(reqCtx, compKey); err != nil {
-			reqCtx.Log.Error(err, "failed to get secrets")
-			return err
-		}
-		reqCtx.Log.V(1).Info("detected k8s facts", "cluster", req.NamespacedName, "accounts", detectedK8SFacts)
-
-		// toCreate = account to create - account exists
-		// (toCreate \intersect detectedEngineFacts) means the set of account exists in engine but not in k8s, and should be updated or altered, not re-created.
-		toCreate &= toCreate ^ detectedK8SFacts
-		if toCreate == 0 {
-			return nil
-		}
-
-		// facts: accounts have been created in engine.
-		if detectedEngineFacts, err = r.getEngineFacts(reqCtx, compKey); err != nil {
-			reqCtx.Log.Error(err, "failed to get accounts", "cluster", cluster.Name, "component", compDecl.Name)
-			// we don't return error here, because we can still create accounts in k8s and will give it a try.
-		}
-		reqCtx.Log.V(1).Info("detected database facts", "cluster", req.NamespacedName, "accounts", detectedEngineFacts)
-
-		// replace KubeBlocks ENVs.
-		replaceEnvsValues(cluster.Name, compDef.SystemAccounts, nil)
-
-		for _, account := range compDef.SystemAccounts.Accounts {
-			accountID := account.Name.GetAccountID()
-			if toCreate&accountID == 0 {
-				continue
-			}
-
-			strategy := reCreate
-			if detectedEngineFacts&accountID != 0 {
-				strategy = inPlaceUpdate
-			}
-
-			switch account.ProvisionPolicy.Type {
-			case appsv1alpha1.CreateByStmt:
-				if engine == nil {
-					execConfig := compDef.SystemAccounts.CmdExecutorConfig
-					// complete execConfig with settings from component version
-					completeExecConfig(execConfig, componentVersions[compDef.Name])
-					engine = newCustomizedEngine(execConfig, cluster, compDecl.Name)
-				}
-				reqCtx.Log.V(1).Info("create account by stmt", "cluster", req.NamespacedName, "account", account.Name, "strategy", strategy)
-				if err := r.createByStmt(reqCtx, cluster, compDef, compKey, engine, account, svcEP, headlessEP, strategy); err != nil {
-					return err
-				}
-			case appsv1alpha1.ReferToExisting:
-				if err := r.createByReferringToExisting(reqCtx, cluster, compKey, account); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	} // end of processAccountForComponent
-
-	reconcileCounter := 0
-	existsOps := existsOperations(cluster)
-	// for each component in the cluster
-	for _, compDecl := range cluster.Spec.ComponentSpecs {
-		compName := compDecl.Name
-		compType := compDecl.ComponentDefRef
-		for _, compDef := range clusterdefinition.Spec.ComponentDefs {
-			if compType != compDef.Name || compDef.SystemAccounts == nil {
-				continue
-			}
-
-			isReady, svcEP, headlessEP, err := r.isComponentReady(reqCtx, cluster.Name, compName)
-			if err != nil {
-				return intctrlutil.RequeueAfter(requeueDuration, reqCtx.Log, "failed to get service")
-			}
-
-			// either service or endpoint is not ready, increase counter and continue to process next component
-			if !isReady || existsOps {
-				reconcileCounter++
-				continue
-			}
-
-			if err := processAccountsForComponent(&compDef, &compDecl, svcEP, headlessEP); err != nil {
-				reconcileCounter++
-				continue
-			}
-		}
+	compKey := &compUniqueKey{
+		namespace:    comp.Namespace,
+		clusterName:  cluster.Name,
+		compName:     getCompNameShort(comp),
+		compFullName: comp.Name,
 	}
 
-	if reconcileCounter > 0 {
-		return intctrlutil.Requeue(reqCtx.Log, "Not all components have been reconciled. Requeue request.")
+	action := cmpd.Spec.LifecycleActions.AccountProvision.CustomHandler
+
+	provisionedAccounts, err := getAccountsProvisioned(reqCtx, r.Client, compKey)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	return ctrl.Result{}, nil
+	detectedEngineAccounts := getAccountsInEngine(reqCtx, r.Client, compKey)
+
+	for _, account := range cmpd.Spec.SystemAccounts {
+		if provisionedAccounts.Contains(account.Name) {
+			continue
+		}
+		strategy := reCreate
+		if detectedEngineAccounts.Contains(account.Name) {
+			strategy = inPlaceUpdate
+		}
+
+		reqCtx.Log.V(1).Info("create account by stmt", "cluster", req.NamespacedName, "account", account.Name, "strategy", strategy)
+
+		secret, err := getAccountSecretByName(reqCtx.Ctx, r.Client, compKey, account.Name)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+
+		username, passwd := secret.Data[constant.AccountNameForSecret], secret.Data[constant.AccountPasswdForSecret]
+		stmts := getCreationStmtForAccount((string)(username), (string)(passwd), account.Statement, strategy)
+		pods, err := getTargetPods(reqCtx.Ctx, r.Client, action, cmpd.Spec.Roles, compKey)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+
+		if err := r.createByStmt(reqCtx, cluster, comp, action, account.Name, stmts, pods); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+	}
+	return intctrlutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.Cluster{}).
+		For(&appsv1alpha1.Component{}).
 		Owns(&corev1.Secret{}).
 		Watches(&batchv1.Job{}, r.jobCompletionHandler()).
 		Complete(r)
@@ -304,36 +250,34 @@ func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ClusterComponentDefinition,
-	compKey componentUniqueKey,
-	engine *customizedEngine,
-	account appsv1alpha1.SystemAccountConfig,
-	svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints, strategy updateStrategy) error {
-	policy := account.ProvisionPolicy
-
+	comp *appsv1alpha1.Component,
+	action *appsv1alpha1.Action,
+	accountName string,
+	stmts []string,
+	pods *corev1.PodList) error {
+	// render a job object, named after account name
 	generateJobName := func() string {
-		// render a job object, named after account name
 		randSuffix := rand.String(5)
-		fullJobName := strings.Join([]string{systemAccountjobPrefix, compKey.clusterName, compKey.componentName, string(account.Name), randSuffix}, "-")
+		fullJobName := strings.Join([]string{systemAccountjobPrefix, comp.Name, accountName, randSuffix}, "-")
 		if len(fullJobName) > 63 {
-			return systemAccountjobPrefix + "-" + string(account.Name) + "-" + randSuffix
+			return systemAccountjobPrefix + "-" + accountName + "-" + randSuffix
 		} else {
 			return fullJobName
 		}
 	}
 
-	stmts, passwd := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, strategy)
+	compKey := &compUniqueKey{
+		namespace:    comp.Namespace,
+		clusterName:  cluster.Name,
+		compName:     getCompNameShort(comp),
+		compFullName: comp.Name,
+	}
 
-	for _, ep := range retrieveEndpoints(policy.Scope, svcEP, headlessEP) {
-		job := renderJob(generateJobName(), engine, compKey, stmts, ep)
+	for _, pod := range pods.Items {
+		job := renderJob(generateJobName(), action, compKey, stmts, &pod)
 		controllerutil.AddFinalizer(job, constant.DBClusterFinalizerName)
-		if job.Annotations == nil {
-			job.Annotations = map[string]string{}
-		}
-		job.Annotations[systemAccountPasswdAnnotation] = passwd
-
 		// before creating job, we adjust job's attributes, such as labels, tolerations w.r.t cluster info.
-		if err := calibrateJobMetaAndSpec(job, cluster, compKey, account.Name); err != nil {
+		if err := calibrateJobMetaAndSpec(job, cluster, comp, accountName); err != nil {
 			return err
 		}
 		// update owner reference
@@ -344,126 +288,10 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 		if err := r.Client.Create(reqCtx.Ctx, job); err != nil {
 			return err
 		}
-		reqCtx.Log.V(1).Info("created job", "job", job.Name, "passwd", passwd)
+		reqCtx.Log.V(1).Info("created job", "job", job.Name)
 	}
+
 	return nil
-}
-
-func (r *SystemAccountReconciler) createByReferringToExisting(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
-	// get secret
-	secret := &corev1.Secret{}
-	secretRef := account.ProvisionPolicy.SecretRef
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: secretRef.Namespace, Name: secretRef.Name}, secret); err != nil {
-		reqCtx.Log.Error(err, "Failed to find secret", "secret", secretRef.Name)
-		return err
-	}
-	// and make a copy of it
-	newSecret := renderSecretByCopy(key, (string)(account.Name), secret)
-	if uprefErr := controllerutil.SetControllerReference(cluster, newSecret, r.Scheme); uprefErr != nil {
-		return uprefErr
-	}
-
-	if err := r.Client.Create(reqCtx.Ctx, newSecret); err != nil {
-		reqCtx.Log.Error(err, "Failed to find secret", "secret", newSecret.Name)
-		return err
-	}
-	return nil
-}
-
-func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx, clusterName string, compName string) (bool, *corev1.Endpoints, *corev1.Endpoints, error) {
-	svcEP := &corev1.Endpoints{}
-	serviceName := clusterName + "-" + compName
-
-	headlessEP := &corev1.Endpoints{}
-	headlessSvcName := serviceName + "-headless"
-
-	svcErr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: serviceName}, svcEP)
-	if svcErr != nil {
-		return false, nil, nil, svcErr
-	}
-
-	headlessSvcErr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: headlessSvcName}, headlessEP)
-	if headlessSvcErr != nil {
-		return false, nil, nil, headlessSvcErr
-	}
-	// Neither service nor endpoints is ready.
-	if len(svcEP.Subsets) == 0 || len(headlessEP.Subsets) == 0 {
-		return false, nil, nil, nil
-	}
-
-	// make sure address exists
-	if len(svcEP.Subsets[0].Addresses) == 0 || len(headlessEP.Subsets[0].Addresses) == 0 {
-		return false, nil, nil, nil
-	}
-
-	return true, svcEP, headlessEP, nil
-}
-
-// getAccountFacts parses secrets for given cluster as facts, i.e., accounts created
-// TODO: @shanshan, should verify accounts on database cluster as well.
-func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
-	// get account facts, i.e., secrets created
-	ml := getLabelsForSecretsAndJobs(key)
-
-	secrets := &corev1.SecretList{}
-	if err := r.Client.List(reqCtx.Ctx, secrets, client.InNamespace(key.namespace), ml); err != nil {
-		return appsv1alpha1.KBAccountInvalid, err
-	}
-
-	// get all running jobs
-	jobs := &batchv1.JobList{}
-	if err := r.Client.List(reqCtx.Ctx, jobs, client.InNamespace(key.namespace), ml); err != nil {
-		return appsv1alpha1.KBAccountInvalid, err
-	}
-
-	detectedFacts := getAcctFromSecretAndJobs(secrets, jobs)
-	reqCtx.Log.V(1).Info("Detected account facts", "facts", detectedFacts)
-	return detectedFacts, nil
-}
-
-func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
-	// get pods for this cluster-component, by label
-	ml := getLabelsForSecretsAndJobs(key)
-	pods := &corev1.PodList{}
-	if err := r.Client.List(reqCtx.Ctx, pods, client.InNamespace(key.namespace), ml); err != nil {
-		return appsv1alpha1.KBAccountInvalid, err
-	}
-	if len(pods.Items) == 0 {
-		return appsv1alpha1.KBAccountInvalid, fmt.Errorf("no pods available for cluster: %s, component %s", key.clusterName, key.componentName)
-	}
-	// find the first running pod
-	var target *corev1.Pod
-	for _, pod := range pods.Items {
-		if pod.Status.Phase == corev1.PodRunning {
-			target = &pod
-		}
-	}
-	if target == nil {
-		return appsv1alpha1.KBAccountInvalid, fmt.Errorf("no pod is running for cluster: %s, component %s", key.clusterName, key.componentName)
-	}
-
-	lorryClient, err := lorry.NewClient(*target)
-	if err != nil {
-		return appsv1alpha1.KBAccountInvalid, err
-	}
-	if intctrlutil.IsNil(lorryClient) {
-		return appsv1alpha1.KBAccountInvalid, errors.New("not lorry service")
-	}
-
-	accounts, err := lorryClient.ListSystemAccounts(reqCtx.Ctx)
-	if err != nil {
-		return appsv1alpha1.KBAccountInvalid, err
-	}
-	accountsID := appsv1alpha1.KBAccountInvalid
-	for _, acc := range accounts {
-		accountName, ok := acc["userName"]
-		if !ok {
-			continue
-		}
-
-		updateFacts(appsv1alpha1.AccountName(accountName.(string)), &accountsID)
-	}
-	return accountsID, nil
 }
 
 func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
@@ -504,11 +332,7 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 				return
 			}
 
-			if job, ok = e.ObjectNew.(*batchv1.Job); !ok {
-				return
-			}
-
-			if job.Annotations == nil || job.Labels == nil {
+			if job, ok = e.ObjectNew.(*batchv1.Job); !ok || job.Labels == nil {
 				return
 			}
 
@@ -516,6 +340,11 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 			clusterName := job.Labels[constant.AppInstanceLabelKey]
 			componentName := job.Labels[constant.KBAppComponentLabelKey]
 
+			compKey := &compUniqueKey{
+				namespace:   job.Namespace,
+				clusterName: clusterName,
+				compName:    componentName,
+			}
 			// filter out jobs that are not for system account
 			if len(accountName) == 0 || len(clusterName) == 0 || len(componentName) == 0 {
 				return
@@ -528,47 +357,35 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 			}
 
 			jobTerminated = true
-			clusterKey := types.NamespacedName{Namespace: job.Namespace, Name: clusterName}
-			cluster := &appsv1alpha1.Cluster{}
-			if err := r.Client.Get(context.TODO(), clusterKey, cluster); err != nil {
-				logger.Error(err, "failed to get cluster", "cluster key", clusterKey)
+
+			comp := &appsv1alpha1.Component{}
+			if err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: job.Namespace, Name: fmt.Sprintf("%s-%s", clusterName, componentName)}, comp); err != nil {
+				logger.Error(err, "failed to get component", "key", compKey)
 				return
 			}
 
 			if containsJobCondition(*job, job.Status.Conditions, batchv1.JobFailed, corev1.ConditionTrue) {
 				logger.V(1).Info("job failed", "job", job.Name)
-				r.Recorder.Eventf(cluster, corev1.EventTypeNormal, SysAcctCreate,
-					"Failed to create accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
+				r.Recorder.Eventf(comp, corev1.EventTypeNormal, SysAcctCreate,
+					"Failed to create accounts for cluster: %s, component: %s, accounts: %s", clusterName, componentName, accountName)
 				return
 			}
 
-			compKey := componentUniqueKey{
-				namespace:     job.Namespace,
-				clusterName:   clusterName,
-				componentName: componentName,
-			}
-			// get password from job
-			passwd := job.Annotations[systemAccountPasswdAnnotation]
-			secret := renderSecretWithPwd(compKey, accountName, passwd)
-			if err := controllerutil.SetControllerReference(cluster, secret, r.Scheme); err != nil {
-				logger.Error(err, "failed to set owner reference for secret", "secret", secret.Name)
+			secret, err := getAccountSecretByName(context.TODO(), r.Client, compKey, accountName)
+			if err != nil {
+				logger.Error(err, "failed to get secret for account", "account", accountName)
 				return
 			}
-
-			if err := r.Client.Create(context.TODO(), secret); err != nil {
-				logger.Error(err, "failed to create secret", "secret", secret.Name)
-				return
+			// update secret annotation
+			patch := client.MergeFrom(secret.DeepCopy())
+			if secret.Annotations == nil {
+				secret.Annotations = map[string]string{}
 			}
+			secret.Annotations[constant.ComponentAccountProvisionKey] = constant.AccountProvisioned
+			_ = r.Client.Patch(context.Background(), secret, patch)
 
-			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, SysAcctCreate,
-				"Created accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
+			r.Recorder.Eventf(comp, corev1.EventTypeNormal, SysAcctCreate,
+				"Created accounts for cluster: %s, component: %s, accounts: %s", clusterName, componentName, accountName)
 		},
 	}
-}
-
-// existsOperations checks if the cluster is doing operations
-func existsOperations(cluster *appsv1alpha1.Cluster) bool {
-	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	_, isRestoring := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
-	return len(opsRequestMap) > 0 || isRestoring
 }

@@ -151,11 +151,21 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(synthesizeC
 	account appsv1alpha1.SystemAccount, password []byte) *corev1.Secret {
 	secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name)
 	labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
-	return builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
+	secretBuilder := builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
 		AddLabelsInMap(labels).
 		AddLabels(constant.ClusterAccountLabelKey, account.Name).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
-		PutData(constant.AccountPasswdForSecret, password).
-		SetImmutable(true).
-		GetObject()
+		PutData(constant.AccountPasswdForSecret, password)
+
+	var accountStatus string
+	if account.InitAccount || account.SecretRef != nil {
+		accountStatus = constant.AccountProvisioned
+	} else {
+		accountStatus = constant.AccountInited
+	}
+	secretBuilder.GetObject().SetAnnotations(map[string]string{
+		constant.ComponentAccountProvisionKey: accountStatus,
+	})
+	secretBuilder.SetImmutable(true)
+	return secretBuilder.GetObject()
 }

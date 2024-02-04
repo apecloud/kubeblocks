@@ -202,11 +202,9 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				Default: true,
 				Components: []appsv1alpha1.ClusterTopologyComponent{
 					{
-						Name:                   "server",
-						CompDef:                compDefinitionName,
-						ServiceRefs:            []appsv1alpha1.ServiceRef{},
-						ServiceVersion:         "",
-						RequiredServiceVersion: "",
+						Name:           "server",
+						CompDef:        compDefinitionName,
+						ServiceVersion: "",
 					},
 				},
 				Orders: &appsv1alpha1.ClusterTopologyOrders{},
@@ -216,60 +214,24 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				Default: false,
 				Components: []appsv1alpha1.ClusterTopologyComponent{
 					{
-						Name:                   "proxy",
-						CompDef:                compDefinitionName,
-						ServiceRefs:            []appsv1alpha1.ServiceRef{},
-						ServiceVersion:         "",
-						RequiredServiceVersion: "",
+						Name:           "proxy",
+						CompDef:        compDefinitionName,
+						ServiceVersion: "",
 					},
 					{
-						Name:                   "server",
-						CompDef:                compDefinitionName,
-						ServiceRefs:            []appsv1alpha1.ServiceRef{},
-						ServiceVersion:         "",
-						RequiredServiceVersion: "",
+						Name:           "server",
+						CompDef:        compDefinitionName,
+						ServiceVersion: "",
 					},
 					{
-						Name:                   "storage",
-						CompDef:                compDefinitionName,
-						ServiceRefs:            []appsv1alpha1.ServiceRef{},
-						ServiceVersion:         "",
-						RequiredServiceVersion: "",
+						Name:           "storage",
+						CompDef:        compDefinitionName,
+						ServiceVersion: "",
 					},
 				},
 				Orders: &appsv1alpha1.ClusterTopologyOrders{
 					StartupOrder: []string{"storage", "server", "proxy"},
 					UpdateOrder:  []string{"storage", "server", "proxy"},
-				},
-			}
-			multipleCompsWithServiceRefTopology = appsv1alpha1.ClusterTopology{
-				Name:    "topo3",
-				Default: false,
-				Components: []appsv1alpha1.ClusterTopologyComponent{
-					{
-						Name:                   "proxy",
-						CompDef:                compDefinitionName,
-						ServiceRefs:            []appsv1alpha1.ServiceRef{},
-						ServiceVersion:         "",
-						RequiredServiceVersion: "",
-					},
-					{
-						Name:    "server",
-						CompDef: compDefinitionName,
-						ServiceRefs: []appsv1alpha1.ServiceRef{
-							{
-								Name:      "service-1",
-								Namespace: "default",
-								Cluster:   "cluster-1",
-							},
-						},
-						ServiceVersion:         "",
-						RequiredServiceVersion: "",
-					},
-				},
-				Orders: &appsv1alpha1.ClusterTopologyOrders{
-					StartupOrder: []string{"server", "proxy"},
-					UpdateOrder:  []string{"server", "proxy"},
 				},
 			}
 		)
@@ -291,7 +253,6 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddClusterTopology(singleCompTopology).
 				AddClusterTopology(multipleCompsTopology).
-				AddClusterTopology(multipleCompsWithServiceRefTopology).
 				Create(&testCtx).
 				GetObject()
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
@@ -396,50 +357,6 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
 				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
 				g.Expect(cd.Status.Message).Should(ContainSubstring("there is no matched definitions found for the topology component"))
-			})).Should(Succeed())
-		})
-
-		It("duplicate topology component service-refs", func() {
-			By("update cd to set all service-refs as same")
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1alpha1.ClusterDefinition) {
-				for i, topology := range cd.Spec.Topologies {
-					for j, comp := range topology.Components {
-						if len(comp.ServiceRefs) > 0 {
-							serviceRefs := comp.ServiceRefs
-							cd.Spec.Topologies[i].Components[j].ServiceRefs = append(serviceRefs, serviceRefs[0])
-						}
-					}
-				}
-			})()).Should(Succeed())
-
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
-				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
-				g.Expect(cd.Status.Message).Should(ContainSubstring("duplicate topology component serviceRef"))
-			})).Should(Succeed())
-		})
-
-		It("topology component service-ref not declared in definition", func() {
-			By("update cd to add non-exist service-ref")
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1alpha1.ClusterDefinition) {
-				for i, topology := range cd.Spec.Topologies {
-					for j, comp := range topology.Components {
-						serviceRefs := comp.ServiceRefs
-						if len(serviceRefs) > 0 {
-							cd.Spec.Topologies[i].Components[j].ServiceRefs = append(serviceRefs, appsv1alpha1.ServiceRef{
-								Name:      "serviceref-non-exist",
-								Namespace: "default",
-								Cluster:   "cluster-non-exist",
-							})
-						}
-					}
-				}
-			})()).Should(Succeed())
-
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
-				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
-				g.Expect(cd.Status.Message).Should(MatchRegexp("service ref .* in topology component .* not declared in matched definition"))
 			})).Should(Succeed())
 		})
 	})

@@ -66,8 +66,6 @@ type ClusterDefinitionSpec struct {
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 
-	// TODO: components the definition defined
-
 	// Topologies represents the different topologies within the cluster.
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
@@ -114,21 +112,12 @@ type ClusterTopologyComponent struct {
 	// +kubebuilder:validation:MaxLength=128
 	CompDef string `json:"compDef"`
 
-	// ServiceRefs define the service references for the component.
-	// +optional
-	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
-
 	// ServiceVersion specifies the service version associated with the referenced component definition.
 	// This field helps in determining the appropriate version of the component definition, considering multiple available versions.
 	// If not explicitly specified, the latest available version will be used.
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
-
-	// RequiredServiceVersion specifies the minimum service version required for this topology.
-	// +kubebuilder:validation:MaxLength=32
-	// +optional
-	RequiredServiceVersion string `json:"requiredServiceVersion,omitempty"`
 }
 
 // ClusterTopologyOrders defines the orders for components within a topology.

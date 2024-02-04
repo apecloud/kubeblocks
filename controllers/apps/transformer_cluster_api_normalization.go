@@ -77,7 +77,6 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 			Name:           comp.Name,
 			ComponentDef:   comp.CompDef,
 			ServiceVersion: comp.ServiceVersion,
-			ServiceRefs:    comp.ServiceRefs,
 		}
 	}
 
@@ -87,16 +86,6 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 		}
 		if len(compSpec.ServiceVersion) == 0 {
 			compSpec.ServiceVersion = comp.ServiceVersion
-		}
-		serviceRefs := make(map[string]bool)
-		for _, ref := range compSpec.ServiceRefs {
-			serviceRefs[ref.Name] = true
-		}
-		for i, ref := range comp.ServiceRefs {
-			if _, ok := serviceRefs[ref.Name]; ok {
-				continue
-			}
-			compSpec.ServiceRefs = append(compSpec.ServiceRefs, comp.ServiceRefs[i])
 		}
 		return compSpec
 	}

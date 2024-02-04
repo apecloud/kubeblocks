@@ -277,40 +277,6 @@ func (r *ClusterDefinitionReconciler) validateTopologyComponent(compDefs map[str
 	if !ok || len(defs) == 0 {
 		return fmt.Errorf("there is no matched definitions found for the topology component %s", comp.Name)
 	}
-
-	if !checkUniqueItemWithValue(comp.ServiceRefs, "Name", nil) {
-		return fmt.Errorf("duplicate topology component serviceRef")
-	}
-	for _, serviceRef := range comp.ServiceRefs {
-		if err := r.validateTopologyServiceRefs(defs, comp, serviceRef); err != nil {
-			return err
-		}
-	}
-	if len(comp.RequiredServiceVersion) > 0 {
-		if err := r.validateTopologyRequiredServiceVersion(defs, comp); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *ClusterDefinitionReconciler) validateTopologyServiceRefs(compDefs []*appsv1alpha1.ComponentDefinition,
-	comp appsv1alpha1.ClusterTopologyComponent, serviceRef appsv1alpha1.ServiceRef) error {
-	match := func(d appsv1alpha1.ServiceRefDeclaration) bool {
-		return d.Name == serviceRef.Name
-	}
-	for _, compDef := range compDefs {
-		if slices.IndexFunc(compDef.Spec.ServiceRefDeclarations, match) == -1 {
-			return fmt.Errorf("service ref %s in topology component %s not declared in matched definition %s",
-				serviceRef.Name, comp.Name, compDef.Name)
-		}
-	}
-	return nil
-}
-
-func (r *ClusterDefinitionReconciler) validateTopologyRequiredServiceVersion(compDefs []*appsv1alpha1.ComponentDefinition,
-	comp appsv1alpha1.ClusterTopologyComponent) error {
-	// TODO
 	return nil
 }
 

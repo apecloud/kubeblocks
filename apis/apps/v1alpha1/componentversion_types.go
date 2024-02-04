@@ -72,6 +72,7 @@ type ComponentVersionRelease struct {
 	Changes string `json:"changes,omitempty"`
 
 	// ServiceVersion defines the version of the well-known service that the component provides.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	// If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
 	// Cannot be updated.
 	// +kubebuilder:validation:Required

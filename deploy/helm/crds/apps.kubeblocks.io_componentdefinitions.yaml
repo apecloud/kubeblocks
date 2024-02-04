@@ -11483,7 +11483,9 @@ spec:
                 type: array
               serviceVersion:
                 description: ServiceVersion defines the version of the well-known
-                  service that the component provides. Cannot be updated.
+                  service that the component provides. The version should follow the
+                  syntax and semantics of the "Semantic Versioning" specification
+                  (http://semver.org/). Cannot be updated.
                 maxLength: 32
                 type: string
               services:

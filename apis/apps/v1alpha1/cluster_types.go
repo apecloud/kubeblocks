@@ -360,6 +360,7 @@ type ClusterComponentSpec struct {
 	ComponentDef string `json:"componentDef,omitempty"`
 
 	// ServiceVersion specifies the version of the service provisioned by the component.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	// If not explicitly specified, the version defined in the referenced topology will be used.
 	// If no version is specified in the topology, the latest available version will be used.
 	// +kubebuilder:validation:MaxLength=32

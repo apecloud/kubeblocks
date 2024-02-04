@@ -103,7 +103,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 		objs := make([]*appsv1alpha1.ComponentDefinition, 0)
 		for _, name := range compDefNames {
 			f := testapps.NewComponentDefinitionFactory(name).
-				SetServiceVersion(serviceVersion("")) // use empty revision as init service version
+				SetServiceVersion(serviceVersion("v0")) // use v0 as init service version
 			for _, app := range []string{appName, appNameSamePrefix} {
 				// use empty revision as init image tag
 				f = f.SetRuntime(&corev1.Container{Name: app, Image: appImage(app, releaseID(""))})
@@ -200,7 +200,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 		return obj
 	}
 
-	updateNcheckCompDefinitionImages := func(compDef *appsv1alpha1.ComponentDefinition, serviceVersion string, r0, r1 string) {
+	updateNCheckCompDefinitionImages := func(compDef *appsv1alpha1.ComponentDefinition, serviceVersion string, r0, r1 string) {
 		Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[0].Name, releaseID(""))))
 		Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(appImage(compDef.Spec.Runtime.Containers[1].Name, releaseID(""))))
 		Expect(updateCompDefinitionImages4ServiceVersion(testCtx.Ctx, testCtx.Cli, compDef, serviceVersion)).Should(Succeed())
@@ -388,49 +388,49 @@ var _ = Describe("ComponentVersion Controller", func() {
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
 
 			By("with definition v1.1 and service version v0")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.1"), serviceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.1")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
 
 			By("with definition v2.0 and service version v0")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v2.0"), serviceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
 
 			By("with definition v1.0 and service version v1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.0"), serviceVersion("v2"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
 			By("with definition v1.1 and service version v1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.1"), serviceVersion("v2"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.1")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
 			By("with definition v2.0 and service version v1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v2.0"), serviceVersion("v2"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
 			By("with definition v3.0 and service version v2")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v3.0"), serviceVersion("v3"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v3.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v3")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
 		})
 
 		It("w/o service version", func() {
@@ -439,28 +439,28 @@ var _ = Describe("ComponentVersion Controller", func() {
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
 			By("with definition v1.1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.1"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.1")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
 			By("with definition v2.0")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v2.0"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
 			By("with definition v3.0")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v3.0"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v3.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v3")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
 		})
 
 		It("prefix match definition", func() {
@@ -469,35 +469,35 @@ var _ = Describe("ComponentVersion Controller", func() {
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
 
 			By("with definition prefix and service version v1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefinitionName, serviceVersion("v2"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
 			By("with definition prefix and service version v2")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefinitionName, serviceVersion("v3"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v3.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v3")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
 
 			By("with definition v1 prefix and service version v0")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1"), serviceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.1")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v1")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
 
 			By("with definition v2 prefix and service version v1")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v2"), serviceVersion("v2"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 		})
 
 		It("prefix match definition and w/o service version", func() {
@@ -506,30 +506,30 @@ var _ = Describe("ComponentVersion Controller", func() {
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v3.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v3")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
 
 			By("with definition v1 prefix")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.1")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 
 			By("with definition v2 prefix")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v2"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v2")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 		})
 
 		It("match from definition", func() {
-			By("with definition v1.0 and service version empty revision")
-			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.0"), serviceVersion(""))
+			By("with definition v1.0 and service version v0")
+			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, compDefName("v1.0"), serviceVersion("v0"))
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v1.0")))
-			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "", "") // empty revision of image tag
+			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v0")))
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "", "") // empty revision of image tag
 		})
 
 		It("resolve images from definition and version", func() {
@@ -574,7 +574,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(compDefName("v4.0")))
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v4")))
-			updateNcheckCompDefinitionImages(compDef, resolvedServiceVersion, "r6", "") // app is r6 and another one is ""
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r6", "") // app is r6 and another one is ""
 		})
 	})
 })

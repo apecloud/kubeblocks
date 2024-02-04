@@ -272,12 +272,18 @@ func (r *ClusterDefinitionReconciler) loadTopologyCompDefs(ctx context.Context,
 
 func (r *ClusterDefinitionReconciler) validateTopologyComponent(compDefs map[string][]*appsv1alpha1.ComponentDefinition,
 	comp appsv1alpha1.ClusterTopologyComponent) error {
-	// TODO(API): validate service version
 	defs, ok := compDefs[comp.Name]
 	if !ok || len(defs) == 0 {
 		return fmt.Errorf("there is no matched definitions found for the topology component %s", comp.Name)
 	}
+	if err := r.validateCompServiceVersion(comp); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (r *ClusterDefinitionReconciler) validateCompServiceVersion(comp appsv1alpha1.ClusterTopologyComponent) error {
+	return validateServiceVersion(comp.ServiceVersion)
 }
 
 // defaultClusterTopology returns the default cluster topology in specified cluster definition.

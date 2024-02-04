@@ -35,6 +35,7 @@ type ComponentSpec struct {
 	CompDef string `json:"compDef"`
 
 	// ServiceVersion specifies the version of the service provisioned by the component.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`

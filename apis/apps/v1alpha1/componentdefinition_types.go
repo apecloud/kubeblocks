@@ -77,6 +77,7 @@ type ComponentDefinitionSpec struct {
 	ServiceKind string `json:"serviceKind,omitempty"`
 
 	// ServiceVersion defines the version of the well-known service that the component provides.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	// Cannot be updated.
 	// +kubebuilder:validation:MaxLength=32
 	// +optional

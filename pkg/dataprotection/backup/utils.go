@@ -234,8 +234,8 @@ func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
 // For kubernetes version >= 1.25, the timeZone field is supported, return timezone.
 // Ref https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
 //
-// For kubernetes version < 1.25 and greater than or equal  to 1.22, the timeZone
-// field is not supported. Therefor, we need to set the CRON_TZ environment variable.
+// For kubernetes version < 1.25 and >= 1.22, the timeZone field is not supported.
+// Therefor, we need to set the CRON_TZ environment variable.
 // Ref https://github.com/kubernetes/kubernetes/issues/47202#issuecomment-901294870
 //
 // For kubernetes version < 1.22, the CRON_TZ environment variable is not supported.

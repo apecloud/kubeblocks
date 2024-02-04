@@ -558,10 +558,10 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 
 	clusterCompDefRoleProbe := clusterCompDef.Probes.RoleProbe
 	roleProbe := &appsv1alpha1.RoleProbe{
-		TimeoutSeconds:   clusterCompDefRoleProbe.TimeoutSeconds,
-		PeriodSeconds:    clusterCompDefRoleProbe.PeriodSeconds,
-		SuccessThreshold: 1, // default non-zero value
-		FailureThreshold: clusterCompDefRoleProbe.FailureThreshold,
+		Timer: appsv1alpha1.Timer{
+			TimeoutSeconds: clusterCompDefRoleProbe.TimeoutSeconds,
+			PeriodSeconds:  clusterCompDefRoleProbe.PeriodSeconds,
+		},
 	}
 
 	builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)

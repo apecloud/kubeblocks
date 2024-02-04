@@ -199,11 +199,8 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 	}
 
 	rsmRoleProbe := &workloads.RoleProbe{
-		InitialDelaySeconds: synthesizeComp.LifecycleActions.RoleProbe.InitialDelaySeconds,
 		TimeoutSeconds:      synthesizeComp.LifecycleActions.RoleProbe.TimeoutSeconds,
 		PeriodSeconds:       synthesizeComp.LifecycleActions.RoleProbe.PeriodSeconds,
-		SuccessThreshold:    synthesizeComp.LifecycleActions.RoleProbe.SuccessThreshold,
-		FailureThreshold:    synthesizeComp.LifecycleActions.RoleProbe.FailureThreshold,
 		RoleUpdateMechanism: workloads.DirectAPIServerEventUpdate,
 	}
 

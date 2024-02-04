@@ -270,7 +270,6 @@ func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = roleProbe.PeriodSeconds
 	probe.TimeoutSeconds = roleProbe.TimeoutSeconds
-	probe.FailureThreshold = roleProbe.FailureThreshold
 	roleChangedContainer.ReadinessProbe = probe
 }
 

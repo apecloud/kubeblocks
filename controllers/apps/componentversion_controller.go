@@ -246,7 +246,7 @@ func (r *ComponentVersionReconciler) supportedServiceVersions(compVersion *appsv
 	}
 	keys := maps.Keys(versions)
 	slices.Sort(keys)
-	return strings.Join(keys, ",") // TODO
+	return strings.Join(keys, ",") // TODO(API): service versions length
 }
 
 func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Client, rctx intctrlutil.RequestCtx,
@@ -447,7 +447,7 @@ func compatibleServiceVersions4Definition(compDef *appsv1alpha1.ComponentDefinit
 	return serviceVersions
 }
 
-// TODO
+// TODO(API): service version comparison
 func compareServiceVersion(required, provide string) bool {
 	v, err1 := version.ParseSemantic(required)
 	if err1 != nil {

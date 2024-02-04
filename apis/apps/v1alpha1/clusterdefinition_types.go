@@ -1048,7 +1048,7 @@ type GVKResource struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
-// TODO:
+// TODO(API):
 //  1. how to display the aggregated topologies and its service references line by line?
 //  2. the services and versions supported
 

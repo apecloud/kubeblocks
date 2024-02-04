@@ -20,8 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"reflect"
+
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -33,37 +36,31 @@ var _ graph.Transformer = &componentMetaTransformer{}
 
 func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	component := transCtx.Component
-	componentOrig := transCtx.ComponentOrig
-	needUpdate := false
+	comp := transCtx.Component
 
 	// if !controllerutil.ContainsFinalizer(component, constant.DBComponentFinalizerName) {
 	//	controllerutil.AddFinalizer(component, constant.DBComponentFinalizerName)
 	//	needUpdate = true
 	// }
-	if !controllerutil.ContainsFinalizer(component, constant.DBClusterFinalizerName) {
-		controllerutil.AddFinalizer(component, constant.DBClusterFinalizerName)
-		needUpdate = true
-	}
+	controllerutil.AddFinalizer(comp, constant.DBClusterFinalizerName)
 
-	labels := component.Labels
-	if labels == nil {
-		labels = map[string]string{}
-	}
-	labelName := labels[constant.ComponentDefinitionLabelKey]
-	if labelName != component.Spec.CompDef {
-		labels[constant.ComponentDefinitionLabelKey] = component.Spec.CompDef
-		// TODO: service version label
-		needUpdate = true
-	}
+	t.setMetaLabels(comp)
 
-	if !needUpdate {
+	if reflect.DeepEqual(transCtx.ComponentOrig.Finalizers, comp.Finalizers) &&
+		reflect.DeepEqual(transCtx.ComponentOrig.Labels, comp.Labels) {
 		return nil
 	}
 
-	component.Labels = labels
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	graphCli.Update(dag, componentOrig, component)
+	graphCli.Update(dag, transCtx.ComponentOrig, comp)
 
 	return graph.ErrPrematureStop
+}
+
+func (t *componentMetaTransformer) setMetaLabels(comp *appsv1alpha1.Component) {
+	if comp.Labels == nil {
+		comp.Labels = map[string]string{}
+	}
+	comp.Labels[constant.ComponentDefinitionLabelKey] = comp.Spec.CompDef
+	comp.Labels[constant.KBAppServiceVersionLabelKey] = comp.Spec.ServiceVersion
 }

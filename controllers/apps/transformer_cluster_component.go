@@ -134,7 +134,7 @@ func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 		if buildErr != nil {
 			return buildErr
 		}
-		if newCompObj := copyAndMergeComponent(runningComp, comp); newCompObj != nil {
+		if newCompObj := copyAndMergeComponent(protoCompSpecMap[compName], runningComp, comp); newCompObj != nil {
 			graphCli.Update(dag, runningComp, newCompObj)
 		}
 	}
@@ -169,7 +169,7 @@ func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1alph
 // copyAndMergeComponent merges two component objects for updating:
 // 1. new a component object targetCompObj by copying from oldCompObj
 // 2. merge all fields can be updated from newCompObj into targetCompObj
-func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *appsv1alpha1.Component {
+func copyAndMergeComponent(compSpec *appsv1alpha1.ClusterComponentSpec, oldCompObj, newCompObj *appsv1alpha1.Component) *appsv1alpha1.Component {
 	compObjCopy := oldCompObj.DeepCopy()
 	compProto := newCompObj
 
@@ -180,14 +180,16 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Labels = compProto.Labels
 
 	// merge spec
-	mergeComponent4Upgrade(compObjCopy, compProto)
-	compObjCopy.Spec.Monitor = compProto.Spec.Monitor
+	// TODO(API): upgrade service version and definition
+	checkNMergeComponent4Upgrade(compSpec, compObjCopy, compProto)
 	compObjCopy.Spec.ClassDefRef = compProto.Spec.ClassDefRef
+	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
 	compObjCopy.Spec.Resources = compProto.Spec.Resources
+	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
 	compObjCopy.Spec.Configs = compProto.Spec.Configs
+	compObjCopy.Spec.Monitor = compProto.Spec.Monitor
 	compObjCopy.Spec.EnabledLogs = compProto.Spec.EnabledLogs
-	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
 	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
@@ -203,13 +205,25 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	return compObjCopy
 }
 
-func mergeComponent4Upgrade(obj, proto *appsv1alpha1.Component) {
-	check4Upgrade := func() bool {
-		return false // TODO
+func checkNMergeComponent4Upgrade(compSpec *appsv1alpha1.ClusterComponentSpec, obj, proto *appsv1alpha1.Component) {
+	if obj.Spec.CompDef == proto.Spec.CompDef && obj.Spec.ServiceVersion == proto.Spec.ServiceVersion {
+		return
 	}
-	if check4Upgrade() {
-		obj.Spec.CompDef = proto.Spec.CompDef
-		obj.Spec.ServiceVersion = proto.Spec.ServiceVersion
-		obj.Spec.ServiceRefs = proto.Spec.ServiceRefs
+	if obj.Spec.ServiceVersion != proto.Spec.ServiceVersion {
+		mergeComponent4Upgrade(compSpec, obj, proto)
+	} else {
+		mergeComponent4DefinitionUpgrade(compSpec, obj, proto)
 	}
+}
+
+func mergeComponent4Upgrade(compSpec *appsv1alpha1.ClusterComponentSpec, obj, proto *appsv1alpha1.Component) {
+	// only support full match now
+	if compSpec.ServiceVersion != proto.Spec.ServiceVersion {
+		return
+	}
+	obj.Spec.CompDef = proto.Spec.CompDef
+	obj.Spec.ServiceVersion = proto.Spec.ServiceVersion
+}
+
+func mergeComponent4DefinitionUpgrade(compSpec *appsv1alpha1.ClusterComponentSpec, obj, proto *appsv1alpha1.Component) {
 }

@@ -54,12 +54,12 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	}
 
 	// resolve all component definitions referenced
-	return t.resolveCompDefinitions(transCtx, transCtx.Cluster)
+	return t.resolveCompDefinitions(transCtx)
 }
 
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	if withClusterTopology(cluster) {
-		return t.buildCompSpecs4Topology(transCtx.ClusterDef, cluster), nil
+		return t.buildCompSpecs4Topology(transCtx.ClusterDef, cluster)
 	}
 	if withClusterUserDefined(cluster) || withClusterLegacyDefinition(cluster) {
 		return t.buildCompSpecs4Specified(transCtx, cluster)
@@ -71,7 +71,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTra
 }
 
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1alpha1.ClusterDefinition,
-	cluster *appsv1alpha1.Cluster) []*appsv1alpha1.ClusterComponentSpec {
+	cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	newCompSpec := func(comp appsv1alpha1.ClusterTopologyComponent) *appsv1alpha1.ClusterComponentSpec {
 		return &appsv1alpha1.ClusterComponentSpec{
 			Name:           comp.Name,
@@ -90,10 +90,13 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 		return compSpec
 	}
 
-	// TODO: the default topology may be changed
-	clusterTopology := referredClusterTopology(clusterDef, cluster.Spec.Topology)
+	topologyName := clusterTopologyName(cluster)
+	clusterTopology := referredClusterTopology(clusterDef, topologyName)
 	if clusterTopology == nil {
-		panic(fmt.Sprintf("runtime error - cluster topology not found : %s", cluster.Spec.Topology))
+		return nil, fmt.Errorf("referred cluster topology not found : %s", topologyName)
+	}
+	if clusterTopology.Name != topologyName {
+		return nil, fmt.Errorf("referred cluster topology is changed, expected: %s, resolved: %s", topologyName, clusterTopology.Name)
 	}
 
 	specifiedCompSpecs := make(map[string]*appsv1alpha1.ClusterComponentSpec)
@@ -110,7 +113,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 			compSpecs = append(compSpecs, newCompSpec(comp))
 		}
 	}
-	return compSpecs
+	return compSpecs, nil
 }
 
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Specified(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
@@ -149,7 +152,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4SimplifiedAPI(cluste
 	return []*appsv1alpha1.ClusterComponentSpec{apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster)}
 }
 
-func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext) error {
 	if transCtx.ComponentDefs == nil {
 		transCtx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)
 	}

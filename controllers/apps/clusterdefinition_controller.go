@@ -154,11 +154,11 @@ func (r *ClusterDefinitionReconciler) supportedTopologies(clusterDef *appsv1alph
 		topologies = append(topologies, topology.Name)
 	}
 	slices.Sort(topologies)
-	return strings.Join(topologies, ",") // TODO
+	return strings.Join(topologies, ",") // TODO(API): topologies length
 }
 
 func (r *ClusterDefinitionReconciler) referredServiceRefs(clusterDef *appsv1alpha1.ClusterDefinition) string {
-	return "" // TODO
+	return "" // TODO(API): referred service refs
 }
 
 func (r *ClusterDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) (*ctrl.Result, error) {
@@ -272,7 +272,7 @@ func (r *ClusterDefinitionReconciler) loadTopologyCompDefs(ctx context.Context,
 
 func (r *ClusterDefinitionReconciler) validateTopologyComponent(compDefs map[string][]*appsv1alpha1.ComponentDefinition,
 	comp appsv1alpha1.ClusterTopologyComponent) error {
-	// TODO: service version
+	// TODO(API): validate service version
 	defs, ok := compDefs[comp.Name]
 	if !ok || len(defs) == 0 {
 		return fmt.Errorf("there is no matched definitions found for the topology component %s", comp.Name)

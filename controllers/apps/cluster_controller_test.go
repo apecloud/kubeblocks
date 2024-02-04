@@ -172,8 +172,8 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	createClusterObjNoWait := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
-		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+	createClusterObjNoWait := func(clusterDefName, clusterVerName, compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
+		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVerName).
 			WithRandomName()
 		if !v2 {
 			factory.AddComponent(compName, compDefName).SetReplicas(1)
@@ -191,8 +191,8 @@ var _ = Describe("Cluster Controller", func() {
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 	}
 
-	createClusterObjWithShardNoWait := func(compTplName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
-		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+	createClusterObjWithShardNoWait := func(clusterDefName, clusterVerName, compTplName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
+		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVerName).
 			WithRandomName()
 		if !v2 {
 			factory.AddShardingSpec(compTplName, compDefName).SetShards(defaultShardCount)
@@ -208,7 +208,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjNoWait(compName, compDefName, false, processor)
+		createClusterObjNoWait(clusterDefObj.Name, clusterVersionObj.Name, compName, compDefName, false, processor)
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -224,7 +224,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	createClusterObjWithShard := func(compTplName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjWithShardNoWait(compTplName, compDefName, false, processor)
+		createClusterObjWithShardNoWait(clusterDefObj.Name, clusterVersionObj.Name, compTplName, compDefName, false, processor)
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -242,7 +242,7 @@ var _ = Describe("Cluster Controller", func() {
 	// createClusterObjV2 creates cluster objects with new component definition API enabled.
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjNoWait(compName, compDefName, true, processor)
+		createClusterObjNoWait("", "", compName, compDefName, true, processor)
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -258,7 +258,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	createClusterObjWithShardV2 := func(compTplName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjWithShardNoWait(compTplName, compDefName, true, processor)
+		createClusterObjWithShardNoWait("", "", compTplName, compDefName, true, processor)
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -973,7 +973,7 @@ var _ = Describe("Cluster Controller", func() {
 		It("test cluster conditions when cluster definition non-exist", func() {
 			By("create a cluster with cluster definition non-exist")
 			mockCompDefName := fmt.Sprintf("%s-%s", consensusCompDefName, testCtx.GetRandomStr())
-			createClusterObjNoWait(consensusCompName, mockCompDefName, false, nil)
+			createClusterObjNoWait(clusterDefObj.Name, clusterVersionObj.Name, consensusCompName, mockCompDefName, false, nil)
 
 			By("check conditions")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
@@ -1001,7 +1001,7 @@ var _ = Describe("Cluster Controller", func() {
 			})).Should(Succeed())
 
 			By("create a cluster with the unavailable cluster version")
-			createClusterObjNoWait(consensusCompName, consensusCompDefName, false, nil)
+			createClusterObjNoWait(clusterDefObj.Name, clusterVersionObj.Name, consensusCompName, consensusCompDefName, false, nil)
 
 			By("expect the cluster provisioning condition as pre-check failed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {

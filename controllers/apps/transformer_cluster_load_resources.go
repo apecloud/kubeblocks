@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -61,6 +62,8 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 		if err = validateClusterTopology(transCtx.ClusterDef, cluster); err != nil {
 			return newRequeueError(requeueDuration, err.Error())
 		}
+		// patch topology name to cluster annotations in case the default topology changed.
+		setClusterTopologyAnnotation(transCtx.ClusterDef, cluster)
 	}
 	return nil
 }
@@ -137,12 +140,33 @@ func validateClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition, cluster
 	return nil
 }
 
+func setClusterTopologyAnnotation(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) {
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
+	}
+	clusterTopology := referredClusterTopology(clusterDef, cluster.Spec.Topology)
+	if clusterTopology == nil {
+		panic(fmt.Sprintf("runtime error - cluster topology not found : %s", cluster.Spec.Topology))
+	}
+	cluster.Annotations[constant.ClusterDefTopologyLabelKey] = clusterTopology.Name
+}
+
+func clusterTopologyName(cluster *appsv1alpha1.Cluster) string {
+	if cluster.Annotations != nil {
+		return cluster.Annotations[constant.ClusterDefTopologyLabelKey]
+	}
+	if len(cluster.Spec.Topology) > 0 {
+		return cluster.Spec.Topology
+	}
+	return ""
+}
+
 func withClusterTopology(cluster *appsv1alpha1.Cluster) bool {
-	return len(cluster.Spec.ClusterDefRef) > 0 && len(cluster.Spec.Topology) > 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
+	return len(cluster.Spec.ClusterDefRef) > 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
 }
 
 func withClusterUserDefined(cluster *appsv1alpha1.Cluster) bool {
-	return len(cluster.Spec.Topology) == 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
+	return len(cluster.Spec.ClusterDefRef) == 0 && len(cluster.Spec.Topology) == 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
 }
 
 func withClusterLegacyDefinition(cluster *appsv1alpha1.Cluster) bool {

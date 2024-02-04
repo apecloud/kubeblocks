@@ -44,7 +44,8 @@ func IsHAAvailable(characterType, workloadType string) bool {
 			return true
 		}
 	case models.ApecloudPostgreSQL:
-		return true
+		// apecloud-pg use syncer to support ha
+		return false
 	case models.OfficialPostgreSQL:
 		return true
 	}

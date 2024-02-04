@@ -44,7 +44,9 @@ spec:
       {{ `{{- $endpoint = (printf "https://storage.googleapis.com") }}` }}
     {{ `{{- end }}` }}
     endpoint = {{ `{{ $endpoint }}` }}
+    region = {{ `{{ index .Parameters "region" }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
+    no_check_bucket = true
     chunk_size = 50Mi
 
   parametersSchema:
@@ -56,7 +58,7 @@ spec:
           description: "GCS region, e.g. auto"
         bucket:
           type: string
-          description: "GCS bucket"
+          description: "GCS bucket, the bucket must already exist"
         endpoint:
           type: string
           description: "GCS endpoint (optional)"

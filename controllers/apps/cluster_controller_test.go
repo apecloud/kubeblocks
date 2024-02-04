@@ -852,27 +852,6 @@ var _ = Describe("Cluster Controller", func() {
 		deleteClusterWithBackup(appsv1alpha1.WipeOut, backupRetainPolicy)
 	}
 
-	// getPVCName := func(vctName, compName string, i int) string {
-	//	return fmt.Sprintf("%s-%s-%s-%d", vctName, clusterKey.Name, compName, i)
-	//}
-	//
-	// createPVC := func(clusterName, pvcName, compName, storageSize, storageClassName string) {
-	//	if storageSize == "" {
-	//		storageSize = "1Gi"
-	//	}
-	//	clusterBytes, _ := json.Marshal(clusterObj)
-	//	testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
-	//		compName, testapps.DataVolumeName).
-	//		AddLabelsInMap(map[string]string{
-	//			constant.AppInstanceLabelKey:    clusterName,
-	//			constant.KBAppComponentLabelKey: compName,
-	//			constant.AppManagedByLabelKey:   constant.AppName,
-	//		}).AddAnnotations(constant.LastAppliedClusterAnnotationKey, string(clusterBytes)).
-	//		SetStorage(storageSize).
-	//		SetStorageClass(storageClassName).
-	//		CheckedCreate(&testCtx)
-	// }
-
 	Context("cluster provisioning", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
@@ -898,11 +877,11 @@ var _ = Describe("Cluster Controller", func() {
 				testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjV2, nil)
 			})
 
-			PIt("create shardingSpec cluster with component template object", func() {
+			It("create shardingSpec cluster with component template object", func() {
 				testClusterComponent(consensusCompName, compDefName, createClusterObjWithShard, &shards)
 			})
 
-			PIt("create shardingSpec cluster with new component template object", func() {
+			It("create shardingSpec cluster with new component template object", func() {
 				testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjWithShardV2, &shards)
 			})
 
@@ -923,7 +902,7 @@ var _ = Describe("Cluster Controller", func() {
 				testClusterServiceCreateAndDelete(consensusCompName, compDefName, createObj)
 			})
 
-			PIt("should create and delete shard topology cluster service correctly", func() {
+			It("should create and delete shard topology cluster service correctly", func() {
 				testClusterShardServiceCreateAndDelete(consensusCompName, compDefName, createClusterObjWithShard)
 			})
 		}

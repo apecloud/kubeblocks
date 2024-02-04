@@ -67,13 +67,13 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 
 func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1alpha1.Cluster) error {
 	if withClusterTopology(cluster) ||
-		withUserDefinedTopology(cluster) ||
-		withLegacyClusterDef(cluster) ||
-		withSimplifiedClusterAPI(cluster) {
+		withClusterUserDefined(cluster) ||
+		withClusterLegacyDefinition(cluster) ||
+		withClusterSimplifiedAPI(cluster) {
 		return nil
 	}
 	return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d, legacy comps: %d, new comps: %d, simplified API: %v",
-		cluster.Spec.ClusterDefRef, cluster.Spec.Topology, clusterCompCnt(cluster), clusterLegacyCompCnt(cluster), clusterNewCompCnt(cluster), withSimplifiedClusterAPI(cluster))
+		cluster.Spec.ClusterDefRef, cluster.Spec.Topology, clusterCompCnt(cluster), clusterLegacyCompCnt(cluster), clusterNewCompCnt(cluster), withClusterSimplifiedAPI(cluster))
 }
 
 func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
@@ -141,30 +141,42 @@ func withClusterTopology(cluster *appsv1alpha1.Cluster) bool {
 	return len(cluster.Spec.ClusterDefRef) > 0 && len(cluster.Spec.Topology) > 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
 }
 
-func withUserDefinedTopology(cluster *appsv1alpha1.Cluster) bool {
+func withClusterUserDefined(cluster *appsv1alpha1.Cluster) bool {
 	return len(cluster.Spec.Topology) == 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
 }
 
-func withLegacyClusterDef(cluster *appsv1alpha1.Cluster) bool {
+func withClusterLegacyDefinition(cluster *appsv1alpha1.Cluster) bool {
 	return len(cluster.Spec.ClusterDefRef) > 0 && len(cluster.Spec.Topology) == 0 && clusterCompCnt(cluster) == clusterLegacyCompCnt(cluster)
 }
 
-func withSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster) bool {
+func withClusterSimplifiedAPI(cluster *appsv1alpha1.Cluster) bool {
 	return apiconversion.HasSimplifiedClusterAPI(cluster)
 }
 
 func clusterCompCnt(cluster *appsv1alpha1.Cluster) int {
-	return len(cluster.Spec.ComponentSpecs)
-}
-
-func clusterLegacyCompCnt(cluster *appsv1alpha1.Cluster) int {
-	return generics.CountFunc(cluster.Spec.ComponentSpecs, func(spec appsv1alpha1.ClusterComponentSpec) bool {
-		return len(spec.ComponentDefRef) != 0 && len(spec.ComponentDef) == 0
-	})
+	return clusterCompCntWithFunc(cluster, func(spec appsv1alpha1.ClusterComponentSpec) bool { return true })
 }
 
 func clusterNewCompCnt(cluster *appsv1alpha1.Cluster) int {
-	return generics.CountFunc(cluster.Spec.ComponentSpecs, func(spec appsv1alpha1.ClusterComponentSpec) bool {
-		return len(spec.ComponentDefRef) == 0
-	})
+	isNewComp := func(spec appsv1alpha1.ClusterComponentSpec) bool {
+		return len(spec.ComponentDefRef) == 0 // spec.componentDef is optional and can be inferred by operator.
+	}
+	return clusterCompCntWithFunc(cluster, isNewComp)
+}
+
+func clusterLegacyCompCnt(cluster *appsv1alpha1.Cluster) int {
+	isLegacyComp := func(spec appsv1alpha1.ClusterComponentSpec) bool {
+		return len(spec.ComponentDefRef) != 0 && len(spec.ComponentDef) == 0
+	}
+	return clusterCompCntWithFunc(cluster, isLegacyComp)
+}
+
+func clusterCompCntWithFunc(cluster *appsv1alpha1.Cluster, match func(spec appsv1alpha1.ClusterComponentSpec) bool) int {
+	cnt := generics.CountFunc(cluster.Spec.ComponentSpecs, match)
+	for _, sharding := range cluster.Spec.ShardingSpecs {
+		if match(sharding.Template) {
+			cnt += int(sharding.Shards)
+		}
+	}
+	return cnt
 }

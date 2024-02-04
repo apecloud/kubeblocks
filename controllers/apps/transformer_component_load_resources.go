@@ -56,13 +56,7 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	}
 	transCtx.Cluster = cluster
 
-	generated := false
-	generated, err = isGeneratedComponent(cluster)
-	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
-
-	if generated {
+	if isGeneratedComponent(transCtx.ComponentOrig) {
 		return t.transformForGeneratedComponent(transCtx)
 	}
 	return t.transformForNativeComponent(transCtx)
@@ -117,12 +111,7 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	return nil
 }
 
-func isGeneratedComponent(cluster *appsv1alpha1.Cluster) (bool, error) {
-	if withClusterTopology(cluster) || withUserDefinedTopology(cluster) {
-		return false, nil
-	}
-	if withLegacyClusterDef(cluster) || withSimplifiedClusterAPI(cluster) {
-		return true, nil
-	}
-	return true, fmt.Errorf("unknown cluster API")
+// isGeneratedComponent checks if the component is generated from legacy cluster definitions.
+func isGeneratedComponent(comp *appsv1alpha1.Component) bool {
+	return len(comp.Spec.CompDef) == 0
 }

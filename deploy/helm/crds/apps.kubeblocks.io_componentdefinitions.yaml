@@ -3042,10 +3042,14 @@ spec:
                       Cannot be updated.
                     properties:
                       args:
+                        description: RoleProbeArgs defines the arguments for probing
+                          a role
                         properties:
                           host:
-                            description: EnvVar represents an environment variable
-                              present in a Container.
+                            description: Host is the argument containing the address
+                              of the db service to probe. This should specify where
+                              the database server is running, e.g. the service dns
+                              or IP address
                             properties:
                               name:
                                 description: Name of the environment variable. Must
@@ -3160,8 +3164,8 @@ spec:
                             - name
                             type: object
                           password:
-                            description: EnvVar represents an environment variable
-                              present in a Container.
+                            description: Password is the argument containing password
+                              which is used to authenticate the database connection.
                             properties:
                               name:
                                 description: Name of the environment variable. Must
@@ -3276,8 +3280,8 @@ spec:
                             - name
                             type: object
                           port:
-                            description: EnvVar represents an environment variable
-                              present in a Container.
+                            description: Port is the argument containing the port
+                              on which the db service is listening.
                             properties:
                               name:
                                 description: Name of the environment variable. Must
@@ -3392,8 +3396,8 @@ spec:
                             - name
                             type: object
                           user:
-                            description: EnvVar represents an environment variable
-                              present in a Container.
+                            description: UserName is the argument containing username
+                              which is used to authenticate the database connection.
                             properties:
                               name:
                                 description: Name of the environment variable. Must

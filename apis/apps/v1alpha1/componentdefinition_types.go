@@ -658,15 +658,34 @@ type Timer struct {
 	PeriodSeconds int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
 }
 
+// RoleProbeArgs defines the arguments for probing a role
 type RoleProbeArgs struct {
-	Host     *corev1.EnvVar `json:"host,omitempty"`
-	Port     *corev1.EnvVar `json:"port,omitempty"`
-	User     *corev1.EnvVar `json:"user,omitempty"`
+	// Host is the argument containing the address of the db service to probe.
+	// This should specify where the database server is running, e.g. the service dns or IP address
+	// +optional
+	Host *corev1.EnvVar `json:"host,omitempty"`
+
+	// Port is the argument containing the port on which the db service is listening.
+	// +optional
+	Port *corev1.EnvVar `json:"port,omitempty"`
+
+	// UserName is the argument containing username which is used to authenticate the database connection.
+	// +optional
+	UserName *corev1.EnvVar `json:"user,omitempty"`
+
+	// Password is the argument containing password which is used to authenticate the database connection.
+	// +optional
 	Password *corev1.EnvVar `json:"password,omitempty"`
 }
 
 type RoleProbe struct {
 	LifecycleActionHandler `json:",inline"`
-	Timer                  `json:",inline"`
-	Args                   *RoleProbeArgs `json:"args,omitempty"`
+
+	// Timer contains the settings for a periodic executor that will
+	// trigger an action on a repeating schedule.
+	Timer `json:",inline"`
+
+	// RoleProbeArgs defines the arguments for probing a role
+	// +optional
+	Args *RoleProbeArgs `json:"args,omitempty"`
 }

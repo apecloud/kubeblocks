@@ -4584,8 +4584,8 @@ func (in *RoleProbeArgs) DeepCopyInto(out *RoleProbeArgs) {
 		*out = new(v1.EnvVar)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.User != nil {
-		in, out := &in.User, &out.User
+	if in.UserName != nil {
+		in, out := &in.UserName, &out.UserName
 		*out = new(v1.EnvVar)
 		(*in).DeepCopyInto(*out)
 	}

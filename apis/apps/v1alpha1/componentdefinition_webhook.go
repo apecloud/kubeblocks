@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -38,7 +38,7 @@ func (r *ComponentDefinition) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-//+kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-componentdefinition,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=create;update,versions=v1alpha1,name=mcomponentdefinition.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-componentdefinition,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=create;update,versions=v1alpha1,name=mcomponentdefinition.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &ComponentDefinition{}
 
@@ -50,7 +50,7 @@ func (r *ComponentDefinition) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-apps-kubeblocks-io-v1alpha1-componentdefinition,mutating=false,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=create;update,versions=v1alpha1,name=vcomponentdefinition.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-apps-kubeblocks-io-v1alpha1-componentdefinition,mutating=false,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=create;update,versions=v1alpha1,name=vcomponentdefinition.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &ComponentDefinition{}
 

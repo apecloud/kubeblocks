@@ -646,13 +646,7 @@ type ComponentSwitchover struct {
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
-type RoleProbe struct {
-	LifecycleActionHandler `json:",inline"`
-
-	// Number of seconds after the container has started before liveness probes are initiated.
-	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
-	// +optional
-	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty" protobuf:"varint,2,opt,name=initialDelaySeconds"`
+type Timer struct {
 	// Number of seconds after which the probe times out.
 	// Defaults to 1 second. Minimum value is 1.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
@@ -662,14 +656,21 @@ type RoleProbe struct {
 	// Default to 10 seconds. Minimum value is 1.
 	// +optional
 	PeriodSeconds int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
-	// Minimum consecutive successes for the probe to be considered successful after having failed.
-	// Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
-	// +optional
-	SuccessThreshold int32 `json:"successThreshold,omitempty" protobuf:"varint,5,opt,name=successThreshold"`
-	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
-	// Defaults to 3. Minimum value is 1.
-	// +optional
-	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
+}
+
+type RoleProbeArgs struct {
+	Host     *corev1.EnvVar `json:"host,omitempty"`
+	Port     *corev1.EnvVar `json:"port,omitempty"`
+	User     *corev1.EnvVar `json:"user,omitempty"`
+	Password *corev1.EnvVar `json:"password,omitempty"`
+}
+
+type RoleProbe struct {
+	LifecycleActionHandler `json:",inline"`
+	Timer                  `json:",inline"`
+	Args                   *RoleProbeArgs `json:"args,omitempty"`
+
+	// TODO: duplicated, will be removed
 	// Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
 	// The grace period is the duration in seconds after the processes running in the pod are sent
 	// a termination signal and the time when the processes are forcibly halted with a kill signal.

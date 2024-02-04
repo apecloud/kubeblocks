@@ -41,6 +41,7 @@ require (
 	github.com/prometheus-community/pro-bing v0.3.0
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/replicatedhq/troubleshoot v0.57.0
+	github.com/rogpeppe/go-internal v1.10.0
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/sethvargo/go-password v0.2.0
 	github.com/shirou/gopsutil/v3 v3.23.6

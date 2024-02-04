@@ -32,13 +32,6 @@ metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:
-# need to run "kubectl exec" inside a worker pod
-- apiGroups:
-  - ""
-  resources:
-  - pods/exec
-  verbs:
-  - create
 # need to run "kubectl patch backup" inside a worker pod to update the status
 - apiGroups:
   - dataprotection.kubeblocks.io

@@ -277,7 +277,7 @@ func (r *Request) buildExecAction(targetPod *corev1.Pod,
 		Namespace:          targetPod.Namespace,
 		PodName:            targetPod.Name,
 		Timeout:            exec.Timeout,
-		ServiceAccountName: r.WorkerServiceAccount,
+		ServiceAccountName: viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName),
 	}
 }
 

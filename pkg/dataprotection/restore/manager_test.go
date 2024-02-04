@@ -296,9 +296,9 @@ var _ = Describe("Backup Deleter Test", func() {
 
 		testPostReady := func(existVolume bool) {
 			kbNamespace := "kb-system"
-			workerServiceAccountName := "dp-worker"
+			execWorkerServiceAccountName := "dp-exec-worker"
 			viper.Set(constant.CfgKeyCtrlrMgrNS, kbNamespace)
-			viper.Set(dptypes.CfgKeyWorkerServiceAccountName, workerServiceAccountName)
+			viper.Set(dptypes.CfgKeyExecWorkerServiceAccountName, execWorkerServiceAccountName)
 			reqCtx := getReqCtx()
 			matchLabels := map[string]string{
 				constant.AppInstanceLabelKey: testdp.ClusterName,
@@ -317,7 +317,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			// the count of exec jobs should equal to the pods count of cluster
 			Expect(len(jobs)).Should(Equal(2))
 			Expect(jobs[0].Namespace).Should(Equal(kbNamespace))
-			Expect(jobs[0].Spec.Template.Spec.ServiceAccountName).Should(Equal(workerServiceAccountName))
+			Expect(jobs[0].Spec.Template.Spec.ServiceAccountName).Should(Equal(execWorkerServiceAccountName))
 
 			By("test with jobAction and expect for creating 1 job")
 			// step 0 is the execAction in actionSet

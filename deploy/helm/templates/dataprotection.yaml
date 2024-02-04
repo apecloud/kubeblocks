@@ -101,6 +101,8 @@ spec:
               value: "{{ .Values.dataProtection.gcFrequencySeconds }}"
             - name: WORKER_SERVICE_ACCOUNT_NAME
               value: {{ include "dataprotection.workerSAName" . }}
+            - name: EXEC_WORKER_SERVICE_ACCOUNT_NAME
+              value: {{ include "dataprotection.execWorkerSAName" . }}
             - name: WORKER_SERVICE_ACCOUNT_ANNOTATIONS
               value: {{ .Values.dataProtection.worker.serviceAccount.annotations | toJson | quote }}
             - name: WORKER_CLUSTER_ROLE_NAME

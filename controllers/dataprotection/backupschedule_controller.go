@@ -196,9 +196,12 @@ func (r *BackupScheduleReconciler) handleSchedule(
 	if err = r.patchScheduleMetadata(reqCtx, backupSchedule); err != nil {
 		return err
 	}
-	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backupSchedule.Namespace)
-	if err != nil {
-		return err
+	saName := backupPolicy.Spec.Target.ServiceAccountName
+	if saName == "" {
+		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, backupSchedule.Namespace)
+		if err != nil {
+			return err
+		}
 	}
 	scheduler := dpbackup.Scheduler{
 		RequestCtx:           reqCtx,

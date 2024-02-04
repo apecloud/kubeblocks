@@ -27,6 +27,8 @@ const (
 	CfgKeyGCFrequencySeconds = "GC_FREQUENCY_SECONDS"
 	// CfgKeyWorkerServiceAccountName is the key of service account name for worker
 	CfgKeyWorkerServiceAccountName = "WORKER_SERVICE_ACCOUNT_NAME"
+	// CfgKeyExecWorkerServiceAccountName is the key of service account name for worker that runs "kubectl exec"
+	CfgKeyExecWorkerServiceAccountName = "EXEC_WORKER_SERVICE_ACCOUNT_NAME"
 	// CfgKeyWorkerServiceAccountAnnotations is the key of annotations for the service account of the worker
 	CfgKeyWorkerServiceAccountAnnotations = "WORKER_SERVICE_ACCOUNT_ANNOTATIONS"
 	// CfgKeyWorkerClusterRoleName is the key of cluster role name for binding the service account of the worker

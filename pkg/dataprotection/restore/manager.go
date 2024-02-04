@@ -480,8 +480,8 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			kbInstalledNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			if kbInstalledNamespace != "" {
 				job.Namespace = kbInstalledNamespace
-				// the ServiceAccount has been created by helm in the kubeblocks namespace
-				job.Spec.Template.Spec.ServiceAccountName = viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)
+				// use the dedicated ServiceAccount for executing "kubectl exec"
+				job.Spec.Template.Spec.ServiceAccountName = viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName)
 			}
 			job.Labels[DataProtectionRestoreNamespaceLabelKey] = r.Restore.Namespace
 			restoreJobs = append(restoreJobs, job)

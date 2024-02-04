@@ -327,9 +327,12 @@ func (r *BackupReconciler) prepareBackupRequest(
 	}
 	request.TargetPods = targetPods
 
-	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get worker service account: %w", err)
+	saName := backupPolicy.Spec.Target.ServiceAccountName
+	if saName == "" {
+		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get worker service account: %w", err)
+		}
 	}
 	request.WorkerServiceAccount = saName
 

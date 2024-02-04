@@ -179,10 +179,12 @@ func (r *RestoreReconciler) inProgressAction(reqCtx intctrlutil.RequestCtx, rest
 		return intctrlutil.Reconciled()
 	}
 	if err == nil {
-		var saName string
-		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace)
-		if err == nil {
-			restoreMgr.WorkerServiceAccount = saName
+		saName := restore.Spec.ServiceAccountName
+		if saName == "" {
+			saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace)
+			if err == nil {
+				restoreMgr.WorkerServiceAccount = saName
+			}
 		}
 	}
 	if err == nil {

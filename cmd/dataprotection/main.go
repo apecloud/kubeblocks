@@ -101,6 +101,7 @@ func init() {
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(dptypes.CfgKeyGCFrequencySeconds, dptypes.DefaultGCFrequencySeconds)
 	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountName, "kubeblocks-dataprotection-worker")
+	viper.SetDefault(dptypes.CfgKeyExecWorkerServiceAccountName, "kubeblocks-dataprotection-exec-worker")
 	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, "{}")
 	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kubeblocks-dataprotection-worker-role")
 }

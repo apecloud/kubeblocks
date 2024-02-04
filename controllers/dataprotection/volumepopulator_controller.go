@@ -158,11 +158,14 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err := dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, restoreMgr); err != nil {
 		return nil, err
 	}
-	if saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace); err != nil {
-		return nil, err
-	} else {
-		restoreMgr.WorkerServiceAccount = saName
+	saName := restore.Spec.ServiceAccountName
+	if saName == "" {
+		var err error
+		if saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace); err != nil {
+			return nil, err
+		}
 	}
+	restoreMgr.WorkerServiceAccount = saName
 	return restoreMgr, nil
 }
 

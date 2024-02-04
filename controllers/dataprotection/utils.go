@@ -292,8 +292,9 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		return "", fmt.Errorf("worker service account name is empty")
 	}
 	sa := &corev1.ServiceAccount{}
-	err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: namespace, Name: saName}, sa)
-	if client.IgnoreNotFound(err) != nil {
+	saKey := client.ObjectKey{Namespace: namespace, Name: saName}
+	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, saKey, sa)
+	if err != nil {
 		return "", err
 	}
 
@@ -313,7 +314,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		}
 	}
 
-	if err == nil {
+	if exists {
 		// SA exists, check if annotations are consistent
 		saCopy := sa.DeepCopy()
 		if len(extraAnnotations) > 0 && sa.Annotations == nil {

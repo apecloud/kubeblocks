@@ -631,7 +631,10 @@ func (r *BackupRepoReconciler) preCheckRepo(reconCtx *reconcileContext) (err err
 	}()
 
 	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-	saName := viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)
+	saName, err := EnsureWorkerServiceAccount(reconCtx.RequestCtx, r.Client, namespace)
+	if err != nil {
+		return err
+	}
 
 	var job *batchv1.Job
 	var pvc *corev1.PersistentVolumeClaim

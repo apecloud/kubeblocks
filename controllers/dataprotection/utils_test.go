@@ -54,6 +54,7 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 
 	const (
 		defaultWorkerServiceAccountName        = "sa-name"
+		defaultExecWorkerServiceAccountName    = "exec-sa-name"
 		defaultWorkerServiceAccountAnnotations = `{"role-arn": "arn:xxx:xxx"}`
 		defaultWorkerClusterRoleName           = "worker-role"
 	)
@@ -66,6 +67,7 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 	BeforeEach(func() {
 		cleanEnv()
 		viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountName, defaultWorkerServiceAccountName)
+		viper.SetDefault(dptypes.CfgKeyExecWorkerServiceAccountName, defaultExecWorkerServiceAccountName)
 		viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, defaultWorkerServiceAccountAnnotations)
 		viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, defaultWorkerClusterRoleName)
 

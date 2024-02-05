@@ -326,12 +326,12 @@ func buildPostProvisionEnvs(ctx context.Context,
 		workloadEnvFroms = append(workloadEnvFroms, tplPod.Spec.Containers[0].EnvFrom...)
 	}
 
-	compEnvs, err := genClusterNComponentEnvs(ctx, cli, cluster, pods)
+	genEnvs, err := genClusterNComponentEnvs(ctx, cli, cluster, pods)
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(compEnvs) > 0 {
-		workloadEnvs = append(workloadEnvs, compEnvs...)
+	if len(genEnvs) > 0 {
+		workloadEnvs = append(workloadEnvs, genEnvs...)
 	}
 
 	return workloadEnvs, workloadEnvFroms, nil

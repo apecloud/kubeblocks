@@ -22,10 +22,10 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	mathrand "math/rand"
 	"time"
 
 	"github.com/sethvargo/go-password/password"
-	mathrand "math/rand"
 )
 
 const (

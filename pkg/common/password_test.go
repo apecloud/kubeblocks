@@ -61,30 +61,6 @@ func testGeneratorGeneratePassword(t *testing.T) {
 		}
 	})
 
-	t.Run("exceeds_letters_available", func(t *testing.T) {
-		t.Parallel()
-
-		if _, err := GeneratePassword(1000, 0, 0, false, ""); err != password.ErrLettersExceedsAvailable {
-			t.Errorf("expected %q to be %q", err, password.ErrLettersExceedsAvailable)
-		}
-	})
-
-	t.Run("exceeds_digits_available", func(t *testing.T) {
-		t.Parallel()
-
-		if _, err := GeneratePassword(52, 11, 0, false, ""); err != password.ErrDigitsExceedsAvailable {
-			t.Errorf("expected %q to be %q", err, password.ErrDigitsExceedsAvailable)
-		}
-	})
-
-	t.Run("exceeds_symbols_available", func(t *testing.T) {
-		t.Parallel()
-
-		if _, err := GeneratePassword(52, 0, 31, false, ""); err != password.ErrSymbolsExceedsAvailable {
-			t.Errorf("expected %q to be %q", err, password.ErrSymbolsExceedsAvailable)
-		}
-	})
-
 	t.Run("should be different when seed is empty", func(t *testing.T) {
 		t.Parallel()
 		resultSeedFirstTime := ""

@@ -70,5 +70,5 @@ func GeneratePassword(length, numDigits, numSymbols int, noUpper bool, seed stri
 	if err != nil {
 		return "", err
 	}
-	return gen.Generate(length, numDigits, numSymbols, noUpper, true)
+	return gen.Generate(length, numDigits, numSymbols, noUpper, false)
 }

@@ -386,6 +386,7 @@ addonChartsImage:
   pullPolicy: IfNotPresent
   tag: ""
   chartsPath: /charts
+  pullSecrets: []
 
 ## @param addonHelmInstallOptions - addon helm install options.
 addonHelmInstallOptions:

@@ -57,7 +57,6 @@ func GeneratePassword(length, numDigits, numSymbols int, noUpper bool, seed stri
 			return "", err
 		}
 		uSeed := binary.BigEndian.Uint64(h.Sum(nil))
-
 		rand = mathrand.New(mathrand.NewSource(int64(uSeed)))
 	}
 	passwordReader := &PasswordReader{rand: rand}

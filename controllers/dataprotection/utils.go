@@ -21,13 +21,16 @@ package dataprotection
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,6 +47,7 @@ import (
 	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
@@ -277,6 +281,99 @@ func RecorderEventAndRequeue(reqCtx intctrlutil.RequestCtx, recorder record.Even
 	obj client.Object, err error) (reconcile.Result, error) {
 	sendWarningEventForError(recorder, obj, err)
 	return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+}
+
+func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string) (string, error) {
+	if namespace == "" {
+		return "", fmt.Errorf("namespace is empty")
+	}
+	saName := viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)
+	if saName == "" {
+		return "", fmt.Errorf("worker service account name is empty")
+	}
+	sa := &corev1.ServiceAccount{}
+	saKey := client.ObjectKey{Namespace: namespace, Name: saName}
+	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, saKey, sa)
+	if err != nil {
+		return "", err
+	}
+
+	clusterRoleName := viper.GetString(dptypes.CfgKeyWorkerClusterRoleName)
+	if clusterRoleName == "" {
+		return "", fmt.Errorf("worker cluster role name is empty")
+	}
+
+	var extraAnnotations map[string]string
+	annotationsJSON := viper.GetString(dptypes.CfgKeyWorkerServiceAccountAnnotations)
+	if annotationsJSON != "" {
+		extraAnnotations = make(map[string]string)
+		err := json.Unmarshal([]byte(annotationsJSON), &extraAnnotations)
+		if err != nil {
+			return "", fmt.Errorf("failed to unmarshal worker service account annotations: %s, json: %q",
+				err.Error(), annotationsJSON)
+		}
+	}
+
+	if exists {
+		// SA exists, check if annotations are consistent
+		saCopy := sa.DeepCopy()
+		if len(extraAnnotations) > 0 && sa.Annotations == nil {
+			sa.Annotations = extraAnnotations
+		} else {
+			for k, v := range extraAnnotations {
+				sa.Annotations[k] = v
+			}
+		}
+		if !reflect.DeepEqual(sa, saCopy) {
+			err := cli.Patch(reqCtx.Ctx, sa, client.MergeFrom(saCopy))
+			if err != nil {
+				return "", fmt.Errorf("failed to patch worker service account: %w", err)
+			}
+		}
+		// fast path
+		return saName, nil
+	}
+
+	createRoleBinding := func() error {
+		rb := &rbacv1.RoleBinding{}
+		rb.Name = fmt.Sprintf("%s-rolebinding", saName)
+		rb.Namespace = namespace
+		rb.Subjects = []rbacv1.Subject{{
+			Kind:      rbacv1.ServiceAccountKind,
+			Name:      saName,
+			Namespace: namespace,
+		}}
+		rb.RoleRef = rbacv1.RoleRef{
+			Kind:     "ClusterRole",
+			Name:     clusterRoleName,
+			APIGroup: "rbac.authorization.k8s.io",
+		}
+		if err := cli.Create(reqCtx.Ctx, rb); err != nil {
+			return client.IgnoreAlreadyExists(err)
+		}
+		return nil
+	}
+
+	createServiceAccount := func() error {
+		sa := &corev1.ServiceAccount{}
+		sa.Name = saName
+		sa.Namespace = namespace
+		sa.Annotations = extraAnnotations
+		if err := cli.Create(reqCtx.Ctx, sa); err != nil {
+			return client.IgnoreAlreadyExists(err)
+		}
+		return nil
+	}
+
+	// this function returns earlier if the service account already exists,
+	// so we create the role binding first for idempotent.
+	if err := createRoleBinding(); err != nil {
+		return "", fmt.Errorf("failed to create rolebinding: %w", err)
+	}
+	if err := createServiceAccount(); err != nil {
+		return "", fmt.Errorf("failed to create service account: %w", err)
+	}
+	return saName, nil
 }
 
 // ============================================================================

@@ -592,6 +592,14 @@ parameters:
 					&batchv1.Job{}, exists)).WithOffset(1).Should(Succeed())
 				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: pvcName, Namespace: namespace},
 					&corev1.PersistentVolumeClaim{}, exists)).WithOffset(1).Should(Succeed())
+				if exists {
+					// the job has desired status
+					Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace},
+						func(g Gomega, job *batchv1.Job) {
+							g.Expect(job.Spec.Template.Spec.ServiceAccountName).
+								Should(Equal(viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)))
+						})).WithOffset(1).Should(Succeed())
+				}
 			}
 			checkResources(true)
 
@@ -1002,6 +1010,14 @@ new-item=new-value
 						&batchv1.Job{}, exists)).WithOffset(1).Should(Succeed())
 					Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: secretName, Namespace: namespace},
 						&corev1.Secret{}, exists)).WithOffset(1).Should(Succeed())
+					if exists {
+						// the job has desired status
+						Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace},
+							func(g Gomega, job *batchv1.Job) {
+								g.Expect(job.Spec.Template.Spec.ServiceAccountName).
+									Should(Equal(viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)))
+							})).WithOffset(1).Should(Succeed())
+					}
 				}
 				checkResources(true)
 

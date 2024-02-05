@@ -53,14 +53,15 @@ type Request struct {
 	*dpv1alpha1.Backup
 	intctrlutil.RequestCtx
 
-	Client           client.Client
-	BackupPolicy     *dpv1alpha1.BackupPolicy
-	BackupMethod     *dpv1alpha1.BackupMethod
-	ActionSet        *dpv1alpha1.ActionSet
-	TargetPods       []*corev1.Pod
-	BackupRepoPVC    *corev1.PersistentVolumeClaim
-	BackupRepo       *dpv1alpha1.BackupRepo
-	ToolConfigSecret *corev1.Secret
+	Client               client.Client
+	BackupPolicy         *dpv1alpha1.BackupPolicy
+	BackupMethod         *dpv1alpha1.BackupMethod
+	ActionSet            *dpv1alpha1.ActionSet
+	TargetPods           []*corev1.Pod
+	BackupRepoPVC        *corev1.PersistentVolumeClaim
+	BackupRepo           *dpv1alpha1.BackupRepo
+	ToolConfigSecret     *corev1.Secret
+	WorkerServiceAccount string
 }
 
 func (r *Request) GetBackupType() string {
@@ -271,13 +272,12 @@ func (r *Request) buildExecAction(targetPod *corev1.Pod,
 			ObjectMeta: objectMeta,
 			Owner:      r.Backup,
 		},
-		Command:   exec.Command,
-		Container: containerName,
-		Namespace: targetPod.Namespace,
-		PodName:   targetPod.Name,
-		Timeout:   exec.Timeout,
-		// use the kubeblocks's serviceAccount
-		ServiceAccountName: viper.GetString(constant.KBServiceAccountName),
+		Command:            exec.Command,
+		Container:          containerName,
+		Namespace:          targetPod.Namespace,
+		PodName:            targetPod.Name,
+		Timeout:            exec.Timeout,
+		ServiceAccountName: viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName),
 	}
 }
 
@@ -411,7 +411,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	podSpec := &corev1.PodSpec{
 		Containers:         []corev1.Container{container},
 		Volumes:            buildVolumes(),
-		ServiceAccountName: r.targetServiceAccountName(),
+		ServiceAccountName: r.WorkerServiceAccount,
 		RestartPolicy:      corev1.RestartPolicyNever,
 	}
 
@@ -501,14 +501,4 @@ func (r *Request) InjectSyncProgressContainer(podSpec *corev1.PodSpec,
 
 func (r *Request) backupActionSetExists() bool {
 	return r.ActionSet != nil && r.ActionSet.Spec.Backup != nil
-}
-
-func (r *Request) targetServiceAccountName() string {
-	saName := r.BackupPolicy.Spec.Target.ServiceAccountName
-	if len(saName) > 0 {
-		return saName
-	}
-	// service account name is not specified, use the target pod service account
-	targetPod := r.TargetPods[0]
-	return targetPod.Spec.ServiceAccountName
 }

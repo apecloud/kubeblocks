@@ -29,4 +29,3 @@ subjects:
     name: {{ include "kubeblocks.addonSAName" . }}
     namespace: {{ .Release.Namespace }}
 {{- end }}
-

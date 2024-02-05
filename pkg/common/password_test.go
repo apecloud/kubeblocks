@@ -21,6 +21,8 @@ package common
 
 import (
 	"testing"
+
+	"github.com/sethvargo/go-password/password"
 )
 
 const (
@@ -32,7 +34,7 @@ func testGeneratorGeneratePasswordWithSeed(t *testing.T) {
 	resultSeedFirstTime := ""
 	resultSeedEachTime := ""
 	for i := 0; i < N; i++ {
-		res, err := GeneratePasswordWithSeed(10, 5, 0, false, seed)
+		res, err := GeneratePassword(10, 5, 0, false, seed)
 		if err != nil {
 			t.Error(err)
 		}
@@ -44,6 +46,48 @@ func testGeneratorGeneratePasswordWithSeed(t *testing.T) {
 			t.Errorf("%q should be equal to %q", resultSeedFirstTime, resultSeedEachTime)
 		}
 	}
+}
+
+func testGeneratorGeneratePassword(t *testing.T) {
+	t.Run("exceeds_length", func(t *testing.T) {
+		t.Parallel()
+
+		if _, err := GeneratePassword(0, 1, 0, false, ""); err != password.ErrExceedsTotalLength {
+			t.Errorf("expected %q to be %q", err, password.ErrExceedsTotalLength)
+		}
+
+		if _, err := GeneratePassword(0, 0, 1, false, ""); err != password.ErrExceedsTotalLength {
+			t.Errorf("expected %q to be %q", err, password.ErrExceedsTotalLength)
+		}
+	})
+
+	t.Run("should be different when seed is empty", func(t *testing.T) {
+		t.Parallel()
+		resultSeedFirstTime := ""
+		resultSeedEachTime := ""
+		hasDiffPassword := false
+		for i := 0; i < N; i++ {
+			res, err := GeneratePassword(i%len(password.LowerLetters), 0, 0, true, "")
+			if err != nil {
+				t.Error(err)
+			}
+			resultSeedEachTime = res
+			if len(resultSeedFirstTime) == 0 {
+				resultSeedFirstTime = res
+			}
+			if resultSeedFirstTime != resultSeedEachTime {
+				hasDiffPassword = true
+				break
+			}
+		}
+		if !hasDiffPassword {
+			t.Errorf("%q should be different to %q", resultSeedFirstTime, resultSeedEachTime)
+		}
+	})
+}
+
+func TestGeneratorGeneratePassword(t *testing.T) {
+	testGeneratorGeneratePassword(t)
 }
 
 func TestGeneratorGeneratePasswordWithSeed(t *testing.T) {

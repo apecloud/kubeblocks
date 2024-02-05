@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -364,6 +364,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 		backupMethod := v.BackupMethod
 		if m, ok := oldBackupMethodMap[backupMethod.Name]; ok {
 			backupMethod = m
+			delete(oldBackupMethodMap, backupMethod.Name)
 		} else if v.Target != nil {
 			backupMethod.Target = r.buildBackupTarget(*v.Target, comp)
 			r.syncRoleLabelSelector(backupMethod.Target, v.Target.Role)
@@ -371,6 +372,9 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 		mappingEnv := r.doEnvMapping(comp, v.EnvMapping)
 		backupMethod.Env = dputils.MergeEnv(backupMethod.Env, mappingEnv)
 		backupMethods = append(backupMethods, backupMethod)
+	}
+	for _, v := range oldBackupMethodMap {
+		backupMethods = append(backupMethods, v)
 	}
 	backupPolicy.Spec.BackupMethods = backupMethods
 }

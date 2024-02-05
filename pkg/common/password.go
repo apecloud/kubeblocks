@@ -22,39 +22,34 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"errors"
+	mathrand "math/rand"
 	"time"
 
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"github.com/sethvargo/go-password/password"
 )
 
 const (
-	// LowerLetters is the list of lowercase letters.
-	LowerLetters = "abcdefghijklmnopqrstuvwxyz"
-
-	// UpperLetters is the list of uppercase letters.
-	UpperLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-	// Letters is the list of all letters.
-	Letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-	// Digits is the list of permitted digits.
-	Digits = "0123456789"
-
 	// Symbols is the list of symbols.
 	Symbols = "!@#&*"
 )
 
-var (
-	// ErrExceedsTotalLength is the error returned with the number of digits and
-	// symbols is greater than the total length.
-	ErrExceedsTotalLength = errors.New("number of digits and symbols must be less than total length")
-)
+type PasswordReader struct {
+	rand *mathrand.Rand
+}
 
-// GeneratePasswordWithSeed generates a password with the given requirements and seed.
-func GeneratePasswordWithSeed(length, numDigits, numSymbols int, noUpper bool, seed string) (string, error) {
+func (r *PasswordReader) Read(data []byte) (int, error) {
+	return r.rand.Read(data)
+}
+
+func (r *PasswordReader) Seed(seed int64) {
+	r.rand.Seed(seed)
+}
+
+// GeneratePassword generates a password with the given requirements and seed.
+func GeneratePassword(length, numDigits, numSymbols int, noUpper bool, seed string) (string, error) {
+	var rand *mathrand.Rand
 	if len(seed) == 0 {
-		utilrand.Seed(time.Now().UnixNano())
+		rand = mathrand.New(mathrand.NewSource(time.Now().UnixNano()))
 	} else {
 		h := sha256.New()
 		_, err := h.Write([]byte(seed))
@@ -62,33 +57,19 @@ func GeneratePasswordWithSeed(length, numDigits, numSymbols int, noUpper bool, s
 			return "", err
 		}
 		uSeed := binary.BigEndian.Uint64(h.Sum(nil))
-		utilrand.Seed(int64(uSeed))
-	}
 
-	chars := length - numDigits - numSymbols
-	if chars < 0 {
-		return "", ErrExceedsTotalLength
+		rand = mathrand.New(mathrand.NewSource(int64(uSeed)))
 	}
-
-	password := make([]byte, length)
-	// Characters
-	for i := 0; i < chars; i++ {
-		if noUpper {
-			password[i] = LowerLetters[utilrand.Intn(len(LowerLetters))]
-		} else {
-			password[i] = Letters[utilrand.Intn(len(Letters))]
-		}
+	passwordReader := &PasswordReader{rand: rand}
+	gen, err := password.NewGenerator(&password.GeneratorInput{
+		LowerLetters: password.LowerLetters,
+		UpperLetters: password.UpperLetters,
+		Symbols:      Symbols,
+		Digits:       password.Digits,
+		Reader:       passwordReader,
+	})
+	if err != nil {
+		return "", err
 	}
-
-	// Digits
-	for i := 0; i < numDigits; i++ {
-		password[chars+i] = Digits[utilrand.Intn(len(Digits))]
-	}
-
-	// Symbols
-	for i := 0; i < numSymbols; i++ {
-		password[chars+numDigits+i] = Symbols[utilrand.Intn(len(Symbols))]
-	}
-
-	return string(password), nil
+	return gen.Generate(length, numDigits, numSymbols, noUpper, false)
 }

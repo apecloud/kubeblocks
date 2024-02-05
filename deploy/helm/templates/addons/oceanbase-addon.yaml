@@ -2,7 +2,7 @@
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.8.0"
   "selectorLabels" $selectorLabels
-  "name" "oceanbase"
+  "name" "oceanbase-ce"
   "version" "0.8.1"
   "model" "RDBMS"
   "provider" "community"

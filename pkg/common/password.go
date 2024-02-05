@@ -22,25 +22,34 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"errors"
 	"time"
 
 	"github.com/sethvargo/go-password/password"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	mathrand "math/rand"
 )
 
 const (
-	// Letters is the list of all letters.
-	Letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
 	// Symbols is the list of symbols.
 	Symbols = "!@#&*"
 )
 
+type PasswordReader struct {
+	rand *mathrand.Rand
+}
+
+func (r *PasswordReader) Read(data []byte) (int, error) {
+	return r.rand.Read(data)
+}
+
+func (r *PasswordReader) Seed(seed int64) {
+	r.rand.Seed(seed)
+}
+
 // GeneratePassword generates a password with the given requirements and seed.
 func GeneratePassword(length, numDigits, numSymbols int, noUpper bool, seed string) (string, error) {
+	var rand *mathrand.Rand
 	if len(seed) == 0 {
-		utilrand.Seed(time.Now().UnixNano())
+		rand = mathrand.New(mathrand.NewSource(time.Now().UnixNano()))
 	} else {
 		h := sha256.New()
 		_, err := h.Write([]byte(seed))
@@ -48,41 +57,18 @@ func GeneratePassword(length, numDigits, numSymbols int, noUpper bool, seed stri
 			return "", err
 		}
 		uSeed := binary.BigEndian.Uint64(h.Sum(nil))
-		utilrand.Seed(int64(uSeed))
+		rand = mathrand.New(mathrand.NewSource(int64(uSeed)))
 	}
-
-	chars := length - numDigits - numSymbols
-	if chars < 0 {
-		return "", errors.New("number of digits and symbols must be less than total length")
+	passwordReader := &PasswordReader{rand: rand}
+	gen, err := password.NewGenerator(&password.GeneratorInput{
+		LowerLetters: password.LowerLetters,
+		UpperLetters: password.UpperLetters,
+		Symbols:      Symbols,
+		Digits:       password.Digits,
+		Reader:       passwordReader,
+	})
+	if err != nil {
+		return "", err
 	}
-
-	passwd := make([]byte, length)
-	// Characters
-	for i := 0; i < chars; i++ {
-		if noUpper {
-			passwd[i] = password.LowerLetters[utilrand.Intn(len(password.LowerLetters))]
-		} else {
-			passwd[i] = Letters[utilrand.Intn(len(Letters))]
-		}
-	}
-
-	// Digits
-	for i := 0; i < numDigits; i++ {
-		passwd[chars+i] = password.Digits[utilrand.Intn(len(password.Digits))]
-	}
-
-	// Symbols
-	for i := 0; i < numSymbols; i++ {
-		passwd[chars+numDigits+i] = Symbols[utilrand.Intn(len(Symbols))]
-	}
-
-	// Shuffle the password characters
-	if len(seed) > 0 {
-		for i := 0; i < length; i++ {
-			j := utilrand.Intn(length)
-			passwd[i], passwd[j] = passwd[j], passwd[i]
-		}
-	}
-
-	return string(passwd), nil
+	return gen.Generate(length, numDigits, numSymbols, noUpper, false)
 }

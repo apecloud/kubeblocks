@@ -25,34 +25,20 @@ import (
 	"errors"
 	"time"
 
+	"github.com/sethvargo/go-password/password"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
 
 const (
-	// LowerLetters is the list of lowercase letters.
-	LowerLetters = "abcdefghijklmnopqrstuvwxyz"
-
-	// UpperLetters is the list of uppercase letters.
-	UpperLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
 	// Letters is the list of all letters.
 	Letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-	// Digits is the list of permitted digits.
-	Digits = "0123456789"
 
 	// Symbols is the list of symbols.
 	Symbols = "!@#&*"
 )
 
-var (
-	// ErrExceedsTotalLength is the error returned with the number of digits and
-	// symbols is greater than the total length.
-	ErrExceedsTotalLength = errors.New("number of digits and symbols must be less than total length")
-)
-
-// GeneratePasswordWithSeed generates a password with the given requirements and seed.
-func GeneratePasswordWithSeed(length, numDigits, numSymbols int, noUpper bool, seed string) (string, error) {
+// GeneratePassword generates a password with the given requirements and seed.
+func GeneratePassword(length, numDigits, numSymbols int, noUpper bool, seed string) (string, error) {
 	if len(seed) == 0 {
 		utilrand.Seed(time.Now().UnixNano())
 	} else {
@@ -67,28 +53,36 @@ func GeneratePasswordWithSeed(length, numDigits, numSymbols int, noUpper bool, s
 
 	chars := length - numDigits - numSymbols
 	if chars < 0 {
-		return "", ErrExceedsTotalLength
+		return "", errors.New("number of digits and symbols must be less than total length")
 	}
 
-	password := make([]byte, length)
+	passwd := make([]byte, length)
 	// Characters
 	for i := 0; i < chars; i++ {
 		if noUpper {
-			password[i] = LowerLetters[utilrand.Intn(len(LowerLetters))]
+			passwd[i] = password.LowerLetters[utilrand.Intn(len(password.LowerLetters))]
 		} else {
-			password[i] = Letters[utilrand.Intn(len(Letters))]
+			passwd[i] = Letters[utilrand.Intn(len(Letters))]
 		}
 	}
 
 	// Digits
 	for i := 0; i < numDigits; i++ {
-		password[chars+i] = Digits[utilrand.Intn(len(Digits))]
+		passwd[chars+i] = password.Digits[utilrand.Intn(len(password.Digits))]
 	}
 
 	// Symbols
 	for i := 0; i < numSymbols; i++ {
-		password[chars+numDigits+i] = Symbols[utilrand.Intn(len(Symbols))]
+		passwd[chars+numDigits+i] = Symbols[utilrand.Intn(len(Symbols))]
 	}
 
-	return string(password), nil
+	// Shuffle the password characters
+	if len(seed) > 0 {
+		for i := 0; i < length; i++ {
+			j := utilrand.Intn(length)
+			passwd[i], passwd[j] = passwd[j], passwd[i]
+		}
+	}
+
+	return string(passwd), nil
 }

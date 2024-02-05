@@ -32,7 +32,7 @@ func testGeneratorGeneratePasswordWithSeed(t *testing.T) {
 	resultSeedFirstTime := ""
 	resultSeedEachTime := ""
 	for i := 0; i < N; i++ {
-		res, err := GeneratePasswordWithSeed(10, 5, 0, false, seed)
+		res, err := GeneratePassword(10, 5, 0, false, seed)
 		if err != nil {
 			t.Error(err)
 		}

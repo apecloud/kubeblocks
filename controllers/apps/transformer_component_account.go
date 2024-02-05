@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -137,15 +136,8 @@ func (t *componentAccountTransformer) buildPassword(ctx *componentTransformConte
 }
 
 func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.SystemAccount) []byte {
-	var (
-		passwd string
-		config = account.PasswordGenerationPolicy
-	)
-	if len(config.Seed) > 0 {
-		passwd, _ = common.GeneratePasswordWithSeed((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, config.Seed)
-	} else {
-		passwd, _ = password.Generate((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, false)
-	}
+	config := account.PasswordGenerationPolicy
+	passwd, _ := common.GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, config.Seed)
 	switch config.LetterCase {
 	case appsv1alpha1.UpperCases:
 		passwd = strings.ToUpper(passwd)

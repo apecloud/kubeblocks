@@ -748,6 +748,9 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 			},
 			BackoffLimit: pointer.Int32(2),
 		}
+		if err := utils.AddTolerations(&job.Spec.Template.Spec); err != nil {
+			return err
+		}
 		for i := range job.Spec.Template.Spec.Containers {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
 		}
@@ -815,6 +818,9 @@ echo "pre-check" | datasafed push - /precheck.txt`,
 		}
 		job.Annotations = map[string]string{
 			dataProtectionBackupRepoDigestAnnotationKey: reconCtx.getDigest(),
+		}
+		if err := utils.AddTolerations(&job.Spec.Template.Spec); err != nil {
+			return err
 		}
 		for i := range job.Spec.Template.Spec.Containers {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])

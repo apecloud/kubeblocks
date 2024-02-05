@@ -423,22 +423,6 @@ const (
 	ReplicatorAccount     AccountName = "kbreplicator"
 )
 
-func (r AccountName) GetAccountID() KBAccountType {
-	switch r {
-	case AdminAccount:
-		return KBAccountAdmin
-	case DataprotectionAccount:
-		return KBAccountDataprotection
-	case ProbeAccount:
-		return KBAccountProbe
-	case MonitorAccount:
-		return KBAccountMonitor
-	case ReplicatorAccount:
-		return KBAccountReplicator
-	}
-	return KBAccountInvalid
-}
-
 // LetterCase defines cases to use in password generation.
 // +enum
 type LetterCase string

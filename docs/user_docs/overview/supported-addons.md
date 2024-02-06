@@ -10,8 +10,8 @@ sidebar_label: Supported add-ons
 
 KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides management and control for relational databases, NoSQL databases, vector databases, and stream computing systems; and these databases can be all added as addons. Besides databases, KubeBlocks addon now also supports plugins for cloud environments and applications.
 
-| Addons         | Description                                                                                                                                                                                                       |
-|:----------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Addons          | Description                                                                                                                                                                                                       |
+|:----------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | apecloud-mysql  | ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability through the utilization of the RAFT consensus protocol.                                                          |
 | clickhouse      |
 | elasticsearch   | Elasticsearch is a distributed, RESTful search engine optimized for speed and relevance on production-scale workloads. |
@@ -67,7 +67,7 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides 
 | mariadb                               | 10.6.15                           | ✔️      | N/A    | ✔️            | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | milvus                                | 2.2.4                             | ✔️      | N/A    | ✔️            | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | mongodb                               | 4.0<br />4.2<br />4.4<br />5.0<br />5.0.20<br />6.0 | ✔️      | ✔️   | ✔️          | ✔️       | ✔️       | ✔️    | ✔️    | ✔️      | N/A                         | N/A     | ✔️        | ✔️          | ✔️       |
-| mysql-cluster                         | 5.7.42<br />8.0.33                | ✔️      | ✔️      | ✔️            | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | ✔️       |
+| mysql-cluster                         | 5.7.42<br />8.0.33                | ✔️      | ✔️      | ✔️            | ✔️          | ✔️       | ✔️              | ✔️    | ✔️      | N/A                         | ✔️       | ✔️        | ✔️          | ✔️       |
 | nebula                                | 3.5.0                             | ✔️      | ✔️      | ✔️            | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | neon                                  | latest                            | ✔️      | N/A    | N/A          | N/A        | N/A     | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | oceanbase                             | 4.2.0.0-100010032023083021        | N/A    | ✔️      | ✔️            | N/A        | N/A     | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
@@ -92,6 +92,12 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides 
 | weaviate                              | 1.18.0                            | ✔️      | ✔️      | ✔️            | ✔️          | ✔️       | N/A            | N/A  | ✔️      | N/A                         | N/A     | N/A      | N/A        | ✔️       |
 | xinference                            | 1.16.0                            | ✔️      | N/A    | N/A          | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | zookeeper                             | 3.7.1                             | ✔️      | ✔️      | ✔️            | ✔️          | ✔️       | N/A            | ✔️    | ✔️      | N/A                         | N/A     | N/A      | N/A        | N/A     |
+
+:::note
+
+The upgrade feature means that KubeBlocks supports minor version upgrades for a database engine. For example, you can upgrade PostgreSQL from v12.14 to v12.15.
+
+:::
 
 ## Use addons
 

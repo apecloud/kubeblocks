@@ -182,10 +182,8 @@ func (r *RestoreReconciler) inProgressAction(reqCtx intctrlutil.RequestCtx, rest
 		saName := restore.Spec.ServiceAccountName
 		if saName == "" {
 			saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace)
-			if err == nil {
-				restoreMgr.WorkerServiceAccount = saName
-			}
 		}
+		restoreMgr.WorkerServiceAccount = saName
 	}
 	if err == nil {
 		// handle restore actions

@@ -61,6 +61,8 @@ type AddonSpec struct {
 	// Plugin installation spec.
 	// +optional
 	CliPlugins []CliPlugin `json:"cliPlugins,omitempty"`
+	Version    string      `json:"version,omitempty"`
+	Provider   string      `json:"provider,omitempty"`
 }
 
 // AddonStatus defines the observed state of an add-on.

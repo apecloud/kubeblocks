@@ -5,7 +5,7 @@ type: application
 version: 0.8.1
 appVersion: 0.8.1
 
-kubeVersion: '>=1.21.0-0'
+kubeVersion: '>=1.20.0-0'
 
 home: https://www.kubeblocks.io/
 icon: https://kubeblocks.io/img/logo.png

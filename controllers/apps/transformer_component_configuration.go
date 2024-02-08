@@ -57,7 +57,7 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 	}
 
 	// wait for the completion of relevant conditions
-	components, err := t.needWaiting(transCtx)
+	components, err := component.GetHostNetworkRelatedComponents(&transCtx.CompDef.Spec.Runtime, transCtx.Context, t.Client, transCtx.Cluster)
 	if err != nil {
 		return err
 	}
@@ -95,15 +95,4 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 		return err
 	}
 	return nil
-}
-
-// needWaiting checks if it is necessary to wait for the completion of relevant conditions.
-func (t *componentConfigurationTransformer) needWaiting(ctx *componentTransformContext) ([]client.Object, error) {
-	if !ctx.CompDef.Spec.Runtime.HostNetwork {
-		// if the component not uses hostNetwork, ignore it.
-		return nil, nil
-	}
-	// HACK for hostNetwork
-	// TODO: define the api to inject dynamic info of the cluster components
-	return component.CheckAndGetClusterComponents(ctx.Context, t.Client, ctx.Cluster)
 }

@@ -59,6 +59,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/metrics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -125,6 +126,7 @@ func init() {
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
 	viper.SetDefault(rsm.FeatureGateRSMToPod, true)
+	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
 }
 
 type flagName string
@@ -537,6 +539,9 @@ func main() {
 		os.Exit(1)
 	}
 	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
+
+	setupLog.Info("golang runtime metrics.", "featureGate", constant.EnabledRuntimeMetrics())
+	metrics.RegisterRuntimeMetric(mgr)
 
 	setupLog.Info("starting manager")
 	if multiClusterMgr != nil {

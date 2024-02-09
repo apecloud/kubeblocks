@@ -192,6 +192,8 @@ serviceMonitor:
   enabled: false
   # metrics server will be exposed at this port.
   port: 8080
+  goRuntime:
+    enabled: false
   # Only used if `service.type` is `NodePort`.
   nodePort:
 

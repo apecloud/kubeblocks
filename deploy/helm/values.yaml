@@ -910,6 +910,18 @@ prometheus:
                 summary: 'MySQL has too many connections (> 80%)'
                 description: '{{ $value | printf "%.2f" }} percent of MySQL connections are in use. (instance: {{ $labels.pod }})'
 
+            - alert: MysqlReplicationLag
+              expr:  |-
+                max by(namespace,app_kubernetes_io_instance,pod) (
+                  max_over_time(mysql_replication_heartbeat_relay_delay_seconds{replication_role=~"slave"}[2m])
+                ) > 3600
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: 'MySQL replication lag delay exceeds one hour'
+                description: 'mysql replication relay latency: {{ $value | printf "%.2f" }}. (instance: {{ $labels.pod }})'
+
             - alert: MysqlConnectionErrors
               expr: 'sum(increase(mysql_global_status_connection_errors_total[1m])) BY (namespace,app_kubernetes_io_instance,pod) > 0'
               for: 2m
@@ -967,6 +979,18 @@ prometheus:
               annotations:
                 summary: 'PostgreSQL is down'
                 description: 'PostgreSQL is down. (instance: {{ $labels.pod }})'
+
+            - alert: PGReplicationLag
+              expr:  |-
+                max by(namespace,app_kubernetes_io_instance,pod) (
+                  max_over_time(pg_replication_lag[2m])
+                ) > 3600
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: 'PG replication lag delay exceeds one hour'
+                description: 'PostgresSQL replication relay latency: {{ $value | printf "%.2f" }}. (instance: {{ $labels.pod }})'
 
             - alert: PostgreSQLRestarted
               expr: 'time() - pg_postmaster_start_time_seconds < 60'

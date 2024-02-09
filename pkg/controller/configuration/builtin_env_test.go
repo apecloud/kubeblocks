@@ -229,14 +229,7 @@ bootstrap:
 			cfgBuilder := newTemplateBuilder(
 				"my_test",
 				"default",
-				&appsv1alpha1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my_test",
-						Namespace: "default",
-					},
-				},
 				ctx, mockClient.Client(),
-				nil,
 			)
 
 			localObjs := []coreclient.Object{
@@ -249,7 +242,13 @@ bootstrap:
 						cmConfigFileName: patroniTemplate,
 					}},
 			}
-			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, localObjs)).Should(BeNil())
+			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, localObjs,
+				&appsv1alpha1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my_test",
+						Namespace: "default",
+					},
+				})
 
 			rendered, err := cfgBuilder.render(map[string]string{
 				// KB_CLUSTER_NAME, KB_COMP_NAME from env

@@ -191,17 +191,16 @@ single_thread_memory = 294912
 			cfgBuilder := newTemplateBuilder(
 				"my_test",
 				"default",
-				&appsv1alpha1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my_test",
-						Namespace: "default",
-					},
+				nil, nil)
+
+			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil, &appsv1alpha1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my_test",
+					Namespace: "default",
 				},
-				nil, nil, nil)
+			})
 
-			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil)).Should(BeNil())
-
-			cfgBuilder.componentValues.Resource = &ResourceDefinition{
+			cfgBuilder.builtInObjects.componentValues.Resource = &ResourceDefinition{
 				MemorySize: 8 * 1024 * 1024 * 1024,
 				CoreNum:    4,
 			}
@@ -218,18 +217,18 @@ single_thread_memory = 294912
 			cfgBuilder := newTemplateBuilder(
 				"my_test",
 				"default",
+				nil, nil,
+			)
+
+			viper.Set(constant.KubernetesClusterDomainEnv, "test-domain")
+
+			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil,
 				&appsv1alpha1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",
 					},
-				},
-				nil, nil, nil,
-			)
-
-			viper.Set(constant.KubernetesClusterDomainEnv, "test-domain")
-
-			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil)).Should(BeNil())
+				})
 
 			rendered, err := cfgBuilder.render(map[string]string{
 				"a":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"log\" }}",
@@ -287,16 +286,16 @@ single_thread_memory = 294912
 			cfgBuilder := newTemplateBuilder(
 				"my_test",
 				"default",
+				nil, nil,
+			)
+
+			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil,
 				&appsv1alpha1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",
 					},
-				},
-				nil, nil, nil,
-			)
-
-			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil)).Should(BeNil())
+				})
 
 			tests := []struct {
 				name     string

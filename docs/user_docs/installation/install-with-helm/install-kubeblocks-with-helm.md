@@ -63,17 +63,15 @@ Use Helm to install KubeBlocks by following the steps below.
 
 3. Install KubeBlocks
    ```bash
-   helm install kubeblocks kubeblocks/kubeblocks \
-       --namespace kb-system --create-namespace
+   helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
    ```
 
    If you want to install KubeBlocks with custom tolerations, you can use the following command:
 
    ```bash
-   helm install kubeblocks kubeblocks/kubeblocks \
-       --namespace kb-system --create-namespace \
+   helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace \
        --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' \
-       --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true"    } ]'
+       --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true"    }]'
    ```
 
    If you want to install KubeBlocks with a specified version, follow the steps below.
@@ -82,8 +80,7 @@ Use Helm to install KubeBlocks by following the steps below.
    2. Specify a version with `--version` and run the command below.
 
       ```bash
-      helm install kubeblocks kubeblocks/kubeblocks \
-       --namespace kb-system --create-namespace --version="x.x.x"
+      helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version="x.x.x"
       ```
 
      :::note

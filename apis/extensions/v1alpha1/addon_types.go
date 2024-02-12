@@ -39,7 +39,9 @@ type AddonSpec struct {
 	// Add-on type. The valid value is helm.
 	// +unionDiscriminator
 	// +kubebuilder:validation:Required
-	Type AddonType `json:"type"`
+	Type     AddonType `json:"type"`
+	Version  string    `json:"version,omitempty"`
+	Provider string    `json:"provider,omitempty"`
 
 	// Helm installation spec. It's processed only when type=helm.
 	// +optional
@@ -405,6 +407,8 @@ type ResourceRequirements struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster
 // +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="addon types"
+// +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.version",description="addon version"
+// +kubebuilder:printcolumn:name="PROVIDER",type="string",JSONPath=".spec.provider",description="addon provider"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

@@ -50,7 +50,7 @@ Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm]
 
 Use Helm to install KubeBlocks by following the steps below.
 
-1. Create dependency CRDs
+1. Create dependent CRDs
    ```bash
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.8.1/kubeblocks_crds.yaml
    ```

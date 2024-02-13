@@ -48,20 +48,20 @@ Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm]
 
 ## Installation steps
 
-Use Helm to install KubeBlocks by following the steps below.
+Use Helm and follow the steps below to install KubeBlocks.
 
-1. Create dependent CRDs
+1. Create dependent CRDs.
    ```bash
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.8.1/kubeblocks_crds.yaml
    ```
 
-2. Add helm repo
+2. Add helm repo.
    ```bash
    helm repo add kubeblocks https://apecloud.github.io/helm-charts
    helm repo update
    ```
 
-3. Install KubeBlocks
+3. Install KubeBlocks.
    ```bash
    helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
    ```

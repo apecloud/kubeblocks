@@ -6896,7 +6896,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.<br />If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.<br />They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.<br />And the Service.Name will also be generated with named pattern <Service.Name>-<PodOrdinal>.<br />The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.<br />For example, a Service might be defined as follows:<br />- name: my-service<br />  serviceName: my-service<br />  generatePodOrdinalService: true<br />  spec:<br />    type: NodePort<br />    ports:<br />    - name: http<br />      port: 80<br />      targetPort: 8080<br />Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.</p><br />
+<p>GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.<br />If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.<br />They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <code>$(Service.ServiceName)-$(PodOrdinal)</code>.<br />And the Service.Name will also be generated with named pattern <code>$(Service.Name)-$(PodOrdinal)</code>.<br />The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.<br />For example, a Service might be defined as follows:<br />- name: my-service<br />  serviceName: my-service<br />  generatePodOrdinalService: true<br />  spec:<br />    type: NodePort<br />    ports:<br />    - name: http<br />      port: 80<br />      targetPort: 8080<br />Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.</p><br />
 </td>
 </tr>
 </tbody>
@@ -13741,7 +13741,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceName defines the name of the underlying service object.<br />If not specified, the default service name with different patterns will be used:<br /> - <CLUSTER_NAME>: for cluster-level services<br /> - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services<br />Only one default service name is allowed.<br />Cannot be updated.</p><br />
+<p>ServiceName defines the name of the underlying service object.<br />If not specified, the default service name with different patterns will be used:<br /> - CLUSTER_NAME: for cluster-level services<br /> - CLUSTER_NAME-COMPONENT_NAME: for component-level services<br />Only one default service name is allowed.<br />Cannot be updated.</p><br />
 </td>
 </tr>
 <tr>
@@ -14587,7 +14587,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.<br />If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.<br />They can be referred to by adding the PodOrdinal to the defined name template with named pattern $<Vars[x].Name>_<PodOrdinal>.<br />For example, a ServiceVarRef might be defined as follows:<br />- name: MY_SERVICE_PORT<br />  valueFrom:<br />    serviceVarRef:<br />      compDef: my-component-definition<br />      name: my-service<br />      optional: true<br />      generatePodOrdinalServiceVar: true<br />      port:<br />        name: redis-sentinel<br />Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,<br />and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.<br />It should be used in conjunction with Service.GeneratePodOrdinalService.</p><br />
+<p>GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.<br />If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.<br />They can be referred to by adding the PodOrdinal to the defined name template with named pattern <code>$(Vars[x].Name)_$(PodOrdinal)</code>.<br />For example, a ServiceVarRef might be defined as follows:<br />- name: MY_SERVICE_PORT<br />  valueFrom:<br />    serviceVarRef:<br />      compDef: my-component-definition<br />      name: my-service<br />      optional: true<br />      generatePodOrdinalServiceVar: true<br />      port:<br />        name: redis-sentinel<br />Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,<br />and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.<br />It should be used in conjunction with Service.GeneratePodOrdinalService.</p><br />
 </td>
 </tr>
 </tbody>
@@ -14673,7 +14673,7 @@ string
 </em>
 </td>
 <td>
-<p>name defines sharding name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.<br />The name is also used to generate the name of the underlying components with the naming pattern <ShardingSpec.Name>-<ShardID>.<br />At the same time, the name of component template defined in ShardingSpec.Template.Name will be ignored.</p><br />
+<p>name defines sharding name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.<br />The name is also used to generate the name of the underlying components with the naming pattern <code>$(ShardingSpec.Name)-$(ShardID)</code>.<br />At the same time, the name of component template defined in ShardingSpec.Template.Name will be ignored.</p><br />
 </td>
 </tr>
 <tr>

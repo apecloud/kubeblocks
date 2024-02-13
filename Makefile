@@ -263,6 +263,8 @@ lorryctl-doc: generate test-go-generate ## generate CLI command reference manual
 api-doc:  ## generate API reference manual.
 	@./hack/docgen/api/generate.sh
 
+.PHONY: doc
+doc: lorryctl-doc api-doc ## generate all documents.
 
 ##@ Operator Controller Manager
 

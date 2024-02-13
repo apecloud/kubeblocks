@@ -101,6 +101,26 @@ AddonType
 </tr>
 <tr>
 <td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>provider</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
 <code>helm</code><br/>
 <em>
 <a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">
@@ -455,6 +475,8 @@ ResourceRequirements
 </thead>
 <tbody><tr><td><p>&#34;KubeGitVersion&#34;</p></td>
 <td></td>
+</tr><tr><td><p>&#34;KubeProvider&#34;</p></td>
+<td></td>
 </tr><tr><td><p>&#34;KubeVersion&#34;</p></td>
 <td></td>
 </tr></tbody>
@@ -498,6 +520,26 @@ AddonType
 </td>
 <td>
 <p>Add-on type. The valid value is helm.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>provider</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
 </td>
 </tr>
 <tr>
@@ -1384,7 +1426,7 @@ AddonSelectorKey
 </em>
 </td>
 <td>
-<p>The selector key. Valid values are KubeVersion, KubeGitVersion.<br />&ldquo;KubeVersion&rdquo; the semver expression of Kubernetes versions, i.e., v1.24.<br />&ldquo;KubeGitVersion&rdquo; may contain distro. info., i.e., v1.24.4+eks.</p><br />
+<p>The selector key. Valid values are KubeVersion, KubeGitVersion and KubeProvider.<br />&ldquo;KubeVersion&rdquo; the semver expression of Kubernetes versions, i.e., v1.24.<br />&ldquo;KubeGitVersion&rdquo; may contain distro. info., i.e., v1.24.4+eks.<br />&ldquo;KubeProvider&rdquo; the Kubernetes provider, i.e., aws, gcp, azure, huaweiCloud, tencentCloud etc.</p><br />
 </td>
 </tr>
 <tr>

@@ -3949,7 +3949,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>message is a human readable message indicating details about the object condition.</p><br />
+<p>message is a human-readable message indicating details about the object condition.</p><br />
 </td>
 </tr>
 <tr>
@@ -4137,7 +4137,7 @@ int32
 </em>
 </td>
 <td>
-<p>the replicas of persistent volume claim which need to be created and restored.<br />the format of created claim name is &ldquo;<template-name>-<index>&rdquo;.</p><br />
+<p>the replicas of persistent volume claim which need to be created and restored.<br />the format of created claim name is <code>$(template-name)-$(index)</code>.</p><br />
 </td>
 </tr>
 <tr>

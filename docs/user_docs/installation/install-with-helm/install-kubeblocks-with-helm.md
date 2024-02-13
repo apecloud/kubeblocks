@@ -55,7 +55,7 @@ Use Helm and follow the steps below to install KubeBlocks.
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.8.1/kubeblocks_crds.yaml
    ```
 
-2. Add helm repo.
+2. Add Helm repo.
    ```bash
    helm repo add kubeblocks https://apecloud.github.io/helm-charts
    helm repo update

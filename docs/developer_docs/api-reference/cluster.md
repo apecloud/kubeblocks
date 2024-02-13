@@ -6074,7 +6074,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>the account name of the component.<br />will inject the account username and password to KB_ACCOUNT_USERNAME and KB_ACCOUNT_PASSWORD in env of the job.</p><br />
+<p>the account name of the component.<br />will inject the account username and password to <code>KB_ACCOUNT_USERNAME</code> and <code>KB_ACCOUNT_PASSWORD</code> in env of the job.</p><br />
 </td>
 </tr>
 <tr>
@@ -6086,7 +6086,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>reference the services[*].name.<br />will map the service name and ports to KB_COMP_SVC_NAME and KB_COMP_SVC<em>PORT</em><portName> in env of the job.<br />portName will replace the characters &lsquo;-&rsquo; to &lsquo;_&rsquo; and convert to uppercase.</p><br />
+<p>reference the services[*].name.<br />will map the service name and ports to <code>KB_COMP_SVC_NAME</code> and <code>KB_COMP_SVC_PORT_$(portName)</code> in env of the job.<br />portName will replace the characters &lsquo;-&rsquo; to &lsquo;_&rsquo; and convert to uppercase.</p><br />
 </td>
 </tr>
 <tr>

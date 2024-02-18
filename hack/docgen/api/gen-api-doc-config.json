@@ -48,7 +48,7 @@
         },
         {
             "groupName": "add-on",
-            "packages": ["workloads.kubeblocks.io"],
+            "packages": ["extensions.kubeblocks.io"],
             "order": 3
         }
     ],

@@ -83,7 +83,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Addon description.</p><br />
+<p>Add-on description.</p><br />
 </td>
 </tr>
 <tr>
@@ -107,6 +107,8 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>Add-on version.</p><br />
 </td>
 </tr>
 <tr>
@@ -117,6 +119,8 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>Add-on provider.</p><br />
 </td>
 </tr>
 <tr>
@@ -246,7 +250,7 @@ AddonInstallSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Addon installs parameters selectors by default. If multiple selectors are provided,<br />all selectors must evaluate to true.</p><br />
+<p>Add-on installs parameters selectors by default. If multiple selectors are provided,<br />all selectors must evaluate to true.</p><br />
 </td>
 </tr>
 </tbody>
@@ -506,7 +510,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Addon description.</p><br />
+<p>Add-on description.</p><br />
 </td>
 </tr>
 <tr>
@@ -530,6 +534,8 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>Add-on version.</p><br />
 </td>
 </tr>
 <tr>
@@ -540,6 +546,8 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>Add-on provider.</p><br />
 </td>
 </tr>
 <tr>

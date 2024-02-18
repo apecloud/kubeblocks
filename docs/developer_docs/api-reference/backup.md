@@ -2194,7 +2194,7 @@ string
 <code>schedules</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.ScheduleStatus">
-map[string]github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.ScheduleStatus
+map[string]..ScheduleStatus
 </a>
 </em>
 </td>

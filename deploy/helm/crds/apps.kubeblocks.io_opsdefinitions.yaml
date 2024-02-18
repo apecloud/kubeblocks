@@ -57,8 +57,8 @@ spec:
                   properties:
                     accountName:
                       description: the account name of the component. will inject
-                        the account username and password to KB_ACCOUNT_USERNAME and
-                        KB_ACCOUNT_PASSWORD in env of the job.
+                        the account username and password to `KB_ACCOUNT_USERNAME`
+                        and `KB_ACCOUNT_PASSWORD` in env of the job.
                       type: string
                     name:
                       description: refer to componentDefinition name.
@@ -66,7 +66,7 @@ spec:
                       type: string
                     serviceName:
                       description: reference the services[*].name. will map the service
-                        name and ports to KB_COMP_SVC_NAME and KB_COMP_SVC_PORT_<portName>
+                        name and ports to `KB_COMP_SVC_NAME` and `KB_COMP_SVC_PORT_$(portName)`
                         in env of the job. portName will replace the characters '-'
                         to '_' and convert to uppercase.
                       type: string

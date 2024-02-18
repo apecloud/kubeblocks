@@ -1724,7 +1724,7 @@ spec:
                       replicas:
                         description: the replicas of persistent volume claim which
                           need to be created and restored. the format of created claim
-                          name is "<template-name>-<index>".
+                          name is `$(template-name)-$(index)`.
                         format: int32
                         minimum: 1
                         type: integer
@@ -2360,7 +2360,7 @@ spec:
                           format: date-time
                           type: string
                         message:
-                          description: message is a human readable message indicating
+                          description: message is a human-readable message indicating
                             details about the object condition.
                           type: string
                         name:
@@ -2401,7 +2401,7 @@ spec:
                           format: date-time
                           type: string
                         message:
-                          description: message is a human readable message indicating
+                          description: message is a human-readable message indicating
                             details about the object condition.
                           type: string
                         name:

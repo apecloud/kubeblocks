@@ -227,7 +227,7 @@ type RestoreVolumeClaimsTemplate struct {
 	Templates []RestoreVolumeClaim `json:"templates"`
 
 	// the replicas of persistent volume claim which need to be created and restored.
-	// the format of created claim name is "<template-name>-<index>".
+	// the format of created claim name is `$(template-name)-$(index)`.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Required
 	Replicas int32 `json:"replicas"`
@@ -337,7 +337,7 @@ type RestoreStatusAction struct {
 	// +kubebuilder:validation:Required
 	ObjectKey string `json:"objectKey"`
 
-	// message is a human readable message indicating details about the object condition.
+	// message is a human-readable message indicating details about the object condition.
 	// +optional
 	Message string `json:"message,omitempty"`
 

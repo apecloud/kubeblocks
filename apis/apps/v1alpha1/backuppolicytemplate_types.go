@@ -88,13 +88,11 @@ type BackupMethod struct {
 	dpv1alpha1.BackupMethod `json:",inline"`
 
 	// Specifies the instance where the backup will be stored.
-	// This field is optional.
 	//
 	// +optional
 	Target *TargetInstance `json:"target"`
 
 	// Defines the mapping between the environment variables of the cluster and the keys of the environment values.
-	// This field is optional.
 	//
 	// +optional
 	EnvMapping []EnvMappingVar `json:"envMapping,omitempty"`

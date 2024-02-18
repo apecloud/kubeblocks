@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -58,12 +57,11 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 	}
 
 	if withClusterTopology(cluster) {
-		// check again with cluster definition loaded
-		if err = validateClusterTopology(transCtx.ClusterDef, cluster); err != nil {
+		// check again with cluster definition loaded,
+		// and update topology to cluster spec in case the default topology changed.
+		if err = t.checkNUpdateClusterTopology(transCtx, cluster); err != nil {
 			return newRequeueError(requeueDuration, err.Error())
 		}
-		// patch topology name to cluster annotations in case the default topology changed.
-		setClusterTopologyAnnotation(transCtx.ClusterDef, cluster)
 	}
 	return nil
 }
@@ -121,8 +119,8 @@ func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterVersion(transCtx *
 	return nil
 }
 
-func validateClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) error {
-	clusterTopology := referredClusterTopology(clusterDef, cluster.Spec.Topology)
+func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+	clusterTopology := referredClusterTopology(transCtx.ClusterDef, cluster.Spec.Topology)
 	if clusterTopology == nil {
 		return fmt.Errorf("specified cluster topology not found: %s", cluster.Spec.Topology)
 	}
@@ -131,34 +129,15 @@ func validateClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition, cluster
 	for _, comp := range clusterTopology.Components {
 		comps[comp.Name] = true
 	}
-
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		if !comps[comp.Name] {
 			return fmt.Errorf("component %s not defined in topology %s", comp.Name, clusterTopology.Name)
 		}
 	}
+
+	cluster.Spec.Topology = clusterTopology.Name
+
 	return nil
-}
-
-func setClusterTopologyAnnotation(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) {
-	if cluster.Annotations == nil {
-		cluster.Annotations = make(map[string]string)
-	}
-	clusterTopology := referredClusterTopology(clusterDef, cluster.Spec.Topology)
-	if clusterTopology == nil {
-		panic(fmt.Sprintf("runtime error - cluster topology not found : %s", cluster.Spec.Topology))
-	}
-	cluster.Annotations[constant.ClusterDefTopologyLabelKey] = clusterTopology.Name
-}
-
-func clusterTopologyName(cluster *appsv1alpha1.Cluster) string {
-	if cluster.Annotations != nil {
-		return cluster.Annotations[constant.ClusterDefTopologyLabelKey]
-	}
-	if len(cluster.Spec.Topology) > 0 {
-		return cluster.Spec.Topology
-	}
-	return ""
 }
 
 func withClusterTopology(cluster *appsv1alpha1.Cluster) bool {

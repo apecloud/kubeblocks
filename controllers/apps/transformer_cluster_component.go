@@ -134,7 +134,7 @@ func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 		if buildErr != nil {
 			return buildErr
 		}
-		if newCompObj := copyAndMergeComponent(protoCompSpecMap[compName], runningComp, comp); newCompObj != nil {
+		if newCompObj := copyAndMergeComponent(runningComp, comp); newCompObj != nil {
 			graphCli.Update(dag, runningComp, newCompObj)
 		}
 	}
@@ -169,7 +169,7 @@ func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1alph
 // copyAndMergeComponent merges two component objects for updating:
 // 1. new a component object targetCompObj by copying from oldCompObj
 // 2. merge all fields can be updated from newCompObj into targetCompObj
-func copyAndMergeComponent(compSpec *appsv1alpha1.ClusterComponentSpec, oldCompObj, newCompObj *appsv1alpha1.Component) *appsv1alpha1.Component {
+func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *appsv1alpha1.Component {
 	compObjCopy := oldCompObj.DeepCopy()
 	compProto := newCompObj
 

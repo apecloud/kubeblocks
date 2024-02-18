@@ -100,13 +100,9 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 		return compSpec
 	}
 
-	topologyName := clusterTopologyName(cluster)
-	clusterTopology := referredClusterTopology(clusterDef, topologyName)
+	clusterTopology := referredClusterTopology(clusterDef, cluster.Spec.Topology)
 	if clusterTopology == nil {
-		return nil, fmt.Errorf("referred cluster topology not found : %s", topologyName)
-	}
-	if clusterTopology.Name != topologyName {
-		return nil, fmt.Errorf("referred cluster topology is changed, expected: %s, resolved: %s", topologyName, clusterTopology.Name)
+		return nil, fmt.Errorf("referred cluster topology not found : %s", cluster.Spec.Topology)
 	}
 
 	specifiedCompSpecs := make(map[string]*appsv1alpha1.ClusterComponentSpec)

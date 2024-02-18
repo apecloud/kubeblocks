@@ -2765,7 +2765,7 @@ TargetInstance
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the instance where the backup will be stored.<br />This field is optional.</p><br />
+<p>Specifies the instance where the backup will be stored.</p><br />
 </td>
 </tr>
 <tr>
@@ -2779,7 +2779,7 @@ TargetInstance
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the mapping between the environment variables of the cluster and the keys of the environment values.<br />This field is optional.</p><br />
+<p>Defines the mapping between the environment variables of the cluster and the keys of the environment values.</p><br />
 </td>
 </tr>
 </tbody>

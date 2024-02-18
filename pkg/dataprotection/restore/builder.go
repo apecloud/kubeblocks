@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -59,6 +59,7 @@ type restoreJobBuilder struct {
 	nodeSelector         map[string]string
 	jobName              string
 	labels               map[string]string
+	serviceAccount       string
 }
 
 func newRestoreJobBuilder(restore *dpv1alpha1.Restore, backupSet BackupActionSet, backupRepo *dpv1alpha1.BackupRepo, stage dpv1alpha1.RestoreStage) *restoreJobBuilder {
@@ -168,6 +169,11 @@ func (r *restoreJobBuilder) addLabel(key, value string) *restoreJobBuilder {
 		return r
 	}
 	r.labels[key] = value
+	return r
+}
+
+func (r *restoreJobBuilder) setServiceAccount(serviceAccount string) *restoreJobBuilder {
+	r.serviceAccount = serviceAccount
 	return r
 }
 
@@ -300,6 +306,8 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	}
 	r.specificVolumes = append(r.specificVolumes, r.commonVolumes...)
 	podSpec.Volumes = r.specificVolumes
+	podSpec.ServiceAccountName = r.serviceAccount
+
 	job.Spec.Template.Spec = podSpec
 	job.Spec.Template.ObjectMeta = metav1.ObjectMeta{
 		Labels: r.labels,

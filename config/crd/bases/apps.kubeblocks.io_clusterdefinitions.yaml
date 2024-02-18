@@ -9883,6 +9883,10 @@ spec:
                               maximum: 8
                               minimum: 0
                               type: integer
+                            seed:
+                              description: seed specifies the seed used to generate
+                                the account's password. Cannot be updated.
+                              type: string
                           type: object
                       required:
                       - accounts

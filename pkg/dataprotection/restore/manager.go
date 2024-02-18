@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -37,6 +37,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -57,6 +58,7 @@ type RestoreManager struct {
 	PostReadyBackupSets   []BackupActionSet
 	Schema                *runtime.Scheme
 	Recorder              record.EventRecorder
+	WorkerServiceAccount  string
 }
 
 func NewRestoreManager(restore *dpv1alpha1.Restore, recorder record.EventRecorder, schema *runtime.Scheme) *RestoreManager {
@@ -277,6 +279,7 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 		setImage(backupSet.ActionSet.Spec.Restore.PrepareData.Image).
 		setCommand(backupSet.ActionSet.Spec.Restore.PrepareData.Command).
 		addCommonEnv().
+		setServiceAccount(r.WorkerServiceAccount).
 		attachBackupRepo()
 
 	createPVCIfNotExistsAndBuildVolume := func(claim dpv1alpha1.RestoreVolumeClaim, identifier string) (*corev1.Volume, *corev1.VolumeMount, error) {
@@ -374,6 +377,7 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 		addLabel(DataProtectionPopulatePVCLabelKey, populatePVC.Name).
 		setImage(backupSet.ActionSet.Spec.Restore.PrepareData.Image).
 		setCommand(backupSet.ActionSet.Spec.Restore.PrepareData.Command).
+		setServiceAccount(r.WorkerServiceAccount).
 		attachBackupRepo().
 		addCommonEnv()
 	volume, volumeMount, err := jobBuilder.buildPVCVolumeAndMount(*prepareDataConfig.DataSourceRef, populatePVC.Name, "dp-claim")
@@ -447,6 +451,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			setCommand(actionSpec.Job.Command).
 			setToleration(targetPod.Spec.Tolerations).
 			addTargetPodAndCredentialEnv(targetPod, r.Restore.Spec.ReadyConfig.ConnectionCredential).
+			setServiceAccount(r.WorkerServiceAccount).
 			build()
 		return []*batchv1.Job{job}, nil
 	}
@@ -475,8 +480,8 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			kbInstalledNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			if kbInstalledNamespace != "" {
 				job.Namespace = kbInstalledNamespace
-				// use the KubeBlocks' serviceAccount
-				job.Spec.Template.Spec.ServiceAccountName = viper.GetString(constant.KBServiceAccountName)
+				// use the dedicated ServiceAccount for executing "kubectl exec"
+				job.Spec.Template.Spec.ServiceAccountName = viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName)
 			}
 			job.Labels[DataProtectionRestoreNamespaceLabelKey] = r.Restore.Namespace
 			restoreJobs = append(restoreJobs, job)

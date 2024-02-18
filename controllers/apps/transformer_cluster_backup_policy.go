@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -408,12 +408,6 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(targetTpl appsv1alpha
 	comp *appsv1alpha1.ClusterComponentSpec) *dpv1alpha1.BackupTarget {
 	clusterName := r.OrigCluster.Name
 
-	getSAName := func() string {
-		if comp.ServiceAccountName != "" {
-			return comp.ServiceAccountName
-		}
-		return constant.GenerateDefaultServiceAccountName(r.Cluster.Name)
-	}
 	if targetTpl.Strategy == "" {
 		targetTpl.Strategy = dpv1alpha1.PodSelectionStrategyAny
 	}
@@ -424,7 +418,8 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(targetTpl appsv1alpha
 				MatchLabels: r.buildTargetPodLabels(targetTpl, comp),
 			},
 		},
-		ServiceAccountName: getSAName(),
+		// dataprotection will use its dedicated service account if this field is empty.
+		ServiceAccountName: "",
 	}
 
 	// build the target connection credential

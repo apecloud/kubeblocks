@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Backup Schedule Controller", func() {
@@ -150,6 +151,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 					}
 					g.Expect(fetched.Spec.StartingDeadlineSeconds).ShouldNot(BeNil())
 					g.Expect(*fetched.Spec.StartingDeadlineSeconds).To(Equal(getStartingDeadlineSeconds(backupSchedule)))
+					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.ServiceAccountName).To(Equal(viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)))
 				})).Should(Succeed())
 			})
 		})

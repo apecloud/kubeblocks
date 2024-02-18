@@ -192,6 +192,8 @@ serviceMonitor:
   enabled: false
   # metrics server will be exposed at this port.
   port: 8080
+  goRuntime:
+    enabled: false
   # Only used if `service.type` is `NodePort`.
   nodePort:
 
@@ -308,6 +310,18 @@ dataProtection:
   encryptionKey: ""
   gcFrequencySeconds: 3600
 
+  worker:
+    serviceAccount:
+      # The name of the service account for worker pods.
+      # ServiceAccount resources will be created in every namespace where a worker pod needs to run.
+      # If not set, a name is generated using the fullname template.
+      name: ""
+
+      # Extra annotations when creating service accounts.
+      # This field is primarily for associating IAM roles in cloud environments.
+      # e.g. EKS associates IAM roles by adding the "eks.amazonaws.com/role-arn" annotation.
+      annotations: {}
+
   image:
     # if the value of dataProtection.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
     registry: ""
@@ -374,6 +388,7 @@ addonChartsImage:
   pullPolicy: IfNotPresent
   tag: ""
   chartsPath: /charts
+  pullSecrets: []
 
 ## @param addonHelmInstallOptions - addon helm install options.
 addonHelmInstallOptions:
@@ -895,6 +910,18 @@ prometheus:
                 summary: 'MySQL has too many connections (> 80%)'
                 description: '{{ $value | printf "%.2f" }} percent of MySQL connections are in use. (instance: {{ $labels.pod }})'
 
+            - alert: MysqlReplicationLag
+              expr:  |-
+                max by(namespace,app_kubernetes_io_instance,pod) (
+                  max_over_time(mysql_replication_heartbeat_relay_delay_seconds{replication_role=~"slave"}[2m])
+                ) > 3600
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: 'MySQL replication lag delay exceeds one hour'
+                description: 'mysql replication relay latency: {{ $value | printf "%.2f" }}. (instance: {{ $labels.pod }})'
+
             - alert: MysqlConnectionErrors
               expr: 'sum(increase(mysql_global_status_connection_errors_total[1m])) BY (namespace,app_kubernetes_io_instance,pod) > 0'
               for: 2m
@@ -952,6 +979,18 @@ prometheus:
               annotations:
                 summary: 'PostgreSQL is down'
                 description: 'PostgreSQL is down. (instance: {{ $labels.pod }})'
+
+            - alert: PGReplicationLag
+              expr:  |-
+                max by(namespace,app_kubernetes_io_instance,pod) (
+                  max_over_time(pg_replication_lag[2m])
+                ) > 3600
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: 'PG replication lag delay exceeds one hour'
+                description: 'PostgresSQL replication relay latency: {{ $value | printf "%.2f" }}. (instance: {{ $labels.pod }})'
 
             - alert: PostgreSQLRestarted
               expr: 'time() - pg_postmaster_start_time_seconds < 60'

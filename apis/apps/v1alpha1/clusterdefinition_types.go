@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -188,6 +188,10 @@ type PasswordConfig struct {
 	// +kubebuilder:default=MixedCases
 	// +optional
 	LetterCase LetterCase `json:"letterCase,omitempty"`
+	// seed specifies the seed used to generate the account's password.
+	// Cannot be updated.
+	// +optional
+	Seed string `json:"seed,omitempty"`
 }
 
 // SystemAccountConfig specifies how to create and delete system accounts.

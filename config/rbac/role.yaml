@@ -600,8 +600,12 @@ rules:
   resources:
   - serviceaccounts
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - ""
@@ -856,8 +860,12 @@ rules:
   resources:
   - rolebindings
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io

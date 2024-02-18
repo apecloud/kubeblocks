@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -40,10 +40,11 @@ import (
 
 type Scheduler struct {
 	intctrlutil.RequestCtx
-	Client         client.Client
-	Scheme         *k8sruntime.Scheme
-	BackupSchedule *dpv1alpha1.BackupSchedule
-	BackupPolicy   *dpv1alpha1.BackupPolicy
+	Client               client.Client
+	Scheme               *k8sruntime.Scheme
+	BackupSchedule       *dpv1alpha1.BackupSchedule
+	BackupPolicy         *dpv1alpha1.BackupPolicy
+	WorkerServiceAccount string
 }
 
 func (s *Scheduler) Schedule() error {
@@ -190,7 +191,7 @@ EOF
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	podSpec := &corev1.PodSpec{
-		ServiceAccountName: s.BackupPolicy.Spec.Target.ServiceAccountName,
+		ServiceAccountName: s.WorkerServiceAccount,
 		RestartPolicy:      corev1.RestartPolicyNever,
 		Containers:         []corev1.Container{container},
 	}

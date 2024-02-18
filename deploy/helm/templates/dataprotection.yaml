@@ -99,6 +99,14 @@ spec:
               value: "{{ .Values.dataProtection.image.registry | default $dataProtectionImageRegistry }}/{{ .Values.dataProtection.image.datasafed.repository }}:{{ .Values.dataProtection.image.datasafed.tag | default "latest" }}"
             - name: GC_FREQUENCY_SECONDS
               value: "{{ .Values.dataProtection.gcFrequencySeconds }}"
+            - name: WORKER_SERVICE_ACCOUNT_NAME
+              value: {{ include "dataprotection.workerSAName" . }}
+            - name: EXEC_WORKER_SERVICE_ACCOUNT_NAME
+              value: {{ include "dataprotection.execWorkerSAName" . }}
+            - name: WORKER_SERVICE_ACCOUNT_ANNOTATIONS
+              value: {{ .Values.dataProtection.worker.serviceAccount.annotations | toJson | quote }}
+            - name: WORKER_CLUSTER_ROLE_NAME
+              value: {{ include "dataprotection.workerClusterRoleName" . }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
@@ -166,8 +174,8 @@ spec:
             name: {{ include "kubeblocks.fullname" . }}-manager-config
         {{- if .Values.admissionWebhooks.enabled }}
         - name: cert
-        secret:
-          defaultMode: 420
-          secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+          secret:
+            defaultMode: 420
+            secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
         {{- end }}
 {{- end }}

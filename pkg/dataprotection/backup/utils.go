@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -25,6 +25,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/rogpeppe/go-internal/semver"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -233,14 +234,23 @@ func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
 // For kubernetes version >= 1.25, the timeZone field is supported, return timezone.
 // Ref https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
 //
-// For kubernetes version < 1.25 and greater than 1.21, the timeZone field is not
-// supported, so we need to set the CRON_TZ environment variable.
+// For kubernetes version < 1.25 and >= 1.22, the timeZone field is not supported.
+// Therefore, we need to set the CRON_TZ environment variable.
 // Ref https://github.com/kubernetes/kubernetes/issues/47202#issuecomment-901294870
+//
+// For kubernetes version < 1.22, the CRON_TZ environment variable is not supported.
+// The kube-controller-manager interprets schedules relative to its local time zone.
 func BuildCronJobSchedule(cronExpression string) (*string, string) {
 	timeZone := "UTC"
-	major, minor, _ := dputils.GetKubeVersion()
-	if major >= 1 && minor >= 25 {
+	ver, err := dputils.GetKubeVersion()
+	if err != nil {
+		return nil, cronExpression
+	}
+	if semver.Compare(ver, "v1.25") >= 0 {
 		return &timeZone, cronExpression
+	}
+	if semver.Compare(ver, "v1.22") < 0 {
+		return nil, cronExpression
 	}
 	return nil, fmt.Sprintf("CRON_TZ=%s %s", timeZone, cronExpression)
 }

@@ -5282,7 +5282,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ClusterComponentStatus
+map[string]..ClusterComponentStatus
 </a>
 </em>
 </td>
@@ -7964,7 +7964,7 @@ ConfigTemplateExtension
 <code>configFileParams</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ConfigParams">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ConfigParams
+map[string]..ConfigParams
 </a>
 </em>
 </td>
@@ -9816,7 +9816,7 @@ ClassDefRef
 <td>
 <code>targetResources</code><br/>
 <em>
-map[github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ComponentResourceKey][]string
+map[..ComponentResourceKey][]string
 </em>
 </td>
 <td>
@@ -9858,7 +9858,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfiguration
+map[string]..LastComponentConfiguration
 </a>
 </em>
 </td>
@@ -10916,7 +10916,7 @@ LastConfiguration
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponentStatus
+map[string]..OpsRequestComponentStatus
 </a>
 </em>
 </td>
@@ -10986,7 +10986,7 @@ ReconfiguringStatus
 <code>reconfiguringStatusAsComponent</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ReconfiguringStatus">
-map[string]*github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ReconfiguringStatus
+map[string]*..ReconfiguringStatus
 </a>
 </em>
 </td>

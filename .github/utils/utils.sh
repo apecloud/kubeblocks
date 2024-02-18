@@ -511,6 +511,12 @@ get_trigger_mode() {
             pkg/cli/cmd/*)
                 add_trigger_mode "[cli][test]"
             ;;
+            apis/*)
+                add_trigger_mode "[apis][test]"
+            ;;
+            pkg/lorry/ctl/*)
+                add_trigger_mode "[lorry][test]"
+            ;;
             *)
                 add_trigger_mode "[test]"
             ;;

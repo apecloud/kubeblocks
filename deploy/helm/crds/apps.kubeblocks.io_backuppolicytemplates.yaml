@@ -748,8 +748,6 @@ spec:
             description: BackupPolicyTemplateStatus defines the observed state of
               BackupPolicyTemplate
             type: object
-        required:
-        - spec
         type: object
     served: true
     storage: true

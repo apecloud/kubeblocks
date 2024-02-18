@@ -83,10 +83,12 @@ type ComponentDefinitionRef struct {
 type ParametersSchema struct {
 	// openAPIV3Schema is the OpenAPI v3 schema to use for parameter schema.
 	// supported properties types:
+	//
 	// - string
 	// - number
 	// - integer
 	// - array: only supported the item with string type.
+	//
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=object
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -97,8 +99,10 @@ type ParametersSchema struct {
 
 type VarsRef struct {
 	// podSelectionStrategy how to select the target component pod for variable references based on the strategy.
+	//
 	// - PreferredAvailable: prioritize the selection of available pod.
 	// - Available: only select available pod. if not found, terminating the operation.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=PreferredAvailable
 	PodSelectionStrategy PodSelectionStrategy `json:"podSelectionStrategy"`
@@ -152,9 +156,11 @@ type PreCondition struct {
 type Rule struct {
 	// expression declares how the operation can be executed using go template expression.
 	// it should return "true" or "false", built-in objects:
+	//
 	// - "params" are input parameters.
 	// - "cluster" is referenced cluster object.
 	// - "component" is referenced the component Object.
+	//
 	// +kubebuilder:validation:Required
 	Expression string `json:"expression"`
 

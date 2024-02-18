@@ -9,20 +9,20 @@ sidebar_label: Add-On
 <p>Packages:</p>
 <ul>
 <li>
-<a href="#extensions.kubeblocks.io%2fv1alpha1">extensions.kubeblocks.io/v1alpha1</a>
+<a href="#workloads.kubeblocks.io%2fv1alpha1">workloads.kubeblocks.io/v1alpha1</a>
 </li>
 </ul>
-<h2 id="extensions.kubeblocks.io/v1alpha1">extensions.kubeblocks.io/v1alpha1</h2>
+<h2 id="workloads.kubeblocks.io/v1alpha1">workloads.kubeblocks.io/v1alpha1</h2>
 <div>
 </div>
 Resource Types:
 <ul><li>
-<a href="#extensions.kubeblocks.io/v1alpha1.Addon">Addon</a>
+<a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachine">ReplicatedStateMachine</a>
 </li></ul>
-<h3 id="extensions.kubeblocks.io/v1alpha1.Addon">Addon
+<h3 id="workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachine">ReplicatedStateMachine
 </h3>
 <div>
-<p>Addon is the Schema for the add-ons API.</p><br />
+<p>ReplicatedStateMachine is the Schema for the replicatedstatemachines API.</p>
 </div>
 <table>
 <thead>
@@ -37,7 +37,7 @@ Resource Types:
 <code>apiVersion</code><br/>
 string</td>
 <td>
-<code>extensions.kubeblocks.io/v1alpha1</code>
+<code>workloads.kubeblocks.io/v1alpha1</code>
 </td>
 </tr>
 <tr>
@@ -45,7 +45,7 @@ string</td>
 <code>kind</code><br/>
 string
 </td>
-<td><code>Addon</code></td>
+<td><code>ReplicatedStateMachine</code></td>
 </tr>
 <tr>
 <td>
@@ -65,8 +65,8 @@ Refer to the Kubernetes API documentation for the fields of the
 <td>
 <code>spec</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">
-AddonSpec
+<a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">
+ReplicatedStateMachineSpec
 </a>
 </em>
 </td>
@@ -76,120 +76,277 @@ AddonSpec
 <table>
 <tr>
 <td>
-<code>description</code><br/>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>replicas is the desired number of replicas of the given Template.
+These are replicas in the sense that they are instantiations of the
+same Template, but individual replicas also have a consistent identity.
+If unspecified, defaults to 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>minReadySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Minimum number of seconds for which a newly created pod should be ready
+without any of its container crashing for it to be considered available.
+Defaults to 0 (pod will be considered available as soon as it is ready)</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>selector is a label query over pods that should match the replica count.
+It must match the pod template&rsquo;s labels.
+More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceName</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Add-on description.</p><br />
+<p>serviceName is the name of the service that governs this StatefulSet.
+This service must exist before the StatefulSet, and is responsible for
+the network identity of the set. Pods get DNS/hostnames that follow the
+pattern: pod-specific-string.serviceName.default.svc.cluster.local
+where &ldquo;pod-specific-string&rdquo; is managed by the StatefulSet controller.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>type</code><br/>
+<code>service</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonType">
-AddonType
-</a>
-</em>
-</td>
-<td>
-<p>Add-on type. The valid value is helm.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>version</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Add-on version.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>provider</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Add-on provider.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>helm</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">
-HelmTypeInstallSpec
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
+Kubernetes core/v1.Service
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Helm installation spec. It&rsquo;s processed only when type=helm.</p><br />
+<p>service defines the behavior of a service spec.
+provides read-write service
+<a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
 </td>
 </tr>
 <tr>
 <td>
-<code>defaultInstallValues</code><br/>
+<code>alternativeServices</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">
-[]AddonDefaultInstallSpecItem
-</a>
-</em>
-</td>
-<td>
-<p>Default installation parameters.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>install</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">
-AddonInstallSpec
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
+[]Kubernetes core/v1.Service
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Installation parameters.</p><br />
+<p>AlternativeServices defines Alternative Services selector pattern specifier.
+can be used for creating Readonly service.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>installable</code><br/>
+<code>template</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.InstallableSpec">
-InstallableSpec
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
+Kubernetes core/v1.PodTemplateSpec
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Addon installable spec. It provides selector and auto-install settings.</p><br />
+<p>volumeClaimTemplates is a list of claims that pods are allowed to reference.
+The ReplicatedStateMachine controller is responsible for mapping network identities to
+claims in a way that maintains the identity of a pod. Every claim in
+this list must have at least one matching (by name) volumeMount in one
+container in the template. A claim in this list takes precedence over
+any volumes in the template, with the same name.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>cliPlugins</code><br/>
+<code>podManagementPolicy</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.CliPlugin">
-[]CliPlugin
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Plugin installation spec.</p><br />
+<p>podManagementPolicy controls how pods are created during initial scale up,
+when replacing pods on nodes, or when scaling down. The default policy is
+<code>OrderedReady</code>, where pods are created in increasing order (pod-0, then
+pod-1, etc) and the controller will wait until each pod is ready before
+continuing. When scaling down, the pods are removed in the opposite order.
+The alternative policy is <code>Parallel</code> which will create pods in parallel
+to match the desired scale without waiting, and on scale down will delete
+all pods at once.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
+Kubernetes apps/v1.StatefulSetUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<p>updateStrategy indicates the StatefulSetUpdateStrategy that will be
+employed to update Pods in the RSM when a revision is made to
+Template.
+UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roles</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.ReplicaRole">
+[]ReplicaRole
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Roles, a list of roles defined in the system.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleProbe</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.RoleProbe">
+RoleProbe
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RoleProbe provides method to probe role.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membershipReconfiguration</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.MembershipReconfiguration">
+MembershipReconfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MembershipReconfiguration provides actions to do membership dynamic reconfiguration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemberUpdateStrategy, Members(Pods) update strategy.
+serial: update Members one by one that guarantee minimum component unavailable time.
+Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader
+bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader, keep majority online all the time.
+parallel: force parallel</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>paused</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Paused indicates that the rsm is paused, means the reconciliation of this rsm object will be paused.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>credential</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Credential">
+Credential
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Credential used to connect to DB engine</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rsmTransformPolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
+RsmTransformPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RsmTransformPolicy defines the policy generate sts using rsm. Passed from cluster.
+ToSts: rsm transform to statefulSet
+ToPod: rsm transform to pod</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeAssignment</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.NodeAssignment">
+[]NodeAssignment
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeAssignment defines the expected assignment of nodes.</p>
 </td>
 </tr>
 </table>
@@ -199,8 +356,8 @@ InstallableSpec
 <td>
 <code>status</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonStatus">
-AddonStatus
+<a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineStatus">
+ReplicatedStateMachineStatus
 </a>
 </em>
 </td>
@@ -209,10 +366,33 @@ AddonStatus
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">AddonDefaultInstallSpecItem
+<h3 id="workloads.kubeblocks.io/v1alpha1.AccessMode">AccessMode
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicaRole">ReplicaRole</a>)
+</p>
+<div>
+<p>AccessMode defines SVC access mode enums.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;None&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ReadWrite&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Readonly&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.MembershipReconfiguration">MembershipReconfiguration</a>, <a href="#workloads.kubeblocks.io/v1alpha1.RoleProbe">RoleProbe</a>)
 </p>
 <div>
 </div>
@@ -226,39 +406,141 @@ AddonStatus
 <tbody>
 <tr>
 <td>
-<code>AddonInstallSpec</code><br/>
+<code>image</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">
-AddonInstallSpec
-</a>
+string
 </em>
 </td>
 <td>
-<p>
-(Members of <code>AddonInstallSpec</code> are embedded into this type.)
-</p>
+<em>(Optional)</em>
+<p>utility image contains command that can be used to retrieve of process role info</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>selectors</code><br/>
+<code>command</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.SelectorRequirement">
-[]SelectorRequirement
+[]string
+</em>
+</td>
+<td>
+<p>Command will be executed in Container to retrieve or process role info</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>args</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Args is used to perform statements.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.Credential">Credential
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>username</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<p>Username
+variable name will be KB_RSM_USERNAME</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>password</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<p>Password
+variable name will be KB_RSM_PASSWORD</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.CredentialVar">CredentialVar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.Credential">Credential</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Variable references $(VAR_NAME) are expanded
+using the previously defined environment variables in the container and
+any service environment variables. If a variable cannot be resolved,
+the reference in the input string will be unchanged. Double $$ are reduced
+to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+&ldquo;$$(VAR_NAME)&rdquo; will produce the string literal &ldquo;$(VAR_NAME)&rdquo;.
+Escaped references will never be expanded, regardless of whether the variable
+exists or not.
+Defaults to &ldquo;&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>valueFrom</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvarsource-v1-core">
+Kubernetes core/v1.EnvVarSource
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Add-on installs parameters selectors by default. If multiple selectors are provided,<br />all selectors must evaluate to true.</p><br />
+<p>Source for the environment variable&rsquo;s value. Cannot be used if value is not empty.</p>
 </td>
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonInstallExtraItem">AddonInstallExtraItem
+<h3 id="workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">AddonInstallSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineStatus">ReplicatedStateMachineStatus</a>)
 </p>
 <div>
 </div>
@@ -272,19 +554,179 @@ AddonInstallSpec
 <tbody>
 <tr>
 <td>
-<code>AddonInstallSpecItem</code><br/>
+<code>podName</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpecItem">
-AddonInstallSpecItem
+string
+</em>
+</td>
+<td>
+<p>PodName pod name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.ReplicaRole">
+ReplicaRole
 </a>
 </em>
 </td>
 <td>
-<p>
-(Members of <code>AddonInstallSpecItem</code> are embedded into this type.)
-</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>readyWithoutPrimary</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Is it required for rsm to have at least one primary pod to be ready.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">MemberUpdateStrategy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+</p>
+<div>
+<p>MemberUpdateStrategy defines Cluster Component update strategy.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;BestEffortParallel&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Parallel&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Serial&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.MembershipReconfiguration">MembershipReconfiguration
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>switchoverAction</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Environment variables can be used in all following Actions:</p>
+<ul>
+<li>KB_RSM_USERNAME username part of credential</li>
+<li>KB_RSM_PASSWORD password part of credential</li>
+<li>KB_RSM_LEADER_HOST leader host</li>
+<li>KB_RSM_TARGET_HOST target host</li>
+<li>KB_RSM_SERVICE_PORT port</li>
+</ul>
+<p>SwitchoverAction specifies how to do switchover
+latest <a href="https://busybox.net/">BusyBox</a> image will be used if Image not configured</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoinAction</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemberJoinAction specifies how to add member
+previous none-nil action&rsquo;s Image will be used if not configured</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberLeaveAction</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemberLeaveAction specifies how to remove member
+previous none-nil action&rsquo;s Image will be used if not configured</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>logSyncAction</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>LogSyncAction specifies how to trigger the new member to start log syncing
+previous none-nil action&rsquo;s Image will be used if not configured</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>promoteAction</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PromoteAction specifies how to tell the cluster that the new member can join voting now
+previous none-nil action&rsquo;s Image will be used if not configured</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.NodeAssignment">NodeAssignment
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
 <tr>
 <td>
 <code>name</code><br/>
@@ -293,15 +735,30 @@ string
 </em>
 </td>
 <td>
-<p>Name of the item.</p><br />
+<em>(Optional)</em>
+<p>Name defines the name of statefulSet that needs to allocate node.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSpec</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.NodeSpec">
+NodeSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeSpec defines the detailed node info that will assign to the statefulSet.</p>
 </td>
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">AddonInstallSpec
+<h3 id="workloads.kubeblocks.io/v1alpha1.NodeSpec">NodeSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">AddonDefaultInstallSpecItem</a>, <a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.NodeAssignment">NodeAssignment</a>)
 </p>
 <div>
 </div>
@@ -315,53 +772,91 @@ string
 <tbody>
 <tr>
 <td>
-<code>AddonInstallSpecItem</code><br/>
+<code>nodeName</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpecItem">
-AddonInstallSpecItem
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
+k8s.io/apimachinery/pkg/types.NodeName
 </a>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.ReplicaRole">ReplicaRole
+</h3>
 <p>
-(Members of <code>AddonInstallSpecItem</code> are embedded into this type.)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus</a>, <a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
 </p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name, role name.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>enabled</code><br/>
+<code>accessMode</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.AccessMode">
+AccessMode
+</a>
+</em>
+</td>
+<td>
+<p>AccessMode, what service this member capable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>canVote</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>enabled can be set if there are no specific installation attributes to be set.</p><br />
+<p>CanVote, whether this member has voting rights</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>extras</code><br/>
+<code>isLeader</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallExtraItem">
-[]AddonInstallExtraItem
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Installs spec. for extra items.</p><br />
+<p>IsLeader, whether this member is the leader</p>
 </td>
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonInstallSpecItem">AddonInstallSpecItem
+<h3 id="workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallExtraItem">AddonInstallExtraItem</a>, <a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">AddonInstallSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachine">ReplicatedStateMachine</a>)
 </p>
 <div>
+<p>ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine</p>
 </div>
 <table>
 <thead>
@@ -380,118 +875,281 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Replicas value.</p><br />
+<p>replicas is the desired number of replicas of the given Template.
+These are replicas in the sense that they are instantiations of the
+same Template, but individual replicas also have a consistent identity.
+If unspecified, defaults to 1.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>persistentVolumeEnabled</code><br/>
+<code>minReadySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Minimum number of seconds for which a newly created pod should be ready
+without any of its container crashing for it to be considered available.
+Defaults to 0 (pod will be considered available as soon as it is ready)</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>selector is a label query over pods that should match the replica count.
+It must match the pod template&rsquo;s labels.
+More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>serviceName is the name of the service that governs this StatefulSet.
+This service must exist before the StatefulSet, and is responsible for
+the network identity of the set. Pods get DNS/hostnames that follow the
+pattern: pod-specific-string.serviceName.default.svc.cluster.local
+where &ldquo;pod-specific-string&rdquo; is managed by the StatefulSet controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
+Kubernetes core/v1.Service
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>service defines the behavior of a service spec.
+provides read-write service
+<a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>alternativeServices</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
+[]Kubernetes core/v1.Service
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AlternativeServices defines Alternative Services selector pattern specifier.
+can be used for creating Readonly service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
+Kubernetes core/v1.PodTemplateSpec
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>volumeClaimTemplates is a list of claims that pods are allowed to reference.
+The ReplicatedStateMachine controller is responsible for mapping network identities to
+claims in a way that maintains the identity of a pod. Every claim in
+this list must have at least one matching (by name) volumeMount in one
+container in the template. A claim in this list takes precedence over
+any volumes in the template, with the same name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podManagementPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>podManagementPolicy controls how pods are created during initial scale up,
+when replacing pods on nodes, or when scaling down. The default policy is
+<code>OrderedReady</code>, where pods are created in increasing order (pod-0, then
+pod-1, etc) and the controller will wait until each pod is ready before
+continuing. When scaling down, the pods are removed in the opposite order.
+The alternative policy is <code>Parallel</code> which will create pods in parallel
+to match the desired scale without waiting, and on scale down will delete
+all pods at once.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
+Kubernetes apps/v1.StatefulSetUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<p>updateStrategy indicates the StatefulSetUpdateStrategy that will be
+employed to update Pods in the RSM when a revision is made to
+Template.
+UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roles</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.ReplicaRole">
+[]ReplicaRole
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Roles, a list of roles defined in the system.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleProbe</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.RoleProbe">
+RoleProbe
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RoleProbe provides method to probe role.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membershipReconfiguration</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.MembershipReconfiguration">
+MembershipReconfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MembershipReconfiguration provides actions to do membership dynamic reconfiguration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemberUpdateStrategy, Members(Pods) update strategy.
+serial: update Members one by one that guarantee minimum component unavailable time.
+Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader
+bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader, keep majority online all the time.
+parallel: force parallel</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>paused</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Persistent Volume Enabled value.</p><br />
+<p>Paused indicates that the rsm is paused, means the reconciliation of this rsm object will be paused.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>storageClass</code><br/>
+<code>credential</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Storage class name.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>tolerations</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Tolerations JSON array string value.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>resources</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.ResourceRequirements">
-ResourceRequirements
+<a href="#workloads.kubeblocks.io/v1alpha1.Credential">
+Credential
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Resource requirements.</p><br />
+<p>Credential used to connect to DB engine</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rsmTransformPolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
+RsmTransformPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RsmTransformPolicy defines the policy generate sts using rsm. Passed from cluster.
+ToSts: rsm transform to statefulSet
+ToPod: rsm transform to pod</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeAssignment</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.NodeAssignment">
+[]NodeAssignment
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeAssignment defines the expected assignment of nodes.</p>
 </td>
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonPhase">AddonPhase
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonStatus">AddonStatus</a>)
-</p>
-<div>
-<p>AddonPhase defines addon phases.</p><br />
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Disabled&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Disabling&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Enabled&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Enabling&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonSelectorKey">AddonSelectorKey
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.SelectorRequirement">SelectorRequirement</a>)
-</p>
-<div>
-<p>AddonSelectorKey are selector requirement key types.</p><br />
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;KubeGitVersion&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;KubeProvider&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;KubeVersion&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec
+<h3 id="workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineStatus">ReplicatedStateMachineStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.Addon">Addon</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachine">ReplicatedStateMachine</a>)
 </p>
 <div>
-<p>AddonSpec defines the desired state of an add-on.</p><br />
+<p>ReplicatedStateMachineStatus defines the observed state of ReplicatedStateMachine</p>
 </div>
 <table>
 <thead>
@@ -503,188 +1161,214 @@ ResourceRequirements
 <tbody>
 <tr>
 <td>
-<code>description</code><br/>
+<code>StatefulSetStatus</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Add-on description.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>type</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonType">
-AddonType
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetstatus-v1-apps">
+Kubernetes apps/v1.StatefulSetStatus
 </a>
 </em>
 </td>
 <td>
-<p>Add-on type. The valid value is helm.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>version</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Add-on version.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>provider</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Add-on provider.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>helm</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">
-HelmTypeInstallSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Helm installation spec. It&rsquo;s processed only when type=helm.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>defaultInstallValues</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">
-[]AddonDefaultInstallSpecItem
-</a>
-</em>
-</td>
-<td>
-<p>Default installation parameters.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>install</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">
-AddonInstallSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Installation parameters.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>installable</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.InstallableSpec">
-InstallableSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Addon installable spec. It provides selector and auto-install settings.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>cliPlugins</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.CliPlugin">
-[]CliPlugin
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Plugin installation spec.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonStatus">AddonStatus
-</h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.Addon">Addon</a>)
+(Members of <code>StatefulSetStatus</code> are embedded into this type.)
 </p>
-<div>
-<p>AddonStatus defines the observed state of an add-on.</p><br />
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
+</td>
 </tr>
-</thead>
-<tbody>
 <tr>
 <td>
-<code>phase</code><br/>
+<code>initReplicas</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonPhase">
-AddonPhase
-</a>
+int32
 </em>
 </td>
 <td>
-<p>Add-on installation phases. Valid values are Disabled, Enabled, Failed, Enabling, Disabling.</p><br />
+<p>InitReplicas is the number of pods(members) when cluster first initialized
+it&rsquo;s set to spec.Replicas at object creation time and never changes</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>conditions</code><br/>
+<code>readyInitReplicas</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
-[]Kubernetes meta/v1.Condition
-</a>
+int32
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the current state of add-on API installation conditions.</p><br />
+<p>ReadyInitReplicas is the number of pods(members) already in MembersStatus in the cluster initialization stage
+will never change once equals to InitReplicas</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>observedGeneration</code><br/>
+<code>currentGeneration</code><br/>
 <em>
 int64
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the most recent generation observed for this<br />add-on. It corresponds to the add-on&rsquo;s generation, which is<br />updated on mutation by the API Server.</p><br />
+<p>CurrentGeneration, if not empty, indicates the version of the RSM used to generate the underlying workload</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membersStatus</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.MemberStatus">
+[]MemberStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>members&rsquo; status.</p>
 </td>
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonType">AddonType
-(<code>string</code> alias)</h3>
+<h3 id="workloads.kubeblocks.io/v1alpha1.RoleProbe">RoleProbe
+</h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
 </p>
 <div>
-<p>AddonType defines the addon types.</p><br />
+<p>RoleProbe defines how to observe role</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>builtinHandlerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BuiltinHandler specifies the builtin handler name to use to probe the role of the main container.
+current available handlers: mysql, postgres, mongodb, redis, etcd, kafka.
+use CustomHandler to define your own role probe function if none of them satisfies the requirement.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>customHandler</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Action">
+[]Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CustomHandler defines the custom way to do role probe.
+if the BuiltinHandler satisfies the requirement, use it instead.</p>
+<p>how the actions defined here works:</p>
+<p>Actions will be taken in serial.
+after all actions done, the final output should be a single string of the role name defined in spec.Roles
+latest <a href="https://busybox.net/">BusyBox</a> image will be used if Image not configured
+Environment variables can be used in Command:</p>
+<ul>
+<li>v_KB_RSM_LAST<em>STDOUT stdout from last action, watch &lsquo;v</em>&rsquo; prefixed</li>
+<li>KB_RSM_USERNAME username part of credential</li>
+<li>KB_RSM_PASSWORD password part of credential</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>initialDelaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Number of seconds after the container has started before role probe has started.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>timeoutSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Number of seconds after which the probe times out.
+Defaults to 1 second. Minimum value is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>periodSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>How often (in seconds) to perform the probe.
+Default to 2 seconds. Minimum value is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>successThreshold</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Minimum consecutive successes for the probe to be considered successful after having failed.
+Defaults to 1. Minimum value is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failureThreshold</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Minimum consecutive failures for the probe to be considered failed after having succeeded.
+Defaults to 3. Minimum value is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleUpdateMechanism</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.RoleUpdateMechanism">
+RoleUpdateMechanism
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RoleUpdateMechanism specifies the way how pod role label being updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.RoleUpdateMechanism">RoleUpdateMechanism
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.RoleProbe">RoleProbe</a>)
+</p>
+<div>
+<p>RoleUpdateMechanism defines the way how pod role label being updated.</p>
 </div>
 <table>
 <thead>
@@ -693,561 +1377,20 @@ int64
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Helm&#34;</p></td>
+<tbody><tr><td><p>&#34;DirectAPIServerEventUpdate&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ReadinessProbeEventUpdate&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.CliPlugin">CliPlugin
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Name of the plugin.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>indexRepository</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The index repository of the plugin.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>description</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The description of the plugin.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.DataObjectKeySelector">DataObjectKeySelector
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmInstallValues">HelmInstallValues</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Object name of the referent.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>key</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The key to select.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmInstallOptions">HelmInstallOptions
-(<code>map[string]string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">HelmTypeInstallSpec</a>)
-</p>
-<div>
-</div>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmInstallValues">HelmInstallValues
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">HelmTypeInstallSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>urls</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>configMapRefs</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.DataObjectKeySelector">
-[]DataObjectKeySelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Selects a key of a ConfigMap item list. The value of ConfigMap can be<br />a JSON or YAML string content. Use a key name with &ldquo;.json&rdquo; or &ldquo;.yaml&rdquo; or &ldquo;.yml&rdquo;<br />extension name to specify a content type.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>secretRefs</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.DataObjectKeySelector">
-[]DataObjectKeySelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Selects a key of a Secrets item list. The value of Secrets can be<br />a JSON or YAML string content. Use a key name with &ldquo;.json&rdquo; or &ldquo;.yaml&rdquo; or &ldquo;.yml&rdquo;<br />extension name to specify a content type.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>setValues</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Helm install set values. It can specify multiple or separate values with commas(key1=val1,key2=val2).</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>setJSONValues</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Helm install set JSON values. It can specify multiple or separate values with commas(key1=jsonval1,key2=jsonval2).</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmJSONValueMapType">HelmJSONValueMapType
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">HelmValuesMappingItem</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>tolerations</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>tolerations sets the toleration mapping key.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">HelmTypeInstallSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
-</p>
-<div>
-<p>HelmTypeInstallSpec defines the Helm installation spec.</p><br />
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>chartLocationURL</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>A Helm Chart location URL.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>installOptions</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmInstallOptions">
-HelmInstallOptions
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>installOptions defines Helm release installation options.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>installValues</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmInstallValues">
-HelmInstallValues
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>HelmInstallValues defines Helm release installation set values.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>valuesMapping</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMapping">
-HelmValuesMapping
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>valuesMapping defines add-on normalized resources parameters mapped to Helm values&rsquo; keys.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>chartsImage</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>chartsImage defines the image of Helm charts.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>chartsPathInImage</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>chartsPathInImage defines the path of Helm charts in the image. It&rsquo;s used to copy<br />Helm charts from the image to the shared volume.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmValueMapType">HelmValueMapType
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">HelmValuesMappingItem</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>replicaCount</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>replicaCount sets the replicaCount value mapping key.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>persistentVolumeEnabled</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>persistentVolumeEnabled sets the persistent volume enabled mapping key.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>storageClass</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>storageClass sets the storageClass mapping key.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmValuesMapping">HelmValuesMapping
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">HelmTypeInstallSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>HelmValuesMappingItem</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">
-HelmValuesMappingItem
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>HelmValuesMappingItem</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>extras</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingExtraItem">
-[]HelmValuesMappingExtraItem
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Helm value mapping items for extra items.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmValuesMappingExtraItem">HelmValuesMappingExtraItem
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMapping">HelmValuesMapping</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>HelmValuesMappingItem</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">
-HelmValuesMappingItem
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>HelmValuesMappingItem</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Name of the item.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">HelmValuesMappingItem
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMapping">HelmValuesMapping</a>, <a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingExtraItem">HelmValuesMappingExtraItem</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>valueMap</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmValueMapType">
-HelmValueMapType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>valueMap define the &ldquo;key&rdquo; mapping values. Valid keys are replicaCount,<br />persistentVolumeEnabled, and storageClass. Enum values explained:<br /><code>&quot;replicaCount&quot;</code> sets the replicaCount value mapping key.<br /><code>&quot;persistentVolumeEnabled&quot;</code> sets the persistent volume enabled mapping key.<br /><code>&quot;storageClass&quot;</code> sets the storageClass mapping key.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>jsonMap</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmJSONValueMapType">
-HelmJSONValueMapType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>jsonMap defines the &ldquo;key&rdquo; mapping values. The valid key is tolerations.<br />Enum values explained:<br /><code>&quot;tolerations&quot;</code> sets the toleration mapping key.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>resources</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.ResourceMappingItem">
-ResourceMappingItem
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>resources sets resources related mapping keys.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.InstallableSpec">InstallableSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>selectors</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.SelectorRequirement">
-[]SelectorRequirement
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Add-on installable selectors. If multiple selectors are provided,<br />all selectors must evaluate to true.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>autoInstall</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<p>autoInstall defines an add-on should be installed automatically.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.LineSelectorOperator">LineSelectorOperator
+<h3 id="workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">RsmTransformPolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.SelectorRequirement">SelectorRequirement</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
 </p>
 <div>
-<p>LineSelectorOperator defines line selector operators.</p><br />
+<p>RsmTransformPolicy defines rsm transform type
+ToSts and ToPod is supported</p>
 </div>
 <table>
 <thead>
@@ -1256,213 +1399,11 @@ bool
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Contains&#34;</p></td>
+<tbody><tr><td><p>&#34;ToPod&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;DoesNotContain&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;DoesNotMatchRegex&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;MatchRegex&#34;</p></td>
+</tr><tr><td><p>&#34;ToSts&#34;</p></td>
 <td></td>
 </tr></tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.ResourceMappingItem">ResourceMappingItem
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">HelmValuesMappingItem</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>storage</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>storage sets the storage size value mapping key.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>cpu</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.ResourceReqLimItem">
-ResourceReqLimItem
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>cpu sets CPU requests and limits mapping keys.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>memory</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.ResourceReqLimItem">
-ResourceReqLimItem
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>memory sets Memory requests and limits mapping keys.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.ResourceReqLimItem">ResourceReqLimItem
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.ResourceMappingItem">ResourceMappingItem</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>requests</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Requests value mapping key.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>limits</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Limits value mapping key.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.ResourceRequirements">ResourceRequirements
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpecItem">AddonInstallSpecItem</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>limits</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcelist-v1-core">
-Kubernetes core/v1.ResourceList
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Limits describes the maximum amount of compute resources allowed.<br />More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</a>.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>requests</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcelist-v1-core">
-Kubernetes core/v1.ResourceList
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Requests describes the minimum amount of compute resources required.<br />If Requests is omitted for a container, it defaults to Limits if that is explicitly specified;<br />otherwise, it defaults to an implementation-defined value.<br />More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</a>.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.SelectorRequirement">SelectorRequirement
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">AddonDefaultInstallSpecItem</a>, <a href="#extensions.kubeblocks.io/v1alpha1.InstallableSpec">InstallableSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>key</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonSelectorKey">
-AddonSelectorKey
-</a>
-</em>
-</td>
-<td>
-<p>The selector key. Valid values are KubeVersion, KubeGitVersion and KubeProvider.<br />&ldquo;KubeVersion&rdquo; the semver expression of Kubernetes versions, i.e., v1.24.<br />&ldquo;KubeGitVersion&rdquo; may contain distro. info., i.e., v1.24.4+eks.<br />&ldquo;KubeProvider&rdquo; the Kubernetes provider, i.e., aws, gcp, azure, huaweiCloud, tencentCloud etc.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>operator</code><br/>
-<em>
-<a href="#extensions.kubeblocks.io/v1alpha1.LineSelectorOperator">
-LineSelectorOperator
-</a>
-</em>
-</td>
-<td>
-<p>Represents a key&rsquo;s relationship to a set of values.<br />Valid operators are Contains, NotIn, DoesNotContain, MatchRegex, and DoesNoteMatchRegex.</p><br /><br /><p>Possible enum values:<br /><code>&quot;Contains&quot;</code> line contains a string.<br /><code>&quot;DoesNotContain&quot;</code> line does not contain a string.<br /><code>&quot;MatchRegex&quot;</code> line contains a match to the regular expression.<br /><code>&quot;DoesNotMatchRegex&quot;</code> line does not contain a match to the regular expression.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>values</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>An array of string values. It serves as an &ldquo;OR&rdquo; expression to the operator.</p><br />
-</td>
-</tr>
-</tbody>
 </table>
 <hr/>
 <p><em>

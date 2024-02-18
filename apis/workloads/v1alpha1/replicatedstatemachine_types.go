@@ -291,9 +291,11 @@ type RoleProbe struct {
 	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
 	// Environment variables can be used in Command:
+	//
 	// - v_KB_RSM_LAST_STDOUT stdout from last action, watch 'v_' prefixed
 	// - KB_RSM_USERNAME username part of credential
 	// - KB_RSM_PASSWORD password part of credential
+	//
 	// +optional
 	CustomHandler []Action `json:"customHandler,omitempty"`
 
@@ -372,14 +374,16 @@ type CredentialVar struct {
 
 type MembershipReconfiguration struct {
 	// Environment variables can be used in all following Actions:
+	//
 	// - KB_RSM_USERNAME username part of credential
 	// - KB_RSM_PASSWORD password part of credential
 	// - KB_RSM_LEADER_HOST leader host
 	// - KB_RSM_TARGET_HOST target host
 	// - KB_RSM_SERVICE_PORT port
-
+	//
 	// SwitchoverAction specifies how to do switchover
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
+	//
 	// +optional
 	SwitchoverAction *Action `json:"switchoverAction,omitempty"`
 

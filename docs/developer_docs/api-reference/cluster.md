@@ -81,6 +81,7 @@ Kubernetes meta/v1.ObjectMeta
 </em>
 </td>
 <td>
+<p>The metadata for the BackupPolicyTemplate object, including name, namespace, labels, and annotations.</p><br />
 Refer to the Kubernetes API documentation for the fields of the
 <code>metadata</code> field.
 </td>
@@ -95,6 +96,7 @@ BackupPolicyTemplateSpec
 </em>
 </td>
 <td>
+<p>Defines the desired state of the BackupPolicyTemplate.</p><br />
 <br/>
 <br/>
 <table>
@@ -106,7 +108,7 @@ string
 </em>
 </td>
 <td>
-<p>clusterDefinitionRef references ClusterDefinition name, this is an immutable attribute.</p><br />
+<p>Specifies a reference to the ClusterDefinition name. This is an immutable attribute that cannot be changed after creation.</p><br />
 </td>
 </tr>
 <tr>
@@ -119,7 +121,7 @@ string
 </em>
 </td>
 <td>
-<p>backupPolicies is a list of backup policy template for the specified componentDefinition.</p><br />
+<p>Represents an array of backup policy templates for the specified ComponentDefinition.</p><br />
 </td>
 </tr>
 <tr>
@@ -131,7 +133,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Identifier is a unique identifier for this BackupPolicyTemplate.<br />this identifier will be the suffix of the automatically generated backupPolicy name.<br />and must be added when multiple BackupPolicyTemplates exist,<br />otherwise the generated backupPolicy override will occur.</p><br />
+<p>Acts as a unique identifier for this BackupPolicyTemplate. This identifier will be used as a suffix for the automatically generated backupPolicy name.<br />It is required when multiple BackupPolicyTemplates exist to prevent backupPolicy override.</p><br />
 </td>
 </tr>
 </table>
@@ -147,6 +149,7 @@ BackupPolicyTemplateStatus
 </em>
 </td>
 <td>
+<p>Populated by the system, it represents the current information about the BackupPolicyTemplate.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2748,6 +2751,7 @@ github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.BackupMethod
 <p>
 (Members of <code>BackupMethod</code> are embedded into this type.)
 </p>
+<p>Method for backup</p><br />
 </td>
 </tr>
 <tr>
@@ -2761,7 +2765,7 @@ TargetInstance
 </td>
 <td>
 <em>(Optional)</em>
-<p>target instance for backup.</p><br />
+<p>Specifies the instance where the backup will be stored.<br />This field is optional.</p><br />
 </td>
 </tr>
 <tr>
@@ -2775,7 +2779,7 @@ TargetInstance
 </td>
 <td>
 <em>(Optional)</em>
-<p>envMapping defines the variables of cluster mapped to env values&rsquo; keys.</p><br />
+<p>Defines the mapping between the environment variables of the cluster and the keys of the environment values.<br />This field is optional.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2804,7 +2808,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>componentDefRef references componentDef defined in ClusterDefinition spec. Need to<br />comply with IANA Service Naming rule.</p><br />
+<p>References a componentDef defined in the ClusterDefinition spec.<br />Must comply with the IANA Service Naming rule.</p><br />
 </td>
 </tr>
 <tr>
@@ -2816,7 +2820,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>componentDef references componentDefinition. Need to<br />comply with IANA Service Naming rule.</p><br />
+<p>References to componentDefinitions.<br />Must comply with the IANA Service Naming rule.</p><br />
 </td>
 </tr>
 <tr>
@@ -2830,7 +2834,7 @@ TargetInstance
 </td>
 <td>
 <em>(Optional)</em>
-<p>target instance for backup.</p><br />
+<p>The instance to be backed up.</p><br />
 </td>
 </tr>
 <tr>
@@ -2844,7 +2848,7 @@ TargetInstance
 </td>
 <td>
 <em>(Optional)</em>
-<p>schedule policy for backup.</p><br />
+<p>Define the policy for backup scheduling.</p><br />
 </td>
 </tr>
 <tr>
@@ -2857,7 +2861,7 @@ TargetInstance
 </em>
 </td>
 <td>
-<p>backupMethods defines the backup methods.</p><br />
+<p>Define the methods to be used for backups.</p><br />
 </td>
 </tr>
 <tr>
@@ -2869,7 +2873,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the number of retries before marking the backup failed.</p><br />
+<p>Specifies the number of retries before marking the backup as failed.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2898,7 +2902,7 @@ string
 </em>
 </td>
 <td>
-<p>clusterDefinitionRef references ClusterDefinition name, this is an immutable attribute.</p><br />
+<p>Specifies a reference to the ClusterDefinition name. This is an immutable attribute that cannot be changed after creation.</p><br />
 </td>
 </tr>
 <tr>
@@ -2911,7 +2915,7 @@ string
 </em>
 </td>
 <td>
-<p>backupPolicies is a list of backup policy template for the specified componentDefinition.</p><br />
+<p>Represents an array of backup policy templates for the specified ComponentDefinition.</p><br />
 </td>
 </tr>
 <tr>
@@ -2923,7 +2927,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Identifier is a unique identifier for this BackupPolicyTemplate.<br />this identifier will be the suffix of the automatically generated backupPolicy name.<br />and must be added when multiple BackupPolicyTemplates exist,<br />otherwise the generated backupPolicy override will occur.</p><br />
+<p>Acts as a unique identifier for this BackupPolicyTemplate. This identifier will be used as a suffix for the automatically generated backupPolicy name.<br />It is required when multiple BackupPolicyTemplates exist to prevent backupPolicy override.</p><br />
 </td>
 </tr>
 </tbody>
@@ -8426,7 +8430,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>the key of password in the ConnectionCredential secret.<br />if not set, the default key is &ldquo;password&rdquo;.</p><br />
+<p>Represents the key of the password in the ConnectionCredential secret.<br />If not specified, the default key &ldquo;password&rdquo; is used.</p><br />
 </td>
 </tr>
 <tr>
@@ -8438,7 +8442,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>the key of username in the ConnectionCredential secret.<br />if not set, the default key is &ldquo;username&rdquo;.</p><br />
+<p>Represents the key of the username in the ConnectionCredential secret.<br />If not specified, the default key &ldquo;username&rdquo; is used.</p><br />
 </td>
 </tr>
 <tr>
@@ -8449,7 +8453,7 @@ string
 </em>
 </td>
 <td>
-<p>hostKey specifies the map key of the host in the connection credential secret.</p><br />
+<p>Defines the map key of the host in the connection credential secret.</p><br />
 </td>
 </tr>
 <tr>
@@ -8460,7 +8464,7 @@ string
 </em>
 </td>
 <td>
-<p>portKey specifies the map key of the port in the connection credential secret.</p><br />
+<p>Indicates the map key of the port in the connection credential secret.</p><br />
 </td>
 </tr>
 </tbody>
@@ -8959,7 +8963,7 @@ string
 </em>
 </td>
 <td>
-<p>env key which needs to mapping.</p><br />
+<p>Specifies the environment variable key that requires mapping.</p><br />
 </td>
 </tr>
 <tr>
@@ -8972,7 +8976,7 @@ ValueFrom
 </em>
 </td>
 <td>
-<p>valueFrom defines source of the env value.</p><br />
+<p>Defines the source from which the environment variable value is derived.</p><br />
 </td>
 </tr>
 </tbody>
@@ -13138,7 +13142,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>enabled specifies whether the backup schedule is enabled or not.</p><br />
+<p>Specifies whether the backup schedule is enabled or not.</p><br />
 </td>
 </tr>
 <tr>
@@ -13149,7 +13153,7 @@ string
 </em>
 </td>
 <td>
-<p>backupMethod specifies the backup method name that is defined in backupPolicy.</p><br />
+<p>Defines the backup method name that is defined in backupPolicy.</p><br />
 </td>
 </tr>
 <tr>
@@ -13160,7 +13164,7 @@ string
 </em>
 </td>
 <td>
-<p>the cron expression for schedule, the timezone is in UTC.<br />see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p><br />
+<p>Represents the cron expression for schedule, with the timezone set in UTC.<br />Refer to <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a> for more details.</p><br />
 </td>
 </tr>
 <tr>
@@ -13172,7 +13176,7 @@ github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RetentionPeriod
 </td>
 <td>
 <em>(Optional)</em>
-<p>retentionPeriod determines a duration up to which the backup should be kept.<br />controller will remove all backups that are older than the RetentionPeriod.<br />For example, RetentionPeriod of <code>30d</code> will keep only the backups of last 30 days.<br />Sample duration format:<br />- years: 	2y<br />- months: 	6mo<br />- days: 		30d<br />- hours: 	12h<br />- minutes: 	30m<br />You can also combine the above durations. For example: 30d12h30m</p><br />
+<p>Determines the duration for which the backup should be retained.<br />The controller will remove all backups that are older than the RetentionPeriod.<br />For instance, a RetentionPeriod of <code>30d</code> will retain only the backups from the last 30 days.</p><br /><br /><p>The duration format can be in years (2y), months (6mo), days (30d), hours (12h), or minutes (30m).<br />These durations can also be combined, for example: 30d12h30m.</p><br />
 </td>
 </tr>
 </tbody>
@@ -15311,7 +15315,7 @@ string
 </em>
 </td>
 <td>
-<p>select instance of corresponding role for backup, role are:<br />- the name of Leader/Follower/Leaner for Consensus component.<br />- primary or secondary for Replication component.<br />finally, invalid role of the component will be ignored.<br />such as if workload type is Replication and component&rsquo;s replicas is 1,<br />the secondary role is invalid. and it also will be ignored when component is Stateful/Stateless.<br />the role will be transformed to a role LabelSelector for BackupPolicy&rsquo;s target attribute.</p><br />
+<p>Specifies the instance of the corresponding role for backup. The roles can be:<br />- Leader, Follower, or Leaner for the Consensus component.<br />- Primary or Secondary for the Replication component.</p><br /><br /><p>Invalid roles of the component will be ignored. For example, if the workload type is Replication and the component&rsquo;s replicas is 1,<br />the secondary role is invalid. It will also be ignored when the component is Stateful or Stateless.</p><br /><br /><p>The role will be transformed into a role LabelSelector for the BackupPolicy&rsquo;s target attribute.</p><br />
 </td>
 </tr>
 <tr>
@@ -15323,7 +15327,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>refer to spec.componentDef.systemAccounts.accounts[*].name in ClusterDefinition.<br />the secret created by this account will be used to connect the database.<br />if not set, the secret created by spec.ConnectionCredential of the ClusterDefinition will be used.<br />it will be transformed to a secret for BackupPolicy&rsquo;s target secret.</p><br />
+<p>Refers to spec.componentDef.systemAccounts.accounts[*].name in the ClusterDefinition.<br />The secret created by this account will be used to connect to the database.<br />If not set, the secret created by spec.ConnectionCredential of the ClusterDefinition will be used.</p><br /><br /><p>It will be transformed into a secret for the BackupPolicy&rsquo;s target secret.</p><br />
 </td>
 </tr>
 <tr>
@@ -15335,7 +15339,7 @@ github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.PodSelectionStrategy
 </td>
 <td>
 <em>(Optional)</em>
-<p>PodSelectionStrategy specifies the strategy to select when multiple pods are<br />selected for backup target.<br />Valid values are:<br />- Any: select any one pod that match the labelsSelector.<br />- All: select all pods that match the labelsSelector.</p><br />
+<p>Specifies the PodSelectionStrategy to use when multiple pods are<br />selected for the backup target.<br />Valid values are:<br />- Any: Selects any one pod that matches the labelsSelector.<br />- All: Selects all pods that match the labelsSelector.</p><br />
 </td>
 </tr>
 <tr>
@@ -15349,7 +15353,7 @@ ConnectionCredentialKey
 </td>
 <td>
 <em>(Optional)</em>
-<p>connectionCredentialKey defines connection credential key in secret<br />which created by spec.ConnectionCredential of the ClusterDefinition.<br />it will be ignored when &ldquo;account&rdquo; is set.</p><br />
+<p>Defines the connection credential key in the secret<br />created by spec.ConnectionCredential of the ClusterDefinition.<br />It will be ignored when the &ldquo;account&rdquo; is set.</p><br />
 </td>
 </tr>
 </tbody>
@@ -15764,7 +15768,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>mapped ClusterVersionRef to env value.</p><br />
+<p>Maps to the environment value. This is an optional field.</p><br />
 </td>
 </tr>
 <tr>
@@ -15778,7 +15782,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>mapped ComponentDefinition to env value.</p><br />
+<p>Maps to the environment value. This is also an optional field.</p><br />
 </td>
 </tr>
 </tbody>
@@ -15806,7 +15810,7 @@ string
 </em>
 </td>
 <td>
-<p>the array of ClusterVersion name which can be mapped to the env value.</p><br />
+<p>Represents an array of ClusterVersion names that can be mapped to an environment variable value.</p><br />
 </td>
 </tr>
 <tr>
@@ -15817,7 +15821,7 @@ string
 </em>
 </td>
 <td>
-<p>mapping value for the specified ClusterVersion names.</p><br />
+<p>The value that corresponds to the specified ClusterVersion names.</p><br />
 </td>
 </tr>
 </tbody>

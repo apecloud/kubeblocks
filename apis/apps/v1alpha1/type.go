@@ -622,8 +622,8 @@ type ComponentService struct {
 
 	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
 	// If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.
-	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
-	// And the Service.Name will also be generated with named pattern <Service.Name>-<PodOrdinal>.
+	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern `$(Service.ServiceName)-$(PodOrdinal)`.
+	// And the Service.Name will also be generated with named pattern `$(Service.Name)-$(PodOrdinal)`.
 	// The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.
 	// For example, a Service might be defined as follows:
 	// - name: my-service
@@ -651,8 +651,8 @@ type Service struct {
 
 	// ServiceName defines the name of the underlying service object.
 	// If not specified, the default service name with different patterns will be used:
-	//  - <CLUSTER_NAME>: for cluster-level services
-	//  - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services
+	//  - CLUSTER_NAME: for cluster-level services
+	//  - CLUSTER_NAME-COMPONENT_NAME: for component-level services
 	// Only one default service name is allowed.
 	// Cannot be updated.
 	// +optional
@@ -797,7 +797,7 @@ type ServiceVarSelector struct {
 
 	// GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.
 	// If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.
-	// They can be referred to by adding the PodOrdinal to the defined name template with named pattern $<Vars[x].Name>_<PodOrdinal>.
+	// They can be referred to by adding the PodOrdinal to the defined name template with named pattern `$(Vars[x].Name)_$(PodOrdinal)`.
 	// For example, a ServiceVarRef might be defined as follows:
 	// - name: MY_SERVICE_PORT
 	//   valueFrom:

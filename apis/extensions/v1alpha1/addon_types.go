@@ -32,16 +32,22 @@ import (
 // AddonSpec defines the desired state of an add-on.
 // +kubebuilder:validation:XValidation:rule="has(self.type) && self.type == 'Helm' ?  has(self.helm) : !has(self.helm)",message="spec.helm is required when spec.type is Helm, and forbidden otherwise"
 type AddonSpec struct {
-	// Addon description.
+	// Add-on description.
 	// +optional
 	Description string `json:"description,omitempty"`
 
 	// Add-on type. The valid value is helm.
 	// +unionDiscriminator
 	// +kubebuilder:validation:Required
-	Type     AddonType `json:"type"`
-	Version  string    `json:"version,omitempty"`
-	Provider string    `json:"provider,omitempty"`
+	Type AddonType `json:"type"`
+
+	// Add-on version.
+	// +optional
+	Version string `json:"version,omitempty"`
+
+	// Add-on provider.
+	// +optional
+	Provider string `json:"provider,omitempty"`
 
 	// Helm installation spec. It's processed only when type=helm.
 	// +optional
@@ -307,7 +313,7 @@ type DataObjectKeySelector struct {
 type AddonDefaultInstallSpecItem struct {
 	AddonInstallSpec `json:",inline"`
 
-	// Addon installs parameters selectors by default. If multiple selectors are provided,
+	// Add-on installs parameters selectors by default. If multiple selectors are provided,
 	// all selectors must evaluate to true.
 	// +optional
 	Selectors []SelectorRequirement `json:"selectors,omitempty"`

@@ -22,6 +22,14 @@ spec:
       jsonPath: .spec.type
       name: TYPE
       type: string
+    - description: addon version
+      jsonPath: .spec.version
+      name: VERSION
+      type: string
+    - description: addon provider
+      jsonPath: .spec.provider
+      name: PROVIDER
+      type: string
     - description: status phase
       jsonPath: .status.phase
       name: STATUS
@@ -164,7 +172,7 @@ spec:
                           type: object
                       type: object
                     selectors:
-                      description: Addon installs parameters selectors by default.
+                      description: Add-on installs parameters selectors by default.
                         If multiple selectors are provided, all selectors must evaluate
                         to true.
                       items:
@@ -216,7 +224,7 @@ spec:
                 minItems: 1
                 type: array
               description:
-                description: Addon description.
+                description: Add-on description.
                 type: string
               helm:
                 description: Helm installation spec. It's processed only when type=helm.
@@ -602,10 +610,16 @@ spec:
                 required:
                 - autoInstall
                 type: object
+              provider:
+                description: Add-on provider.
+                type: string
               type:
                 description: Add-on type. The valid value is helm.
                 enum:
                 - Helm
+                type: string
+              version:
+                description: Add-on version.
                 type: string
             required:
             - defaultInstallValues

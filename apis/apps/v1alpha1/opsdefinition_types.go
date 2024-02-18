@@ -64,12 +64,12 @@ type ComponentDefinitionRef struct {
 	Name string `json:"name"`
 
 	// the account name of the component.
-	// will inject the account username and password to KB_ACCOUNT_USERNAME and KB_ACCOUNT_PASSWORD in env of the job.
+	// will inject the account username and password to `KB_ACCOUNT_USERNAME` and `KB_ACCOUNT_PASSWORD` in env of the job.
 	// +optional
 	AccountName string `json:"accountName,omitempty"`
 
 	// reference the services[*].name.
-	// will map the service name and ports to KB_COMP_SVC_NAME and KB_COMP_SVC_PORT_<portName> in env of the job.
+	// will map the service name and ports to `KB_COMP_SVC_NAME` and `KB_COMP_SVC_PORT_$(portName)` in env of the job.
 	// portName will replace the characters '-' to '_' and convert to uppercase.
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
@@ -215,7 +215,7 @@ type OpsDefinition struct {
 	Status OpsDefinitionStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // OpsDefinitionList contains a list of OpsDefinition
 type OpsDefinitionList struct {

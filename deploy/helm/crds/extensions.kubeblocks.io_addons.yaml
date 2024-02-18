@@ -22,6 +22,14 @@ spec:
       jsonPath: .spec.type
       name: TYPE
       type: string
+    - description: addon version
+      jsonPath: .spec.version
+      name: VERSION
+      type: string
+    - description: addon provider
+      jsonPath: .spec.provider
+      name: PROVIDER
+      type: string
     - description: status phase
       jsonPath: .status.phase
       name: STATUS
@@ -602,10 +610,14 @@ spec:
                 required:
                 - autoInstall
                 type: object
+              provider:
+                type: string
               type:
                 description: Add-on type. The valid value is helm.
                 enum:
                 - Helm
+                type: string
+              version:
                 type: string
             required:
             - defaultInstallValues

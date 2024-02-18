@@ -22,6 +22,9 @@ package apps
 import (
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
@@ -54,7 +57,14 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	}
 
 	// resolve all component definitions referenced
-	return t.resolveCompDefinitions(transCtx)
+	if err = t.resolveCompDefinitions(transCtx); err != nil {
+		return err
+	}
+
+	// update the resolved component definitions and service versions to cluster spec.
+	t.updateCompSpecs(transCtx)
+
+	return nil
 }
 
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
@@ -157,27 +167,26 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *cl
 		transCtx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)
 	}
 	for i, compSpec := range transCtx.ComponentSpecs {
-		if len(compSpec.ComponentDef) == 0 {
-			compDef, err := t.buildCompDefinition4Legacy(transCtx, compSpec)
-			if err != nil {
-				return err
-			}
-			transCtx.ComponentDefs[compDef.Name] = compDef
-			transCtx.ComponentSpecs[i].ComponentDef = compDef.Name
-			// compDef.Name = ""
-		} else {
-			compDef, serviceVersion, err := resolveCompDefinitionNServiceVersion(
-				transCtx.Context, transCtx.Client, compSpec.ComponentDef, compSpec.ServiceVersion)
-			if err != nil {
-				return err
-			}
-			transCtx.ComponentDefs[compDef.Name] = compDef
-			// set the componentDef and serviceVersion as resolved
-			transCtx.ComponentSpecs[i].ComponentDef = compDef.Name
-			transCtx.ComponentSpecs[i].ServiceVersion = serviceVersion
+		compDef, serviceVersion, err := t.resolveCompDefinitionNServiceVersion(transCtx, compSpec)
+		if err != nil {
+			return err
 		}
+		transCtx.ComponentDefs[compDef.Name] = compDef
+		// set the componentDef and serviceVersion as resolved
+		transCtx.ComponentSpecs[i].ComponentDef = compDef.Name
+		transCtx.ComponentSpecs[i].ServiceVersion = serviceVersion
 	}
 	return nil
+}
+
+func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersion(transCtx *clusterTransformContext,
+	compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, string, error) {
+	if withClusterLegacyDefinition(transCtx.Cluster) || withClusterSimplifiedAPI(transCtx.Cluster) {
+		compDef, err := t.buildCompDefinition4Legacy(transCtx, compSpec)
+		// compDef.Name = ""
+		return compDef, "", err
+	}
+	return t.resolveCompDefinitionNServiceVersionWithUpgrade(transCtx, compSpec)
 }
 
 func (t *ClusterAPINormalizationTransformer) buildCompDefinition4Legacy(transCtx *clusterTransformContext,
@@ -188,4 +197,86 @@ func (t *ClusterAPINormalizationTransformer) buildCompDefinition4Legacy(transCtx
 	}
 	compDef.Name = constant.GenerateVirtualComponentDefinition(compSpec.ComponentDefRef)
 	return compDef, nil
+}
+
+func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersionWithUpgrade(transCtx *clusterTransformContext,
+	compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, string, error) {
+	var (
+		ctx     = transCtx.Context
+		cli     = transCtx.Client
+		cluster = transCtx.Cluster
+	)
+	comp := &appsv1alpha1.Component{}
+	err := cli.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: component.FullName(cluster.Name, compSpec.Name)}, comp)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, "", err
+	}
+
+	if apierrors.IsNotFound(err) || t.checkCompUpgrade(compSpec, comp) {
+		return resolveCompDefinitionNServiceVersion(ctx, cli, compSpec.ComponentDef, compSpec.ServiceVersion)
+	}
+	return resolveCompDefinitionNServiceVersion(ctx, cli, comp.Spec.CompDef, comp.Spec.ServiceVersion)
+}
+
+func (t *ClusterAPINormalizationTransformer) checkCompUpgrade(compSpec *appsv1alpha1.ClusterComponentSpec, comp *appsv1alpha1.Component) bool {
+	return compSpec.ServiceVersion != comp.Spec.ServiceVersion || compSpec.ComponentDef != comp.Spec.CompDef
+}
+
+func (t *ClusterAPINormalizationTransformer) updateCompSpecs(transCtx *clusterTransformContext) {
+	var (
+		cluster = transCtx.Cluster
+	)
+	if withClusterLegacyDefinition(cluster) || withClusterSimplifiedAPI(cluster) {
+		return
+	}
+	if withClusterTopology(cluster) {
+		t.updateCompSpecs4Topology(transCtx)
+	}
+	if withClusterUserDefined(cluster) {
+		t.updateCompSpecs4Specified(transCtx)
+	}
+}
+
+func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Topology(transCtx *clusterTransformContext) {
+	var (
+		cluster = transCtx.Cluster
+	)
+	compSpecs := make([]appsv1alpha1.ClusterComponentSpec, 0)
+	for i := range transCtx.ComponentSpecs {
+		compSpecs = append(compSpecs, appsv1alpha1.ClusterComponentSpec{
+			Name:           transCtx.ComponentSpecs[i].Name,
+			ComponentDef:   transCtx.ComponentSpecs[i].ComponentDef,
+			ServiceVersion: transCtx.ComponentSpecs[i].ServiceVersion,
+		})
+	}
+	for i, compSpec := range cluster.Spec.ComponentSpecs {
+		for j := range compSpecs {
+			if compSpec.Name == compSpecs[j].Name {
+				compSpecs[j] = cluster.Spec.ComponentSpecs[i]
+				compSpecs[j].ComponentDef = transCtx.ComponentSpecs[j].ComponentDef
+				compSpecs[j].ServiceVersion = transCtx.ComponentSpecs[j].ServiceVersion
+				break
+			}
+		}
+	}
+	cluster.Spec.ComponentSpecs = compSpecs
+}
+
+func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Specified(transCtx *clusterTransformContext) {
+	var (
+		resolvedCompSpecs = transCtx.ComponentSpecs
+		idx               = 0
+		cluster           = transCtx.Cluster
+	)
+	for i := range cluster.Spec.ComponentSpecs {
+		cluster.Spec.ComponentSpecs[i].ComponentDef = resolvedCompSpecs[i].ComponentDef
+		cluster.Spec.ComponentSpecs[i].ServiceVersion = resolvedCompSpecs[i].ServiceVersion
+	}
+	idx += len(cluster.Spec.ComponentSpecs)
+
+	for i, sharding := range cluster.Spec.ShardingSpecs {
+		cluster.Spec.ShardingSpecs[i].Template.ComponentDef = resolvedCompSpecs[idx].ComponentDef
+		cluster.Spec.ShardingSpecs[i].Template.ServiceVersion = resolvedCompSpecs[idx].ServiceVersion
+		idx += int(sharding.Shards)
+	}
 }

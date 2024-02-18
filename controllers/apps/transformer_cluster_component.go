@@ -180,8 +180,8 @@ func copyAndMergeComponent(compSpec *appsv1alpha1.ClusterComponentSpec, oldCompO
 	compObjCopy.Labels = compProto.Labels
 
 	// merge spec
-	// TODO(API): upgrade service version and definition
-	checkNMergeComponent4Upgrade(compSpec, compObjCopy, compProto)
+	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
+	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
 	compObjCopy.Spec.ClassDefRef = compProto.Spec.ClassDefRef
 	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
 	compObjCopy.Spec.Resources = compProto.Spec.Resources
@@ -203,27 +203,4 @@ func copyAndMergeComponent(compSpec *appsv1alpha1.ClusterComponentSpec, oldCompO
 		return nil
 	}
 	return compObjCopy
-}
-
-func checkNMergeComponent4Upgrade(compSpec *appsv1alpha1.ClusterComponentSpec, obj, proto *appsv1alpha1.Component) {
-	if obj.Spec.CompDef == proto.Spec.CompDef && obj.Spec.ServiceVersion == proto.Spec.ServiceVersion {
-		return
-	}
-	if obj.Spec.ServiceVersion != proto.Spec.ServiceVersion {
-		mergeComponent4Upgrade(compSpec, obj, proto)
-	} else {
-		mergeComponent4DefinitionUpgrade(compSpec, obj, proto)
-	}
-}
-
-func mergeComponent4Upgrade(compSpec *appsv1alpha1.ClusterComponentSpec, obj, proto *appsv1alpha1.Component) {
-	// only support full match now
-	if compSpec.ServiceVersion != proto.Spec.ServiceVersion {
-		return
-	}
-	obj.Spec.CompDef = proto.Spec.CompDef
-	obj.Spec.ServiceVersion = proto.Spec.ServiceVersion
-}
-
-func mergeComponent4DefinitionUpgrade(compSpec *appsv1alpha1.ClusterComponentSpec, obj, proto *appsv1alpha1.Component) {
 }

@@ -10254,6 +10254,31 @@ string
 <p>sectionName describes ini section.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>applyAllSection</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>applyAllSection determines whether to support multiple sections in the ini file.
+if set to true, all sections parameter can be updated, e.g: client.default_character_set=utf8mb4</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parametersInSection</code><br/>
+<em>
+map[string][]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>parametersInSection is a map of section name to parameters.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Issuer">Issuer

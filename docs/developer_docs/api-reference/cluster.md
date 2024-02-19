@@ -36,6 +36,8 @@ Resource Types:
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentResourceConstraint">ComponentResourceConstraint</a>
 </li><li>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion</a>
+</li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraint">ConfigConstraint</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.Configuration">Configuration</a>
@@ -239,6 +241,20 @@ string
 </tr>
 <tr>
 <td>
+<code>topology</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topology specifies the topology to use for the cluster.
+If not specified, the default topology will be used.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>terminationPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.TerminationPolicyType">
@@ -324,6 +340,20 @@ Affinity
 <td>
 <em>(Optional)</em>
 <p>tolerations are attached to tolerate any taint that matches the triple <code>key,value,effect</code> using the matching operator <code>operator</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backup</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
+ClusterBackup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>cluster backup configuration.</p>
 </td>
 </tr>
 <tr>
@@ -424,20 +454,6 @@ ClusterNetwork
 <p>network specifies the configuration of network</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>backup</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
-ClusterBackup
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>cluster backup configuration.</p>
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -532,6 +548,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>componentDefs provides cluster components definitions.</p>
 </td>
 </tr>
@@ -563,6 +580,20 @@ where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.sp
 <code>&#123;&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306&#125;</code>, and <code>$(SVC_PORT_mysql)</code> in the
 connection credential value is 3306.</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologies</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">
+[]ClusterTopology
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topologies represents the different topologies within the cluster.</p>
 </td>
 </tr>
 </table>
@@ -742,6 +773,19 @@ string
 </td>
 <td>
 <p>compDef is the name of the referenced componentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the service provisioned by the component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
 </td>
 </tr>
 <tr>
@@ -1161,6 +1205,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>ServiceVersion defines the version of the well-known service that the component provides.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
 Cannot be updated.</p>
 </td>
 </tr>
@@ -1566,6 +1611,104 @@ ComponentResourceConstraintSpec
 </td>
 </tr>
 </table>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion
+</h3>
+<div>
+<p>ComponentVersion is the Schema for the componentversions API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1alpha1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ComponentVersion</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">
+ComponentVersionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>compatibilityRules</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">
+[]ComponentVersionCompatibilityRule
+</a>
+</em>
+</td>
+<td>
+<p>CompatibilityRules defines compatibility rules between sets of component definitions and releases.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>releases</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionRelease">
+[]ComponentVersionRelease
+</a>
+</em>
+</td>
+<td>
+<p>Releases represents different releases of component instances within this ComponentVersion.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">
+ComponentVersionStatus
+</a>
+</em>
+</td>
+<td>
 </td>
 </tr>
 </tbody>
@@ -4120,6 +4263,21 @@ If both componentDefRef and componentDef are provided, the componentDef will tak
 </tr>
 <tr>
 <td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the service provisioned by the component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If not explicitly specified, the version defined in the referenced topology will be used.
+If no version is specified in the topology, the latest available version will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>classDefRef</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClassDefRef">
@@ -4900,6 +5058,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>componentDefs provides cluster components definitions.</p>
 </td>
 </tr>
@@ -4933,6 +5092,20 @@ connection credential value is 3306.</li>
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>topologies</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">
+[]ClusterTopology
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topologies represents the different topologies within the cluster.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus
@@ -4951,6 +5124,20 @@ connection credential value is 3306.</li>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>observedGeneration is the most recent generation observed for this
+ClusterDefinition. It corresponds to the ClusterDefinition&rsquo;s generation, which is
+updated on mutation by the API Server.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>phase</code><br/>
@@ -4979,16 +5166,25 @@ string
 </tr>
 <tr>
 <td>
-<code>observedGeneration</code><br/>
+<code>topologies</code><br/>
 <em>
-int64
+string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the most recent generation observed for this
-ClusterDefinition. It corresponds to the ClusterDefinition&rsquo;s generation, which is
-updated on mutation by the API Server.</p>
+<p>Topologies this ClusterDefinition supported.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceRefs</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 </td>
 </tr>
 </tbody>
@@ -5341,6 +5537,20 @@ string
 </tr>
 <tr>
 <td>
+<code>topology</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topology specifies the topology to use for the cluster.
+If not specified, the default topology will be used.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>terminationPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.TerminationPolicyType">
@@ -5426,6 +5636,20 @@ Affinity
 <td>
 <em>(Optional)</em>
 <p>tolerations are attached to tolerate any taint that matches the triple <code>key,value,effect</code> using the matching operator <code>operator</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backup</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
+ClusterBackup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>cluster backup configuration.</p>
 </td>
 </tr>
 <tr>
@@ -5524,20 +5748,6 @@ ClusterNetwork
 <td>
 <em>(Optional)</em>
 <p>network specifies the configuration of network</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>backup</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
-ClusterBackup
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>cluster backup configuration.</p>
 </td>
 </tr>
 </tbody>
@@ -5710,6 +5920,188 @@ SwitchPolicyType
 MaximumAvailability: [WIP] when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately. It will be available in future versions.
 MaximumDataProtection: [WIP] when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch. It will be available in future versions.
 Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves or integrate open source HA solution.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopology">ClusterTopology
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionSpec">ClusterDefinitionSpec</a>)
+</p>
+<div>
+<p>ClusterTopology represents the definition for a specific cluster topology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the unique identifier for the cluster topology.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopologyComponent">
+[]ClusterTopologyComponent
+</a>
+</em>
+</td>
+<td>
+<p>Components specifies the components in the topology.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>orders</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopologyOrders">
+ClusterTopologyOrders
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Orders defines the orders of components within the topology.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>default</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>Default indicates whether this topology is the default configuration.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopologyComponent">ClusterTopologyComponent
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">ClusterTopology</a>)
+</p>
+<div>
+<p>ClusterTopologyComponent defines a component within a cluster topology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name defines the name of the component.
+This name is also part of Service DNS name, following IANA Service Naming rules.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>CompDef specifies the component definition to use, either as a specific name or a name prefix.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the service version associated with the referenced component definition.
+This field helps in determining the appropriate version of the component definition, considering multiple available versions.
+If not explicitly specified, the latest available version will be used.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopologyOrders">ClusterTopologyOrders
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">ClusterTopology</a>)
+</p>
+<div>
+<p>ClusterTopologyOrders defines the orders for components within a topology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>startupOrder</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>StartupOrder defines the order in which components should be started in the cluster.
+Components with the same order can be listed together, separated by commas.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shutdownOrder</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ShutdownOrder defines the order in which components should be shut down in the cluster.
+Components with the same order can be listed together, separated by commas.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateOrder</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdateOrder defines the order in which components should be updated in the cluster.
+Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
 </tbody>
@@ -6484,6 +6876,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>ServiceVersion defines the version of the well-known service that the component provides.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
 Cannot be updated.</p>
 </td>
 </tr>
@@ -7381,6 +7774,19 @@ string
 </tr>
 <tr>
 <td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the service provisioned by the component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>classDefRef</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClassDefRef">
@@ -7915,6 +8321,230 @@ string
 </tr><tr><td><p>&#34;ServiceRef&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">ComponentVersionCompatibilityRule
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">ComponentVersionSpec</a>)
+</p>
+<div>
+<p>ComponentVersionCompatibilityRule defines the compatibility between a set of component definitions and a set of releases.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>compDefs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>CompDefs specifies names for the component definitions associated with this ComponentVersion.
+Each name in the list can represent an exact name, or a name prefix.
+Examples:
+- &ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;
+- &ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>releases</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Releases is a list of identifiers for the releases.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionRelease">ComponentVersionRelease
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">ComponentVersionSpec</a>)
+</p>
+<div>
+<p>ComponentVersionRelease represents a release of component instances within a ComponentVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is a unique identifier for this release.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>changes</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Changes provides information about the changes made in this release.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ServiceVersion defines the version of the well-known service that the component provides.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>images</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<p>Images define the new images for different containers within the release.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">ComponentVersionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion</a>)
+</p>
+<div>
+<p>ComponentVersionSpec defines the desired state of ComponentVersion</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>compatibilityRules</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">
+[]ComponentVersionCompatibilityRule
+</a>
+</em>
+</td>
+<td>
+<p>CompatibilityRules defines compatibility rules between sets of component definitions and releases.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>releases</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionRelease">
+[]ComponentVersionRelease
+</a>
+</em>
+</td>
+<td>
+<p>Releases represents different releases of component instances within this ComponentVersion.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">ComponentVersionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion</a>)
+</p>
+<div>
+<p>ComponentVersionStatus defines the observed state of ComponentVersion</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ObservedGeneration is the most recent generation observed for this ComponentVersion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Phase valid values are `<code>,</code>Available<code>, 'Unavailable</code>.
+Available is ComponentVersion become available, and can be used for co-related objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Extra message for current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersions</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersions represent the supported service versions of this ComponentVersion.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentVolume">ComponentVolume
 </h3>
@@ -12216,7 +12846,7 @@ Kubernetes core/v1.PersistentVolumeMode
 <h3 id="apps.kubeblocks.io/v1alpha1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterVersionStatus">ClusterVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionStatus">OpsDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterVersionStatus">ClusterVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionStatus">OpsDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
 </p>
 <div>
 <p>Phase defines the ClusterDefinition and ClusterVersion  CR .status.phase</p>

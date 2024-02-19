@@ -235,9 +235,7 @@ spec:
                     componentDef:
                       description: componentDef references the name of the ComponentDefinition.
                         If both componentDefRef and componentDef are provided, the
-                        componentDef will take precedence over componentDefRef. //(TODO)
-                        +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef
-                        is immutable"
+                        componentDef will take precedence over componentDefRef.
                       maxLength: 128
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
@@ -935,9 +933,6 @@ spec:
                   required:
                   - replicas
                   type: object
-                  x-kubernetes-validations:
-                  - message: either componentDefRef or componentDef should be provided
-                    rule: has(self.componentDefRef) || has(self.componentDef)
                 maxItems: 128
                 minItems: 1
                 type: array
@@ -1504,8 +1499,6 @@ spec:
                           description: componentDef references the name of the ComponentDefinition.
                             If both componentDefRef and componentDef are provided,
                             the componentDef will take precedence over componentDefRef.
-                            //(TODO) +kubebuilder:validation:XValidation:rule="self
-                            == oldSelf",message="componentDef is immutable"
                           maxLength: 128
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
@@ -2231,10 +2224,6 @@ spec:
                       required:
                       - replicas
                       type: object
-                      x-kubernetes-validations:
-                      - message: either componentDefRef or componentDef should be
-                          provided
-                        rule: has(self.componentDefRef) || has(self.componentDef)
                   required:
                   - name
                   - template

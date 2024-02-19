@@ -361,4 +361,5 @@ func ClearClusterResourcesWithRemoveFinalizerOption(testCtx *testutil.TestContex
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ClusterVersionSignature, true, hasLabels)
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ClusterDefinitionSignature, true, hasLabels)
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentDefinitionSignature, true, hasLabels)
+	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentVersionSignature, true, hasLabels)
 }

@@ -31,7 +31,7 @@ type WorkloadsV1alpha1Interface interface {
 	ReplicatedStateMachinesGetter
 }
 
-// WorkloadsV1alpha1Client is used to interact with features provided by the workloads group.
+// WorkloadsV1alpha1Client is used to interact with features provided by the workloads.kubeblocks.io group.
 type WorkloadsV1alpha1Client struct {
 	restClient rest.Interface
 }

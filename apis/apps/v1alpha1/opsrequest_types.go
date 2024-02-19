@@ -518,13 +518,16 @@ type BackupSpec struct {
 	// Controller will remove all backups that are older than the RetentionPeriod.
 	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
 	// Sample duration format:
+	//
 	// - years: 	2y
 	// - months: 	6mo
 	// - days: 		30d
 	// - hours: 	12h
 	// - minutes: 	30m
+	//
 	// You can also combine the above durations. For example: 30d12h30m.
 	// If not set, the backup will be kept forever.
+	//
 	// +optional
 	RetentionPeriod string `json:"retentionPeriod,omitempty"`
 

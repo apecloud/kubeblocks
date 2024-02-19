@@ -45,7 +45,7 @@ type ComponentDefinition struct {
 	Status ComponentDefinitionStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ComponentDefinitionList contains a list of ComponentDefinition
 type ComponentDefinitionList struct {
@@ -483,13 +483,15 @@ type Action struct {
 	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
 
 	// PreCondition defines the condition when the action will be executed.
+	//
 	// - Immediately: The Action is executed immediately after the Component object is created,
-	// without guaranteeing the availability of the Component and its underlying resources. only after the action is successfully executed will the Component's state turn to ready.
+	//   without guaranteeing the availability of the Component and its underlying resources. only after the action is successfully executed will the Component's state turn to ready.
 	// - RuntimeReady: The Action is executed after the Component object is created and once all underlying Runtimes are ready.
-	// only after the action is successfully executed will the Component's state turn to ready.
+	//   only after the action is successfully executed will the Component's state turn to ready.
 	// - ComponentReady: The Action is executed after the Component object is created and once the Component is ready.
-	// the execution process does not impact the state of the Component and the Cluster.
+	//   the execution process does not impact the state of the Component and the Cluster.
 	// - ClusterReady: The Action is executed after the Cluster object is created and once the Cluster is ready.
+	//
 	// the execution process does not impact the state of the Component and the Cluster.
 	// Cannot be updated.
 	// +optional
@@ -532,12 +534,15 @@ type ComponentLifecycleActions struct {
 	// You can define the preCondition for executing PostProvision using Action.PreCondition. The default PostProvision action preCondition is ComponentReady.
 	// The PostProvision Action will be executed only once.
 	// Dedicated env vars for the action:
+	//
 	// - KB_CLUSTER_COMPONENT_LIST: The list of all components in the cluster, joined by ',' (e.g., "comp1,comp2").
 	// - KB_CLUSTER_COMPONENT_POD_NAME_LIST: The list of all pods name in this component, joined by ',' (e.g., "pod1,pod2").
 	// - KB_CLUSTER_COMPONENT_POD_IP_LIST: The list of pod IPs where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by ',' (e.g., "podIp1,podIp2").
 	// - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: The list of hostName where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by ',' (e.g., "hostName1,hostName2").
 	// - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: The list of host IPs where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by ',' (e.g., "hostIp1,hostIp2").
+	//
 	// Cannot be updated.
+	//
 	// +optional
 	PostProvision *LifecycleActionHandler `json:"postProvision,omitempty"`
 
@@ -555,20 +560,27 @@ type ComponentLifecycleActions struct {
 
 	// Switchover defines how to proactively switch the current leader to a new replica to minimize the impact on availability.
 	// This action is typically invoked when the leader is about to become unavailable due to events, such as:
+	//
 	// - switchover
 	// - stop
 	// - restart
 	// - scale-in
+	//
 	// Dedicated env vars for the action:
+	//
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the new candidate replica's Pod. It may be empty.
 	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new candidate replica. It may be empty.
 	// - KB_LEADER_POD_IP: The IP address of the original leader's Pod before switchover.
 	// - KB_LEADER_POD_NAME: The name of the original leader's Pod before switchover.
 	// - KB_LEADER_POD_FQDN: The FQDN of the original leader's Pod before switchover.
+	//
 	// The env vars with following prefix are deprecated and will be removed in the future:
+	//
 	// - KB_REPLICATION_PRIMARY_POD_: The prefix of the environment variables of the original primary's Pod before switchover.
 	// - KB_CONSENSUS_LEADER_POD_: The prefix of the environment variables of the original leader's Pod before switchover.
+	//
 	// Cannot be updated.
+	//
 	// +optional
 	Switchover *ComponentSwitchover `json:"switchover,omitempty"`
 
@@ -600,11 +612,14 @@ type ComponentLifecycleActions struct {
 
 	// DataPopulate defines how to populate the data to create new replicas.
 	// This action is typically used when a new replica needs to be constructed, such as:
+	//
 	// - scale-out
 	// - rebuild
 	// - clone
+	//
 	// It should write the valid data to stdout without including any extraneous information.
 	// Cannot be updated.
+	//
 	// +optional
 	DataPopulate *LifecycleActionHandler `json:"dataPopulate,omitempty"`
 

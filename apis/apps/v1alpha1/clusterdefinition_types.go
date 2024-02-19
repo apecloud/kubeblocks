@@ -49,18 +49,20 @@ type ClusterDefinitionSpec struct {
 	// secret for cluster.apps.kubeblocks.io object.
 	//
 	// Built-in objects are:
-	// - `$(RANDOM_PASSWD)` - random 8 characters.
-	// - `$(STRONG_RANDOM_PASSWD)` - random 16 characters, with mixed cases, digits and symbols.
-	// - `$(UUID)` - generate a random UUID v4 string.
-	// - `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
-	// - `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
-	// - `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
-	// - `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
+	//
+	// - `$(RANDOM_PASSWD)` random 8 characters.
+	// dfjksgks
+	// - `$(STRONG_RANDOM_PASSWD)` random 16 characters, with mixed cases, digits and symbols.
+	// - `$(UUID)` generate a random UUID v4 string.
+	// - `$(UUID_B64)` generate a random UUID v4 BASE64 encoded string.
+	// - `$(UUID_STR_B64)` generate a random UUID v4 string then BASE64 encoded.
+	// - `$(UUID_HEX)` generate a random UUID v4 HEX representation.
+	// - `$(HEADLESS_SVC_FQDN)` headless service FQDN placeholder, value pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+	// - `$(SVC_FQDN)` service FQDN placeholder, value pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc`,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
-	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the
+	// - `$(SVC_PORT_{PORT-NAME})` is ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and `$(SVC_PORT_mysql)` in the
 	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
@@ -388,22 +390,22 @@ type ClusterComponentDefinition struct {
 
 	// statelessSpec defines stateless related spec if workloadType is Stateless.
 	// +optional
-	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	StatelessSpec *StatelessSetSpec `json:"statelessSpec,omitempty"`
 
 	// statefulSpec defines stateful related spec if workloadType is Stateful.
 	// +optional
-	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	StatefulSpec *StatefulSetSpec `json:"statefulSpec,omitempty"`
 
 	// consensusSpec defines consensus related spec if workloadType is Consensus, required if workloadType is Consensus.
 	// +optional
-	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 
 	// replicationSpec defines replication related spec if workloadType is Replication.
 	// +optional
-	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	ReplicationSpec *ReplicationSetSpec `json:"replicationSpec,omitempty"`
 
 	// RSMSpec defines workload related spec of this component.
@@ -725,7 +727,7 @@ type ClusterDefinitionProbes struct {
 
 	// Probe for DB role changed check.
 	// +optional
-	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	RoleProbe *ClusterDefinitionProbe `json:"roleProbe,omitempty"`
 
 	// roleProbeTimeoutAfterPodsReady(in seconds), when all pods of the component are ready,

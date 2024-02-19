@@ -399,9 +399,9 @@ spec:
                     properties:
                       name:
                         default: KubeBlocks
-                        description: 'Name of issuer. Options supported: - KubeBlocks
+                        description: "Name of issuer. Options supported: \n - KubeBlocks
                           - Certificates signed by KubeBlocks Operator. - UserProvided
-                          - User provided own CA-signed certificates.'
+                          - User provided own CA-signed certificates."
                         enum:
                         - KubeBlocks
                         - UserProvided

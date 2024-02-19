@@ -22,6 +22,10 @@
         {
             "typeMatchPrefix": "^k8s\\.io/apimachinery/pkg/util",
             "docsURLTemplate": "https://pkg.go.dev/k8s.io/apimachinery/pkg/util/{{arrIndex .PackageSegments -1}}#{{.TypeIdentifier}}"
+        },
+        {
+            "typeMatchPrefix": "^k8s\\.io/apimachinery/pkg/types",
+            "docsURLTemplate": "https://pkg.go.dev/k8s.io/apimachinery/pkg/types#{{.TypeIdentifier}}"
         }
     ],
     "typeDisplayNamePrefixOverrides": {
@@ -31,5 +35,22 @@
         "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/": "Kubernetes api extensions ",
         "k8s.io/apimachinery/pkg/util/": "Kubernetes api utils "
     },
+    "packageGroups": [
+        {
+            "groupName": "cluster",
+            "packages": ["apps.kubeblocks.io", "workloads.kubeblocks.io"],
+            "order": 1
+        },
+        {
+            "groupName": "backup",
+            "packages": ["dataprotection.kubeblocks.io", "storage.kubeblocks.io"],
+            "order": 2
+        },
+        {
+            "groupName": "add-on",
+            "packages": ["extensions.kubeblocks.io"],
+            "order": 3
+        }
+    ],
     "markdownDisabled": false
 }

@@ -136,12 +136,14 @@ type SchedulePolicy struct {
 	// controller will remove all backups that are older than the RetentionPeriod.
 	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
 	// Sample duration format:
+	//
 	// - years: 	2y
 	// - months: 	6mo
 	// - days: 		30d
 	// - hours: 	12h
 	// - minutes: 	30m
 	// You can also combine the above durations. For example: 30d12h30m
+	//
 	// +optional
 	// +kubebuilder:default="7d"
 	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
@@ -149,8 +151,10 @@ type SchedulePolicy struct {
 
 type TargetInstance struct {
 	// select instance of corresponding role for backup, role are:
+	//
 	// - the name of Leader/Follower/Leaner for Consensus component.
 	// - primary or secondary for Replication component.
+	//
 	// finally, invalid role of the component will be ignored.
 	// such as if workload type is Replication and component's replicas is 1,
 	// the secondary role is invalid. and it also will be ignored when component is Stateful/Stateless.
@@ -167,8 +171,10 @@ type TargetInstance struct {
 	// PodSelectionStrategy specifies the strategy to select when multiple pods are
 	// selected for backup target.
 	// Valid values are:
+	//
 	// - Any: select any one pod that match the labelsSelector.
 	// - All: select all pods that match the labelsSelector.
+	//
 	// +optional
 	Strategy dpv1alpha1.PodSelectionStrategy `json:"strategy,omitempty"`
 

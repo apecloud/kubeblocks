@@ -898,9 +898,13 @@ spec:
                     - command
                     type: object
                   switchoverAction:
-                    description: SwitchoverAction specifies how to do switchover latest
+                    description: "Environment variables can be used in all following
+                      Actions: \n - KB_RSM_USERNAME username part of credential -
+                      KB_RSM_PASSWORD password part of credential - KB_RSM_LEADER_HOST
+                      leader host - KB_RSM_TARGET_HOST target host - KB_RSM_SERVICE_PORT
+                      port \n SwitchoverAction specifies how to do switchover latest
                       [BusyBox](https://busybox.net/) image will be used if Image
-                      not configured
+                      not configured"
                     properties:
                       command:
                         description: Command will be executed in Container to retrieve
@@ -999,8 +1003,8 @@ spec:
                       should be a single string of the role name defined in spec.Roles
                       latest [BusyBox](https://busybox.net/) image will be used if
                       Image not configured Environment variables can be used in Command:
-                      - v_KB_RSM_LAST_STDOUT stdout from last action, watch 'v_' prefixed
-                      - KB_RSM_USERNAME username part of credential - KB_RSM_PASSWORD
+                      \n - v_KB_RSM_LAST_STDOUT stdout from last action, watch 'v_'
+                      prefixed - KB_RSM_USERNAME username part of credential - KB_RSM_PASSWORD
                       password part of credential"
                     items:
                       properties:

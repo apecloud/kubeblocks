@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -19,5 +19,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // +k8s:deepcopy-gen=package,register
 // +k8s:openapi-gen=true
-// +groupName=dataprotection.kubeblocks.io
+// +groupName=workloads.kubeblocks.io
 package v1alpha1

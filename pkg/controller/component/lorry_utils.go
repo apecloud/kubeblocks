@@ -113,7 +113,8 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	return nil
 }
 
-func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container, lorryHTTPPort, lorryGRPCPort int) {
+func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container,
+	lorryHTTPPort, lorryGRPCPort int) {
 	actionCommands, execImage, containerName := getActionCommandsWithExecImageOrContainerName(synthesizeComp)
 	if len(actionCommands) == 0 {
 		return
@@ -142,6 +143,10 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 		Value: string(actionJSON),
 	})
 
+	if execContainer == nil {
+		return
+	}
+
 	envSet := sets.New([]string{}...)
 	for _, env := range lorryContainer.Env {
 		envSet.Insert(env.Name)
@@ -167,8 +172,8 @@ func buildBasicContainer(synthesizeComp *SynthesizedComponent, lorryHTTPPort int
 		GetObject()
 }
 
-func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container *corev1.Container, lorryHTTPPort,
-	lorryGRPCPort int, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
+func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container *corev1.Container,
+	lorryHTTPPort, lorryGRPCPort int, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
 	container.Name = constant.LorryContainerName
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
@@ -270,7 +275,12 @@ func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = roleProbe.PeriodSeconds
 	probe.TimeoutSeconds = roleProbe.TimeoutSeconds
+	probe.FailureThreshold = 3
 	roleChangedContainer.ReadinessProbe = probe
+	roleChangedContainer.Env = append(roleChangedContainer.Env, *roleProbe.Args.Host)
+	roleChangedContainer.Env = append(roleChangedContainer.Env, *roleProbe.Args.Port)
+	roleChangedContainer.Env = append(roleChangedContainer.Env, *roleProbe.Args.UserName)
+	roleChangedContainer.Env = append(roleChangedContainer.Env, *roleProbe.Args.Password)
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {
@@ -311,31 +321,33 @@ func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *a
 		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
 	}
 	envs := []corev1.EnvVar{}
-	if secretName != "" {
-		envs = append(envs,
-			corev1.EnvVar{
-				Name: constant.KBEnvServiceUser,
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
-						Key: constant.AccountNameForSecret,
+	if secretName == "" {
+		return envs
+	}
+
+	envs = append(envs,
+		corev1.EnvVar{
+			Name: constant.KBEnvServiceUser,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
 					},
+					Key: constant.AccountNameForSecret,
 				},
 			},
-			corev1.EnvVar{
-				Name: constant.KBEnvServicePassword,
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
-						Key: constant.AccountPasswdForSecret,
+		},
+		corev1.EnvVar{
+			Name: constant.KBEnvServicePassword,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
 					},
+					Key: constant.AccountPasswdForSecret,
 				},
-			})
-	}
+			},
+		})
 	return envs
 }
 

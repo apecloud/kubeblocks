@@ -19,5 +19,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // +k8s:deepcopy-gen=package,register
 // +k8s:openapi-gen=true
-// +groupName=apps.kubeblocks.io
+// +groupName=workloads.kubeblocks.io
 package v1alpha1

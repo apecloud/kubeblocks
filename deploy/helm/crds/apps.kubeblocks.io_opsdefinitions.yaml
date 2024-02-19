@@ -77,11 +77,11 @@ spec:
                       properties:
                         podSelectionStrategy:
                           default: PreferredAvailable
-                          description: 'podSelectionStrategy how to select the target
+                          description: "podSelectionStrategy how to select the target
                             component pod for variable references based on the strategy.
-                            - PreferredAvailable: prioritize the selection of available
+                            \n - PreferredAvailable: prioritize the selection of available
                             pod. - Available: only select available pod. if not found,
-                            terminating the operation.'
+                            terminating the operation."
                           enum:
                           - Available
                           - PreferredAvailable
@@ -8357,10 +8357,10 @@ spec:
                   pruning, and defaulting.
                 properties:
                   openAPIV3Schema:
-                    description: 'openAPIV3Schema is the OpenAPI v3 schema to use
-                      for parameter schema. supported properties types: - string -
-                      number - integer - array: only supported the item with string
-                      type.'
+                    description: "openAPIV3Schema is the OpenAPI v3 schema to use
+                      for parameter schema. supported properties types: \n - string
+                      - number - integer - array: only supported the item with string
+                      type."
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
@@ -8512,11 +8512,11 @@ spec:
                       description: condition declares how the operation can be executed.
                       properties:
                         expression:
-                          description: 'expression declares how the operation can
+                          description: "expression declares how the operation can
                             be executed using go template expression. it should return
-                            "true" or "false", built-in objects: - "params" are input
-                            parameters. - "cluster" is referenced cluster object.
-                            - "component" is referenced the component Object.'
+                            \"true\" or \"false\", built-in objects: \n - \"params\"
+                            are input parameters. - \"cluster\" is referenced cluster
+                            object. - \"component\" is referenced the component Object."
                           type: string
                         message:
                           description: report the message if the rule is not matched.
@@ -8536,10 +8536,10 @@ spec:
                 properties:
                   podSelectionStrategy:
                     default: PreferredAvailable
-                    description: 'podSelectionStrategy how to select the target component
-                      pod for variable references based on the strategy. - PreferredAvailable:
+                    description: "podSelectionStrategy how to select the target component
+                      pod for variable references based on the strategy. \n - PreferredAvailable:
                       prioritize the selection of available pod. - Available: only
-                      select available pod. if not found, terminating the operation.'
+                      select available pod. if not found, terminating the operation."
                     enum:
                     - Available
                     - PreferredAvailable

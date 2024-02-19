@@ -94,10 +94,10 @@ spec:
                       the backup should be kept. Controller will remove all backups
                       that are older than the RetentionPeriod. For example, RetentionPeriod
                       of `30d` will keep only the backups of last 30 days. Sample
-                      duration format: - years: \t2y - months: \t6mo - days: \t\t30d
-                      - hours: \t12h - minutes: \t30m You can also combine the above
-                      durations. For example: 30d12h30m. If not set, the backup will
-                      be kept forever."
+                      duration format: \n - years: \t2y - months: \t6mo - days: \t\t30d
+                      - hours: \t12h - minutes: \t30m \n You can also combine the
+                      above durations. For example: 30d12h30m. If not set, the backup
+                      will be kept forever."
                     type: string
                 type: object
               cancel:

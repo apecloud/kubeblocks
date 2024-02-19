@@ -8808,9 +8808,13 @@ spec:
                               - command
                               type: object
                             switchoverAction:
-                              description: SwitchoverAction specifies how to do switchover
-                                latest [BusyBox](https://busybox.net/) image will
-                                be used if Image not configured
+                              description: "Environment variables can be used in all
+                                following Actions: \n - KB_RSM_USERNAME username part
+                                of credential - KB_RSM_PASSWORD password part of credential
+                                - KB_RSM_LEADER_HOST leader host - KB_RSM_TARGET_HOST
+                                target host - KB_RSM_SERVICE_PORT port \n SwitchoverAction
+                                specifies how to do switchover latest [BusyBox](https://busybox.net/)
+                                image will be used if Image not configured"
                               properties:
                                 args:
                                   description: Args is used to perform statements.
@@ -8851,7 +8855,7 @@ spec:
                                 string of the role name defined in spec.Roles latest
                                 [BusyBox](https://busybox.net/) image will be used
                                 if Image not configured Environment variables can
-                                be used in Command: - v_KB_RSM_LAST_STDOUT stdout
+                                be used in Command: \n - v_KB_RSM_LAST_STDOUT stdout
                                 from last action, watch 'v_' prefixed - KB_RSM_USERNAME
                                 username part of credential - KB_RSM_PASSWORD password
                                 part of credential"
@@ -9992,22 +9996,22 @@ spec:
                   type: string
                 description: "Connection credential template used for creating a connection
                   credential secret for cluster.apps.kubeblocks.io object. \n Built-in
-                  objects are: - `$(RANDOM_PASSWD)` - random 8 characters. - `$(STRONG_RANDOM_PASSWD)`
-                  - random 16 characters, with mixed cases, digits and symbols. -
-                  `$(UUID)` - generate a random UUID v4 string. - `$(UUID_B64)` -
-                  generate a random UUID v4 BASE64 encoded string. - `$(UUID_STR_B64)`
-                  - generate a random UUID v4 string then BASE64 encoded. - `$(UUID_HEX)`
-                  - generate a random UUID v4 HEX representation. - `$(HEADLESS_SVC_FQDN)`
-                  - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
+                  objects are: \n - `$(RANDOM_PASSWD)` random 8 characters. dfjksgks
+                  - `$(STRONG_RANDOM_PASSWD)` random 16 characters, with mixed cases,
+                  digits and symbols. - `$(UUID)` generate a random UUID v4 string.
+                  - `$(UUID_B64)` generate a random UUID v4 BASE64 encoded string.
+                  - `$(UUID_STR_B64)` generate a random UUID v4 string then BASE64
+                  encoded. - `$(UUID_HEX)` generate a random UUID v4 HEX representation.
+                  - `$(HEADLESS_SVC_FQDN)` headless service FQDN placeholder, value
+                  pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`,
                   where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
-                  attribute; - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern
-                  - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME
+                  attribute; - `$(SVC_FQDN)` service FQDN placeholder, value pattern
+                  is `$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc`, where 1ST_COMP_NAME
                   is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
-                  attribute; - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value
+                  attribute; - `$(SVC_PORT_{PORT-NAME})` is ServicePort's port value
                   with specified port name, i.e, a servicePort JSON struct: `{\"name\":
                   \"mysql\", \"targetPort\": \"mysqlContainerPort\", \"port\": 3306}`,
-                  and \"$(SVC_PORT_mysql)\" in the connection credential value is
-                  3306."
+                  and `$(SVC_PORT_mysql)` in the connection credential value is 3306."
                 type: object
               type:
                 description: Cluster definition type defines well known application

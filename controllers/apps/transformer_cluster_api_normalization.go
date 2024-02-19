@@ -41,17 +41,22 @@ var _ graph.Transformer = &ClusterAPINormalizationTransformer{}
 
 func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
+	cluster := transCtx.Cluster
 	if model.IsObjectDeleting(transCtx.OrigCluster) {
 		return nil
 	}
+
+	var err error
+	defer func() {
+		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
+	}()
 
 	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	transCtx.ShardingComponentSpecs = make(map[string][]*appsv1alpha1.ClusterComponentSpec, 0)
 	transCtx.Labels = make(map[string]map[string]string, 0)
 
 	// build all component specs
-	var err error
-	transCtx.ComponentSpecs, err = t.buildCompSpecs(transCtx, transCtx.Cluster)
+	transCtx.ComponentSpecs, err = t.buildCompSpecs(transCtx, cluster)
 	if err != nil {
 		return err
 	}

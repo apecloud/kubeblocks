@@ -41,7 +41,9 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 
 	var err error
 	defer func() {
-		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
+		if err != nil {
+			setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
+		}
 	}()
 
 	if err = t.apiValidation(cluster); err != nil {

@@ -247,11 +247,13 @@ TerminationPolicyType
 </em>
 </td>
 <td>
-<p>Cluster termination policy. Valid values are DoNotTerminate, Halt, Delete, WipeOut.
-DoNotTerminate will block delete operation.
-Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
-Delete is based on Halt and deletes PVCs.
-WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.</p>
+<p>Cluster termination policy. Valid values are <code>DoNotTerminate</code>, <code>Halt</code>, <code>Delete</code>, <code>WipeOut</code>.</p>
+<ul>
+<li>DoNotTerminate will block delete operation.</li>
+<li>Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.</li>
+<li>Delete is based on Halt and deletes PVCs.</li>
+<li>WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -658,7 +660,7 @@ string
 </em>
 </td>
 <td>
-<p>List of components&rsquo; containers versioning context, i.e., container image ID, container commands, args., and environments.</p>
+<p>List of components&rsquo; containers versioning context, i.e., container image ID, container commands, args, and environments.</p>
 </td>
 </tr>
 </table>
@@ -769,10 +771,12 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
-Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
-Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
-Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
+<p>serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:</p>
+<ul>
+<li>Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.</li>
+<li>Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.</li>
+</ul>
+<p>Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
 It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.</p>
 </td>
 </tr>
@@ -1174,20 +1178,24 @@ Kubernetes core/v1.PodSpec
 </em>
 </td>
 <td>
-<p>Runtime defines primarily runtime information for the component, including:
-- Init containers
-- Containers
-- Image
-- Commands
-- Args
-- Envs
-- Mounts
-- Ports
-- Security context
-- Probes
-- Lifecycle
-- Volumes
-CPU and memory resource limits, as well as scheduling settings (affinity, toleration, priority), should not be configured within this structure.
+<p>Runtime defines primarily runtime information for the component, including:</p>
+<ul>
+<li>Init containers</li>
+<li>Containers
+<ul>
+<li>Image</li>
+<li>Commands</li>
+<li>Args</li>
+<li>Envs</li>
+<li>Mounts</li>
+<li>Ports</li>
+<li>Security context</li>
+<li>Probes</li>
+<li>Lifecycle</li>
+</ul></li>
+<li>Volumes</li>
+</ul>
+<p>CPU and memory resource limits, as well as scheduling settings (affinity, toleration, priority), should not be configured within this structure.
 Cannot be updated.</p>
 </td>
 </tr>
@@ -1202,8 +1210,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Vars represents user-defined variables.
-These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
+<p>Vars represents user-defined variables.</p>
+<p>These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
 When used as environment variables, these variables are placed in front of the environment variables declared in the Pod.
 Cannot be updated.</p>
 </td>
@@ -1235,8 +1243,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Services defines endpoints that can be used to access the component service to manage the component.
-In addition, a reserved headless service will be created by default, with the name pattern &#123;clusterName&#125;-&#123;componentName&#125;-headless.
+<p>Services defines endpoints that can be used to access the component service to manage the component.</p>
+<p>In addition, a reserved headless service will be created by default, with the name pattern <code>&#123;clusterName&#125;-&#123;componentName&#125;-headless</code>.
 Cannot be updated.</p>
 </td>
 </tr>
@@ -1636,8 +1644,8 @@ ReloadOptions
 </td>
 <td>
 <em>(Optional)</em>
-<p>reloadOptions indicates whether the process supports reload.
-if set, the controller will determine the behavior of the engine instance based on the configuration templates,
+<p>reloadOptions indicates whether the process supports reload.</p>
+<p>if set, the controller will determine the behavior of the engine instance based on the configuration templates,
 restart or reload depending on whether any parameters in the StaticParameters have been modified.</p>
 </td>
 </tr>
@@ -1769,10 +1777,12 @@ FormatterConfig
 </em>
 </td>
 <td>
-<p>formatterConfig describes the format of the configuration file, the controller
-1. parses configuration file
-2. analyzes the modified parameters
-3. applies corresponding policies.</p>
+<p>formatterConfig describes the format of the configuration file, the controller will:</p>
+<ol>
+<li>parses configuration file</li>
+<li>analyzes the modified parameters</li>
+<li>applies corresponding policies.</li>
+</ol>
 </td>
 </tr>
 </table>
@@ -2117,7 +2127,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>cancel defines the action to cancel the Pending/Creating/Running opsRequest, supported types: [VerticalScaling, HorizontalScaling].
+<p>cancel defines the action to cancel the <code>Pending/Creating/Running</code> opsRequest, supported types: <code>VerticalScaling/HorizontalScaling</code>.
 once cancel is set to true, this opsRequest will be canceled and modifying this property again will not take effect.</p>
 </td>
 </tr>
@@ -2436,7 +2446,7 @@ string
 <td>
 <p>service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. &#123;mysql, redis, mongodb&#125;.
 The serviceKind is case-insensitive and supports abbreviations for some well-known databases.
-For example, both &lsquo;zk&rsquo; and &lsquo;zookeeper&rsquo; will be considered as a ZooKeeper cluster, and &lsquo;pg&rsquo;, &lsquo;postgres&rsquo;, &lsquo;postgresql&rsquo; will all be considered as a PostgreSQL cluster.</p>
+For example, both <code>zk</code> and <code>zookeeper</code> will be considered as a ZooKeeper cluster, and <code>pg</code>, <code>postgres</code>, <code>postgresql</code> will all be considered as a PostgreSQL cluster.</p>
 </td>
 </tr>
 <tr>
@@ -2569,9 +2579,11 @@ ServiceDescriptorStatus
 There are some pre-defined environment variables that can be used when writing action commands, check @BuiltInVars for reference.</p>
 <p>An action is considered successful if it returns 0 (or HTTP 200 for HTTP(s) actions). Any other return value or
 HTTP status code is considered as a failure, and the action may be retried based on the configured retry policy.</p>
-<p>If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.
-If an action produces any data as output, it should be written to stdout (or included in the HTTP response payload for HTTP(s) actions).
-If an action encounters any errors, error messages should be written to stderr (or included in the HTTP response payload with a non-200 HTTP status code).</p>
+<ul>
+<li>If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.</li>
+<li>If an action produces any data as output, it should be written to stdout (or included in the HTTP response payload for HTTP(s) actions).</li>
+<li>If an action encounters any errors, error messages should be written to stderr (or included in the HTTP response payload with a non-200 HTTP status code).</li>
+</ul>
 </div>
 <table>
 <thead>
@@ -2783,7 +2795,7 @@ Required means must spread pods by <code>TopologyKeys</code>.</p>
 <p>topologyKey is the key of node labels.
 Nodes that have a label with this key and identical values are considered to be in the same topology.
 It&rsquo;s used as the topology domain for pod anti-affinity and pod spread constraint.
-Some well-known label keys, such as &ldquo;kubernetes.io/hostname&rdquo; and &ldquo;topology.kubernetes.io/zone&rdquo;
+Some well-known label keys, such as <code>kubernetes.io/hostname</code> and <code>topology.kubernetes.io/zone</code>
 are often used as TopologyKey, as well as any other custom label key.</p>
 </td>
 </tr>
@@ -3181,9 +3193,11 @@ string
 <em>(Optional)</em>
 <p>deletionPolicy determines whether the backup contents stored in backup repository
 should be deleted when the backup custom resource is deleted.
-Supported values are &ldquo;Retain&rdquo; and &ldquo;Delete&rdquo;.
-&ldquo;Retain&rdquo; means that the backup content and its physical snapshot on backup repository are kept.
-&ldquo;Delete&rdquo; means that the backup content and its physical snapshot on backup repository are deleted.</p>
+Supported values are <code>Retain</code> and <code>Delete</code>.</p>
+<ul>
+<li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.</li>
+<li><code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -3629,11 +3643,13 @@ WorkloadType
 </em>
 </td>
 <td>
-<p>workloadType defines type of the workload.
-Stateless is a stateless workload type used to describe stateless applications.
-Stateful is a stateful workload type used to describe common stateful applications.
-Consensus is a stateful workload type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.
-Replication is a stateful workload type used to describe applications based on the primary-secondary data replication protocol.</p>
+<p>workloadType defines type of the workload.</p>
+<ul>
+<li><code>Stateless</code> is a stateless workload type used to describe stateless applications.</li>
+<li><code>Stateful</code> is a stateful workload type used to describe common stateful applications.</li>
+<li><code>Consensus</code> is a stateful workload type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.</li>
+<li><code>Replication</code> is a stateful workload type used to describe applications based on the primary-secondary data replication protocol.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -3645,9 +3661,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+<p>characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql).
 KubeBlocks will generate proper monitor configs for well-known characterType when builtIn is true.</p>
-<p>CharacterType will also be used in role probe to decide which probe engine to use.
+<p>It will also be used in role probe to decide which probe engine to use.
 current available candidates are: mysql, postgres, mongodb, redis, etcd, kafka.</p>
 </td>
 </tr>
@@ -3868,11 +3884,12 @@ mapping the name of the VolumeMounts in the PodSpec.Container field,
 such as data volume, log volume, etc.
 When backing up the volume, the volume can be correctly backed up
 according to the volumeType.</p>
-<p>For example:
-<code>name: data, type: data</code> means that the volume named <code>data</code> is used to store <code>data</code>.
-<code>name: binlog, type: log</code> means that the volume named <code>binlog</code> is used to store <code>log</code>.</p>
-<p>NOTE:
-When volumeTypes is not defined, the backup function will not be supported,
+<p>For example:</p>
+<ul>
+<li><code>name: data, type: data</code> means that the volume named <code>data</code> is used to store <code>data</code>.</li>
+<li><code>name: binlog, type: log</code> means that the volume named <code>binlog</code> is used to store <code>log</code>.</li>
+</ul>
+<p>NOTE: When volumeTypes is not defined, the backup function will not be supported,
 even if a persistent volume has been specified.</p>
 </td>
 </tr>
@@ -4034,19 +4051,21 @@ Kubernetes core/v1.ServiceType
 <td>
 <em>(Optional)</em>
 <p>serviceType determines how the Service is exposed. Valid
-options are ClusterIP, NodePort, and LoadBalancer.
-&ldquo;ClusterIP&rdquo; allocates a cluster-internal IP address for load-balancing
+options are ClusterIP, NodePort, and LoadBalancer.</p>
+<ul>
+<li><code>ClusterIP</code> allocates a cluster-internal IP address for load-balancing
 to endpoints. Endpoints are determined by the selector or if that is not
 specified, they are determined by manual construction of an Endpoints object or
 EndpointSlice objects. If clusterIP is &ldquo;None&rdquo;, no virtual IP is
 allocated and the endpoints are published as a set of endpoints rather
-than a virtual IP.
-&ldquo;NodePort&rdquo; builds on ClusterIP and allocates a port on every node which
-routes to the same endpoints as the clusterIP.
-&ldquo;LoadBalancer&rdquo; builds on NodePort and creates an external load-balancer
+than a virtual IP.</li>
+<li><code>NodePort</code> builds on ClusterIP and allocates a port on every node which
+routes to the same endpoints as the clusterIP.</li>
+<li><code>LoadBalancer</code> builds on NodePort and creates an external load-balancer
 (if supported in the current cloud) which routes to the same endpoints
-as the clusterIP.
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a>.</p>
+as the clusterIP.</li>
+</ul>
+<p>More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a>.</p>
 </td>
 </tr>
 <tr>
@@ -4143,10 +4162,12 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
-Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
-Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
-Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
+<p>serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:</p>
+<ul>
+<li>Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.</li>
+<li>Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.</li>
+</ul>
+<p>Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
 It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.</p>
 </td>
 </tr>
@@ -4416,15 +4437,17 @@ ClusterComponentPhase
 </em>
 </td>
 <td>
-<p>phase describes the phase of the component and the detail information of the phases are as following:
-Creating: <code>Creating</code> is a special <code>Updating</code> with previous phase <code>empty</code>(means &ldquo;&rdquo;) or <code>Creating</code>.
-Running: component replicas &gt; 0 and all pod specs are latest with a Running state.
-Updating: component replicas &gt; 0 and has no failed pods. the component is being updated.
-Abnormal: component replicas &gt; 0 but having some failed pods. the component basically works but in a fragile state.
-Failed: component replicas &gt; 0 but having some failed pods. the component doesn&rsquo;t work anymore.
-Stopping: component replicas = 0 and has terminating pods.
-Stopped: component replicas = 0 and all pods have been deleted.
-Deleting: the component is being deleted.</p>
+<p>phase describes the phase of the component and the detail information of the phases are as following:</p>
+<ul>
+<li>Creating: <code>Creating</code> is a special <code>Updating</code> with previous phase <code>empty</code>(means &ldquo;&rdquo;) or <code>Creating</code>.</li>
+<li>Running: component replicas &gt; 0 and all pod specs are latest with a Running state.</li>
+<li>Updating: component replicas &gt; 0 and has no failed pods. the component is being updated.</li>
+<li>Abnormal: component replicas &gt; 0 but having some failed pods. the component basically works but in a fragile state.</li>
+<li>Failed: component replicas &gt; 0 but having some failed pods. the component doesn&rsquo;t work anymore.</li>
+<li>Stopping: component replicas = 0 and has terminating pods.</li>
+<li>Stopped: component replicas = 0 and all pods have been deleted.</li>
+<li>Deleting: the component is being deleted.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -4855,8 +4878,8 @@ int32
 <p>roleProbeTimeoutAfterPodsReady(in seconds), when all pods of the component are ready,
 it will detect whether the application is available in the pod.
 if pods exceed the InitializationTimeoutSeconds time without a role label,
-this component will enter the Failed/Abnormal phase.
-Note that this configuration will only take effect if the component supports RoleProbe
+this component will enter the Failed/Abnormal phase.</p>
+<p>Note that this configuration will only take effect if the component supports RoleProbe
 and will not affect the life cycle of the pod. default values are 60 seconds.</p>
 </td>
 </tr>
@@ -4961,7 +4984,7 @@ Phase
 </em>
 </td>
 <td>
-<p>ClusterDefinition phase, valid values are <code>empty</code>, <code>Available</code>, &lsquo;Unavailable`.
+<p>ClusterDefinition phase, valid values are <code>empty</code>, <code>Available</code>, <code>Unavailable</code>.
 Available is ClusterDefinition become available, and can be referenced for co-related objects.</p>
 </td>
 </tr>
@@ -5349,11 +5372,13 @@ TerminationPolicyType
 </em>
 </td>
 <td>
-<p>Cluster termination policy. Valid values are DoNotTerminate, Halt, Delete, WipeOut.
-DoNotTerminate will block delete operation.
-Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
-Delete is based on Halt and deletes PVCs.
-WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.</p>
+<p>Cluster termination policy. Valid values are <code>DoNotTerminate</code>, <code>Halt</code>, <code>Delete</code>, <code>WipeOut</code>.</p>
+<ul>
+<li>DoNotTerminate will block delete operation.</li>
+<li>Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.</li>
+<li>Delete is based on Halt and deletes PVCs.</li>
+<li>WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -5583,16 +5608,18 @@ ClusterPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>phase describes the phase of the Cluster, the detail information of the phases are as following:
-Creating: all components are in <code>Creating</code> phase.
-Running: all components are in <code>Running</code> phase, means the cluster is working well.
-Updating: all components are in <code>Creating</code>, <code>Running</code> or <code>Updating</code> phase,
-and at least one component is in <code>Creating</code> or <code>Updating</code> phase, means the cluster is doing an update.
-Stopping: at least one component is in <code>Stopping</code> phase, means the cluster is in a stop progress.
-Stopped: all components are in &lsquo;Stopped<code>phase, means the cluster has stopped and didn't provide any function anymore.
-Failed: all components are in</code>Failed<code>phase, means the cluster is unavailable.
-Abnormal: some components are in</code>Failed<code>or</code>Abnormal` phase, means the cluster in a fragile state. troubleshoot need to be done.
-Deleting: the cluster is being deleted.</p>
+<p>phase describes the phase of the Cluster, the detail information of the phases are as following:</p>
+<ul>
+<li>Creating: all components are in <code>Creating</code> phase.</li>
+<li>Running: all components are in <code>Running</code> phase, means the cluster is working well.</li>
+<li>Updating: all components are in <code>Creating</code>, <code>Running</code> or <code>Updating</code> phase,
+and at least one component is in <code>Creating</code> or <code>Updating</code> phase, means the cluster is doing an update.</li>
+<li>Stopping: at least one component is in <code>Stopping</code> phase, means the cluster is in a stop progress.</li>
+<li>Stopped: all components are in <code>Stopped</code> phase, means the cluster has stopped and didn&rsquo;t provide any function anymore.</li>
+<li>Failed: all components are in <code>Failed</code> phase, means the cluster is unavailable.</li>
+<li>Abnormal: some components are in <code>Failed</code> or <code>Abnormal</code> phase, means the cluster in a fragile state. troubleshoot need to be done.</li>
+<li>Deleting: the cluster is being deleted.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -5706,10 +5733,12 @@ SwitchPolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>clusterSwitchPolicy defines type of the switchPolicy when workloadType is Replication.
-MaximumAvailability: [WIP] when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately. It will be available in future versions.
-MaximumDataProtection: [WIP] when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch. It will be available in future versions.
-Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves or integrate open source HA solution.</p>
+<p>clusterSwitchPolicy defines type of the switchPolicy when workloadType is Replication.</p>
+<ul>
+<li>MaximumAvailability: [WIP] when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately. It will be available in future versions.</li>
+<li>MaximumDataProtection: [WIP] when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch. It will be available in future versions.</li>
+<li>Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves or integrate open source HA solution.</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -5751,7 +5780,7 @@ string
 </em>
 </td>
 <td>
-<p>List of components&rsquo; containers versioning context, i.e., container image ID, container commands, args., and environments.</p>
+<p>List of components&rsquo; containers versioning context, i.e., container image ID, container commands, args, and environments.</p>
 </td>
 </tr>
 </tbody>
@@ -6127,10 +6156,11 @@ string
 <p>template is a class definition template that uses the Go template syntax and allows for variable declaration.
 When defining a class in Series, specifying the variable&rsquo;s value is sufficient, as the complete class
 definition will be generated through rendering the template.</p>
-<p>For example:
-template: |
-cpu: &ldquo;&#123;&#123; or .cpu 1 &#125;&#125;&rdquo;
-memory: &ldquo;&#123;&#123; or .memory 4 &#125;&#125;Gi&rdquo;</p>
+<p>For example:</p>
+<pre><code class="language-yaml">template: |
+cpu: &quot;&#123;&#123; or .cpu 1 &#125;&#125;&quot;
+memory: &quot;&#123;&#123; or .memory 4 &#125;&#125;Gi&quot;
+</code></pre>
 </td>
 </tr>
 <tr>
@@ -6497,20 +6527,24 @@ Kubernetes core/v1.PodSpec
 </em>
 </td>
 <td>
-<p>Runtime defines primarily runtime information for the component, including:
-- Init containers
-- Containers
-- Image
-- Commands
-- Args
-- Envs
-- Mounts
-- Ports
-- Security context
-- Probes
-- Lifecycle
-- Volumes
-CPU and memory resource limits, as well as scheduling settings (affinity, toleration, priority), should not be configured within this structure.
+<p>Runtime defines primarily runtime information for the component, including:</p>
+<ul>
+<li>Init containers</li>
+<li>Containers
+<ul>
+<li>Image</li>
+<li>Commands</li>
+<li>Args</li>
+<li>Envs</li>
+<li>Mounts</li>
+<li>Ports</li>
+<li>Security context</li>
+<li>Probes</li>
+<li>Lifecycle</li>
+</ul></li>
+<li>Volumes</li>
+</ul>
+<p>CPU and memory resource limits, as well as scheduling settings (affinity, toleration, priority), should not be configured within this structure.
 Cannot be updated.</p>
 </td>
 </tr>
@@ -6525,8 +6559,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Vars represents user-defined variables.
-These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
+<p>Vars represents user-defined variables.</p>
+<p>These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
 When used as environment variables, these variables are placed in front of the environment variables declared in the Pod.
 Cannot be updated.</p>
 </td>
@@ -6558,8 +6592,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Services defines endpoints that can be used to access the component service to manage the component.
-In addition, a reserved headless service will be created by default, with the name pattern &#123;clusterName&#125;-&#123;componentName&#125;-headless.
+<p>Services defines endpoints that can be used to access the component service to manage the component.</p>
+<p>In addition, a reserved headless service will be created by default, with the name pattern <code>&#123;clusterName&#125;-&#123;componentName&#125;-headless</code>.
 Cannot be updated.</p>
 </td>
 </tr>
@@ -6816,7 +6850,7 @@ Phase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Phase valid values are `<code>,</code>Available<code>, 'Unavailable</code>.
+<p>Phase valid values are `<code>,</code>Available<code>,</code>Unavailable`.
 Available is ComponentDefinition become available, and can be used for co-related objects.</p>
 </td>
 </tr>
@@ -7042,11 +7076,13 @@ LifecycleActionHandler
 <td>
 <em>(Optional)</em>
 <p>DataAssemble defines how to assemble data synchronized from external before starting the service for a new replica.
-This action is typically used when creating a new replica, such as:
-- scale-out
-- rebuild
-- clone
-The data will be streamed in via stdin. If any error occurs during the assembly process,
+This action is typically used when creating a new replica, such as:</p>
+<ul>
+<li>scale-out</li>
+<li>rebuild</li>
+<li>clone</li>
+</ul>
+<p>The data will be streamed in via stdin. If any error occurs during the assembly process,
 the action must be able to guarantee idempotence to allow for retries from the beginning.
 Cannot be updated.</p>
 </td>
@@ -7337,8 +7373,8 @@ If sets to true, a set of Service will be automatically generated for each Pod. 
 They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <code>$(Service.ServiceName)-$(PodOrdinal)</code>.
 And the Service.Name will also be generated with named pattern <code>$(Service.Name)-$(PodOrdinal)</code>.
 The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.
-For example, a Service might be defined as follows:
-- name: my-service
+For example, a Service might be defined as follows:</p>
+<pre><code class="language-yaml">name: my-service
 serviceName: my-service
 generatePodOrdinalService: true
 spec:
@@ -7347,7 +7383,8 @@ ports:
 - name: http
 port: 80
 targetPort: 8080
-Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.</p>
+</code></pre>
+<p>Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.</p>
 </td>
 </tr>
 </tbody>
@@ -7404,10 +7441,12 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
-Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
-Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
-Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
+<p>serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:</p>
+<ul>
+<li>Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.</li>
+<li>Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.</li>
+</ul>
+<p>Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
 It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.</p>
 </td>
 </tr>
@@ -7647,15 +7686,17 @@ ClusterComponentPhase
 </em>
 </td>
 <td>
-<p>phase describes the phase of the component and the detail information of the phases are as following:
-Creating: <code>Creating</code> is a special <code>Updating</code> with previous phase <code>empty</code>(means &ldquo;&rdquo;) or <code>Creating</code>.
-Running: component replicas &gt; 0 and all pod specs are latest with a Running state.
-Updating: component replicas &gt; 0 and has no failed pods. the component is being updated.
-Abnormal: component replicas &gt; 0 but having some failed pods. the component basically works but in a fragile state.
-Failed: component replicas &gt; 0 but having some failed pods. the component doesn&rsquo;t work anymore.
-Stopping: component replicas = 0 and has terminating pods.
-Stopped: component replicas = 0 and all pods have been deleted.
-Deleting: the component is being deleted.</p>
+<p>phase describes the phase of the component and the detail information of the phases are as following:</p>
+<ul>
+<li>Creating: <code>Creating</code> is a special <code>Updating</code> with previous phase <code>empty</code>(means &ldquo;&rdquo;) or <code>Creating</code>.</li>
+<li>Running: component replicas &gt; 0 and all pod specs are latest with a Running state.</li>
+<li>Updating: component replicas &gt; 0 and has no failed pods. the component is being updated.</li>
+<li>Abnormal: component replicas &gt; 0 but having some failed pods. the component basically works but in a fragile state.</li>
+<li>Failed: component replicas &gt; 0 but having some failed pods. the component doesn&rsquo;t work anymore.</li>
+<li>Stopping: component replicas = 0 and has terminating pods.</li>
+<li>Stopped: component replicas = 0 and all pods have been deleted.</li>
+<li>Deleting: the component is being deleted.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -7809,11 +7850,11 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>defaultMode is optional: mode bits used to set permissions on created files by default.
-Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+<p>defaultMode is optional: mode bits used to set permissions on created files by default.</p>
+<p>Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
 YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
-Defaults to 0644.
-Directories within the path are not affected by this setting.
+Defaults to 0644.</p>
+<p>Directories within the path are not affected by this setting.
 This might be in conflict with other options that affect the file
 mode, like fsGroup, and the result can be other mode bits set.</p>
 </td>
@@ -7858,9 +7899,11 @@ string
 <td>
 <em>(Optional)</em>
 <p>fieldRef is the jsonpath of the source to select when type is <code>FieldRef</code>.
-there are two objects registered in the jsonpath: <code>componentDef</code> and <code>components</code>.
-componentDef is the component definition object specified in <code>componentRef.componentDefName</code>.
-components is the component list objects referring to the component definition object.</p>
+there are two objects registered in the jsonpath: <code>componentDef</code> and <code>components</code>:</p>
+<ul>
+<li>componentDef is the component definition object specified in <code>componentRef.componentDefName</code>.</li>
+<li>components is the component list objects referring to the component definition object.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -7873,10 +7916,12 @@ string
 <td>
 <em>(Optional)</em>
 <p>format is the format of each headless service address.
-there are three builtin variables can be used as placeholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME
-$POD_ORDINAL is the ordinal of the pod.
-$POD_FQDN is the fully qualified domain name of the pod.
-$POD_NAME is the name of the pod</p>
+there are three builtin variables can be used as placeholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME</p>
+<ul>
+<li>$POD_ORDINAL is the ordinal of the pod.</li>
+<li>$POD_FQDN is the fully qualified domain name of the pod.</li>
+<li>$POD_NAME is the name of the pod</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -7967,8 +8012,8 @@ int
 </td>
 <td>
 <em>(Optional)</em>
-<p>HighWatermark defines the high watermark threshold for the volume space usage.
-If there is any specified volumes who&rsquo;s space usage is over the threshold, the pre-defined &ldquo;LOCK&rdquo; action
+<p>HighWatermark defines the high watermark threshold for the volume space usage.</p>
+<p>If there is any specified volumes who&rsquo;s space usage is over the threshold, the pre-defined &ldquo;LOCK&rdquo; action
 will be triggered to degrade the service to protect volume from space exhaustion, such as to set the instance
 as read-only. And after that, if all volumes&rsquo; space usage drops under the threshold later, the pre-defined
 &ldquo;UNLOCK&rdquo; action will be performed to recover the service normally.
@@ -8027,8 +8072,8 @@ ReloadOptions
 </td>
 <td>
 <em>(Optional)</em>
-<p>reloadOptions indicates whether the process supports reload.
-if set, the controller will determine the behavior of the engine instance based on the configuration templates,
+<p>reloadOptions indicates whether the process supports reload.</p>
+<p>if set, the controller will determine the behavior of the engine instance based on the configuration templates,
 restart or reload depending on whether any parameters in the StaticParameters have been modified.</p>
 </td>
 </tr>
@@ -8160,10 +8205,12 @@ FormatterConfig
 </em>
 </td>
 <td>
-<p>formatterConfig describes the format of the configuration file, the controller
-1. parses configuration file
-2. analyzes the modified parameters
-3. applies corresponding policies.</p>
+<p>formatterConfig describes the format of the configuration file, the controller will:</p>
+<ol>
+<li>parses configuration file</li>
+<li>analyzes the modified parameters</li>
+<li>applies corresponding policies.</li>
+</ol>
 </td>
 </tr>
 </tbody>
@@ -9061,10 +9108,12 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>replicas, number of Pods of this role.
-default 1 for Leader
-default 0 for Learner
-default Cluster.spec.componentSpec[*].Replicas - Leader.Replicas - Learner.Replicas for Followers</p>
+<p>replicas, number of Pods of this role.</p>
+<ul>
+<li>default 1 for Leader</li>
+<li>default 0 for Learner</li>
+<li>default <code>Cluster.spec.componentSpec[*].Replicas - Leader.Replicas - Learner.Replicas</code> for Followers</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -9575,11 +9624,13 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Variable references $(VAR_NAME) are expanded using the previously defined variables in the current context.
-If a variable cannot be resolved, the reference in the input string will be unchanged.
-Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-&ldquo;$$(VAR_NAME)&rdquo; will produce the string literal &ldquo;$(VAR_NAME)&rdquo;.
-Escaped references will never be expanded, regardless of whether the variable exists or not.
+<p>Variable references $(VAR_NAME) are expanded using the previously defined variables in the current context.</p>
+<p>If a variable cannot be resolved, the reference in the input string will be unchanged.
+Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.</p>
+<ul>
+<li>&rdquo;$$(VAR_NAME)&rdquo; will produce the string literal &ldquo;$(VAR_NAME)&rdquo;.</li>
+</ul>
+<p>Escaped references will never be expanded, regardless of whether the variable exists or not.
 Defaults to &ldquo;&rdquo;.</p>
 </td>
 </tr>
@@ -9873,17 +9924,19 @@ CfgFileFormat
 </em>
 </td>
 <td>
-<p>The configuration file format. Valid values are ini, xml, yaml, json,
-hcl, dotenv, properties and toml.</p>
-<p>ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a>
-xml: reference wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a>
-yaml: a configuration file support for complex data types and structures.
-json: reference wiki: <a href="https://en.wikipedia.org/wiki/JSON">https://en.wikipedia.org/wiki/JSON</a>
-hcl: : The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: <a href="https://www.linode.com/docs/guides/introduction-to-hcl/">https://www.linode.com/docs/guides/introduction-to-hcl/</a>
-dotenv: this was a plain text file with simple key–value pairs, reference wiki: <a href="https://en.wikipedia.org/wiki/Configuration_file#MS-DOS">https://en.wikipedia.org/wiki/Configuration_file#MS-DOS</a>
-properties: a file extension mainly used in Java, reference wiki: <a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a>
-toml: reference wiki: <a href="https://en.wikipedia.org/wiki/TOML">https://en.wikipedia.org/wiki/TOML</a>
-props-plus: a file extension mainly used in Java, support CamelCase(e.g: brokerMaxConnectionsPerIp)</p>
+<p>The configuration file format. Valid values are <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>,
+<code>hcl</code>, <code>dotenv</code>, <code>properties</code> and <code>toml</code>.</p>
+<ul>
+<li>ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a></li>
+<li>xml: reference wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a></li>
+<li>yaml: a configuration file support for complex data types and structures.</li>
+<li>json: reference wiki: <a href="https://en.wikipedia.org/wiki/JSON">https://en.wikipedia.org/wiki/JSON</a></li>
+<li>hcl: The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: <a href="https://www.linode.com/docs/guides/introduction-to-hcl/">https://www.linode.com/docs/guides/introduction-to-hcl/</a></li>
+<li>dotenv: this was a plain text file with simple key–value pairs, reference wiki: <a href="https://en.wikipedia.org/wiki/Configuration_file#MS-DOS">https://en.wikipedia.org/wiki/Configuration_file#MS-DOS</a></li>
+<li>properties: a file extension mainly used in Java, reference wiki: <a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a></li>
+<li>toml: reference wiki: <a href="https://en.wikipedia.org/wiki/TOML">https://en.wikipedia.org/wiki/TOML</a></li>
+<li>props-plus: a file extension mainly used in Java, support CamelCase(e.g: brokerMaxConnectionsPerIp)</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -9944,8 +9997,8 @@ string
 </em>
 </td>
 <td>
-<p>gvk is Group/Version/Kind, for example &ldquo;v1/Pod&rdquo;, &ldquo;apps/v1/StatefulSet&rdquo;, etc.
-when the gvk resource filtered by the selector already exists, if there is no corresponding custom label, it will be added, and if label already exists, it will be updated.</p>
+<p>gvk is Group/Version/Kind, for example &ldquo;v1/Pod&rdquo;, &ldquo;apps/v1/StatefulSet&rdquo;, etc.</p>
+<p>when the gvk resource filtered by the selector already exists, if there is no corresponding custom label, it will be added, and if label already exists, it will be updated.</p>
 </td>
 </tr>
 <tr>
@@ -10112,12 +10165,13 @@ HScaleDataClonePolicyType
 <td>
 <em>(Optional)</em>
 <p>type controls what kind of data synchronization do when component scale out.
-Policy is in enum of &#123;None, CloneVolume&#125;. The default policy is <code>None</code>.
-None: Default policy, create empty volume and no data clone.
-CloneVolume: Do data clone to newly scaled pods. Prefer to use volume snapshot first,
-and will try backup tool if volume snapshot is not enabled, finally
-report error if both above cannot work.
-Snapshot: Deprecated, alias for CloneVolume.</p>
+Policy is in enum of &#123;None, CloneVolume&#125;. The default policy is <code>None</code>.</p>
+<ul>
+<li>None: Default policy, create empty volume and no data clone.</li>
+<li>CloneVolume: Do data clone to newly scaled pods. Prefer to use volume snapshot first,
+and will try backup tool if volume snapshot is not enabled, finally report error if both above cannot work.</li>
+<li>Snapshot: Deprecated, alias for CloneVolume.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -10218,11 +10272,13 @@ is filled, all pods will be evenly scheduled across the Nodes in the list when s
 <em>(Optional)</em>
 <p>Instances defines the name of instance that rsm scale down priorly.
 If the RsmTransformPolicy is specified as ToPod and expected replicas is less than current replicas, the list of
-Instances will be used.
-current replicas - expected replicas &gt; len(Instances): Scale down from the list of Instances priorly, the others
-will select from NodeAssignment.
-current replicas - expected replicas &lt; len(Instances): Scale down from the list of Instances.
-current replicas - expected replicas &lt; len(Instances): Scale down from a part of Instances.</p>
+Instances will be used.</p>
+<ul>
+<li><code>current replicas - expected replicas &gt; len(Instances)</code>: Scale down from the list of Instances priorly, the others
+will select from NodeAssignment.</li>
+<li><code>current replicas - expected replicas &lt; len(Instances)</code>: Scale down from the list of Instances.</li>
+<li><code>current replicas - expected replicas &lt; len(Instances)</code>: Scale down from a part of Instances.</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -10938,7 +10994,7 @@ Phase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Phase valid values are `<code>,</code>Available<code>, 'Unavailable</code>.
+<p>Phase valid values are `<code>,</code>Available<code>,</code>Unavailable`.
 Available is OpsDefinition become available, and can be used for co-related objects.</p>
 </td>
 </tr>
@@ -11248,7 +11304,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>cancel defines the action to cancel the Pending/Creating/Running opsRequest, supported types: [VerticalScaling, HorizontalScaling].
+<p>cancel defines the action to cancel the <code>Pending/Creating/Running</code> opsRequest, supported types: <code>VerticalScaling/HorizontalScaling</code>.
 once cancel is set to true, this opsRequest will be canceled and modifying this property again will not take effect.</p>
 </td>
 </tr>
@@ -11774,11 +11830,12 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>Route service traffic to pods with label keys and values matching this
-selector. If empty or not present, the service is assumed to have an
+selector.</p>
+<p>If empty or not present, the service is assumed to have an
 external process managing its endpoints, which Kubernetes will not
 modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
-Ignored if type is ExternalName.
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/">https://kubernetes.io/docs/concepts/services-networking/service/</a></p>
+Ignored if type is ExternalName.</p>
+<p>More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/">https://kubernetes.io/docs/concepts/services-networking/service/</a></p>
 </td>
 </tr>
 <tr>
@@ -11793,21 +11850,21 @@ Kubernetes core/v1.ServiceType
 <td>
 <em>(Optional)</em>
 <p>type determines how the Service is exposed. Defaults to ClusterIP. Valid
-options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
-&ldquo;ClusterIP&rdquo; allocates a cluster-internal IP address for load-balancing
+options are ExternalName, ClusterIP, NodePort, and LoadBalancer.</p>
+<ul>
+<li><code>ClusterIP</code> allocates a cluster-internal IP address for load-balancing
 to endpoints. Endpoints are determined by the selector or if that is not
-specified, by manual construction of an Endpoints object or
+specified, they are determined by manual construction of an Endpoints object or
 EndpointSlice objects. If clusterIP is &ldquo;None&rdquo;, no virtual IP is
 allocated and the endpoints are published as a set of endpoints rather
-than a virtual IP.
-&ldquo;NodePort&rdquo; builds on ClusterIP and allocates a port on every node which
-routes to the same endpoints as the clusterIP.
-&ldquo;LoadBalancer&rdquo; builds on NodePort and creates an external load-balancer
+than a virtual IP.</li>
+<li><code>NodePort</code> builds on ClusterIP and allocates a port on every node which
+routes to the same endpoints as the clusterIP.</li>
+<li><code>LoadBalancer</code> builds on NodePort and creates an external load-balancer
 (if supported in the current cloud) which routes to the same endpoints
-as the clusterIP.
-&ldquo;ExternalName&rdquo; aliases this service to the specified externalName.
-Several other fields do not apply to ExternalName services.
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a></p>
+as the clusterIP.</li>
+</ul>
+<p>More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a>.</p>
 </td>
 </tr>
 </tbody>
@@ -12945,12 +13002,14 @@ MemberUpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberUpdateStrategy, Members(Pods) update strategy.
-serial: update Members one by one that guarantee minimum component unavailable time.
-Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader
-bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
-Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader, keep majority online all the time.
-parallel: force parallel</p>
+<p>MemberUpdateStrategy, Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.
+<code>Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader</code></li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+<code>Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader</code>, keep majority online all the time.</li>
+<li>parallel: force parallel</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -13795,15 +13854,15 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
-The grace period is the duration in seconds after the processes running in the pod are sent
+<p>Optional duration in seconds the pod needs to terminate gracefully upon probe failure.</p>
+<p>The grace period is the duration in seconds after the processes running in the pod are sent
 a termination signal and the time when the processes are forcibly halted with a kill signal.
-Set this value longer than the expected cleanup time for your process.
-If this value is nil, the pod&rsquo;s terminationGracePeriodSeconds will be used. Otherwise, this
+Set this value longer than the expected cleanup time for your process.</p>
+<p>If this value is nil, the pod&rsquo;s terminationGracePeriodSeconds will be used. Otherwise, this
 value overrides the value provided by the pod spec.
 Value must be non-negative integer. The value zero indicates stop immediately via
-the kill signal (no opportunity to shut down).
-This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+the kill signal (no opportunity to shut down).</p>
+<p>This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
 Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</p>
 </td>
 </tr>
@@ -13833,11 +13892,11 @@ string
 </td>
 <td>
 <p>expression declares how the operation can be executed using go template expression.
-it should return &ldquo;true&rdquo; or &ldquo;false&rdquo;, built-in objects:</p>
+it should return <code>true</code> or <code>false</code>, built-in objects:</p>
 <ul>
-<li>&ldquo;params&rdquo; are input parameters.</li>
-<li>&ldquo;cluster&rdquo; is referenced cluster object.</li>
-<li>&ldquo;component&rdquo; is referenced the component Object.</li>
+<li><code>params</code> are input parameters.</li>
+<li><code>cluster</code> is referenced cluster object.</li>
+<li><code>component</code> is referenced the component Object.</li>
 </ul>
 </td>
 </tr>
@@ -14286,10 +14345,12 @@ string
 <td>
 <em>(Optional)</em>
 <p>ServiceName defines the name of the underlying service object.
-If not specified, the default service name with different patterns will be used:
-- CLUSTER_NAME: for cluster-level services
-- CLUSTER_NAME-COMPONENT_NAME: for component-level services
-Only one default service name is allowed.
+If not specified, the default service name with different patterns will be used:</p>
+<ul>
+<li>CLUSTER_NAME: for cluster-level services</li>
+<li>CLUSTER_NAME-COMPONENT_NAME: for component-level services</li>
+</ul>
+<p>Only one default service name is allowed.
 Cannot be updated.</p>
 </td>
 </tr>
@@ -14754,7 +14815,7 @@ string
 <td>
 <p>service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. &#123;mysql, redis, mongodb&#125;.
 The serviceKind is case-insensitive and supports abbreviations for some well-known databases.
-For example, both &lsquo;zk&rsquo; and &lsquo;zookeeper&rsquo; will be considered as a ZooKeeper cluster, and &lsquo;pg&rsquo;, &lsquo;postgres&rsquo;, &lsquo;postgresql&rsquo; will all be considered as a PostgreSQL cluster.</p>
+For example, both <code>zk</code> and <code>zookeeper</code> will be considered as a ZooKeeper cluster, and <code>pg</code>, <code>postgres</code>, <code>postgresql</code> will all be considered as a PostgreSQL cluster.</p>
 </td>
 </tr>
 <tr>
@@ -14951,14 +15012,15 @@ Kubernetes api utils intstr.IntOrString
 </td>
 <td>
 <em>(Optional)</em>
-<p>Number or name of the port to access on the pods targeted by the service.
-Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
-If this is a string, it will be looked up as a named port in the
-target Pod&rsquo;s container ports. If this is not specified, the value
-of the &lsquo;port&rsquo; field is used (an identity map).
-This field is ignored for services with clusterIP=None, and should be
-omitted or set equal to the &lsquo;port&rsquo; field.
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service">https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service</a></p>
+<p>Number or name of the port to access on the pods targeted by the service.</p>
+<p>Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</p>
+<ul>
+<li>If this is a string, it will be looked up as a named port in the target Pod&rsquo;s container ports.</li>
+<li>If this is not specified, the value of the <code>port</code> field is used (an identity map).</li>
+</ul>
+<p>This field is ignored for services with clusterIP=None, and should be
+omitted or set equal to the <code>port</code> field.</p>
+<p>More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service">https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service</a></p>
 </td>
 </tr>
 </tbody>
@@ -15011,10 +15073,10 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>When referencing a service provided by other KubeBlocks cluster, you need to provide the name of the Cluster being referenced.
-By default, when other KubeBlocks Cluster are referenced, the ClusterDefinition.spec.connectionCredential secret corresponding to the referenced Cluster will be used to bind to the current component.
-Currently, if a KubeBlocks cluster is to be referenced, the connection credential secret should include and correspond to the following fields: endpoint, port, username, and password.
-Under this referencing approach, the ServiceKind and ServiceVersion of service reference declaration defined in the ClusterDefinition will not be validated.
+<p>When referencing a service provided by other KubeBlocks cluster, you need to provide the name of the Cluster being referenced.</p>
+<p>By default, when other KubeBlocks Cluster are referenced, the ClusterDefinition.spec.connectionCredential secret corresponding to the referenced Cluster will be used to bind to the current component.
+Currently, if a KubeBlocks cluster is to be referenced, the connection credential secret should include and correspond to the following fields: endpoint, port, username, and password.</p>
+<p>Under this referencing approach, the ServiceKind and ServiceVersion of service reference declaration defined in the ClusterDefinition will not be validated.
 If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.</p>
 </td>
 </tr>
@@ -15027,12 +15089,12 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>serviceDescriptor defines the service descriptor of the service provided by external sources.
-When referencing a service provided by external sources, you need to provide the ServiceDescriptor object name to establish the service binding.
-And serviceDescriptor is the name of the ServiceDescriptor object, furthermore, the ServiceDescriptor.spec.serviceKind and ServiceDescriptor.spec.serviceVersion
-should match clusterDefinition.componentDefs[<em>].serviceRefDeclarations[</em>].serviceRefDeclarationSpecs[<em>].serviceKind
-and the regular expression defines in clusterDefinition.componentDefs[</em>].serviceRefDeclarations[<em>].serviceRefDeclarationSpecs[</em>].serviceVersion.
-If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.</p>
+<p>serviceDescriptor defines the service descriptor of the service provided by external sources.</p>
+<p>When referencing a service provided by external sources, you need to provide the ServiceDescriptor object name to establish the service binding.
+And serviceDescriptor is the name of the ServiceDescriptor object, furthermore, the <code>ServiceDescriptor.spec.serviceKind</code> and <code>ServiceDescriptor.spec.serviceVersion</code>
+should match <code>clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind</code>
+and the regular expression defines in <code>clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion</code>.</p>
+<p>If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.</p>
 </td>
 </tr>
 </tbody>
@@ -15075,10 +15137,10 @@ The specific type of service reference depends on the binding declaration when c
 </em>
 </td>
 <td>
-<p>serviceRefDeclarationSpecs is a collection of service descriptions for a service reference declaration.
-Each ServiceRefDeclarationSpec defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs are defined,
-it indicates that the ServiceRefDeclaration can be any one of the specified ServiceRefDeclarationSpecs.
-For example, when the ServiceRefDeclaration is declared to require an OLTP database, which can be either MySQL or PostgreSQL,
+<p>serviceRefDeclarationSpecs is a collection of service descriptions for a service reference declaration.</p>
+<p>Each ServiceRefDeclarationSpec defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs are defined,
+it indicates that the ServiceRefDeclaration can be any one of the specified ServiceRefDeclarationSpecs.</p>
+<p>For example, when the ServiceRefDeclaration is declared to require an OLTP database, which can be either MySQL or PostgreSQL,
 you can define a ServiceRefDeclarationSpec for MySQL and another ServiceRefDeclarationSpec for PostgreSQL,
 when referencing the service within the cluster, as long as the serviceKind and serviceVersion match either MySQL or PostgreSQL, it can be used.</p>
 </td>
@@ -15110,7 +15172,7 @@ string
 <td>
 <p>service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. &#123;mysql, redis, mongodb&#125;.
 The serviceKind is case-insensitive and supports abbreviations for some well-known databases.
-For example, both &lsquo;zk&rsquo; and &lsquo;zookeeper&rsquo; will be considered as a ZooKeeper cluster, and &lsquo;pg&rsquo;, &lsquo;postgres&rsquo;, &lsquo;postgresql&rsquo; will all be considered as a PostgreSQL cluster.</p>
+For example, both <code>zk</code> and <code>zookeeper</code> will be considered as a ZooKeeper cluster, and <code>pg</code>, <code>postgres</code>, <code>postgresql</code> will all be considered as a PostgreSQL cluster.</p>
 </td>
 </tr>
 <tr>
@@ -15327,8 +15389,9 @@ bool
 <p>GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.
 If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.
 They can be referred to by adding the PodOrdinal to the defined name template with named pattern <code>$(Vars[x].Name)_$(PodOrdinal)</code>.
-For example, a ServiceVarRef might be defined as follows:
-- name: MY_SERVICE_PORT
+For example, a ServiceVarRef might be defined as follows:</p>
+<pre><code class="language-yaml">
+name: MY_SERVICE_PORT
 valueFrom:
 serviceVarRef:
 compDef: my-component-definition
@@ -15337,7 +15400,8 @@ optional: true
 generatePodOrdinalServiceVar: true
 port:
 name: redis-sentinel
-Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,
+</code></pre>
+<p>Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,
 and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
 It should be used in conjunction with Service.GeneratePodOrdinalService.</p>
 </td>
@@ -15452,13 +15516,15 @@ int32
 </em>
 </td>
 <td>
-<p>shards indicates the number of component, and these components have the same specifications and definitions.
-It should be noted that the number of replicas for each component should be defined by template.replicas.
+<p>shards indicates the number of component, and these components have the same specifications and definitions.</p>
+<p>It should be noted that the number of replicas for each component should be defined by template.replicas.
 Moreover, the logical relationship between these components should be maintained by the components themselves,
-KubeBlocks only provides the following capabilities for managing the lifecycle of sharding:
-1. When the number of shards increases, the postProvision Action defined in the ComponentDefinition will be executed if the conditions are met.
-2. When the number of shards decreases, the preTerminate Action defined in the ComponentDefinition will be executed if the conditions are met.
-Additionally, the resources and data associated with the corresponding Component will be deleted as well.</p>
+KubeBlocks only provides the following capabilities for managing the lifecycle of sharding:</p>
+<ol>
+<li>When the number of shards increases, the postProvision Action defined in the ComponentDefinition will be executed if the conditions are met.</li>
+<li>When the number of shards decreases, the preTerminate Action defined in the ComponentDefinition will be executed if the conditions are met.
+Additionally, the resources and data associated with the corresponding Component will be deleted as well.</li>
+</ol>
 </td>
 </tr>
 </tbody>
@@ -15610,11 +15676,13 @@ UpdateStrategy
 <em>(Optional)</em>
 <p>updateStrategy, Pods update strategy.
 In case of workloadType=Consensus the update strategy will be following:</p>
-<p>serial: update Pods one by one that guarantee minimum component unavailable time.
-Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader
-bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time.
-Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader, keep majority online all the time.
-parallel: force parallel</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.
+<code>Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader</code></li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+<code>Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader</code>, keep majority online all the time.</li>
+<li>parallel: force parallel</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -15629,13 +15697,15 @@ Kubernetes apps/v1.PodManagementPolicyType
 <td>
 <em>(Optional)</em>
 <p>llPodManagementPolicy is the low-level controls how pods are created during initial scale up,
-when replacing pods on nodes, or when scaling down.
-<code>OrderedReady</code> policy specify where pods are created in increasing order (pod-0, then
+when replacing pods on nodes, or when scaling down.</p>
+<ul>
+<li><code>OrderedReady</code> policy specify where pods are created in increasing order (pod-0, then
 pod-1, etc) and the controller will wait until each pod is ready before
-continuing. When scaling down, the pods are removed in the opposite order.
-<code>Parallel</code> policy specify create pods in parallel
+continuing. When scaling down, the pods are removed in the opposite order.</li>
+<li><code>Parallel</code> policy specify create pods in parallel
 to match the desired scale without waiting, and on scale down will delete
-all pods at once.</p>
+all pods at once.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -15799,11 +15869,11 @@ string
 </em>
 </td>
 <td>
-<p>instanceName is used to specify the candidate primary or leader instanceName for switchover.
-If instanceName is set to &ldquo;<em>&rdquo;, it means that no specific primary or leader is specified for the switchover,
-and the switchoverAction defined in clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate will be executed,
-It is required that clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate is not empty.
-If instanceName is set to a valid instanceName other than &ldquo;</em>&rdquo;, it means that a specific candidate primary or leader is specified for the switchover.
+<p>instanceName is used to specify the candidate primary or leader instanceName for switchover.</p>
+<p>If instanceName is set to &ldquo;*&rdquo;, it means that no specific primary or leader is specified for the switchover,
+and the switchoverAction defined in <code>clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate</code> will be executed.</p>
+<p>It is required that <code>clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate</code> is not empty.</p>
+<p>If instanceName is set to a valid instanceName other than &ldquo;*&rdquo;, it means that a specific candidate primary or leader is specified for the switchover.
 the value of instanceName can be obtained using <code>kbcli cluster list-instances</code>, any other value is invalid.
 In this case, the <code>switchoverAction</code> defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate will be executed,
 and it is required that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate is not empty.</p>
@@ -16445,13 +16515,17 @@ it will be ignored when &ldquo;account&rdquo; is set.</p>
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Delete&#34;</p></td>
-<td></td>
+<td><p>Delete is based on Halt and deletes PVCs.</p>
+</td>
 </tr><tr><td><p>&#34;DoNotTerminate&#34;</p></td>
-<td></td>
+<td><p>DoNotTerminate will block delete operation.</p>
+</td>
 </tr><tr><td><p>&#34;Halt&#34;</p></td>
-<td></td>
+<td><p>Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.</p>
+</td>
 </tr><tr><td><p>&#34;WipeOut&#34;</p></td>
-<td></td>
+<td><p>WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ToolConfig">ToolConfig
@@ -17486,13 +17560,15 @@ Kubernetes apps/v1.PodManagementPolicyType
 <td>
 <em>(Optional)</em>
 <p>podManagementPolicy controls how pods are created during initial scale up,
-when replacing pods on nodes, or when scaling down. The default policy is
-<code>OrderedReady</code>, where pods are created in increasing order (pod-0, then
+when replacing pods on nodes, or when scaling down.</p>
+<ul>
+<li>The default policy is <code>OrderedReady</code>, where pods are created in increasing order (pod-0, then
 pod-1, etc) and the controller will wait until each pod is ready before
-continuing. When scaling down, the pods are removed in the opposite order.
-The alternative policy is <code>Parallel</code> which will create pods in parallel
+continuing. When scaling down, the pods are removed in the opposite order.</li>
+<li>The alternative policy is <code>Parallel</code> which will create pods in parallel
 to match the desired scale without waiting, and on scale down will delete
-all pods at once.</p>
+all pods at once.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -17564,12 +17640,14 @@ MemberUpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberUpdateStrategy, Members(Pods) update strategy.
-serial: update Members one by one that guarantee minimum component unavailable time.
-Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader
-bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
-Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader, keep majority online all the time.
-parallel: force parallel</p>
+<p>MemberUpdateStrategy, Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.
+<code>Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader</code></li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+<code>Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader</code>, keep majority online all the time.</li>
+<li>parallel: force parallel</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -18278,13 +18356,15 @@ Kubernetes apps/v1.PodManagementPolicyType
 <td>
 <em>(Optional)</em>
 <p>podManagementPolicy controls how pods are created during initial scale up,
-when replacing pods on nodes, or when scaling down. The default policy is
-<code>OrderedReady</code>, where pods are created in increasing order (pod-0, then
+when replacing pods on nodes, or when scaling down.</p>
+<ul>
+<li>The default policy is <code>OrderedReady</code>, where pods are created in increasing order (pod-0, then
 pod-1, etc) and the controller will wait until each pod is ready before
-continuing. When scaling down, the pods are removed in the opposite order.
-The alternative policy is <code>Parallel</code> which will create pods in parallel
+continuing. When scaling down, the pods are removed in the opposite order.</li>
+<li>The alternative policy is <code>Parallel</code> which will create pods in parallel
 to match the desired scale without waiting, and on scale down will delete
-all pods at once.</p>
+all pods at once.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -18356,12 +18436,14 @@ MemberUpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberUpdateStrategy, Members(Pods) update strategy.
-serial: update Members one by one that guarantee minimum component unavailable time.
-Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader
-bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
-Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader, keep majority online all the time.
-parallel: force parallel</p>
+<p>MemberUpdateStrategy, Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.
+<code>Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader</code></li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+<code>Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader</code>, keep majority online all the time.</li>
+<li>parallel: force parallel</li>
+</ul>
 </td>
 </tr>
 <tr>

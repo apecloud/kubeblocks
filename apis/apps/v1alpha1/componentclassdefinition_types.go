@@ -35,9 +35,12 @@ type ComponentClassGroup struct {
 	// definition will be generated through rendering the template.
 	//
 	// For example:
-	//	template: |
-	//	  cpu: "{{ or .cpu 1 }}"
-	//	  memory: "{{ or .memory 4 }}Gi"
+	//
+	// ```yaml
+	// template: |
+	//	 cpu: "{{ or .cpu 1 }}"
+	//	 memory: "{{ or .memory 4 }}Gi"
+	// ```
 	//
 	// +optional
 	Template string `json:"template,omitempty"`

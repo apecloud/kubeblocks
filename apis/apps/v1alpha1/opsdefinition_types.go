@@ -155,11 +155,11 @@ type PreCondition struct {
 
 type Rule struct {
 	// expression declares how the operation can be executed using go template expression.
-	// it should return "true" or "false", built-in objects:
+	// it should return `true` or `false`, built-in objects:
 	//
-	// - "params" are input parameters.
-	// - "cluster" is referenced cluster object.
-	// - "component" is referenced the component Object.
+	// - `params` are input parameters.
+	// - `cluster` is referenced cluster object.
+	// - `component` is referenced the component Object.
 	//
 	// +kubebuilder:validation:Required
 	Expression string `json:"expression"`
@@ -193,7 +193,7 @@ type OpsDefinitionStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Phase valid values are ``, `Available`, 'Unavailable`.
+	// Phase valid values are ``, `Available`, `Unavailable`.
 	// Available is OpsDefinition become available, and can be used for co-related objects.
 	// +optional
 	Phase Phase `json:"phase,omitempty"`

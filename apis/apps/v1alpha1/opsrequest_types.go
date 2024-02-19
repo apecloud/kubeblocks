@@ -33,8 +33,9 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
 
-	// cancel defines the action to cancel the Pending/Creating/Running opsRequest, supported types: [VerticalScaling, HorizontalScaling].
+	// cancel defines the action to cancel the `Pending/Creating/Running` opsRequest, supported types: `VerticalScaling/HorizontalScaling`.
 	// once cancel is set to true, this opsRequest will be canceled and modifying this property again will not take effect.
+	//
 	// +optional
 	Cancel bool `json:"cancel,omitempty"`
 
@@ -166,13 +167,17 @@ type Switchover struct {
 	ComponentOps `json:",inline"`
 
 	// instanceName is used to specify the candidate primary or leader instanceName for switchover.
+	//
 	// If instanceName is set to "*", it means that no specific primary or leader is specified for the switchover,
-	// and the switchoverAction defined in clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate will be executed,
-	// It is required that clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate is not empty.
+	// and the switchoverAction defined in `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate` will be executed.
+	//
+	// It is required that `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate` is not empty.
+	//
 	// If instanceName is set to a valid instanceName other than "*", it means that a specific candidate primary or leader is specified for the switchover.
 	// the value of instanceName can be obtained using `kbcli cluster list-instances`, any other value is invalid.
 	// In this case, the `switchoverAction` defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate will be executed,
 	// and it is required that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate is not empty.
+	//
 	// +kubebuilder:validation:Required
 	InstanceName string `json:"instanceName"`
 }
@@ -239,10 +244,12 @@ type HorizontalScaling struct {
 	// Instances defines the name of instance that rsm scale down priorly.
 	// If the RsmTransformPolicy is specified as ToPod and expected replicas is less than current replicas, the list of
 	// Instances will be used.
-	// current replicas - expected replicas > len(Instances): Scale down from the list of Instances priorly, the others
-	//	will select from NodeAssignment.
-	// current replicas - expected replicas < len(Instances): Scale down from the list of Instances.
-	// current replicas - expected replicas < len(Instances): Scale down from a part of Instances.
+	//
+	// - `current replicas - expected replicas > len(Instances)`: Scale down from the list of Instances priorly, the others
+	//	 will select from NodeAssignment.
+	// - `current replicas - expected replicas < len(Instances)`: Scale down from the list of Instances.
+	// - `current replicas - expected replicas < len(Instances)`: Scale down from a part of Instances.
+	//
 	// +optional
 	Instances []string `json:"instances,omitempty"`
 }
@@ -395,31 +402,36 @@ type OpsService struct {
 	RoleSelector string `json:"roleSelector,omitempty"`
 
 	// Route service traffic to pods with label keys and values matching this
-	// selector. If empty or not present, the service is assumed to have an
+	// selector.
+	//
+	// If empty or not present, the service is assumed to have an
 	// external process managing its endpoints, which Kubernetes will not
 	// modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
 	// Ignored if type is ExternalName.
+	//
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/
+	//
 	// +optional
 	// +mapType=atomic
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
 	// type determines how the Service is exposed. Defaults to ClusterIP. Valid
 	// options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
-	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
-	// to endpoints. Endpoints are determined by the selector or if that is not
-	// specified, by manual construction of an Endpoints object or
-	// EndpointSlice objects. If clusterIP is "None", no virtual IP is
-	// allocated and the endpoints are published as a set of endpoints rather
-	// than a virtual IP.
-	// "NodePort" builds on ClusterIP and allocates a port on every node which
-	// routes to the same endpoints as the clusterIP.
-	// "LoadBalancer" builds on NodePort and creates an external load-balancer
-	// (if supported in the current cloud) which routes to the same endpoints
-	// as the clusterIP.
-	// "ExternalName" aliases this service to the specified externalName.
-	// Several other fields do not apply to ExternalName services.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+	//
+	// - `ClusterIP` allocates a cluster-internal IP address for load-balancing
+	//   to endpoints. Endpoints are determined by the selector or if that is not
+	//   specified, they are determined by manual construction of an Endpoints object or
+	//   EndpointSlice objects. If clusterIP is "None", no virtual IP is
+	//   allocated and the endpoints are published as a set of endpoints rather
+	//   than a virtual IP.
+	// - `NodePort` builds on ClusterIP and allocates a port on every node which
+	//   routes to the same endpoints as the clusterIP.
+	// - `LoadBalancer` builds on NodePort and creates an external load-balancer
+	//   (if supported in the current cloud) which routes to the same endpoints
+	//   as the clusterIP.
+	//
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.
+	//
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 }
@@ -504,9 +516,11 @@ type BackupSpec struct {
 
 	// deletionPolicy determines whether the backup contents stored in backup repository
 	// should be deleted when the backup custom resource is deleted.
-	// Supported values are "Retain" and "Delete".
-	// "Retain" means that the backup content and its physical snapshot on backup repository are kept.
-	// "Delete" means that the backup content and its physical snapshot on backup repository are deleted.
+	// Supported values are `Retain` and `Delete`.
+	//
+	// - `Retain` means that the backup content and its physical snapshot on backup repository are kept.
+	// - `Delete` means that the backup content and its physical snapshot on backup repository are deleted.
+	//
 	// +kubebuilder:validation:Enum=Delete;Retain
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Delete

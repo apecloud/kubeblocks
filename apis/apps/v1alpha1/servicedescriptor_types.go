@@ -28,7 +28,8 @@ import (
 type ServiceDescriptorSpec struct {
 	// service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. {mysql, redis, mongodb}.
 	// The serviceKind is case-insensitive and supports abbreviations for some well-known databases.
-	// For example, both 'zk' and 'zookeeper' will be considered as a ZooKeeper cluster, and 'pg', 'postgres', 'postgresql' will all be considered as a PostgreSQL cluster.
+	// For example, both `zk` and `zookeeper` will be considered as a ZooKeeper cluster, and `pg`, `postgres`, `postgresql` will all be considered as a PostgreSQL cluster.
+	//
 	// +kubebuilder:validation:Required
 	ServiceKind string `json:"serviceKind"`
 
@@ -116,7 +117,7 @@ type ServiceDescriptor struct {
 	Status ServiceDescriptorStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ServiceDescriptorList contains a list of ServiceDescriptor
 type ServiceDescriptorList struct {

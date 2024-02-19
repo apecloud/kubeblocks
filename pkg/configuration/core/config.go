@@ -334,15 +334,23 @@ func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *ap
 
 	var trimPrefix = NestedPrefixField(formatConfig)
 	var applyAllSections = isIniCfgAndSupportMultiSection(formatConfig)
+	var section = getIniSection(formatConfig)
 
 	r := make([]VisualizedParam, 0)
-	r = append(r, generateUpdateParam(configPatch.UpdateConfig, trimPrefix, sets, applyAllSections)...)
-	r = append(r, generateUpdateKeyParam(configPatch.AddConfig, trimPrefix, AddedType, sets, applyAllSections)...)
-	r = append(r, generateUpdateKeyParam(configPatch.DeleteConfig, trimPrefix, DeletedType, sets, applyAllSections)...)
+	r = append(r, generateUpdateParam(configPatch.UpdateConfig, trimPrefix, sets, applyAllSections, section)...)
+	r = append(r, generateUpdateKeyParam(configPatch.AddConfig, trimPrefix, AddedType, sets, applyAllSections, section)...)
+	r = append(r, generateUpdateKeyParam(configPatch.DeleteConfig, trimPrefix, DeletedType, sets, applyAllSections, section)...)
 	return r
 }
 
-func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, sets *set.LinkedHashSetString, applyAllSections bool) []VisualizedParam {
+func getIniSection(config *appsv1alpha1.FormatterConfig) string {
+	if config != nil && config.IniConfig != nil {
+		return config.IniConfig.SectionName
+	}
+	return ""
+}
+
+func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, sets *set.LinkedHashSetString, applyAllSections bool, defaultSection string) []VisualizedParam {
 	r := make([]VisualizedParam, 0, len(updatedParams))
 
 	for key, b := range updatedParams {
@@ -354,7 +362,7 @@ func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, set
 		if err := json.Unmarshal(b, &v); err != nil {
 			return nil
 		}
-		if params := checkAndFlattenMap(v, trimPrefix, applyAllSections); params != nil {
+		if params := checkAndFlattenMap(v, trimPrefix, applyAllSections, defaultSection); params != nil {
 			r = append(r, VisualizedParam{
 				Key:        key,
 				Parameters: params,
@@ -365,18 +373,18 @@ func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, set
 	return r
 }
 
-func checkAndFlattenMap(v any, trim string, applyAllSections bool) []ParameterPair {
+func checkAndFlattenMap(v any, trim string, applyAllSections bool, defaultSection string) []ParameterPair {
 	m := cast.ToStringMap(v)
 	if m != nil && trim != "" {
 		m = cast.ToStringMap(m[trim])
 	}
 	if m != nil {
-		return flattenMap(m, "", applyAllSections)
+		return flattenMap(m, "", applyAllSections, defaultSection)
 	}
 	return nil
 }
 
-func flattenMap(m map[string]interface{}, prefix string, applyAllSections bool) []ParameterPair {
+func flattenMap(m map[string]interface{}, prefix string, applyAllSections bool, defaultSection string) []ParameterPair {
 	if prefix != "" {
 		prefix += unstructured.DelimiterDot
 	}
@@ -386,10 +394,10 @@ func flattenMap(m map[string]interface{}, prefix string, applyAllSections bool) 
 		fullKey := prefix + k
 		switch m2 := val.(type) {
 		case map[string]interface{}:
-			r = append(r, flattenMap(m2, fullKey, applyAllSections)...)
+			r = append(r, flattenMap(m2, fullKey, applyAllSections, defaultSection)...)
 		case []interface{}:
 			r = append(r, ParameterPair{
-				Key:   transArrayFieldName(trimPrimaryKeyName(fullKey, applyAllSections)),
+				Key:   transArrayFieldName(trimPrimaryKeyName(fullKey, applyAllSections, defaultSection)),
 				Value: util.ToPointer(transJSONString(val)),
 			})
 		default:
@@ -398,7 +406,7 @@ func flattenMap(m map[string]interface{}, prefix string, applyAllSections bool) 
 				v = util.ToPointer(cast.ToString(val))
 			}
 			r = append(r, ParameterPair{
-				Key:   trimPrimaryKeyName(fullKey, applyAllSections),
+				Key:   trimPrimaryKeyName(fullKey, applyAllSections, defaultSection),
 				Value: v,
 			})
 		}
@@ -406,16 +414,19 @@ func flattenMap(m map[string]interface{}, prefix string, applyAllSections bool) 
 	return r
 }
 
-func trimPrimaryKeyName(key string, section bool) string {
-	if !section {
+func trimPrimaryKeyName(key string, applyAllSections bool, defaultSection string) string {
+	if !applyAllSections || defaultSection == "" {
 		return key
 	}
 
 	pos := strings.Index(key, ".")
-	if pos < 0 {
+	switch {
+	case pos < 0:
 		return key
-	} else {
+	case key[:pos] == defaultSection:
 		return key[pos+1:]
+	default:
+		return key
 	}
 }
 
@@ -424,14 +435,15 @@ func generateUpdateKeyParam(
 	trimPrefix string,
 	updatedType ParameterUpdateType,
 	sets *set.LinkedHashSetString,
-	applyAllSections bool) []VisualizedParam {
+	applyAllSections bool,
+	defaultSection string) []VisualizedParam {
 	r := make([]VisualizedParam, 0, len(files))
 
 	for key, params := range files {
 		if sets != nil && sets.Length() > 0 && !sets.InArray(key) {
 			continue
 		}
-		if params := checkAndFlattenMap(params, trimPrefix, applyAllSections); params != nil {
+		if params := checkAndFlattenMap(params, trimPrefix, applyAllSections, defaultSection); params != nil {
 			r = append(r, VisualizedParam{
 				Key:        key,
 				Parameters: params,

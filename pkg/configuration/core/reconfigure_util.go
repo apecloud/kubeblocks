@@ -107,7 +107,7 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 		return true, nil
 	}
 	// for ini format, if support multi-section, trim section name
-	updatedParamsSet := util.NewSet(trimIniSectionName(updatedParams, isIniCfgAndSupportMultiSection(cc.FormatterConfig))...)
+	updatedParamsSet := util.NewSet(trimIniSectionName(updatedParams, isIniCfgAndSupportMultiSection(cc.FormatterConfig), getIniSection(cc.FormatterConfig))...)
 
 	// if ConfigConstraint has StaticParameters, check updated parameter
 	if len(cc.StaticParameters) > 0 {
@@ -134,14 +134,14 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	return false, nil
 }
 
-func trimIniSectionName(updatedParams []string, supportIncMultiSection bool) []string {
-	if !supportIncMultiSection {
+func trimIniSectionName(updatedParams []string, supportIncMultiSection bool, defaultSection string) []string {
+	if !supportIncMultiSection || defaultSection == "" {
 		return updatedParams
 	}
 
 	trimFields := make([]string, len(updatedParams))
 	for i, param := range updatedParams {
-		trimFields[i] = trimPrimaryKeyName(param, true)
+		trimFields[i] = trimPrimaryKeyName(param, true, defaultSection)
 	}
 	return trimFields
 }

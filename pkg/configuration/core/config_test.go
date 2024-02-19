@@ -307,10 +307,10 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 					Key:   "delete_params",
 					Value: nil,
 				}, {
-					Key:   "default-character-set",
+					Key:   "mysql.default-character-set",
 					Value: util.ToPointer("utf8mb4"),
 				}, {
-					Key:   "port",
+					Key:   "client.port",
 					Value: util.ToPointer("3306"),
 				}},
 		}},

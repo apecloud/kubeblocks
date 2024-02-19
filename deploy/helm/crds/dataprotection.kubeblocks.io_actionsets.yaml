@@ -280,13 +280,13 @@ spec:
                   - Differential
                   - Continuous
                 default: Full
-                description: 'backupType specifies the backup type, supported values:
-                  Full, Continuous. Full means full backup. Incremental means back
-                  up data that have changed since the last backup (full or incremental).
-                  Differential means back up data that have changed since the last
-                  full backup. Continuous will back up the transaction log continuously,
-                  the PITR (Point in Time Recovery). can be performed based on the
-                  continuous backup and full backup.'
+                description: "backupType specifies the backup type, supported values:
+                  \n - `Full` means full backup. - `Incremental` means back up data
+                  that have changed since the last backup (full or incremental). -
+                  `Differential` means back up data that have changed since the last
+                  full backup. - `Continuous` will back up the transaction log continuously,
+                  the PITR (Point in Time Recovery) can be performed based on the
+                  continuous backup and full backup."
                 type: string
               env:
                 description: List of environment variables to set in the container.

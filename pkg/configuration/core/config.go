@@ -22,6 +22,7 @@ package core
 import (
 	"encoding/json"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/StudioSol/set"
@@ -233,7 +234,12 @@ func WithFormatterConfig(formatConfig *appsv1alpha1.FormatterConfig) Option {
 	return func(ctx *CfgOpOption) {
 		if formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
 			ctx.IniContext = &IniContext{
-				SectionName: formatConfig.IniConfig.SectionName,
+				SectionName:              formatConfig.IniConfig.SectionName,
+				ParametersInSectionAsMap: formatConfig.IniConfig.ParametersInSectionAsMap,
+				ApplyAllSection:          false,
+			}
+			if formatConfig.IniConfig.ApplyAllSection != nil {
+				ctx.IniContext.ApplyAllSection = *formatConfig.IniConfig.ApplyAllSection
 			}
 		}
 	}
@@ -241,7 +247,9 @@ func WithFormatterConfig(formatConfig *appsv1alpha1.FormatterConfig) Option {
 
 func NestedPrefixField(formatConfig *appsv1alpha1.FormatterConfig) string {
 	if formatConfig != nil && formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
-		return formatConfig.IniConfig.SectionName
+		if !formatConfig.IniConfig.IsSupportMultiSection() {
+			return formatConfig.IniConfig.SectionName
+		}
 	}
 	return ""
 }
@@ -276,7 +284,7 @@ func (c *cfgWrapper) queryAllCfg(jsonpath string, option CfgOpOption) ([]byte, e
 	return util.RetrievalWithJSONPath(tops, jsonpath)
 }
 
-func (c cfgWrapper) getConfigObject(option CfgOpOption) unstructured.ConfigObject {
+func (c *cfgWrapper) getConfigObject(option CfgOpOption) unstructured.ConfigObject {
 	if len(c.v) == 0 {
 		return nil
 	}
@@ -289,11 +297,26 @@ func (c cfgWrapper) getConfigObject(option CfgOpOption) unstructured.ConfigObjec
 }
 
 func (c *cfgWrapper) generateKey(paramKey string, option CfgOpOption) string {
-	if option.IniContext != nil && len(option.IniContext.SectionName) > 0 {
-		return strings.Join([]string{option.IniContext.SectionName, paramKey}, unstructured.DelimiterDot)
+	if option.IniContext != nil {
+		// support special section, e.g: mysql.default-character-set
+		if strings.Index(paramKey, unstructured.DelimiterDot) > 0 {
+			return paramKey
+		}
+		sectionName := fromIniConfig(paramKey, option.IniContext)
+		if sectionName != "" {
+			return strings.Join([]string{sectionName, paramKey}, unstructured.DelimiterDot)
+		}
 	}
-
 	return paramKey
+}
+
+func fromIniConfig(paramKey string, iniContext *IniContext) string {
+	for s, params := range iniContext.ParametersInSectionAsMap {
+		if slices.Contains(params, paramKey) {
+			return s
+		}
+	}
+	return iniContext.SectionName
 }
 
 func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
@@ -310,15 +333,16 @@ func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *ap
 	}
 
 	var trimPrefix = NestedPrefixField(formatConfig)
+	var applyAllSections = isIniCfgAndSupportMultiSection(formatConfig)
 
 	r := make([]VisualizedParam, 0)
-	r = append(r, generateUpdateParam(configPatch.UpdateConfig, trimPrefix, sets)...)
-	r = append(r, generateUpdateKeyParam(configPatch.AddConfig, trimPrefix, AddedType, sets)...)
-	r = append(r, generateUpdateKeyParam(configPatch.DeleteConfig, trimPrefix, DeletedType, sets)...)
+	r = append(r, generateUpdateParam(configPatch.UpdateConfig, trimPrefix, sets, applyAllSections)...)
+	r = append(r, generateUpdateKeyParam(configPatch.AddConfig, trimPrefix, AddedType, sets, applyAllSections)...)
+	r = append(r, generateUpdateKeyParam(configPatch.DeleteConfig, trimPrefix, DeletedType, sets, applyAllSections)...)
 	return r
 }
 
-func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, sets *set.LinkedHashSetString) []VisualizedParam {
+func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, sets *set.LinkedHashSetString, applyAllSections bool) []VisualizedParam {
 	r := make([]VisualizedParam, 0, len(updatedParams))
 
 	for key, b := range updatedParams {
@@ -330,7 +354,7 @@ func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, set
 		if err := json.Unmarshal(b, &v); err != nil {
 			return nil
 		}
-		if params := checkAndFlattenMap(v, trimPrefix); params != nil {
+		if params := checkAndFlattenMap(v, trimPrefix, applyAllSections); params != nil {
 			r = append(r, VisualizedParam{
 				Key:        key,
 				Parameters: params,
@@ -341,18 +365,18 @@ func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, set
 	return r
 }
 
-func checkAndFlattenMap(v any, trim string) []ParameterPair {
+func checkAndFlattenMap(v any, trim string, applyAllSections bool) []ParameterPair {
 	m := cast.ToStringMap(v)
 	if m != nil && trim != "" {
 		m = cast.ToStringMap(m[trim])
 	}
 	if m != nil {
-		return flattenMap(m, "")
+		return flattenMap(m, "", applyAllSections)
 	}
 	return nil
 }
 
-func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
+func flattenMap(m map[string]interface{}, prefix string, applyAllSections bool) []ParameterPair {
 	if prefix != "" {
 		prefix += unstructured.DelimiterDot
 	}
@@ -362,10 +386,10 @@ func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
 		fullKey := prefix + k
 		switch m2 := val.(type) {
 		case map[string]interface{}:
-			r = append(r, flattenMap(m2, fullKey)...)
+			r = append(r, flattenMap(m2, fullKey, applyAllSections)...)
 		case []interface{}:
 			r = append(r, ParameterPair{
-				Key:   transArrayFieldName(fullKey),
+				Key:   transArrayFieldName(trimPrimaryKeyName(fullKey, applyAllSections)),
 				Value: util.ToPointer(transJSONString(val)),
 			})
 		default:
@@ -374,7 +398,7 @@ func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
 				v = util.ToPointer(cast.ToString(val))
 			}
 			r = append(r, ParameterPair{
-				Key:   fullKey,
+				Key:   trimPrimaryKeyName(fullKey, applyAllSections),
 				Value: v,
 			})
 		}
@@ -382,14 +406,32 @@ func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
 	return r
 }
 
-func generateUpdateKeyParam(files map[string]interface{}, trimPrefix string, updatedType ParameterUpdateType, sets *set.LinkedHashSetString) []VisualizedParam {
+func trimPrimaryKeyName(key string, section bool) string {
+	if !section {
+		return key
+	}
+
+	pos := strings.Index(key, ".")
+	if pos < 0 {
+		return key
+	} else {
+		return key[pos+1:]
+	}
+}
+
+func generateUpdateKeyParam(
+	files map[string]interface{},
+	trimPrefix string,
+	updatedType ParameterUpdateType,
+	sets *set.LinkedHashSetString,
+	applyAllSections bool) []VisualizedParam {
 	r := make([]VisualizedParam, 0, len(files))
 
 	for key, params := range files {
 		if sets != nil && sets.Length() > 0 && !sets.InArray(key) {
 			continue
 		}
-		if params := checkAndFlattenMap(params, trimPrefix); params != nil {
+		if params := checkAndFlattenMap(params, trimPrefix, applyAllSections); params != nil {
 			r = append(r, VisualizedParam{
 				Key:        key,
 				Parameters: params,

@@ -106,7 +106,8 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	if len(updatedParams) == 0 {
 		return true, nil
 	}
-	updatedParamsSet := util.NewSet(updatedParams...)
+	// for ini format, if support multi-section, trim section name
+	updatedParamsSet := util.NewSet(trimIniSectionName(updatedParams, isIniCfgAndSupportMultiSection(cc.FormatterConfig))...)
 
 	// if ConfigConstraint has StaticParameters, check updated parameter
 	if len(cc.StaticParameters) > 0 {
@@ -131,6 +132,22 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	// if the updated parameter is not in list of DynamicParameter,
 	// it is StaticParameter by default, and restart is the default behavior.
 	return false, nil
+}
+
+func trimIniSectionName(updatedParams []string, supportIncMultiSection bool) []string {
+	if !supportIncMultiSection {
+		return updatedParams
+	}
+
+	trimFields := make([]string, len(updatedParams))
+	for i, param := range updatedParams {
+		trimFields[i] = trimPrimaryKeyName(param, true)
+	}
+	return trimFields
+}
+
+func isIniCfgAndSupportMultiSection(config *appsv1alpha1.FormatterConfig) bool {
+	return config != nil && config.IniConfig != nil && config.IniConfig.IsSupportMultiSection()
 }
 
 // IsParametersUpdateFromManager checks if the parameters are updated from manager

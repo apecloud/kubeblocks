@@ -49,6 +49,9 @@ type RawConfig struct {
 
 type IniContext struct {
 	SectionName string
+
+	ApplyAllSection          bool
+	ParametersInSectionAsMap map[string][]string
 }
 
 // XMLContext TODO(zt) Support Xml config

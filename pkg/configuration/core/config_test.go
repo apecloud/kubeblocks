@@ -158,9 +158,10 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 	}
 
 	var (
-		testJSON          any
-		fileUpdatedParams = []byte(`{"mysqld": { "max_connections": "666", "read_buffer_size": "55288" }}`)
-		testUpdatedParams = []byte(`{"mysqld": { "max_connections": "666", "read_buffer_size": "55288", "delete_params": null }}`)
+		testJSON           any
+		fileUpdatedParams  = []byte(`{"mysqld": { "max_connections": "666", "read_buffer_size": "55288" }}`)
+		testUpdatedParams  = []byte(`{"mysqld": { "max_connections": "666", "read_buffer_size": "55288", "delete_params": null }}`)
+		testUpdatedParams2 = []byte(`{"mysqld": { "max_connections": "666", "read_buffer_size": "55288", "delete_params": null }, "mysql": { "default-character-set": "utf8mb4"}, "client": { "port": "3306"}}`)
 	)
 
 	require.Nil(t, json.Unmarshal(fileUpdatedParams, &testJSON))
@@ -276,6 +277,69 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				}, {
 					Key:   "read_buffer_size",
 					Value: util.ToPointer("55288"),
+				}},
+		}},
+	}, {
+		name: "visualizedUpdatedMultiParamsTest",
+		args: args{
+			configPatch: &ConfigPatchInfo{
+				IsModify:     true,
+				UpdateConfig: map[string][]byte{"key": testUpdatedParams2}},
+			formatConfig: &appsv1alpha1.FormatterConfig{
+				Format: appsv1alpha1.Ini,
+				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
+					SectionName:     "mysqld",
+					ApplyAllSection: util.ToPointer(true),
+				}},
+			},
+		},
+		want: []VisualizedParam{{
+			Key:        "key",
+			UpdateType: UpdatedType,
+			Parameters: []ParameterPair{
+				{
+					Key:   "max_connections",
+					Value: util.ToPointer("666"),
+				}, {
+					Key:   "read_buffer_size",
+					Value: util.ToPointer("55288"),
+				}, {
+					Key:   "delete_params",
+					Value: nil,
+				}, {
+					Key:   "default-character-set",
+					Value: util.ToPointer("utf8mb4"),
+				}, {
+					Key:   "port",
+					Value: util.ToPointer("3306"),
+				}},
+		}},
+	}, {
+		name: "visualizedUpdatedMultiParamsTest",
+		args: args{
+			configPatch: &ConfigPatchInfo{
+				IsModify:     true,
+				UpdateConfig: map[string][]byte{"key": testUpdatedParams2}},
+			formatConfig: &appsv1alpha1.FormatterConfig{
+				Format: appsv1alpha1.Ini,
+				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
+					SectionName: "mysqld",
+				}},
+			},
+		},
+		want: []VisualizedParam{{
+			Key:        "key",
+			UpdateType: UpdatedType,
+			Parameters: []ParameterPair{
+				{
+					Key:   "max_connections",
+					Value: util.ToPointer("666"),
+				}, {
+					Key:   "read_buffer_size",
+					Value: util.ToPointer("55288"),
+				}, {
+					Key:   "delete_params",
+					Value: nil,
 				}},
 		}},
 	}}

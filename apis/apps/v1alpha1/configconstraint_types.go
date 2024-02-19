@@ -277,6 +277,15 @@ type IniConfig struct {
 	// sectionName describes ini section.
 	// +optional
 	SectionName string `json:"sectionName,omitempty"`
+
+	// applyAllSection determines whether to support multiple sections in the ini file.
+	// if set to true, all sections parameter can be updated, e.g: client.default_character_set=utf8mb4
+	// +optional
+	ApplyAllSection *bool `json:"applyAllSection,omitempty"`
+
+	// parametersInSection is a map of section name to parameters.
+	// +optional
+	ParametersInSectionAsMap map[string][]string `json:"parametersInSection,omitempty"`
 }
 
 // +genclient
@@ -308,4 +317,11 @@ type ConfigConstraintList struct {
 
 func init() {
 	SchemeBuilder.Register(&ConfigConstraint{}, &ConfigConstraintList{})
+}
+
+func (in *IniConfig) IsSupportMultiSection() bool {
+	if in.ApplyAllSection == nil {
+		return false
+	}
+	return *in.ApplyAllSection
 }

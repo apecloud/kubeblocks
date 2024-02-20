@@ -3534,7 +3534,6 @@ string
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>backup method name to use, that is defined in backupPolicy.</p>
 </td>
 </tr>

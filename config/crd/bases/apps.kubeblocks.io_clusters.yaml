@@ -147,6 +147,8 @@ spec:
                     maximum: 1440
                     minimum: 0
                     type: integer
+                required:
+                - method
                 type: object
               clusterDefinitionRef:
                 description: Cluster referencing ClusterDefinition name. This is an

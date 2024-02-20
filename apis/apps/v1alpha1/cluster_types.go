@@ -154,7 +154,7 @@ type ClusterBackup struct {
 	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
 
 	// backup method name to use, that is defined in backupPolicy.
-	// +optional
+	// +kubebuilder:validation:Required
 	Method string `json:"method"`
 
 	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.

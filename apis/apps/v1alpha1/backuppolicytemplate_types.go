@@ -22,51 +22,54 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
-// BackupPolicyTemplateSpec defines the desired state of a BackupPolicyTemplate.
+// BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
 type BackupPolicyTemplateSpec struct {
-	// Specifies a reference to the ClusterDefinition name. This is an immutable attribute.
+	// clusterDefinitionRef references ClusterDefinition name, this is an immutable attribute.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
-	// Represents a list of backup policy templates for the specified ComponentDefinition.
+	// backupPolicies is a list of backup policy template for the specified componentDefinition.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	BackupPolicies []BackupPolicy `json:"backupPolicies"`
 
-	// A unique identifier for this BackupPolicyTemplate.
-	// This identifier will be used as the suffix of the automatically generated backupPolicy name.
-	// It must be added when multiple BackupPolicyTemplates exist to prevent the generated backupPolicy from being overridden.
+	// Identifier is a unique identifier for this BackupPolicyTemplate.
+	// this identifier will be the suffix of the automatically generated backupPolicy name.
+	// and must be added when multiple BackupPolicyTemplates exist,
+	// otherwise the generated backupPolicy override will occur.
 	// +optional
 	// +kubebuilder:validation:MaxLength=20
 	Identifier string `json:"identifier,omitempty"`
 }
 
 type BackupPolicy struct {
-	// References a componentDef defined in the ClusterDefinition spec. Must comply with the IANA Service Naming rule.
+	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
+	// comply with IANA Service Naming rule.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
-	// References to componentDefinitions. Must comply with the IANA Service Naming rule.
+	// componentDef references componentDefinition. Need to
+	// comply with IANA Service Naming rule.
 	// +optional
 	ComponentDefs []string `json:"componentDefs,omitempty"`
 
-	// The instance pod to be backed up.
+	// target instance for backup.
 	// +optional
 	Target TargetInstance `json:"target"`
 
-	// The policies for scheduling backups.
+	// schedule policy for backup.
 	// +optional
 	Schedules []SchedulePolicy `json:"schedules,omitempty"`
 
-	// The methods used for backups.
+	// backupMethods defines the backup methods.
 	// +kubebuilder:validation:Required
 	BackupMethods []BackupMethod `json:"backupMethods"`
 
-	// Specifies the number of retries before marking the backup as failed.
+	// Specifies the number of retries before marking the backup failed.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=10
@@ -76,68 +79,69 @@ type BackupPolicy struct {
 type BackupMethod struct {
 	dpv1alpha1.BackupMethod `json:",inline"`
 
-	// The instance to be backed up.
+	// target instance for backup.
 	// +optional
 	Target *TargetInstance `json:"target"`
 
-	// Defines the mapping of cluster variables to environment variable keys.
+	// envMapping defines the variables of cluster mapped to env values' keys.
 	// +optional
 	EnvMapping []EnvMappingVar `json:"envMapping,omitempty"`
 }
 
 type EnvMappingVar struct {
-	// The environment variable key that needs to be mapped.
+	// env key which needs to mapping.
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 
-	// Defines the source of the environment variable value.
+	// valueFrom defines source of the env value.
 	// +kubebuilder:validation:Required
 	ValueFrom ValueFrom `json:"valueFrom"`
 }
 
 type ValueFrom struct {
-	// Maps ClusterVersionRef to environment value.
+	// mapped ClusterVersionRef to env value.
 	// +optional
 	ClusterVersionRef []ValueMapping `json:"clusterVersionRef,omitempty"`
 
-	// Maps ComponentDefinition to environment value.
+	// mapped ComponentDefinition to env value.
 	// +optional
 	ComponentDef []ValueMapping `json:"componentDef,omitempty"`
 }
 
 type ValueMapping struct {
-	// An array of ClusterVersion names that can be mapped to the environment value.
+	// the array of ClusterVersion name which can be mapped to the env value.
 	// +kubebuilder:validation:Required
 	Names []string `json:"names"`
 
-	// The mapping value for the specified ClusterVersion names.
+	// mapping value for the specified ClusterVersion names.
 	// +kubebuilder:validation:Required
 	MappingValue string `json:"mappingValue"`
 }
 
 type SchedulePolicy struct {
-	// Specifies whether the backup schedule is enabled or not.
+	// enabled specifies whether the backup schedule is enabled or not.
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Specifies the backup method name that is defined in backupPolicy.
+	// backupMethod specifies the backup method name that is defined in backupPolicy.
 	// +kubebuilder:validation:Required
 	BackupMethod string `json:"backupMethod"`
 
-	// The cron expression for schedule, the timezone is in UTC.
-	// Refer to https://en.wikipedia.org/wiki/Cron for more details.
+	// the cron expression for schedule, the timezone is in UTC.
+	// see https://en.wikipedia.org/wiki/Cron.
 	// +kubebuilder:validation:Required
 	CronExpression string `json:"cronExpression"`
 
-	// Determines a duration up to which the backup should be kept.
-	// The controller will remove all backups that are older than the RetentionPeriod.
-	// For example, a RetentionPeriod of `30d` will keep only the backups of the last 30 days.
-	// The duration format is as follows:
-	// - years: 2y
-	// - months: 6mo
-	// - days: 30d
-	// - hours: 12h
-	// - minutes: 30m
+	// retentionPeriod determines a duration up to which the backup should be kept.
+	// controller will remove all backups that are older than the RetentionPeriod.
+	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
+	// Sample duration format:
+	//
+	// - years: 	2y
+	// - months: 	6mo
+	// - days: 		30d
+	// - hours: 	12h
+	// - minutes: 	30m
 	// You can also combine the above durations. For example: 30d12h30m
 	//
 	// +optional
@@ -146,48 +150,56 @@ type SchedulePolicy struct {
 }
 
 type TargetInstance struct {
-	// Specifies the role of the instance for backup. Valid roles include Leader, Follower, and Leaner for Consensus components,
-	// and primary or secondary for Replication components.
-	// Invalid roles will be ignored. For example, if the workload type is Replication
-	// and the component's replicas is 1, the secondary role is invalid and will be ignored.
-	// The role will be transformed into a LabelSelector for the BackupPolicy's target attribute.
+	// select instance of corresponding role for backup, role are:
+	//
+	// - the name of Leader/Follower/Leaner for Consensus component.
+	// - primary or secondary for Replication component.
+	//
+	// finally, invalid role of the component will be ignored.
+	// such as if workload type is Replication and component's replicas is 1,
+	// the secondary role is invalid. and it also will be ignored when component is Stateful/Stateless.
+	// the role will be transformed to a role LabelSelector for BackupPolicy's target attribute.
 	Role string `json:"role"`
 
-	// Refers to spec.componentDef.systemAccounts.accounts[*].name in ClusterDefinition or spec.systemAccounts in ComponentDefinition.
-	// The secret created by this account will be used to connect to the database.
-	// If not set, the secret created by spec.ConnectionCredential of the ClusterDefinition will be used.
-	// This will be transformed into a secret for the BackupPolicy's target secret.
+	// refer to spec.componentDef.systemAccounts.accounts[*].name in ClusterDefinition.
+	// the secret created by this account will be used to connect the database.
+	// if not set, the secret created by spec.ConnectionCredential of the ClusterDefinition will be used.
+	// it will be transformed to a secret for BackupPolicy's target secret.
 	// +optional
 	Account string `json:"account,omitempty"`
 
-	// Specifies the strategy to use when multiple pods are selected for the backup target.
+	// PodSelectionStrategy specifies the strategy to select when multiple pods are
+	// selected for backup target.
 	// Valid values are:
-	// - Any: select any one pod that matches the labelsSelector.
+	//
+	// - Any: select any one pod that match the labelsSelector.
 	// - All: select all pods that match the labelsSelector.
+	//
 	// +optional
 	Strategy dpv1alpha1.PodSelectionStrategy `json:"strategy,omitempty"`
 
-	// Defines the connection credential key in the secret created by spec.ConnectionCredential of the ClusterDefinition.
-	// This will be ignored when "account" is set.
+	// connectionCredentialKey defines connection credential key in secret
+	// which created by spec.ConnectionCredential of the ClusterDefinition.
+	// it will be ignored when "account" is set.
 	// +optional
 	ConnectionCredentialKey ConnectionCredentialKey `json:"connectionCredentialKey,omitempty"`
 }
 
 type ConnectionCredentialKey struct {
-	// Specifies the key of the password in the ConnectionCredential secret.
-	// If not set, the default key is "password".
+	// the key of password in the ConnectionCredential secret.
+	// if not set, the default key is "password".
 	// +optional
 	PasswordKey *string `json:"passwordKey,omitempty"`
 
-	// Specifies the key of the username in the ConnectionCredential secret.
-	// If not set, the default key is "username".
+	// the key of username in the ConnectionCredential secret.
+	// if not set, the default key is "username".
 	// +optional
 	UsernameKey *string `json:"usernameKey,omitempty"`
 
-	// Specifies the map key of the host in the connection credential secret.
+	// hostKey specifies the map key of the host in the connection credential secret.
 	HostKey *string `json:"hostKey,omitempty"`
 
-	// Specifies the map key of the port in the connection credential secret.
+	// portKey specifies the map key of the port in the connection credential secret.
 	PortKey *string `json:"portKey,omitempty"`
 }
 

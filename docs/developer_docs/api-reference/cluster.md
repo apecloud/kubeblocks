@@ -744,7 +744,7 @@ string
 </em>
 </td>
 <td>
-<p>compDef is the name of the referenced componentDefinition.</p>
+<p>CompDef is the name of the referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -758,7 +758,7 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>classDefRef references the class defined in ComponentClassDefinition.</p>
+<p>ClassDefRef references the class defined in ComponentClassDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -772,7 +772,7 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:</p>
+<p>ServiceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:</p>
 <ul>
 <li>Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.</li>
 <li>Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.</li>
@@ -831,6 +831,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
+<p>Configs defines the configuration for the component.</p>
 </td>
 </tr>
 <tr>
@@ -842,7 +843,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>monitor is a switch to enable monitoring and is set as false by default.
+<p>Monitor is a switch to enable monitoring and is set as false by default.
 KubeBlocks provides an extension mechanism to support component level monitoring,
 which will scrape metrics auto or manually from servers in component and export
 metrics to Time Series Database.</p>
@@ -857,7 +858,7 @@ metrics to Time Series Database.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>enabledLogs indicates which log file takes effect in the database cluster,
+<p>EnabledLogs indicates which log file takes effect in the database cluster,
 element is the log type which is defined in ComponentDefinition logConfig.name.</p>
 </td>
 </tr>
@@ -870,7 +871,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>serviceAccountName is the name of the ServiceAccount that running component depends on.</p>
+<p>ServiceAccountName is the name of the ServiceAccount that running component depends on.</p>
 </td>
 </tr>
 <tr>
@@ -914,6 +915,7 @@ TLSConfig
 </td>
 <td>
 <em>(Optional)</em>
+<p>TLSConfig specifies the TLS configuration for the component.</p>
 </td>
 </tr>
 <tr>
@@ -2463,9 +2465,9 @@ string
 </em>
 </td>
 <td>
-<p>service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. &#123;mysql, redis, mongodb&#125;.
-The serviceKind is case-insensitive and supports abbreviations for some well-known databases.
-For example, both <code>zk</code> and <code>zookeeper</code> will be considered as a ZooKeeper cluster, and <code>pg</code>, <code>postgres</code>, <code>postgresql</code> will all be considered as a PostgreSQL cluster.</p>
+<p>Specifies the type or nature of the service. Should represent a well-known application cluster type, such as &#123;mysql, redis, mongodb&#125;.
+This field is case-insensitive and supports abbreviations for some well-known databases.
+For instance, both <code>zk</code> and <code>zookeeper</code> will be recognized as a ZooKeeper cluster, and <code>pg</code>, <code>postgres</code>, <code>postgresql</code> will all be recognized as a PostgreSQL cluster.</p>
 </td>
 </tr>
 <tr>
@@ -2476,7 +2478,7 @@ string
 </em>
 </td>
 <td>
-<p>The version of the service reference.</p>
+<p>Represents the version of the service reference.</p>
 </td>
 </tr>
 <tr>
@@ -2490,7 +2492,7 @@ CredentialVar
 </td>
 <td>
 <em>(Optional)</em>
-<p>endpoint is the endpoint of the service connection credential.</p>
+<p>Represents the endpoint of the service connection credential.</p>
 </td>
 </tr>
 <tr>
@@ -2504,7 +2506,7 @@ ConnectionCredentialAuth
 </td>
 <td>
 <em>(Optional)</em>
-<p>auth is the auth of the service connection credential.</p>
+<p>Represents the authentication details of the service connection credential.</p>
 </td>
 </tr>
 <tr>
@@ -2518,7 +2520,7 @@ CredentialVar
 </td>
 <td>
 <em>(Optional)</em>
-<p>port is the port of the service connection credential.</p>
+<p>Represents the port of the service connection credential.</p>
 </td>
 </tr>
 </table>
@@ -7428,7 +7430,7 @@ string
 </em>
 </td>
 <td>
-<p>compDef is the name of the referenced componentDefinition.</p>
+<p>CompDef is the name of the referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -7442,7 +7444,7 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>classDefRef references the class defined in ComponentClassDefinition.</p>
+<p>ClassDefRef references the class defined in ComponentClassDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -7456,7 +7458,7 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:</p>
+<p>ServiceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:</p>
 <ul>
 <li>Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.</li>
 <li>Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.</li>
@@ -7515,6 +7517,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
+<p>Configs defines the configuration for the component.</p>
 </td>
 </tr>
 <tr>
@@ -7526,7 +7529,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>monitor is a switch to enable monitoring and is set as false by default.
+<p>Monitor is a switch to enable monitoring and is set as false by default.
 KubeBlocks provides an extension mechanism to support component level monitoring,
 which will scrape metrics auto or manually from servers in component and export
 metrics to Time Series Database.</p>
@@ -7541,7 +7544,7 @@ metrics to Time Series Database.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>enabledLogs indicates which log file takes effect in the database cluster,
+<p>EnabledLogs indicates which log file takes effect in the database cluster,
 element is the log type which is defined in ComponentDefinition logConfig.name.</p>
 </td>
 </tr>
@@ -7554,7 +7557,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>serviceAccountName is the name of the ServiceAccount that running component depends on.</p>
+<p>ServiceAccountName is the name of the ServiceAccount that running component depends on.</p>
 </td>
 </tr>
 <tr>
@@ -7598,6 +7601,7 @@ TLSConfig
 </td>
 <td>
 <em>(Optional)</em>
+<p>TLSConfig specifies the TLS configuration for the component.</p>
 </td>
 </tr>
 <tr>
@@ -7757,7 +7761,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
+<p>WithCandidate corresponds to the switchover of the specified candidate primary or leader instance.
 Currently, only Action.Exec is supported, Action.HTTP is not supported.</p>
 </td>
 </tr>
@@ -7772,7 +7776,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
+<p>WithoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
 Currently, only Action.Exec is supported, Action.HTTP is not supported.</p>
 </td>
 </tr>
@@ -7787,7 +7791,7 @@ Currently, only Action.Exec is supported, Action.HTTP is not supported.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
+<p>ScriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
 Once ScriptSpecSelectors is defined, the scripts defined in scripts can be referenced in the Action.</p>
 </td>
 </tr>
@@ -8984,6 +8988,7 @@ updated by the API Server.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorSpec">ServiceDescriptorSpec</a>)
 </p>
 <div>
+<p>ConnectionCredentialAuth represents the authentication details of the service connection credential.</p>
 </div>
 <table>
 <thead>
@@ -9004,7 +9009,7 @@ CredentialVar
 </td>
 <td>
 <em>(Optional)</em>
-<p>service connection based-on username and password credential.</p>
+<p>Represents the username credential for the service connection.</p>
 </td>
 </tr>
 <tr>
@@ -9018,7 +9023,7 @@ CredentialVar
 </td>
 <td>
 <em>(Optional)</em>
-<p>service connection based-on username and password credential.</p>
+<p>Represents the password credential for the service connection.</p>
 </td>
 </tr>
 </tbody>
@@ -9225,6 +9230,7 @@ ConsensusMember
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialAuth">ConnectionCredentialAuth</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorSpec">ServiceDescriptorSpec</a>)
 </p>
 <div>
+<p>CredentialVar defines the value of credential variable.</p>
 </div>
 <table>
 <thead>
@@ -9243,15 +9249,14 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Variable references $(VAR_NAME) are expanded
-using the previously defined environment variables in the container and
-any service environment variables. If a variable cannot be resolved,
-the reference in the input string will be unchanged. Double $$ are reduced
-to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-&ldquo;$$(VAR_NAME)&rdquo; will produce the string literal &ldquo;$(VAR_NAME)&rdquo;.
-Escaped references will never be expanded, regardless of whether the variable
-exists or not.
-Defaults to &ldquo;&rdquo;.</p>
+<p>Specifies an optional variable. Only one of the following may be specified.
+Variable references, denoted by $(VAR_NAME), are expanded using previously defined
+environment variables in the container and any service environment variables.
+If a variable cannot be resolved, the reference in the input string remains unchanged.</p>
+<p>Double $$ are reduced to a single $, enabling the escaping of the $(VAR_NAME) syntax.
+For instance, &ldquo;$$(VAR_NAME)&rdquo; will produce the string literal &ldquo;$(VAR_NAME)&rdquo;.
+Escaped references will never be expanded, irrespective of the variable&rsquo;s existence.
+The default value is &ldquo;&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -9265,7 +9270,7 @@ Kubernetes core/v1.EnvVarSource
 </td>
 <td>
 <em>(Optional)</em>
-<p>Source for the environment variable&rsquo;s value. Cannot be used if value is not empty.</p>
+<p>Defines the source for the environment variable&rsquo;s value. This cannot be used if the value is not empty.</p>
 </td>
 </tr>
 </tbody>
@@ -9743,11 +9748,10 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Command is the command line to execute inside the container, the working directory for the
-command  is root (&lsquo;/&rsquo;) in the container&rsquo;s filesystem. The command is simply exec&rsquo;d, it is
-not run inside a shell, so traditional shell instructions (&lsquo;|&rsquo;, etc) won&rsquo;t work. To use
-a shell, you need to explicitly call out to that shell.
-Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</p>
+<p>Specifies the command line to be executed inside the container. The working directory for this command
+is the root (&lsquo;/&rsquo;) of the container&rsquo;s filesystem. The command is directly executed and not run inside a shell,
+hence traditional shell instructions (&lsquo;|&rsquo;, etc) are not applicable. To use a shell, it needs to be explicitly invoked.</p>
+<p>An exit status of 0 is interpreted as live/healthy, while a non-zero status indicates unhealthy.</p>
 </td>
 </tr>
 <tr>
@@ -9759,7 +9763,7 @@ Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>args is used to perform statements.</p>
+<p>Args are used to perform statements.</p>
 </td>
 </tr>
 </tbody>
@@ -10091,7 +10095,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Path to access on the HTTP server.</p>
+<p>Specifies the path to be accessed on the HTTP server.</p>
 </td>
 </tr>
 <tr>
@@ -10104,9 +10108,9 @@ Kubernetes api utils intstr.IntOrString
 </em>
 </td>
 <td>
-<p>Name or number of the port to access on the container.
-Number must be in the range 1 to 65535.
-Name must be an IANA_SVC_NAME.</p>
+<p>Defines the name or number of the port to be accessed on the container.
+The number must fall within the range of 1 to 65535.
+The name must conform to the IANA_SVC_NAME standard.</p>
 </td>
 </tr>
 <tr>
@@ -10118,8 +10122,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Host name to connect to, defaults to the pod IP. You probably want to set
-&ldquo;Host&rdquo; in httpHeaders instead.</p>
+<p>Indicates the host name to connect to, which defaults to the pod IP.
+It is recommended to set &ldquo;Host&rdquo; in httpHeaders instead.</p>
 </td>
 </tr>
 <tr>
@@ -10133,8 +10137,8 @@ Kubernetes core/v1.URIScheme
 </td>
 <td>
 <em>(Optional)</em>
-<p>Scheme to use for connecting to the host.
-Defaults to HTTP.</p>
+<p>Specifies the scheme to be used for connecting to the host.
+The default scheme is HTTP.</p>
 </td>
 </tr>
 <tr>
@@ -10146,8 +10150,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Method represents the HTTP request method, which can be one of the standard HTTP methods like &ldquo;GET,&rdquo; &ldquo;POST,&rdquo; &ldquo;PUT,&rdquo; etc.
-Defaults to Get.</p>
+<p>Represents the HTTP request method, which can be one of the standard HTTP methods such as &ldquo;GET,&rdquo; &ldquo;POST,&rdquo; &ldquo;PUT,&rdquo; etc.
+The default method is Get.</p>
 </td>
 </tr>
 <tr>
@@ -10161,7 +10165,8 @@ Defaults to Get.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Custom headers to set in the request. HTTP allows repeated headers.</p>
+<p>Allows for the setting of custom headers in the request.
+HTTP supports repeated headers.</p>
 </td>
 </tr>
 </tbody>
@@ -10655,7 +10660,7 @@ BuiltinActionHandlerType
 </td>
 <td>
 <em>(Optional)</em>
-<p>builtinHandler specifies the builtin action handler name to do the action.
+<p>BuiltinHandler specifies the builtin action handler name to do the action.
 the BuiltinHandler within the same ComponentLifecycleActions should be consistent. Details can be queried through official documentation in the future.
 use CustomHandler to define your own actions if none of them satisfies the requirement.</p>
 </td>
@@ -10671,7 +10676,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>customHandler defines the custom way to do action.</p>
+<p>CustomHandler defines the custom way to do action.</p>
 </td>
 </tr>
 </tbody>
@@ -13350,8 +13355,8 @@ string
 </em>
 </td>
 <td>
-<p>Name of the role. It will apply to &ldquo;apps.kubeblocks.io/role&rdquo; object label value.
-Cannot be updated.</p>
+<p>Defines the role&rsquo;s identifier. This will be applied to the &ldquo;apps.kubeblocks.io/role&rdquo; object label value.
+This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -13363,8 +13368,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Serviceable indicates whether a replica with this role can provide services.
-Cannot be updated.</p>
+<p>Specifies if a replica assuming this role can provide services.
+This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -13376,8 +13381,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Writable indicates whether a replica with this role is allowed to write data.
-Cannot be updated.</p>
+<p>Specifies if a replica assuming this role is permitted to write data.
+This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -13389,8 +13394,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Votable indicates whether a replica with this role is allowed to vote.
-Cannot be updated.</p>
+<p>Specifies if a replica assuming this role is permitted to vote.
+This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>
@@ -13728,7 +13733,8 @@ int
 </td>
 <td>
 <em>(Optional)</em>
-<p>MaxRetries specifies the maximum number of times the action should be retried.</p>
+<p>Defines the maximum number of retry attempts that should be made for a given action.
+This value is set to 0 by default, indicating that no retries will be made.</p>
 </td>
 </tr>
 <tr>
@@ -13740,7 +13746,8 @@ time.Duration
 </td>
 <td>
 <em>(Optional)</em>
-<p>RetryInterval specifies the interval between retry attempts.</p>
+<p>Indicates the duration of time to wait between each retry attempt.
+This value is set to 0 by default, indicating that there will be no delay between retry attempts.</p>
 </td>
 </tr>
 </tbody>
@@ -13804,9 +13811,6 @@ int32
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Number of seconds after the container has started before liveness probes are initiated.
-More info: <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes">https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</a></p>
 </td>
 </tr>
 <tr>
@@ -13817,10 +13821,6 @@ int32
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Number of seconds after which the probe times out.
-Defaults to 1 second. Minimum value is 1.
-More info: <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes">https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</a></p>
 </td>
 </tr>
 <tr>
@@ -13831,9 +13831,6 @@ int32
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>How often (in seconds) to perform the probe.
-Default to 10 seconds. Minimum value is 1.</p>
 </td>
 </tr>
 <tr>
@@ -14826,9 +14823,9 @@ string
 </em>
 </td>
 <td>
-<p>service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. &#123;mysql, redis, mongodb&#125;.
-The serviceKind is case-insensitive and supports abbreviations for some well-known databases.
-For example, both <code>zk</code> and <code>zookeeper</code> will be considered as a ZooKeeper cluster, and <code>pg</code>, <code>postgres</code>, <code>postgresql</code> will all be considered as a PostgreSQL cluster.</p>
+<p>Specifies the type or nature of the service. Should represent a well-known application cluster type, such as &#123;mysql, redis, mongodb&#125;.
+This field is case-insensitive and supports abbreviations for some well-known databases.
+For instance, both <code>zk</code> and <code>zookeeper</code> will be recognized as a ZooKeeper cluster, and <code>pg</code>, <code>postgres</code>, <code>postgresql</code> will all be recognized as a PostgreSQL cluster.</p>
 </td>
 </tr>
 <tr>
@@ -14839,7 +14836,7 @@ string
 </em>
 </td>
 <td>
-<p>The version of the service reference.</p>
+<p>Represents the version of the service reference.</p>
 </td>
 </tr>
 <tr>
@@ -14853,7 +14850,7 @@ CredentialVar
 </td>
 <td>
 <em>(Optional)</em>
-<p>endpoint is the endpoint of the service connection credential.</p>
+<p>Represents the endpoint of the service connection credential.</p>
 </td>
 </tr>
 <tr>
@@ -14867,7 +14864,7 @@ ConnectionCredentialAuth
 </td>
 <td>
 <em>(Optional)</em>
-<p>auth is the auth of the service connection credential.</p>
+<p>Represents the authentication details of the service connection credential.</p>
 </td>
 </tr>
 <tr>
@@ -14881,7 +14878,7 @@ CredentialVar
 </td>
 <td>
 <em>(Optional)</em>
-<p>port is the port of the service connection credential.</p>
+<p>Represents the port of the service connection credential.</p>
 </td>
 </tr>
 </tbody>
@@ -14913,7 +14910,7 @@ Phase
 </td>
 <td>
 <em>(Optional)</em>
-<p>phase - in list of [Available,Unavailable]</p>
+<p>Indicates the current lifecycle phase of the ServiceDescriptor. This can be either &lsquo;Available&rsquo; or &lsquo;Unavailable&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -14925,7 +14922,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A human-readable message indicating details about why the ServiceConnectionCredential is in this phase.</p>
+<p>Provides a human-readable explanation detailing the reason for the current phase of the ServiceConnectionCredential.</p>
 </td>
 </tr>
 <tr>
@@ -14937,7 +14934,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>generation number</p>
+<p>Represents the generation number that has been processed by the controller.</p>
 </td>
 </tr>
 </tbody>
@@ -16038,9 +16035,8 @@ string
 </em>
 </td>
 <td>
-<p>The name of the account.
-Others can refer to this account by the name.
-Cannot be updated.</p>
+<p>Specifies the unique identifier for the account. This name is used by other entities to reference the account.
+This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -16052,9 +16048,9 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>InitAccount indicates whether this is the unique system initialization account (e.g., MySQL root).
-Only one system init account is allowed.
-Cannot be updated.</p>
+<p>Indicates if this account is the unique system initialization account (e.g., MySQL root).
+Only one system initialization account is permitted.
+This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -16066,8 +16062,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Statement specifies the statement used to create the account with required privileges.
-Cannot be updated.</p>
+<p>Defines the statement used to create the account with the necessary privileges.
+This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -16081,8 +16077,8 @@ PasswordConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>PasswordGenerationPolicy defines the policy for generating the account&rsquo;s password.
-Cannot be updated.</p>
+<p>Specifies the policy for generating the account&rsquo;s password.
+This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -16096,8 +16092,8 @@ ProvisionSecretRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>SecretRef specifies the secret from which data will be copied to create the new account.
-Cannot be updated.</p>
+<p>Refers to the secret from which data will be copied to create the new account.
+This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>

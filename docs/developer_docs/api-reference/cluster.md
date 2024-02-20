@@ -1651,6 +1651,19 @@ restart or reload depending on whether any parameters in the StaticParameters ha
 </tr>
 <tr>
 <td>
+<code>forceHotUpdate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>forceHotUpdate indicates whether to execute hot update parameters when the pod needs to be restarted.
+if set true, the controller does the hot update and then restarts the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>toolsImageSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ToolsImageSpec">
@@ -8074,6 +8087,19 @@ ReloadOptions
 <p>reloadOptions indicates whether the process supports reload.</p>
 <p>if set, the controller will determine the behavior of the engine instance based on the configuration templates,
 restart or reload depending on whether any parameters in the StaticParameters have been modified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>forceHotUpdate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>forceHotUpdate indicates whether to execute hot update parameters when the pod needs to be restarted.
+if set true, the controller does the hot update and then restarts the pod.</p>
 </td>
 </tr>
 <tr>
@@ -16784,6 +16810,8 @@ string
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;autoReload&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;reloadAndRestart&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;none&#34;</p></td>
 <td></td>

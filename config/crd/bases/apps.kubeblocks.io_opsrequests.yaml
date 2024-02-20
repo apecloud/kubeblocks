@@ -138,7 +138,16 @@ spec:
                 items:
                   properties:
                     componentName:
-                      description: componentName cluster component name.
+                      default: ""
+                      description: ComponentName is Cluster Component name. Either
+                        ComponentName or ServiceName must be specified.
+                      type: string
+                    serviceName:
+                      default: ""
+                      description: Service name. Chosen from  `cluster.spec.services.name`.
+                        Either componentName or serviceName should be specified (or
+                        componentName can be left empty), and the `services` will
+                        be ignored.
                       type: string
                     services:
                       description: Setting the list of services to be exposed or removed.
@@ -287,13 +296,13 @@ spec:
                       - Disable
                       type: string
                   required:
-                  - componentName
                   - services
                   - switch
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:
                 - componentName
+                - serviceName
                 x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: forbidden to update spec.expose

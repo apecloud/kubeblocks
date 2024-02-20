@@ -126,6 +126,7 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +listMapKey=serviceName
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.expose"
 	ExposeList []Expose `json:"expose,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
@@ -360,14 +361,27 @@ const (
 )
 
 type Expose struct {
-	ComponentOps `json:",inline"`
+	// ComponentName is Cluster Component name.
+	// Either ComponentName or ServiceName must be specified.
+	// +kubebuilder:default=""
+	// +optional
+	ComponentName string `json:"componentName,omitempty"`
+
+	// Service name. Chosen from  `cluster.spec.services.name`.
+	// Either componentName or serviceName should be specified (or componentName can be left empty),
+	// and the `services` will be ignored.
+	// +kubebuilder:default=""
+	// +optional
+	ServiceName string `json:"serviceName,omitempty"`
 
 	// switch defines the switch of expose operation.
 	// if switch is set to Enable, the service will be exposed. if switch is set to Disable, the service will be removed.
+	//
 	// +kubebuilder:validation:Required
 	Switch ExposeSwitch `json:"switch"`
 
 	// Setting the list of services to be exposed or removed.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minitems=0
 	Services []OpsService `json:"services"`
@@ -933,7 +947,20 @@ func (r OpsRequestSpec) ToVolumeExpansionListToMap() map[string]VolumeExpansion 
 func (r OpsRequestSpec) ToExposeListToMap() map[string]Expose {
 	exposeMap := make(map[string]Expose)
 	for _, v := range r.ExposeList {
-		exposeMap[v.ComponentName] = v
+		if len(v.ComponentName) > 0 {
+			exposeMap[v.ComponentName] = v
+		}
+	}
+	return exposeMap
+}
+
+// ToExposeServiceNames build service name map
+func (r OpsRequestSpec) ToExposeServiceNames() map[string]Expose {
+	exposeMap := make(map[string]Expose)
+	for _, v := range r.ExposeList {
+		if len(v.ServiceName) > 0 {
+			exposeMap[v.ServiceName] = v
+		}
 	}
 	return exposeMap
 }

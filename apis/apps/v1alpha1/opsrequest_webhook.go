@@ -218,8 +218,64 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 		return r.validateSwitchover(ctx, k8sClient, cluster)
 	case DataScriptType:
 		return r.validateDataScript(ctx, k8sClient, cluster)
+	case ExposeType:
+		return r.validateExpose(cluster)
 	}
 	return nil
+}
+
+// validateVerticalScaling validates api when spec.type is VerticalScaling
+func (r *OpsRequest) validateExpose(cluster *Cluster) error {
+	exposeList := r.Spec.ExposeList
+	if len(exposeList) == 0 {
+		return notEmptyError("spec.expose")
+	}
+
+	// retrieve service.name and service.serviceName
+	clusterSVCNamesMap := make(map[string]bool)
+	clusterSVCServiceNamesMap := make(map[string]bool)
+
+	for _, svc := range cluster.Spec.Services {
+		clusterSVCNamesMap[svc.Name] = true
+		clusterSVCServiceNamesMap[svc.GeneratedSVCNameSuffix()] = true
+	}
+	// validate resources is legal and get component name slice
+	componentNames := make([]string, len(exposeList))
+	for i, v := range exposeList {
+		if len(v.ComponentName) > 0 {
+			componentNames = append(componentNames, v.ComponentName)
+		}
+
+		if (len(v.ServiceName) == 0) == (len(v.ComponentName) == 0) {
+			return fmt.Errorf("specify either spec.expose[%d].serviceName or spec.expose[%d].componentName", i, i)
+		}
+
+		if len(v.Services) == 0 {
+			return notEmptyError(fmt.Sprintf("spec.expose[%d].services", i))
+		}
+		// check if referred service name exists
+		if _, ok := clusterSVCNamesMap[v.ServiceName]; !ok {
+			return fmt.Errorf("service: %s not found in cluster %s", v.ServiceName, cluster.Name)
+		}
+		// check if generated service name is available (not taken)
+		for _, svc := range v.Services {
+			var generatedSVCName string
+			if len(v.ServiceName) > 0 {
+				generatedSVCName = fmt.Sprintf("%s-%s", v.ServiceName, svc.Name)
+			} else {
+				generatedSVCName = fmt.Sprintf("%s-%s", v.ComponentName, svc.Name)
+			}
+
+			if v.Switch == EnableExposeSwitch {
+				if _, ok := clusterSVCServiceNamesMap[generatedSVCName]; ok {
+					return fmt.Errorf("service: %s already exists in cluster %s", generatedSVCName, cluster.Name)
+				}
+			} else if _, ok := clusterSVCServiceNamesMap[generatedSVCName]; !ok {
+				return fmt.Errorf("service: %s not found in cluster %s", generatedSVCName, cluster.Name)
+			}
+		}
+	}
+	return r.checkComponentExistence(cluster, componentNames)
 }
 
 // validateUpgrade validates spec.restart
@@ -413,6 +469,9 @@ func (r *OpsRequest) checkComponentExistence(cluster *Cluster, compNames []strin
 
 	var notFoundCompNames []string
 	for _, compName := range compNames {
+		if len(compName) == 0 {
+			continue
+		}
 		if _, ok := compSpecNameMap[compName]; !ok {
 			notFoundCompNames = append(notFoundCompNames, compName)
 		}

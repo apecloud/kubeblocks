@@ -171,9 +171,7 @@ func mockExposeOps() *OpsRequest {
 	ops.Spec.Type = ExposeType
 	ops.Spec.ExposeList = []Expose{
 		{
-			ComponentOps: ComponentOps{
-				ComponentName: componentName,
-			},
+			ComponentName: componentName,
 		},
 	}
 	return ops

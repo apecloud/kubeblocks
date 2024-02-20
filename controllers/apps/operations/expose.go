@@ -52,25 +52,49 @@ func init() {
 
 func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
-		exposeMap = opsRes.OpsRequest.Spec.ToExposeListToMap()
+		exposeMap      = opsRes.OpsRequest.Spec.ToExposeListToMap()
+		exposeSVCNames = opsRes.OpsRequest.Spec.ToExposeServiceNames()
 	)
 	reqCtx.Log.Info("cluster service before action", "clusterService", opsRes.Cluster.Spec.Services)
-	for _, clusterCompSpec := range opsRes.Cluster.Spec.ComponentSpecs {
-		expose, ok := exposeMap[clusterCompSpec.Name]
-		if !ok {
-			continue
+	if len(exposeMap) > 0 {
+		for _, clusterCompSpec := range opsRes.Cluster.Spec.ComponentSpecs {
+			expose, ok := exposeMap[clusterCompSpec.Name]
+			if !ok {
+				continue
+			}
+			switch expose.Switch {
+			case appsv1alpha1.EnableExposeSwitch:
+				if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, &clusterCompSpec, expose.Services); err != nil {
+					return err
+				}
+			case appsv1alpha1.DisableExposeSwitch:
+				if err := e.removeClusterServices(opsRes.Cluster, &clusterCompSpec, expose.Services); err != nil {
+					return err
+				}
+			default:
+				return fmt.Errorf("invalid expose switch: %s", expose.Switch)
+			}
 		}
-		switch expose.Switch {
-		case appsv1alpha1.EnableExposeSwitch:
-			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, &clusterCompSpec, expose.Services); err != nil {
-				return err
+	}
+
+	if len(exposeSVCNames) > 0 {
+		for _, clusterSVC := range opsRes.Cluster.Spec.Services {
+			expose, ok := exposeSVCNames[clusterSVC.Name]
+			if !ok {
+				continue
 			}
-		case appsv1alpha1.DisableExposeSwitch:
-			if err := e.removeClusterServices(opsRes.Cluster, &clusterCompSpec, expose.Services); err != nil {
-				return err
+			switch expose.Switch {
+			case appsv1alpha1.EnableExposeSwitch:
+				if err := e.buildClusterServiceFromExistingSVC(reqCtx, cli, opsRes.Cluster, clusterSVC.Name, expose.Services); err != nil {
+					return err
+				}
+			case appsv1alpha1.DisableExposeSwitch:
+				if err := e.removeClusterServicesByName(opsRes.Cluster, clusterSVC.Name, expose.Services); err != nil {
+					return err
+				}
+			default:
+				return fmt.Errorf("invalid expose switch: %s", expose.Switch)
 			}
-		default:
-			return fmt.Errorf("invalid expose switch: %s", expose.Switch)
 		}
 	}
 	reqCtx.Log.Info("cluster service to be updated", "clusterService", opsRes.Cluster.Spec.Services)
@@ -86,10 +110,13 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 
-	// update component status
+	// update component status)
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = make(map[string]appsv1alpha1.OpsRequestComponentStatus)
 		for _, v := range opsRequest.Spec.ExposeList {
+			if len(v.ComponentName) == 0 {
+				continue
+			}
 			opsRequest.Status.Components[v.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{
 				Phase: appsv1alpha1.UpdatingClusterCompPhase, // appsv1alpha1.ExposingPhase,
 			}
@@ -109,6 +136,10 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		expectProgressCount += expectCount
 
 		// update component status if completed
+		if len(v.ComponentName) == 0 {
+			continue
+		}
+
 		if actualCount == expectCount {
 			p := opsRequest.Status.Components[v.ComponentName]
 			p.Phase = appsv1alpha1.RunningClusterCompPhase
@@ -167,24 +198,40 @@ func (e ExposeOpsHandler) handleComponentServices(reqCtx intctrlutil.RequestCtx,
 
 	checkEnableExposeService := func() {
 		for _, item := range expose.Services {
-			service, ok := svcMap[getSvcName(opsRes.Cluster.Name, expose.ComponentName, item.Name)]
+			middleName := ""
+			if len(expose.ComponentName) > 0 {
+				middleName = expose.ComponentName
+			} else {
+				middleName = expose.ServiceName
+			}
+			service, ok := svcMap[getSvcName(opsRes.Cluster.Name, middleName, item.Name)]
 			if !ok {
 				continue
 			}
 
-			for _, ingress := range service.Status.LoadBalancer.Ingress {
-				if ingress.Hostname == "" && ingress.IP == "" {
-					continue
+			if service.Spec.Type == corev1.ServiceTypeLoadBalancer {
+				for _, ingress := range service.Status.LoadBalancer.Ingress {
+					if ingress.Hostname == "" && ingress.IP == "" {
+						continue
+					}
+					actualCount += 1
+					break
 				}
+			} else {
 				actualCount += 1
-				break
 			}
 		}
 	}
 
 	checkDisableExposeService := func() {
 		for _, item := range expose.Services {
-			_, ok := svcMap[getSvcName(opsRes.Cluster.Name, expose.ComponentName, item.Name)]
+			middleName := ""
+			if len(expose.ComponentName) > 0 {
+				middleName = expose.ComponentName
+			} else {
+				middleName = expose.ServiceName
+			}
+			_, ok := svcMap[getSvcName(opsRes.Cluster.Name, middleName, item.Name)]
 			// if service is not found, it means that the service has been removed
 			if !ok {
 				actualCount += 1
@@ -405,6 +452,106 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			}
 		}
 		cluster.Spec.Services = append(cluster.Spec.Services, clusterService)
+	}
+	return nil
+}
+
+func (e ExposeOpsHandler) buildClusterServiceFromExistingSVC(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	referredServiceName string,
+	exposeServices []appsv1alpha1.OpsService) error {
+	if cluster == nil || len(exposeServices) == 0 {
+		return nil
+	}
+
+	getClusterSVCByName := func() (*appsv1alpha1.ClusterService, error) {
+		for _, clusterService := range cluster.Spec.Services {
+			if clusterService.Name == referredServiceName {
+				return &clusterService, nil
+			}
+		}
+		return nil, fmt.Errorf("cluster service not found: %s", referredServiceName)
+	}
+
+	checkServiceExist := func(exposeService appsv1alpha1.OpsService) bool {
+		genServiceName := fmt.Sprintf("%s-%s", referredServiceName, exposeService.Name)
+		for _, clusterService := range cluster.Spec.Services {
+			if clusterService.Name == genServiceName {
+				return true
+			}
+		}
+		return false
+	}
+
+	referredSVC, err := getClusterSVCByName()
+	if err != nil {
+		return err
+	}
+
+	for _, exposeService := range exposeServices {
+		if checkServiceExist(exposeService) {
+			reqCtx.Log.Info("cluster service already exists, skip", "service", exposeService.Name)
+			continue
+		}
+		genServiceName := fmt.Sprintf("%s-%s", referredServiceName, exposeService.Name)
+		clusterService := appsv1alpha1.ClusterService{
+			Service: appsv1alpha1.Service{
+				Name:        genServiceName,
+				ServiceName: genServiceName,
+				Annotations: exposeService.Annotations,
+				Spec: corev1.ServiceSpec{
+					Ports:    referredSVC.Spec.Ports,
+					Selector: referredSVC.Spec.Selector,
+					Type:     exposeService.ServiceType,
+				},
+			},
+			ComponentSelector: referredSVC.ComponentSelector,
+			ShardingSelector:  referredSVC.ShardingSelector,
+		}
+
+		// merge annotations
+		if clusterService.Annotations == nil {
+			clusterService.Annotations = make(map[string]string)
+		}
+
+		for k, v := range exposeService.Annotations {
+			if _, ok := clusterService.Annotations[k]; ok {
+				continue
+			}
+			clusterService.Annotations[k] = v
+		}
+
+		// user ports from referred service if not defined
+		if len(clusterService.Spec.Ports) == 0 {
+			clusterService.Spec.Ports = referredSVC.Spec.Ports
+		}
+
+		// use selector from referred service if not defined
+		if len(exposeService.Selector) == 0 {
+			clusterService.Spec.Selector = referredSVC.Spec.Selector
+		}
+
+		cluster.Spec.Services = append(cluster.Spec.Services, clusterService)
+	}
+	return nil
+}
+
+func (e ExposeOpsHandler) removeClusterServicesByName(cluster *appsv1alpha1.Cluster,
+	referredServiceName string,
+	exposeServices []appsv1alpha1.OpsService) error {
+	if cluster == nil || len(exposeServices) == 0 {
+		return nil
+	}
+	for _, exposeService := range exposeServices {
+		genServiceName := fmt.Sprintf("%s-%s", referredServiceName, exposeService.Name)
+		for i, clusterService := range cluster.Spec.Services {
+			// remove service from cluster
+			if clusterService.Name == genServiceName {
+				cluster.Spec.Services = append(cluster.Spec.Services[:i], cluster.Spec.Services[i+1:]...)
+				break
+			}
+		}
 	}
 	return nil
 }

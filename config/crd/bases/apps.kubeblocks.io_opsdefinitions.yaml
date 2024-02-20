@@ -49,68 +49,76 @@ spec:
             description: OpsDefinitionSpec defines the desired state of OpsDefinition
             properties:
               componentDefinitionRefs:
-                description: componentDefinitionRefs indicates which types of componentDefinitions
-                  are supported by the operation, and can refer some vars of the componentDefinition.
-                  if it is set, the component that does not meet the conditions will
-                  be intercepted.
+                description: Specifies the types of componentDefinitions that are
+                  supported by the operation. It can refer to some variables of the
+                  componentDefinition. If set, any component that does not meet the
+                  conditions will be intercepted.
                 items:
                   properties:
                     accountName:
-                      description: the account name of the component. will inject
-                        the account username and password to `KB_ACCOUNT_USERNAME`
-                        and `KB_ACCOUNT_PASSWORD` in env of the job.
+                      description: Represents the account name of the component. If
+                        provided, the account username and password will be injected
+                        into the job environment variables `KB_ACCOUNT_USERNAME` and
+                        `KB_ACCOUNT_PASSWORD`.
                       type: string
                     name:
-                      description: refer to componentDefinition name.
+                      description: Refers to the name of the component definition.
+                        This is a required field with a maximum length of 32 characters.
                       maxLength: 32
                       type: string
                     serviceName:
-                      description: reference the services[*].name. will map the service
-                        name and ports to `KB_COMP_SVC_NAME` and `KB_COMP_SVC_PORT_$(portName)`
-                        in env of the job. portName will replace the characters '-'
-                        to '_' and convert to uppercase.
+                      description: References the name of the service. If provided,
+                        the service name and ports will be mapped to the job environment
+                        variables `KB_COMP_SVC_NAME` and `KB_COMP_SVC_PORT_$(portName)`.
+                        Note that the portName will replace the characters '-' with
+                        '_' and convert to uppercase.
                       type: string
                     varsRef:
-                      description: varsRef defines the envs that need to be referenced
-                        from the target component pod, and will inject to job's containers.
-                        if it is set, will ignore the global "varsRef".
+                      description: Defines the environment variables that need to
+                        be referenced from the target component pod and will be injected
+                        into the job's containers. If this field is set, the global
+                        "varsRef" will be ignored.
                       properties:
                         podSelectionStrategy:
                           default: PreferredAvailable
-                          description: "podSelectionStrategy how to select the target
-                            component pod for variable references based on the strategy.
-                            \n - PreferredAvailable: prioritize the selection of available
-                            pod. - Available: only select available pod. if not found,
-                            terminating the operation."
+                          description: Defines the method to select the target component
+                            pod for variable references. The strategy can be either
+                            'PreferredAvailable' which prioritizes the selection of
+                            available pods, or 'Available' which selects only available
+                            pods and terminates the operation if none are found.
                           enum:
                           - Available
                           - PreferredAvailable
                           type: string
                         vars:
-                          description: List of environment variables to set in the
-                            job's container.
+                          description: Represents a list of environment variables
+                            to be set in the job's container.
                           items:
                             properties:
                               name:
-                                description: Name of the variable. Must be a C_IDENTIFIER.
+                                description: Specifies the name of the variable. This
+                                  must be a C_IDENTIFIER.
                                 type: string
                               valueFrom:
-                                description: Source for the variable's value. Cannot
-                                  be used if value is not empty.
+                                description: Defines the source for the variable's
+                                  value.
                                 properties:
                                   envVarRef:
-                                    description: 'envVarRef defines which container
-                                      and env that the variable references from. source:
-                                      "env" or "envFrom" of the container.'
+                                    description: Specifies a reference to a specific
+                                      environment variable within a container. Used
+                                      to specify the source of the variable, which
+                                      can be either "env" or "envFrom".
                                     properties:
                                       containerName:
-                                        description: container name which defines
-                                          in componentDefinition or is injected by
-                                          kubeBlocks controller. if not specified,
-                                          will use the first container by default.
+                                        description: Specifies the name of the container
+                                          as defined in the componentDefinition or
+                                          as injected by the kubeBlocks controller.
+                                          If not specified, the first container will
+                                          be used by default.
                                         type: string
                                       envName:
-                                        description: env name, it will .
+                                        description: Defines the name of the environment
+                                          variable.
                                         type: string
                                     required:
                                     - envName
@@ -134,7 +142,7 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               jobSpec:
-                description: jobSpec describes the job spec for the operation.
+                description: Describes the job specification for the operation.
                 properties:
                   activeDeadlineSeconds:
                     description: Specifies the duration in seconds relative to the
@@ -8353,38 +8361,41 @@ spec:
                 - template
                 type: object
               parametersSchema:
-                description: parametersSchema describes the schema used for validation,
-                  pruning, and defaulting.
+                description: Describes the schema used for validation, pruning, and
+                  defaulting.
                 properties:
                   openAPIV3Schema:
-                    description: "openAPIV3Schema is the OpenAPI v3 schema to use
-                      for parameter schema. supported properties types: \n - string
-                      - number - integer - array: only supported the item with string
-                      type."
+                    description: 'Defines the OpenAPI v3 schema used for the parameter
+                      schema. The supported property types include: - string - number
+                      - integer - array: Note that only items of string type are supported.'
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
               preConditions:
-                description: preCondition if it meets the requirements to run the
+                description: Specifies the preconditions that must be met to run the
                   job for the operation.
                 items:
                   properties:
                     exec:
-                      description: a job will be run to execute preCondition. and
-                        the operation will be executed when the exec job is succeed.
+                      description: Represents a job that will be run to execute the
+                        PreCondition. The operation will only be executed if the job
+                        is successful.
                       properties:
                         args:
-                          description: container args.
+                          description: Represents the arguments to be passed to the
+                            command in the container.
                           items:
                             type: string
                           type: array
                         command:
-                          description: container commands.
+                          description: Specifies the commands to be executed in the
+                            container.
                           items:
                             type: string
                           type: array
                         env:
-                          description: container env.
+                          description: Defines the environment variables to be set
+                            in the container.
                           items:
                             description: EnvVar represents an environment variable
                               present in a Container.
@@ -8503,23 +8514,27 @@ spec:
                             type: object
                           type: array
                         image:
-                          description: image name.
+                          description: Specifies the name of the Docker image to be
+                            used for the execution.
                           type: string
                       required:
                       - image
                       type: object
                     rule:
-                      description: condition declares how the operation can be executed.
+                      description: Defines the conditions under which the operation
+                        can be executed.
                       properties:
                         expression:
-                          description: "expression declares how the operation can
-                            be executed using go template expression. it should return
-                            `true` or `false`, built-in objects: \n - `params` are
-                            input parameters. - `cluster` is referenced cluster object.
-                            - `component` is referenced the component Object."
+                          description: 'Defines how the operation can be executed
+                            using a Go template expression. Should return either `true`
+                            or `false`. The built-in objects available for use in
+                            the expression include: - `params`: These are the input
+                            parameters. - `cluster`: This is the referenced cluster
+                            object. - `component`: This is the referenced component
+                            object.'
                           type: string
                         message:
-                          description: report the message if the rule is not matched.
+                          description: Reported if the rule is not matched.
                           type: string
                       required:
                       - expression
@@ -8531,43 +8546,47 @@ spec:
                     rule: has(self.rule) || has(self.exec)
                 type: array
               varsRef:
-                description: varsRef defines the envs that need to be referenced from
-                  the target component pod, and will inject to job's containers.
+                description: Defines the environment variables that need to be referenced
+                  from the target component pod, and will be injected into the job's
+                  containers.
                 properties:
                   podSelectionStrategy:
                     default: PreferredAvailable
-                    description: "podSelectionStrategy how to select the target component
-                      pod for variable references based on the strategy. \n - PreferredAvailable:
-                      prioritize the selection of available pod. - Available: only
-                      select available pod. if not found, terminating the operation."
+                    description: Defines the method to select the target component
+                      pod for variable references. The strategy can be either 'PreferredAvailable'
+                      which prioritizes the selection of available pods, or 'Available'
+                      which selects only available pods and terminates the operation
+                      if none are found.
                     enum:
                     - Available
                     - PreferredAvailable
                     type: string
                   vars:
-                    description: List of environment variables to set in the job's
-                      container.
+                    description: Represents a list of environment variables to be
+                      set in the job's container.
                     items:
                       properties:
                         name:
-                          description: Name of the variable. Must be a C_IDENTIFIER.
+                          description: Specifies the name of the variable. This must
+                            be a C_IDENTIFIER.
                           type: string
                         valueFrom:
-                          description: Source for the variable's value. Cannot be
-                            used if value is not empty.
+                          description: Defines the source for the variable's value.
                           properties:
                             envVarRef:
-                              description: 'envVarRef defines which container and
-                                env that the variable references from. source: "env"
-                                or "envFrom" of the container.'
+                              description: Specifies a reference to a specific environment
+                                variable within a container. Used to specify the source
+                                of the variable, which can be either "env" or "envFrom".
                               properties:
                                 containerName:
-                                  description: container name which defines in componentDefinition
-                                    or is injected by kubeBlocks controller. if not
-                                    specified, will use the first container by default.
+                                  description: Specifies the name of the container
+                                    as defined in the componentDefinition or as injected
+                                    by the kubeBlocks controller. If not specified,
+                                    the first container will be used by default.
                                   type: string
                                 envName:
-                                  description: env name, it will .
+                                  description: Defines the name of the environment
+                                    variable.
                                   type: string
                               required:
                               - envName
@@ -8589,17 +8608,17 @@ spec:
             description: OpsDefinitionStatus defines the observed state of OpsDefinition
             properties:
               message:
-                description: Extra message for current phase.
+                description: Provides additional information about the current phase.
                 type: string
               observedGeneration:
-                description: ObservedGeneration is the most recent generation observed
-                  for this OpsDefinition.
+                description: Refers to the most recent generation observed for this
+                  OpsDefinition.
                 format: int64
                 type: integer
               phase:
-                description: Phase valid values are ``, `Available`, `Unavailable`.
-                  Available is OpsDefinition become available, and can be used for
-                  co-related objects.
+                description: Represents the current state of the OpsDefinition. Valid
+                  values are ``, `Available`, `Unavailable`. When the state is `Available`,
+                  the OpsDefinition is ready and can be used for related objects.
                 enum:
                 - Available
                 - Unavailable

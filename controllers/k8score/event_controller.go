@@ -29,6 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -76,5 +77,6 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Event{}).
+		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter)).
 		Complete(r)
 }

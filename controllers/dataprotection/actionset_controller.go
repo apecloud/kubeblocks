@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -93,7 +94,9 @@ func (r *ActionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 // SetupWithManager sets up the controller with the Manager.
 func (r *ActionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&dpv1alpha1.ActionSet{}).Complete(r)
+		For(&dpv1alpha1.ActionSet{}).
+		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter)).
+		Complete(r)
 }
 
 func (r *ActionSetReconciler) deleteExternalResources(

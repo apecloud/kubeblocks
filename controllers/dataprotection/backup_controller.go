@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -139,7 +140,8 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	} else {
 		b.Owns(&vsv1.VolumeSnapshot{}, builder.Predicates{})
 	}
-	return b.Complete(r)
+	return b.WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter)).
+		Complete(r)
 }
 
 func (r *BackupReconciler) parseBackupJob(ctx context.Context, object client.Object) []reconcile.Request {

@@ -21,4 +21,6 @@ package constant
 
 const (
 	EnableRBACManager = "EnableRBACManager"
+
+	ManagedNamespacesFlag = "managed-namespaces"
 )

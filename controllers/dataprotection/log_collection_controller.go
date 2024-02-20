@@ -26,14 +26,13 @@ import (
 	"strings"
 
 	"golang.org/x/exp/slices"
-	"k8s.io/utils/pointer"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -102,34 +101,16 @@ func (r *LogCollectionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 // SetupWithManager sets up the controller with the Manager.
 func (r *LogCollectionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&batchv1.Job{}, builder.WithPredicates(predicate.Funcs{
-			CreateFunc: func(_ event.CreateEvent) bool {
-				return false
-			},
-			UpdateFunc: func(e event.UpdateEvent) bool {
-				job, ok := e.ObjectNew.(*batchv1.Job)
-				if !ok {
-					return false
-				}
-				if !r.ownedByDataProtection(job) {
-					return false
-				}
-				for _, c := range job.Status.Conditions {
-					if c.Type == batchv1.JobFailed {
-						return true
-					}
-				}
-				return false
-			},
-			DeleteFunc: func(_ event.DeleteEvent) bool {
-				return false
-			},
-			GenericFunc: func(_ event.GenericEvent) bool {
-				return false
-			},
-		})).WithOptions(controller.Options{
-		MaxConcurrentReconciles: runtime.NumCPU(),
-	}).Complete(r)
+		For(&batchv1.Job{}, builder.WithPredicates(
+			failedJobUpdatePredicate{
+				Funcs: predicate.NewPredicateFuncs(func(object client.Object) bool { return false }),
+				r:     r,
+			})).
+		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter)).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: runtime.NumCPU(),
+		}).
+		Complete(r)
 }
 
 func (r *LogCollectionReconciler) ownedByDataProtection(job *batchv1.Job) bool {
@@ -252,4 +233,27 @@ func (r *LogCollectionReconciler) patchRestoreStatus(reqCtx intctrlutil.RequestC
 		return nil
 	}
 	return r.Client.Status().Patch(reqCtx.Ctx, restore, patch)
+}
+
+type failedJobUpdatePredicate struct {
+	predicate.Funcs
+	r *LogCollectionReconciler
+}
+
+var _ predicate.Predicate = failedJobUpdatePredicate{}
+
+func (p failedJobUpdatePredicate) Update(e event.UpdateEvent) bool {
+	job, ok := e.ObjectNew.(*batchv1.Job)
+	if !ok {
+		return false
+	}
+	if !p.r.ownedByDataProtection(job) {
+		return false
+	}
+	for _, c := range job.Status.Conditions {
+		if c.Type == batchv1.JobFailed {
+			return true
+		}
+	}
+	return false
 }

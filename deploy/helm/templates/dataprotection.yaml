@@ -58,6 +58,9 @@ spec:
             {{- with .Values.loggerSettings.encoder }}
             - "--zap-encoder={{ . }}"
             {{- end }}
+            {{- with .Values.managedNamespaces }}
+            - "--managed-namespaces={{ . }}"
+            {{- end }}
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}

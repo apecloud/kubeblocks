@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
@@ -299,6 +300,7 @@ func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1alpha1.Cluster{}).
 		Owns(&corev1.Secret{}).
 		Watches(&batchv1.Job{}, r.jobCompletionHandler()).
+		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter)).
 		Complete(r)
 }
 

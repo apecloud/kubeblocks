@@ -136,7 +136,7 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
-		WithEventFilter(predicate.NewPredicateFuncs(checkConfigurationObject)).
+		WithEventFilter(predicate.And(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter), predicate.NewPredicateFuncs(checkConfigurationObject))).
 		Complete(r)
 }
 

@@ -124,6 +124,9 @@ func main() {
 		"The leader election ID prefix for controller manager. "+
 			"This ID must be unique to controller manager.")
 
+	flag.String(constant.ManagedNamespacesFlag, "",
+		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -168,6 +171,11 @@ func main() {
 	if err := validateRequiredToParseConfigs(); err != nil {
 		setupLog.Error(err, "config value error")
 		os.Exit(1)
+	}
+
+	managedNamespaces := viper.GetString(strings.ReplaceAll(constant.ManagedNamespacesFlag, "-", "_"))
+	if len(managedNamespaces) > 0 {
+		setupLog.Info(fmt.Sprintf("managed namespaces: %s", managedNamespaces))
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{

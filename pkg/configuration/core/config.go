@@ -328,12 +328,18 @@ func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
 }
 
 func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig, sets *set.LinkedHashSetString) []VisualizedParam {
+	return GenerateVisualizedParamsListImpl(configPatch, formatConfig, sets, false)
+}
+
+// GenerateVisualizedParamsListImpl Generate visualized parameters list
+// for kbcli edit-config command
+func GenerateVisualizedParamsListImpl(configPatch *ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig, sets *set.LinkedHashSetString, force bool) []VisualizedParam {
 	if !configPatch.IsModify {
 		return nil
 	}
 
 	var trimPrefix = NestedPrefixField(formatConfig)
-	var applyAllSections = isIniCfgAndSupportMultiSection(formatConfig)
+	var applyAllSections = isIniCfgAndSupportMultiSection(formatConfig) || force
 	var section = getIniSection(formatConfig)
 
 	r := make([]VisualizedParam, 0)
@@ -375,7 +381,7 @@ func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, set
 
 func checkAndFlattenMap(v any, trim string, applyAllSections bool, defaultSection string) []ParameterPair {
 	m := cast.ToStringMap(v)
-	if m != nil && trim != "" {
+	if m != nil && !applyAllSections && trim != "" {
 		m = cast.ToStringMap(m[trim])
 	}
 	if m != nil {

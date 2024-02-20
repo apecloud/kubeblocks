@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -121,7 +122,9 @@ func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts, handler cfg
 	eventHandler := func(ctx context.Context, event fsnotify.Event) error {
 		return handler.VolumeHandle(ctx, event)
 	}
-	logger.Info("starting fsnotify VolumeWatcher.")
+	logger.Infow("starting fsnotify VolumeWatcher.",
+		zap.Any("volumesDirs", strings.Join(opt.VolumeDirs, ",")),
+	)
 	volumeWatcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
 	err := volumeWatcher.AddHandler(eventHandler).Run()
 	if err != nil {

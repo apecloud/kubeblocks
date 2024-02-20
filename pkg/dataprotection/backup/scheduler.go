@@ -226,7 +226,7 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 			}
 			return s.Client.Delete(s.Ctx, cronJob)
 		}
-		// if no cron expression, return
+		// if cronjob does not exist, return
 		return nil
 	}
 

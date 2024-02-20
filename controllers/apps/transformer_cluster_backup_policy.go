@@ -36,6 +36,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
+)
+
+const (
+	defaultCronExpression = "0 18 * * *"
 )
 
 // clusterBackupPolicyTransformer transforms the backup policy template to the data protection backup policy and backup schedule.
@@ -85,7 +90,6 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 		r.backupPolicyTpl = &tpl
 
 		for i := range tpl.Spec.BackupPolicies {
-
 			r.backupPolicy = &tpl.Spec.BackupPolicies[i]
 
 			transformBackupPolicy := func() *dpv1alpha1.BackupPolicy {
@@ -94,26 +98,25 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 					return nil
 				}
 				// build the data protection backup policy from the template.
-				dpBackupPolicy, action := r.transformBackupPolicy(comp)
-				if dpBackupPolicy == nil {
+				oldBackupPolicy, newBackupPolicy := r.transformBackupPolicy(comp)
+				if newBackupPolicy == nil {
 					return nil
 				}
 
 				// if exist multiple backup policy templates and duplicate spec.identifier,
 				// the generated backupPolicy may have duplicate names, so it is
 				// necessary to check if it already exists.
-				if _, ok := backupPolicyNames[dpBackupPolicy.Name]; ok {
-					return dpBackupPolicy
+				if _, ok := backupPolicyNames[newBackupPolicy.Name]; ok {
+					return nil
 				}
 
-				switch *action {
-				case model.CREATE:
-					graphCli.Create(dag, dpBackupPolicy)
-				case model.UPDATE:
-					graphCli.Update(dag, dpBackupPolicy, dpBackupPolicy)
+				if oldBackupPolicy == nil {
+					graphCli.Create(dag, newBackupPolicy)
+				} else {
+					graphCli.Patch(dag, oldBackupPolicy, newBackupPolicy)
 				}
-				backupPolicyNames[dpBackupPolicy.Name] = struct{}{}
-				return dpBackupPolicy
+				backupPolicyNames[newBackupPolicy.Name] = struct{}{}
+				return newBackupPolicy
 			}
 
 			transformBackupSchedule := func(backupPolicy *dpv1alpha1.BackupPolicy) {
@@ -127,22 +130,17 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				// only create backup schedule for the default backup policy template
 				// if there are more than one backup policy templates.
 				if r.isDefaultTemplate != trueVal && r.tplCount > 1 {
+					r.V(1).Info("Skip creating backup schedule for non-default backup policy template %s", tpl.Name)
 					return
 				}
 
 				// build the data protection backup schedule from the template.
-				dpBackupSchedule, action := r.transformBackupSchedule(backupPolicy)
+				oldBackupSchedule, newBackupSchedule := r.transformBackupSchedule(backupPolicy)
 
 				// merge cluster backup configuration into the backup schedule.
 				// If the backup schedule is nil, create a new backup schedule
 				// based on the cluster backup configuration.
-				if dpBackupSchedule == nil {
-					action = model.ActionCreatePtr()
-				} else if action == nil {
-					action = model.ActionUpdatePtr()
-				}
-
-				// for a cluster, the default backup schedule is created by backup
+				// For a cluster, the default backup schedule is created by backup
 				// policy template, user can also configure cluster backup in the
 				// cluster custom object, such as enable cluster backup, set backup
 				// schedule, etc.
@@ -150,26 +148,25 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				// cluster object, so we need to merge the cluster backup configuration
 				// into the default backup schedule created by backup policy template
 				// if it exists.
-				dpBackupSchedule = r.mergeClusterBackup(backupPolicy, dpBackupSchedule)
-				if dpBackupSchedule == nil {
+				newBackupSchedule = r.mergeClusterBackup(backupPolicy, newBackupSchedule)
+				if newBackupSchedule == nil {
 					return
 				}
 
 				// if exist multiple backup policy templates and duplicate spec.identifier,
-				// the backupPolicy that may be generated may have duplicate names,
+				// the backupSchedule that may be generated may have duplicate names,
 				// and it is necessary to check if it already exists.
-				if _, ok := backupScheduleNames[dpBackupSchedule.Name]; ok {
+				if _, ok := backupScheduleNames[newBackupSchedule.Name]; ok {
 					return
 				}
 
-				switch *action {
-				case model.CREATE:
-					graphCli.Create(dag, dpBackupSchedule)
-				case model.UPDATE:
-					graphCli.Update(dag, dpBackupSchedule, dpBackupSchedule)
+				if oldBackupSchedule == nil {
+					graphCli.Create(dag, newBackupSchedule)
+				} else {
+					graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
 				}
-				graphCli.DependOn(dag, backupPolicy, dpBackupSchedule)
-				backupScheduleNames[dpBackupSchedule.Name] = struct{}{}
+				graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
+				backupScheduleNames[newBackupSchedule.Name] = struct{}{}
 			}
 
 			// transform backup policy template to data protection backupPolicy
@@ -182,8 +179,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 }
 
 // transformBackupPolicy transforms backup policy template to backup policy.
-func (r *clusterBackupPolicyTransformer) transformBackupPolicy(comp *appsv1alpha1.ClusterComponentSpec) (*dpv1alpha1.BackupPolicy, *model.Action) {
-
+func (r *clusterBackupPolicyTransformer) transformBackupPolicy(comp *appsv1alpha1.ClusterComponentSpec) (*dpv1alpha1.BackupPolicy, *dpv1alpha1.BackupPolicy) {
 	cluster := r.OrigCluster
 	compDefName := comp.ComponentDefRef
 	if compDefName == "" {
@@ -195,21 +191,24 @@ func (r *clusterBackupPolicyTransformer) transformBackupPolicy(comp *appsv1alpha
 		Namespace: cluster.Namespace,
 		Name:      backupPolicyName,
 	}, backupPolicy); client.IgnoreNotFound(err) != nil {
+		r.Error(err, "failed to get backup policy", "backupPolicy", backupPolicyName)
 		return nil, nil
 	}
 
 	if len(backupPolicy.Name) == 0 {
 		// build a new backup policy by the backup policy template.
-		return r.buildBackupPolicy(comp, backupPolicyName), model.ActionCreatePtr()
+		return nil, r.buildBackupPolicy(comp, backupPolicyName)
 	}
 
 	// sync the existing backup policy with the cluster changes
+	old := backupPolicy.DeepCopy()
 	r.syncBackupPolicy(comp, backupPolicy)
-	return backupPolicy, model.ActionUpdatePtr()
+	return old, backupPolicy
 }
 
 func (r *clusterBackupPolicyTransformer) transformBackupSchedule(
-	backupPolicy *dpv1alpha1.BackupPolicy) (*dpv1alpha1.BackupSchedule, *model.Action) {
+	backupPolicy *dpv1alpha1.BackupPolicy,
+) (*dpv1alpha1.BackupSchedule, *dpv1alpha1.BackupSchedule) {
 	cluster := r.OrigCluster
 	scheduleName := generateBackupScheduleName(cluster.Name, r.backupPolicy.ComponentDefRef, r.tplIdentifier)
 	backupSchedule := &dpv1alpha1.BackupSchedule{}
@@ -217,16 +216,18 @@ func (r *clusterBackupPolicyTransformer) transformBackupSchedule(
 		Namespace: cluster.Namespace,
 		Name:      scheduleName,
 	}, backupSchedule); client.IgnoreNotFound(err) != nil {
+		r.Error(err, "failed to get backup schedule", "backupSchedule", scheduleName)
 		return nil, nil
 	}
 
+	// build a new backup schedule from the backup policy template.
 	if len(backupSchedule.Name) == 0 {
-		// build a new backup schedule from the backup policy template.
-		return r.buildBackupSchedule(scheduleName, backupPolicy), model.ActionCreatePtr()
+		return nil, r.buildBackupSchedule(scheduleName, backupPolicy)
 	}
-	// sync backup schedule
+
+	old := backupSchedule.DeepCopy()
 	r.syncBackupSchedule(backupSchedule)
-	return backupSchedule, model.ActionUpdatePtr()
+	return old, backupSchedule
 }
 
 func (r *clusterBackupPolicyTransformer) buildBackupSchedule(
@@ -299,7 +300,6 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp *appsv1alpha1.Clu
 	r.syncBackupMethods(backupPolicy, comp)
 
 	// convert role labelSelector based on the replicas of the component automatically.
-	// TODO(ldm): need more review.
 	r.syncRoleLabelSelector(backupPolicy.Spec.Target, r.backupPolicy.Target.Role)
 }
 
@@ -353,8 +353,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupPolicy(comp *appsv1alpha1.Cl
 }
 
 // syncBackupMethods syncs the backupMethod of tpl to backupPolicy.
-func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy,
-	comp *appsv1alpha1.ClusterComponentSpec) {
+func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy, comp *appsv1alpha1.ClusterComponentSpec) {
 	var backupMethods []dpv1alpha1.BackupMethod
 	oldBackupMethodMap := map[string]dpv1alpha1.BackupMethod{}
 	for _, v := range backupPolicy.Spec.BackupMethods {
@@ -404,10 +403,11 @@ func (r *clusterBackupPolicyTransformer) doEnvMapping(comp *appsv1alpha1.Cluster
 	return env
 }
 
-func (r *clusterBackupPolicyTransformer) buildBackupTarget(targetTpl appsv1alpha1.TargetInstance,
-	comp *appsv1alpha1.ClusterComponentSpec) *dpv1alpha1.BackupTarget {
+func (r *clusterBackupPolicyTransformer) buildBackupTarget(
+	targetTpl appsv1alpha1.TargetInstance,
+	comp *appsv1alpha1.ClusterComponentSpec,
+) *dpv1alpha1.BackupTarget {
 	clusterName := r.OrigCluster.Name
-
 	if targetTpl.Strategy == "" {
 		targetTpl.Strategy = dpv1alpha1.PodSelectionStrategyAny
 	}
@@ -453,7 +453,8 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(targetTpl appsv1alpha
 
 func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 	backupPolicy *dpv1alpha1.BackupPolicy,
-	backupSchedule *dpv1alpha1.BackupSchedule) *dpv1alpha1.BackupSchedule {
+	backupSchedule *dpv1alpha1.BackupSchedule,
+) *dpv1alpha1.BackupSchedule {
 	cluster := r.OrigCluster
 	backupEnabled := func() bool {
 		return cluster.Spec.Backup != nil && boolValue(cluster.Spec.Backup.Enabled)
@@ -469,6 +470,14 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 	}
 
 	backup := cluster.Spec.Backup
+	method := dputils.GetBackupMethodByName(backup.Method, backupPolicy)
+	// the specified backup method should be in the backup policy, if not, record event and return.
+	if method == nil {
+		r.EventRecorder.Event(r.Cluster, corev1.EventTypeWarning,
+			"BackupMethodNotFound", fmt.Sprintf("backup method %s is not found in backup policy", backup.Method))
+		return backupSchedule
+	}
+
 	// there is no backup schedule created by backup policy template, so we need to
 	// create a new backup schedule for cluster backup.
 	if backupSchedule == nil {
@@ -499,13 +508,53 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 	// schedule with specified method already exists, we need to update it
 	// using the cluster backup schedule policy. Otherwise, we need to append
 	// it to the backup schedule.
+	// If cluster backup method is changed, we need to disable previous backup
+	// method, for instance, the method is changed from A to B, we need to
+	// disable A and enable B.
+	exist := false
 	for i, s := range backupSchedule.Spec.Schedules {
 		if s.BackupMethod == backup.Method {
 			mergeSchedulePolicy(sp, &backupSchedule.Spec.Schedules[i])
-			return backupSchedule
+			exist = true
+			continue
+		}
+
+		// for the backup methods that are not specified in the cluster backup,
+		// we need to disable them.
+
+		if !boolptr.IsSetToTrue(s.Enabled) {
+			continue
+		}
+
+		// if PITR is not enabled, disable the backup schedule.
+		if !boolptr.IsSetToTrue(backup.PITREnabled) {
+			backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
+			continue
+		}
+
+		// if PITR is enabled, we should check and disable the backup schedule if
+		// the backup type is not Continuous. The Continuous backup schedule is
+		// reconciled by the enterprise edition operator.
+		m := dputils.GetBackupMethodByName(s.BackupMethod, backupPolicy)
+		if m == nil || m.ActionSetName == "" {
+			continue
+		}
+
+		as := &dpv1alpha1.ActionSet{}
+		if err := r.Client.Get(r.Context, client.ObjectKey{Name: m.ActionSetName}, as); err != nil {
+			r.Error(err, "failed to get ActionSet for backup.", "ActionSet", as.Name)
+			continue
+		}
+		if as.Spec.BackupType != dpv1alpha1.BackupTypeContinuous {
+			backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
 		}
 	}
-	backupSchedule.Spec.Schedules = append(backupSchedule.Spec.Schedules, *sp)
+	if !exist {
+		if sp.CronExpression == "" {
+			sp.CronExpression = defaultCronExpression
+		}
+		backupSchedule.Spec.Schedules = append(backupSchedule.Spec.Schedules, *sp)
+	}
 	return backupSchedule
 }
 

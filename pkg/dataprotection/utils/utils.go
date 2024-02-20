@@ -103,8 +103,7 @@ func RemoveDataProtectionFinalizer(ctx context.Context, cli client.Client, obj c
 }
 
 // GetActionSetByName gets the ActionSet by name.
-func GetActionSetByName(reqCtx intctrlutil.RequestCtx,
-	cli client.Client, name string) (*dpv1alpha1.ActionSet, error) {
+func GetActionSetByName(reqCtx intctrlutil.RequestCtx, cli client.Client, name string) (*dpv1alpha1.ActionSet, error) {
 	if name == "" {
 		return nil, nil
 	}
@@ -116,10 +115,7 @@ func GetActionSetByName(reqCtx intctrlutil.RequestCtx,
 	return as, nil
 }
 
-func GetBackupPolicyByName(
-	reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	name string) (*dpv1alpha1.BackupPolicy, error) {
+func GetBackupPolicyByName(reqCtx intctrlutil.RequestCtx, cli client.Client, name string) (*dpv1alpha1.BackupPolicy, error) {
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	key := client.ObjectKey{
 		Namespace: reqCtx.Req.Namespace,
@@ -132,9 +128,9 @@ func GetBackupPolicyByName(
 }
 
 func GetBackupMethodByName(name string, backupPolicy *dpv1alpha1.BackupPolicy) *dpv1alpha1.BackupMethod {
-	for _, m := range backupPolicy.Spec.BackupMethods {
+	for i, m := range backupPolicy.Spec.BackupMethods {
 		if m.Name == name {
-			return &m
+			return &backupPolicy.Spec.BackupMethods[i]
 		}
 	}
 	return nil

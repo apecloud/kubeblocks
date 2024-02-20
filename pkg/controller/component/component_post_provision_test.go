@@ -183,12 +183,16 @@ var _ = Describe("Component PostProvision Test", func() {
 			renderJob, err := renderPostProvisionCmdJob(testCtx.Ctx, testCtx.Cli, cluster, synthesizeComp)
 			Expect(err).Should(Succeed())
 			Expect(renderJob).ShouldNot(BeNil())
-			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 5).Should(BeTrue())
+			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 9).Should(BeTrue())
 			compListExist := false
 			compPodNameListExist := false
 			compPodIPListExist := false
 			compPodHostNameListExist := false
 			compPodHostIPListExist := false
+			clusterPodNameListExist := false
+			clusterPodIPListExist := false
+			clusterPodHostNameListExist := false
+			clusterPodHostIPListExist := false
 			for _, env := range renderJob.Spec.Template.Spec.Containers[0].Env {
 				switch env.Name {
 				case kbPostProvisionClusterCompList:
@@ -201,6 +205,14 @@ var _ = Describe("Component PostProvision Test", func() {
 					compPodIPListExist = true
 				case kbPostProvisionClusterCompPodNameList:
 					compPodNameListExist = true
+				case kbPostProvisionClusterPodHostIPList:
+					clusterPodHostIPListExist = true
+				case kbPostProvisionClusterPodHostNameList:
+					clusterPodHostNameListExist = true
+				case kbPostProvisionClusterPodIPList:
+					clusterPodIPListExist = true
+				case kbPostProvisionClusterPodNameList:
+					clusterPodNameListExist = true
 				}
 			}
 			Expect(compListExist).Should(BeTrue())
@@ -208,6 +220,10 @@ var _ = Describe("Component PostProvision Test", func() {
 			Expect(compPodIPListExist).Should(BeTrue())
 			Expect(compPodHostNameListExist).Should(BeTrue())
 			Expect(compPodHostIPListExist).Should(BeTrue())
+			Expect(clusterPodNameListExist).Should(BeTrue())
+			Expect(clusterPodIPListExist).Should(BeTrue())
+			Expect(clusterPodHostNameListExist).Should(BeTrue())
+			Expect(clusterPodHostIPListExist).Should(BeTrue())
 		})
 	})
 })

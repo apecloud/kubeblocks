@@ -16,16 +16,21 @@ limitations under the License.
 
 package v1alpha1
 
-// StorageProviderPhase defines phases of a storage provider.
+// StorageProviderPhase defines phases of a `StorageProvider`.
+//
 // +enum
 type StorageProviderPhase string
 
 const (
+	// StorageProviderNotReady indicates that the `StorageProvider` is not ready,
+	// usually because the specified CSI driver is not yet installed.
 	StorageProviderNotReady StorageProviderPhase = "NotReady"
-	StorageProviderReady    StorageProviderPhase = "Ready"
+	// StorageProviderReady indicates that the `StorageProvider` is ready for use.
+	StorageProviderReady StorageProviderPhase = "Ready"
 )
 
 const (
-	// condition types
+	// ConditionTypeCSIDriverInstalled is the name of the condition that
+	// indicates whether the CSI driver is installed.
 	ConditionTypeCSIDriverInstalled = "CSIDriverInstalled"
 )

@@ -26,70 +26,82 @@ import (
 
 // ServiceDescriptorSpec defines the desired state of ServiceDescriptor
 type ServiceDescriptorSpec struct {
-	// service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. {mysql, redis, mongodb}.
-	// The serviceKind is case-insensitive and supports abbreviations for some well-known databases.
-	// For example, both `zk` and `zookeeper` will be considered as a ZooKeeper cluster, and `pg`, `postgres`, `postgresql` will all be considered as a PostgreSQL cluster.
+	// Specifies the type or nature of the service. Should represent a well-known application cluster type, such as {mysql, redis, mongodb}.
+	// This field is case-insensitive and supports abbreviations for some well-known databases.
+	// For instance, both `zk` and `zookeeper` will be recognized as a ZooKeeper cluster, and `pg`, `postgres`, `postgresql` will all be recognized as a PostgreSQL cluster.
 	//
 	// +kubebuilder:validation:Required
 	ServiceKind string `json:"serviceKind"`
 
-	// The version of the service reference.
+	// Represents the version of the service reference.
+	//
 	// +kubebuilder:validation:Required
 	ServiceVersion string `json:"serviceVersion"`
 
-	// endpoint is the endpoint of the service connection credential.
+	// Represents the endpoint of the service connection credential.
+	//
 	// +optional
 	Endpoint *CredentialVar `json:"endpoint,omitempty"`
 
-	// auth is the auth of the service connection credential.
+	// Represents the authentication details of the service connection credential.
+	//
 	// +optional
 	Auth *ConnectionCredentialAuth `json:"auth,omitempty"`
 
-	// port is the port of the service connection credential.
+	// Represents the port of the service connection credential.
+	//
 	// +optional
 	Port *CredentialVar `json:"port,omitempty" protobuf:"bytes,4,opt,name=port"`
 }
 
+// ConnectionCredentialAuth represents the authentication details of the service connection credential.
 type ConnectionCredentialAuth struct {
-	// service connection based-on username and password credential.
+	// Represents the username credential for the service connection.
+	//
 	// +optional
 	Username *CredentialVar `json:"username,omitempty"`
 
-	// service connection based-on username and password credential.
+	// Represents the password credential for the service connection.
+	//
 	// +optional
 	Password *CredentialVar `json:"password,omitempty"`
 }
 
+// CredentialVar defines the value of credential variable.
 type CredentialVar struct {
-	// Optional: no more than one of the following may be specified.
-
-	// Variable references $(VAR_NAME) are expanded
-	// using the previously defined environment variables in the container and
-	// any service environment variables. If a variable cannot be resolved,
-	// the reference in the input string will be unchanged. Double $$ are reduced
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-	// "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
-	// Escaped references will never be expanded, regardless of whether the variable
-	// exists or not.
-	// Defaults to "".
+	// Specifies an optional variable. Only one of the following may be specified.
+	// Variable references, denoted by $(VAR_NAME), are expanded using previously defined
+	// environment variables in the container and any service environment variables.
+	// If a variable cannot be resolved, the reference in the input string remains unchanged.
+	//
+	// Double $$ are reduced to a single $, enabling the escaping of the $(VAR_NAME) syntax.
+	// For instance, "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+	// Escaped references will never be expanded, irrespective of the variable's existence.
+	// The default value is "".
+	//
 	// +optional
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
-	// Source for the environment variable's value. Cannot be used if value is not empty.
+
+	// Defines the source for the environment variable's value. This cannot be used if the value is not empty.
+	//
 	// +optional
 	ValueFrom *corev1.EnvVarSource `json:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
 }
 
 // ServiceDescriptorStatus defines the observed state of ServiceDescriptor
 type ServiceDescriptorStatus struct {
-	// phase - in list of [Available,Unavailable]
+	// Indicates the current lifecycle phase of the ServiceDescriptor. This can be either 'Available' or 'Unavailable'.
+	//
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// A human-readable message indicating details about why the ServiceConnectionCredential is in this phase.
+	// Provides a human-readable explanation detailing the reason for the current phase of the ServiceConnectionCredential.
+	//
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// generation number
+	// Represents the generation number that has been processed by the controller.
+	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }

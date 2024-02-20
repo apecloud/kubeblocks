@@ -61,23 +61,27 @@ func init() {
 // ComponentDefinitionSpec provides a workload component specification with attributes that strongly work with stateful workloads and day-2 operation behaviors.
 type ComponentDefinitionSpec struct {
 	// Provider is the name of the component provider.
+	//
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	Provider string `json:"provider,omitempty"`
 
 	// Description is a brief description of the component.
+	//
 	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	Description string `json:"description,omitempty"`
 
 	// ServiceKind defines what kind of well-known service that the component provides (e.g., MySQL, Redis, ETCD, case insensitive).
 	// Cannot be updated.
+	//
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceKind string `json:"serviceKind,omitempty"`
 
 	// ServiceVersion defines the version of the well-known service that the component provides.
 	// Cannot be updated.
+	//
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
@@ -116,6 +120,7 @@ type ComponentDefinitionSpec struct {
 	// Volumes defines the persistent volumes needed by the component.
 	// The users are responsible for providing these volumes when creating a component instance.
 	// Cannot be updated.
+	//
 	// +optional
 	Volumes []ComponentVolume `json:"volumes"`
 
@@ -130,6 +135,7 @@ type ComponentDefinitionSpec struct {
 	// The configs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// Cannot be updated.
+	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
@@ -140,6 +146,7 @@ type ComponentDefinitionSpec struct {
 
 	// LogConfigs is detail log file config which provided by provider.
 	// Cannot be updated.
+	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
@@ -149,12 +156,14 @@ type ComponentDefinitionSpec struct {
 
 	// Monitor is monitoring config which provided by provider.
 	// Cannot be updated.
+	//
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
 	// The scripts field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// Cannot be updated.
+	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
@@ -165,39 +174,46 @@ type ComponentDefinitionSpec struct {
 	// PolicyRules defines the namespaced policy rules required by the component.
 	// If any rule application fails (e.g., due to lack of permissions), the provisioning of the component instance will also fail.
 	// Cannot be updated.
+	//
 	// +optional
 	PolicyRules []rbacv1.PolicyRule `json:"policyRules,omitempty"`
 
 	// Labels defines static labels that will be patched to all k8s resources created for the component.
 	// If a label key conflicts with any other system labels or user-specified labels, it will be silently ignored.
 	// Cannot be updated.
+	//
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// ReplicasLimit defines the limit of valid replicas supported.
 	// Cannot be updated.
+	//
 	// +optional
 	ReplicasLimit *ReplicasLimit `json:"replicasLimit,omitempty"`
 
 	// SystemAccounts defines the pre-defined system accounts required to manage the component.
 	// TODO(component): accounts KB required
 	// Cannot be updated.
+	//
 	// +optional
 	SystemAccounts []SystemAccount `json:"systemAccounts,omitempty"`
 
 	// UpdateStrategy defines the strategy for updating the component instance.
 	// Cannot be updated.
+	//
 	// +kubebuilder:default=Serial
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// Roles defines all the roles that the component can assume.
 	// Cannot be updated.
+	//
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
 	// RoleArbitrator defines the strategy for electing the component's active role.
 	// Cannot be updated.
+	//
 	// +kubebuilder:default=External
 	// +optional
 	RoleArbitrator *RoleArbitrator `json:"roleArbitrator,omitempty"`
@@ -205,17 +221,20 @@ type ComponentDefinitionSpec struct {
 	// LifecycleActions defines the operational actions that needed to interoperate with the component
 	// service and processes for lifecycle management.
 	// Cannot be updated.
+	//
 	// +optional
 	LifecycleActions *ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 
 	// ServiceRefDeclarations is used to declare the service reference of the current component.
 	// Cannot be updated.
+	//
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	//
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=0
 	// +optional
@@ -225,15 +244,18 @@ type ComponentDefinitionSpec struct {
 // ComponentDefinitionStatus defines the observed state of ComponentDefinition.
 type ComponentDefinitionStatus struct {
 	// ObservedGeneration is the most recent generation observed for this ComponentDefinition.
+	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Phase valid values are ``, `Available`, `Unavailable`.
 	// Available is ComponentDefinition become available, and can be used for co-related objects.
+	//
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
 	// Extra message for current phase.
+	//
 	// +optional
 	Message string `json:"message,omitempty"`
 }
@@ -243,11 +265,13 @@ type ComponentVolume struct {
 	// Must be a DNS_LABEL and unique within the pod.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	// Cannot be updated.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// NeedSnapshot indicates whether the volume need to snapshot when making a backup for the component.
 	// Cannot be updated.
+	//
 	// +kubebuilder:default=false
 	// +optional
 	NeedSnapshot bool `json:"needSnapshot,omitempty"`
@@ -272,40 +296,46 @@ type ComponentVolume struct {
 // +kubebuilder:validation:XValidation:rule="self.minReplicas <= self.maxReplicas",message="the minimum replicas limit should be no greater than the maximum"
 type ReplicasLimit struct {
 	// The minimum limit of replicas.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	MinReplicas int32 `json:"minReplicas"`
 
 	// The maximum limit of replicas.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	MaxReplicas int32 `json:"maxReplicas"`
 }
 
 type SystemAccount struct {
-	// The name of the account.
-	// Others can refer to this account by the name.
-	// Cannot be updated.
+	// Specifies the unique identifier for the account. This name is used by other entities to reference the account.
+	// This field is immutable once set.
+	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// InitAccount indicates whether this is the unique system initialization account (e.g., MySQL root).
-	// Only one system init account is allowed.
-	// Cannot be updated.
+	// Indicates if this account is the unique system initialization account (e.g., MySQL root).
+	// Only one system initialization account is permitted.
+	// This field is immutable once set.
+	//
 	// +kubebuilder:default=false
 	// +optional
 	InitAccount bool `json:"initAccount,omitempty"`
 
-	// Statement specifies the statement used to create the account with required privileges.
-	// Cannot be updated.
+	// Defines the statement used to create the account with the necessary privileges.
+	// This field is immutable once set.
+	//
 	// +optional
 	Statement string `json:"statement,omitempty"`
 
-	// PasswordGenerationPolicy defines the policy for generating the account's password.
-	// Cannot be updated.
+	// Specifies the policy for generating the account's password.
+	// This field is immutable once set.
+	//
 	// +optional
 	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy"`
 
-	// SecretRef specifies the secret from which data will be copied to create the new account.
-	// Cannot be updated.
+	// Refers to the secret from which data will be copied to create the new account.
+	// This field is immutable once set.
+	//
 	// +optional
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
@@ -322,27 +352,31 @@ const (
 
 // ReplicaRole represents a role that can be assumed by a component instance.
 type ReplicaRole struct {
-	// Name of the role. It will apply to "apps.kubeblocks.io/role" object label value.
-	// Cannot be updated.
+	// Defines the role's identifier. This will be applied to the "apps.kubeblocks.io/role" object label value.
+	// This field is immutable once set.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	// +kubebuilder:validation:Pattern=`^.*[^\s]+.*$`
 	Name string `json:"name"`
 
-	// Serviceable indicates whether a replica with this role can provide services.
-	// Cannot be updated.
+	// Specifies if a replica assuming this role can provide services.
+	// This field is immutable once set.
+	//
 	// +kubebuilder:default=false
 	// +optional
 	Serviceable bool `json:"serviceable,omitempty"`
 
-	// Writable indicates whether a replica with this role is allowed to write data.
-	// Cannot be updated.
+	// Specifies if a replica assuming this role is permitted to write data.
+	// This field is immutable once set.
+	//
 	// +kubebuilder:default=false
 	// +optional
 	Writable bool `json:"writable,omitempty"`
 
-	// Votable indicates whether a replica with this role is allowed to vote.
-	// Cannot be updated.
+	// Specifies if a replica assuming this role is permitted to vote.
+	// This field is immutable once set.
+	//
 	// +kubebuilder:default=false
 	// +optional
 	Votable bool `json:"votable,omitempty"`
@@ -362,56 +396,68 @@ const (
 
 // HTTPAction describes an action based on HTTP requests.
 type HTTPAction struct {
-	// Path to access on the HTTP server.
+	// Specifies the path to be accessed on the HTTP server.
+	//
 	// +optional
 	Path string `json:"path,omitempty"`
 
-	// Name or number of the port to access on the container.
-	// Number must be in the range 1 to 65535.
-	// Name must be an IANA_SVC_NAME.
+	// Defines the name or number of the port to be accessed on the container.
+	// The number must fall within the range of 1 to 65535.
+	// The name must conform to the IANA_SVC_NAME standard.
 	Port intstr.IntOrString `json:"port"`
 
-	// Host name to connect to, defaults to the pod IP. You probably want to set
-	// "Host" in httpHeaders instead.
+	// Indicates the host name to connect to, which defaults to the pod IP.
+	// It is recommended to set "Host" in httpHeaders instead.
+	//
 	// +optional
 	Host string `json:"host,omitempty"`
 
-	// Scheme to use for connecting to the host.
-	// Defaults to HTTP.
+	// Specifies the scheme to be used for connecting to the host.
+	// The default scheme is HTTP.
+	//
 	// +optional
 	Scheme corev1.URIScheme `json:"scheme,omitempty"`
 
-	// Method represents the HTTP request method, which can be one of the standard HTTP methods like "GET," "POST," "PUT," etc.
-	// Defaults to Get.
+	// Represents the HTTP request method, which can be one of the standard HTTP methods such as "GET," "POST," "PUT," etc.
+	// The default method is Get.
+	//
 	// +optional
 	Method string `json:"method,omitempty"`
 
-	// Custom headers to set in the request. HTTP allows repeated headers.
+	// Allows for the setting of custom headers in the request.
+	// HTTP supports repeated headers.
+	//
 	// +optional
 	HTTPHeaders []corev1.HTTPHeader `json:"httpHeaders,omitempty"`
 }
 
 type ExecAction struct {
-	// Command is the command line to execute inside the container, the working directory for the
-	// command  is root ('/') in the container's filesystem. The command is simply exec'd, it is
-	// not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use
-	// a shell, you need to explicitly call out to that shell.
-	// Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
+	// Specifies the command line to be executed inside the container. The working directory for this command
+	// is the root ('/') of the container's filesystem. The command is directly executed and not run inside a shell,
+	// hence traditional shell instructions ('|', etc) are not applicable. To use a shell, it needs to be explicitly invoked.
+	//
+	// An exit status of 0 is interpreted as live/healthy, while a non-zero status indicates unhealthy.
+	//
 	// +optional
 	Command []string `json:"command,omitempty" protobuf:"bytes,1,rep,name=command"`
 
-	// args is used to perform statements.
+	// Args are used to perform statements.
+	//
 	// +optional
 	Args []string `json:"args,omitempty"`
 }
 
 type RetryPolicy struct {
-	// MaxRetries specifies the maximum number of times the action should be retried.
+	// Defines the maximum number of retry attempts that should be made for a given action.
+	// This value is set to 0 by default, indicating that no retries will be made.
+	//
 	// +kubebuilder:default=0
 	// +optional
 	MaxRetries int `json:"maxRetries,omitempty"`
 
-	// RetryInterval specifies the interval between retry attempts.
+	// Indicates the duration of time to wait between each retry attempt.
+	// This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+	//
 	// +kubebuilder:default=0
 	// +optional
 	RetryInterval time.Duration `json:"retryInterval,omitempty"`
@@ -439,21 +485,25 @@ const (
 type Action struct {
 	// Image defines the container image to run the action.
 	// Cannot be updated.
+	//
 	// +optional
 	Image string `json:"image,omitempty"`
 
 	// Exec specifies the action to take.
 	// Cannot be updated.
+	//
 	// +optional
 	Exec *ExecAction `json:"exec,omitempty"`
 
 	// HTTP specifies the http request to perform.
 	// Cannot be updated.
+	//
 	// +optional
 	HTTP *HTTPAction `json:"http,omitempty"`
 
 	// List of environment variables to set in the container.
 	// Cannot be updated.
+	//
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
@@ -462,6 +512,7 @@ type Action struct {
 	// TargetPodSelector defines the way that how to select the target Pod where the action will be performed,
 	// if there may not have a target replica by default.
 	// Cannot be updated.
+	//
 	// +optional
 	TargetPodSelector TargetPodSelector `json:"targetPodSelector,omitempty"`
 
@@ -469,6 +520,7 @@ type Action struct {
 	// If the selector is AnyReplica or AllReplicas, the matchingKey will be ignored.
 	// If the selector is RoleSelector, any replica which has the same role with matchingKey will be chosen.
 	// Cannot be updated.
+	//
 	// +optional
 	MatchingKey string `json:"matchingKey,omitempty"`
 
@@ -476,17 +528,20 @@ type Action struct {
 	// If specified, it must be one of container declared in @Runtime.
 	// If not specified, the first container declared in @Runtime will be used.
 	// Cannot be updated.
+	//
 	// +optional
 	Container string `json:"container,omitempty"`
 
 	// TimeoutSeconds defines the timeout duration for the action in seconds.
 	// Cannot be updated.
+	//
 	// +kubebuilder:default=0
 	// +optional
 	TimeoutSeconds int32 `json:"timeoutSeconds:omitempty"`
 
 	// RetryPolicy defines the strategy for retrying the action in case of failure.
 	// Cannot be updated.
+	//
 	// +optional
 	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
 
@@ -502,6 +557,7 @@ type Action struct {
 	//
 	// the execution process does not impact the state of the Component and the Cluster.
 	// Cannot be updated.
+	//
 	// +optional
 	PreCondition *PreConditionType `json:"preCondition,omitempty"`
 }
@@ -525,13 +581,15 @@ const (
 )
 
 type LifecycleActionHandler struct {
-	// builtinHandler specifies the builtin action handler name to do the action.
+	// BuiltinHandler specifies the builtin action handler name to do the action.
 	// the BuiltinHandler within the same ComponentLifecycleActions should be consistent. Details can be queried through official documentation in the future.
 	// use CustomHandler to define your own actions if none of them satisfies the requirement.
+	//
 	// +optional
 	BuiltinHandler *BuiltinActionHandlerType `json:"builtinHandler,omitempty"`
 
-	// customHandler defines the custom way to do action.
+	// CustomHandler defines the custom way to do action.
+	//
 	// +optional
 	CustomHandler *Action `json:"customHandler,omitempty"`
 }
@@ -558,11 +616,13 @@ type ComponentLifecycleActions struct {
 	// The PreTerminate Action will be executed only once. Upon receiving a scale-down command for the Component, it is executed immediately.
 	// Only after the preTerminate action is successfully executed, the destruction of the Component and its underlying resources proceeds.
 	// Cannot be updated.
+	//
 	// +optional
 	PreTerminate *LifecycleActionHandler `json:"preTerminate,omitempty"`
 
 	// RoleProbe defines how to probe the role of replicas.
 	// Cannot be updated.
+	//
 	// +optional
 	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
 
@@ -596,6 +656,7 @@ type ComponentLifecycleActions struct {
 	// This action is typically invoked when a new replica needs to be added, such as during scale-out.
 	// It may involve updating configuration, notifying other members, and ensuring data consistency.
 	// Cannot be updated.
+	//
 	// +optional
 	MemberJoin *LifecycleActionHandler `json:"memberJoin,omitempty"`
 
@@ -604,12 +665,14 @@ type ComponentLifecycleActions struct {
 	// It may involve configuration updates and notifying other members about the departure,
 	// but it is advisable to avoid performing data migration within this action.
 	// Cannot be updated.
+	//
 	// +optional
 	MemberLeave *LifecycleActionHandler `json:"memberLeave,omitempty"`
 
 	// Readonly defines how to set a replica service as read-only.
 	// This action is used to protect a replica in case of volume space exhaustion or excessive traffic.
 	// Cannot be updated.
+	//
 	// +optional
 	Readonly *LifecycleActionHandler `json:"readonly,omitempty"`
 
@@ -647,28 +710,33 @@ type ComponentLifecycleActions struct {
 
 	// Reconfigure defines how to notify the replica service that there is a configuration update.
 	// Cannot be updated.
+	//
 	// +optional
 	Reconfigure *LifecycleActionHandler `json:"reconfigure,omitempty"`
 
 	// AccountProvision defines how to provision accounts.
 	// Cannot be updated.
+	//
 	// +optional
 	AccountProvision *LifecycleActionHandler `json:"accountProvision,omitempty"`
 }
 
 type ComponentSwitchover struct {
-	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
+	// WithCandidate corresponds to the switchover of the specified candidate primary or leader instance.
 	// Currently, only Action.Exec is supported, Action.HTTP is not supported.
+	//
 	// +optional
 	WithCandidate *Action `json:"withCandidate,omitempty"`
 
-	// withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
+	// WithoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
 	// Currently, only Action.Exec is supported, Action.HTTP is not supported.
+	//
 	// +optional
 	WithoutCandidate *Action `json:"withoutCandidate,omitempty"`
 
-	// scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
+	// ScriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
 	// Once ScriptSpecSelectors is defined, the scripts defined in scripts can be referenced in the Action.
+	//
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
@@ -678,25 +746,35 @@ type RoleProbe struct {
 
 	// Number of seconds after the container has started before liveness probes are initiated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	//
 	// +optional
+
 	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty" protobuf:"varint,2,opt,name=initialDelaySeconds"`
 	// Number of seconds after which the probe times out.
 	// Defaults to 1 second. Minimum value is 1.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	//
 	// +optional
+
 	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,3,opt,name=timeoutSeconds"`
 	// How often (in seconds) to perform the probe.
 	// Default to 10 seconds. Minimum value is 1.
+	//
 	// +optional
+
 	PeriodSeconds int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+	//
 	// +optional
 	SuccessThreshold int32 `json:"successThreshold,omitempty" protobuf:"varint,5,opt,name=successThreshold"`
+
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// Defaults to 3. Minimum value is 1.
+	//
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
+
 	// Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
 	//
 	// The grace period is the duration in seconds after the processes running in the pod are sent

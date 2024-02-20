@@ -38,16 +38,21 @@ func (p Phase) IsAvailable() bool {
 	return p == AvailablePhase
 }
 
-// BackupRepoPhase defines phases for BackupRepo CR.
+// BackupRepoPhase denotes different stages for the `BackupRepo`.
+//
 // +enum
 // +kubebuilder:validation:Enum={PreChecking,Failed,Ready,Deleting}
 type BackupRepoPhase string
 
 const (
+	// BackupRepoPreChecking indicates the backup repository is being pre-checked.
 	BackupRepoPreChecking BackupRepoPhase = "PreChecking"
-	BackupRepoFailed      BackupRepoPhase = "Failed"
-	BackupRepoReady       BackupRepoPhase = "Ready"
-	BackupRepoDeleting    BackupRepoPhase = "Deleting"
+	// BackupRepoFailed indicates the pre-check has been failed.
+	BackupRepoFailed BackupRepoPhase = "Failed"
+	// BackupRepoReady indicates the backup repository is ready for use.
+	BackupRepoReady BackupRepoPhase = "Ready"
+	// BackupRepoDeleting indicates the backup repository is being deleted.
+	BackupRepoDeleting BackupRepoPhase = "Deleting"
 )
 
 // RetentionPeriod represents a duration in the format "1y2mo3w4d5h6m", where

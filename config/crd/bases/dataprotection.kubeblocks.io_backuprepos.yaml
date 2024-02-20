@@ -36,7 +36,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BackupRepo is the Schema for the backuprepos API
+        description: BackupRepo is a repository for storing backup data.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -51,11 +51,11 @@ spec:
           metadata:
             type: object
           spec:
-            description: BackupRepoSpec defines the desired state of BackupRepo
+            description: BackupRepoSpec defines the desired state of `BackupRepo`.
             properties:
               accessMethod:
                 default: Mount
-                description: Specifies the access method of the backup repo.
+                description: Specifies the access method of the backup repository.
                 enum:
                 - Mount
                 - Tool
@@ -63,11 +63,12 @@ spec:
               config:
                 additionalProperties:
                   type: string
-                description: Non-secret configurations for the storage provider.
+                description: Stores the non-secret configuration parameters for the
+                  `StorageProvider`.
                 type: object
               credential:
-                description: A secret that contains the credentials needed by the
-                  storage provider.
+                description: References to the secret that holds the credentials for
+                  the `StorageProvider`.
                 properties:
                   name:
                     description: name is unique within a namespace to reference a
@@ -80,14 +81,15 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               pvReclaimPolicy:
-                description: The reclaim policy for the PV created by this backup
-                  repo.
+                description: Specifies reclaim policy of the PV created by this backup
+                  repository.
                 enum:
                 - Delete
                 - Retain
                 type: string
               storageProviderRef:
-                description: The storage provider used by this backup repo.
+                description: Specifies the name of the `StorageProvider` used by this
+                  backup repository.
                 type: string
                 x-kubernetes-validations:
                 - message: StorageProviderRef is immutable
@@ -96,8 +98,8 @@ spec:
                 anyOf:
                 - type: integer
                 - type: string
-                description: The requested capacity for the PVC created by this backup
-                  repo.
+                description: Specifies the capacity of the PVC created by this backup
+                  repository.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
             required:
@@ -105,14 +107,14 @@ spec:
             - storageProviderRef
             type: object
           status:
-            description: BackupRepoStatus defines the observed state of BackupRepo
+            description: BackupRepoStatus defines the observed state of `BackupRepo`.
             properties:
               backupPVCName:
-                description: backupPVCName is the name of the PVC used to store backup
-                  data.
+                description: Represents the name of the PVC that stores backup data.
                 type: string
               conditions:
-                description: conditions describes the current state of the repo.
+                description: Provides a detailed description of the current state
+                  of the backup repository.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -181,8 +183,7 @@ spec:
                   type: object
                 type: array
               generatedCSIDriverSecret:
-                description: generatedCSIDriverSecret references the generated secret
-                  used by the CSI driver.
+                description: Refers to the generated secret for the `StorageProvider`.
                 properties:
                   name:
                     description: name is unique within a namespace to reference a
@@ -195,16 +196,14 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               generatedStorageClassName:
-                description: generatedStorageClassName indicates the generated storage
-                  class name.
+                description: Represents the name of the generated storage class.
                 type: string
               isDefault:
-                description: isDefault indicates whether this backup repo is the default
-                  one.
+                description: Indicates if this backup repository is the default one.\
                 type: boolean
               observedGeneration:
-                description: observedGeneration is the latest generation observed
-                  by the controller.
+                description: Represents the latest generation of the resource that
+                  the controller has observed.
                 format: int64
                 type: integer
               phase:
@@ -219,12 +218,13 @@ spec:
                   - Failed
                   - Ready
                   - Deleting
-                description: Backup repo reconciliation phases. Valid values are PreChecking,
-                  Failed, Ready, Deleting.
+                description: Represents the current phase of reconciliation for the
+                  backup repository. Permissible values are PreChecking, Failed, Ready,
+                  Deleting.
                 type: string
               toolConfigSecretName:
-                description: toolConfigSecretName is the name of the secret containing
-                  the configuration for the access tool.
+                description: Represents the name of the secret that contains the configuration
+                  for the tool.
                 type: string
             type: object
         type: object

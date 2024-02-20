@@ -155,8 +155,14 @@ type SchedulePolicy struct {
 	// Determines the duration for which the backup should be retained.
 	// The controller will remove all backups that are older than the RetentionPeriod.
 	// For instance, a RetentionPeriod of `30d` will retain only the backups from the last 30 days.
+	// Sample duration format:
 	//
-	// The duration format can be in years (2y), months (6mo), days (30d), hours (12h), or minutes (30m).
+	// - years: 	2y
+	// - months: 	6mo
+	// - days: 		30d
+	// - hours: 	12h
+	// - minutes: 	30m
+	//
 	// These durations can also be combined, for example: 30d12h30m.
 	//
 	// +optional
@@ -166,6 +172,7 @@ type SchedulePolicy struct {
 
 type TargetInstance struct {
 	// Specifies the instance of the corresponding role for backup. The roles can be:
+	//
 	// - Leader, Follower, or Leaner for the Consensus component.
 	// - Primary or Secondary for the Replication component.
 	//
@@ -187,6 +194,7 @@ type TargetInstance struct {
 	// Specifies the PodSelectionStrategy to use when multiple pods are
 	// selected for the backup target.
 	// Valid values are:
+	//
 	// - Any: Selects any one pod that matches the labelsSelector.
 	// - All: Selects all pods that match the labelsSelector.
 	//

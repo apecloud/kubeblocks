@@ -194,7 +194,7 @@ spec:
                           envMapping:
                             description: Defines the mapping between the environment
                               variables of the cluster and the keys of the environment
-                              values. This field is optional.
+                              values.
                             items:
                               properties:
                                 key:
@@ -444,11 +444,11 @@ spec:
                                     type: object
                                   strategy:
                                     default: Any
-                                    description: 'strategy specifies the strategy
+                                    description: "strategy specifies the strategy
                                       to select the target pod when multiple pods
-                                      are selected. Valid values are: - Any: select
+                                      are selected. Valid values are: \n - Any: select
                                       any one pod that match the labelsSelector. -
-                                      All: select all pods that match the labelsSelector.'
+                                      All: select all pods that match the labelsSelector."
                                     enum:
                                     - Any
                                     - All
@@ -533,27 +533,27 @@ spec:
                                 type: object
                               role:
                                 description: "Specifies the instance of the corresponding
-                                  role for backup. The roles can be: - Leader, Follower,
-                                  or Leaner for the Consensus component. - Primary
-                                  or Secondary for the Replication component. \n Invalid
-                                  roles of the component will be ignored. For example,
-                                  if the workload type is Replication and the component's
-                                  replicas is 1, the secondary role is invalid. It
-                                  will also be ignored when the component is Stateful
-                                  or Stateless. \n The role will be transformed into
-                                  a role LabelSelector for the BackupPolicy's target
-                                  attribute."
+                                  role for backup. The roles can be: \n - Leader,
+                                  Follower, or Leaner for the Consensus component.
+                                  - Primary or Secondary for the Replication component.
+                                  \n Invalid roles of the component will be ignored.
+                                  For example, if the workload type is Replication
+                                  and the component's replicas is 1, the secondary
+                                  role is invalid. It will also be ignored when the
+                                  component is Stateful or Stateless. \n The role
+                                  will be transformed into a role LabelSelector for
+                                  the BackupPolicy's target attribute."
                                 type: string
                               serviceAccountName:
                                 description: serviceAccountName specifies the service
                                   account to run the backup workload.
                                 type: string
                               strategy:
-                                description: 'Specifies the PodSelectionStrategy to
+                                description: "Specifies the PodSelectionStrategy to
                                   use when multiple pods are selected for the backup
-                                  target. Valid values are: - Any: Selects any one
-                                  pod that matches the labelsSelector. - All: Selects
-                                  all pods that match the labelsSelector.'
+                                  target. Valid values are: \n - Any: Selects any
+                                  one pod that matches the labelsSelector. - All:
+                                  Selects all pods that match the labelsSelector."
                                 enum:
                                 - Any
                                 - All
@@ -657,10 +657,10 @@ spec:
                               should be retained. The controller will remove all backups
                               that are older than the RetentionPeriod. For instance,
                               a RetentionPeriod of `30d` will retain only the backups
-                              from the last 30 days. \n The duration format can be
-                              in years (2y), months (6mo), days (30d), hours (12h),
-                              or minutes (30m). These durations can also be combined,
-                              for example: 30d12h30m."
+                              from the last 30 days. Sample duration format: \n -
+                              years: \t2y - months: \t6mo - days: \t\t30d - hours:
+                              \t12h - minutes: \t30m \n These durations can also be
+                              combined, for example: 30d12h30m."
                             type: string
                         required:
                         - backupMethod
@@ -704,7 +704,7 @@ spec:
                           type: object
                         role:
                           description: "Specifies the instance of the corresponding
-                            role for backup. The roles can be: - Leader, Follower,
+                            role for backup. The roles can be: \n - Leader, Follower,
                             or Leaner for the Consensus component. - Primary or Secondary
                             for the Replication component. \n Invalid roles of the
                             component will be ignored. For example, if the workload
@@ -715,11 +715,11 @@ spec:
                             BackupPolicy's target attribute."
                           type: string
                         strategy:
-                          description: 'Specifies the PodSelectionStrategy to use
+                          description: "Specifies the PodSelectionStrategy to use
                             when multiple pods are selected for the backup target.
-                            Valid values are: - Any: Selects any one pod that matches
+                            Valid values are: \n - Any: Selects any one pod that matches
                             the labelsSelector. - All: Selects all pods that match
-                            the labelsSelector.'
+                            the labelsSelector."
                           enum:
                           - Any
                           - All

@@ -29,27 +29,35 @@ type StorageProviderSpec struct {
 
 	// A Go template for rendering a secret which will be used by the CSI driver.
 	// The template will be rendered with the following variables:
+	//
 	// - Parameters: a map of parameters defined in the ParametersSchema.
+	//
 	// +optional
 	CSIDriverSecretTemplate string `json:"csiDriverSecretTemplate,omitempty"`
 
 	// A Go template for rendering a storage class which will be used by the CSI driver.
 	// The template will be rendered with the following variables:
+	//
 	// - Parameters: a map of parameters defined in the ParametersSchema.
 	// - CSIDriverSecretRef: the reference of the secret created by the CSIDriverSecretTemplate.
+	//
 	// +optional
 	StorageClassTemplate string `json:"storageClassTemplate,omitempty"`
 
 	// A Go template for rendering a PersistentVolumeClaim.
 	// The template will be rendered with the following variables:
+	//
 	// - Parameters: a map of parameters defined in the ParametersSchema.
 	// - GeneratedStorageClassName: the name of the storage class generated with the StorageClassTemplate.
+	//
 	// +optional
 	PersistentVolumeClaimTemplate string `json:"persistentVolumeClaimTemplate,omitempty"`
 
 	// A Go template for rendering a config used by the datasafed command.
 	// The template will be rendered with the following variables:
+	//
 	// - Parameters: a map of parameters defined in the ParametersSchema.
+	//
 	// +optional
 	DatasafedConfigTemplate string `json:"datasafedConfigTemplate,omitempty"`
 

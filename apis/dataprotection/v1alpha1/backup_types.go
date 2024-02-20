@@ -36,9 +36,11 @@ type BackupSpec struct {
 
 	// deletionPolicy determines whether the backup contents stored in backup repository
 	// should be deleted when the backup custom resource is deleted.
-	// Supported values are "Retain" and "Delete".
-	// "Retain" means that the backup can not be deleted and remains in 'Deleting' phase.
-	// "Delete" means that the backup content and its physical snapshot on backup repository are deleted.
+	// Supported values are `Retain` and `Delete`.
+	//
+	// - `Retain` means that the backup content and its physical snapshot on backup repository are kept.
+	// - `Delete` means that the backup content and its physical snapshot on backup repository are deleted.
+	//
 	// TODO: for the retain policy, we should support in the future for only deleting
 	//   the backup custom objects but retaining the backup contents in backup repository.
 	//   The current implementation only prevent accidental deletion of backup data.
@@ -51,13 +53,16 @@ type BackupSpec struct {
 	// Controller will remove all backups that are older than the RetentionPeriod.
 	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
 	// Sample duration format:
+	//
 	// - years: 	2y
 	// - months: 	6mo
 	// - days: 		30d
 	// - hours: 	12h
 	// - minutes: 	30m
+	//
 	// You can also combine the above durations. For example: 30d12h30m.
 	// If not set, the backup will be kept forever.
+	//
 	// +optional
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 

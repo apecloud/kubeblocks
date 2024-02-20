@@ -101,8 +101,8 @@ spec:
                         When defining a class in Series, specifying the variable's
                         value is sufficient, as the complete class definition will
                         be generated through rendering the template. \n For example:
-                        template: | cpu: \"{{ or .cpu 1 }}\" memory: \"{{ or .memory
-                        4 }}Gi\""
+                        \n ```yaml template: | cpu: \"{{ or .cpu 1 }}\" memory: \"{{
+                        or .memory 4 }}Gi\" ```"
                       type: string
                     vars:
                       description: vars defines the variables declared in the template

@@ -661,14 +661,14 @@ spec:
                 type: object
               useKopia:
                 default: false
-                description: 'useKopia specifies whether backup data should be stored
-                  in a Kopia repository. Data within the Kopia repository is both
+                description: "useKopia specifies whether backup data should be stored
+                  in a Kopia repository. \n Data within the Kopia repository is both
                   compressed and encrypted. Furthermore, data deduplication is implemented
                   across various backups of the same cluster. This approach significantly
                   reduces the actual storage usage, particularly for clusters with
-                  a low update frequency. NOTE: This feature should NOT be enabled
+                  a low update frequency. \n NOTE: This feature should NOT be enabled
                   when using KubeBlocks Community Edition, otherwise the backup will
-                  not be processed.'
+                  not be processed."
                 type: boolean
             required:
             - backupMethods

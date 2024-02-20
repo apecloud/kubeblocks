@@ -36,9 +36,11 @@ type BackupSpec struct {
 
 	// deletionPolicy determines whether the backup contents stored in backup repository
 	// should be deleted when the backup custom resource is deleted.
-	// Supported values are "Retain" and "Delete".
-	// "Retain" means that the backup can not be deleted and remains in 'Deleting' phase.
-	// "Delete" means that the backup content and its physical snapshot on backup repository are deleted.
+	// Supported values are `Retain` and `Delete`.
+	//
+	// - `Retain` means that the backup content and its physical snapshot on backup repository are kept.
+	// - `Delete` means that the backup content and its physical snapshot on backup repository are deleted.
+	//
 	// TODO: for the retain policy, we should support in the future for only deleting
 	//   the backup custom objects but retaining the backup contents in backup repository.
 	//   The current implementation only prevent accidental deletion of backup data.

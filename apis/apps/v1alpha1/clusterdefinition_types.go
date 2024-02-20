@@ -176,7 +176,7 @@ type ProvisionStatements struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// ClusterDefinition phase, valid values are `empty`, `Available`, 'Unavailable`.
+	// ClusterDefinition phase, valid values are `empty`, `Available`, `Unavailable`.
 	// Available is ClusterDefinition become available, and can be referenced for co-related objects.
 	Phase Phase `json:"phase,omitempty"`
 
@@ -287,11 +287,14 @@ type ServiceRefDeclaration struct {
 	Name string `json:"name"`
 
 	// serviceRefDeclarationSpecs is a collection of service descriptions for a service reference declaration.
+	//
 	// Each ServiceRefDeclarationSpec defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs are defined,
 	// it indicates that the ServiceRefDeclaration can be any one of the specified ServiceRefDeclarationSpecs.
+	//
 	// For example, when the ServiceRefDeclaration is declared to require an OLTP database, which can be either MySQL or PostgreSQL,
 	// you can define a ServiceRefDeclarationSpec for MySQL and another ServiceRefDeclarationSpec for PostgreSQL,
 	// when referencing the service within the cluster, as long as the serviceKind and serviceVersion match either MySQL or PostgreSQL, it can be used.
+	//
 	// +kubebuilder:validation:Required
 	ServiceRefDeclarationSpecs []ServiceRefDeclarationSpec `json:"serviceRefDeclarationSpecs"`
 }
@@ -299,7 +302,8 @@ type ServiceRefDeclaration struct {
 type ServiceRefDeclarationSpec struct {
 	// service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. {mysql, redis, mongodb}.
 	// The serviceKind is case-insensitive and supports abbreviations for some well-known databases.
-	// For example, both 'zk' and 'zookeeper' will be considered as a ZooKeeper cluster, and 'pg', 'postgres', 'postgresql' will all be considered as a PostgreSQL cluster.
+	// For example, both `zk` and `zookeeper` will be considered as a ZooKeeper cluster, and `pg`, `postgres`, `postgresql` will all be considered as a PostgreSQL cluster.
+	//
 	// +kubebuilder:validation:Required
 	ServiceKind string `json:"serviceKind"`
 
@@ -328,18 +332,21 @@ type ClusterComponentDefinition struct {
 	Description string `json:"description,omitempty"`
 
 	// workloadType defines type of the workload.
-	// Stateless is a stateless workload type used to describe stateless applications.
-	// Stateful is a stateful workload type used to describe common stateful applications.
-	// Consensus is a stateful workload type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.
-	// Replication is a stateful workload type used to describe applications based on the primary-secondary data replication protocol.
+	//
+	// - `Stateless` is a stateless workload type used to describe stateless applications.
+	// - `Stateful` is a stateful workload type used to describe common stateful applications.
+	// - `Consensus` is a stateful workload type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.
+	// - `Replication` is a stateful workload type used to describe applications based on the primary-secondary data replication protocol.
+	//
 	// +kubebuilder:validation:Required
 	WorkloadType WorkloadType `json:"workloadType"`
 
-	// characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+	// characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql).
 	// KubeBlocks will generate proper monitor configs for well-known characterType when builtIn is true.
 	//
-	// CharacterType will also be used in role probe to decide which probe engine to use.
+	// It will also be used in role probe to decide which probe engine to use.
 	// current available candidates are: mysql, postgres, mongodb, redis, etcd, kafka.
+	//
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
@@ -429,12 +436,13 @@ type ClusterComponentDefinition struct {
 	// according to the volumeType.
 	//
 	// For example:
-	//  `name: data, type: data` means that the volume named `data` is used to store `data`.
-	//  `name: binlog, type: log` means that the volume named `binlog` is used to store `log`.
 	//
-	// NOTE:
-	//   When volumeTypes is not defined, the backup function will not be supported,
+	// - `name: data, type: data` means that the volume named `data` is used to store `data`.
+	// - `name: binlog, type: log` means that the volume named `binlog` is used to store `log`.
+	//
+	// NOTE: When volumeTypes is not defined, the backup function will not be supported,
 	// even if a persistent volume has been specified.
+	//
 	// +listType=map
 	// +listMapKey=name
 	// +optional
@@ -568,13 +576,17 @@ type ServicePort struct {
 	Port int32 `json:"port" protobuf:"varint,3,opt,name=port"`
 
 	// Number or name of the port to access on the pods targeted by the service.
+	//
 	// Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
-	// If this is a string, it will be looked up as a named port in the
-	// target Pod's container ports. If this is not specified, the value
-	// of the 'port' field is used (an identity map).
+	//
+	// - If this is a string, it will be looked up as a named port in the target Pod's container ports.
+	// - If this is not specified, the value of the `port` field is used (an identity map).
+	//
 	// This field is ignored for services with clusterIP=None, and should be
-	// omitted or set equal to the 'port' field.
+	// omitted or set equal to the `port` field.
+	//
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+	//
 	// +kubebuilder:validation:XIntOrString
 	// +optional
 	TargetPort intstr.IntOrString `json:"targetPort,omitempty" protobuf:"bytes,4,opt,name=targetPort"`
@@ -593,11 +605,12 @@ func (r *ServicePort) toSVCPort() corev1.ServicePort {
 type HorizontalScalePolicy struct {
 	// type controls what kind of data synchronization do when component scale out.
 	// Policy is in enum of {None, CloneVolume}. The default policy is `None`.
-	// None: Default policy, create empty volume and no data clone.
-	// CloneVolume: Do data clone to newly scaled pods. Prefer to use volume snapshot first,
-	//         and will try backup tool if volume snapshot is not enabled, finally
-	// 	       report error if both above cannot work.
-	// Snapshot: Deprecated, alias for CloneVolume.
+	//
+	// - None: Default policy, create empty volume and no data clone.
+	// - CloneVolume: Do data clone to newly scaled pods. Prefer to use volume snapshot first,
+	//   and will try backup tool if volume snapshot is not enabled, finally report error if both above cannot work.
+	// - Snapshot: Deprecated, alias for CloneVolume.
+	//
 	// +kubebuilder:default=None
 	// +optional
 	Type HScaleDataClonePolicyType `json:"type,omitempty"`
@@ -662,8 +675,10 @@ type ClusterDefinitionProbes struct {
 	// it will detect whether the application is available in the pod.
 	// if pods exceed the InitializationTimeoutSeconds time without a role label,
 	// this component will enter the Failed/Abnormal phase.
+	//
 	// Note that this configuration will only take effect if the component supports RoleProbe
 	// and will not affect the life cycle of the pod. default values are 60 seconds.
+	//
 	// +optional
 	// +kubebuilder:validation:Minimum=30
 	RoleProbeTimeoutAfterPodsReady int32 `json:"roleProbeTimeoutAfterPodsReady,omitempty"`
@@ -680,23 +695,26 @@ type StatefulSetSpec struct {
 	// updateStrategy, Pods update strategy.
 	// In case of workloadType=Consensus the update strategy will be following:
 	//
-	// serial: update Pods one by one that guarantee minimum component unavailable time.
-	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time.
-	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
-	// parallel: force parallel
+	// - serial: update Members one by one that guarantee minimum component unavailable time.
+	// 	 `Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader`
+	// - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+	//	 `Learner, Follower(minority) in parallel -> Follower(majority) -> Leader`, keep majority online all the time.
+	// - parallel: force parallel
+	//
 	// +kubebuilder:default=Serial
 	// +optional
 	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// llPodManagementPolicy is the low-level controls how pods are created during initial scale up,
 	// when replacing pods on nodes, or when scaling down.
-	// `OrderedReady` policy specify where pods are created in increasing order (pod-0, then
-	// pod-1, etc) and the controller will wait until each pod is ready before
-	// continuing. When scaling down, the pods are removed in the opposite order.
-	// `Parallel` policy specify create pods in parallel
-	// to match the desired scale without waiting, and on scale down will delete
-	// all pods at once.
+	//
+	// - `OrderedReady` policy specify where pods are created in increasing order (pod-0, then
+	//   pod-1, etc) and the controller will wait until each pod is ready before
+	//   continuing. When scaling down, the pods are removed in the opposite order.
+	// - `Parallel` policy specify create pods in parallel
+	//   to match the desired scale without waiting, and on scale down will delete
+	//   all pods at once.
+	//
 	// +optional
 	LLPodManagementPolicy appsv1.PodManagementPolicyType `json:"llPodManagementPolicy,omitempty"`
 
@@ -827,9 +845,11 @@ type ConsensusMember struct {
 	AccessMode AccessMode `json:"accessMode"`
 
 	// replicas, number of Pods of this role.
-	// default 1 for Leader
-	// default 0 for Learner
-	// default Cluster.spec.componentSpec[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
+	//
+	// - default 1 for Leader
+	// - default 0 for Learner
+	// - default `Cluster.spec.componentSpec[*].Replicas - Leader.Replicas - Learner.Replicas` for Followers
+	//
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
@@ -850,11 +870,13 @@ type RSMSpec struct {
 	MembershipReconfiguration *workloads.MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
 
 	// MemberUpdateStrategy, Members(Pods) update strategy.
-	// serial: update Members one by one that guarantee minimum component unavailable time.
-	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-	// bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
-	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
-	// parallel: force parallel
+	//
+	// - serial: update Members one by one that guarantee minimum component unavailable time.
+	// 	 `Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader`
+	// - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+	//	 `Learner, Follower(minority) in parallel -> Follower(majority) -> Leader`, keep majority online all the time.
+	// - parallel: force parallel
+	//
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
 	MemberUpdateStrategy *workloads.MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
@@ -964,7 +986,9 @@ type CustomLabelSpec struct {
 
 type GVKResource struct {
 	// gvk is Group/Version/Kind, for example "v1/Pod", "apps/v1/StatefulSet", etc.
+	//
 	// when the gvk resource filtered by the selector already exists, if there is no corresponding custom label, it will be added, and if label already exists, it will be updated.
+	//
 	// +kubebuilder:validation:Required
 	GVK string `json:"gvk"`
 
@@ -1103,16 +1127,20 @@ type ComponentValueFrom struct {
 	// +kubebuilder:validation:Required
 	Type ComponentValueFromType `json:"type"`
 	// fieldRef is the jsonpath of the source to select when type is `FieldRef`.
-	// there are two objects registered in the jsonpath: `componentDef` and `components`.
-	// componentDef is the component definition object specified in `componentRef.componentDefName`.
-	// components is the component list objects referring to the component definition object.
+	// there are two objects registered in the jsonpath: `componentDef` and `components`:
+	//
+	// - componentDef is the component definition object specified in `componentRef.componentDefName`.
+	// - components is the component list objects referring to the component definition object.
+	//
 	// +optional
 	FieldPath string `json:"fieldPath,omitempty"`
 	// format is the format of each headless service address.
 	// there are three builtin variables can be used as placeholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME
-	// $POD_ORDINAL is the ordinal of the pod.
-	// $POD_FQDN is the fully qualified domain name of the pod.
-	// $POD_NAME is the name of the pod
+	//
+	// - $POD_ORDINAL is the ordinal of the pod.
+	// - $POD_FQDN is the fully qualified domain name of the pod.
+	// - $POD_NAME is the name of the pod
+	//
 	// +optional
 	// +kubebuilder:default=="$POD_FQDN"
 	Format string `json:"format,omitempty"`

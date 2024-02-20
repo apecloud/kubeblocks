@@ -97,12 +97,14 @@ BackupType
 </em>
 </td>
 <td>
-<p>backupType specifies the backup type, supported values: Full, Continuous.
-Full means full backup.
-Incremental means back up data that have changed since the last backup (full or incremental).
-Differential means back up data that have changed since the last full backup.
-Continuous will back up the transaction log continuously, the PITR (Point in Time Recovery).
-can be performed based on the continuous backup and full backup.</p>
+<p>backupType specifies the backup type, supported values:</p>
+<ul>
+<li><code>Full</code> means full backup.</li>
+<li><code>Incremental</code> means back up data that have changed since the last backup (full or incremental).</li>
+<li><code>Differential</code> means back up data that have changed since the last full backup.</li>
+<li><code>Continuous</code> will back up the transaction log continuously, the PITR (Point in Time Recovery)
+can be performed based on the continuous backup and full backup.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -272,10 +274,12 @@ BackupDeletionPolicy
 <td>
 <p>deletionPolicy determines whether the backup contents stored in backup repository
 should be deleted when the backup custom resource is deleted.
-Supported values are &ldquo;Retain&rdquo; and &ldquo;Delete&rdquo;.
-&ldquo;Retain&rdquo; means that the backup can not be deleted and remains in &lsquo;Deleting&rsquo; phase.
-&ldquo;Delete&rdquo; means that the backup content and its physical snapshot on backup repository are deleted.
-the backup custom objects but retaining the backup contents in backup repository.
+Supported values are <code>Retain</code> and <code>Delete</code>.</p>
+<ul>
+<li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.</li>
+<li><code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</li>
+</ul>
+<p>the backup custom objects but retaining the backup contents in backup repository.
 The current implementation only prevent accidental deletion of backup data.</p>
 </td>
 </tr>
@@ -464,12 +468,12 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>useKopia specifies whether backup data should be stored in a Kopia repository.
-Data within the Kopia repository is both compressed and encrypted. Furthermore,
+<p>useKopia specifies whether backup data should be stored in a Kopia repository.</p>
+<p>Data within the Kopia repository is both compressed and encrypted. Furthermore,
 data deduplication is implemented across various backups of the same cluster.
 This approach significantly reduces the actual storage usage, particularly for
-clusters with a low update frequency.
-NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
+clusters with a low update frequency.</p>
+<p>NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
 otherwise the backup will not be processed.</p>
 </td>
 </tr>
@@ -814,11 +818,13 @@ BackupRef
 </em>
 </td>
 <td>
-<p>backup to be restored. The restore behavior based on the backup type:
-1. Full: will be restored the full backup directly.
-2. Incremental: will be restored sequentially from the most recent full backup of this incremental backup.
-3. Differential: will be restored sequentially from the parent backup of the differential backup.
-4. Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.</p>
+<p>backup to be restored. The restore behavior based on the backup type:</p>
+<ol>
+<li>Full: will be restored the full backup directly.</li>
+<li>Incremental: will be restored sequentially from the most recent full backup of this incremental backup.</li>
+<li>Differential: will be restored sequentially from the parent backup of the differential backup.</li>
+<li>Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.</li>
+</ol>
 </td>
 </tr>
 <tr>
@@ -900,8 +906,8 @@ ReadyConfig
 <td>
 <em>(Optional)</em>
 <p>list of environment variables to set in the container for restore and will be
-merged with the env of Backup and ActionSet.
-The priority of merging is as follows: Restore env &gt; Backup env &gt; ActionSet env.</p>
+merged with the env of Backup and ActionSet.</p>
+<p>The priority of merging is as follows: <code>Restore env &gt; Backup env &gt; ActionSet env</code>.</p>
 </td>
 </tr>
 <tr>
@@ -1050,12 +1056,14 @@ BackupType
 </em>
 </td>
 <td>
-<p>backupType specifies the backup type, supported values: Full, Continuous.
-Full means full backup.
-Incremental means back up data that have changed since the last backup (full or incremental).
-Differential means back up data that have changed since the last full backup.
-Continuous will back up the transaction log continuously, the PITR (Point in Time Recovery).
-can be performed based on the continuous backup and full backup.</p>
+<p>backupType specifies the backup type, supported values:</p>
+<ul>
+<li><code>Full</code> means full backup.</li>
+<li><code>Incremental</code> means back up data that have changed since the last backup (full or incremental).</li>
+<li><code>Differential</code> means back up data that have changed since the last full backup.</li>
+<li><code>Continuous</code> will back up the transaction log continuously, the PITR (Point in Time Recovery)
+can be performed based on the continuous backup and full backup.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -1806,12 +1814,12 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>useKopia specifies whether backup data should be stored in a Kopia repository.
-Data within the Kopia repository is both compressed and encrypted. Furthermore,
+<p>useKopia specifies whether backup data should be stored in a Kopia repository.</p>
+<p>Data within the Kopia repository is both compressed and encrypted. Furthermore,
 data deduplication is implemented across various backups of the same cluster.
 This approach significantly reduces the actual storage usage, particularly for
-clusters with a low update frequency.
-NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
+clusters with a low update frequency.</p>
+<p>NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
 otherwise the backup will not be processed.</p>
 </td>
 </tr>
@@ -2357,10 +2365,12 @@ BackupDeletionPolicy
 <td>
 <p>deletionPolicy determines whether the backup contents stored in backup repository
 should be deleted when the backup custom resource is deleted.
-Supported values are &ldquo;Retain&rdquo; and &ldquo;Delete&rdquo;.
-&ldquo;Retain&rdquo; means that the backup can not be deleted and remains in &lsquo;Deleting&rsquo; phase.
-&ldquo;Delete&rdquo; means that the backup content and its physical snapshot on backup repository are deleted.
-the backup custom objects but retaining the backup contents in backup repository.
+Supported values are <code>Retain</code> and <code>Delete</code>.</p>
+<ul>
+<li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.</li>
+<li><code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</li>
+</ul>
+<p>the backup custom objects but retaining the backup contents in backup repository.
 The current implementation only prevent accidental deletion of backup data.</p>
 </td>
 </tr>
@@ -3482,9 +3492,11 @@ VolumeClaimRestorePolicy
 </td>
 <td>
 <p>VolumeClaimRestorePolicy defines restore policy for persistent volume claim.
-Supported policies are as follows:
-1. Parallel: parallel recovery of persistent volume claim.
-2. Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.</p>
+Supported policies are as follows:</p>
+<ol>
+<li>Parallel: parallel recovery of persistent volume claim.</li>
+<li>Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.</li>
+</ol>
 </td>
 </tr>
 <tr>
@@ -3834,11 +3846,13 @@ BackupRef
 </em>
 </td>
 <td>
-<p>backup to be restored. The restore behavior based on the backup type:
-1. Full: will be restored the full backup directly.
-2. Incremental: will be restored sequentially from the most recent full backup of this incremental backup.
-3. Differential: will be restored sequentially from the parent backup of the differential backup.
-4. Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.</p>
+<p>backup to be restored. The restore behavior based on the backup type:</p>
+<ol>
+<li>Full: will be restored the full backup directly.</li>
+<li>Incremental: will be restored sequentially from the most recent full backup of this incremental backup.</li>
+<li>Differential: will be restored sequentially from the parent backup of the differential backup.</li>
+<li>Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.</li>
+</ol>
 </td>
 </tr>
 <tr>
@@ -3920,8 +3934,8 @@ ReadyConfig
 <td>
 <em>(Optional)</em>
 <p>list of environment variables to set in the container for restore and will be
-merged with the env of Backup and ActionSet.
-The priority of merging is as follows: Restore env &gt; Backup env &gt; ActionSet env.</p>
+merged with the env of Backup and ActionSet.</p>
+<p>The priority of merging is as follows: <code>Restore env &gt; Backup env &gt; ActionSet env</code>.</p>
 </td>
 </tr>
 <tr>
@@ -4745,10 +4759,11 @@ be mounted on the backup job.</p>
 </p>
 <div>
 <p>VolumeClaimRestorePolicy defines restore policy for persistent volume claim.
-Supported policies are as follows:
-1. Parallel: parallel recovery of persistent volume claim.
-2. Serial: restore the persistent volume claim in sequence, and wait until the
-previous persistent volume claim is restored before restoring a new one.</p>
+Supported policies are as follows:</p>
+<ol>
+<li>Parallel: parallel recovery of persistent volume claim.</li>
+<li>Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.</li>
+</ol>
 </div>
 <table>
 <thead>

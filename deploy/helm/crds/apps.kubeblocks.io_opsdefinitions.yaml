@@ -8514,9 +8514,9 @@ spec:
                         expression:
                           description: "expression declares how the operation can
                             be executed using go template expression. it should return
-                            \"true\" or \"false\", built-in objects: \n - \"params\"
-                            are input parameters. - \"cluster\" is referenced cluster
-                            object. - \"component\" is referenced the component Object."
+                            `true` or `false`, built-in objects: \n - `params` are
+                            input parameters. - `cluster` is referenced cluster object.
+                            - `component` is referenced the component Object."
                           type: string
                         message:
                           description: report the message if the rule is not matched.
@@ -8597,7 +8597,7 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase valid values are ``, `Available`, 'Unavailable`.
+                description: Phase valid values are ``, `Available`, `Unavailable`.
                   Available is OpsDefinition become available, and can be used for
                   co-related objects.
                 enum:

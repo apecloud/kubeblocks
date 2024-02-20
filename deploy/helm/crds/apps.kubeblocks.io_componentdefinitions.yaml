@@ -79,14 +79,14 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     defaultMode:
-                      description: 'defaultMode is optional: mode bits used to set
-                        permissions on created files by default. Must be an octal
+                      description: "defaultMode is optional: mode bits used to set
+                        permissions on created files by default. \n Must be an octal
                         value between 0000 and 0777 or a decimal value between 0 and
                         511. YAML accepts both octal and decimal values, JSON requires
-                        decimal values for mode bits. Defaults to 0644. Directories
+                        decimal values for mode bits. Defaults to 0644. \n Directories
                         within the path are not affected by this setting. This might
                         be in conflict with other options that affect the file mode,
-                        like fsGroup, and the result can be other mode bits set.'
+                        like fsGroup, and the result can be other mode bits set."
                       format: int32
                       type: integer
                     keys:
@@ -462,13 +462,13 @@ spec:
                         type: object
                     type: object
                   dataAssemble:
-                    description: 'DataAssemble defines how to assemble data synchronized
+                    description: "DataAssemble defines how to assemble data synchronized
                       from external before starting the service for a new replica.
                       This action is typically used when creating a new replica, such
-                      as: - scale-out - rebuild - clone The data will be streamed
+                      as: \n - scale-out - rebuild - clone \n The data will be streamed
                       in via stdin. If any error occurs during the assembly process,
                       the action must be able to guarantee idempotence to allow for
-                      retries from the beginning. Cannot be updated.'
+                      retries from the beginning. Cannot be updated."
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -3342,20 +3342,20 @@ spec:
                         format: int32
                         type: integer
                       terminationGracePeriodSeconds:
-                        description: Optional duration in seconds the pod needs to
-                          terminate gracefully upon probe failure. The grace period
+                        description: "Optional duration in seconds the pod needs to
+                          terminate gracefully upon probe failure. \n The grace period
                           is the duration in seconds after the processes running in
                           the pod are sent a termination signal and the time when
                           the processes are forcibly halted with a kill signal. Set
                           this value longer than the expected cleanup time for your
-                          process. If this value is nil, the pod's terminationGracePeriodSeconds
+                          process. \n If this value is nil, the pod's terminationGracePeriodSeconds
                           will be used. Otherwise, this value overrides the value
                           provided by the pod spec. Value must be non-negative integer.
                           The value zero indicates stop immediately via the kill signal
-                          (no opportunity to shut down). This is a beta field and
+                          (no opportunity to shut down). \n This is a beta field and
                           requires enabling ProbeTerminationGracePeriod feature gate.
                           Minimum value is 1. spec.terminationGracePeriodSeconds is
-                          used if unset.
+                          used if unset."
                         format: int64
                         type: integer
                       timeoutSeconds:
@@ -4125,12 +4125,12 @@ spec:
                   type: object
                 type: array
               runtime:
-                description: 'Runtime defines primarily runtime information for the
-                  component, including: - Init containers - Containers - Image - Commands
-                  - Args - Envs - Mounts - Ports - Security context - Probes - Lifecycle
-                  - Volumes CPU and memory resource limits, as well as scheduling
-                  settings (affinity, toleration, priority), should not be configured
-                  within this structure. Cannot be updated.'
+                description: "Runtime defines primarily runtime information for the
+                  component, including: \n - Init containers - Containers - Image
+                  - Commands - Args - Envs - Mounts - Ports - Security context - Probes
+                  - Lifecycle - Volumes \n CPU and memory resource limits, as well
+                  as scheduling settings (affinity, toleration, priority), should
+                  not be configured within this structure. Cannot be updated."
                 properties:
                   activeDeadlineSeconds:
                     description: Optional duration in seconds the pod may be active
@@ -11369,14 +11369,14 @@ spec:
                 items:
                   properties:
                     defaultMode:
-                      description: 'defaultMode is optional: mode bits used to set
-                        permissions on created files by default. Must be an octal
+                      description: "defaultMode is optional: mode bits used to set
+                        permissions on created files by default. \n Must be an octal
                         value between 0000 and 0777 or a decimal value between 0 and
                         511. YAML accepts both octal and decimal values, JSON requires
-                        decimal values for mode bits. Defaults to 0644. Directories
+                        decimal values for mode bits. Defaults to 0644. \n Directories
                         within the path are not affected by this setting. This might
                         be in conflict with other options that affect the file mode,
-                        like fsGroup, and the result can be other mode bits set.'
+                        like fsGroup, and the result can be other mode bits set."
                       format: int32
                       type: integer
                     name:
@@ -11434,18 +11434,18 @@ spec:
                         on the binding declaration when creates a Cluster.
                       type: string
                     serviceRefDeclarationSpecs:
-                      description: serviceRefDeclarationSpecs is a collection of service
-                        descriptions for a service reference declaration. Each ServiceRefDeclarationSpec
-                        defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs
-                        are defined, it indicates that the ServiceRefDeclaration can
-                        be any one of the specified ServiceRefDeclarationSpecs. For
-                        example, when the ServiceRefDeclaration is declared to require
-                        an OLTP database, which can be either MySQL or PostgreSQL,
-                        you can define a ServiceRefDeclarationSpec for MySQL and another
-                        ServiceRefDeclarationSpec for PostgreSQL, when referencing
-                        the service within the cluster, as long as the serviceKind
-                        and serviceVersion match either MySQL or PostgreSQL, it can
-                        be used.
+                      description: "serviceRefDeclarationSpecs is a collection of
+                        service descriptions for a service reference declaration.
+                        \n Each ServiceRefDeclarationSpec defines a service Kind and
+                        Version. When multiple ServiceRefDeclarationSpecs are defined,
+                        it indicates that the ServiceRefDeclaration can be any one
+                        of the specified ServiceRefDeclarationSpecs. \n For example,
+                        when the ServiceRefDeclaration is declared to require an OLTP
+                        database, which can be either MySQL or PostgreSQL, you can
+                        define a ServiceRefDeclarationSpec for MySQL and another ServiceRefDeclarationSpec
+                        for PostgreSQL, when referencing the service within the cluster,
+                        as long as the serviceKind and serviceVersion match either
+                        MySQL or PostgreSQL, it can be used."
                       items:
                         properties:
                           serviceKind:
@@ -11453,9 +11453,9 @@ spec:
                               of the service. It should be well-known application
                               cluster type, e.g. {mysql, redis, mongodb}. The serviceKind
                               is case-insensitive and supports abbreviations for some
-                              well-known databases. For example, both 'zk' and 'zookeeper'
-                              will be considered as a ZooKeeper cluster, and 'pg',
-                              'postgres', 'postgresql' will all be considered as a
+                              well-known databases. For example, both `zk` and `zookeeper`
+                              will be considered as a ZooKeeper cluster, and `pg`,
+                              `postgres`, `postgresql` will all be considered as a
                               PostgreSQL cluster.
                             type: string
                           serviceVersion:
@@ -11479,10 +11479,10 @@ spec:
                 maxLength: 32
                 type: string
               services:
-                description: Services defines endpoints that can be used to access
-                  the component service to manage the component. In addition, a reserved
-                  headless service will be created by default, with the name pattern
-                  {clusterName}-{componentName}-headless. Cannot be updated.
+                description: "Services defines endpoints that can be used to access
+                  the component service to manage the component. \n In addition, a
+                  reserved headless service will be created by default, with the name
+                  pattern `{clusterName}-{componentName}-headless`. Cannot be updated."
                 items:
                   properties:
                     annotations:
@@ -11493,22 +11493,22 @@ spec:
                       type: object
                     generatePodOrdinalService:
                       default: false
-                      description: 'GeneratePodOrdinalService indicates whether to
+                      description: "GeneratePodOrdinalService indicates whether to
                         create a corresponding Service for each Pod of the selected
                         Component. If sets to true, a set of Service will be automatically
                         generated for each Pod. And Service.RoleSelector will be ignored.
                         They can be referred to by adding the PodOrdinal to the defined
-                        ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
+                        ServiceName with named pattern `$(Service.ServiceName)-$(PodOrdinal)`.
                         And the Service.Name will also be generated with named pattern
-                        <Service.Name>-<PodOrdinal>. The PodOrdinal is zero-based,
+                        `$(Service.Name)-$(PodOrdinal)`. The PodOrdinal is zero-based,
                         and the number of generated Services is equal to the number
                         of replicas of the Component. For example, a Service might
-                        be defined as follows: - name: my-service serviceName: my-service
-                        generatePodOrdinalService: true spec: type: NodePort ports:
-                        - name: http port: 80 targetPort: 8080 Assuming that the Component
-                        has 3 replicas, then three services would be generated: my-service-0,
-                        my-service-1, and my-service-2, each pointing to its respective
-                        Pod.'
+                        be defined as follows: \n ```yaml name: my-service serviceName:
+                        my-service generatePodOrdinalService: true spec: type: NodePort
+                        ports: - name: http port: 80 targetPort: 8080 ``` \n Assuming
+                        that the Component has 3 replicas, then three services would
+                        be generated: my-service-0, my-service-1, and my-service-2,
+                        each pointing to its respective Pod."
                       type: boolean
                     name:
                       description: Name defines the name of the service. otherwise,
@@ -11523,12 +11523,12 @@ spec:
                         be ignored.
                       type: string
                     serviceName:
-                      description: 'ServiceName defines the name of the underlying
+                      description: "ServiceName defines the name of the underlying
                         service object. If not specified, the default service name
-                        with different patterns will be used: - <CLUSTER_NAME>: for
-                        cluster-level services - <CLUSTER_NAME>-<COMPONENT_NAME>:
-                        for component-level services Only one default service name
-                        is allowed. Cannot be updated.'
+                        with different patterns will be used: \n - CLUSTER_NAME: for
+                        cluster-level services - CLUSTER_NAME-COMPONENT_NAME: for
+                        component-level services \n Only one default service name
+                        is allowed. Cannot be updated."
                       type: string
                     spec:
                       description: Spec defines the behavior of a service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -11966,11 +11966,11 @@ spec:
                 - Parallel
                 type: string
               vars:
-                description: Vars represents user-defined variables. These variables
+                description: "Vars represents user-defined variables. \n These variables
                   can be utilized as environment variables for Pods and Actions, or
                   to render the templates of config and script. When used as environment
                   variables, these variables are placed in front of the environment
-                  variables declared in the Pod. Cannot be updated.
+                  variables declared in the Pod. Cannot be updated."
                 items:
                   description: EnvVar represents a variable present in the env of
                     Pod/Action or the template of config/script.
@@ -11979,14 +11979,14 @@ spec:
                       description: Name of the variable. Must be a C_IDENTIFIER.
                       type: string
                     value:
-                      description: 'Variable references $(VAR_NAME) are expanded using
-                        the previously defined variables in the current context. If
-                        a variable cannot be resolved, the reference in the input
+                      description: "Variable references $(VAR_NAME) are expanded using
+                        the previously defined variables in the current context. \n
+                        If a variable cannot be resolved, the reference in the input
                         string will be unchanged. Double $$ are reduced to a single
                         $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
-                        Escaped references will never be expanded, regardless of whether
-                        the variable exists or not. Defaults to "".'
+                        \n - \"$$(VAR_NAME)\" will produce the string literal \"$(VAR_NAME)\".
+                        \n Escaped references will never be expanded, regardless of
+                        whether the variable exists or not. Defaults to \"\"."
                       type: string
                     valueFrom:
                       description: Source for the variable's value. Cannot be used
@@ -12108,23 +12108,23 @@ spec:
                               type: string
                             generatePodOrdinalServiceVar:
                               default: false
-                              description: 'GeneratePodOrdinalServiceVar indicates
+                              description: "GeneratePodOrdinalServiceVar indicates
                                 whether to create a corresponding ServiceVars reference
                                 variable for each Pod. If set to true, a set of ServiceVars
                                 that can be referenced will be automatically generated
                                 for each Pod Ordinal. They can be referred to by adding
                                 the PodOrdinal to the defined name template with named
-                                pattern $<Vars[x].Name>_<PodOrdinal>. For example,
-                                a ServiceVarRef might be defined as follows: - name:
-                                MY_SERVICE_PORT valueFrom: serviceVarRef: compDef:
-                                my-component-definition name: my-service optional:
-                                true generatePodOrdinalServiceVar: true port: name:
-                                redis-sentinel Assuming that the Component has 3 replicas,
-                                then you can reference the port of existing services
-                                named my-service-0, my-service-1, and my-service-2
-                                with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2,
-                                respectively. It should be used in conjunction with
-                                Service.GeneratePodOrdinalService.'
+                                pattern `$(Vars[x].Name)_$(PodOrdinal)`. For example,
+                                a ServiceVarRef might be defined as follows: \n ```yaml
+                                \n name: MY_SERVICE_PORT valueFrom: serviceVarRef:
+                                compDef: my-component-definition name: my-service
+                                optional: true generatePodOrdinalServiceVar: true
+                                port: name: redis-sentinel \n ``` \n Assuming that
+                                the Component has 3 replicas, then you can reference
+                                the port of existing services named my-service-0,
+                                my-service-1, and my-service-2 with $MY_SERVICE_PORT_0,
+                                $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
+                                It should be used in conjunction with Service.GeneratePodOrdinalService."
                               type: boolean
                             host:
                               description: VarOption defines whether a variable is
@@ -12177,15 +12177,15 @@ spec:
                   properties:
                     highWatermark:
                       default: 0
-                      description: HighWatermark defines the high watermark threshold
-                        for the volume space usage. If there is any specified volumes
-                        who's space usage is over the threshold, the pre-defined "LOCK"
+                      description: "HighWatermark defines the high watermark threshold
+                        for the volume space usage. \n If there is any specified volumes
+                        who's space usage is over the threshold, the pre-defined \"LOCK\"
                         action will be triggered to degrade the service to protect
                         volume from space exhaustion, such as to set the instance
                         as read-only. And after that, if all volumes' space usage
-                        drops under the threshold later, the pre-defined "UNLOCK"
+                        drops under the threshold later, the pre-defined \"UNLOCK\"
                         action will be performed to recover the service normally.
-                        Cannot be updated.
+                        Cannot be updated."
                       maximum: 100
                       minimum: 0
                       type: integer
@@ -12219,7 +12219,7 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase valid values are ``, `Available`, 'Unavailable`.
+                description: Phase valid values are ``, `Available`, `Unavailable`.
                   Available is ComponentDefinition become available, and can be used
                   for co-related objects.
                 enum:

@@ -22,6 +22,7 @@ package core
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -131,6 +132,17 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	// if the updated parameter is not in list of DynamicParameter,
 	// it is StaticParameter by default, and restart is the default behavior.
 	return false, nil
+}
+
+// IsDynamicParameter checks if the parameter supports hot update
+func IsDynamicParameter(paramName string, cc *appsv1alpha1.ConfigConstraintSpec) bool {
+	if len(cc.DynamicParameters) != 0 {
+		return slices.Contains(cc.DynamicParameters, paramName)
+	}
+	if len(cc.StaticParameters) != 0 {
+		return !slices.Contains(cc.StaticParameters, paramName)
+	}
+	return false
 }
 
 // IsParametersUpdateFromManager checks if the parameters are updated from manager

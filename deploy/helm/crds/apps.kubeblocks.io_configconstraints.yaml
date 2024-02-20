@@ -162,6 +162,11 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
+              forceHotUpdate:
+                description: forceHotUpdate indicates whether to execute hot update
+                  parameters when the pod needs to be restarted. if set true, the
+                  controller does the hot update and then restarts the pod.
+                type: boolean
               formatterConfig:
                 description: "formatterConfig describes the format of the configuration
                   file, the controller will: \n 1. parses configuration file 2. analyzes

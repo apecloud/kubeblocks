@@ -440,11 +440,11 @@ spec:
                                     type: object
                                   strategy:
                                     default: Any
-                                    description: 'strategy specifies the strategy
+                                    description: "strategy specifies the strategy
                                       to select the target pod when multiple pods
-                                      are selected. Valid values are: - Any: select
+                                      are selected. Valid values are: \n - Any: select
                                       any one pod that match the labelsSelector. -
-                                      All: select all pods that match the labelsSelector.'
+                                      All: select all pods that match the labelsSelector."
                                     enum:
                                     - Any
                                     - All
@@ -528,27 +528,27 @@ spec:
                                     x-kubernetes-map-type: atomic
                                 type: object
                               role:
-                                description: 'select instance of corresponding role
-                                  for backup, role are: - the name of Leader/Follower/Leaner
+                                description: "select instance of corresponding role
+                                  for backup, role are: \n - the name of Leader/Follower/Leaner
                                   for Consensus component. - primary or secondary
-                                  for Replication component. finally, invalid role
+                                  for Replication component. \n finally, invalid role
                                   of the component will be ignored. such as if workload
-                                  type is Replication and component''s replicas is
+                                  type is Replication and component's replicas is
                                   1, the secondary role is invalid. and it also will
                                   be ignored when component is Stateful/Stateless.
                                   the role will be transformed to a role LabelSelector
-                                  for BackupPolicy''s target attribute.'
+                                  for BackupPolicy's target attribute."
                                 type: string
                               serviceAccountName:
                                 description: serviceAccountName specifies the service
                                   account to run the backup workload.
                                 type: string
                               strategy:
-                                description: 'PodSelectionStrategy specifies the strategy
+                                description: "PodSelectionStrategy specifies the strategy
                                   to select when multiple pods are selected for backup
-                                  target. Valid values are: - Any: select any one
+                                  target. Valid values are: \n - Any: select any one
                                   pod that match the labelsSelector. - All: select
-                                  all pods that match the labelsSelector.'
+                                  all pods that match the labelsSelector."
                                 enum:
                                 - Any
                                 - All
@@ -653,7 +653,7 @@ spec:
                               remove all backups that are older than the RetentionPeriod.
                               For example, RetentionPeriod of `30d` will keep only
                               the backups of last 30 days. Sample duration format:
-                              - years: \t2y - months: \t6mo - days: \t\t30d - hours:
+                              \n - years: \t2y - months: \t6mo - days: \t\t30d - hours:
                               \t12h - minutes: \t30m You can also combine the above
                               durations. For example: 30d12h30m"
                             type: string
@@ -697,22 +697,22 @@ spec:
                               type: string
                           type: object
                         role:
-                          description: 'select instance of corresponding role for
-                            backup, role are: - the name of Leader/Follower/Leaner
+                          description: "select instance of corresponding role for
+                            backup, role are: \n - the name of Leader/Follower/Leaner
                             for Consensus component. - primary or secondary for Replication
-                            component. finally, invalid role of the component will
+                            component. \n finally, invalid role of the component will
                             be ignored. such as if workload type is Replication and
-                            component''s replicas is 1, the secondary role is invalid.
+                            component's replicas is 1, the secondary role is invalid.
                             and it also will be ignored when component is Stateful/Stateless.
                             the role will be transformed to a role LabelSelector for
-                            BackupPolicy''s target attribute.'
+                            BackupPolicy's target attribute."
                           type: string
                         strategy:
-                          description: 'PodSelectionStrategy specifies the strategy
+                          description: "PodSelectionStrategy specifies the strategy
                             to select when multiple pods are selected for backup target.
-                            Valid values are: - Any: select any one pod that match
+                            Valid values are: \n - Any: select any one pod that match
                             the labelsSelector. - All: select all pods that match
-                            the labelsSelector.'
+                            the labelsSelector."
                           enum:
                           - Any
                           - All

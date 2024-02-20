@@ -90,7 +90,7 @@ spec:
                       have a label with this key and identical values are considered
                       to be in the same topology. It's used as the topology domain
                       for pod anti-affinity and pod spread constraint. Some well-known
-                      label keys, such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
+                      label keys, such as `kubernetes.io/hostname` and `topology.kubernetes.io/zone`
                       are often used as TopologyKey, as well as any other custom label
                       key.
                     items:
@@ -135,9 +135,9 @@ spec:
                       the backup should be kept. controller will remove all backups
                       that are older than the RetentionPeriod. For example, RetentionPeriod
                       of `30d` will keep only the backups of last 30 days. Sample
-                      duration format: - years: \t2y - months: \t6mo - days: \t\t30d
-                      - hours: \t12h - minutes: \t30m You can also combine the above
-                      durations. For example: 30d12h30m"
+                      duration format: \n - years: \t2y - months: \t6mo - days: \t\t30d
+                      - hours: \t12h - minutes: \t30m \n You can also combine the
+                      above durations. For example: 30d12h30m"
                     type: string
                   startingDeadlineMinutes:
                     description: startingDeadlineMinutes defines the deadline in minutes
@@ -169,9 +169,9 @@ spec:
                   both be empty at the same time.
                 items:
                   description: ClusterComponentSpec defines the cluster component
-                    spec. //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef)
+                    spec. TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef)
                     || has(self.componentDefRef)", message="componentDefRef is required
-                    once set" //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef)
+                    once set" TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef)
                     || has(self.componentDef)", message="componentDef is required
                     once set"
                   properties:
@@ -209,8 +209,8 @@ spec:
                             that have a label with this key and identical values are
                             considered to be in the same topology. It's used as the
                             topology domain for pod anti-affinity and pod spread constraint.
-                            Some well-known label keys, such as "kubernetes.io/hostname"
-                            and "topology.kubernetes.io/zone" are often used as TopologyKey,
+                            Some well-known label keys, such as `kubernetes.io/hostname`
+                            and `topology.kubernetes.io/zone` are often used as TopologyKey,
                             as well as any other custom label key.
                           items:
                             type: string
@@ -235,7 +235,7 @@ spec:
                     componentDef:
                       description: componentDef references the name of the ComponentDefinition.
                         If both componentDefRef and componentDef are provided, the
-                        componentDef will take precedence over componentDefRef. //(TODO)
+                        componentDef will take precedence over componentDefRef. TODO
                         +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef
                         is immutable"
                       maxLength: 22
@@ -244,7 +244,7 @@ spec:
                     componentDefRef:
                       description: componentDefRef references componentDef defined
                         in ClusterDefinition spec. Need to comply with IANA Service
-                        Naming rule. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                        Naming rule. TODO +kubebuilder:validation:XValidation:rule="self
                         == oldSelf",message="componentDefRef is immutable"
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
@@ -271,9 +271,9 @@ spec:
                       properties:
                         name:
                           default: KubeBlocks
-                          description: 'Name of issuer. Options supported: - KubeBlocks
+                          description: "Name of issuer. Options supported: \n - KubeBlocks
                             - Certificates signed by KubeBlocks Operator. - UserProvided
-                            - User provided own CA-signed certificates.'
+                            - User provided own CA-signed certificates."
                           enum:
                           - KubeBlocks
                           - UserProvided
@@ -316,7 +316,7 @@ spec:
                         is also part of Service DNS name, so this name will comply
                         with IANA Service Naming rule. When ClusterComponentSpec is
                         referenced as a template, name is optional. Otherwise, it
-                        is required. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                        is required. TODO +kubebuilder:validation:XValidation:rule="self
                         == oldSelf",message="name is immutable"
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
@@ -424,41 +424,41 @@ spec:
                         that running component depends on.
                       type: string
                     serviceRefs:
-                      description: 'serviceRefs define service references for the
+                      description: "serviceRefs define service references for the
                         current component. Based on the referenced services, they
-                        can be categorized into two types: Service provided by external
-                        sources: These services are provided by external sources and
-                        are not managed by KubeBlocks. They can be Kubernetes-based
+                        can be categorized into two types: \n - Service provided by
+                        external sources: These services are provided by external
+                        sources and are not managed by KubeBlocks. They can be Kubernetes-based
                         or non-Kubernetes services. For external services, you need
                         to provide an additional ServiceDescriptor object to establish
-                        the service binding. Service provided by other KubeBlocks
+                        the service binding. - Service provided by other KubeBlocks
                         clusters: These services are provided by other KubeBlocks
                         clusters. You can bind to these services by specifying the
-                        name of the hosting cluster. Each type of service reference
+                        name of the hosting cluster. \n Each type of service reference
                         requires specific configurations and bindings to establish
                         the connection and interaction with the respective services.
                         It should be noted that the ServiceRef has cluster-level semantic
                         consistency, meaning that within the same Cluster, service
                         references with the same ServiceRef.Name are considered to
                         be the same service. It is only allowed to bind to the same
-                        Cluster or ServiceDescriptor.'
+                        Cluster or ServiceDescriptor."
                       items:
                         properties:
                           cluster:
-                            description: 'When referencing a service provided by other
+                            description: "When referencing a service provided by other
                               KubeBlocks cluster, you need to provide the name of
-                              the Cluster being referenced. By default, when other
+                              the Cluster being referenced. \n By default, when other
                               KubeBlocks Cluster are referenced, the ClusterDefinition.spec.connectionCredential
                               secret corresponding to the referenced Cluster will
                               be used to bind to the current component. Currently,
                               if a KubeBlocks cluster is to be referenced, the connection
                               credential secret should include and correspond to the
                               following fields: endpoint, port, username, and password.
-                              Under this referencing approach, the ServiceKind and
-                              ServiceVersion of service reference declaration defined
-                              in the ClusterDefinition will not be validated. If both
-                              Cluster and ServiceDescriptor are specified, the Cluster
-                              takes precedence.'
+                              \n Under this referencing approach, the ServiceKind
+                              and ServiceVersion of service reference declaration
+                              defined in the ClusterDefinition will not be validated.
+                              If both Cluster and ServiceDescriptor are specified,
+                              the Cluster takes precedence."
                             type: string
                           name:
                             description: name of the service reference declaration.
@@ -473,17 +473,17 @@ spec:
                               by default.
                             type: string
                           serviceDescriptor:
-                            description: serviceDescriptor defines the service descriptor
-                              of the service provided by external sources. When referencing
-                              a service provided by external sources, you need to
-                              provide the ServiceDescriptor object name to establish
-                              the service binding. And serviceDescriptor is the name
-                              of the ServiceDescriptor object, furthermore, the ServiceDescriptor.spec.serviceKind
-                              and ServiceDescriptor.spec.serviceVersion should match
-                              clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind
-                              and the regular expression defines in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion.
-                              If both Cluster and ServiceDescriptor are specified,
-                              the Cluster takes precedence.
+                            description: "serviceDescriptor defines the service descriptor
+                              of the service provided by external sources. \n When
+                              referencing a service provided by external sources,
+                              you need to provide the ServiceDescriptor object name
+                              to establish the service binding. And serviceDescriptor
+                              is the name of the ServiceDescriptor object, furthermore,
+                              the `ServiceDescriptor.spec.serviceKind` and `ServiceDescriptor.spec.serviceVersion`
+                              should match `clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind`
+                              and the regular expression defines in `clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion`.
+                              \n If both Cluster and ServiceDescriptor are specified,
+                              the Cluster takes precedence."
                             type: string
                         required:
                         - name
@@ -506,21 +506,21 @@ spec:
                             type: string
                           serviceType:
                             default: ClusterIP
-                            description: 'serviceType determines how the Service is
+                            description: "serviceType determines how the Service is
                               exposed. Valid options are ClusterIP, NodePort, and
-                              LoadBalancer. "ClusterIP" allocates a cluster-internal
+                              LoadBalancer. \n - `ClusterIP` allocates a cluster-internal
                               IP address for load-balancing to endpoints. Endpoints
                               are determined by the selector or if that is not specified,
                               they are determined by manual construction of an Endpoints
-                              object or EndpointSlice objects. If clusterIP is "None",
+                              object or EndpointSlice objects. If clusterIP is \"None\",
                               no virtual IP is allocated and the endpoints are published
-                              as a set of endpoints rather than a virtual IP. "NodePort"
+                              as a set of endpoints rather than a virtual IP. - `NodePort`
                               builds on ClusterIP and allocates a port on every node
                               which routes to the same endpoints as the clusterIP.
-                              "LoadBalancer" builds on NodePort and creates an external
+                              - `LoadBalancer` builds on NodePort and creates an external
                               load-balancer (if supported in the current cloud) which
-                              routes to the same endpoints as the clusterIP. More
-                              info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.'
+                              routes to the same endpoints as the clusterIP. \n More
+                              info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
                             enum:
                             - ClusterIP
                             - NodePort
@@ -537,21 +537,21 @@ spec:
                       properties:
                         type:
                           default: Noop
-                          description: 'clusterSwitchPolicy defines type of the switchPolicy
-                            when workloadType is Replication. MaximumAvailability:
+                          description: "clusterSwitchPolicy defines type of the switchPolicy
+                            when workloadType is Replication. \n - MaximumAvailability:
                             [WIP] when the primary is active, do switch if the synchronization
                             delay = 0 in the user-defined lagProbe data delay detection
                             logic, otherwise do not switch. The primary is down, switch
                             immediately. It will be available in future versions.
-                            MaximumDataProtection: [WIP] when the primary is active,
+                            - MaximumDataProtection: [WIP] when the primary is active,
                             do switch if synchronization delay = 0 in the user-defined
                             lagProbe data lag detection logic, otherwise do not switch.
                             If the primary is down, if it can be judged that the primary
                             and secondary data are consistent, then do the switch,
                             otherwise do not switch. It will be available in future
-                            versions. Noop: KubeBlocks will not perform high-availability
+                            versions. - Noop: KubeBlocks will not perform high-availability
                             switching on components. Users need to implement HA by
-                            themselves or integrate open source HA solution.'
+                            themselves or integrate open source HA solution."
                           enum:
                           - Noop
                           type: string
@@ -1018,12 +1018,12 @@ spec:
                         be ignored.
                       type: string
                     serviceName:
-                      description: 'ServiceName defines the name of the underlying
+                      description: "ServiceName defines the name of the underlying
                         service object. If not specified, the default service name
-                        with different patterns will be used: - CLUSTER_NAME: for
+                        with different patterns will be used: \n - CLUSTER_NAME: for
                         cluster-level services - CLUSTER_NAME-COMPONENT_NAME: for
-                        component-level services Only one default service name is
-                        allowed. Cannot be updated.'
+                        component-level services \n Only one default service name
+                        is allowed. Cannot be updated."
                       type: string
                     shardingSelector:
                       description: ShardingSelector extends the ServiceSpec.Selector
@@ -1406,20 +1406,20 @@ spec:
                       - message: name is immutable
                         rule: self == oldSelf
                     shards:
-                      description: 'shards indicates the number of component, and
+                      description: "shards indicates the number of component, and
                         these components have the same specifications and definitions.
-                        It should be noted that the number of replicas for each component
-                        should be defined by template.replicas. Moreover, the logical
-                        relationship between these components should be maintained
-                        by the components themselves, KubeBlocks only provides the
-                        following capabilities for managing the lifecycle of sharding:
-                        1. When the number of shards increases, the postProvision
+                        \n It should be noted that the number of replicas for each
+                        component should be defined by template.replicas. Moreover,
+                        the logical relationship between these components should be
+                        maintained by the components themselves, KubeBlocks only provides
+                        the following capabilities for managing the lifecycle of sharding:
+                        \n 1. When the number of shards increases, the postProvision
                         Action defined in the ComponentDefinition will be executed
                         if the conditions are met. 2. When the number of shards decreases,
                         the preTerminate Action defined in the ComponentDefinition
                         will be executed if the conditions are met. Additionally,
                         the resources and data associated with the corresponding Component
-                        will be deleted as well.'
+                        will be deleted as well."
                       format: int32
                       maximum: 2048
                       minimum: 0
@@ -1466,7 +1466,7 @@ spec:
                                 values are considered to be in the same topology.
                                 It's used as the topology domain for pod anti-affinity
                                 and pod spread constraint. Some well-known label keys,
-                                such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
+                                such as `kubernetes.io/hostname` and `topology.kubernetes.io/zone`
                                 are often used as TopologyKey, as well as any other
                                 custom label key.
                               items:
@@ -1494,15 +1494,15 @@ spec:
                           description: componentDef references the name of the ComponentDefinition.
                             If both componentDefRef and componentDef are provided,
                             the componentDef will take precedence over componentDefRef.
-                            //(TODO) +kubebuilder:validation:XValidation:rule="self
-                            == oldSelf",message="componentDef is immutable"
+                            TODO +kubebuilder:validation:XValidation:rule="self ==
+                            oldSelf",message="componentDef is immutable"
                           maxLength: 22
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         componentDefRef:
                           description: componentDefRef references componentDef defined
                             in ClusterDefinition spec. Need to comply with IANA Service
-                            Naming rule. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                            Naming rule. TODO +kubebuilder:validation:XValidation:rule="self
                             == oldSelf",message="componentDefRef is immutable"
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
@@ -1530,9 +1530,9 @@ spec:
                           properties:
                             name:
                               default: KubeBlocks
-                              description: 'Name of issuer. Options supported: - KubeBlocks
-                                - Certificates signed by KubeBlocks Operator. - UserProvided
-                                - User provided own CA-signed certificates.'
+                              description: "Name of issuer. Options supported: \n
+                                - KubeBlocks - Certificates signed by KubeBlocks Operator.
+                                - UserProvided - User provided own CA-signed certificates."
                               enum:
                               - KubeBlocks
                               - UserProvided
@@ -1575,7 +1575,7 @@ spec:
                             name is also part of Service DNS name, so this name will
                             comply with IANA Service Naming rule. When ClusterComponentSpec
                             is referenced as a template, name is optional. Otherwise,
-                            it is required. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                            it is required. TODO +kubebuilder:validation:XValidation:rule="self
                             == oldSelf",message="name is immutable"
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
@@ -1686,43 +1686,43 @@ spec:
                             that running component depends on.
                           type: string
                         serviceRefs:
-                          description: 'serviceRefs define service references for
+                          description: "serviceRefs define service references for
                             the current component. Based on the referenced services,
-                            they can be categorized into two types: Service provided
+                            they can be categorized into two types: \n - Service provided
                             by external sources: These services are provided by external
                             sources and are not managed by KubeBlocks. They can be
                             Kubernetes-based or non-Kubernetes services. For external
                             services, you need to provide an additional ServiceDescriptor
-                            object to establish the service binding. Service provided
+                            object to establish the service binding. - Service provided
                             by other KubeBlocks clusters: These services are provided
                             by other KubeBlocks clusters. You can bind to these services
-                            by specifying the name of the hosting cluster. Each type
-                            of service reference requires specific configurations
+                            by specifying the name of the hosting cluster. \n Each
+                            type of service reference requires specific configurations
                             and bindings to establish the connection and interaction
                             with the respective services. It should be noted that
                             the ServiceRef has cluster-level semantic consistency,
                             meaning that within the same Cluster, service references
                             with the same ServiceRef.Name are considered to be the
                             same service. It is only allowed to bind to the same Cluster
-                            or ServiceDescriptor.'
+                            or ServiceDescriptor."
                           items:
                             properties:
                               cluster:
-                                description: 'When referencing a service provided
+                                description: "When referencing a service provided
                                   by other KubeBlocks cluster, you need to provide
-                                  the name of the Cluster being referenced. By default,
-                                  when other KubeBlocks Cluster are referenced, the
-                                  ClusterDefinition.spec.connectionCredential secret
-                                  corresponding to the referenced Cluster will be
-                                  used to bind to the current component. Currently,
+                                  the name of the Cluster being referenced. \n By
+                                  default, when other KubeBlocks Cluster are referenced,
+                                  the ClusterDefinition.spec.connectionCredential
+                                  secret corresponding to the referenced Cluster will
+                                  be used to bind to the current component. Currently,
                                   if a KubeBlocks cluster is to be referenced, the
                                   connection credential secret should include and
                                   correspond to the following fields: endpoint, port,
-                                  username, and password. Under this referencing approach,
-                                  the ServiceKind and ServiceVersion of service reference
-                                  declaration defined in the ClusterDefinition will
-                                  not be validated. If both Cluster and ServiceDescriptor
-                                  are specified, the Cluster takes precedence.'
+                                  username, and password. \n Under this referencing
+                                  approach, the ServiceKind and ServiceVersion of
+                                  service reference declaration defined in the ClusterDefinition
+                                  will not be validated. If both Cluster and ServiceDescriptor
+                                  are specified, the Cluster takes precedence."
                                 type: string
                               name:
                                 description: name of the service reference declaration.
@@ -1737,18 +1737,18 @@ spec:
                                   the namespace of the current cluster by default.
                                 type: string
                               serviceDescriptor:
-                                description: serviceDescriptor defines the service
+                                description: "serviceDescriptor defines the service
                                   descriptor of the service provided by external sources.
-                                  When referencing a service provided by external
+                                  \n When referencing a service provided by external
                                   sources, you need to provide the ServiceDescriptor
                                   object name to establish the service binding. And
                                   serviceDescriptor is the name of the ServiceDescriptor
-                                  object, furthermore, the ServiceDescriptor.spec.serviceKind
-                                  and ServiceDescriptor.spec.serviceVersion should
-                                  match clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind
-                                  and the regular expression defines in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion.
-                                  If both Cluster and ServiceDescriptor are specified,
-                                  the Cluster takes precedence.
+                                  object, furthermore, the `ServiceDescriptor.spec.serviceKind`
+                                  and `ServiceDescriptor.spec.serviceVersion` should
+                                  match `clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind`
+                                  and the regular expression defines in `clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion`.
+                                  \n If both Cluster and ServiceDescriptor are specified,
+                                  the Cluster takes precedence."
                                 type: string
                             required:
                             - name
@@ -1772,22 +1772,22 @@ spec:
                                 type: string
                               serviceType:
                                 default: ClusterIP
-                                description: 'serviceType determines how the Service
+                                description: "serviceType determines how the Service
                                   is exposed. Valid options are ClusterIP, NodePort,
-                                  and LoadBalancer. "ClusterIP" allocates a cluster-internal
+                                  and LoadBalancer. \n - `ClusterIP` allocates a cluster-internal
                                   IP address for load-balancing to endpoints. Endpoints
                                   are determined by the selector or if that is not
                                   specified, they are determined by manual construction
                                   of an Endpoints object or EndpointSlice objects.
-                                  If clusterIP is "None", no virtual IP is allocated
+                                  If clusterIP is \"None\", no virtual IP is allocated
                                   and the endpoints are published as a set of endpoints
-                                  rather than a virtual IP. "NodePort" builds on ClusterIP
-                                  and allocates a port on every node which routes
-                                  to the same endpoints as the clusterIP. "LoadBalancer"
-                                  builds on NodePort and creates an external load-balancer
-                                  (if supported in the current cloud) which routes
-                                  to the same endpoints as the clusterIP. More info:
-                                  https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.'
+                                  rather than a virtual IP. - `NodePort` builds on
+                                  ClusterIP and allocates a port on every node which
+                                  routes to the same endpoints as the clusterIP. -
+                                  `LoadBalancer` builds on NodePort and creates an
+                                  external load-balancer (if supported in the current
+                                  cloud) which routes to the same endpoints as the
+                                  clusterIP. \n More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
                                 enum:
                                 - ClusterIP
                                 - NodePort
@@ -1804,22 +1804,23 @@ spec:
                           properties:
                             type:
                               default: Noop
-                              description: 'clusterSwitchPolicy defines type of the
-                                switchPolicy when workloadType is Replication. MaximumAvailability:
-                                [WIP] when the primary is active, do switch if the
-                                synchronization delay = 0 in the user-defined lagProbe
-                                data delay detection logic, otherwise do not switch.
-                                The primary is down, switch immediately. It will be
-                                available in future versions. MaximumDataProtection:
-                                [WIP] when the primary is active, do switch if synchronization
-                                delay = 0 in the user-defined lagProbe data lag detection
-                                logic, otherwise do not switch. If the primary is
-                                down, if it can be judged that the primary and secondary
-                                data are consistent, then do the switch, otherwise
-                                do not switch. It will be available in future versions.
+                              description: "clusterSwitchPolicy defines type of the
+                                switchPolicy when workloadType is Replication. \n
+                                - MaximumAvailability: [WIP] when the primary is active,
+                                do switch if the synchronization delay = 0 in the
+                                user-defined lagProbe data delay detection logic,
+                                otherwise do not switch. The primary is down, switch
+                                immediately. It will be available in future versions.
+                                - MaximumDataProtection: [WIP] when the primary is
+                                active, do switch if synchronization delay = 0 in
+                                the user-defined lagProbe data lag detection logic,
+                                otherwise do not switch. If the primary is down, if
+                                it can be judged that the primary and secondary data
+                                are consistent, then do the switch, otherwise do not
+                                switch. It will be available in future versions. -
                                 Noop: KubeBlocks will not perform high-availability
                                 switching on components. Users need to implement HA
-                                by themselves or integrate open source HA solution.'
+                                by themselves or integrate open source HA solution."
                               enum:
                               - Noop
                               type: string
@@ -2247,12 +2248,12 @@ spec:
                 - DedicatedNode
                 type: string
               terminationPolicy:
-                description: Cluster termination policy. Valid values are DoNotTerminate,
-                  Halt, Delete, WipeOut. DoNotTerminate will block delete operation.
-                  Halt will delete workload resources such as statefulset, deployment
-                  workloads but keep PVCs. Delete is based on Halt and deletes PVCs.
-                  WipeOut is based on Delete and wipe out all volume snapshots and
-                  snapshot data from backup storage location.
+                description: "Cluster termination policy. Valid values are `DoNotTerminate`,
+                  `Halt`, `Delete`, `WipeOut`. \n - DoNotTerminate will block delete
+                  operation. - Halt will delete workload resources such as statefulset,
+                  deployment workloads but keep PVCs. - Delete is based on Halt and
+                  deletes PVCs. - WipeOut is based on Delete and wipe out all volume
+                  snapshots and snapshot data from backup storage location."
                 enum:
                 - DoNotTerminate
                 - Halt
@@ -2370,19 +2371,19 @@ spec:
                         The format is `ObjectKind/Name`.
                       type: object
                     phase:
-                      description: 'phase describes the phase of the component and
-                        the detail information of the phases are as following: Creating:
-                        `Creating` is a special `Updating` with previous phase `empty`(means
-                        "") or `Creating`. Running: component replicas > 0 and all
-                        pod specs are latest with a Running state. Updating: component
-                        replicas > 0 and has no failed pods. the component is being
-                        updated. Abnormal: component replicas > 0 but having some
-                        failed pods. the component basically works but in a fragile
-                        state. Failed: component replicas > 0 but having some failed
-                        pods. the component doesn''t work anymore. Stopping: component
-                        replicas = 0 and has terminating pods. Stopped: component
-                        replicas = 0 and all pods have been deleted. Deleting: the
-                        component is being deleted.'
+                      description: "phase describes the phase of the component and
+                        the detail information of the phases are as following: \n
+                        - Creating: `Creating` is a special `Updating` with previous
+                        phase `empty`(means \"\") or `Creating`. - Running: component
+                        replicas > 0 and all pod specs are latest with a Running state.
+                        - Updating: component replicas > 0 and has no failed pods.
+                        the component is being updated. - Abnormal: component replicas
+                        > 0 but having some failed pods. the component basically works
+                        but in a fragile state. - Failed: component replicas > 0 but
+                        having some failed pods. the component doesn't work anymore.
+                        - Stopping: component replicas = 0 and has terminating pods.
+                        - Stopped: component replicas = 0 and all pods have been deleted.
+                        - Deleting: the component is being deleted."
                       enum:
                       - Creating
                       - Running
@@ -2488,20 +2489,20 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: 'phase describes the phase of the Cluster, the detail
-                  information of the phases are as following: Creating: all components
-                  are in `Creating` phase. Running: all components are in `Running`
-                  phase, means the cluster is working well. Updating: all components
+                description: "phase describes the phase of the Cluster, the detail
+                  information of the phases are as following: \n - Creating: all components
+                  are in `Creating` phase. - Running: all components are in `Running`
+                  phase, means the cluster is working well. - Updating: all components
                   are in `Creating`, `Running` or `Updating` phase, and at least one
                   component is in `Creating` or `Updating` phase, means the cluster
-                  is doing an update. Stopping: at least one component is in `Stopping`
-                  phase, means the cluster is in a stop progress. Stopped: all components
-                  are in ''Stopped` phase, means the cluster has stopped and didn''t
-                  provide any function anymore. Failed: all components are in `Failed`
-                  phase, means the cluster is unavailable. Abnormal: some components
+                  is doing an update. - Stopping: at least one component is in `Stopping`
+                  phase, means the cluster is in a stop progress. - Stopped: all components
+                  are in `Stopped` phase, means the cluster has stopped and didn't
+                  provide any function anymore. - Failed: all components are in `Failed`
+                  phase, means the cluster is unavailable. - Abnormal: some components
                   are in `Failed` or `Abnormal` phase, means the cluster in a fragile
-                  state. troubleshoot need to be done. Deleting: the cluster is being
-                  deleted.'
+                  state. troubleshoot need to be done. - Deleting: the cluster is
+                  being deleted."
                 enum:
                 - Creating
                 - Running

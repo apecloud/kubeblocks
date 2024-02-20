@@ -150,7 +150,7 @@ func runWithRetry(ctx context.Context, handler WatchEventHandler, event fsnotify
 			logger.Errorf("failed to handle event, retry limit exceeded: %d", maxRetryCount)
 			return
 		}
-		logger.Errorf("failed to handl event, will try again after [%d]s: %s", DefaultSleepRetryTime, err)
+		logger.Errorf("failed to handle event, will try again after [%d]s: %s", DefaultSleepRetryTime, err)
 		time.Sleep(time.Second * DefaultRetryCount)
 	}
 }

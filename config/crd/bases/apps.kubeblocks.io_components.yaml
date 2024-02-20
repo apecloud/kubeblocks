@@ -95,7 +95,7 @@ spec:
                     x-kubernetes-list-type: set
                 type: object
               classDefRef:
-                description: classDefRef references the class defined in ComponentClassDefinition.
+                description: ClassDefRef references the class defined in ComponentClassDefinition.
                 properties:
                   class:
                     description: Class refers to the name of the class that is defined
@@ -110,9 +110,10 @@ spec:
                 - class
                 type: object
               compDef:
-                description: compDef is the name of the referenced componentDefinition.
+                description: CompDef is the name of the referenced ComponentDefinition.
                 type: string
               configs:
+                description: Configs defines the configuration for the component.
                 items:
                   properties:
                     asEnvFrom:
@@ -210,7 +211,7 @@ spec:
                   type: object
                 type: array
               enabledLogs:
-                description: enabledLogs indicates which log file takes effect in
+                description: EnabledLogs indicates which log file takes effect in
                   the database cluster, element is the log type which is defined in
                   ComponentDefinition logConfig.name.
                 items:
@@ -225,7 +226,7 @@ spec:
                 type: array
               monitor:
                 default: false
-                description: monitor is a switch to enable monitoring and is set as
+                description: Monitor is a switch to enable monitoring and is set as
                   false by default. KubeBlocks provides an extension mechanism to
                   support component level monitoring, which will scrape metrics auto
                   or manually from servers in component and export metrics to Time
@@ -327,11 +328,11 @@ spec:
                 - ToSts
                 type: string
               serviceAccountName:
-                description: serviceAccountName is the name of the ServiceAccount
+                description: ServiceAccountName is the name of the ServiceAccount
                   that running component depends on.
                 type: string
               serviceRefs:
-                description: "serviceRefs define service references for the current
+                description: "ServiceRefs define service references for the current
                   component. Based on the referenced services, they can be categorized
                   into two types: \n - Service provided by external sources: These
                   services are provided by external sources and are not managed by
@@ -392,6 +393,7 @@ spec:
                   type: object
                 type: array
               tlsConfig:
+                description: TLSConfig specifies the TLS configuration for the component.
                 properties:
                   enable:
                     default: false

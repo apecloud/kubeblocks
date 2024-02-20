@@ -59,10 +59,10 @@ spec:
               operation behaviors.
             properties:
               configs:
-                description: 'The configs field provided by provider, and finally
-                  this configTemplateRefs will be rendered into the user''s own configuration
-                  file according to the user''s cluster. Cannot be updated. TODO:
-                  support referencing configs from other components or clusters.'
+                description: "The configs field provided by provider, and finally
+                  this configTemplateRefs will be rendered into the user's own configuration
+                  file according to the user's cluster. Cannot be updated. \n TODO:
+                  support referencing configs from other components or clusters."
                 items:
                   properties:
                     asEnvFrom:
@@ -184,7 +184,7 @@ spec:
                       Cannot be updated.
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -192,7 +192,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -327,19 +327,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -349,13 +350,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -374,24 +375,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -432,12 +436,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -471,7 +479,7 @@ spec:
                       retries from the beginning. Cannot be updated."
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -479,7 +487,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -614,19 +622,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -636,13 +645,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -661,24 +670,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -719,12 +731,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -756,7 +772,7 @@ spec:
                       including any extraneous information. Cannot be updated."
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -764,7 +780,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -899,19 +915,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -921,13 +938,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -946,24 +963,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -1004,12 +1024,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -1041,7 +1065,7 @@ spec:
                       ensuring data consistency. Cannot be updated.
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -1049,7 +1073,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -1184,19 +1208,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -1206,13 +1231,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -1231,24 +1256,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -1289,12 +1317,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -1327,7 +1359,7 @@ spec:
                       migration within this action. Cannot be updated.
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -1335,7 +1367,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -1470,19 +1502,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -1492,13 +1525,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -1517,24 +1550,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -1575,12 +1611,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -1626,7 +1666,7 @@ spec:
                       joined by ',' (e.g., \"hostIp1,hostIp2\"). \n Cannot be updated."
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -1634,7 +1674,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -1769,19 +1809,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -1791,13 +1832,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -1816,24 +1857,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -1874,12 +1918,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -1913,7 +1961,7 @@ spec:
                       Cannot be updated.
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -1921,7 +1969,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -2056,19 +2104,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -2078,13 +2127,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -2103,24 +2152,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -2161,12 +2213,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -2196,7 +2252,7 @@ spec:
                       of volume space exhaustion or excessive traffic. Cannot be updated.
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -2204,7 +2260,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -2339,19 +2395,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -2361,13 +2418,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -2386,24 +2443,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -2444,12 +2504,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -2478,7 +2542,7 @@ spec:
                       read-write. Cannot be updated.
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -2486,7 +2550,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -2621,19 +2685,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -2643,13 +2708,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -2668,24 +2733,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -2726,12 +2794,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -2760,7 +2832,7 @@ spec:
                       that there is a configuration update. Cannot be updated.
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -2768,7 +2840,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -2903,19 +2975,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -2925,13 +2998,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -2950,24 +3023,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -3008,12 +3084,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -3042,7 +3122,7 @@ spec:
                       Cannot be updated.
                     properties:
                       builtinHandler:
-                        description: builtinHandler specifies the builtin action handler
+                        description: BuiltinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
                           ComponentLifecycleActions should be consistent. Details
                           can be queried through official documentation in the future.
@@ -3050,7 +3130,7 @@ spec:
                           them satisfies the requirement.
                         type: string
                       customHandler:
-                        description: customHandler defines the custom way to do action.
+                        description: CustomHandler defines the custom way to do action.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -3185,19 +3265,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -3207,13 +3288,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -3232,24 +3313,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -3290,12 +3374,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -3325,13 +3413,9 @@ spec:
                         format: int32
                         type: integer
                       initialDelaySeconds:
-                        description: 'Number of seconds after the container has started
-                          before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                         format: int32
                         type: integer
                       periodSeconds:
-                        description: How often (in seconds) to perform the probe.
-                          Default to 10 seconds. Minimum value is 1.
                         format: int32
                         type: integer
                       successThreshold:
@@ -3359,9 +3443,6 @@ spec:
                         format: int64
                         type: integer
                       timeoutSeconds:
-                        description: 'Number of seconds after which the probe times
-                          out. Defaults to 1 second. Minimum value is 1. More info:
-                          https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                         format: int32
                         type: integer
                     type: object
@@ -3386,7 +3467,7 @@ spec:
                       updated."
                     properties:
                       scriptSpecSelectors:
-                        description: scriptSpecSelectors defines the selector of the
+                        description: ScriptSpecSelectors defines the selector of the
                           scriptSpecs that need to be referenced. Once ScriptSpecSelectors
                           is defined, the scripts defined in scripts can be referenced
                           in the Action.
@@ -3403,7 +3484,7 @@ spec:
                           type: object
                         type: array
                       withCandidate:
-                        description: withCandidate corresponds to the switchover of
+                        description: WithCandidate corresponds to the switchover of
                           the specified candidate primary or leader instance. Currently,
                           only Action.Exec is supported, Action.HTTP is not supported.
                         properties:
@@ -3540,19 +3621,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -3562,13 +3644,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -3587,24 +3669,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -3645,12 +3730,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -3674,7 +3763,7 @@ spec:
                             type: integer
                         type: object
                       withoutCandidate:
-                        description: withoutCandidate corresponds to a switchover
+                        description: WithoutCandidate corresponds to a switchover
                           that does not specify a candidate primary or leader instance.
                           Currently, only Action.Exec is supported, Action.HTTP is
                           not supported.
@@ -3812,19 +3901,20 @@ spec:
                               be updated.
                             properties:
                               args:
-                                description: args is used to perform statements.
+                                description: Args are used to perform statements.
                                 items:
                                   type: string
                                 type: array
                               command:
-                                description: Command is the command line to execute
-                                  inside the container, the working directory for
-                                  the command  is root ('/') in the container's filesystem.
-                                  The command is simply exec'd, it is not run inside
-                                  a shell, so traditional shell instructions ('|',
-                                  etc) won't work. To use a shell, you need to explicitly
-                                  call out to that shell. Exit status of 0 is treated
-                                  as live/healthy and non-zero is unhealthy.
+                                description: "Specifies the command line to be executed
+                                  inside the container. The working directory for
+                                  this command is the root ('/') of the container's
+                                  filesystem. The command is directly executed and
+                                  not run inside a shell, hence traditional shell
+                                  instructions ('|', etc) are not applicable. To use
+                                  a shell, it needs to be explicitly invoked. \n An
+                                  exit status of 0 is interpreted as live/healthy,
+                                  while a non-zero status indicates unhealthy."
                                 items:
                                   type: string
                                 type: array
@@ -3834,13 +3924,13 @@ spec:
                               Cannot be updated.
                             properties:
                               host:
-                                description: Host name to connect to, defaults to
-                                  the pod IP. You probably want to set "Host" in httpHeaders
-                                  instead.
+                                description: Indicates the host name to connect to,
+                                  which defaults to the pod IP. It is recommended
+                                  to set "Host" in httpHeaders instead.
                                 type: string
                               httpHeaders:
-                                description: Custom headers to set in the request.
-                                  HTTP allows repeated headers.
+                                description: Allows for the setting of custom headers
+                                  in the request. HTTP supports repeated headers.
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
@@ -3859,24 +3949,27 @@ spec:
                                   type: object
                                 type: array
                               method:
-                                description: Method represents the HTTP request method,
-                                  which can be one of the standard HTTP methods like
-                                  "GET," "POST," "PUT," etc. Defaults to Get.
+                                description: Represents the HTTP request method, which
+                                  can be one of the standard HTTP methods such as
+                                  "GET," "POST," "PUT," etc. The default method is
+                                  Get.
                                 type: string
                               path:
-                                description: Path to access on the HTTP server.
+                                description: Specifies the path to be accessed on
+                                  the HTTP server.
                                 type: string
                               port:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
+                                description: Defines the name or number of the port
+                                  to be accessed on the container. The number must
+                                  fall within the range of 1 to 65535. The name must
+                                  conform to the IANA_SVC_NAME standard.
                                 x-kubernetes-int-or-string: true
                               scheme:
-                                description: Scheme to use for connecting to the host.
-                                  Defaults to HTTP.
+                                description: Specifies the scheme to be used for connecting
+                                  to the host. The default scheme is HTTP.
                                 type: string
                             required:
                             - port
@@ -3917,12 +4010,16 @@ spec:
                             properties:
                               maxRetries:
                                 default: 0
-                                description: MaxRetries specifies the maximum number
-                                  of times the action should be retried.
+                                description: Defines the maximum number of retry attempts
+                                  that should be made for a given action. This value
+                                  is set to 0 by default, indicating that no retries
+                                  will be made.
                                 type: integer
                               retryInterval:
                                 default: 0
-                                description: RetryInterval specifies the interval
+                                description: Indicates the duration of time to wait
+                                  between each retry attempt. This value is set to
+                                  0 by default, indicating that there will be no delay
                                   between retry attempts.
                                 format: int64
                                 type: integer
@@ -4109,25 +4206,26 @@ spec:
                     a component instance.
                   properties:
                     name:
-                      description: Name of the role. It will apply to "apps.kubeblocks.io/role"
-                        object label value. Cannot be updated.
+                      description: Defines the role's identifier. This will be applied
+                        to the "apps.kubeblocks.io/role" object label value. This
+                        field is immutable once set.
                       maxLength: 32
                       pattern: ^.*[^\s]+.*$
                       type: string
                     serviceable:
                       default: false
-                      description: Serviceable indicates whether a replica with this
-                        role can provide services. Cannot be updated.
+                      description: Specifies if a replica assuming this role can provide
+                        services. This field is immutable once set.
                       type: boolean
                     votable:
                       default: false
-                      description: Votable indicates whether a replica with this role
-                        is allowed to vote. Cannot be updated.
+                      description: Specifies if a replica assuming this role is permitted
+                        to vote. This field is immutable once set.
                       type: boolean
                     writable:
                       default: false
-                      description: Writable indicates whether a replica with this
-                        role is allowed to write data. Cannot be updated.
+                      description: Specifies if a replica assuming this role is permitted
+                        to write data. This field is immutable once set.
                       type: boolean
                   required:
                   - name
@@ -11900,17 +11998,19 @@ spec:
                   properties:
                     initAccount:
                       default: false
-                      description: InitAccount indicates whether this is the unique
-                        system initialization account (e.g., MySQL root). Only one
-                        system init account is allowed. Cannot be updated.
+                      description: Indicates if this account is the unique system
+                        initialization account (e.g., MySQL root). Only one system
+                        initialization account is permitted. This field is immutable
+                        once set.
                       type: boolean
                     name:
-                      description: The name of the account. Others can refer to this
-                        account by the name. Cannot be updated.
+                      description: Specifies the unique identifier for the account.
+                        This name is used by other entities to reference the account.
+                        This field is immutable once set.
                       type: string
                     passwordGenerationPolicy:
-                      description: PasswordGenerationPolicy defines the policy for
-                        generating the account's password. Cannot be updated.
+                      description: Specifies the policy for generating the account's
+                        password. This field is immutable once set.
                       properties:
                         length:
                           default: 16
@@ -11944,8 +12044,8 @@ spec:
                           type: string
                       type: object
                     secretRef:
-                      description: SecretRef specifies the secret from which data
-                        will be copied to create the new account. Cannot be updated.
+                      description: Refers to the secret from which data will be copied
+                        to create the new account. This field is immutable once set.
                       properties:
                         name:
                           description: name refers to the name of the secret.
@@ -11958,8 +12058,9 @@ spec:
                       - namespace
                       type: object
                     statement:
-                      description: Statement specifies the statement used to create
-                        the account with required privileges. Cannot be updated.
+                      description: Defines the statement used to create the account
+                        with the necessary privileges. This field is immutable once
+                        set.
                       type: string
                   required:
                   - name

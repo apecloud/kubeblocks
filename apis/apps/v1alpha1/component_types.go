@@ -29,16 +29,16 @@ import (
 
 // ComponentSpec defines the desired state of Component
 type ComponentSpec struct {
-	// compDef is the name of the referenced componentDefinition.
+	// CompDef is the name of the referenced ComponentDefinition.
 	// +kubebuilder:validation:Required
 	CompDef string `json:"compDef"`
 
-	// classDefRef references the class defined in ComponentClassDefinition.
+	// ClassDefRef references the class defined in ComponentClassDefinition.
 	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
-	// serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
+	// ServiceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
 	//
 	// - Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
 	// - Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
@@ -66,10 +66,11 @@ type ComponentSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
+	// Configs defines the configuration for the component.
 	// +optional
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
 
-	// monitor is a switch to enable monitoring and is set as false by default.
+	// Monitor is a switch to enable monitoring and is set as false by default.
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
 	// metrics to Time Series Database.
@@ -77,13 +78,13 @@ type ComponentSpec struct {
 	// +optional
 	Monitor bool `json:"monitor,omitempty"`
 
-	// enabledLogs indicates which log file takes effect in the database cluster,
+	// EnabledLogs indicates which log file takes effect in the database cluster,
 	// element is the log type which is defined in ComponentDefinition logConfig.name.
 	// +listType=set
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
-	// serviceAccountName is the name of the ServiceAccount that running component depends on.
+	// ServiceAccountName is the name of the ServiceAccount that running component depends on.
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
@@ -97,6 +98,7 @@ type ComponentSpec struct {
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
+	// TLSConfig specifies the TLS configuration for the component.
 	// +optional
 	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
 

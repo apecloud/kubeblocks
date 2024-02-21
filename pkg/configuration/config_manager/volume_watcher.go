@@ -138,17 +138,19 @@ func (w *ConfigMapVolumeWatcher) loopNotifyEvent(watcher *fsnotify.Watcher, ctx 
 	}
 }
 
-func runWithRetry(ctx context.Context, handler WatchEventHandler, event fsnotify.Event, retryCount int, logger *zap.SugaredLogger) {
+func runWithRetry(ctx context.Context, handler WatchEventHandler, event fsnotify.Event, maxRetryCount int, logger *zap.SugaredLogger) {
 	var err error
+	var retryCount = maxRetryCount
 	for {
 		if err = handler(ctx, event); err == nil {
 			return
 		}
 		retryCount--
-		if retryCount <= 0 {
+		if retryCount < 0 {
+			logger.Errorf("failed to handle event, retry limit exceeded: %d", maxRetryCount)
 			return
 		}
-		logger.Errorf("failed event handler, please retry after [%d]s : %s", DefaultSleepRetryTime, err)
+		logger.Errorf("failed to handle event, will try again after [%d]s: %s", DefaultSleepRetryTime, err)
 		time.Sleep(time.Second * DefaultRetryCount)
 	}
 }

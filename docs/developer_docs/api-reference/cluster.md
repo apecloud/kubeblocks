@@ -6946,7 +6946,7 @@ If there is a change, a rolechange event will be created to notify the controlle
 This action is required if the component has defined roles. Otherwise, the replicas&rsquo; pods will have no role
 information after cluster creation, and services will not route to the replica correctly.
 Args for the action:
-- KB_POD_IP: The pod IP of the replica to check the role. If the action is implemented through a CDI GRPC plugin, this environment variable will be translated to the &lsquo;podIP&rsquo; argument.
+- KB_POD_FQDN: The pod FQDN of the replica to check the role. If the action is implemented through a CDI GRPC plugin, this environment variable will be translated to the &lsquo;podIP&rsquo; argument.
 - KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the &lsquo;servicePort&rsquo; argument.
 - KB_SERVICE_USER: The username used to access the DB service and retrieve the role information with sufficient privileges. &lsquo;serviceUser&rsquo; is used if provided by a CDI GRPC plugin.
 - KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information. &lsquo;servicePassword&rsquo; is used if provided by a CDI GRPC plugin.

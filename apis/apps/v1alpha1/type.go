@@ -871,17 +871,3 @@ type ClusterObjectReference struct {
 	// +optional
 	Optional *bool `json:"optional,omitempty"`
 }
-
-func (r ClusterService) GeneratedSVCNameSuffix() string {
-	if len(r.ServiceName) > 0 {
-		return r.ServiceName
-	}
-	if len(r.ComponentSelector) > 0 {
-		return r.ComponentSelector
-	}
-	if len(r.ShardingSelector) > 0 {
-		return r.ShardingSelector
-	}
-	// otherwise, svc is named after the cluster name, has no suffix
-	return ""
-}

@@ -235,9 +235,32 @@ func (r *OpsRequest) validateExpose(cluster *Cluster) error {
 	clusterSVCNamesMap := make(map[string]bool)
 	clusterSVCServiceNamesMap := make(map[string]bool)
 
+	// if clusterService.SerivceName is specified
+	// the generated svc name is:
+	// - CLUSTER_NAME-SERVICE_NAME
+	//
+	// otherwise, service name with different patterns will be used:
+	//
+	// - CLUSTER_NAME: for cluster-level services (if `clusterService.ComponentSelector` is empty)
+	// - CLUSTER_NAME-COMPONENT_NAME: for component-level services
+	//
+	generatedSVCNameSuffix := func(svc ClusterService) string {
+		if len(svc.ServiceName) > 0 {
+			return svc.ServiceName
+		}
+		if len(svc.ComponentSelector) > 0 {
+			return svc.ComponentSelector
+		}
+		if len(svc.ShardingSelector) > 0 {
+			return svc.ShardingSelector
+		}
+		// otherwise, svc is named after the cluster name
+		return ""
+	}
+
 	for _, svc := range cluster.Spec.Services {
 		clusterSVCNamesMap[svc.Name] = true
-		clusterSVCServiceNamesMap[svc.GeneratedSVCNameSuffix()] = true
+		clusterSVCServiceNamesMap[generatedSVCNameSuffix(svc)] = true
 	}
 	// validate resources is legal and get component name slice
 	componentNames := make([]string, len(exposeList))
@@ -257,7 +280,7 @@ func (r *OpsRequest) validateExpose(cluster *Cluster) error {
 		if _, ok := clusterSVCNamesMap[v.ServiceName]; !ok {
 			return fmt.Errorf("service: %s not found in cluster %s", v.ServiceName, cluster.Name)
 		}
-		// check if generated service name is available (not taken)
+		// check if generated service name is legal
 		for _, svc := range v.Services {
 			var generatedSVCName string
 			if len(v.ServiceName) > 0 {
@@ -270,6 +293,7 @@ func (r *OpsRequest) validateExpose(cluster *Cluster) error {
 				if _, ok := clusterSVCServiceNamesMap[generatedSVCName]; ok {
 					return fmt.Errorf("service: %s already exists in cluster %s", generatedSVCName, cluster.Name)
 				}
+				clusterSVCServiceNamesMap[generatedSVCName] = true
 			} else if _, ok := clusterSVCServiceNamesMap[generatedSVCName]; !ok {
 				return fmt.Errorf("service: %s not found in cluster %s", generatedSVCName, cluster.Name)
 			}

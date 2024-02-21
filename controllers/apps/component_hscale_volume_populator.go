@@ -47,7 +47,7 @@ type dataClone interface {
 	ClearTmpResources() ([]client.Object, error)
 
 	CheckBackupStatus() (backupStatus, error)
-	CheckRestoreStatus(startingIndex int32) (backupStatus, error)
+	CheckRestoreStatus(startingIndex int32) (dpv1alpha1.RestorePhase, error)
 
 	backup() ([]client.Object, error)
 
@@ -130,7 +130,7 @@ func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, err
 		}
 		objs = append(objs, backupObjs...)
 		return objs, nil
-	case backupStatusProcessing:
+	case backupStatusProcessing, backupStatusFailed:
 		// requeue to waiting for backup ready
 		return objs, nil
 	case backupStatusReadyToUse:
@@ -146,18 +146,14 @@ func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, err
 			return nil, err
 		}
 		switch restoreStatus {
-		case backupStatusNotCreated:
+		case "":
 			restoreObjs, err := realDataClone.restore(i)
 			if err != nil {
 				return nil, err
 			}
 			objs = append(objs, restoreObjs...)
-		case backupStatusProcessing:
-		case backupStatusReadyToUse:
+		case dpv1alpha1.RestorePhaseCompleted:
 			continue
-		default:
-			panic(fmt.Sprintf("unexpected restore status: %s, clustre: %s, component: %s",
-				status, d.cluster.Name, d.component.Name))
 		}
 	}
 	// create PVCs that do not need to restore
@@ -276,8 +272,8 @@ func (d *dummyDataClone) backup() ([]client.Object, error) {
 	panic("runtime error: dummyDataClone.backup called")
 }
 
-func (d *dummyDataClone) CheckRestoreStatus(startingIndex int32) (backupStatus, error) {
-	return backupStatusReadyToUse, nil
+func (d *dummyDataClone) CheckRestoreStatus(startingIndex int32) (dpv1alpha1.RestorePhase, error) {
+	return dpv1alpha1.RestorePhaseCompleted, nil
 }
 
 func (d *dummyDataClone) restore(startingIndex int32) ([]client.Object, error) {
@@ -307,7 +303,7 @@ func (d *backupDataClone) Succeed() (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		if restoreStatus != backupStatusReadyToUse {
+		if restoreStatus != dpv1alpha1.RestorePhaseCompleted {
 			return false, nil
 		}
 	}
@@ -370,8 +366,9 @@ func (d *backupDataClone) CheckBackupStatus() (backupStatus, error) {
 		}
 	}
 	if backup.Status.Phase == dpv1alpha1.BackupPhaseFailed {
-		return backupStatusFailed, intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s",
-			backup.Status.FailureReason)
+		d.reqCtx.Recorder.Event(d.cluster, corev1.EventTypeWarning, string(intctrlutil.ErrorTypeBackupFailed), fmt.Sprintf("backup for horizontalScaling failed: %s",
+			backup.Status.FailureReason))
+		return backupStatusFailed, nil
 	}
 	if backup.Status.Phase == dpv1alpha1.BackupPhaseCompleted {
 		return backupStatusReadyToUse, nil
@@ -392,17 +389,17 @@ func (d *backupDataClone) restore(startingIndex int32) ([]client.Object, error) 
 	return []client.Object{restore}, nil
 }
 
-func (d *backupDataClone) CheckRestoreStatus(startingIndex int32) (backupStatus, error) {
+func (d *backupDataClone) CheckRestoreStatus(startingIndex int32) (dpv1alpha1.RestorePhase, error) {
 	restoreMGR := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil, d.getBRLabels(), int32(1), startingIndex)
 	restoreMeta := restoreMGR.GetRestoreObjectMeta(d.component, dpv1alpha1.PrepareData)
 	restore := &dpv1alpha1.Restore{}
 	if err := d.cli.Get(d.reqCtx.Ctx, types.NamespacedName{Namespace: d.cluster.Namespace, Name: restoreMeta.Name}, restore); err != nil {
-		return backupStatusNotCreated, client.IgnoreNotFound(err)
+		return "", client.IgnoreNotFound(err)
 	}
-	if restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted {
-		return backupStatusReadyToUse, nil
+	if restore.Status.Phase == dpv1alpha1.RestorePhaseFailed {
+		d.reqCtx.Recorder.Event(d.cluster, corev1.EventTypeWarning, string(intctrlutil.ErrorTypeRestoreFailed), fmt.Sprintf(`restore for horizontalScaling failed: you can describe the restore resource "%s"`, restore.Name))
 	}
-	return backupStatusProcessing, nil
+	return restore.Status.Phase, nil
 }
 
 // getBackupPolicyFromTemplate gets backup policy from template policy template.

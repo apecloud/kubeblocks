@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -369,7 +370,7 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 	for i := *r.runningRSM.Spec.Replicas; i < r.synthesizeComp.Replicas; i++ {
 		if status, err := d.CheckRestoreStatus(i); err != nil {
 			return false, err
-		} else if status == backupStatusFailed {
+		} else if status == dpv1alpha1.RestorePhaseFailed {
 			return true, nil
 		}
 	}

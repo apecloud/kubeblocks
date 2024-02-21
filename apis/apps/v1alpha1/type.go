@@ -486,12 +486,13 @@ const (
 type UpgradePolicy string
 
 const (
-	NonePolicy         UpgradePolicy = "none"
-	NormalPolicy       UpgradePolicy = "simple"
-	RestartPolicy      UpgradePolicy = "parallel"
-	RollingPolicy      UpgradePolicy = "rolling"
-	AutoReload         UpgradePolicy = "autoReload"
-	OperatorSyncUpdate UpgradePolicy = "operatorSyncUpdate"
+	NonePolicy                UpgradePolicy = "none"
+	NormalPolicy              UpgradePolicy = "simple"
+	RestartPolicy             UpgradePolicy = "parallel"
+	RollingPolicy             UpgradePolicy = "rolling"
+	AutoReload                UpgradePolicy = "autoReload"
+	HotUpdateAndRestartPolicy UpgradePolicy = "reloadAndRestart"
+	OperatorSyncUpdate        UpgradePolicy = "operatorSyncUpdate"
 )
 
 // CfgReloadType defines reload method.

@@ -2391,6 +2391,11 @@ func (in *ConfigConstraintSpec) DeepCopyInto(out *ConfigConstraintSpec) {
 		*out = new(ReloadOptions)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ForceHotUpdate != nil {
+		in, out := &in.ForceHotUpdate, &out.ForceHotUpdate
+		*out = new(bool)
+		**out = **in
+	}
 	if in.ToolsImageSpec != nil {
 		in, out := &in.ToolsImageSpec, &out.ToolsImageSpec
 		*out = new(ToolsImageSpec)

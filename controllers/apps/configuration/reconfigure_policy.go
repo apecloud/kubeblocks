@@ -220,6 +220,9 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.
 	}
 	if policy == appsv1alpha1.NonePolicy {
 		policy = appsv1alpha1.NormalPolicy
+		if cc.NeedForceUpdateHot() && enableSyncTrigger(cc.ReloadOptions) {
+			policy = appsv1alpha1.HotUpdateAndRestartPolicy
+		}
 	}
 	if action, ok := upgradePolicyMap[policy]; ok {
 		return action, nil

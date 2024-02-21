@@ -1665,6 +1665,19 @@ If set to true, the controller performs the hot update and then restarts the pod
 </tr>
 <tr>
 <td>
+<code>forceHotUpdate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>forceHotUpdate indicates whether to execute hot update parameters when the pod needs to be restarted.
+if set true, the controller does the hot update and then restarts the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>toolsImageSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ToolsImageSpec">
@@ -8149,6 +8162,19 @@ bool
 <em>(Optional)</em>
 <p>Indicates whether to execute hot update parameters when the pod needs to be restarted.
 If set to true, the controller performs the hot update and then restarts the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>forceHotUpdate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>forceHotUpdate indicates whether to execute hot update parameters when the pod needs to be restarted.
+if set true, the controller does the hot update and then restarts the pod.</p>
 </td>
 </tr>
 <tr>

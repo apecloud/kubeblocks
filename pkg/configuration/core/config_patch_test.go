@@ -94,6 +94,33 @@ func TestConfigPatch(t *testing.T) {
 		log.Log.Info("patch : %v", patch)
 		require.False(t, patch.IsModify)
 	}
+
+	{
+
+		require.Nil(t,
+			cfg.MergeFrom(map[string]interface{}{
+				"server-id":   1,
+				"socket":      "/data/mysql/tmp/mysqld.sock2",
+				"client.port": "6666",
+			}, NewCfgOptions("", func(ctx *CfgOpOption) {
+				// filter mysqld
+				ctx.IniContext = &IniContext{
+					SectionName: "mysqld",
+					ParametersInSectionAsMap: map[string][]string{
+						"client": {"port", "socket"},
+					},
+				}
+			})))
+		content, err := cfg.ToCfgContent()
+		require.Nil(t, err)
+		newContent := content[cfg.name]
+		// CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
+		patch, err := CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
+		require.Nil(t, err)
+		log.Log.Info("patch : %v", patch)
+		require.True(t, patch.IsModify)
+		require.Equal(t, string(patch.UpdateConfig["raw"]), `{"client":{"port":"6666","socket":"/data/mysql/tmp/mysqld.sock2"}}`)
+	}
 }
 
 func TestYamlConfigPatch(t *testing.T) {

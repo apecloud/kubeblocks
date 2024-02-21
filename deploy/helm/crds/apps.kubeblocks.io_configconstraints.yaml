@@ -199,6 +199,19 @@ spec:
                   iniConfig:
                     description: iniConfig represents the ini options.
                     properties:
+                      applyAllSection:
+                        description: 'applyAllSection determines whether to support
+                          multiple sections in the ini file. if set to true, all sections
+                          parameter can be updated, e.g: client.default_character_set=utf8mb4'
+                        type: boolean
+                      parametersInSection:
+                        additionalProperties:
+                          items:
+                            type: string
+                          type: array
+                        description: parametersInSection is a map of section name
+                          to parameters.
+                        type: object
                       sectionName:
                         description: sectionName describes ini section.
                         type: string

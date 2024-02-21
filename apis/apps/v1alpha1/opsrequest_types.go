@@ -28,33 +28,31 @@ import (
 // OpsRequestSpec defines the desired state of OpsRequest
 // +kubebuilder:validation:XValidation:rule="has(self.cancel) && self.cancel ? (self.type in ['VerticalScaling', 'HorizontalScaling']) : true",message="forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"
 type OpsRequestSpec struct {
-	// clusterRef references cluster object.
+	// References the cluster object.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
 
-	// cancel defines the action to cancel the Pending/Creating/Running opsRequest, supported types: [VerticalScaling, HorizontalScaling].
-	// once cancel is set to true, this opsRequest will be canceled and modifying this property again will not take effect.
+	// Defines the action to cancel the `Pending/Creating/Running` opsRequest, supported types: `VerticalScaling/HorizontalScaling`.
+	// Once set to true, this opsRequest will be canceled and modifying this property again will not take effect.
 	// +optional
 	Cancel bool `json:"cancel,omitempty"`
 
-	// type defines the operation type.
+	// Defines the operation type.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.type"
 	Type OpsType `json:"type"`
 
-	// ttlSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
+	// OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
-	// upgrade specifies the cluster version by specifying clusterVersionRef.
+	// Specifies the cluster version by specifying clusterVersionRef.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.upgrade"
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
-	// Deprecate: replace by update cluster command
-
-	// horizontalScaling defines what component need to horizontal scale the specified replicas.
+	// Defines what component need to horizontal scale the specified replicas.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -63,10 +61,8 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.horizontalScaling"
 	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
-	// Deprecate: replace by update cluster command.
 	// Note: Quantity struct can not do immutable check by CEL.
-
-	// volumeExpansion defines what component and volumeClaimTemplate need to expand the specified storage.
+	// Defines what component and volumeClaimTemplate need to expand the specified storage.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -74,7 +70,7 @@ type OpsRequestSpec struct {
 	// +listMapKey=componentName
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
-	// restart the specified components.
+	// Restarts the specified components.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -83,7 +79,7 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
 	RestartList []ComponentOps `json:"restart,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
-	// switchover the specified components.
+	// Switches over the specified components.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -92,10 +88,8 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.switchover"
 	SwitchoverList []Switchover `json:"switchover,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
-	// Deprecate: replace by update cluster command.
 	// Note: Quantity struct can not do immutable check by CEL.
-
-	// verticalScaling defines what component need to vertical scale the specified compute resources.
+	// Defines what component need to vertical scale the specified compute resources.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -103,15 +97,14 @@ type OpsRequestSpec struct {
 	// +listMapKey=componentName
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
-	// Deprecate: replace by reconfigures.
-
-	// reconfigure defines the variables that need to input when updating configuration.
+	// Deprecated: replace by reconfigures.
+	// Defines the variables that need to input when updating configuration.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
 	// +kubebuilder:validation:XValidation:rule="self.configurations.size() > 0", message="Value can not be empty"
 	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
 
-	// reconfigure defines the variables that need to input when updating configuration.
+	// Defines the variables that need to input when updating configuration.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -119,7 +112,7 @@ type OpsRequestSpec struct {
 	// +listMapKey=componentName
 	Reconfigures []Reconfigure `json:"reconfigures,omitempty"`
 
-	// expose defines services the component needs to expose.
+	// Defines services the component needs to expose.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -128,36 +121,38 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.expose"
 	ExposeList []Expose `json:"expose,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
-	// cluster RestoreFrom backup or point in time
+	// Cluster RestoreFrom backup or point in time.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restoreFrom"
 	RestoreFrom *RestoreFromSpec `json:"restoreFrom,omitempty"`
 
-	// ttlSecondsBeforeAbort OpsRequest will wait at most TTLSecondsBeforeAbort seconds for start-conditions to be met.
+	// OpsRequest will wait at most TTLSecondsBeforeAbort seconds for start-conditions to be met.
 	// If not specified, the default value is 0, which means that the start-conditions must be met immediately.
 	// +kubebuilder:default=0
 	// +optional
 	TTLSecondsBeforeAbort *int32 `json:"ttlSecondsBeforeAbort,omitempty"`
 
-	// scriptSpec defines the script to be executed.
+	// Defines the script to be executed.
 	// +optional
 	ScriptSpec *ScriptSpec `json:"scriptSpec,omitempty"`
 
-	// backupSpec defines how to backup the cluster.
+	// Defines how to backup the cluster.
 	// +optional
 	BackupSpec *BackupSpec `json:"backupSpec,omitempty"`
 
-	// restoreSpec defines how to restore the cluster.
-	// note that this restore operation will roll back cluster services.
+	// Defines how to restore the cluster.
+	// Note that this restore operation will roll back cluster services.
 	// +optional
 	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
 
+	// Specifies a custom operation as defined by OpsDefinition.
+	// +optional
 	CustomSpec *CustomOpsSpec `json:"customSpec,omitempty"`
 }
 
-// ComponentOps defines the common variables of component scope operations.
+// ComponentOps represents the common variables required for operations within the scope of a component.
 type ComponentOps struct {
-	// componentName cluster component name.
+	// Specifies the name of the cluster component.
 	// +kubebuilder:validation:Required
 	ComponentName string `json:"componentName"`
 }
@@ -165,40 +160,45 @@ type ComponentOps struct {
 type Switchover struct {
 	ComponentOps `json:",inline"`
 
-	// instanceName is used to specify the candidate primary or leader instanceName for switchover.
-	// If instanceName is set to "*", it means that no specific primary or leader is specified for the switchover,
-	// and the switchoverAction defined in clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate will be executed,
-	// It is required that clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate is not empty.
-	// If instanceName is set to a valid instanceName other than "*", it means that a specific candidate primary or leader is specified for the switchover.
-	// the value of instanceName can be obtained using `kbcli cluster list-instances`, any other value is invalid.
-	// In this case, the `switchoverAction` defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate will be executed,
-	// and it is required that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate is not empty.
+	// Utilized to designate the candidate primary or leader instance for the switchover process.
+	// If assigned "*", it signifies that no specific primary or leader is designated for the switchover,
+	// and the switchoverAction defined in `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate` will be executed.
+	//
+	// It is mandatory that `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate` is not left blank.
+	//
+	// If assigned a valid instance name other than "*", it signifies that a specific candidate primary or leader is designated for the switchover.
+	// The value can be retrieved using `kbcli cluster list-instances`, any other value is considered invalid.
+	//
+	// In this scenario, the `switchoverAction` defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate will be executed,
+	// and it is mandatory that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate is not left blank.
+	//
 	// +kubebuilder:validation:Required
 	InstanceName string `json:"instanceName"`
 }
 
-// Upgrade defines the variables of upgrade operation.
+// Upgrade represents the parameters required for an upgrade operation.
 type Upgrade struct {
-	// clusterVersionRef references ClusterVersion name.
+	// A reference to the name of the ClusterVersion.
+	//
 	// +kubebuilder:validation:Required
 	ClusterVersionRef string `json:"clusterVersionRef"`
 }
 
-// VerticalScaling defines the variables that need to input when scaling compute resources.
+// VerticalScaling defines the parameters required for scaling compute resources.
 type VerticalScaling struct {
 	ComponentOps `json:",inline"`
 
-	// resources specifies the computing resource size of verticalScaling.
+	// Defines the computational resource size for vertical scaling.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
 
-	// classDefRef reference class defined in ComponentClassDefinition.
+	// A reference to a class defined in ComponentClassDefinition.
 	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 }
 
-// VolumeExpansion defines the variables of volume expansion operation.
+// VolumeExpansion encapsulates the parameters required for a volume expansion operation.
 type VolumeExpansion struct {
 	ComponentOps `json:",inline"`
 
@@ -212,11 +212,11 @@ type VolumeExpansion struct {
 }
 
 type OpsRequestVolumeClaimTemplate struct {
-	// Request storage size.
+	// Specifies the requested storage size for the volume.
 	// +kubebuilder:validation:Required
 	Storage resource.Quantity `json:"storage"`
 
-	// name references volumeClaimTemplate name from cluster components.
+	// A reference to the volumeClaimTemplate name from the cluster components.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 }
@@ -225,34 +225,36 @@ type OpsRequestVolumeClaimTemplate struct {
 type HorizontalScaling struct {
 	ComponentOps `json:",inline"`
 
-	// replicas for the workloads.
+	//  Specifies the number of replicas for the workloads.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
 
-	// Nodes defines the list of nodes that pods can schedule when scale up
-	// If the RsmTransformPolicy is specified as ToPod and expected replicas is more than current replicas,the list of
-	// Nodes will be used. If the list of Nodes is empty, no specific node will be assigned. However, if the list of Nodes
-	// is filled, all pods will be evenly scheduled across the Nodes in the list when scale up.
+	// Defines the list of nodes where pods can be scheduled during a scale-up operation.
+	// If the RsmTransformPolicy is set to ToPod and the expected number of replicas is greater than the current number,
+	// the list of Nodes will be used. If the list of Nodes is empty, pods will not be assigned to any specific node.
+	// However, if the list of Nodes is populated, pods will be evenly distributed across the nodes in the list during scale-up.
 	// +optional
 	Nodes []types.NodeName `json:"nodes,omitempty"`
 
-	// Instances defines the name of instance that rsm scale down priorly.
-	// If the RsmTransformPolicy is specified as ToPod and expected replicas is less than current replicas, the list of
-	// Instances will be used.
-	// current replicas - expected replicas > len(Instances): Scale down from the list of Instances priorly, the others
-	//	will select from NodeAssignment.
-	// current replicas - expected replicas < len(Instances): Scale down from the list of Instances.
-	// current replicas - expected replicas < len(Instances): Scale down from a part of Instances.
+	// Defines the names of instances that the rsm should prioritize for scale-down operations.
+	// If the RsmTransformPolicy is set to ToPod and the expected number of replicas is less than the current number,
+	// the list of Instances will be used.
+	//
+	// - `current replicas - expected replicas > len(Instances)`: Scale down from the list of Instances priorly, the others
+	//	 will select from NodeAssignment.
+	// - `current replicas - expected replicas < len(Instances)`: Scale down from the list of Instances.
+	// - `current replicas - expected replicas < len(Instances)`: Scale down from a part of Instances.
+	//
 	// +optional
 	Instances []string `json:"instances,omitempty"`
 }
 
-// Reconfigure defines the variables that need to input when updating configuration.
+// Reconfigure represents the variables required for updating a configuration.
 type Reconfigure struct {
 	ComponentOps `json:",inline"`
 
-	// configurations defines which components perform the operation.
+	// Specifies the components that will perform the operation.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=name
@@ -261,34 +263,34 @@ type Reconfigure struct {
 	// +listMapKey=name
 	Configurations []ConfigurationItem `json:"configurations" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// TTL(Time to Live) defines the time period during which changing parameters is valid.
+	// Indicates the duration for which the parameter changes are valid.
 	// +optional
 	// TTL *int64 `json:"ttl,omitempty"`
 
-	// triggeringTime defines the time at which the changing parameter to be applied.
+	// Specifies the time when the parameter changes should be applied.
 	// +kubebuilder:validation:MaxLength=19
 	// +kubebuilder:validation:MinLength=19
 	// +kubebuilder:validation:Pattern:=`^([0-9]{2})/([0-9]{2})/([0-9]{4}) ([0-9]{2}):([0-9]{2}):([0-9]{2})$`
 	// +optional
 	// TriggeringTime *string `json:"triggeringTime,omitempty"`
 
-	// selector indicates the component for reconfigure
+	//  Identifies the component to be reconfigured.
 	// +optional
 	// Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 type ConfigurationItem struct {
-	// name is a config template name.
+	// Specifies the name of the configuration template.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// policy defines the upgrade policy.
+	// Defines the upgrade policy for the configuration. This field is optional.
 	// +optional
 	Policy *UpgradePolicy `json:"policy,omitempty"`
 
-	// keys is used to set the parameters to be updated.
+	// Sets the parameters to be updated. It should contain at least one item. The keys are merged and retained during patch operations.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=key
@@ -299,50 +301,50 @@ type ConfigurationItem struct {
 }
 
 type CustomOpsSpec struct {
+	// Refers to the name of the cluster component.
 	// +kubebuilder:validation:Required
-	// cluster component name.
 	ComponentName string `json:"componentName"`
 
+	// Is a reference to an OpsDefinition.
 	// +kubebuilder:validation:Required
-	// reference a opsDefinition
 	OpsDefinitionRef string `json:"opsDefinitionRef"`
 
-	// the input for this operation declared in the opsDefinition.spec.parametersSchema.
-	// will create corresponding jobs for each array element.
-	// if the param type is array, the format must be "v1,v2,v3".
+	// Represents the input for this operation as declared in the opsDefinition.spec.parametersSchema.
+	// It will create corresponding jobs for each array element.
+	// If the param type is an array, the format must be "v1,v2,v3".
 	// +kubebuilder:validation:MaxItem=10
 	// +optional
 	Params []map[string]string `json:"params,omitempty"`
 }
 
 type ParameterPair struct {
-	// key is name of the parameter to be updated.
+	// Represents the name of the parameter that is to be updated.
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 
-	// parameter values to be updated.
-	// if set nil, the parameter defined by the key field will be deleted from the configuration file.
+	// Represents the parameter values that are to be updated.
+	// If set to nil, the parameter defined by the Key field will be removed from the configuration file.
 	// +optional
 	Value *string `json:"value"`
 }
 
 type ParameterConfig struct {
-	// key indicates the key name of ConfigMap.
+	// Represents the unique identifier for the ConfigMap.
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 
-	// Setting the list of parameters for a single configuration file.
-	// update specified the parameters.
+	// Defines a list of key-value pairs for a single configuration file.
+	// These parameters are used to update the specified configuration settings.
 	// +optional
 	Parameters []ParameterPair `json:"parameters,omitempty"`
 
-	// fileContent indicates the configuration file content.
-	// update whole file.
+	// Represents the content of the configuration file.
+	// This field is used to update the entire content of the file.
 	// +optional
 	FileContent string `json:"fileContent,omitempty"`
 }
 
-// ExposeSwitch defines the switch of expose operation.
+// ExposeSwitch Specifies the switch for the expose operation. This switch can be used to enable or disable the expose operation.
 // +enum
 // +kubebuilder:validation:Enum={Enable, Disable}
 type ExposeSwitch string
@@ -355,32 +357,30 @@ const (
 type Expose struct {
 	ComponentOps `json:",inline"`
 
-	// switch defines the switch of expose operation.
-	// if switch is set to Enable, the service will be exposed. if switch is set to Disable, the service will be removed.
+	// Controls the expose operation.
+	// If set to Enable, the corresponding service will be exposed. Conversely, if set to Disable, the service will be removed.
 	// +kubebuilder:validation:Required
 	Switch ExposeSwitch `json:"switch"`
 
-	// Setting the list of services to be exposed or removed.
+	// A list of services that are to be exposed or removed.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minitems=0
 	Services []OpsService `json:"services"`
 }
 
 type OpsService struct {
-	// Name defines the name of the service.
-	// otherwise, it indicates the name of the service.
-	// Others can refer to this service by its name. (e.g., connection credential)
-	// Cannot be updated.
+	// Specifies the name of the service. This name is used by others to refer to this service (e.g., connection credential).
+	// Note: This field cannot be updated.
 	// +required
 	Name string `json:"name"`
 
-	// If ServiceType is LoadBalancer, cloud provider related parameters can be put here
+	// Contains cloud provider related parameters if ServiceType is LoadBalancer.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 
-	// The list of ports that are exposed by this service.
-	// If Ports are not provided, the default Services Ports defined in the ClusterDefinition or ComponentDefinition that are neither of NodePort nor LoadBalancer service type will be used.
+	// Lists the ports that are exposed by this service.
+	// If not provided, the default Services Ports defined in the ClusterDefinition or ComponentDefinition that are neither of NodePort nor LoadBalancer service type will be used.
 	// If there is no corresponding Service defined in the ClusterDefinition or ComponentDefinition, the expose operation will fail.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +patchMergeKey=port
@@ -391,242 +391,230 @@ type OpsService struct {
 	// +optional
 	Ports []corev1.ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
 
-	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
+	// Allows you to specify a defined role as a selector for the service, extending the ServiceSpec.Selector.
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
 
-	// Route service traffic to pods with label keys and values matching this
-	// selector. If empty or not present, the service is assumed to have an
-	// external process managing its endpoints, which Kubernetes will not
-	// modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
-	// Ignored if type is ExternalName.
+	// Routes service traffic to pods with label keys and values matching this selector.
+	// If empty or not present, the service is assumed to have an external process managing its endpoints, which Kubernetes will not modify.
+	// This only applies to types ClusterIP, NodePort, and LoadBalancer and is ignored if type is ExternalName.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/
 	// +optional
 	// +mapType=atomic
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
-	// type determines how the Service is exposed. Defaults to ClusterIP. Valid
-	// options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
-	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
-	// to endpoints. Endpoints are determined by the selector or if that is not
-	// specified, by manual construction of an Endpoints object or
-	// EndpointSlice objects. If clusterIP is "None", no virtual IP is
-	// allocated and the endpoints are published as a set of endpoints rather
-	// than a virtual IP.
-	// "NodePort" builds on ClusterIP and allocates a port on every node which
-	// routes to the same endpoints as the clusterIP.
-	// "LoadBalancer" builds on NodePort and creates an external load-balancer
-	// (if supported in the current cloud) which routes to the same endpoints
-	// as the clusterIP.
-	// "ExternalName" aliases this service to the specified externalName.
-	// Several other fields do not apply to ExternalName services.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+	// Determines how the Service is exposed. Defaults to ClusterIP. Valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+	// - `ClusterIP` allocates a cluster-internal IP address for load-balancing to endpoints.
+	// - `NodePort` builds on ClusterIP and allocates a port on every node which routes to the same endpoints as the clusterIP.
+	// - `LoadBalancer` builds on NodePort and creates an external load-balancer (if supported in the current cloud) which routes to the same endpoints as the clusterIP.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 }
 
 type RestoreFromSpec struct {
-	// use the backup name and component name for restore, support for multiple components' recovery.
+	// Refers to the backup name and component name used for restoration. Supports recovery of multiple components.
 	// +optional
 	Backup []BackupRefSpec `json:"backup,omitempty"`
 
-	// specified the point in time to recovery
+	// Refers to the specific point in time for recovery.
 	// +optional
 	PointInTime *PointInTimeRefSpec `json:"pointInTime,omitempty"`
 }
 
 type RefNamespaceName struct {
-	// specified the name
+	// Refers to the specific name of the resource.
 	// +optional
 	Name string `json:"name,omitempty"`
 
-	// specified the namespace
+	// Refers to the specific namespace of the resource.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 }
 
 type BackupRefSpec struct {
-	// specify a reference backup to restore
+	// Refers to a reference backup that needs to be restored.
 	// +optional
 	Ref RefNamespaceName `json:"ref,omitempty"`
 }
 
 type PointInTimeRefSpec struct {
-	// specify the time point to restore, with UTC as the time zone.
+	// Refers to the specific time point for restoration, with UTC as the time zone.
 	// +optional
 	Time *metav1.Time `json:"time,omitempty"`
 
-	// specify a reference source cluster to restore
+	// Refers to a reference source cluster that needs to be restored.
 	// +optional
 	Ref RefNamespaceName `json:"ref,omitempty"`
 }
 
-// ScriptSpec defines the script to be executed. It is not a general purpose script executor.
-// It is designed to execute the script to perform some specific operations, such as create database, create user, etc.
-// It is applicable for engines, such as MySQL, PostgreSQL, Redis, MongoDB, etc.
+// ScriptSpec is designed to execute specific operations such as creating a database or user.
+// It is not a general-purpose script executor and is applicable for engines like MySQL, PostgreSQL, Redis, MongoDB, etc.
 type ScriptSpec struct {
 	ComponentOps `json:",inline"`
-	// exec command with image, by default use the image of kubeblocks-datascript.
+	// Specifies the image to be used for the exec command. By default, the image of kubeblocks-datascript is used.
 	// +optional
 	Image string `json:"image,omitempty"`
-	// secret defines the secret to be used to execute the script.
-	// If not specified, the default cluster root credential secret will be used.
+
+	// Defines the secret to be used to execute the script. If not specified, the default cluster root credential secret is used.
 	// +optional
 	Secret *ScriptSecret `json:"secret,omitempty"`
-	// script defines the script to be executed.
+
+	// Defines the script to be executed.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script"
 	Script []string `json:"script,omitempty"`
-	// scriptFrom defines the script to be executed from configMap or secret.
+
+	// Defines the script to be executed from a configMap or secret.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom"
 	ScriptFrom *ScriptFrom `json:"scriptFrom,omitempty"`
-	// KubeBlocks, by default, will execute the script on the primary pod, with role=leader.
-	// There are some exceptions, such as Redis, which does not synchronize accounts info between primary and secondary.
-	// In this case, we need to execute the script on all pods, matching the selector.
-	// selector indicates the components on which the script is executed.
+
+	// By default, KubeBlocks will execute the script on the primary pod with role=leader.
+	// Exceptions exist, such as Redis, which does not synchronize account information between primary and secondary.
+	// In such cases, the script needs to be executed on all pods matching the selector.
+	// Indicates the components on which the script is executed.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script.selector"
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 type BackupSpec struct {
-	// backupName is the name of the backup.
+	// Specifies the name of the backup.
 	// +optional
 	BackupName string `json:"backupName,omitempty"`
 
-	// Which backupPolicy is applied to perform this backup
+	// Indicates the backupPolicy applied to perform this backup.
 	// +optional
 	BackupPolicyName string `json:"backupPolicyName,omitempty"`
 
-	// Backup method name that is defined in backupPolicy.
+	// Defines the backup method that is defined in backupPolicy.
 	// +optional
 	BackupMethod string `json:"backupMethod,omitempty"`
 
-	// deletionPolicy determines whether the backup contents stored in backup repository
+	// Determines whether the backup contents stored in backup repository
 	// should be deleted when the backup custom resource is deleted.
-	// Supported values are "Retain" and "Delete".
-	// "Retain" means that the backup content and its physical snapshot on backup repository are kept.
-	// "Delete" means that the backup content and its physical snapshot on backup repository are deleted.
+	// Supported values are `Retain` and `Delete`.
+	// - `Retain` means that the backup content and its physical snapshot on backup repository are kept.
+	// - `Delete` means that the backup content and its physical snapshot on backup repository are deleted.
 	// +kubebuilder:validation:Enum=Delete;Retain
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Delete
 	// +optional
 	DeletionPolicy string `json:"deletionPolicy,omitempty"`
 
-	// retentionPeriod determines a duration up to which the backup should be kept.
+	// Determines a duration up to which the backup should be kept.
 	// Controller will remove all backups that are older than the RetentionPeriod.
 	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
 	// Sample duration format:
 	//
-	// - years: 	2y
-	// - months: 	6mo
-	// - days: 		30d
-	// - hours: 	12h
-	// - minutes: 	30m
+	// - years: 2y
+	// - months: 6mo
+	// - days: 30d
+	// - hours: 12h
+	// - minutes: 30m
 	//
 	// You can also combine the above durations. For example: 30d12h30m.
 	// If not set, the backup will be kept forever.
-	//
 	// +optional
 	RetentionPeriod string `json:"retentionPeriod,omitempty"`
 
-	// if backupType is incremental, parentBackupName is required.
+	// If backupType is incremental, parentBackupName is required.
 	// +optional
 	ParentBackupName string `json:"parentBackupName,omitempty"`
 }
 
 type RestoreSpec struct {
-	// backupName is the name of the backup.
+	// Specifies the name of the backup.
 	// +kubebuilder:validation:Required
 	BackupName string `json:"backupName"`
 
-	// effectiveCommonComponentDef describes this backup will be restored for all components which refer to common ComponentDefinition.
+	// Indicates if this backup will be restored for all components which refer to common ComponentDefinition.
 	EffectiveCommonComponentDef bool `json:"effectiveCommonComponentDef,omitempty"`
 
-	// restoreTime point in time to restore
+	// Defines the point in time to restore.
 	RestoreTimeStr string `json:"restoreTimeStr,omitempty"`
 
-	// the volume claim restore policy, support values: [Serial, Parallel]
+	// Specifies the volume claim restore policy, support values: [Serial, Parallel]
 	// +kubebuilder:validation:Enum=Serial;Parallel
 	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
 }
 
-// ScriptSecret defines the secret to be used to execute the script.
+// ScriptSecret represents the secret that is used to execute the script.
 type ScriptSecret struct {
-	// name is the name of the secret.
+	// Specifies the name of the secret.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
-	// usernameKey field is used to specify the username of the secret.
+	// Used to specify the username part of the secret.
 	// +kubebuilder:default:="username"
 	// +optional
 	UsernameKey string `json:"usernameKey,omitempty"`
-	// passwordKey field is used to specify the password of the secret.
+	// Used to specify the password part of the secret.
 	// +kubebuilder:default:="password"
 	// +optional
 	PasswordKey string `json:"passwordKey,omitempty"`
 }
 
-// ScriptFrom defines the script to be executed from configMap or secret.
+// ScriptFrom represents the script that is to be executed from a configMap or a secret.
 type ScriptFrom struct {
-	// configMapRef defines the configMap to be executed.
+	// Specifies the configMap that is to be executed.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.configMapRef"
 	ConfigMapRef []corev1.ConfigMapKeySelector `json:"configMapRef,omitempty"`
-	// secretRef defines the secret to be executed.
+	// Specifies the secret that is to be executed.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.secretRef"
 	SecretRef []corev1.SecretKeySelector `json:"secretRef,omitempty"`
 }
 
-// OpsRequestStatus defines the observed state of OpsRequest
+// OpsRequestStatus represents the observed state of an OpsRequest.
 type OpsRequestStatus struct {
 
-	// ClusterGeneration records the cluster generation after handling the opsRequest action.
+	// Specifies the cluster generation after the OpsRequest action has been handled.
 	// +optional
 	ClusterGeneration int64 `json:"clusterGeneration,omitempty"`
 
-	// phase describes OpsRequest phase.
+	// Defines the phase of the OpsRequest.
 	Phase OpsPhase `json:"phase,omitempty"`
 
+	// Represents the progress of the OpsRequest.
 	// +kubebuilder:validation:Pattern:=`^(\d+|\-)/(\d+|\-)$`
 	// +kubebuilder:default=-/-
 	Progress string `json:"progress"`
 
-	// lastConfiguration records the last configuration before this operation take effected.
+	// Records the last configuration before this operation took effect.
 	// +optional
 	LastConfiguration LastConfiguration `json:"lastConfiguration,omitempty"`
 
-	// components defines the recorded the status information of changed components for operation request.
+	// Records the status information of components changed due to the operation request.
 	// +optional
 	Components map[string]OpsRequestComponentStatus `json:"components,omitempty"`
 
-	// startTimestamp The time when the OpsRequest started processing.
+	// Indicates the time when the OpsRequest started processing.
 	// +optional
 	StartTimestamp metav1.Time `json:"startTimestamp,omitempty"`
 
-	// completionTimestamp defines the OpsRequest completion time.
+	// Specifies the time when the OpsRequest was completed.
 	// +optional
 	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
 
-	// CancelTimestamp defines cancel time.
+	// Defines the time when the OpsRequest was cancelled.
 	// +optional
 	CancelTimestamp metav1.Time `json:"cancelTimestamp,omitempty"`
 
-	// Deprecate: replace by ReconfiguringStatusAsComponent.
-
-	// reconfiguringStatus defines the status information of reconfiguring.
+	// Deprecated: Replaced by ReconfiguringStatusAsComponent.
+	// Defines the status information of reconfiguring.
 	// +optional
 	ReconfiguringStatus *ReconfiguringStatus `json:"reconfiguringStatus,omitempty"`
 
-	// reconfiguringStatus defines the status information of reconfiguring.
+	// Represents the status information of reconfiguring.
 	// +optional
 	ReconfiguringStatusAsComponent map[string]*ReconfiguringStatus `json:"reconfiguringStatusAsComponent,omitempty"`
 
-	// conditions describes opsRequest detail status.
+	// Describes the detailed status of the OpsRequest.
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
@@ -636,101 +624,101 @@ type OpsRequestStatus struct {
 }
 
 type ProgressStatusDetail struct {
-	// group describes which group the current object belongs to.
-	// if the objects of a component belong to the same group, we can ignore it.
+	// Specifies the group to which the current object belongs.
+	// If the objects of a component belong to the same group, they can be ignored.
 	// +optional
 	Group string `json:"group,omitempty"`
 
-	// objectKey is the unique key of the object.
+	// Represents the unique key of the object.
 	// +kubebuilder:validation:Required
 	ObjectKey string `json:"objectKey"`
 
-	// status describes the state of processing the object.
+	// Indicates the state of processing the object.
 	// +kubebuilder:validation:Required
 	Status ProgressStatus `json:"status"`
 
-	// message is a human readable message indicating details about the object condition.
+	// Provides a human-readable message detailing the condition of the object.
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// startTime is the start time of object processing.
+	// Represents the start time of object processing.
 	// +optional
 	StartTime metav1.Time `json:"startTime,omitempty"`
 
-	// endTime is the completion time of object processing.
+	// Represents the completion time of object processing.
 	// +optional
 	EndTime metav1.Time `json:"endTime,omitempty"`
 }
 
 type LastComponentConfiguration struct {
-	// replicas are the last replicas of the component.
+	// Represents the last replicas of the component.
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// the last resources of the component.
+	// Represents the last resources of the component.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	corev1.ResourceRequirements `json:",inline,omitempty"`
 
-	// classDefRef reference class defined in ComponentClassDefinition.
+	// References a class defined in ComponentClassDefinition.
 	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
-	// volumeClaimTemplates records the last volumeClaimTemplates of the component.
+	// Records the last volumeClaimTemplates of the component.
 	// +optional
 	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 
-	// services records the last services of the component.
+	// Records the last services of the component.
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
-	// targetResources records the affecting target resources information for the component.
-	// resource key is in list of [pods].
+	// Records the information about the target resources affected by the component.
+	// The resource key is in the list of [pods].
 	// +optional
 	TargetResources map[ComponentResourceKey][]string `json:"targetResources,omitempty"`
 }
 
 type LastConfiguration struct {
-	// clusterVersionRef references ClusterVersion name.
+	// Specifies the reference to the ClusterVersion name.
 	// +optional
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
 
-	// components records last configuration of the component.
+	// Records the last configuration of the component.
 	// +optional
 	Components map[string]LastComponentConfiguration `json:"components,omitempty"`
 }
 
 type OpsRequestComponentStatus struct {
-	// phase describes the component phase, reference Cluster.status.component.phase.
+	// Describes the component phase, referencing Cluster.status.component.phase.
 	// +optional
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
-	// lastFailedTime is the last time the component phase transitioned to Failed or Abnormal.
+	// Indicates the last time the component phase transitioned to Failed or Abnormal.
 	// +optional
 	LastFailedTime metav1.Time `json:"lastFailedTime,omitempty"`
 
-	// progressDetails describes the progress details of the component for this operation.
+	// Describes the progress details of the component for this operation.
 	// +optional
 	ProgressDetails []ProgressStatusDetail `json:"progressDetails,omitempty"`
 
-	// workloadType references workload type of component in ClusterDefinition.
+	// References the workload type of component in ClusterDefinition.
 	// +optional
 	WorkloadType WorkloadType `json:"workloadType,omitempty"`
 
-	// reason describes the reason for the component phase.
+	// Describes the reason for the component phase.
 	// +kubebuilder:validation:MaxLength=1024
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
 
-	// message is a human-readable message indicating details about this operation.
+	// Provides a human-readable message indicating details about this operation.
 	// +kubebuilder:validation:MaxLength=32768
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 type ReconfiguringStatus struct {
-	// conditions describes reconfiguring detail status.
+	// Describes the reconfiguring detail status.
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
@@ -738,7 +726,7 @@ type ReconfiguringStatus struct {
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// configurationStatus describes the status of the component reconfiguring.
+	// Describes the status of the component reconfiguring.
 	// +kubebuilder:validation:Required
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -748,57 +736,57 @@ type ReconfiguringStatus struct {
 }
 
 type ConfigurationItemStatus struct {
-	// name is a config template name.
+	// Specifies the name of the configuration template.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// updatePolicy describes the policy of reconfiguring.
+	// Defines the policy for reconfiguration.
 	// +optional
 	UpdatePolicy UpgradePolicy `json:"updatePolicy,omitempty"`
 
-	// status describes the current state of the reconfiguring state machine.
+	// Indicates the current state of the reconfiguration state machine.
 	// +optional
 	Status string `json:"status,omitempty"`
 
-	// message describes the details about this operation.
+	// Provides details about the operation.
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// succeedCount describes the number of successful reconfiguring.
+	// Counts the number of successful reconfigurations.
 	// +kubebuilder:default=0
 	// +optional
 	SucceedCount int32 `json:"succeedCount"`
 
-	// expectedCount describes the number of expected reconfiguring.
+	// Specifies the number of expected reconfigurations.
 	// +kubebuilder:default=-1
 	// +optional
 	ExpectedCount int32 `json:"expectedCount"`
 
-	// lastStatus describes the last status for the reconfiguring controller.
+	// Records the last status of the reconfiguration controller.
 	// +optional
 	LastAppliedStatus string `json:"lastStatus,omitempty"`
 
-	// LastAppliedConfiguration describes the last configuration.
+	// Stores the last applied configuration.
 	// +optional
 	LastAppliedConfiguration map[string]string `json:"lastAppliedConfiguration,omitempty"`
 
-	// updatedParameters describes the updated parameters.
+	// Contains the updated parameters.
 	// +optional
 	UpdatedParameters UpdatedParameters `json:"updatedParameters"`
 }
 
 type UpdatedParameters struct {
-	// addedKeys describes the key added.
+	// Lists the keys that have been added.
 	// +optional
 	AddedKeys map[string]string `json:"addedKeys,omitempty"`
 
-	// deletedKeys describes the key deleted.
+	// Lists the keys that have been deleted.
 	// +optional
 	DeletedKeys map[string]string `json:"deletedKeys,omitempty"`
 
-	// updatedKeys describes the key updated.
+	// Lists the keys that have been updated.
 	// +optional
 	UpdatedKeys map[string]string `json:"updatedKeys,omitempty"`
 }

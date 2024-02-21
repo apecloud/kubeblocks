@@ -29,9 +29,10 @@ import (
 // OpsDefinitionSpec defines the desired state of OpsDefinition
 type OpsDefinitionSpec struct {
 
-	// componentDefinitionRefs indicates which types of componentDefinitions are supported by the operation,
-	// and can refer some vars of the componentDefinition.
-	// if it is set, the component that does not meet the conditions will be intercepted.
+	// Specifies the types of componentDefinitions that are supported by the operation.
+	// It can refer to some variables of the componentDefinition.
+	// If set, any component that does not meet the conditions will be intercepted.
+	//
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -39,55 +40,62 @@ type OpsDefinitionSpec struct {
 	// +listMapKey=name
 	ComponentDefinitionRefs []ComponentDefinitionRef `json:"componentDefinitionRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// varsRef defines the envs that need to be referenced from the target component pod, and will inject to job's containers.
+	// Defines the environment variables that need to be referenced from the target component pod, and will be injected into the job's containers.
+	//
 	// +optional
 	VarsRef *VarsRef `json:"varsRef,omitempty"`
 
-	// parametersSchema describes the schema used for validation, pruning, and defaulting.
+	// Describes the schema used for validation, pruning, and defaulting.
+	//
 	// +optional
 	ParametersSchema *ParametersSchema `json:"parametersSchema,omitempty"`
 
-	// jobSpec describes the job spec for the operation.
+	// Describes the job specification for the operation.
+	//
 	// +kubebuilder:validation:Required
 	JobSpec batchv1.JobSpec `json:"jobSpec"`
 
-	// preCondition if it meets the requirements to run the job for the operation.
+	// Specifies the preconditions that must be met to run the job for the operation.
+	//
 	// +optional
 	PreConditions []PreCondition `json:"preConditions,omitempty"`
 }
 
 type ComponentDefinitionRef struct {
 
-	// refer to componentDefinition name.
+	// Refers to the name of the component definition. This is a required field with a maximum length of 32 characters.
+	//
 	// +kubebuilder:validation:MaxLength=32
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// the account name of the component.
-	// will inject the account username and password to `KB_ACCOUNT_USERNAME` and `KB_ACCOUNT_PASSWORD` in env of the job.
+	// Represents the account name of the component.
+	// If provided, the account username and password will be injected into the job environment variables `KB_ACCOUNT_USERNAME` and `KB_ACCOUNT_PASSWORD`.
+	//
 	// +optional
 	AccountName string `json:"accountName,omitempty"`
 
-	// reference the services[*].name.
-	// will map the service name and ports to `KB_COMP_SVC_NAME` and `KB_COMP_SVC_PORT_$(portName)` in env of the job.
-	// portName will replace the characters '-' to '_' and convert to uppercase.
+	// References the name of the service.
+	// If provided, the service name and ports will be mapped to the job environment variables `KB_COMP_SVC_NAME` and `KB_COMP_SVC_PORT_$(portName)`.
+	// Note that the portName will replace the characters '-' with '_' and convert to uppercase.
+	//
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 
-	// varsRef defines the envs that need to be referenced from the target component pod, and will inject to job's containers.
-	// if it is set, will ignore the global "varsRef".
+	// Defines the environment variables that need to be referenced from the target component pod and will be injected into the job's containers.
+	// If this field is set, the global "varsRef" will be ignored.
+	//
 	// +optional
 	VarsRef *VarsRef `json:"varsRef,omitempty"`
 }
 
 type ParametersSchema struct {
-	// openAPIV3Schema is the OpenAPI v3 schema to use for parameter schema.
-	// supported properties types:
-	//
+	// Defines the OpenAPI v3 schema used for the parameter schema.
+	// The supported property types include:
 	// - string
 	// - number
 	// - integer
-	// - array: only supported the item with string type.
+	// - array: Note that only items of string type are supported.
 	//
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=object
@@ -98,44 +106,49 @@ type ParametersSchema struct {
 }
 
 type VarsRef struct {
-	// podSelectionStrategy how to select the target component pod for variable references based on the strategy.
-	//
-	// - PreferredAvailable: prioritize the selection of available pod.
-	// - Available: only select available pod. if not found, terminating the operation.
+	// Defines the method to select the target component pod for variable references.
+	// The strategy can be either 'PreferredAvailable' which prioritizes the selection of available pods,
+	// or 'Available' which selects only available pods and terminates the operation if none are found.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=PreferredAvailable
 	PodSelectionStrategy PodSelectionStrategy `json:"podSelectionStrategy"`
 
-	// List of environment variables to set in the job's container.
+	// Represents a list of environment variables to be set in the job's container.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	Vars []OpsEnvVar `json:"vars,omitempty"`
 }
 
 type OpsEnvVar struct {
-	// Name of the variable. Must be a C_IDENTIFIER.
+	// Specifies the name of the variable. This must be a C_IDENTIFIER.
+	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Source for the variable's value. Cannot be used if value is not empty.
+	// Defines the source for the variable's value.
+	//
 	// +kubebuilder:validation:Required
 	ValueFrom *OpsVarSource `json:"valueFrom"`
 }
 
 type OpsVarSource struct {
-	// envVarRef defines which container and env that the variable references from.
-	// source: "env" or "envFrom" of the container.
+	// Specifies a reference to a specific environment variable within a container.
+	// Used to specify the source of the variable, which can be either "env" or "envFrom".
+	//
 	EnvVarRef *EnvVarRef `json:"envVarRef,omitempty"`
 }
 
 type EnvVarRef struct {
-	// container name which defines in componentDefinition or is injected by kubeBlocks controller.
-	// if not specified, will use the first container by default.
+	// Specifies the name of the container as defined in the componentDefinition or as injected by the kubeBlocks controller.
+	// If not specified, the first container will be used by default.
+	//
 	// +optional
 	ContainerName string `json:"containerName,omitempty"`
 
-	// env name, it will .
+	// Defines the name of the environment variable.
+	//
 	// +kubebuilder:validation:Required
 	EnvName string `json:"envName"`
 }
@@ -144,61 +157,69 @@ type EnvVarRef struct {
 
 type PreCondition struct {
 
-	// condition declares how the operation can be executed.
+	// Defines the conditions under which the operation can be executed.
 	Rule *Rule `json:"rule,omitempty"`
 
-	// a job will be run to execute preCondition.
-	// and the operation will be executed when the exec job is succeed.
+	// Represents a job that will be run to execute the PreCondition.
+	// The operation will only be executed if the job is successful.
+	//
 	// +optional
 	Exec *PreConditionExec `json:"exec,omitempty"`
 }
 
 type Rule struct {
-	// expression declares how the operation can be executed using go template expression.
-	// it should return "true" or "false", built-in objects:
-	//
-	// - "params" are input parameters.
-	// - "cluster" is referenced cluster object.
-	// - "component" is referenced the component Object.
+	// Defines how the operation can be executed using a Go template expression.
+	// Should return either `true` or `false`. The built-in objects available for use in the expression include:
+	// - `params`: These are the input parameters.
+	// - `cluster`: This is the referenced cluster object.
+	// - `component`: This is the referenced component object.
 	//
 	// +kubebuilder:validation:Required
 	Expression string `json:"expression"`
 
-	// report the message if the rule is not matched.
+	// Reported if the rule is not matched.
+	//
 	// +kubebuilder:validation:Required
 	Message string `json:"message"`
 }
 
 type PreConditionExec struct {
-	// image name.
+	// Specifies the name of the Docker image to be used for the execution.
+	//
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// container env.
+	// Defines the environment variables to be set in the container.
+	//
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// container commands.
+	// Specifies the commands to be executed in the container.
+	//
 	// +optional
 	Command []string `json:"command,omitempty"`
 
-	// container args.
+	// Represents the arguments to be passed to the command in the container.
+	//
 	// +optional
 	Args []string `json:"args,omitempty"`
 }
 
 // OpsDefinitionStatus defines the observed state of OpsDefinition
 type OpsDefinitionStatus struct {
-	// ObservedGeneration is the most recent generation observed for this OpsDefinition.
+	// Refers to the most recent generation observed for this OpsDefinition.
+	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Phase valid values are ``, `Available`, 'Unavailable`.
-	// Available is OpsDefinition become available, and can be used for co-related objects.
+	// Represents the current state of the OpsDefinition. Valid values are ``, `Available`, `Unavailable`.
+	// When the state is `Available`, the OpsDefinition is ready and can be used for related objects.
+	//
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// Extra message for current phase.
+	// Provides additional information about the current phase.
+	//
 	// +optional
 	Message string `json:"message,omitempty"`
 }

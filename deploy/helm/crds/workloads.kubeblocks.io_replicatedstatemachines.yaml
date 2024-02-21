@@ -810,14 +810,14 @@ spec:
                 - username
                 type: object
               memberUpdateStrategy:
-                description: 'MemberUpdateStrategy, Members(Pods) update strategy.
-                  serial: update Members one by one that guarantee minimum component
-                  unavailable time. Learner -> Follower(with AccessMode=none) -> Follower(with
-                  AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-                  bestEffortParallel: update Members in parallel that guarantee minimum
-                  component un-writable time. Learner, Follower(minority) in parallel
-                  -> Follower(majority) -> Leader, keep majority online all the time.
-                  parallel: force parallel'
+                description: "MemberUpdateStrategy, Members(Pods) update strategy.
+                  \n - serial: update Members one by one that guarantee minimum component
+                  unavailable time. `Learner -> Follower(with AccessMode=none) ->
+                  Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite)
+                  -> Leader` - bestEffortParallel: update Members in parallel that
+                  guarantee minimum component un-writable time. `Learner, Follower(minority)
+                  in parallel -> Follower(majority) -> Leader`, keep majority online
+                  all the time. - parallel: force parallel"
                 enum:
                 - Serial
                 - BestEffortParallel
@@ -1000,15 +1000,15 @@ spec:
                   of this rsm object will be paused.
                 type: boolean
               podManagementPolicy:
-                description: podManagementPolicy controls how pods are created during
+                description: "podManagementPolicy controls how pods are created during
                   initial scale up, when replacing pods on nodes, or when scaling
-                  down. The default policy is `OrderedReady`, where pods are created
-                  in increasing order (pod-0, then pod-1, etc) and the controller
+                  down. \n - The default policy is `OrderedReady`, where pods are
+                  created in increasing order (pod-0, then pod-1, etc) and the controller
                   will wait until each pod is ready before continuing. When scaling
-                  down, the pods are removed in the opposite order. The alternative
+                  down, the pods are removed in the opposite order. - The alternative
                   policy is `Parallel` which will create pods in parallel to match
                   the desired scale without waiting, and on scale down will delete
-                  all pods at once.
+                  all pods at once."
                 type: string
               replicas:
                 default: 1

@@ -97,12 +97,14 @@ BackupType
 </em>
 </td>
 <td>
-<p>backupType specifies the backup type, supported values: Full, Continuous.
-Full means full backup.
-Incremental means back up data that have changed since the last backup (full or incremental).
-Differential means back up data that have changed since the last full backup.
-Continuous will back up the transaction log continuously, the PITR (Point in Time Recovery).
-can be performed based on the continuous backup and full backup.</p>
+<p>backupType specifies the backup type, supported values:</p>
+<ul>
+<li><code>Full</code> means full backup.</li>
+<li><code>Incremental</code> means back up data that have changed since the last backup (full or incremental).</li>
+<li><code>Differential</code> means back up data that have changed since the last full backup.</li>
+<li><code>Continuous</code> will back up the transaction log continuously, the PITR (Point in Time Recovery)
+can be performed based on the continuous backup and full backup.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -272,10 +274,12 @@ BackupDeletionPolicy
 <td>
 <p>deletionPolicy determines whether the backup contents stored in backup repository
 should be deleted when the backup custom resource is deleted.
-Supported values are &ldquo;Retain&rdquo; and &ldquo;Delete&rdquo;.
-&ldquo;Retain&rdquo; means that the backup can not be deleted and remains in &lsquo;Deleting&rsquo; phase.
-&ldquo;Delete&rdquo; means that the backup content and its physical snapshot on backup repository are deleted.
-the backup custom objects but retaining the backup contents in backup repository.
+Supported values are <code>Retain</code> and <code>Delete</code>.</p>
+<ul>
+<li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.</li>
+<li><code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</li>
+</ul>
+<p>the backup custom objects but retaining the backup contents in backup repository.
 The current implementation only prevent accidental deletion of backup data.</p>
 </td>
 </tr>
@@ -464,12 +468,12 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>useKopia specifies whether backup data should be stored in a Kopia repository.
-Data within the Kopia repository is both compressed and encrypted. Furthermore,
+<p>useKopia specifies whether backup data should be stored in a Kopia repository.</p>
+<p>Data within the Kopia repository is both compressed and encrypted. Furthermore,
 data deduplication is implemented across various backups of the same cluster.
 This approach significantly reduces the actual storage usage, particularly for
-clusters with a low update frequency.
-NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
+clusters with a low update frequency.</p>
+<p>NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
 otherwise the backup will not be processed.</p>
 </td>
 </tr>
@@ -493,7 +497,7 @@ BackupPolicyStatus
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupRepo">BackupRepo
 </h3>
 <div>
-<p>BackupRepo is the Schema for the backuprepos API</p>
+<p>BackupRepo is a repository for storing backup data.</p>
 </div>
 <table>
 <thead>
@@ -553,7 +557,7 @@ string
 </em>
 </td>
 <td>
-<p>The storage provider used by this backup repo.</p>
+<p>Specifies the name of the <code>StorageProvider</code> used by this backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -567,7 +571,7 @@ AccessMethod
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the access method of the backup repo.</p>
+<p>Specifies the access method of the backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -581,7 +585,7 @@ Kubernetes resource.Quantity
 </td>
 <td>
 <em>(Optional)</em>
-<p>The requested capacity for the PVC created by this backup repo.</p>
+<p>Specifies the capacity of the PVC created by this backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -594,7 +598,7 @@ Kubernetes core/v1.PersistentVolumeReclaimPolicy
 </em>
 </td>
 <td>
-<p>The reclaim policy for the PV created by this backup repo.</p>
+<p>Specifies reclaim policy of the PV created by this backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -606,7 +610,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Non-secret configurations for the storage provider.</p>
+<p>Stores the non-secret configuration parameters for the <code>StorageProvider</code>.</p>
 </td>
 </tr>
 <tr>
@@ -620,7 +624,7 @@ Kubernetes core/v1.SecretReference
 </td>
 <td>
 <em>(Optional)</em>
-<p>A secret that contains the credentials needed by the storage provider.</p>
+<p>References to the secret that holds the credentials for the <code>StorageProvider</code>.</p>
 </td>
 </tr>
 </table>
@@ -814,11 +818,13 @@ BackupRef
 </em>
 </td>
 <td>
-<p>backup to be restored. The restore behavior based on the backup type:
-1. Full: will be restored the full backup directly.
-2. Incremental: will be restored sequentially from the most recent full backup of this incremental backup.
-3. Differential: will be restored sequentially from the parent backup of the differential backup.
-4. Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.</p>
+<p>backup to be restored. The restore behavior based on the backup type:</p>
+<ol>
+<li>Full: will be restored the full backup directly.</li>
+<li>Incremental: will be restored sequentially from the most recent full backup of this incremental backup.</li>
+<li>Differential: will be restored sequentially from the parent backup of the differential backup.</li>
+<li>Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.</li>
+</ol>
 </td>
 </tr>
 <tr>
@@ -900,8 +906,8 @@ ReadyConfig
 <td>
 <em>(Optional)</em>
 <p>list of environment variables to set in the container for restore and will be
-merged with the env of Backup and ActionSet.
-The priority of merging is as follows: Restore env &gt; Backup env &gt; ActionSet env.</p>
+merged with the env of Backup and ActionSet.</p>
+<p>The priority of merging is as follows: <code>Restore env &gt; Backup env &gt; ActionSet env</code>.</p>
 </td>
 </tr>
 <tr>
@@ -953,7 +959,8 @@ RestoreStatus
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepoSpec">BackupRepoSpec</a>)
 </p>
 <div>
-<p>AccessMethod is an enum type that defines the access method of the backup repo.</p>
+<p>AccessMethod represents an enumeration type that outlines
+how the <code>BackupRepo</code> can be accessed.</p>
 </div>
 <table>
 <thead>
@@ -963,12 +970,12 @@ RestoreStatus
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Mount&#34;</p></td>
-<td><p>AccessMethodMount means that the storage is mounted locally,
-so that remote files can be accessed just like a local file.</p>
+<td><p>AccessMethodMount suggests that the storage is mounted locally
+which allows for remote files to be accessed akin to local ones.</p>
 </td>
 </tr><tr><td><p>&#34;Tool&#34;</p></td>
-<td><p>AccessMethodTool means to access the storage with a command-line tool,
-which helps to transfer files between the storage and local.</p>
+<td><p>AccessMethodTool indicates the utilization of a command-line
+tool for accessing the storage.</p>
 </td>
 </tr></tbody>
 </table>
@@ -1050,12 +1057,14 @@ BackupType
 </em>
 </td>
 <td>
-<p>backupType specifies the backup type, supported values: Full, Continuous.
-Full means full backup.
-Incremental means back up data that have changed since the last backup (full or incremental).
-Differential means back up data that have changed since the last full backup.
-Continuous will back up the transaction log continuously, the PITR (Point in Time Recovery).
-can be performed based on the continuous backup and full backup.</p>
+<p>backupType specifies the backup type, supported values:</p>
+<ul>
+<li><code>Full</code> means full backup.</li>
+<li><code>Incremental</code> means back up data that have changed since the last backup (full or incremental).</li>
+<li><code>Differential</code> means back up data that have changed since the last full backup.</li>
+<li><code>Continuous</code> will back up the transaction log continuously, the PITR (Point in Time Recovery)
+can be performed based on the continuous backup and full backup.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -1806,12 +1815,12 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>useKopia specifies whether backup data should be stored in a Kopia repository.
-Data within the Kopia repository is both compressed and encrypted. Furthermore,
+<p>useKopia specifies whether backup data should be stored in a Kopia repository.</p>
+<p>Data within the Kopia repository is both compressed and encrypted. Furthermore,
 data deduplication is implemented across various backups of the same cluster.
 This approach significantly reduces the actual storage usage, particularly for
-clusters with a low update frequency.
-NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
+clusters with a low update frequency.</p>
+<p>NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
 otherwise the backup will not be processed.</p>
 </td>
 </tr>
@@ -1922,7 +1931,7 @@ string
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepoStatus">BackupRepoStatus</a>)
 </p>
 <div>
-<p>BackupRepoPhase defines phases for BackupRepo CR.</p>
+<p>BackupRepoPhase denotes different stages for the <code>BackupRepo</code>.</p>
 </div>
 <table>
 <thead>
@@ -1932,13 +1941,17 @@ string
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Deleting&#34;</p></td>
-<td></td>
+<td><p>BackupRepoDeleting indicates the backup repository is being deleted.</p>
+</td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td></td>
+<td><p>BackupRepoFailed indicates the pre-check has been failed.</p>
+</td>
 </tr><tr><td><p>&#34;PreChecking&#34;</p></td>
-<td></td>
+<td><p>BackupRepoPreChecking indicates the backup repository is being pre-checked.</p>
+</td>
 </tr><tr><td><p>&#34;Ready&#34;</p></td>
-<td></td>
+<td><p>BackupRepoReady indicates the backup repository is ready for use.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupRepoSpec">BackupRepoSpec
@@ -1947,7 +1960,7 @@ string
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepo">BackupRepo</a>)
 </p>
 <div>
-<p>BackupRepoSpec defines the desired state of BackupRepo</p>
+<p>BackupRepoSpec defines the desired state of <code>BackupRepo</code>.</p>
 </div>
 <table>
 <thead>
@@ -1965,7 +1978,7 @@ string
 </em>
 </td>
 <td>
-<p>The storage provider used by this backup repo.</p>
+<p>Specifies the name of the <code>StorageProvider</code> used by this backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -1979,7 +1992,7 @@ AccessMethod
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the access method of the backup repo.</p>
+<p>Specifies the access method of the backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -1993,7 +2006,7 @@ Kubernetes resource.Quantity
 </td>
 <td>
 <em>(Optional)</em>
-<p>The requested capacity for the PVC created by this backup repo.</p>
+<p>Specifies the capacity of the PVC created by this backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -2006,7 +2019,7 @@ Kubernetes core/v1.PersistentVolumeReclaimPolicy
 </em>
 </td>
 <td>
-<p>The reclaim policy for the PV created by this backup repo.</p>
+<p>Specifies reclaim policy of the PV created by this backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -2018,7 +2031,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Non-secret configurations for the storage provider.</p>
+<p>Stores the non-secret configuration parameters for the <code>StorageProvider</code>.</p>
 </td>
 </tr>
 <tr>
@@ -2032,7 +2045,7 @@ Kubernetes core/v1.SecretReference
 </td>
 <td>
 <em>(Optional)</em>
-<p>A secret that contains the credentials needed by the storage provider.</p>
+<p>References to the secret that holds the credentials for the <code>StorageProvider</code>.</p>
 </td>
 </tr>
 </tbody>
@@ -2043,7 +2056,7 @@ Kubernetes core/v1.SecretReference
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepo">BackupRepo</a>)
 </p>
 <div>
-<p>BackupRepoStatus defines the observed state of BackupRepo</p>
+<p>BackupRepoStatus defines the observed state of <code>BackupRepo</code>.</p>
 </div>
 <table>
 <thead>
@@ -2064,7 +2077,8 @@ BackupRepoPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Backup repo reconciliation phases. Valid values are PreChecking, Failed, Ready, Deleting.</p>
+<p>Represents the current phase of reconciliation for the backup repository.
+Permissible values are PreChecking, Failed, Ready, Deleting.</p>
 </td>
 </tr>
 <tr>
@@ -2078,7 +2092,7 @@ BackupRepoPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>conditions describes the current state of the repo.</p>
+<p>Provides a detailed description of the current state of the backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -2090,7 +2104,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the latest generation observed by the controller.</p>
+<p>Represents the latest generation of the resource that the controller has observed.</p>
 </td>
 </tr>
 <tr>
@@ -2104,7 +2118,7 @@ Kubernetes core/v1.SecretReference
 </td>
 <td>
 <em>(Optional)</em>
-<p>generatedCSIDriverSecret references the generated secret used by the CSI driver.</p>
+<p>Refers to the generated secret for the <code>StorageProvider</code>.</p>
 </td>
 </tr>
 <tr>
@@ -2116,7 +2130,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>generatedStorageClassName indicates the generated storage class name.</p>
+<p>Represents the name of the generated storage class.</p>
 </td>
 </tr>
 <tr>
@@ -2128,7 +2142,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>backupPVCName is the name of the PVC used to store backup data.</p>
+<p>Represents the name of the PVC that stores backup data.</p>
 </td>
 </tr>
 <tr>
@@ -2140,7 +2154,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>toolConfigSecretName is the name of the secret containing the configuration for the access tool.</p>
+<p>Represents the name of the secret that contains the configuration for the tool.</p>
 </td>
 </tr>
 <tr>
@@ -2152,7 +2166,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>isDefault indicates whether this backup repo is the default one.</p>
+<p>Indicates if this backup repository is the default one.</p>
 </td>
 </tr>
 </tbody>
@@ -2357,10 +2371,12 @@ BackupDeletionPolicy
 <td>
 <p>deletionPolicy determines whether the backup contents stored in backup repository
 should be deleted when the backup custom resource is deleted.
-Supported values are &ldquo;Retain&rdquo; and &ldquo;Delete&rdquo;.
-&ldquo;Retain&rdquo; means that the backup can not be deleted and remains in &lsquo;Deleting&rsquo; phase.
-&ldquo;Delete&rdquo; means that the backup content and its physical snapshot on backup repository are deleted.
-the backup custom objects but retaining the backup contents in backup repository.
+Supported values are <code>Retain</code> and <code>Delete</code>.</p>
+<ul>
+<li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.</li>
+<li><code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</li>
+</ul>
+<p>the backup custom objects but retaining the backup contents in backup repository.
 The current implementation only prevent accidental deletion of backup data.</p>
 </td>
 </tr>
@@ -3482,9 +3498,11 @@ VolumeClaimRestorePolicy
 </td>
 <td>
 <p>VolumeClaimRestorePolicy defines restore policy for persistent volume claim.
-Supported policies are as follows:
-1. Parallel: parallel recovery of persistent volume claim.
-2. Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.</p>
+Supported policies are as follows:</p>
+<ol>
+<li>Parallel: parallel recovery of persistent volume claim.</li>
+<li>Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.</li>
+</ol>
 </td>
 </tr>
 <tr>
@@ -3834,11 +3852,13 @@ BackupRef
 </em>
 </td>
 <td>
-<p>backup to be restored. The restore behavior based on the backup type:
-1. Full: will be restored the full backup directly.
-2. Incremental: will be restored sequentially from the most recent full backup of this incremental backup.
-3. Differential: will be restored sequentially from the parent backup of the differential backup.
-4. Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.</p>
+<p>backup to be restored. The restore behavior based on the backup type:</p>
+<ol>
+<li>Full: will be restored the full backup directly.</li>
+<li>Incremental: will be restored sequentially from the most recent full backup of this incremental backup.</li>
+<li>Differential: will be restored sequentially from the parent backup of the differential backup.</li>
+<li>Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.</li>
+</ol>
 </td>
 </tr>
 <tr>
@@ -3920,8 +3940,8 @@ ReadyConfig
 <td>
 <em>(Optional)</em>
 <p>list of environment variables to set in the container for restore and will be
-merged with the env of Backup and ActionSet.
-The priority of merging is as follows: Restore env &gt; Backup env &gt; ActionSet env.</p>
+merged with the env of Backup and ActionSet.</p>
+<p>The priority of merging is as follows: <code>Restore env &gt; Backup env &gt; ActionSet env</code>.</p>
 </td>
 </tr>
 <tr>
@@ -4745,10 +4765,11 @@ be mounted on the backup job.</p>
 </p>
 <div>
 <p>VolumeClaimRestorePolicy defines restore policy for persistent volume claim.
-Supported policies are as follows:
-1. Parallel: parallel recovery of persistent volume claim.
-2. Serial: restore the persistent volume claim in sequence, and wait until the
-previous persistent volume claim is restored before restoring a new one.</p>
+Supported policies are as follows:</p>
+<ol>
+<li>Parallel: parallel recovery of persistent volume claim.</li>
+<li>Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.</li>
+</ol>
 </div>
 <table>
 <thead>
@@ -4879,9 +4900,11 @@ Resource Types:
 <h3 id="storage.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider
 </h3>
 <div>
-<p>StorageProvider is the Schema for the storageproviders API
-StorageProvider describes how to provision PVCs for a specific storage system (e.g. S3, NFS, etc),
-by using the CSI driver.</p>
+<p>StorageProvider comprises specifications that provide guidance on accessing remote storage.
+Currently the supported access methods are via a dedicated CSI driver or the <code>datasafed</code> tool.
+In case of CSI driver, the specification expounds on provisioning PVCs for that driver.
+As for the <code>datasafed</code> tool, the specification provides insights on generating the necessary
+configuration file.</p>
 </div>
 <table>
 <thead>
@@ -4942,7 +4965,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The name of the CSI driver used by this StorageProvider.</p>
+<p>Specifies the name of the CSI driver used to access remote storage.
+This field can be empty, it indicates that the storage is not accessible via CSI.</p>
 </td>
 </tr>
 <tr>
@@ -4954,11 +4978,10 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A Go template for rendering a secret which will be used by the CSI driver.
-The template will be rendered with the following variables:</p>
-<ul>
-<li>Parameters: a map of parameters defined in the ParametersSchema.</li>
-</ul>
+<p>A Go template that used to render and generate <code>k8s.io/api/core/v1.Secret</code>
+resources for a specific CSI driver.
+For example, <code>accessKey</code> and <code>secretKey</code> needed by CSI-S3 are stored in this
+<code>Secret</code> resource.</p>
 </td>
 </tr>
 <tr>
@@ -4970,12 +4993,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A Go template for rendering a storage class which will be used by the CSI driver.
-The template will be rendered with the following variables:</p>
-<ul>
-<li>Parameters: a map of parameters defined in the ParametersSchema.</li>
-<li>CSIDriverSecretRef: the reference of the secret created by the CSIDriverSecretTemplate.</li>
-</ul>
+<p>A Go template utilized to render and generate <code>kubernetes.storage.k8s.io.v1.StorageClass</code>
+resources. The `StorageClass&rsquo; created by this template is aimed at using the CSI driver.</p>
 </td>
 </tr>
 <tr>
@@ -4987,12 +5006,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A Go template for rendering a PersistentVolumeClaim.
-The template will be rendered with the following variables:</p>
-<ul>
-<li>Parameters: a map of parameters defined in the ParametersSchema.</li>
-<li>GeneratedStorageClassName: the name of the storage class generated with the StorageClassTemplate.</li>
-</ul>
+<p>A Go template that renders and generates <code>k8s.io/api/core/v1.PersistentVolumeClaim</code>
+resources. This PVC can reference the <code>StorageClass</code> created from <code>storageClassTemplate</code>,
+allowing Pods to access remote storage by mounting the PVC.</p>
 </td>
 </tr>
 <tr>
@@ -5004,11 +5020,12 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A Go template for rendering a config used by the datasafed command.
-The template will be rendered with the following variables:</p>
-<ul>
-<li>Parameters: a map of parameters defined in the ParametersSchema.</li>
-</ul>
+<p>A Go template used to render and generate <code>k8s.io/api/core/v1.Secret</code>.
+This <code>Secret</code> involves the configuration details required by the <code>datasafed</code> tool
+to access remote storage. For example, the <code>Secret</code> should contain <code>endpoint</code>,
+<code>bucket</code>, &lsquo;region&rsquo;, &lsquo;accessKey&rsquo;, &lsquo;secretKey&rsquo;, or something else for S3 storage.
+This field can be empty, it means this kind of storage is not accessible via
+the <code>datasafed</code> tool.</p>
 </td>
 </tr>
 <tr>
@@ -5022,8 +5039,9 @@ ParametersSchema
 </td>
 <td>
 <em>(Optional)</em>
-<p>The schema describes the parameters required by this StorageProvider,
-when rendering the templates.</p>
+<p>Describes the parameters required for storage.
+The parameters defined here can be referenced in the above templates,
+and <code>kbcli</code> uses this definition for dynamic command-line parameter parsing.</p>
 </td>
 </tr>
 </table>
@@ -5049,7 +5067,7 @@ StorageProviderStatus
 (<em>Appears on:</em><a href="#storage.kubeblocks.io/v1alpha1.StorageProviderSpec">StorageProviderSpec</a>)
 </p>
 <div>
-<p>ParametersSchema describes the parameters used by this StorageProvider.</p>
+<p>ParametersSchema describes the parameters needed for a certain storage.</p>
 </div>
 <table>
 <thead>
@@ -5070,7 +5088,7 @@ Kubernetes api extensions v1.JSONSchemaProps
 </td>
 <td>
 <em>(Optional)</em>
-<p>openAPIV3Schema is the OpenAPI v3 schema to use for validation and pruning.</p>
+<p>Defines the parameters in OpenAPI V3.</p>
 </td>
 </tr>
 <tr>
@@ -5082,7 +5100,8 @@ Kubernetes api extensions v1.JSONSchemaProps
 </td>
 <td>
 <em>(Optional)</em>
-<p>credentialFields are the fields used to generate the secret.</p>
+<p>Defines which parameters are credential fields, which need to be handled specifically.
+For instance, these should be stored in a <code>Secret</code> instead of a <code>ConfigMap</code>.</p>
 </td>
 </tr>
 </tbody>
@@ -5093,7 +5112,7 @@ Kubernetes api extensions v1.JSONSchemaProps
 (<em>Appears on:</em><a href="#storage.kubeblocks.io/v1alpha1.StorageProviderStatus">StorageProviderStatus</a>)
 </p>
 <div>
-<p>StorageProviderPhase defines phases of a storage provider.</p>
+<p>StorageProviderPhase defines phases of a <code>StorageProvider</code>.</p>
 </div>
 <table>
 <thead>
@@ -5103,9 +5122,12 @@ Kubernetes api extensions v1.JSONSchemaProps
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;NotReady&#34;</p></td>
-<td></td>
+<td><p>StorageProviderNotReady indicates that the <code>StorageProvider</code> is not ready,
+usually because the specified CSI driver is not yet installed.</p>
+</td>
 </tr><tr><td><p>&#34;Ready&#34;</p></td>
-<td></td>
+<td><p>StorageProviderReady indicates that the <code>StorageProvider</code> is ready for use.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="storage.kubeblocks.io/v1alpha1.StorageProviderSpec">StorageProviderSpec
@@ -5114,7 +5136,7 @@ Kubernetes api extensions v1.JSONSchemaProps
 (<em>Appears on:</em><a href="#storage.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>)
 </p>
 <div>
-<p>StorageProviderSpec defines the desired state of StorageProvider</p>
+<p>StorageProviderSpec defines the desired state of <code>StorageProvider</code>.</p>
 </div>
 <table>
 <thead>
@@ -5133,7 +5155,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The name of the CSI driver used by this StorageProvider.</p>
+<p>Specifies the name of the CSI driver used to access remote storage.
+This field can be empty, it indicates that the storage is not accessible via CSI.</p>
 </td>
 </tr>
 <tr>
@@ -5145,11 +5168,10 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A Go template for rendering a secret which will be used by the CSI driver.
-The template will be rendered with the following variables:</p>
-<ul>
-<li>Parameters: a map of parameters defined in the ParametersSchema.</li>
-</ul>
+<p>A Go template that used to render and generate <code>k8s.io/api/core/v1.Secret</code>
+resources for a specific CSI driver.
+For example, <code>accessKey</code> and <code>secretKey</code> needed by CSI-S3 are stored in this
+<code>Secret</code> resource.</p>
 </td>
 </tr>
 <tr>
@@ -5161,12 +5183,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A Go template for rendering a storage class which will be used by the CSI driver.
-The template will be rendered with the following variables:</p>
-<ul>
-<li>Parameters: a map of parameters defined in the ParametersSchema.</li>
-<li>CSIDriverSecretRef: the reference of the secret created by the CSIDriverSecretTemplate.</li>
-</ul>
+<p>A Go template utilized to render and generate <code>kubernetes.storage.k8s.io.v1.StorageClass</code>
+resources. The `StorageClass&rsquo; created by this template is aimed at using the CSI driver.</p>
 </td>
 </tr>
 <tr>
@@ -5178,12 +5196,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A Go template for rendering a PersistentVolumeClaim.
-The template will be rendered with the following variables:</p>
-<ul>
-<li>Parameters: a map of parameters defined in the ParametersSchema.</li>
-<li>GeneratedStorageClassName: the name of the storage class generated with the StorageClassTemplate.</li>
-</ul>
+<p>A Go template that renders and generates <code>k8s.io/api/core/v1.PersistentVolumeClaim</code>
+resources. This PVC can reference the <code>StorageClass</code> created from <code>storageClassTemplate</code>,
+allowing Pods to access remote storage by mounting the PVC.</p>
 </td>
 </tr>
 <tr>
@@ -5195,11 +5210,12 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A Go template for rendering a config used by the datasafed command.
-The template will be rendered with the following variables:</p>
-<ul>
-<li>Parameters: a map of parameters defined in the ParametersSchema.</li>
-</ul>
+<p>A Go template used to render and generate <code>k8s.io/api/core/v1.Secret</code>.
+This <code>Secret</code> involves the configuration details required by the <code>datasafed</code> tool
+to access remote storage. For example, the <code>Secret</code> should contain <code>endpoint</code>,
+<code>bucket</code>, &lsquo;region&rsquo;, &lsquo;accessKey&rsquo;, &lsquo;secretKey&rsquo;, or something else for S3 storage.
+This field can be empty, it means this kind of storage is not accessible via
+the <code>datasafed</code> tool.</p>
 </td>
 </tr>
 <tr>
@@ -5213,8 +5229,9 @@ ParametersSchema
 </td>
 <td>
 <em>(Optional)</em>
-<p>The schema describes the parameters required by this StorageProvider,
-when rendering the templates.</p>
+<p>Describes the parameters required for storage.
+The parameters defined here can be referenced in the above templates,
+and <code>kbcli</code> uses this definition for dynamic command-line parameter parsing.</p>
 </td>
 </tr>
 </tbody>
@@ -5225,7 +5242,7 @@ when rendering the templates.</p>
 (<em>Appears on:</em><a href="#storage.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>)
 </p>
 <div>
-<p>StorageProviderStatus defines the observed state of StorageProvider</p>
+<p>StorageProviderStatus defines the observed state of <code>StorageProvider</code>.</p>
 </div>
 <table>
 <thead>
@@ -5245,7 +5262,7 @@ StorageProviderPhase
 </em>
 </td>
 <td>
-<p>Storage provider reconciliation phases. Valid values are NotReady, Ready.</p>
+<p>The phase of the <code>StorageProvider</code>. Valid phases are <code>NotReady</code> and <code>Ready</code>.</p>
 </td>
 </tr>
 <tr>
@@ -5259,7 +5276,7 @@ StorageProviderPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the current state of the storage provider.</p>
+<p>Describes the current state of the <code>StorageProvider</code>.</p>
 </td>
 </tr>
 </tbody>

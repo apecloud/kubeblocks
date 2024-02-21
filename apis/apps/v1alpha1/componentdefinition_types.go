@@ -84,28 +84,33 @@ type ComponentDefinitionSpec struct {
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
 	// Runtime defines primarily runtime information for the component, including:
-	//   - Init containers
-	//   - Containers
-	//       - Image
-	//       - Commands
-	//       - Args
-	//       - Envs
-	//       - Mounts
-	//       - Ports
-	//       - Security context
-	//       - Probes
-	//       - Lifecycle
-	//   - Volumes
+	//
+	// - Init containers
+	// - Containers
+	//     - Image
+	//     - Commands
+	//     - Args
+	//     - Envs
+	//     - Mounts
+	//     - Ports
+	//     - Security context
+	//     - Probes
+	//     - Lifecycle
+	// - Volumes
+	//
 	// CPU and memory resource limits, as well as scheduling settings (affinity, toleration, priority), should not be configured within this structure.
 	// Cannot be updated.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
 	// Vars represents user-defined variables.
+	//
 	// These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
 	// When used as environment variables, these variables are placed in front of the environment variables declared in the Pod.
 	// Cannot be updated.
+	//
 	// +optional
 	Vars []EnvVar `json:"vars,omitempty"`
 
@@ -116,8 +121,10 @@ type ComponentDefinitionSpec struct {
 	Volumes []ComponentVolume `json:"volumes"`
 
 	// Services defines endpoints that can be used to access the component service to manage the component.
-	// In addition, a reserved headless service will be created by default, with the name pattern {clusterName}-{componentName}-headless.
+	//
+	// In addition, a reserved headless service will be created by default, with the name pattern `{clusterName}-{componentName}-headless`.
 	// Cannot be updated.
+	//
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
 
@@ -222,7 +229,7 @@ type ComponentDefinitionStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Phase valid values are ``, `Available`, 'Unavailable`.
+	// Phase valid values are ``, `Available`, `Unavailable`.
 	// Available is ComponentDefinition become available, and can be used for co-related objects.
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
@@ -247,11 +254,13 @@ type ComponentVolume struct {
 	NeedSnapshot bool `json:"needSnapshot,omitempty"`
 
 	// HighWatermark defines the high watermark threshold for the volume space usage.
+	//
 	// If there is any specified volumes who's space usage is over the threshold, the pre-defined "LOCK" action
 	// will be triggered to degrade the service to protect volume from space exhaustion, such as to set the instance
 	// as read-only. And after that, if all volumes' space usage drops under the threshold later, the pre-defined
 	// "UNLOCK" action will be performed to recover the service normally.
 	// Cannot be updated.
+	//
 	// +kubebuilder:validation:Maximum=100
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=0
@@ -425,9 +434,9 @@ const (
 // An action is considered successful if it returns 0 (or HTTP 200 for HTTP(s) actions). Any other return value or
 // HTTP status code is considered as a failure, and the action may be retried based on the configured retry policy.
 //
-// If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.
-// If an action produces any data as output, it should be written to stdout (or included in the HTTP response payload for HTTP(s) actions).
-// If an action encounters any errors, error messages should be written to stderr (or included in the HTTP response payload with a non-200 HTTP status code).
+// - If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.
+// - If an action produces any data as output, it should be written to stdout (or included in the HTTP response payload for HTTP(s) actions).
+// - If an action encounters any errors, error messages should be written to stderr (or included in the HTTP response payload with a non-200 HTTP status code).
 type Action struct {
 	// Image defines the container image to run the action.
 	// Cannot be updated.
@@ -625,12 +634,15 @@ type ComponentLifecycleActions struct {
 
 	// DataAssemble defines how to assemble data synchronized from external before starting the service for a new replica.
 	// This action is typically used when creating a new replica, such as:
+	//
 	//  - scale-out
 	//  - rebuild
 	//  - clone
+	//
 	// The data will be streamed in via stdin. If any error occurs during the assembly process,
 	// the action must be able to guarantee idempotence to allow for retries from the beginning.
 	// Cannot be updated.
+	//
 	// +optional
 	DataAssemble *LifecycleActionHandler `json:"dataAssemble,omitempty"`
 
@@ -687,15 +699,19 @@ type RoleProbe struct {
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
 	// Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+	//
 	// The grace period is the duration in seconds after the processes running in the pod are sent
 	// a termination signal and the time when the processes are forcibly halted with a kill signal.
 	// Set this value longer than the expected cleanup time for your process.
+	//
 	// If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
 	// value overrides the value provided by the pod spec.
 	// Value must be non-negative integer. The value zero indicates stop immediately via
 	// the kill signal (no opportunity to shut down).
+	//
 	// This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
 	// Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
+	//
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,7,opt,name=terminationGracePeriodSeconds"`
 }

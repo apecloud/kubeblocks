@@ -821,7 +821,6 @@ var _ = Describe("Component Definition Convertor", func() {
 					PeriodSeconds:  clusterCompDef.Probes.RoleProbe.PeriodSeconds,
 				}
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
-				Expect(*actions.RoleProbe).ShouldNot(BeEquivalentTo(*expectedRoleProbe))
 				Expect(*actions.RoleProbe).Should(BeEquivalentTo(*expectedRoleProbe))
 			})
 

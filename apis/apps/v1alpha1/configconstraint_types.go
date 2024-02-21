@@ -32,6 +32,11 @@ type ConfigConstraintSpec struct {
 	// +optional
 	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
 
+	// forceHotUpdate indicates whether to execute hot update parameters when the pod needs to be restarted.
+	// if set true, the controller does the hot update and then restarts the pod.
+	// +optional
+	ForceHotUpdate *bool `json:"forceHotUpdate,omitempty"`
+
 	// toolConfig used to config init container.
 	// +optional
 	ToolsImageSpec *ToolsImageSpec `json:"toolsImageSpec,omitempty"`
@@ -313,4 +318,11 @@ type ConfigConstraintList struct {
 
 func init() {
 	SchemeBuilder.Register(&ConfigConstraint{}, &ConfigConstraintList{})
+}
+
+func (in *ConfigConstraintSpec) NeedForceUpdateHot() bool {
+	if in.ForceHotUpdate != nil {
+		return *in.ForceHotUpdate
+	}
+	return false
 }

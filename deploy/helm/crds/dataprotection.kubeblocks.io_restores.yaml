@@ -67,13 +67,13 @@ spec:
                 minimum: 0
                 type: integer
               backup:
-                description: 'backup to be restored. The restore behavior based on
-                  the backup type: 1. Full: will be restored the full backup directly.
+                description: "backup to be restored. The restore behavior based on
+                  the backup type: \n 1. Full: will be restored the full backup directly.
                   2. Incremental: will be restored sequentially from the most recent
                   full backup of this incremental backup. 3. Differential: will be
                   restored sequentially from the parent backup of the differential
                   backup. 4. Continuous: will find the most recent full backup at
-                  this time point and the continuous backups after it to restore.'
+                  this time point and the continuous backups after it to restore."
                 properties:
                   name:
                     description: backup name
@@ -137,10 +137,10 @@ spec:
                     type: object
                 type: object
               env:
-                description: 'list of environment variables to set in the container
+                description: "list of environment variables to set in the container
                   for restore and will be merged with the env of Backup and ActionSet.
-                  The priority of merging is as follows: Restore env > Backup env
-                  > ActionSet env.'
+                  \n The priority of merging is as follows: `Restore env > Backup
+                  env > ActionSet env`."
                 items:
                   description: EnvVar represents an environment variable present in
                     a Container.
@@ -1439,12 +1439,12 @@ spec:
                       rule: self == oldSelf
                   volumeClaimRestorePolicy:
                     default: Parallel
-                    description: 'VolumeClaimRestorePolicy defines restore policy
+                    description: "VolumeClaimRestorePolicy defines restore policy
                       for persistent volume claim. Supported policies are as follows:
-                      1. Parallel: parallel recovery of persistent volume claim. 2.
-                      Serial: restore the persistent volume claim in sequence, and
-                      wait until the previous persistent volume claim is restored
-                      before restoring a new one.'
+                      \n 1. Parallel: parallel recovery of persistent volume claim.
+                      2. Serial: restore the persistent volume claim in sequence,
+                      and wait until the previous persistent volume claim is restored
+                      before restoring a new one."
                     enum:
                     - Parallel
                     - Serial
@@ -1724,7 +1724,7 @@ spec:
                       replicas:
                         description: the replicas of persistent volume claim which
                           need to be created and restored. the format of created claim
-                          name is "<template-name>-<index>".
+                          name is `$(template-name)-$(index)`.
                         format: int32
                         minimum: 1
                         type: integer
@@ -2360,7 +2360,7 @@ spec:
                           format: date-time
                           type: string
                         message:
-                          description: message is a human readable message indicating
+                          description: message is a human-readable message indicating
                             details about the object condition.
                           type: string
                         name:
@@ -2401,7 +2401,7 @@ spec:
                           format: date-time
                           type: string
                         message:
-                          description: message is a human readable message indicating
+                          description: message is a human-readable message indicating
                             details about the object condition.
                           type: string
                         name:

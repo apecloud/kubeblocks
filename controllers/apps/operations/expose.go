@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -270,11 +270,18 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			return nil, fmt.Errorf("component service is not defined, expose operation is not supported, cluster: %s, component: %s", cluster.Name, clusterCompSpec.Name)
 		}
 		defaultServicePorts := make([]corev1.ServicePort, 0, len(compServices))
+		portsSet := make(map[string]bool) // to avoid duplicate ports
 		for _, compService := range compServices {
 			if compService.Spec.Type == corev1.ServiceTypeLoadBalancer || compService.Spec.Type == corev1.ServiceTypeNodePort {
 				continue
 			}
 			for _, p := range compService.Spec.Ports {
+				// port key is in the format of `protocol-port`, eg: TCP-80
+				portKey := fmt.Sprintf("%s-%d", p.Protocol, p.Port)
+				if _, ok := portsSet[portKey]; ok {
+					continue
+				}
+				portsSet[portKey] = true
 				genServicePort := corev1.ServicePort{
 					Name:        p.Name,
 					Protocol:    p.Protocol,

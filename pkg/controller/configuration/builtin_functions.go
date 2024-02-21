@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -31,6 +31,30 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
+)
+
+// General built-in functions
+const (
+	builtInGetVolumeFunctionName                 = "getVolumePathByName"
+	builtInGetPvcFunctionName                    = "getPVCByName"
+	builtInGetEnvFunctionName                    = "getEnvByName"
+	builtInGetArgFunctionName                    = "getArgByName"
+	builtInGetPortFunctionName                   = "getPortByName"
+	builtInGetContainerFunctionName              = "getContainerByName"
+	builtInGetContainerCPUFunctionName           = "getContainerCPU"
+	builtInGetPVCSizeByNameFunctionName          = "getComponentPVCSizeByName"
+	builtInGetPVCSizeFunctionName                = "getPVCSize"
+	builtInGetContainerMemoryFunctionName        = "getContainerMemory"
+	builtInGetContainerRequestMemoryFunctionName = "getContainerRequestMemory"
+
+	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
+	// TODO: This function migrate to configuration template
+	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
+
+	// TLS Built-in
+	builtInGetCAFile   = "getCAFile"
+	builtInGetCertFile = "getCertFile"
+	builtInGetKeyFile  = "getKeyFile"
 )
 
 func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {

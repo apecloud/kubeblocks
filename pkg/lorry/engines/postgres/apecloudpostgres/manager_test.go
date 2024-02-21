@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -30,7 +30,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/postgres"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -240,10 +239,10 @@ func TestGetMemberRoleWithHost(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
-	roles := []string{models.FOLLOWER, models.CANDIDATE, models.LEADER, models.LEARNER, ""}
+	roles := []string{constant.Follower, constant.Candidate, constant.Leader, constant.Learner, ""}
 
 	t.Run("query paxos role failed", func(t *testing.T) {
-		mock.ExpectQuery("select paxos_role from consensus_member_status;").
+		mock.ExpectQuery("select role from consensus_cluster_status;").
 			WillReturnError(fmt.Errorf("some error"))
 
 		role, err := manager.GetMemberRoleWithHost(ctx, "")
@@ -252,8 +251,8 @@ func TestGetMemberRoleWithHost(t *testing.T) {
 	})
 
 	t.Run("parse query failed", func(t *testing.T) {
-		mock.ExpectQuery("select paxos_role from consensus_member_status;").
-			WillReturnRows(pgxmock.NewRows([]string{"paxos_role"}))
+		mock.ExpectQuery("select role from consensus_cluster_status;").
+			WillReturnRows(pgxmock.NewRows([]string{"role"}))
 
 		role, err := manager.GetMemberRoleWithHost(ctx, "")
 		assert.Equal(t, "", role)
@@ -261,9 +260,9 @@ func TestGetMemberRoleWithHost(t *testing.T) {
 	})
 
 	t.Run("get member role with host success", func(t *testing.T) {
-		for i, r := range roles {
-			mock.ExpectQuery("select paxos_role from consensus_member_status;").
-				WillReturnRows(pgxmock.NewRows([]string{"paxos_role"}).AddRow(i))
+		for _, r := range roles {
+			mock.ExpectQuery("select role from consensus_cluster_status;").
+				WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow(r))
 
 			role, err := manager.GetMemberRoleWithHost(ctx, "")
 			assert.Equal(t, r, role)
@@ -282,7 +281,7 @@ func TestIsLeaderWithHost(t *testing.T) {
 	defer mock.Close()
 
 	t.Run("get member role with host failed", func(t *testing.T) {
-		mock.ExpectQuery("select paxos_role from consensus_member_status;").
+		mock.ExpectQuery("select role from consensus_cluster_status;").
 			WillReturnError(fmt.Errorf("some error"))
 
 		isLeader, err := manager.IsLeaderWithHost(ctx, "")
@@ -291,8 +290,8 @@ func TestIsLeaderWithHost(t *testing.T) {
 	})
 
 	t.Run("check is leader success", func(t *testing.T) {
-		mock.ExpectQuery("select paxos_role from consensus_member_status;").
-			WillReturnRows(pgxmock.NewRows([]string{"paxos_role"}).AddRow(2))
+		mock.ExpectQuery("select role from consensus_cluster_status;").
+			WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("Leader"))
 
 		isLeader, err := manager.IsLeaderWithHost(ctx, "")
 		assert.True(t, isLeader)
@@ -319,8 +318,8 @@ func TestIsLeader(t *testing.T) {
 
 	t.Run("is leader has not been set", func(t *testing.T) {
 		manager.UnsetIsLeader()
-		mock.ExpectQuery("select paxos_role from consensus_member_status;").
-			WillReturnRows(pgxmock.NewRows([]string{"paxos_role"}).AddRow(2))
+		mock.ExpectQuery("select role from consensus_cluster_status;").
+			WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("Leader"))
 
 		isLeader, err := manager.IsLeader(ctx, nil)
 		assert.True(t, isLeader)
@@ -788,7 +787,7 @@ func TestGetDBState(t *testing.T) {
 	}
 
 	t.Run("check is leader failed", func(t *testing.T) {
-		mock.ExpectQuery("select paxos_role").
+		mock.ExpectQuery("select role").
 			WillReturnError(fmt.Errorf("some error"))
 
 		dbState := manager.GetDBState(ctx, cluster)
@@ -796,8 +795,8 @@ func TestGetDBState(t *testing.T) {
 	})
 
 	t.Run("get member addrs failed", func(t *testing.T) {
-		mock.ExpectQuery("select paxos_role").
-			WillReturnRows(pgxmock.NewRows([]string{"paxos_role"}).AddRow(2))
+		mock.ExpectQuery("select role").
+			WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("Leader"))
 		mock.ExpectQuery("select ip_port").
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -806,8 +805,8 @@ func TestGetDBState(t *testing.T) {
 	})
 
 	t.Run("get member health status failed", func(t *testing.T) {
-		mock.ExpectQuery("select paxos_role").
-			WillReturnRows(pgxmock.NewRows([]string{"paxos_role"}).AddRow(2))
+		mock.ExpectQuery("select role").
+			WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("Leader"))
 		mock.ExpectQuery("select ip_port").
 			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}).AddRows([][]any{{"a"}, {"b"}, {"c"}}...))
 		mock.ExpectQuery("select connected, log_delay_num").
@@ -818,8 +817,8 @@ func TestGetDBState(t *testing.T) {
 	})
 
 	t.Run("get db state success", func(t *testing.T) {
-		mock.ExpectQuery("select paxos_role").
-			WillReturnRows(pgxmock.NewRows([]string{"paxos_role"}).AddRow(2))
+		mock.ExpectQuery("select role").
+			WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("Leader"))
 		mock.ExpectQuery("select ip_port").
 			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}).AddRows([][]any{{"a"}, {"b"}, {"c"}}...))
 		mock.ExpectQuery("select connected, log_delay_num").

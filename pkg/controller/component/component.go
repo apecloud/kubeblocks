@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -282,4 +283,12 @@ func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, clu
 		compSet.Insert(compShortName)
 	}
 	return compSet, nil
+}
+
+// GetHostNetworkRelatedComponents checks if it is necessary to wait for the completion of relevant conditions.
+func GetHostNetworkRelatedComponents(podSpec *corev1.PodSpec, ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
+	if !podSpec.HostNetwork {
+		return nil, nil
+	}
+	return CheckAndGetClusterComponents(ctx, cli, cluster)
 }

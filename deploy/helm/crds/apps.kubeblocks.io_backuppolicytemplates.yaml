@@ -46,22 +46,22 @@ spec:
           metadata:
             type: object
           spec:
-            description: BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
+            description: Defines the desired state of the BackupPolicyTemplate.
             properties:
               backupPolicies:
-                description: backupPolicies is a list of backup policy template for
-                  the specified componentDefinition.
+                description: Represents an array of backup policy templates for the
+                  specified ComponentDefinition.
                 items:
                   properties:
                     backoffLimit:
                       description: Specifies the number of retries before marking
-                        the backup failed.
+                        the backup as failed.
                       format: int32
                       maximum: 10
                       minimum: 0
                       type: integer
                     backupMethods:
-                      description: backupMethods defines the backup methods.
+                      description: Define the methods to be used for backups.
                       items:
                         properties:
                           actionSetName:
@@ -192,30 +192,32 @@ spec:
                               type: object
                             type: array
                           envMapping:
-                            description: envMapping defines the variables of cluster
-                              mapped to env values' keys.
+                            description: Defines the mapping between the environment
+                              variables of the cluster and the keys of the environment
+                              values.
                             items:
                               properties:
                                 key:
-                                  description: env key which needs to mapping.
+                                  description: Specifies the environment variable
+                                    key that requires mapping.
                                   type: string
                                 valueFrom:
-                                  description: valueFrom defines source of the env
-                                    value.
+                                  description: Defines the source from which the environment
+                                    variable value is derived.
                                   properties:
                                     clusterVersionRef:
-                                      description: mapped ClusterVersionRef to env
-                                        value.
+                                      description: Maps to the environment value.
+                                        This is an optional field.
                                       items:
                                         properties:
                                           mappingValue:
-                                            description: mapping value for the specified
-                                              ClusterVersion names.
+                                            description: The value that corresponds
+                                              to the specified ClusterVersion names.
                                             type: string
                                           names:
-                                            description: the array of ClusterVersion
-                                              name which can be mapped to the env
-                                              value.
+                                            description: Represents an array of ClusterVersion
+                                              names that can be mapped to an environment
+                                              variable value.
                                             items:
                                               type: string
                                             type: array
@@ -225,18 +227,18 @@ spec:
                                         type: object
                                       type: array
                                     componentDef:
-                                      description: mapped ComponentDefinition to env
-                                        value.
+                                      description: Maps to the environment value.
+                                        This is also an optional field.
                                       items:
                                         properties:
                                           mappingValue:
-                                            description: mapping value for the specified
-                                              ClusterVersion names.
+                                            description: The value that corresponds
+                                              to the specified ClusterVersion names.
                                             type: string
                                           names:
-                                            description: the array of ClusterVersion
-                                              name which can be mapped to the env
-                                              value.
+                                            description: Represents an array of ClusterVersion
+                                              names that can be mapped to an environment
+                                              variable value.
                                             items:
                                               type: string
                                             type: array
@@ -325,13 +327,13 @@ spec:
                               back up, it will override the global target policy.
                             properties:
                               account:
-                                description: refer to spec.componentDef.systemAccounts.accounts[*].name
-                                  in ClusterDefinition. the secret created by this
-                                  account will be used to connect the database. if
-                                  not set, the secret created by spec.ConnectionCredential
-                                  of the ClusterDefinition will be used. it will be
-                                  transformed to a secret for BackupPolicy's target
-                                  secret.
+                                description: "Refers to spec.componentDef.systemAccounts.accounts[*].name
+                                  in the ClusterDefinition. The secret created by
+                                  this account will be used to connect to the database.
+                                  If not set, the secret created by spec.ConnectionCredential
+                                  of the ClusterDefinition will be used. \n It will
+                                  be transformed into a secret for the BackupPolicy's
+                                  target secret."
                                 type: string
                               connectionCredential:
                                 description: connectionCredential specifies the connection
@@ -368,26 +370,28 @@ spec:
                                 - secretName
                                 type: object
                               connectionCredentialKey:
-                                description: connectionCredentialKey defines connection
-                                  credential key in secret which created by spec.ConnectionCredential
-                                  of the ClusterDefinition. it will be ignored when
-                                  "account" is set.
+                                description: Defines the connection credential key
+                                  in the secret created by spec.ConnectionCredential
+                                  of the ClusterDefinition. It will be ignored when
+                                  the "account" is set.
                                 properties:
                                   hostKey:
-                                    description: hostKey specifies the map key of
-                                      the host in the connection credential secret.
+                                    description: Defines the map key of the host in
+                                      the connection credential secret.
                                     type: string
                                   passwordKey:
-                                    description: the key of password in the ConnectionCredential
-                                      secret. if not set, the default key is "password".
+                                    description: Represents the key of the password
+                                      in the ConnectionCredential secret. If not specified,
+                                      the default key "password" is used.
                                     type: string
                                   portKey:
-                                    description: portKey specifies the map key of
-                                      the port in the connection credential secret.
+                                    description: Indicates the map key of the port
+                                      in the connection credential secret.
                                     type: string
                                   usernameKey:
-                                    description: the key of username in the ConnectionCredential
-                                      secret. if not set, the default key is "username".
+                                    description: Represents the key of the username
+                                      in the ConnectionCredential secret. If not specified,
+                                      the default key "username" is used.
                                     type: string
                                 type: object
                               podSelector:
@@ -440,11 +444,11 @@ spec:
                                     type: object
                                   strategy:
                                     default: Any
-                                    description: 'strategy specifies the strategy
+                                    description: "strategy specifies the strategy
                                       to select the target pod when multiple pods
-                                      are selected. Valid values are: - Any: select
+                                      are selected. Valid values are: \n - Any: select
                                       any one pod that match the labelsSelector. -
-                                      All: select all pods that match the labelsSelector.'
+                                      All: select all pods that match the labelsSelector."
                                     enum:
                                     - Any
                                     - All
@@ -528,27 +532,28 @@ spec:
                                     x-kubernetes-map-type: atomic
                                 type: object
                               role:
-                                description: 'select instance of corresponding role
-                                  for backup, role are: - the name of Leader/Follower/Leaner
-                                  for Consensus component. - primary or secondary
-                                  for Replication component. finally, invalid role
-                                  of the component will be ignored. such as if workload
-                                  type is Replication and component''s replicas is
-                                  1, the secondary role is invalid. and it also will
-                                  be ignored when component is Stateful/Stateless.
-                                  the role will be transformed to a role LabelSelector
-                                  for BackupPolicy''s target attribute.'
+                                description: "Specifies the instance of the corresponding
+                                  role for backup. The roles can be: \n - Leader,
+                                  Follower, or Leaner for the Consensus component.
+                                  - Primary or Secondary for the Replication component.
+                                  \n Invalid roles of the component will be ignored.
+                                  For example, if the workload type is Replication
+                                  and the component's replicas is 1, the secondary
+                                  role is invalid. It will also be ignored when the
+                                  component is Stateful or Stateless. \n The role
+                                  will be transformed into a role LabelSelector for
+                                  the BackupPolicy's target attribute."
                                 type: string
                               serviceAccountName:
                                 description: serviceAccountName specifies the service
                                   account to run the backup workload.
                                 type: string
                               strategy:
-                                description: 'PodSelectionStrategy specifies the strategy
-                                  to select when multiple pods are selected for backup
-                                  target. Valid values are: - Any: select any one
-                                  pod that match the labelsSelector. - All: select
-                                  all pods that match the labelsSelector.'
+                                description: "Specifies the PodSelectionStrategy to
+                                  use when multiple pods are selected for the backup
+                                  target. Valid values are: \n - Any: Selects any
+                                  one pod that matches the labelsSelector. - All:
+                                  Selects all pods that match the labelsSelector."
                                 enum:
                                 - Any
                                 - All
@@ -618,44 +623,44 @@ spec:
                         type: object
                       type: array
                     componentDefRef:
-                      description: componentDefRef references componentDef defined
-                        in ClusterDefinition spec. Need to comply with IANA Service
-                        Naming rule.
+                      description: References a componentDef defined in the ClusterDefinition
+                        spec. Must comply with the IANA Service Naming rule.
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     componentDefs:
-                      description: componentDef references componentDefinition. Need
-                        to comply with IANA Service Naming rule.
+                      description: References to componentDefinitions. Must comply
+                        with the IANA Service Naming rule.
                       items:
                         type: string
                       type: array
                     schedules:
-                      description: schedule policy for backup.
+                      description: Define the policy for backup scheduling.
                       items:
                         properties:
                           backupMethod:
-                            description: backupMethod specifies the backup method
-                              name that is defined in backupPolicy.
+                            description: Defines the backup method name that is defined
+                              in backupPolicy.
                             type: string
                           cronExpression:
-                            description: the cron expression for schedule, the timezone
-                              is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                            description: Represents the cron expression for schedule,
+                              with the timezone set in UTC. Refer to https://en.wikipedia.org/wiki/Cron
+                              for more details.
                             type: string
                           enabled:
-                            description: enabled specifies whether the backup schedule
-                              is enabled or not.
+                            description: Specifies whether the backup schedule is
+                              enabled or not.
                             type: boolean
                           retentionPeriod:
                             default: 7d
-                            description: "retentionPeriod determines a duration up
-                              to which the backup should be kept. controller will
-                              remove all backups that are older than the RetentionPeriod.
-                              For example, RetentionPeriod of `30d` will keep only
-                              the backups of last 30 days. Sample duration format:
-                              - years: \t2y - months: \t6mo - days: \t\t30d - hours:
-                              \t12h - minutes: \t30m You can also combine the above
-                              durations. For example: 30d12h30m"
+                            description: "Determines the duration for which the backup
+                              should be retained. The controller will remove all backups
+                              that are older than the RetentionPeriod. For instance,
+                              a RetentionPeriod of `30d` will retain only the backups
+                              from the last 30 days. Sample duration format: \n -
+                              years: \t2y - months: \t6mo - days: \t\t30d - hours:
+                              \t12h - minutes: \t30m \n These durations can also be
+                              combined, for example: 30d12h30m."
                             type: string
                         required:
                         - backupMethod
@@ -663,56 +668,58 @@ spec:
                         type: object
                       type: array
                     target:
-                      description: target instance for backup.
+                      description: The instance to be backed up.
                       properties:
                         account:
-                          description: refer to spec.componentDef.systemAccounts.accounts[*].name
-                            in ClusterDefinition. the secret created by this account
-                            will be used to connect the database. if not set, the
+                          description: "Refers to spec.componentDef.systemAccounts.accounts[*].name
+                            in the ClusterDefinition. The secret created by this account
+                            will be used to connect to the database. If not set, the
                             secret created by spec.ConnectionCredential of the ClusterDefinition
-                            will be used. it will be transformed to a secret for BackupPolicy's
-                            target secret.
+                            will be used. \n It will be transformed into a secret
+                            for the BackupPolicy's target secret."
                           type: string
                         connectionCredentialKey:
-                          description: connectionCredentialKey defines connection
-                            credential key in secret which created by spec.ConnectionCredential
-                            of the ClusterDefinition. it will be ignored when "account"
-                            is set.
+                          description: Defines the connection credential key in the
+                            secret created by spec.ConnectionCredential of the ClusterDefinition.
+                            It will be ignored when the "account" is set.
                           properties:
                             hostKey:
-                              description: hostKey specifies the map key of the host
-                                in the connection credential secret.
+                              description: Defines the map key of the host in the
+                                connection credential secret.
                               type: string
                             passwordKey:
-                              description: the key of password in the ConnectionCredential
-                                secret. if not set, the default key is "password".
+                              description: Represents the key of the password in the
+                                ConnectionCredential secret. If not specified, the
+                                default key "password" is used.
                               type: string
                             portKey:
-                              description: portKey specifies the map key of the port
-                                in the connection credential secret.
+                              description: Indicates the map key of the port in the
+                                connection credential secret.
                               type: string
                             usernameKey:
-                              description: the key of username in the ConnectionCredential
-                                secret. if not set, the default key is "username".
+                              description: Represents the key of the username in the
+                                ConnectionCredential secret. If not specified, the
+                                default key "username" is used.
                               type: string
                           type: object
                         role:
-                          description: 'select instance of corresponding role for
-                            backup, role are: - the name of Leader/Follower/Leaner
-                            for Consensus component. - primary or secondary for Replication
-                            component. finally, invalid role of the component will
-                            be ignored. such as if workload type is Replication and
-                            component''s replicas is 1, the secondary role is invalid.
-                            and it also will be ignored when component is Stateful/Stateless.
-                            the role will be transformed to a role LabelSelector for
-                            BackupPolicy''s target attribute.'
+                          description: "Specifies the instance of the corresponding
+                            role for backup. The roles can be: \n - Leader, Follower,
+                            or Leaner for the Consensus component. - Primary or Secondary
+                            for the Replication component. \n Invalid roles of the
+                            component will be ignored. For example, if the workload
+                            type is Replication and the component's replicas is 1,
+                            the secondary role is invalid. It will also be ignored
+                            when the component is Stateful or Stateless. \n The role
+                            will be transformed into a role LabelSelector for the
+                            BackupPolicy's target attribute."
                           type: string
                         strategy:
-                          description: 'PodSelectionStrategy specifies the strategy
-                            to select when multiple pods are selected for backup target.
-                            Valid values are: - Any: select any one pod that match
-                            the labelsSelector. - All: select all pods that match
-                            the labelsSelector.'
+                          description: "Specifies the PodSelectionStrategy to use
+                            when multiple pods are selected for the backup target.
+                            Valid values are: \n - Any: Selects any one pod that matches
+                            the labelsSelector. - All: Selects all pods that match
+                            the labelsSelector."
                           enum:
                           - Any
                           - All
@@ -726,18 +733,18 @@ spec:
                 minItems: 1
                 type: array
               clusterDefinitionRef:
-                description: clusterDefinitionRef references ClusterDefinition name,
-                  this is an immutable attribute.
+                description: Specifies a reference to the ClusterDefinition name.
+                  This is an immutable attribute that cannot be changed after creation.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
                 x-kubernetes-validations:
                 - message: clusterDefinitionRef is immutable
                   rule: self == oldSelf
               identifier:
-                description: Identifier is a unique identifier for this BackupPolicyTemplate.
-                  this identifier will be the suffix of the automatically generated
-                  backupPolicy name. and must be added when multiple BackupPolicyTemplates
-                  exist, otherwise the generated backupPolicy override will occur.
+                description: Acts as a unique identifier for this BackupPolicyTemplate.
+                  This identifier will be used as a suffix for the automatically generated
+                  backupPolicy name. It is required when multiple BackupPolicyTemplates
+                  exist to prevent backupPolicy override.
                 maxLength: 20
                 type: string
             required:
@@ -745,8 +752,8 @@ spec:
             - clusterDefinitionRef
             type: object
           status:
-            description: BackupPolicyTemplateStatus defines the observed state of
-              BackupPolicyTemplate
+            description: Populated by the system, it represents the current information
+              about the BackupPolicyTemplate.
             type: object
         type: object
     served: true

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -36,7 +35,6 @@ import (
 	"strconv"
 	"strings"
 	texttemplate "text/template"
-	"time"
 	"unicode"
 
 	"golang.org/x/text/cases"
@@ -50,14 +48,11 @@ import (
 )
 
 var (
-	flConfig      = flag.String("config", "", "path to config file")
-	flAPIDir      = flag.String("api-dir", "", "api directory (or import path), point this to pkg/apis")
-	flTemplateDir = flag.String("template-dir", "template", "path to template/ dir")
-
-	flHTTPAddr = flag.String("http-addr", "", "start an HTTP server on specified addr to view the result (e.g. :8080)")
-	flOutFile  = flag.String("out-file", "", "path to output file to save the result")
-
-	apiOrder = map[string]int{"cluster": 1, "backup": 2, "add-on": 3}
+	flConfig            = flag.String("config", "", "path to config file")
+	flAPIDir            = flag.String("api-dir", "", "api directory (or import path), point this to pkg/apis")
+	flTemplateDir       = flag.String("template-dir", "template", "path to template/ dir")
+	flOutDir            = flag.String("out-dir", "", "path to output file to save the result")
+	filterPrefixPattern = regexp.MustCompile(`^\+|TODO|FIXME`)
 )
 
 const (
@@ -82,6 +77,18 @@ type generatorConfig struct {
 
 	// MarkdownDisabled controls markdown rendering for comment lines.
 	MarkdownDisabled bool `json:"markdownDisabled"`
+
+	// PackageGroups is a list of package groups to be rendered.
+	PackageGroups []PackageGroup `json:"packageGroups"`
+}
+
+type PackageGroup struct {
+	// GroupName is the name of the package group.
+	GroupName string `json:"groupName"`
+	// Packages is a list of packages to be rendered.
+	Packages []string `json:"packages"`
+	// Order is the order of the package group.
+	Order int `json:"order"`
 }
 
 type externalPackage struct {
@@ -113,11 +120,8 @@ func init() {
 	if *flAPIDir == "" {
 		panic("-api-dir not specified")
 	}
-	if *flHTTPAddr == "" && *flOutFile == "" {
+	if *flOutDir == "" {
 		panic("-out-file or -http-addr must be specified")
-	}
-	if *flHTTPAddr != "" && *flOutFile != "" {
-		panic("only -out-file or -http-addr can be specified")
 	}
 	if err := resolveTemplateDir(*flTemplateDir); err != nil {
 		panic(err)
@@ -161,14 +165,14 @@ func main() {
 		klog.Fatalf("no API packages found in %s", *flAPIDir)
 	}
 
-	apiPackages, err := combineAPIPackages(pkgs)
+	allAPIPackages, err := combineAPIPackages(pkgs)
 	if err != nil {
 		klog.Fatal(err)
 	}
 
-	mkOutput := func() (string, error) {
+	mkOutput := func(groupName string, groupAPIPakcages []*apiPackage) (string, error) {
 		var b bytes.Buffer
-		err := render(&b, apiPackages, config)
+		err := render(&b, groupName, groupAPIPakcages, config)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to render the result")
 		}
@@ -178,38 +182,32 @@ func main() {
 		return s, nil
 	}
 
-	if *flOutFile != "" {
-		dir := filepath.Dir(*flOutFile)
+	for _, pg := range config.PackageGroups {
+		klog.Infof("using group: %s with packages: %s", pg.GroupName, pg.Packages)
+		var groupAPIPakcages []*apiPackage
+		for _, pkg := range allAPIPackages {
+			for _, groupPkg := range pg.Packages {
+				if pkg.apiGroup == groupPkg {
+					groupAPIPakcages = append(groupAPIPakcages, pkg)
+				}
+			}
+		}
+
+		outfile := fmt.Sprintf("%s%s.md", *flOutDir, pg.GroupName)
+		dir := filepath.Dir(outfile)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			klog.Fatalf("failed to create dir %s: %v", dir, err)
 		}
-		s, err := mkOutput()
+		s, err := mkOutput(pg.GroupName, groupAPIPakcages)
 		if err != nil {
 			klog.Fatalf("failed: %+v", err)
 		}
-		if err := os.WriteFile(*flOutFile, []byte(s), 0644); err != nil {
+		if err := os.WriteFile(outfile, []byte(s), 0644); err != nil {
 			klog.Fatalf("failed to write to out file: %v", err)
 		}
-		klog.Infof("written to %s", *flOutFile)
+		klog.Infof("written to %s\n", outfile)
 	}
 
-	if *flHTTPAddr != "" {
-		h := func(w http.ResponseWriter, r *http.Request) {
-			now := time.Now()
-			defer func() { klog.Infof("request took %v", time.Since(now)) }()
-			s, err := mkOutput()
-			if err != nil {
-				_, _ = fmt.Fprintf(w, "error: %+v", err)
-				klog.Warningf("failed: %+v", err)
-			}
-			if _, err := fmt.Fprint(w, s); err != nil {
-				klog.Warningf("response write error: %v", err)
-			}
-		}
-		http.HandleFunc("/", h)
-		klog.Infof("server listening at %s", *flHTTPAddr)
-		klog.Fatal(http.ListenAndServe(*flHTTPAddr, nil))
-	}
 }
 
 // groupName extracts the "//+groupName" meta-comment from the specified
@@ -254,7 +252,6 @@ func parseAPIPackages() ([]*types.Package, error) {
 	sort.Strings(pkgNames)
 	var pkgs []*types.Package
 	for _, p := range pkgNames {
-		klog.Infof("using package=%s", p)
 		pkgs = append(pkgs, scan[p])
 	}
 	return pkgs, nil
@@ -368,7 +365,6 @@ func renderComments(s []string, markdown bool) string {
 
 	if markdown {
 		doc = string(blackfriday.Run([]byte(doc)))
-		doc = strings.ReplaceAll(doc, "\n", string(template.HTML("<br />")))
 		doc = strings.ReplaceAll(doc, "{", string(template.HTML("&#123;")))
 		doc = strings.ReplaceAll(doc, "}", string(template.HTML("&#125;")))
 		return doc
@@ -596,7 +592,7 @@ func visibleTypes(in []*types.Type, c generatorConfig) []*types.Type {
 func filterCommentTags(comments []string) []string {
 	var out []string
 	for _, v := range comments {
-		if !strings.HasPrefix(strings.TrimSpace(v), "+") {
+		if !filterPrefixPattern.MatchString(v) {
 			out = append(out, v)
 		}
 	}
@@ -649,14 +645,16 @@ func constantsOfType(t *types.Type, pkg *apiPackage) []*types.Type {
 	return sortTypes(constants)
 }
 
-func getAPIOrder(filename string) int {
-	if order, ok := apiOrder[filename]; ok {
-		return order
+func getAPIDocOrder(filename string, pg []PackageGroup) int {
+	for _, p := range pg {
+		if filename == p.GroupName {
+			return p.Order
+		}
 	}
 	return 1000
 }
 
-func render(w io.Writer, pkgs []*apiPackage, config generatorConfig) error {
+func render(w io.Writer, groupName string, pkgs []*apiPackage, config generatorConfig) error {
 	references := findTypeReferences(pkgs)
 	typePkgMap := extractTypeToPackageMap(pkgs)
 
@@ -695,12 +693,11 @@ func render(w io.Writer, pkgs []*apiPackage, config generatorConfig) error {
 		return errors.Wrap(err, "parse error")
 	}
 
-	apiName := strings.Split(filepath.Base(*flOutFile), ".")[0]
-	filerOrder := getAPIOrder(apiName)
+	filerOrder := getAPIDocOrder(groupName, config.PackageGroups)
 
 	return errors.Wrap(t.ExecuteTemplate(w, "packages", map[string]interface{}{
 		"packages":   pkgs,
-		"apiName":    apiName,
+		"apiName":    groupName,
 		"filerOrder": filerOrder,
 	}), "template execution error")
 }

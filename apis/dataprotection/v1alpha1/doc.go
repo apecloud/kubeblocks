@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -16,8 +16,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-//go:generate go run ../../../hack/docgen/api/main.go -api-dir . -config ../../../hack/docgen/api/gen-api-doc-config.json -template-dir ../../../hack/docgen/api/template -out-file ../../../docs/user_docs/api-reference/backup.md
 
 // +k8s:deepcopy-gen=package,register
 // +k8s:openapi-gen=true

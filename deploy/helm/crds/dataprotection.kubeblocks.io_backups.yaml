@@ -88,16 +88,16 @@ spec:
                   - Delete
                   - Retain
                 default: Delete
-                description: 'deletionPolicy determines whether the backup contents
+                description: "deletionPolicy determines whether the backup contents
                   stored in backup repository should be deleted when the backup custom
-                  resource is deleted. Supported values are "Retain" and "Delete".
-                  "Retain" means that the backup can not be deleted and remains in
-                  ''Deleting'' phase. "Delete" means that the backup content and its
-                  physical snapshot on backup repository are deleted. TODO: for the
-                  retain policy, we should support in the future for only deleting
-                  the backup custom objects but retaining the backup contents in backup
-                  repository. The current implementation only prevent accidental deletion
-                  of backup data.'
+                  resource is deleted. Supported values are `Retain` and `Delete`.
+                  \n - `Retain` means that the backup content and its physical snapshot
+                  on backup repository are kept. - `Delete` means that the backup
+                  content and its physical snapshot on backup repository are deleted.
+                  \n TODO: for the retain policy, we should support in the future
+                  for only deleting the backup custom objects but retaining the backup
+                  contents in backup repository. The current implementation only prevent
+                  accidental deletion of backup data."
                 type: string
               parentBackupName:
                 description: parentBackupName determines the parent backup name for
@@ -111,9 +111,9 @@ spec:
                   backup should be kept. Controller will remove all backups that are
                   older than the RetentionPeriod. For example, RetentionPeriod of
                   `30d` will keep only the backups of last 30 days. Sample duration
-                  format: - years: \t2y - months: \t6mo - days: \t\t30d - hours: \t12h
-                  - minutes: \t30m You can also combine the above durations. For example:
-                  30d12h30m. If not set, the backup will be kept forever."
+                  format: \n - years: \t2y - months: \t6mo - days: \t\t30d - hours:
+                  \t12h - minutes: \t30m \n You can also combine the above durations.
+                  For example: 30d12h30m. If not set, the backup will be kept forever."
                 type: string
             required:
             - backupMethod
@@ -513,11 +513,11 @@ spec:
                             type: object
                           strategy:
                             default: Any
-                            description: 'strategy specifies the strategy to select
+                            description: "strategy specifies the strategy to select
                               the target pod when multiple pods are selected. Valid
-                              values are: - Any: select any one pod that match the
-                              labelsSelector. - All: select all pods that match the
-                              labelsSelector.'
+                              values are: \n - Any: select any one pod that match
+                              the labelsSelector. - All: select all pods that match
+                              the labelsSelector."
                             enum:
                             - Any
                             - All
@@ -797,10 +797,10 @@ spec:
                         type: object
                       strategy:
                         default: Any
-                        description: 'strategy specifies the strategy to select the
+                        description: "strategy specifies the strategy to select the
                           target pod when multiple pods are selected. Valid values
-                          are: - Any: select any one pod that match the labelsSelector.
-                          - All: select all pods that match the labelsSelector.'
+                          are: \n - Any: select any one pod that match the labelsSelector.
+                          - All: select all pods that match the labelsSelector."
                         enum:
                         - Any
                         - All

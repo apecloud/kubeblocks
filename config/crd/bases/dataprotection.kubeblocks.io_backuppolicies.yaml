@@ -337,11 +337,11 @@ spec:
                               type: object
                             strategy:
                               default: Any
-                              description: 'strategy specifies the strategy to select
+                              description: "strategy specifies the strategy to select
                                 the target pod when multiple pods are selected. Valid
-                                values are: - Any: select any one pod that match the
-                                labelsSelector. - All: select all pods that match
-                                the labelsSelector.'
+                                values are: \n - Any: select any one pod that match
+                                the labelsSelector. - All: select all pods that match
+                                the labelsSelector."
                               enum:
                               - Any
                               - All
@@ -575,10 +575,10 @@ spec:
                         type: object
                       strategy:
                         default: Any
-                        description: 'strategy specifies the strategy to select the
+                        description: "strategy specifies the strategy to select the
                           target pod when multiple pods are selected. Valid values
-                          are: - Any: select any one pod that match the labelsSelector.
-                          - All: select all pods that match the labelsSelector.'
+                          are: \n - Any: select any one pod that match the labelsSelector.
+                          - All: select all pods that match the labelsSelector."
                         enum:
                         - Any
                         - All
@@ -661,14 +661,14 @@ spec:
                 type: object
               useKopia:
                 default: false
-                description: 'useKopia specifies whether backup data should be stored
-                  in a Kopia repository. Data within the Kopia repository is both
+                description: "useKopia specifies whether backup data should be stored
+                  in a Kopia repository. \n Data within the Kopia repository is both
                   compressed and encrypted. Furthermore, data deduplication is implemented
                   across various backups of the same cluster. This approach significantly
                   reduces the actual storage usage, particularly for clusters with
-                  a low update frequency. NOTE: This feature should NOT be enabled
+                  a low update frequency. \n NOTE: This feature should NOT be enabled
                   when using KubeBlocks Community Edition, otherwise the backup will
-                  not be processed.'
+                  not be processed."
                 type: boolean
             required:
             - backupMethods

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -88,11 +88,9 @@ func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemD
 func (p *pipeline) Prepare() *pipeline {
 	buildTemplate := func() (err error) {
 		ctx := p.ctx
-		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, ctx.Cluster, p.Context, p.Client, ctx.Cache)
+		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.Context, p.Client)
 		// Prepare built-in objects and built-in functions
-		if err = templateBuilder.injectBuiltInObjectsAndFunctions(ctx.PodSpec, ctx.Component.ConfigTemplates, ctx.Component, ctx.Cache); err != nil {
-			return
-		}
+		templateBuilder.injectBuiltInObjectsAndFunctions(ctx.PodSpec, ctx.Component.ConfigTemplates, ctx.Component, ctx.Cache, ctx.Cluster)
 		p.renderWrapper = newTemplateRenderWrapper(templateBuilder, ctx.Cluster, p.Context, ctx.Client)
 		return
 	}
@@ -256,11 +254,10 @@ func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 		if p.isDone() {
 			return
 		}
-		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.ctx.Cluster, p.Context, p.Client, p.ctx.Cache)
+		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.Context, p.Client)
 		// Prepare built-in objects and built-in functions
-		if err = templateBuilder.injectBuiltInObjectsAndFunctions(p.ctx.PodSpec, []appsv1alpha1.ComponentConfigSpec{*p.configSpec}, p.ctx.Component, p.ctx.Cache); err != nil {
-			return
-		}
+		templateBuilder.injectBuiltInObjectsAndFunctions(p.ctx.PodSpec,
+			[]appsv1alpha1.ComponentConfigSpec{*p.configSpec}, p.ctx.Component, p.ctx.Cache, p.ctx.Cluster)
 		p.renderWrapper = newTemplateRenderWrapper(templateBuilder, p.ctx.Cluster, p.Context, p.Client)
 		return
 	}

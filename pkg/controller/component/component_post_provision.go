@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -50,6 +50,11 @@ const (
 	kbCompPostStartDoneKeyPattern = "kubeblocks.io/%s-poststart-done"
 	// kbCompPostProvisionDoneKey is used to mark the component postProvision job is done
 	kbCompPostProvisionDoneKey = "kubeblocks.io/post-provision-done"
+
+	kbPostProvisionClusterPodNameList     = "KB_CLUSTER_POD_NAME_LIST"
+	kbPostProvisionClusterPodIPList       = "KB_CLUSTER_POD_IP_LIST"
+	kbPostProvisionClusterPodHostNameList = "KB_CLUSTER_POD_HOST_NAME_LIST"
+	kbPostProvisionClusterPodHostIPList   = "KB_CLUSTER_POD_HOST_IP_LIST"
 
 	kbPostProvisionClusterCompList            = "KB_CLUSTER_COMPONENT_LIST"
 	kbPostProvisionClusterCompPodNameList     = "KB_CLUSTER_COMPONENT_POD_NAME_LIST"
@@ -287,7 +292,7 @@ func renderPostProvisionCmdJob(ctx context.Context,
 		return job, nil
 	}
 
-	envs, envFroms, err := buildPostProvisionEnvs(cluster, synthesizeComp, pods, &tplPod)
+	envs, envFroms, err := buildPostProvisionEnvs(ctx, cli, cluster, synthesizeComp, pods, &tplPod)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +306,9 @@ func renderPostProvisionCmdJob(ctx context.Context,
 }
 
 // buildPostProvisionEnvs builds the postProvision command job envs.
-func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
+func buildPostProvisionEnvs(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent,
 	pods []corev1.Pod,
 	tplPod *corev1.Pod) ([]corev1.EnvVar, []corev1.EnvFromSource, error) {
@@ -319,39 +326,65 @@ func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
 		workloadEnvFroms = append(workloadEnvFroms, tplPod.Spec.Containers[0].EnvFrom...)
 	}
 
-	compEnvs := genClusterComponentEnv(cluster, pods)
-	if len(compEnvs) > 0 {
-		workloadEnvs = append(workloadEnvs, compEnvs...)
+	genEnvs, err := genClusterNComponentEnvs(ctx, cli, cluster, pods)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(genEnvs) > 0 {
+		workloadEnvs = append(workloadEnvs, genEnvs...)
 	}
 
 	return workloadEnvs, workloadEnvFroms, nil
 }
 
-// genClusterComponentEnv generates the cluster component relative envs.
-func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []corev1.EnvVar {
-	if cluster == nil || cluster.Spec.ComponentSpecs == nil {
-		return nil
+// genClusterNComponentEnvs generates the cluster and component relative envs.
+func genClusterNComponentEnvs(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, pods []corev1.Pod) ([]corev1.EnvVar, error) {
+	if cluster == nil || (cluster.Spec.ComponentSpecs == nil && cluster.Spec.ShardingSpecs == nil) {
+		return nil, nil
 	}
-	compEnvs := make([]corev1.EnvVar, 0)
-	compList := make([]string, 0, len(cluster.Spec.ComponentSpecs))
-	compPodNameList := make([]string, 0, len(pods))
-	compPodIPList := make([]string, 0, len(pods))
-	compHostNameList := make([]string, 0, len(pods))
-	compHostIPList := make([]string, 0, len(pods))
 
+	compList := make([]string, 0)
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compList = append(compList, compSpec.Name)
 	}
-	compEnvs = append(compEnvs, corev1.EnvVar{
-		Name:  kbPostProvisionClusterCompList,
-		Value: strings.Join(compList, ","),
-	})
 
-	for _, pod := range pods {
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		shardingCompNames, err := intctrlutil.ListShardingCompNames(ctx, cli, cluster, &shardingSpec)
+		if err != nil {
+			return nil, err
+		}
+		compList = append(compList, shardingCompNames...)
+	}
+
+	envs := make([]corev1.EnvVar, 0)
+	compEnvs, err := genComponentEnvs(pods)
+	if err != nil {
+		return nil, err
+	}
+	envs = append(envs, compEnvs...)
+
+	clusterEnvs, err := genClusterEnvs(ctx, cli, cluster, compList)
+	if err != nil {
+		return nil, err
+	}
+	envs = append(envs, clusterEnvs...)
+
+	return envs, nil
+}
+
+// genComponentEnvs generates the current component scope relative envs.
+func genComponentEnvs(compPods []corev1.Pod) ([]corev1.EnvVar, error) {
+	compEnvs := make([]corev1.EnvVar, 0)
+	compPodNameList := make([]string, 0, len(compPods))
+	compPodIPList := make([]string, 0, len(compPods))
+	compPodHostNameList := make([]string, 0, len(compPods))
+	compPodHostIPList := make([]string, 0, len(compPods))
+
+	for _, pod := range compPods {
 		compPodNameList = append(compPodNameList, pod.Name)
 		compPodIPList = append(compPodIPList, pod.Status.PodIP)
-		compHostNameList = append(compHostNameList, pod.Spec.NodeName)
-		compHostIPList = append(compHostIPList, pod.Status.HostIP)
+		compPodHostNameList = append(compPodHostNameList, pod.Spec.NodeName)
+		compPodHostIPList = append(compPodHostIPList, pod.Status.HostIP)
 	}
 	compEnvs = append(compEnvs, []corev1.EnvVar{
 		{
@@ -364,14 +397,64 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []
 		},
 		{
 			Name:  kbPostProvisionClusterCompPodHostNameList,
-			Value: strings.Join(compHostNameList, ","),
+			Value: strings.Join(compPodHostNameList, ","),
 		},
 		{
 			Name:  kbPostProvisionClusterCompPodHostIPList,
-			Value: strings.Join(compHostIPList, ","),
+			Value: strings.Join(compPodHostIPList, ","),
 		}}...)
 
-	return compEnvs
+	return compEnvs, nil
+}
+
+// genClusterEnvs generates the cluster scope relative envs.
+func genClusterEnvs(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, clusterComps []string) ([]corev1.EnvVar, error) {
+	clusterPods := make([]corev1.Pod, 0)
+	for _, compName := range clusterComps {
+		compPodList, err := GetComponentPodList(ctx, cli, *cluster, compName)
+		if err != nil {
+			return nil, err
+		}
+		if compPodList == nil || len(compPodList.Items) == 0 {
+			continue
+		}
+		clusterPods = append(clusterPods, compPodList.Items...)
+	}
+	clusterEnvs := make([]corev1.EnvVar, 0)
+	clusterPodNameList := make([]string, 0, len(clusterPods))
+	clusterPodIPList := make([]string, 0, len(clusterPods))
+	clusterPodHostNameList := make([]string, 0, len(clusterPods))
+	clusterPodHostIPList := make([]string, 0, len(clusterPods))
+
+	for _, pod := range clusterPods {
+		clusterPodNameList = append(clusterPodNameList, pod.Name)
+		clusterPodIPList = append(clusterPodIPList, pod.Status.PodIP)
+		clusterPodHostNameList = append(clusterPodHostNameList, pod.Spec.NodeName)
+		clusterPodHostIPList = append(clusterPodHostIPList, pod.Status.HostIP)
+	}
+	clusterEnvs = append(clusterEnvs, corev1.EnvVar{
+		Name:  kbPostProvisionClusterCompList,
+		Value: strings.Join(clusterComps, ","),
+	})
+	clusterEnvs = append(clusterEnvs, []corev1.EnvVar{
+		{
+			Name:  kbPostProvisionClusterPodNameList,
+			Value: strings.Join(clusterPodNameList, ","),
+		},
+		{
+			Name:  kbPostProvisionClusterPodIPList,
+			Value: strings.Join(clusterPodIPList, ","),
+		},
+		{
+			Name:  kbPostProvisionClusterPodHostNameList,
+			Value: strings.Join(clusterPodHostNameList, ","),
+		},
+		{
+			Name:  kbPostProvisionClusterPodHostIPList,
+			Value: strings.Join(clusterPodHostIPList, ","),
+		}}...)
+
+	return clusterEnvs, nil
 }
 
 // genPostProvisionJobName generates the postProvision job name.

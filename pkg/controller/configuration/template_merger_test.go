@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -105,15 +105,15 @@ max_connections=666
 
 		templateBuilder = newTemplateBuilder(
 			testClusterName,
-			"default",
+			"default", nil, nil)
+		templateBuilder.injectBuiltInObjectsAndFunctions(
+			&corev1.PodSpec{}, nil, &component.SynthesizedComponent{}, nil,
 			&appsv1alpha1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testClusterName,
 					Namespace: "default",
 				},
-			}, nil, nil, nil)
-		Expect(templateBuilder.injectBuiltInObjectsAndFunctions(
-			&corev1.PodSpec{}, nil, &component.SynthesizedComponent{}, nil)).Should(Succeed())
+			})
 
 		mockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
 			baseCMObject,

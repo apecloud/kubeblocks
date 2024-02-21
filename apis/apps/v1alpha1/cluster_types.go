@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,11 +49,13 @@ type ClusterSpec struct {
 	// +optional
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
 
-	// Cluster termination policy. Valid values are DoNotTerminate, Halt, Delete, WipeOut.
-	// DoNotTerminate will block delete operation.
-	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
-	// Delete is based on Halt and deletes PVCs.
-	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
+	// Cluster termination policy. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.
+	//
+	// - DoNotTerminate will block delete operation.
+	// - Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
+	// - Delete is based on Halt and deletes PVCs.
+	// - WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
+	//
 	// +kubebuilder:validation:Required
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
@@ -138,18 +140,21 @@ type ClusterBackup struct {
 	// controller will remove all backups that are older than the RetentionPeriod.
 	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
 	// Sample duration format:
+	//
 	// - years: 	2y
 	// - months: 	6mo
 	// - days: 		30d
 	// - hours: 	12h
 	// - minutes: 	30m
+	//
 	// You can also combine the above durations. For example: 30d12h30m
+	//
 	// +kubebuilder:default="7d"
 	// +optional
 	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
 
 	// backup method name to use, that is defined in backupPolicy.
-	// +optional
+	// +kubebuilder:validation:Required
 	Method string `json:"method"`
 
 	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
@@ -257,15 +262,17 @@ type ClusterStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// phase describes the phase of the Cluster, the detail information of the phases are as following:
-	// Creating: all components are in `Creating` phase.
-	// Running: all components are in `Running` phase, means the cluster is working well.
-	// Updating: all components are in `Creating`, `Running` or `Updating` phase,
-	// and at least one component is in `Creating` or `Updating` phase, means the cluster is doing an update.
-	// Stopping: at least one component is in `Stopping` phase, means the cluster is in a stop progress.
-	// Stopped: all components are in 'Stopped` phase, means the cluster has stopped and didn't provide any function anymore.
-	// Failed: all components are in `Failed` phase, means the cluster is unavailable.
-	// Abnormal: some components are in `Failed` or `Abnormal` phase, means the cluster in a fragile state. troubleshoot need to be done.
-	// Deleting: the cluster is being deleted.
+	//
+	// - Creating: all components are in `Creating` phase.
+	// - Running: all components are in `Running` phase, means the cluster is working well.
+	// - Updating: all components are in `Creating`, `Running` or `Updating` phase,
+	//   and at least one component is in `Creating` or `Updating` phase, means the cluster is doing an update.
+	// - Stopping: at least one component is in `Stopping` phase, means the cluster is in a stop progress.
+	// - Stopped: all components are in `Stopped` phase, means the cluster has stopped and didn't provide any function anymore.
+	// - Failed: all components are in `Failed` phase, means the cluster is unavailable.
+	// - Abnormal: some components are in `Failed` or `Abnormal` phase, means the cluster in a fragile state. troubleshoot need to be done.
+	// - Deleting: the cluster is being deleted.
+	//
 	// +optional
 	Phase ClusterPhase `json:"phase,omitempty"`
 
@@ -289,7 +296,7 @@ type ClusterStatus struct {
 // ShardingSpec defines the sharding spec.
 type ShardingSpec struct {
 	// name defines sharding name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
-	// The name is also used to generate the name of the underlying components with the naming pattern <ShardingSpec.Name>-<ShardID>.
+	// The name is also used to generate the name of the underlying components with the naming pattern `$(ShardingSpec.Name)-$(ShardID)`.
 	// At the same time, the name of component template defined in ShardingSpec.Template.Name will be ignored.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=15
@@ -303,12 +310,15 @@ type ShardingSpec struct {
 	Template ClusterComponentSpec `json:"template"`
 
 	// shards indicates the number of component, and these components have the same specifications and definitions.
+	//
 	// It should be noted that the number of replicas for each component should be defined by template.replicas.
 	// Moreover, the logical relationship between these components should be maintained by the components themselves,
 	// KubeBlocks only provides the following capabilities for managing the lifecycle of sharding:
+	//
 	// 1. When the number of shards increases, the postProvision Action defined in the ComponentDefinition will be executed if the conditions are met.
 	// 2. When the number of shards decreases, the preTerminate Action defined in the ComponentDefinition will be executed if the conditions are met.
 	//    Additionally, the resources and data associated with the corresponding Component will be deleted as well.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=2048
@@ -317,21 +327,21 @@ type ShardingSpec struct {
 
 // ClusterComponentSpec defines the cluster component spec.
 // +kubebuilder:validation:XValidation:rule="has(self.componentDefRef) || has(self.componentDef)",message="either componentDefRef or componentDef should be provided"
-// //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
-// //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
+// TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
+// TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
 	// When ClusterComponentSpec is referenced as a template, name is optional. Otherwise, it is required.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	// +optional
 	Name string `json:"name"`
 
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to comply with IANA Service Naming rule.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
@@ -339,7 +349,7 @@ type ClusterComponentSpec struct {
 	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
 
@@ -349,10 +359,13 @@ type ClusterComponentSpec struct {
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
 	// serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
-	// Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
-	// Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
+	//
+	// - Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
+	// - Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
+	//
 	// Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
 	// It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.
+	//
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
@@ -453,14 +466,15 @@ type ComponentMessageMap map[string]string
 // ClusterComponentStatus records components status.
 type ClusterComponentStatus struct {
 	// phase describes the phase of the component and the detail information of the phases are as following:
-	// Creating: `Creating` is a special `Updating` with previous phase `empty`(means "") or `Creating`.
-	// Running: component replicas > 0 and all pod specs are latest with a Running state.
-	// Updating: component replicas > 0 and has no failed pods. the component is being updated.
-	// Abnormal: component replicas > 0 but having some failed pods. the component basically works but in a fragile state.
-	// Failed: component replicas > 0 but having some failed pods. the component doesn't work anymore.
-	// Stopping: component replicas = 0 and has terminating pods.
-	// Stopped: component replicas = 0 and all pods have been deleted.
-	// Deleting: the component is being deleted.
+	//
+	// - Creating: `Creating` is a special `Updating` with previous phase `empty`(means "") or `Creating`.
+	// - Running: component replicas > 0 and all pod specs are latest with a Running state.
+	// - Updating: component replicas > 0 and has no failed pods. the component is being updated.
+	// - Abnormal: component replicas > 0 but having some failed pods. the component basically works but in a fragile state.
+	// - Failed: component replicas > 0 but having some failed pods. the component doesn't work anymore.
+	// - Stopping: component replicas = 0 and has terminating pods.
+	// - Stopped: component replicas = 0 and all pods have been deleted.
+	// - Deleting: the component is being deleted.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
@@ -486,9 +500,11 @@ type ClusterSwitchPolicy struct {
 	// TODO other attribute extensions
 
 	// clusterSwitchPolicy defines type of the switchPolicy when workloadType is Replication.
-	// MaximumAvailability: [WIP] when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately. It will be available in future versions.
-	// MaximumDataProtection: [WIP] when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch. It will be available in future versions.
-	// Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves or integrate open source HA solution.
+	//
+	// - MaximumAvailability: [WIP] when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately. It will be available in future versions.
+	// - MaximumDataProtection: [WIP] when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch. It will be available in future versions.
+	// - Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves or integrate open source HA solution.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Noop
 	// +optional
@@ -569,8 +585,9 @@ type Affinity struct {
 	// topologyKey is the key of node labels.
 	// Nodes that have a label with this key and identical values are considered to be in the same topology.
 	// It's used as the topology domain for pod anti-affinity and pod spread constraint.
-	// Some well-known label keys, such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
+	// Some well-known label keys, such as `kubernetes.io/hostname` and `topology.kubernetes.io/zone`
 	// are often used as TopologyKey, as well as any other custom label key.
+	//
 	// +listType=set
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`
@@ -600,8 +617,10 @@ type TLSConfig struct {
 type Issuer struct {
 	// Name of issuer.
 	// Options supported:
+	//
 	// - KubeBlocks - Certificates signed by KubeBlocks Operator.
 	// - UserProvided - User provided own CA-signed certificates.
+	//
 	// +kubebuilder:validation:Enum={KubeBlocks, UserProvided}
 	// +kubebuilder:default=KubeBlocks
 	// +kubebuilder:validation:Required
@@ -640,18 +659,21 @@ type ClusterComponentService struct {
 
 	// serviceType determines how the Service is exposed. Valid
 	// options are ClusterIP, NodePort, and LoadBalancer.
-	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
-	// to endpoints. Endpoints are determined by the selector or if that is not
-	// specified, they are determined by manual construction of an Endpoints object or
-	// EndpointSlice objects. If clusterIP is "None", no virtual IP is
-	// allocated and the endpoints are published as a set of endpoints rather
-	// than a virtual IP.
-	// "NodePort" builds on ClusterIP and allocates a port on every node which
-	// routes to the same endpoints as the clusterIP.
-	// "LoadBalancer" builds on NodePort and creates an external load-balancer
-	// (if supported in the current cloud) which routes to the same endpoints
-	// as the clusterIP.
+	//
+	// - `ClusterIP` allocates a cluster-internal IP address for load-balancing
+	//   to endpoints. Endpoints are determined by the selector or if that is not
+	//   specified, they are determined by manual construction of an Endpoints object or
+	//   EndpointSlice objects. If clusterIP is "None", no virtual IP is
+	//   allocated and the endpoints are published as a set of endpoints rather
+	//   than a virtual IP.
+	// - `NodePort` builds on ClusterIP and allocates a port on every node which
+	//   routes to the same endpoints as the clusterIP.
+	// - `LoadBalancer` builds on NodePort and creates an external load-balancer
+	//   (if supported in the current cloud) which routes to the same endpoints
+	//   as the clusterIP.
+	//
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.
+	//
 	// +kubebuilder:default=ClusterIP
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -708,19 +730,25 @@ type ServiceRef struct {
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 
 	// When referencing a service provided by other KubeBlocks cluster, you need to provide the name of the Cluster being referenced.
+	//
 	// By default, when other KubeBlocks Cluster are referenced, the ClusterDefinition.spec.connectionCredential secret corresponding to the referenced Cluster will be used to bind to the current component.
 	// Currently, if a KubeBlocks cluster is to be referenced, the connection credential secret should include and correspond to the following fields: endpoint, port, username, and password.
+	//
 	// Under this referencing approach, the ServiceKind and ServiceVersion of service reference declaration defined in the ClusterDefinition will not be validated.
 	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
+	//
 	// +optional
 	Cluster string `json:"cluster,omitempty"`
 
 	// serviceDescriptor defines the service descriptor of the service provided by external sources.
+	//
 	// When referencing a service provided by external sources, you need to provide the ServiceDescriptor object name to establish the service binding.
-	// And serviceDescriptor is the name of the ServiceDescriptor object, furthermore, the ServiceDescriptor.spec.serviceKind and ServiceDescriptor.spec.serviceVersion
-	// should match clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind
-	// and the regular expression defines in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion.
+	// And serviceDescriptor is the name of the ServiceDescriptor object, furthermore, the `ServiceDescriptor.spec.serviceKind` and `ServiceDescriptor.spec.serviceVersion`
+	// should match `clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind`
+	// and the regular expression defines in `clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion`.
+	//
 	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
+	//
 	// +optional
 	ServiceDescriptor string `json:"serviceDescriptor,omitempty"`
 }

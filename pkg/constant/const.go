@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -292,9 +292,10 @@ const (
 	Primary   = "primary"
 	Secondary = "secondary"
 
-	Leader   = "leader"
-	Follower = "follower"
-	Learner  = "learner"
+	Leader    = "leader"
+	Follower  = "follower"
+	Learner   = "learner"
+	Candidate = "candidate"
 )
 
 // username and password are keys in created secrets for others to refer to.

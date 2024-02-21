@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -27,10 +27,12 @@ import (
 // RestoreSpec defines the desired state of Restore
 type RestoreSpec struct {
 	// backup to be restored. The restore behavior based on the backup type:
+	//
 	// 1. Full: will be restored the full backup directly.
 	// 2. Incremental: will be restored sequentially from the most recent full backup of this incremental backup.
 	// 3. Differential: will be restored sequentially from the parent backup of the differential backup.
 	// 4. Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupName"
 	Backup BackupRef `json:"backup"`
@@ -62,7 +64,9 @@ type RestoreSpec struct {
 
 	// list of environment variables to set in the container for restore and will be
 	// merged with the env of Backup and ActionSet.
-	// The priority of merging is as follows: Restore env > Backup env > ActionSet env.
+	//
+	// The priority of merging is as follows: `Restore env > Backup env > ActionSet env`.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
@@ -132,8 +136,10 @@ type PrepareDataConfig struct {
 
 	// VolumeClaimRestorePolicy defines restore policy for persistent volume claim.
 	// Supported policies are as follows:
+	//
 	// 1. Parallel: parallel recovery of persistent volume claim.
 	// 2. Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.
+	//
 	// +kubebuilder:default=Parallel
 	// +kubebuilder:validation:Required
 	VolumeClaimRestorePolicy VolumeClaimRestorePolicy `json:"volumeClaimRestorePolicy"`
@@ -227,7 +233,7 @@ type RestoreVolumeClaimsTemplate struct {
 	Templates []RestoreVolumeClaim `json:"templates"`
 
 	// the replicas of persistent volume claim which need to be created and restored.
-	// the format of created claim name is "<template-name>-<index>".
+	// the format of created claim name is `$(template-name)-$(index)`.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Required
 	Replicas int32 `json:"replicas"`
@@ -337,7 +343,7 @@ type RestoreStatusAction struct {
 	// +kubebuilder:validation:Required
 	ObjectKey string `json:"objectKey"`
 
-	// message is a human readable message indicating details about the object condition.
+	// message is a human-readable message indicating details about the object condition.
 	// +optional
 	Message string `json:"message,omitempty"`
 

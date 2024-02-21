@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -25,10 +25,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strconv"
-	"strings"
-	"unicode"
 
+	"github.com/rogpeppe/go-internal/semver"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,8 +103,7 @@ func RemoveDataProtectionFinalizer(ctx context.Context, cli client.Client, obj c
 }
 
 // GetActionSetByName gets the ActionSet by name.
-func GetActionSetByName(reqCtx intctrlutil.RequestCtx,
-	cli client.Client, name string) (*dpv1alpha1.ActionSet, error) {
+func GetActionSetByName(reqCtx intctrlutil.RequestCtx, cli client.Client, name string) (*dpv1alpha1.ActionSet, error) {
 	if name == "" {
 		return nil, nil
 	}
@@ -118,10 +115,7 @@ func GetActionSetByName(reqCtx intctrlutil.RequestCtx,
 	return as, nil
 }
 
-func GetBackupPolicyByName(
-	reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	name string) (*dpv1alpha1.BackupPolicy, error) {
+func GetBackupPolicyByName(reqCtx intctrlutil.RequestCtx, cli client.Client, name string) (*dpv1alpha1.BackupPolicy, error) {
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	key := client.ObjectKey{
 		Namespace: reqCtx.Req.Namespace,
@@ -134,9 +128,9 @@ func GetBackupPolicyByName(
 }
 
 func GetBackupMethodByName(name string, backupPolicy *dpv1alpha1.BackupPolicy) *dpv1alpha1.BackupMethod {
-	for _, m := range backupPolicy.Spec.BackupMethods {
+	for i, m := range backupPolicy.Spec.BackupMethods {
 		if m.Name == name {
-			return &m
+			return &backupPolicy.Spec.BackupMethods[i]
 		}
 	}
 	return nil
@@ -285,31 +279,15 @@ func GetFirstIndexRunningPod(podList *corev1.PodList) *corev1.Pod {
 	return nil
 }
 
-// GetKubeVersion get the version of Kubernetes and return the version major and minor
-func GetKubeVersion() (int, int, error) {
-	var err error
-	verIf := viper.Get(constant.CfgKeyServerInfo)
-	ver, ok := verIf.(version.Info)
+// GetKubeVersion get the version of Kubernetes and return the gitVersion
+func GetKubeVersion() (string, error) {
+	verInfo := viper.Get(constant.CfgKeyServerInfo)
+	ver, ok := verInfo.(version.Info)
 	if !ok {
-		return 0, 0, fmt.Errorf("failed to get kubernetes version, major %s, minor %s", ver.Major, ver.Minor)
+		return "", fmt.Errorf("failed to get kubernetes version, version info %v", verInfo)
 	}
-
-	major, err := strconv.Atoi(ver.Major)
-	if err != nil {
-		return 0, 0, err
+	if !semver.IsValid(ver.GitVersion) {
+		return "", fmt.Errorf("kubernetes version is not a valid semver, version info %v", verInfo)
 	}
-
-	// split the "normal" + and - for semver stuff to get the leading minor number
-	minorStrs := strings.FieldsFunc(ver.Minor, func(r rune) bool {
-		return !unicode.IsDigit(r)
-	})
-	if len(minorStrs) == 0 {
-		return 0, 0, fmt.Errorf("failed to get kubernetes version, major %s, minor %s", ver.Major, ver.Minor)
-	}
-
-	minor, err := strconv.Atoi(minorStrs[0])
-	if err != nil {
-		return 0, 0, err
-	}
-	return major, minor, nil
+	return semver.MajorMinor(ver.GitVersion), nil
 }

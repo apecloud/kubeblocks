@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Volume Populator Controller test", func() {
@@ -159,6 +160,12 @@ var _ = Describe("Volume Populator Controller test", func() {
 			return pv
 		}
 
+		checkJobsSA := func(jobList *batchv1.JobList) {
+			for _, job := range jobList.Items {
+				Expect(job.Spec.Template.Spec.ServiceAccountName).Should(Equal(viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)))
+			}
+		}
+
 		testVolumePopulate := func(volumeBinding storagev1.VolumeBindingMode, useVolumeSnapshotBackup bool) {
 			pvc := initResources(volumeBinding, useVolumeSnapshotBackup, true)
 
@@ -201,6 +208,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(k8sClient.List(ctx, jobList,
 				client.MatchingLabels{dprestore.DataProtectionPopulatePVCLabelKey: getPopulatePVCName(pvc.UID)},
 				client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
+			checkJobsSA(jobList)
 			testdp.ReplaceK8sJobStatus(&testCtx, client.ObjectKeyFromObject(&jobList.Items[0]), batchv1.JobComplete)
 
 			By("expect for pvc has been populated")

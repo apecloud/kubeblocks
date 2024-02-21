@@ -23,3 +23,30 @@ rules:
   {{- end }}
   {{- if eq $line "rules:" }}{{- $doInclude = true }}{{- end }}
 {{- end }}
+{{- if .Values.dataProtection.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "dataprotection.workerClusterRoleName" . }}
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+rules:
+# need to run "kubectl patch backup" inside a worker pod to update the status
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backups
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backups/status
+  verbs:
+  - get
+  - patch
+  - update
+{{- end }}

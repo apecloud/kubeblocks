@@ -79,14 +79,14 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     defaultMode:
-                      description: 'defaultMode is optional: mode bits used to set
-                        permissions on created files by default. Must be an octal
+                      description: "defaultMode is optional: mode bits used to set
+                        permissions on created files by default. \n Must be an octal
                         value between 0000 and 0777 or a decimal value between 0 and
                         511. YAML accepts both octal and decimal values, JSON requires
-                        decimal values for mode bits. Defaults to 0644. Directories
+                        decimal values for mode bits. Defaults to 0644. \n Directories
                         within the path are not affected by this setting. This might
                         be in conflict with other options that affect the file mode,
-                        like fsGroup, and the result can be other mode bits set.'
+                        like fsGroup, and the result can be other mode bits set."
                       format: int32
                       type: integer
                     keys:
@@ -408,23 +408,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -462,13 +462,13 @@ spec:
                         type: object
                     type: object
                   dataAssemble:
-                    description: 'DataAssemble defines how to assemble data synchronized
+                    description: "DataAssemble defines how to assemble data synchronized
                       from external before starting the service for a new replica.
                       This action is typically used when creating a new replica, such
-                      as: - scale-out - rebuild - clone The data will be streamed
+                      as: \n - scale-out - rebuild - clone \n The data will be streamed
                       in via stdin. If any error occurs during the assembly process,
                       the action must be able to guarantee idempotence to allow for
-                      retries from the beginning. Cannot be updated.'
+                      retries from the beginning. Cannot be updated."
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -695,23 +695,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -749,11 +749,11 @@ spec:
                         type: object
                     type: object
                   dataPopulate:
-                    description: 'DataPopulate defines how to populate the data to
+                    description: "DataPopulate defines how to populate the data to
                       create new replicas. This action is typically used when a new
-                      replica needs to be constructed, such as: - scale-out - rebuild
-                      - clone It should write the valid data to stdout without including
-                      any extraneous information. Cannot be updated.'
+                      replica needs to be constructed, such as: \n - scale-out - rebuild
+                      - clone \n It should write the valid data to stdout without
+                      including any extraneous information. Cannot be updated."
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -980,23 +980,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -1277,23 +1277,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -1575,23 +1575,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -1629,25 +1629,25 @@ spec:
                         type: object
                     type: object
                   postProvision:
-                    description: 'PostProvision defines the actions to be executed
+                    description: "PostProvision defines the actions to be executed
                       and the corresponding policy when a component is created. You
                       can define the preCondition for executing PostProvision using
                       Action.PreCondition. The default PostProvision action preCondition
                       is ComponentReady. The PostProvision Action will be executed
-                      only once. Dedicated env vars for the action: - KB_CLUSTER_COMPONENT_LIST:
-                      The list of all components in the cluster, joined by '','' (e.g.,
-                      "comp1,comp2"). - KB_CLUSTER_COMPONENT_POD_NAME_LIST: The list
-                      of all pods name in this component, joined by '','' (e.g., "pod1,pod2").
-                      - KB_CLUSTER_COMPONENT_POD_IP_LIST: The list of pod IPs where
-                      each pod resides in this component, corresponding one-to-one
-                      with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined
-                      by '','' (e.g., "podIp1,podIp2"). - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST:
+                      only once. Dedicated env vars for the action: \n - KB_CLUSTER_COMPONENT_LIST:
+                      The list of all components in the cluster, joined by ',' (e.g.,
+                      \"comp1,comp2\"). - KB_CLUSTER_COMPONENT_POD_NAME_LIST: The
+                      list of all pods name in this component, joined by ',' (e.g.,
+                      \"pod1,pod2\"). - KB_CLUSTER_COMPONENT_POD_IP_LIST: The list
+                      of pod IPs where each pod resides in this component, corresponding
+                      one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST.
+                      joined by ',' (e.g., \"podIp1,podIp2\"). - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST:
                       The list of hostName where each pod resides in this component,
                       corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST.
-                      joined by '','' (e.g., "hostName1,hostName2"). - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST:
+                      joined by ',' (e.g., \"hostName1,hostName2\"). - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST:
                       The list of host IPs where each pod resides in this component,
                       corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST.
-                      joined by '','' (e.g., "hostIp1,hostIp2"). Cannot be updated.'
+                      joined by ',' (e.g., \"hostIp1,hostIp2\"). \n Cannot be updated."
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -1874,23 +1874,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -2161,23 +2161,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -2456,23 +2456,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -2749,23 +2749,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -3031,23 +3031,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -3336,23 +3336,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -3406,23 +3406,24 @@ spec:
                         type: integer
                     type: object
                   switchover:
-                    description: 'Switchover defines how to proactively switch the
+                    description: "Switchover defines how to proactively switch the
                       current leader to a new replica to minimize the impact on availability.
                       This action is typically invoked when the leader is about to
-                      become unavailable due to events, such as: - switchover - stop
-                      - restart - scale-in Dedicated env vars for the action: - KB_SWITCHOVER_CANDIDATE_NAME:
-                      The name of the new candidate replica''s Pod. It may be empty.
-                      - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new candidate
-                      replica. It may be empty. - KB_LEADER_POD_IP: The IP address
-                      of the original leader''s Pod before switchover. - KB_LEADER_POD_NAME:
-                      The name of the original leader''s Pod before switchover. -
-                      KB_LEADER_POD_FQDN: The FQDN of the original leader''s Pod before
-                      switchover. The env vars with following prefix are deprecated
-                      and will be removed in the future: - KB_REPLICATION_PRIMARY_POD_:
-                      The prefix of the environment variables of the original primary''s
-                      Pod before switchover. - KB_CONSENSUS_LEADER_POD_: The prefix
-                      of the environment variables of the original leader''s Pod before
-                      switchover. Cannot be updated.'
+                      become unavailable due to events, such as: \n - switchover -
+                      stop - restart - scale-in \n Dedicated env vars for the action:
+                      \n - KB_SWITCHOVER_CANDIDATE_NAME: The name of the new candidate
+                      replica's Pod. It may be empty. - KB_SWITCHOVER_CANDIDATE_FQDN:
+                      The FQDN of the new candidate replica. It may be empty. - KB_LEADER_POD_IP:
+                      The IP address of the original leader's Pod before switchover.
+                      - KB_LEADER_POD_NAME: The name of the original leader's Pod
+                      before switchover. - KB_LEADER_POD_FQDN: The FQDN of the original
+                      leader's Pod before switchover. \n The env vars with following
+                      prefix are deprecated and will be removed in the future: \n
+                      - KB_REPLICATION_PRIMARY_POD_: The prefix of the environment
+                      variables of the original primary's Pod before switchover. -
+                      KB_CONSENSUS_LEADER_POD_: The prefix of the environment variables
+                      of the original leader's Pod before switchover. \n Cannot be
+                      updated."
                     properties:
                       scriptSpecSelectors:
                         description: scriptSpecSelectors defines the selector of the
@@ -3660,23 +3661,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -3932,23 +3933,23 @@ spec:
                               matchingKey will be chosen. Cannot be updated.
                             type: string
                           preCondition:
-                            description: 'PreCondition defines the condition when
-                              the action will be executed. - Immediately: The Action
+                            description: "PreCondition defines the condition when
+                              the action will be executed. \n - Immediately: The Action
                               is executed immediately after the Component object is
                               created, without guaranteeing the availability of the
                               Component and its underlying resources. only after the
-                              action is successfully executed will the Component''s
+                              action is successfully executed will the Component's
                               state turn to ready. - RuntimeReady: The Action is executed
                               after the Component object is created and once all underlying
                               Runtimes are ready. only after the action is successfully
-                              executed will the Component''s state turn to ready.
-                              - ComponentReady: The Action is executed after the Component
+                              executed will the Component's state turn to ready. -
+                              ComponentReady: The Action is executed after the Component
                               object is created and once the Component is ready. the
                               execution process does not impact the state of the Component
                               and the Cluster. - ClusterReady: The Action is executed
                               after the Cluster object is created and once the Cluster
-                              is ready. the execution process does not impact the
-                              state of the Component and the Cluster. Cannot be updated.'
+                              is ready. \n the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated."
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -4173,12 +4174,12 @@ spec:
                   type: object
                 type: array
               runtime:
-                description: 'Runtime defines primarily runtime information for the
-                  component, including: - Init containers - Containers - Image - Commands
-                  - Args - Envs - Mounts - Ports - Security context - Probes - Lifecycle
-                  - Volumes CPU and memory resource limits, as well as scheduling
-                  settings (affinity, toleration, priority), should not be configured
-                  within this structure. Cannot be updated.'
+                description: "Runtime defines primarily runtime information for the
+                  component, including: \n - Init containers - Containers - Image
+                  - Commands - Args - Envs - Mounts - Ports - Security context - Probes
+                  - Lifecycle - Volumes \n CPU and memory resource limits, as well
+                  as scheduling settings (affinity, toleration, priority), should
+                  not be configured within this structure. Cannot be updated."
                 properties:
                   activeDeadlineSeconds:
                     description: Optional duration in seconds the pod may be active
@@ -11417,14 +11418,14 @@ spec:
                 items:
                   properties:
                     defaultMode:
-                      description: 'defaultMode is optional: mode bits used to set
-                        permissions on created files by default. Must be an octal
+                      description: "defaultMode is optional: mode bits used to set
+                        permissions on created files by default. \n Must be an octal
                         value between 0000 and 0777 or a decimal value between 0 and
                         511. YAML accepts both octal and decimal values, JSON requires
-                        decimal values for mode bits. Defaults to 0644. Directories
+                        decimal values for mode bits. Defaults to 0644. \n Directories
                         within the path are not affected by this setting. This might
                         be in conflict with other options that affect the file mode,
-                        like fsGroup, and the result can be other mode bits set.'
+                        like fsGroup, and the result can be other mode bits set."
                       format: int32
                       type: integer
                     name:
@@ -11482,18 +11483,18 @@ spec:
                         on the binding declaration when creates a Cluster.
                       type: string
                     serviceRefDeclarationSpecs:
-                      description: serviceRefDeclarationSpecs is a collection of service
-                        descriptions for a service reference declaration. Each ServiceRefDeclarationSpec
-                        defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs
-                        are defined, it indicates that the ServiceRefDeclaration can
-                        be any one of the specified ServiceRefDeclarationSpecs. For
-                        example, when the ServiceRefDeclaration is declared to require
-                        an OLTP database, which can be either MySQL or PostgreSQL,
-                        you can define a ServiceRefDeclarationSpec for MySQL and another
-                        ServiceRefDeclarationSpec for PostgreSQL, when referencing
-                        the service within the cluster, as long as the serviceKind
-                        and serviceVersion match either MySQL or PostgreSQL, it can
-                        be used.
+                      description: "serviceRefDeclarationSpecs is a collection of
+                        service descriptions for a service reference declaration.
+                        \n Each ServiceRefDeclarationSpec defines a service Kind and
+                        Version. When multiple ServiceRefDeclarationSpecs are defined,
+                        it indicates that the ServiceRefDeclaration can be any one
+                        of the specified ServiceRefDeclarationSpecs. \n For example,
+                        when the ServiceRefDeclaration is declared to require an OLTP
+                        database, which can be either MySQL or PostgreSQL, you can
+                        define a ServiceRefDeclarationSpec for MySQL and another ServiceRefDeclarationSpec
+                        for PostgreSQL, when referencing the service within the cluster,
+                        as long as the serviceKind and serviceVersion match either
+                        MySQL or PostgreSQL, it can be used."
                       items:
                         properties:
                           serviceKind:
@@ -11501,9 +11502,9 @@ spec:
                               of the service. It should be well-known application
                               cluster type, e.g. {mysql, redis, mongodb}. The serviceKind
                               is case-insensitive and supports abbreviations for some
-                              well-known databases. For example, both 'zk' and 'zookeeper'
-                              will be considered as a ZooKeeper cluster, and 'pg',
-                              'postgres', 'postgresql' will all be considered as a
+                              well-known databases. For example, both `zk` and `zookeeper`
+                              will be considered as a ZooKeeper cluster, and `pg`,
+                              `postgres`, `postgresql` will all be considered as a
                               PostgreSQL cluster.
                             type: string
                           serviceVersion:
@@ -11527,10 +11528,10 @@ spec:
                 maxLength: 32
                 type: string
               services:
-                description: Services defines endpoints that can be used to access
-                  the component service to manage the component. In addition, a reserved
-                  headless service will be created by default, with the name pattern
-                  {clusterName}-{componentName}-headless. Cannot be updated.
+                description: "Services defines endpoints that can be used to access
+                  the component service to manage the component. \n In addition, a
+                  reserved headless service will be created by default, with the name
+                  pattern `{clusterName}-{componentName}-headless`. Cannot be updated."
                 items:
                   properties:
                     annotations:
@@ -11541,22 +11542,22 @@ spec:
                       type: object
                     generatePodOrdinalService:
                       default: false
-                      description: 'GeneratePodOrdinalService indicates whether to
+                      description: "GeneratePodOrdinalService indicates whether to
                         create a corresponding Service for each Pod of the selected
                         Component. If sets to true, a set of Service will be automatically
                         generated for each Pod. And Service.RoleSelector will be ignored.
                         They can be referred to by adding the PodOrdinal to the defined
-                        ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
+                        ServiceName with named pattern `$(Service.ServiceName)-$(PodOrdinal)`.
                         And the Service.Name will also be generated with named pattern
-                        <Service.Name>-<PodOrdinal>. The PodOrdinal is zero-based,
+                        `$(Service.Name)-$(PodOrdinal)`. The PodOrdinal is zero-based,
                         and the number of generated Services is equal to the number
                         of replicas of the Component. For example, a Service might
-                        be defined as follows: - name: my-service serviceName: my-service
-                        generatePodOrdinalService: true spec: type: NodePort ports:
-                        - name: http port: 80 targetPort: 8080 Assuming that the Component
-                        has 3 replicas, then three services would be generated: my-service-0,
-                        my-service-1, and my-service-2, each pointing to its respective
-                        Pod.'
+                        be defined as follows: \n ```yaml name: my-service serviceName:
+                        my-service generatePodOrdinalService: true spec: type: NodePort
+                        ports: - name: http port: 80 targetPort: 8080 ``` \n Assuming
+                        that the Component has 3 replicas, then three services would
+                        be generated: my-service-0, my-service-1, and my-service-2,
+                        each pointing to its respective Pod."
                       type: boolean
                     name:
                       description: Name defines the name of the service. otherwise,
@@ -11571,12 +11572,12 @@ spec:
                         be ignored.
                       type: string
                     serviceName:
-                      description: 'ServiceName defines the name of the underlying
+                      description: "ServiceName defines the name of the underlying
                         service object. If not specified, the default service name
-                        with different patterns will be used: - <CLUSTER_NAME>: for
-                        cluster-level services - <CLUSTER_NAME>-<COMPONENT_NAME>:
-                        for component-level services Only one default service name
-                        is allowed. Cannot be updated.'
+                        with different patterns will be used: \n - CLUSTER_NAME: for
+                        cluster-level services - CLUSTER_NAME-COMPONENT_NAME: for
+                        component-level services \n Only one default service name
+                        is allowed. Cannot be updated."
                       type: string
                     spec:
                       description: Spec defines the behavior of a service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -11977,6 +11978,10 @@ spec:
                           maximum: 8
                           minimum: 0
                           type: integer
+                        seed:
+                          description: seed specifies the seed used to generate the
+                            account's password. Cannot be updated.
+                          type: string
                       type: object
                     secretRef:
                       description: SecretRef specifies the secret from which data
@@ -12010,11 +12015,11 @@ spec:
                 - Parallel
                 type: string
               vars:
-                description: Vars represents user-defined variables. These variables
+                description: "Vars represents user-defined variables. \n These variables
                   can be utilized as environment variables for Pods and Actions, or
                   to render the templates of config and script. When used as environment
                   variables, these variables are placed in front of the environment
-                  variables declared in the Pod. Cannot be updated.
+                  variables declared in the Pod. Cannot be updated."
                 items:
                   description: EnvVar represents a variable present in the env of
                     Pod/Action or the template of config/script.
@@ -12023,14 +12028,14 @@ spec:
                       description: Name of the variable. Must be a C_IDENTIFIER.
                       type: string
                     value:
-                      description: 'Variable references $(VAR_NAME) are expanded using
-                        the previously defined variables in the current context. If
-                        a variable cannot be resolved, the reference in the input
+                      description: "Variable references $(VAR_NAME) are expanded using
+                        the previously defined variables in the current context. \n
+                        If a variable cannot be resolved, the reference in the input
                         string will be unchanged. Double $$ are reduced to a single
                         $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
-                        Escaped references will never be expanded, regardless of whether
-                        the variable exists or not. Defaults to "".'
+                        \n - \"$$(VAR_NAME)\" will produce the string literal \"$(VAR_NAME)\".
+                        \n Escaped references will never be expanded, regardless of
+                        whether the variable exists or not. Defaults to \"\"."
                       type: string
                     valueFrom:
                       description: Source for the variable's value. Cannot be used
@@ -12152,23 +12157,23 @@ spec:
                               type: string
                             generatePodOrdinalServiceVar:
                               default: false
-                              description: 'GeneratePodOrdinalServiceVar indicates
+                              description: "GeneratePodOrdinalServiceVar indicates
                                 whether to create a corresponding ServiceVars reference
                                 variable for each Pod. If set to true, a set of ServiceVars
                                 that can be referenced will be automatically generated
                                 for each Pod Ordinal. They can be referred to by adding
                                 the PodOrdinal to the defined name template with named
-                                pattern $<Vars[x].Name>_<PodOrdinal>. For example,
-                                a ServiceVarRef might be defined as follows: - name:
-                                MY_SERVICE_PORT valueFrom: serviceVarRef: compDef:
-                                my-component-definition name: my-service optional:
-                                true generatePodOrdinalServiceVar: true port: name:
-                                redis-sentinel Assuming that the Component has 3 replicas,
-                                then you can reference the port of existing services
-                                named my-service-0, my-service-1, and my-service-2
-                                with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2,
-                                respectively. It should be used in conjunction with
-                                Service.GeneratePodOrdinalService.'
+                                pattern `$(Vars[x].Name)_$(PodOrdinal)`. For example,
+                                a ServiceVarRef might be defined as follows: \n ```yaml
+                                \n name: MY_SERVICE_PORT valueFrom: serviceVarRef:
+                                compDef: my-component-definition name: my-service
+                                optional: true generatePodOrdinalServiceVar: true
+                                port: name: redis-sentinel \n ``` \n Assuming that
+                                the Component has 3 replicas, then you can reference
+                                the port of existing services named my-service-0,
+                                my-service-1, and my-service-2 with $MY_SERVICE_PORT_0,
+                                $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
+                                It should be used in conjunction with Service.GeneratePodOrdinalService."
                               type: boolean
                             host:
                               description: VarOption defines whether a variable is
@@ -12221,15 +12226,15 @@ spec:
                   properties:
                     highWatermark:
                       default: 0
-                      description: HighWatermark defines the high watermark threshold
-                        for the volume space usage. If there is any specified volumes
-                        who's space usage is over the threshold, the pre-defined "LOCK"
+                      description: "HighWatermark defines the high watermark threshold
+                        for the volume space usage. \n If there is any specified volumes
+                        who's space usage is over the threshold, the pre-defined \"LOCK\"
                         action will be triggered to degrade the service to protect
                         volume from space exhaustion, such as to set the instance
                         as read-only. And after that, if all volumes' space usage
-                        drops under the threshold later, the pre-defined "UNLOCK"
+                        drops under the threshold later, the pre-defined \"UNLOCK\"
                         action will be performed to recover the service normally.
-                        Cannot be updated.
+                        Cannot be updated."
                       maximum: 100
                       minimum: 0
                       type: integer
@@ -12263,7 +12268,7 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase valid values are ``, `Available`, 'Unavailable`.
+                description: Phase valid values are ``, `Available`, `Unavailable`.
                   Available is ComponentDefinition become available, and can be used
                   for co-related objects.
                 enum:

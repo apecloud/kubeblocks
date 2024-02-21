@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Restore Controller test", func() {
@@ -155,6 +156,17 @@ var _ = Describe("Restore Controller test", func() {
 			}
 		}
 
+		checkJobSA := func(restore *dpv1alpha1.Restore, saName string) {
+			jobList := &batchv1.JobList{}
+			Expect(k8sClient.List(ctx, jobList,
+				client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+				client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
+			for _, v := range jobList.Items {
+				Expect(v.Spec.Template.Spec.ServiceAccountName).WithOffset(1).
+					Should(Equal(saName))
+			}
+		}
+
 		mockRestoreJobsCompleted := func(restore *dpv1alpha1.Restore) {
 			jobList := &batchv1.JobList{}
 			Expect(k8sClient.List(ctx, jobList,
@@ -174,6 +186,8 @@ var _ = Describe("Restore Controller test", func() {
 
 			By("expect restore jobs and pvcs are created")
 			checkJobAndPVCSCount(restore, replicas, replicas, startingIndex)
+
+			checkJobSA(restore, viper.GetString(dptypes.CfgKeyWorkerServiceAccountName))
 
 			By("mock jobs are completed")
 			mockRestoreJobsCompleted(restore)
@@ -313,6 +327,8 @@ var _ = Describe("Restore Controller test", func() {
 				Eventually(testapps.List(&testCtx, generics.JobSignature,
 					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(2))
+
+				checkJobSA(restore, viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName))
 
 				By("mock exec jobs are completed")
 				mockRestoreJobsCompleted(restore)

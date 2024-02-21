@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -34,52 +33,50 @@ func TestGetKubeVersion(t *testing.T) {
 	tests := []struct {
 		name        string
 		versionInfo interface{}
-		wantMajor   int
-		wantMinor   int
-		wantErr     error
+		expected    string
+		withError   bool
 	}{
 		{
 			name:        "valid version info",
-			versionInfo: version.Info{Major: "1", Minor: "20+"},
-			wantMajor:   1,
-			wantMinor:   20,
-			wantErr:     nil,
+			versionInfo: version.Info{GitVersion: "v1.20"},
+			expected:    "v1.20",
+			withError:   false,
 		},
 		{
 			name:        "invalid version info",
 			versionInfo: "invalid",
-			wantMajor:   0,
-			wantMinor:   0,
-			wantErr:     errors.New("failed to get kubernetes version, major , minor "),
+			expected:    "",
+			withError:   true,
 		},
 		{
 			name:        "invalid major version",
-			versionInfo: version.Info{Major: "not-a-number", Minor: "20+"},
-			wantMajor:   0,
-			wantMinor:   0,
-			wantErr:     errors.New("strconv.Atoi: parsing \"not-a-number\": invalid syntax"),
+			versionInfo: version.Info{GitVersion: "vmajor.20"},
+			expected:    "",
+			withError:   true,
 		},
 		{
 			name:        "invalid minor version",
-			versionInfo: version.Info{Major: "1", Minor: "not-a-number+"},
-			wantMajor:   0,
-			wantMinor:   0,
-			wantErr:     errors.New("failed to get kubernetes version, major 1, minor not-a-number+"),
+			versionInfo: version.Info{GitVersion: "v1.minor"},
+			expected:    "",
+			withError:   true,
+		},
+		{
+			name:        "version with suffix",
+			versionInfo: version.Info{GitVersion: "v1.20.0-rc1"},
+			expected:    "v1.20",
+			withError:   false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			viper.Set(constant.CfgKeyServerInfo, tt.versionInfo)
-
-			gotMajor, gotMinor, gotErr := GetKubeVersion()
-
-			assert.Equal(t, tt.wantMajor, gotMajor)
-			assert.Equal(t, tt.wantMinor, gotMinor)
-			if tt.wantErr != nil {
-				assert.EqualError(t, gotErr, tt.wantErr.Error())
+			ver, err := GetKubeVersion()
+			assert.Equal(t, tt.expected, ver)
+			if tt.withError {
+				assert.Error(t, err)
 			} else {
-				assert.NoError(t, gotErr)
+				assert.NoError(t, err)
 			}
 		})
 	}

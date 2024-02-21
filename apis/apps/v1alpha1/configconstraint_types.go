@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,8 +25,10 @@ import (
 // ConfigConstraintSpec defines the desired state of ConfigConstraint
 type ConfigConstraintSpec struct {
 	// reloadOptions indicates whether the process supports reload.
+	//
 	// if set, the controller will determine the behavior of the engine instance based on the configuration templates,
 	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
+	//
 	// +optional
 	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
 
@@ -74,10 +76,12 @@ type ConfigConstraintSpec struct {
 	// for example, a pod of the primary is match on the patroni cluster.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
-	// formatterConfig describes the format of the configuration file, the controller
+	// formatterConfig describes the format of the configuration file, the controller will:
+	//
 	// 1. parses configuration file
 	// 2. analyzes the modified parameters
 	// 3. applies corresponding policies.
+	//
 	// +kubebuilder:validation:Required
 	FormatterConfig *FormatterConfig `json:"formatterConfig"`
 }
@@ -246,18 +250,19 @@ type FormatterConfig struct {
 	// +optional
 	FormatterOptions `json:",inline"`
 
-	// The configuration file format. Valid values are ini, xml, yaml, json,
-	// hcl, dotenv, properties and toml.
+	// The configuration file format. Valid values are `ini`, `xml`, `yaml`, `json`,
+	// `hcl`, `dotenv`, `properties` and `toml`.
 	//
-	// ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
-	// xml: reference wiki: https://en.wikipedia.org/wiki/XML
-	// yaml: a configuration file support for complex data types and structures.
-	// json: reference wiki: https://en.wikipedia.org/wiki/JSON
-	// hcl: : The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: https://www.linode.com/docs/guides/introduction-to-hcl/
-	// dotenv: this was a plain text file with simple key–value pairs, reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
-	// properties: a file extension mainly used in Java, reference wiki: https://en.wikipedia.org/wiki/.properties
-	// toml: reference wiki: https://en.wikipedia.org/wiki/TOML
-	// props-plus: a file extension mainly used in Java, support CamelCase(e.g: brokerMaxConnectionsPerIp)
+	// - ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
+	// - xml: reference wiki: https://en.wikipedia.org/wiki/XML
+	// - yaml: a configuration file support for complex data types and structures.
+	// - json: reference wiki: https://en.wikipedia.org/wiki/JSON
+	// - hcl: The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: https://www.linode.com/docs/guides/introduction-to-hcl/
+	// - dotenv: this was a plain text file with simple key–value pairs, reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
+	// - properties: a file extension mainly used in Java, reference wiki: https://en.wikipedia.org/wiki/.properties
+	// - toml: reference wiki: https://en.wikipedia.org/wiki/TOML
+	// - props-plus: a file extension mainly used in Java, support CamelCase(e.g: brokerMaxConnectionsPerIp)
+	//
 	// +kubebuilder:validation:Required
 	Format CfgFileFormat `json:"format"`
 }

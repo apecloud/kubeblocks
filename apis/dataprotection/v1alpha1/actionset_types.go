@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,12 +23,14 @@ import (
 
 // ActionSetSpec defines the desired state of ActionSet
 type ActionSetSpec struct {
-	// backupType specifies the backup type, supported values: Full, Continuous.
-	// Full means full backup.
-	// Incremental means back up data that have changed since the last backup (full or incremental).
-	// Differential means back up data that have changed since the last full backup.
-	// Continuous will back up the transaction log continuously, the PITR (Point in Time Recovery).
-	// can be performed based on the continuous backup and full backup.
+	// backupType specifies the backup type, supported values:
+	//
+	// - `Full` means full backup.
+	// - `Incremental` means back up data that have changed since the last backup (full or incremental).
+	// - `Differential` means back up data that have changed since the last full backup.
+	// - `Continuous` will back up the transaction log continuously, the PITR (Point in Time Recovery)
+	//   can be performed based on the continuous backup and full backup.
+	//
 	// +kubebuilder:validation:Enum={Full,Incremental,Differential,Continuous}
 	// +kubebuilder:default=Full
 	// +kubebuilder:validation:Required

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -100,6 +100,6 @@ func TestConfigFunc(t *testing.T) {
 		}
 
 		consensusIPPort := metadata.GetConsensusIPPort(cluster, "test")
-		assert.Equal(t, consensusIPPort, "test.test-headless.default.svc:15432")
+		assert.Equal(t, consensusIPPort, "test.test-headless.default.svc.cluster.local:15432")
 	})
 }

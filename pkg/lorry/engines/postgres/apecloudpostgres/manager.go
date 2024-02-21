@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -104,7 +104,7 @@ func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, er
 		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
 	}
 
-	return role == models.LEADER, nil
+	return role == strings.ToLower(models.LEADER), nil
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -128,7 +128,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 }
 
 func (mgr *Manager) isConsensusReadyUp(ctx context.Context) bool {
-	sql := `SELECT extname FROM pg_extension WHERE extname = 'consensus_monitor';`
+	sql := `SELECT extname FROM pg_extension WHERE extname = 'consensus';`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
 		mgr.Logger.Error(err, fmt.Sprintf("query sql:%s failed", sql))
@@ -179,7 +179,7 @@ func (mgr *Manager) InitializeCluster(ctx context.Context, _ *dcs.Cluster) error
 }
 
 func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (string, error) {
-	sql := `select paxos_role from consensus_member_status;`
+	sql := `select role from consensus_cluster_status;`
 
 	resp, err := mgr.QueryWithHost(ctx, sql, host)
 	if err != nil {
@@ -193,23 +193,7 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 		return "", err
 	}
 
-	// TODO:paxos roles are currently represented by numbers, will change to string in the future
-	var role string
-	switch cast.ToInt(resMap[0]["paxos_role"]) {
-	case 0:
-		role = models.FOLLOWER
-	case 1:
-		role = models.CANDIDATE
-	case 2:
-		role = models.LEADER
-	case 3:
-		role = models.LEARNER
-	default:
-		mgr.Logger.Info(fmt.Sprintf("get invalid role number:%d", cast.ToInt(resMap[0]["paxos_role"])))
-		role = ""
-	}
-
-	return role, nil
+	return strings.ToLower(cast.ToString(resMap[0]["role"])), nil
 }
 
 func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {

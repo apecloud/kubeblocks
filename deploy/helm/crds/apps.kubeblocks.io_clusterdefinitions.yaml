@@ -60,12 +60,12 @@ spec:
                   properties:
                     characterType:
                       description: "characterType defines well-known database component
-                        name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+                        name, such as mongos(mongodb), proxy(redis), mariadb(mysql).
                         KubeBlocks will generate proper monitor configs for well-known
-                        characterType when builtIn is true. \n CharacterType will
-                        also be used in role probe to decide which probe engine to
-                        use. current available candidates are: mysql, postgres, mongodb,
-                        redis, etcd, kafka."
+                        characterType when builtIn is true. \n It will also be used
+                        in role probe to decide which probe engine to use. current
+                        available candidates are: mysql, postgres, mongodb, redis,
+                        etcd, kafka."
                       type: string
                     componentDefRef:
                       description: componentDefRef is used to inject values from other
@@ -100,24 +100,24 @@ spec:
                                     env to be injected.
                                   properties:
                                     fieldPath:
-                                      description: 'fieldRef is the jsonpath of the
+                                      description: "fieldRef is the jsonpath of the
                                         source to select when type is `FieldRef`.
                                         there are two objects registered in the jsonpath:
-                                        `componentDef` and `components`. componentDef
+                                        `componentDef` and `components`: \n - componentDef
                                         is the component definition object specified
-                                        in `componentRef.componentDefName`. components
+                                        in `componentRef.componentDefName`. - components
                                         is the component list objects referring to
-                                        the component definition object.'
+                                        the component definition object."
                                       type: string
                                     format:
                                       default: ="$POD_FQDN"
-                                      description: 'format is the format of each headless
+                                      description: "format is the format of each headless
                                         service address. there are three builtin variables
                                         can be used as placeholder: $POD_ORDINAL,
-                                        $POD_FQDN, $POD_NAME $POD_ORDINAL is the ordinal
-                                        of the pod. $POD_FQDN is the fully qualified
-                                        domain name of the pod. $POD_NAME is the name
-                                        of the pod'
+                                        $POD_FQDN, $POD_NAME \n - $POD_ORDINAL is
+                                        the ordinal of the pod. - $POD_FQDN is the
+                                        fully qualified domain name of the pod. -
+                                        $POD_NAME is the name of the pod"
                                       type: string
                                     joinWith:
                                       default: ','
@@ -187,15 +187,15 @@ spec:
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           defaultMode:
-                            description: 'defaultMode is optional: mode bits used
-                              to set permissions on created files by default. Must
+                            description: "defaultMode is optional: mode bits used
+                              to set permissions on created files by default. \n Must
                               be an octal value between 0000 and 0777 or a decimal
                               value between 0 and 511. YAML accepts both octal and
                               decimal values, JSON requires decimal values for mode
-                              bits. Defaults to 0644. Directories within the path
+                              bits. Defaults to 0644. \n Directories within the path
                               are not affected by this setting. This might be in conflict
                               with other options that affect the file mode, like fsGroup,
-                              and the result can be other mode bits set.'
+                              and the result can be other mode bits set."
                             format: int32
                             type: integer
                           keys:
@@ -295,10 +295,10 @@ spec:
                                 type: string
                               replicas:
                                 default: 0
-                                description: replicas, number of Pods of this role.
-                                  default 1 for Leader default 0 for Learner default
-                                  Cluster.spec.componentSpec[*].Replicas - Leader.Replicas
-                                  - Learner.Replicas for Followers
+                                description: "replicas, number of Pods of this role.
+                                  \n - default 1 for Leader - default 0 for Learner
+                                  - default `Cluster.spec.componentSpec[*].Replicas
+                                  - Leader.Replicas - Learner.Replicas` for Followers"
                                 format: int32
                                 minimum: 0
                                 type: integer
@@ -324,10 +324,10 @@ spec:
                               type: string
                             replicas:
                               default: 0
-                              description: replicas, number of Pods of this role.
-                                default 1 for Leader default 0 for Learner default
-                                Cluster.spec.componentSpec[*].Replicas - Leader.Replicas
-                                - Learner.Replicas for Followers
+                              description: "replicas, number of Pods of this role.
+                                \n - default 1 for Leader - default 0 for Learner
+                                - default `Cluster.spec.componentSpec[*].Replicas
+                                - Leader.Replicas - Learner.Replicas` for Followers"
                               format: int32
                               minimum: 0
                               type: integer
@@ -352,10 +352,10 @@ spec:
                               type: string
                             replicas:
                               default: 0
-                              description: replicas, number of Pods of this role.
-                                default 1 for Leader default 0 for Learner default
-                                Cluster.spec.componentSpec[*].Replicas - Leader.Replicas
-                                - Learner.Replicas for Followers
+                              description: "replicas, number of Pods of this role.
+                                \n - default 1 for Leader - default 0 for Learner
+                                - default `Cluster.spec.componentSpec[*].Replicas
+                                - Leader.Replicas - Learner.Replicas` for Followers"
                               format: int32
                               minimum: 0
                               type: integer
@@ -364,16 +364,16 @@ spec:
                           - name
                           type: object
                         llPodManagementPolicy:
-                          description: llPodManagementPolicy is the low-level controls
+                          description: "llPodManagementPolicy is the low-level controls
                             how pods are created during initial scale up, when replacing
-                            pods on nodes, or when scaling down. `OrderedReady` policy
-                            specify where pods are created in increasing order (pod-0,
-                            then pod-1, etc) and the controller will wait until each
-                            pod is ready before continuing. When scaling down, the
-                            pods are removed in the opposite order. `Parallel` policy
-                            specify create pods in parallel to match the desired scale
-                            without waiting, and on scale down will delete all pods
-                            at once.
+                            pods on nodes, or when scaling down. \n - `OrderedReady`
+                            policy specify where pods are created in increasing order
+                            (pod-0, then pod-1, etc) and the controller will wait
+                            until each pod is ready before continuing. When scaling
+                            down, the pods are removed in the opposite order. - `Parallel`
+                            policy specify create pods in parallel to match the desired
+                            scale without waiting, and on scale down will delete all
+                            pods at once."
                           type: string
                         llUpdateStrategy:
                           description: llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy
@@ -421,14 +421,14 @@ spec:
                           default: Serial
                           description: "updateStrategy, Pods update strategy. In case
                             of workloadType=Consensus the update strategy will be
-                            following: \n serial: update Pods one by one that guarantee
-                            minimum component unavailable time. Learner -> Follower(with
-                            AccessMode=none) -> Follower(with AccessMode=readonly)
-                            -> Follower(with AccessMode=readWrite) -> Leader bestEffortParallel:
-                            update Pods in parallel that guarantee minimum component
-                            un-writable time. Learner, Follower(minority) in parallel
-                            -> Follower(majority) -> Leader, keep majority online
-                            all the time. parallel: force parallel"
+                            following: \n - serial: update Members one by one that
+                            guarantee minimum component unavailable time. `Learner
+                            -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly)
+                            -> Follower(with AccessMode=readWrite) -> Leader` - bestEffortParallel:
+                            update Members in parallel that guarantee minimum component
+                            un-writable time. `Learner, Follower(minority) in parallel
+                            -> Follower(majority) -> Leader`, keep majority online
+                            all the time. - parallel: force parallel"
                           enum:
                           - Serial
                           - BestEffortParallel
@@ -450,12 +450,12 @@ spec:
                             items:
                               properties:
                                 gvk:
-                                  description: gvk is Group/Version/Kind, for example
-                                    "v1/Pod", "apps/v1/StatefulSet", etc. when the
-                                    gvk resource filtered by the selector already
+                                  description: "gvk is Group/Version/Kind, for example
+                                    \"v1/Pod\", \"apps/v1/StatefulSet\", etc. \n when
+                                    the gvk resource filtered by the selector already
                                     exists, if there is no corresponding custom label,
                                     it will be added, and if label already exists,
-                                    it will be updated.
+                                    it will be updated."
                                   type: string
                                 selector:
                                   additionalProperties:
@@ -491,14 +491,15 @@ spec:
                           type: string
                         type:
                           default: None
-                          description: 'type controls what kind of data synchronization
+                          description: "type controls what kind of data synchronization
                             do when component scale out. Policy is in enum of {None,
-                            CloneVolume}. The default policy is `None`. None: Default
-                            policy, create empty volume and no data clone. CloneVolume:
-                            Do data clone to newly scaled pods. Prefer to use volume
-                            snapshot first, and will try backup tool if volume snapshot
-                            is not enabled, finally report error if both above cannot
-                            work. Snapshot: Deprecated, alias for CloneVolume.'
+                            CloneVolume}. The default policy is `None`. \n - None:
+                            Default policy, create empty volume and no data clone.
+                            - CloneVolume: Do data clone to newly scaled pods. Prefer
+                            to use volume snapshot first, and will try backup tool
+                            if volume snapshot is not enabled, finally report error
+                            if both above cannot work. - Snapshot: Deprecated, alias
+                            for CloneVolume."
                           enum:
                           - None
                           - CloneVolume
@@ -8521,14 +8522,15 @@ spec:
                               type: integer
                           type: object
                         roleProbeTimeoutAfterPodsReady:
-                          description: roleProbeTimeoutAfterPodsReady(in seconds),
+                          description: "roleProbeTimeoutAfterPodsReady(in seconds),
                             when all pods of the component are ready, it will detect
                             whether the application is available in the pod. if pods
                             exceed the InitializationTimeoutSeconds time without a
                             role label, this component will enter the Failed/Abnormal
-                            phase. Note that this configuration will only take effect
-                            if the component supports RoleProbe and will not affect
-                            the life cycle of the pod. default values are 60 seconds.
+                            phase. \n Note that this configuration will only take
+                            effect if the component supports RoleProbe and will not
+                            affect the life cycle of the pod. default values are 60
+                            seconds."
                           format: int32
                           minimum: 30
                           type: integer
@@ -8618,16 +8620,16 @@ spec:
                         if workloadType is Replication.
                       properties:
                         llPodManagementPolicy:
-                          description: llPodManagementPolicy is the low-level controls
+                          description: "llPodManagementPolicy is the low-level controls
                             how pods are created during initial scale up, when replacing
-                            pods on nodes, or when scaling down. `OrderedReady` policy
-                            specify where pods are created in increasing order (pod-0,
-                            then pod-1, etc) and the controller will wait until each
-                            pod is ready before continuing. When scaling down, the
-                            pods are removed in the opposite order. `Parallel` policy
-                            specify create pods in parallel to match the desired scale
-                            without waiting, and on scale down will delete all pods
-                            at once.
+                            pods on nodes, or when scaling down. \n - `OrderedReady`
+                            policy specify where pods are created in increasing order
+                            (pod-0, then pod-1, etc) and the controller will wait
+                            until each pod is ready before continuing. When scaling
+                            down, the pods are removed in the opposite order. - `Parallel`
+                            policy specify create pods in parallel to match the desired
+                            scale without waiting, and on scale down will delete all
+                            pods at once."
                           type: string
                         llUpdateStrategy:
                           description: llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy
@@ -8675,14 +8677,14 @@ spec:
                           default: Serial
                           description: "updateStrategy, Pods update strategy. In case
                             of workloadType=Consensus the update strategy will be
-                            following: \n serial: update Pods one by one that guarantee
-                            minimum component unavailable time. Learner -> Follower(with
-                            AccessMode=none) -> Follower(with AccessMode=readonly)
-                            -> Follower(with AccessMode=readWrite) -> Leader bestEffortParallel:
-                            update Pods in parallel that guarantee minimum component
-                            un-writable time. Learner, Follower(minority) in parallel
-                            -> Follower(majority) -> Leader, keep majority online
-                            all the time. parallel: force parallel"
+                            following: \n - serial: update Members one by one that
+                            guarantee minimum component unavailable time. `Learner
+                            -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly)
+                            -> Follower(with AccessMode=readWrite) -> Leader` - bestEffortParallel:
+                            update Members in parallel that guarantee minimum component
+                            un-writable time. `Learner, Follower(minority) in parallel
+                            -> Follower(majority) -> Leader`, keep majority online
+                            all the time. - parallel: force parallel"
                           enum:
                           - Serial
                           - BestEffortParallel
@@ -8697,15 +8699,15 @@ spec:
                         for heavy-state workloads like databases.
                       properties:
                         memberUpdateStrategy:
-                          description: 'MemberUpdateStrategy, Members(Pods) update
-                            strategy. serial: update Members one by one that guarantee
-                            minimum component unavailable time. Learner -> Follower(with
-                            AccessMode=none) -> Follower(with AccessMode=readonly)
-                            -> Follower(with AccessMode=readWrite) -> Leader bestEffortParallel:
+                          description: "MemberUpdateStrategy, Members(Pods) update
+                            strategy. \n - serial: update Members one by one that
+                            guarantee minimum component unavailable time. `Learner
+                            -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly)
+                            -> Follower(with AccessMode=readWrite) -> Leader` - bestEffortParallel:
                             update Members in parallel that guarantee minimum component
-                            un-writable time. Learner, Follower(minority) in parallel
-                            -> Follower(majority) -> Leader, keep majority online
-                            all the time. parallel: force parallel'
+                            un-writable time. `Learner, Follower(minority) in parallel
+                            -> Follower(majority) -> Leader`, keep majority online
+                            all the time. - parallel: force parallel"
                           enum:
                           - Serial
                           - BestEffortParallel
@@ -8808,9 +8810,13 @@ spec:
                               - command
                               type: object
                             switchoverAction:
-                              description: SwitchoverAction specifies how to do switchover
-                                latest [BusyBox](https://busybox.net/) image will
-                                be used if Image not configured
+                              description: "Environment variables can be used in all
+                                following Actions: \n - KB_RSM_USERNAME username part
+                                of credential - KB_RSM_PASSWORD password part of credential
+                                - KB_RSM_LEADER_HOST leader host - KB_RSM_TARGET_HOST
+                                target host - KB_RSM_SERVICE_PORT port \n SwitchoverAction
+                                specifies how to do switchover latest [BusyBox](https://busybox.net/)
+                                image will be used if Image not configured"
                               properties:
                                 args:
                                   description: Args is used to perform statements.
@@ -8851,7 +8857,7 @@ spec:
                                 string of the role name defined in spec.Roles latest
                                 [BusyBox](https://busybox.net/) image will be used
                                 if Image not configured Environment variables can
-                                be used in Command: - v_KB_RSM_LAST_STDOUT stdout
+                                be used in Command: \n - v_KB_RSM_LAST_STDOUT stdout
                                 from last action, watch 'v_' prefixed - KB_RSM_USERNAME
                                 username part of credential - KB_RSM_PASSWORD password
                                 part of credential"
@@ -8963,15 +8969,15 @@ spec:
                       items:
                         properties:
                           defaultMode:
-                            description: 'defaultMode is optional: mode bits used
-                              to set permissions on created files by default. Must
+                            description: "defaultMode is optional: mode bits used
+                              to set permissions on created files by default. \n Must
                               be an octal value between 0000 and 0777 or a decimal
                               value between 0 and 511. YAML accepts both octal and
                               decimal values, JSON requires decimal values for mode
-                              bits. Defaults to 0644. Directories within the path
+                              bits. Defaults to 0644. \n Directories within the path
                               are not affected by this setting. This might be in conflict
                               with other options that affect the file mode, like fsGroup,
-                              and the result can be other mode bits set.'
+                              and the result can be other mode bits set."
                             format: int32
                             type: integer
                           name:
@@ -9053,16 +9059,16 @@ spec:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: 'Number or name of the port to access
-                                  on the pods targeted by the service. Number must
+                                description: "Number or name of the port to access
+                                  on the pods targeted by the service. \n Number must
                                   be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
-                                  If this is a string, it will be looked up as a named
-                                  port in the target Pod''s container ports. If this
-                                  is not specified, the value of the ''port'' field
-                                  is used (an identity map). This field is ignored
-                                  for services with clusterIP=None, and should be
-                                  omitted or set equal to the ''port'' field. More
-                                  info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service'
+                                  \n - If this is a string, it will be looked up as
+                                  a named port in the target Pod's container ports.
+                                  - If this is not specified, the value of the `port`
+                                  field is used (an identity map). \n This field is
+                                  ignored for services with clusterIP=None, and should
+                                  be omitted or set equal to the `port` field. \n
+                                  More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service"
                                 x-kubernetes-int-or-string: true
                             required:
                             - port
@@ -9087,19 +9093,19 @@ spec:
                               when creates a Cluster.
                             type: string
                           serviceRefDeclarationSpecs:
-                            description: serviceRefDeclarationSpecs is a collection
+                            description: "serviceRefDeclarationSpecs is a collection
                               of service descriptions for a service reference declaration.
-                              Each ServiceRefDeclarationSpec defines a service Kind
-                              and Version. When multiple ServiceRefDeclarationSpecs
+                              \n Each ServiceRefDeclarationSpec defines a service
+                              Kind and Version. When multiple ServiceRefDeclarationSpecs
                               are defined, it indicates that the ServiceRefDeclaration
                               can be any one of the specified ServiceRefDeclarationSpecs.
-                              For example, when the ServiceRefDeclaration is declared
+                              \n For example, when the ServiceRefDeclaration is declared
                               to require an OLTP database, which can be either MySQL
                               or PostgreSQL, you can define a ServiceRefDeclarationSpec
                               for MySQL and another ServiceRefDeclarationSpec for
                               PostgreSQL, when referencing the service within the
                               cluster, as long as the serviceKind and serviceVersion
-                              match either MySQL or PostgreSQL, it can be used.
+                              match either MySQL or PostgreSQL, it can be used."
                             items:
                               properties:
                                 serviceKind:
@@ -9108,9 +9114,9 @@ spec:
                                     application cluster type, e.g. {mysql, redis,
                                     mongodb}. The serviceKind is case-insensitive
                                     and supports abbreviations for some well-known
-                                    databases. For example, both 'zk' and 'zookeeper'
+                                    databases. For example, both `zk` and `zookeeper`
                                     will be considered as a ZooKeeper cluster, and
-                                    'pg', 'postgres', 'postgresql' will all be considered
+                                    `pg`, `postgres`, `postgresql` will all be considered
                                     as a PostgreSQL cluster.
                                   type: string
                                 serviceVersion:
@@ -9134,16 +9140,16 @@ spec:
                         is Stateful.
                       properties:
                         llPodManagementPolicy:
-                          description: llPodManagementPolicy is the low-level controls
+                          description: "llPodManagementPolicy is the low-level controls
                             how pods are created during initial scale up, when replacing
-                            pods on nodes, or when scaling down. `OrderedReady` policy
-                            specify where pods are created in increasing order (pod-0,
-                            then pod-1, etc) and the controller will wait until each
-                            pod is ready before continuing. When scaling down, the
-                            pods are removed in the opposite order. `Parallel` policy
-                            specify create pods in parallel to match the desired scale
-                            without waiting, and on scale down will delete all pods
-                            at once.
+                            pods on nodes, or when scaling down. \n - `OrderedReady`
+                            policy specify where pods are created in increasing order
+                            (pod-0, then pod-1, etc) and the controller will wait
+                            until each pod is ready before continuing. When scaling
+                            down, the pods are removed in the opposite order. - `Parallel`
+                            policy specify create pods in parallel to match the desired
+                            scale without waiting, and on scale down will delete all
+                            pods at once."
                           type: string
                         llUpdateStrategy:
                           description: llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy
@@ -9191,14 +9197,14 @@ spec:
                           default: Serial
                           description: "updateStrategy, Pods update strategy. In case
                             of workloadType=Consensus the update strategy will be
-                            following: \n serial: update Pods one by one that guarantee
-                            minimum component unavailable time. Learner -> Follower(with
-                            AccessMode=none) -> Follower(with AccessMode=readonly)
-                            -> Follower(with AccessMode=readWrite) -> Leader bestEffortParallel:
-                            update Pods in parallel that guarantee minimum component
-                            un-writable time. Learner, Follower(minority) in parallel
-                            -> Follower(majority) -> Leader, keep majority online
-                            all the time. parallel: force parallel"
+                            following: \n - serial: update Members one by one that
+                            guarantee minimum component unavailable time. `Learner
+                            -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly)
+                            -> Follower(with AccessMode=readWrite) -> Leader` - bestEffortParallel:
+                            update Members in parallel that guarantee minimum component
+                            un-writable time. `Learner, Follower(minority) in parallel
+                            -> Follower(majority) -> Leader`, keep majority online
+                            all the time. - parallel: force parallel"
                           enum:
                           - Serial
                           - BestEffortParallel
@@ -9879,6 +9885,10 @@ spec:
                               maximum: 8
                               minimum: 0
                               type: integer
+                            seed:
+                              description: seed specifies the seed used to generate
+                                the account's password. Cannot be updated.
+                              type: string
                           type: object
                       required:
                       - accounts
@@ -9923,12 +9933,12 @@ spec:
                         the volumes mapping the name of the VolumeMounts in the PodSpec.Container
                         field, such as data volume, log volume, etc. When backing
                         up the volume, the volume can be correctly backed up according
-                        to the volumeType. \n For example: `name: data, type: data`
-                        means that the volume named `data` is used to store `data`.
-                        `name: binlog, type: log` means that the volume named `binlog`
-                        is used to store `log`. \n NOTE: When volumeTypes is not defined,
-                        the backup function will not be supported, even if a persistent
-                        volume has been specified."
+                        to the volumeType. \n For example: \n - `name: data, type:
+                        data` means that the volume named `data` is used to store
+                        `data`. - `name: binlog, type: log` means that the volume
+                        named `binlog` is used to store `log`. \n NOTE: When volumeTypes
+                        is not defined, the backup function will not be supported,
+                        even if a persistent volume has been specified."
                       items:
                         properties:
                           name:
@@ -9954,14 +9964,15 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     workloadType:
-                      description: workloadType defines type of the workload. Stateless
-                        is a stateless workload type used to describe stateless applications.
-                        Stateful is a stateful workload type used to describe common
-                        stateful applications. Consensus is a stateful workload type
-                        used to describe applications based on consensus protocols,
-                        common consensus protocols such as raft and paxos. Replication
+                      description: "workloadType defines type of the workload. \n
+                        - `Stateless` is a stateless workload type used to describe
+                        stateless applications. - `Stateful` is a stateful workload
+                        type used to describe common stateful applications. - `Consensus`
                         is a stateful workload type used to describe applications
-                        based on the primary-secondary data replication protocol.
+                        based on consensus protocols, common consensus protocols such
+                        as raft and paxos. - `Replication` is a stateful workload
+                        type used to describe applications based on the primary-secondary
+                        data replication protocol."
                       enum:
                       - Stateless
                       - Stateful
@@ -9988,22 +9999,22 @@ spec:
                   type: string
                 description: "Connection credential template used for creating a connection
                   credential secret for cluster.apps.kubeblocks.io object. \n Built-in
-                  objects are: - `$(RANDOM_PASSWD)` - random 8 characters. - `$(STRONG_RANDOM_PASSWD)`
-                  - random 16 characters, with mixed cases, digits and symbols. -
-                  `$(UUID)` - generate a random UUID v4 string. - `$(UUID_B64)` -
-                  generate a random UUID v4 BASE64 encoded string. - `$(UUID_STR_B64)`
-                  - generate a random UUID v4 string then BASE64 encoded. - `$(UUID_HEX)`
-                  - generate a random UUID v4 HEX representation. - `$(HEADLESS_SVC_FQDN)`
-                  - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
+                  objects are: \n - `$(RANDOM_PASSWD)` random 8 characters. dfjksgks
+                  - `$(STRONG_RANDOM_PASSWD)` random 16 characters, with mixed cases,
+                  digits and symbols. - `$(UUID)` generate a random UUID v4 string.
+                  - `$(UUID_B64)` generate a random UUID v4 BASE64 encoded string.
+                  - `$(UUID_STR_B64)` generate a random UUID v4 string then BASE64
+                  encoded. - `$(UUID_HEX)` generate a random UUID v4 HEX representation.
+                  - `$(HEADLESS_SVC_FQDN)` headless service FQDN placeholder, value
+                  pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`,
                   where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
-                  attribute; - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern
-                  - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME
+                  attribute; - `$(SVC_FQDN)` service FQDN placeholder, value pattern
+                  is `$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc`, where 1ST_COMP_NAME
                   is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
-                  attribute; - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value
+                  attribute; - `$(SVC_PORT_{PORT-NAME})` is ServicePort's port value
                   with specified port name, i.e, a servicePort JSON struct: `{\"name\":
                   \"mysql\", \"targetPort\": \"mysqlContainerPort\", \"port\": 3306}`,
-                  and \"$(SVC_PORT_mysql)\" in the connection credential value is
-                  3306."
+                  and `$(SVC_PORT_mysql)` in the connection credential value is 3306."
                 type: object
               type:
                 description: Cluster definition type defines well known application
@@ -10028,7 +10039,7 @@ spec:
                 type: integer
               phase:
                 description: ClusterDefinition phase, valid values are `empty`, `Available`,
-                  'Unavailable`. Available is ClusterDefinition become available,
+                  `Unavailable`. Available is ClusterDefinition become available,
                   and can be referenced for co-related objects.
                 enum:
                 - Available

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -39,10 +39,13 @@ type ComponentSpec struct {
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
 	// serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
-	// Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
-	// Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
+	//
+	// - Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
+	// - Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
+	//
 	// Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
 	// It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.
+	//
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
@@ -130,14 +133,15 @@ type ComponentStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// phase describes the phase of the component and the detail information of the phases are as following:
-	// Creating: `Creating` is a special `Updating` with previous phase `empty`(means "") or `Creating`.
-	// Running: component replicas > 0 and all pod specs are latest with a Running state.
-	// Updating: component replicas > 0 and has no failed pods. the component is being updated.
-	// Abnormal: component replicas > 0 but having some failed pods. the component basically works but in a fragile state.
-	// Failed: component replicas > 0 but having some failed pods. the component doesn't work anymore.
-	// Stopping: component replicas = 0 and has terminating pods.
-	// Stopped: component replicas = 0 and all pods have been deleted.
-	// Deleting: the component is being deleted.
+	//
+	// - Creating: `Creating` is a special `Updating` with previous phase `empty`(means "") or `Creating`.
+	// - Running: component replicas > 0 and all pod specs are latest with a Running state.
+	// - Updating: component replicas > 0 and has no failed pods. the component is being updated.
+	// - Abnormal: component replicas > 0 but having some failed pods. the component basically works but in a fragile state.
+	// - Failed: component replicas > 0 but having some failed pods. the component doesn't work anymore.
+	// - Stopping: component replicas = 0 and has terminating pods.
+	// - Stopped: component replicas = 0 and all pods have been deleted.
+	// - Deleting: the component is being deleted.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
@@ -163,7 +167,7 @@ type Component struct {
 	Status ComponentStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ComponentList contains a list of Component
 type ComponentList struct {

@@ -128,6 +128,10 @@ spec:
               value: '{{ join "," .Values.hostPorts.exclude }}'
             - name: HOST_PORT_CM_NAME
               value: {{ include "kubeblocks.fullname" . }}-host-ports
+            {{- if .Values.serviceMonitor.goRuntime.enabled }}
+            - name: ENABLED_RUNTIME_METRICS
+              value: "true"
+            {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

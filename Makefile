@@ -261,8 +261,10 @@ lorryctl-doc: generate test-go-generate ## generate CLI command reference manual
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
-	@./hack/docgen/api/generate.sh
+	$(GO) run ./hack/docgen/api/main.go -api-dir github.com/apecloud/kubeblocks/apis -config ./hack/docgen/api/gen-api-doc-config.json -template-dir ./hack/docgen/api/template -out-dir ./docs/developer_docs/api-reference/
 
+.PHONY: doc
+doc: lorryctl-doc api-doc ## generate all documents.
 
 ##@ Operator Controller Manager
 

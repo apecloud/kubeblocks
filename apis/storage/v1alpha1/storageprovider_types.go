@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,47 +21,57 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// StorageProviderSpec defines the desired state of StorageProvider
+// StorageProviderSpec defines the desired state of `StorageProvider`.
 type StorageProviderSpec struct {
-	// The name of the CSI driver used by this StorageProvider.
+	// Specifies the name of the CSI driver used to access remote storage.
+	// This field can be empty, it indicates that the storage is not accessible via CSI.
+	//
 	// +optional
 	CSIDriverName string `json:"csiDriverName,omitempty"`
 
-	// A Go template for rendering a secret which will be used by the CSI driver.
-	// The template will be rendered with the following variables:
-	// - Parameters: a map of parameters defined in the ParametersSchema.
+	// A Go template that used to render and generate `k8s.io/api/core/v1.Secret`
+	// resources for a specific CSI driver.
+	// For example, `accessKey` and `secretKey` needed by CSI-S3 are stored in this
+	// `Secret` resource.
+	//
 	// +optional
 	CSIDriverSecretTemplate string `json:"csiDriverSecretTemplate,omitempty"`
 
-	// A Go template for rendering a storage class which will be used by the CSI driver.
-	// The template will be rendered with the following variables:
-	// - Parameters: a map of parameters defined in the ParametersSchema.
-	// - CSIDriverSecretRef: the reference of the secret created by the CSIDriverSecretTemplate.
+	// A Go template utilized to render and generate `kubernetes.storage.k8s.io.v1.StorageClass`
+	// resources. The `StorageClass' created by this template is aimed at using the CSI driver.
+	//
 	// +optional
 	StorageClassTemplate string `json:"storageClassTemplate,omitempty"`
 
-	// A Go template for rendering a PersistentVolumeClaim.
-	// The template will be rendered with the following variables:
-	// - Parameters: a map of parameters defined in the ParametersSchema.
-	// - GeneratedStorageClassName: the name of the storage class generated with the StorageClassTemplate.
+	// A Go template that renders and generates `k8s.io/api/core/v1.PersistentVolumeClaim`
+	// resources. This PVC can reference the `StorageClass` created from `storageClassTemplate`,
+	// allowing Pods to access remote storage by mounting the PVC.
+	//
 	// +optional
 	PersistentVolumeClaimTemplate string `json:"persistentVolumeClaimTemplate,omitempty"`
 
-	// A Go template for rendering a config used by the datasafed command.
-	// The template will be rendered with the following variables:
-	// - Parameters: a map of parameters defined in the ParametersSchema.
+	// A Go template used to render and generate `k8s.io/api/core/v1.Secret`.
+	// This `Secret` involves the configuration details required by the `datasafed` tool
+	// to access remote storage. For example, the `Secret` should contain `endpoint`,
+	// `bucket`, 'region', 'accessKey', 'secretKey', or something else for S3 storage.
+	// This field can be empty, it means this kind of storage is not accessible via
+	// the `datasafed` tool.
+	//
 	// +optional
 	DatasafedConfigTemplate string `json:"datasafedConfigTemplate,omitempty"`
 
-	// The schema describes the parameters required by this StorageProvider,
-	// when rendering the templates.
+	// Describes the parameters required for storage.
+	// The parameters defined here can be referenced in the above templates,
+	// and `kbcli` uses this definition for dynamic command-line parameter parsing.
+	//
 	// +optional
 	ParametersSchema *ParametersSchema `json:"parametersSchema,omitempty"`
 }
 
-// ParametersSchema describes the parameters used by this StorageProvider.
+// ParametersSchema describes the parameters needed for a certain storage.
 type ParametersSchema struct {
-	// openAPIV3Schema is the OpenAPI v3 schema to use for validation and pruning.
+	// Defines the parameters in OpenAPI V3.
+	//
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=object
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -69,18 +79,22 @@ type ParametersSchema struct {
 	// +optional
 	OpenAPIV3Schema *apiextensionsv1.JSONSchemaProps `json:"openAPIV3Schema,omitempty"`
 
-	// credentialFields are the fields used to generate the secret.
+	// Defines which parameters are credential fields, which need to be handled specifically.
+	// For instance, these should be stored in a `Secret` instead of a `ConfigMap`.
+	//
 	// +optional
 	CredentialFields []string `json:"credentialFields,omitempty"`
 }
 
-// StorageProviderStatus defines the observed state of StorageProvider
+// StorageProviderStatus defines the observed state of `StorageProvider`.
 type StorageProviderStatus struct {
-	// Storage provider reconciliation phases. Valid values are NotReady, Ready.
+	// The phase of the `StorageProvider`. Valid phases are `NotReady` and `Ready`.
+	//
 	// +kubebuilder:validation:Enum={NotReady,Ready}
 	Phase StorageProviderPhase `json:"phase,omitempty"`
 
-	// Describes the current state of the storage provider.
+	// Describes the current state of the `StorageProvider`.
+	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
@@ -95,9 +109,11 @@ type StorageProviderStatus struct {
 // +kubebuilder:printcolumn:name="CSIDRIVER",type="string",JSONPath=".spec.csiDriverName"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// StorageProvider is the Schema for the storageproviders API
-// StorageProvider describes how to provision PVCs for a specific storage system (e.g. S3, NFS, etc),
-// by using the CSI driver.
+// StorageProvider comprises specifications that provide guidance on accessing remote storage.
+// Currently the supported access methods are via a dedicated CSI driver or the `datasafed` tool.
+// In case of CSI driver, the specification expounds on provisioning PVCs for that driver.
+// As for the `datasafed` tool, the specification provides insights on generating the necessary
+// configuration file.
 type StorageProvider struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -108,7 +124,7 @@ type StorageProvider struct {
 
 // +kubebuilder:object:root=true
 
-// StorageProviderList contains a list of StorageProvider
+// StorageProviderList contains a list of `StorageProvider`.
 type StorageProviderList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

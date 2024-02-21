@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,6 +21,7 @@ package backup
 
 import (
 	"fmt"
+	"reflect"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,10 +41,11 @@ import (
 
 type Scheduler struct {
 	intctrlutil.RequestCtx
-	Client         client.Client
-	Scheme         *k8sruntime.Scheme
-	BackupSchedule *dpv1alpha1.BackupSchedule
-	BackupPolicy   *dpv1alpha1.BackupPolicy
+	Client               client.Client
+	Scheme               *k8sruntime.Scheme
+	BackupSchedule       *dpv1alpha1.BackupSchedule
+	BackupPolicy         *dpv1alpha1.BackupPolicy
+	WorkerServiceAccount string
 }
 
 func (s *Scheduler) Schedule() error {
@@ -102,9 +104,7 @@ func (s *Scheduler) handleSchedulePolicy(index int) error {
 }
 
 // buildCronJob builds cronjob from backup schedule.
-func (s *Scheduler) buildCronJob(
-	schedulePolicy *dpv1alpha1.SchedulePolicy,
-	cronJobName string) (*batchv1.CronJob, error) {
+func (s *Scheduler) buildCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy, cronJobName string) (*batchv1.CronJob, error) {
 	var (
 		successfulJobsHistoryLimit int32 = 0
 		failedJobsHistoryLimit     int32 = 1
@@ -190,7 +190,7 @@ EOF
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	podSpec := &corev1.PodSpec{
-		ServiceAccountName: s.BackupPolicy.Spec.Target.ServiceAccountName,
+		ServiceAccountName: s.WorkerServiceAccount,
 		RestartPolicy:      corev1.RestartPolicyNever,
 		Containers:         []corev1.Container{container},
 	}
@@ -226,7 +226,7 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 			}
 			return s.Client.Delete(s.Ctx, cronJob)
 		}
-		// if no cron expression, return
+		// if cronjob does not exist, return
 		return nil
 	}
 
@@ -245,12 +245,17 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 		return s.Client.Create(s.Ctx, cronjobProto)
 	}
 
+	if reflect.DeepEqual(cronJob.Spec, cronjobProto.Spec) &&
+		reflect.DeepEqual(cronJob.Labels, cronjobProto.Labels) &&
+		reflect.DeepEqual(cronJob.Annotations, cronjobProto.Annotations) {
+		return nil
+	}
+
 	// sync the cronjob with the current backup policy configuration.
 	patch := client.MergeFrom(cronJob.DeepCopy())
-	cronJob.Spec.StartingDeadlineSeconds = cronjobProto.Spec.StartingDeadlineSeconds
-	cronJob.Spec.JobTemplate.Spec.BackoffLimit = s.BackupPolicy.Spec.BackoffLimit
-	cronJob.Spec.JobTemplate.Spec.Template = cronjobProto.Spec.JobTemplate.Spec.Template
-	cronJob.Spec.Schedule = cronjobProto.Spec.Schedule
+	cronJob.Spec = cronjobProto.Spec
+	cronJob.Labels = cronjobProto.Labels
+	cronJob.Annotations = cronjobProto.Annotations
 	return s.Client.Patch(s.Ctx, cronJob, patch)
 }
 

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ type ClusterVersionSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefinitionRef string `json:"clusterDefinitionRef"`
 
-	// List of components' containers versioning context, i.e., container image ID, container commands, args., and environments.
+	// List of components' containers versioning context, i.e., container image ID, container commands, args, and environments.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=componentDefRef

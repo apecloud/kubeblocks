@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -64,12 +64,15 @@ type ComponentTemplateSpec struct {
 	VolumeName string `json:"volumeName"`
 
 	// defaultMode is optional: mode bits used to set permissions on created files by default.
+	//
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
 	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
 	// Defaults to 0644.
+	//
 	// Directories within the path are not affected by this setting.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
+	//
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
@@ -300,10 +303,14 @@ var WorkloadTypes = []string{"Stateless", "Stateful", "Consensus", "Replication"
 type TerminationPolicyType string
 
 const (
+	// DoNotTerminate will block delete operation.
 	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
-	Halt           TerminationPolicyType = "Halt"
-	Delete         TerminationPolicyType = "Delete"
-	WipeOut        TerminationPolicyType = "WipeOut"
+	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
+	Halt TerminationPolicyType = "Halt"
+	// Delete is based on Halt and deletes PVCs.
+	Delete TerminationPolicyType = "Delete"
+	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
+	WipeOut TerminationPolicyType = "WipeOut"
 )
 
 // HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
@@ -622,20 +629,25 @@ type ComponentService struct {
 
 	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
 	// If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.
-	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
-	// And the Service.Name will also be generated with named pattern <Service.Name>-<PodOrdinal>.
+	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern `$(Service.ServiceName)-$(PodOrdinal)`.
+	// And the Service.Name will also be generated with named pattern `$(Service.Name)-$(PodOrdinal)`.
 	// The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.
 	// For example, a Service might be defined as follows:
-	// - name: my-service
-	//   serviceName: my-service
-	//   generatePodOrdinalService: true
-	//   spec:
-	//     type: NodePort
-	//     ports:
-	//     - name: http
-	//       port: 80
-	//       targetPort: 8080
+	//
+	// ```yaml
+	// name: my-service
+	// serviceName: my-service
+	// generatePodOrdinalService: true
+	// spec:
+	//   type: NodePort
+	//   ports:
+	//   - name: http
+	//     port: 80
+	//     targetPort: 8080
+	// ```
+	//
 	// Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.
+	//
 	// +kubebuilder:default=false
 	// +optional
 	GeneratePodOrdinalService bool `json:"generatePodOrdinalService,omitempty"`
@@ -651,10 +663,13 @@ type Service struct {
 
 	// ServiceName defines the name of the underlying service object.
 	// If not specified, the default service name with different patterns will be used:
-	//  - <CLUSTER_NAME>: for cluster-level services
-	//  - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services
+	//
+	// - CLUSTER_NAME: for cluster-level services
+	// - CLUSTER_NAME-COMPONENT_NAME: for component-level services
+	//
 	// Only one default service name is allowed.
 	// Cannot be updated.
+	//
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 
@@ -701,11 +716,15 @@ type EnvVar struct {
 	// Optional: no more than one of the following may be specified.
 
 	// Variable references $(VAR_NAME) are expanded using the previously defined variables in the current context.
+	//
 	// If a variable cannot be resolved, the reference in the input string will be unchanged.
 	// Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-	// "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+	//
+	// - "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+	//
 	// Escaped references will never be expanded, regardless of whether the variable exists or not.
 	// Defaults to "".
+	//
 	// +optional
 	Value string `json:"value,omitempty"`
 	// Source for the variable's value. Cannot be used if value is not empty.
@@ -797,17 +816,23 @@ type ServiceVarSelector struct {
 
 	// GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.
 	// If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.
-	// They can be referred to by adding the PodOrdinal to the defined name template with named pattern $<Vars[x].Name>_<PodOrdinal>.
+	// They can be referred to by adding the PodOrdinal to the defined name template with named pattern `$(Vars[x].Name)_$(PodOrdinal)`.
 	// For example, a ServiceVarRef might be defined as follows:
-	// - name: MY_SERVICE_PORT
-	//   valueFrom:
-	//     serviceVarRef:
-	//       compDef: my-component-definition
-	//       name: my-service
-	//       optional: true
-	//       generatePodOrdinalServiceVar: true
-	//       port:
-	//         name: redis-sentinel
+	//
+	// ```yaml
+	//
+	// name: MY_SERVICE_PORT
+	// valueFrom:
+	//   serviceVarRef:
+	//     compDef: my-component-definition
+	//     name: my-service
+	//     optional: true
+	//     generatePodOrdinalServiceVar: true
+	//     port:
+	//       name: redis-sentinel
+	//
+	// ```
+	//
 	// Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,
 	// and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
 	// It should be used in conjunction with Service.GeneratePodOrdinalService.

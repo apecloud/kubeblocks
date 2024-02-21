@@ -48,41 +48,46 @@ Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm]
 
 ## Installation steps
 
-**Use Helm to install KubeBlocks**
+Use Helm and follow the steps below to install KubeBlocks.
 
-Run the following command:
-
-```bash
-helm repo add kubeblocks https://apecloud.github.io/helm-charts
-helm repo update
-helm install kubeblocks kubeblocks/kubeblocks \
-    --namespace kb-system --create-namespace
-```
-
-If you want to install KubeBlocks with custom tolerations, you can use the following command:
-
-```bash
-helm install kubeblocks kubeblocks/kubeblocks \
-    --namespace kb-system --create-namespace \
-    --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' \
-    --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
-```
-
-If you want to install KubeBlocks with a specified version, follow the steps below.
-
-1. View the available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
-2. Specify a version with `--version` and run the command below.
-
+1. Create dependent CRDs.
    ```bash
-   helm install kubeblocks kubeblocks/kubeblocks \
-    --namespace kb-system --create-namespace --version="x.x.x"
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.8.1/kubeblocks_crds.yaml
    ```
 
-  :::note
+2. Add Helm repo.
+   ```bash
+   helm repo add kubeblocks https://apecloud.github.io/helm-charts
+   helm repo update
+   ```
 
-  By default, the latest release version is installed.
+3. Install KubeBlocks.
+   ```bash
+   helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
+   ```
 
-  :::
+   If you want to install KubeBlocks with custom tolerations, you can use the following command:
+
+   ```bash
+   helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace \
+       --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' \
+       --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true"    }]'
+   ```
+
+   If you want to install KubeBlocks with a specified version, follow the steps below.
+
+   1. View the available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
+   2. Specify a version with `--version` and run the command below.
+
+      ```bash
+      helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version="x.x.x"
+      ```
+
+     :::note
+
+     By default, the latest release version is installed.
+
+     :::
 
 ## Verify KubeBlocks installation
 

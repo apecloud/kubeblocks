@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -58,8 +58,10 @@ const (
 
 type Deleter struct {
 	ctrlutil.RequestCtx
-	Client    client.Client
-	Scheme    *runtime.Scheme
+	Client               client.Client
+	Scheme               *runtime.Scheme
+	WorkerServiceAccount string
+
 	actionSet *dpv1alpha1.ActionSet
 }
 
@@ -247,8 +249,9 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 
 	// build pod
 	podSpec := corev1.PodSpec{
-		Containers:    []corev1.Container{container},
-		RestartPolicy: corev1.RestartPolicyNever,
+		Containers:         []corev1.Container{container},
+		RestartPolicy:      corev1.RestartPolicyNever,
+		ServiceAccountName: d.WorkerServiceAccount,
 	}
 	if err := utils.AddTolerations(&podSpec); err != nil {
 		return err

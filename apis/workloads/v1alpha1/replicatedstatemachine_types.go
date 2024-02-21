@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -99,13 +99,15 @@ type ReplicatedStateMachineSpec struct {
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
 	// podManagementPolicy controls how pods are created during initial scale up,
-	// when replacing pods on nodes, or when scaling down. The default policy is
-	// `OrderedReady`, where pods are created in increasing order (pod-0, then
-	// pod-1, etc) and the controller will wait until each pod is ready before
-	// continuing. When scaling down, the pods are removed in the opposite order.
-	// The alternative policy is `Parallel` which will create pods in parallel
-	// to match the desired scale without waiting, and on scale down will delete
-	// all pods at once.
+	// when replacing pods on nodes, or when scaling down.
+	//
+	// - The default policy is `OrderedReady`, where pods are created in increasing order (pod-0, then
+	//   pod-1, etc) and the controller will wait until each pod is ready before
+	//   continuing. When scaling down, the pods are removed in the opposite order.
+	// - The alternative policy is `Parallel` which will create pods in parallel
+	//   to match the desired scale without waiting, and on scale down will delete
+	//   all pods at once.
+	//
 	// +optional
 	PodManagementPolicy appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
 
@@ -128,11 +130,13 @@ type ReplicatedStateMachineSpec struct {
 	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
 
 	// MemberUpdateStrategy, Members(Pods) update strategy.
-	// serial: update Members one by one that guarantee minimum component unavailable time.
-	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-	// bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
-	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
-	// parallel: force parallel
+	//
+	// - serial: update Members one by one that guarantee minimum component unavailable time.
+	// 	 `Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader`
+	// - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+	//	 `Learner, Follower(minority) in parallel -> Follower(majority) -> Leader`, keep majority online all the time.
+	// - parallel: force parallel
+	//
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
 	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
@@ -291,9 +295,11 @@ type RoleProbe struct {
 	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
 	// Environment variables can be used in Command:
+	//
 	// - v_KB_RSM_LAST_STDOUT stdout from last action, watch 'v_' prefixed
 	// - KB_RSM_USERNAME username part of credential
 	// - KB_RSM_PASSWORD password part of credential
+	//
 	// +optional
 	CustomHandler []Action `json:"customHandler,omitempty"`
 
@@ -372,14 +378,16 @@ type CredentialVar struct {
 
 type MembershipReconfiguration struct {
 	// Environment variables can be used in all following Actions:
+	//
 	// - KB_RSM_USERNAME username part of credential
 	// - KB_RSM_PASSWORD password part of credential
 	// - KB_RSM_LEADER_HOST leader host
 	// - KB_RSM_TARGET_HOST target host
 	// - KB_RSM_SERVICE_PORT port
-
+	//
 	// SwitchoverAction specifies how to do switchover
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
+	//
 	// +optional
 	SwitchoverAction *Action `json:"switchoverAction,omitempty"`
 

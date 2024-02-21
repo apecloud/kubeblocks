@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,9 +35,12 @@ type ComponentClassGroup struct {
 	// definition will be generated through rendering the template.
 	//
 	// For example:
-	//	template: |
-	//	  cpu: "{{ or .cpu 1 }}"
-	//	  memory: "{{ or .memory 4 }}Gi"
+	//
+	// ```yaml
+	// template: |
+	//	 cpu: "{{ or .cpu 1 }}"
+	//	 memory: "{{ or .memory 4 }}Gi"
+	// ```
 	//
 	// +optional
 	Template string `json:"template,omitempty"`

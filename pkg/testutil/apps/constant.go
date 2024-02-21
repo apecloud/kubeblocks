@@ -341,10 +341,8 @@ var (
 			PreTerminate:  defaultLifecycleActionHandler,
 			RoleProbe: &appsv1alpha1.RoleProbe{
 				LifecycleActionHandler: *defaultLifecycleActionHandler,
-				Timer: appsv1alpha1.Timer{
-					PeriodSeconds:  1,
-					TimeoutSeconds: 5,
-				},
+				PeriodSeconds:          1,
+				TimeoutSeconds:         5,
 			},
 			Switchover:       nil,
 			MemberJoin:       defaultLifecycleActionHandler,

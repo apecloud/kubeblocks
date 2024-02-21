@@ -547,7 +547,20 @@ type ComponentLifecycleActions struct {
 	// +optional
 	PreTerminate *LifecycleActionHandler `json:"preTerminate,omitempty"`
 
-	// RoleProbe defines how to probe the role of replicas.
+	// RoleProbe defines the mechanism to probe the role of replicas periodically. The specified action will be executed by Lorry.
+	// If the execution is successful, the output will be used as the role of the replica. The role must be one of
+	// the names defined in the componentdefinition roles. The output will be compared with the last successful output.
+	// If there is a change, a rolechange event will be created to notify the controller to update the replica's role.
+	// This action is required if the component has defined roles. Otherwise, the replicas' pods will have no role
+	// information after cluster creation, and services will not route to the replica correctly.
+	// Args for the action:
+	// - KB_POD_IP: The pod IP of the replica to check the role. If the action is implemented through a CDI GRPC plugin, this environment variable will be translated to the 'podIP' argument.
+	// - KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the 'servicePort' argument.
+	// - KB_SERVICE_USER: The username used to access the DB service and retrieve the role information with sufficient privileges. 'serviceUser' is used if provided by a CDI GRPC plugin.
+	// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information. 'servicePassword' is used if provided by a CDI GRPC plugin.
+	// Output of the action:
+	// - ROLE: A string representing the role of the replica. It must be one of the names defined in the roles.
+	// - ERROR: Any error message if the action fails.
 	// Cannot be updated.
 	// +optional
 	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
@@ -574,6 +587,14 @@ type ComponentLifecycleActions struct {
 	// MemberJoin defines how to add a new replica to the replication group.
 	// This action is typically invoked when a new replica needs to be added, such as during scale-out.
 	// It may involve updating configuration, notifying other members, and ensuring data consistency.
+	// Args for the action:
+	// - KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the 'servicePort' argument.
+	// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges. 'serviceUser' is used if provided by a CDI GRPC plugin.
+	// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service . 'servicePassword' is used if provided by a CDI GRPC plugin.
+	// - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover. 'primaryPodFQDN' is used if provided by a CDI GRPC plugin.
+	// - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod. 'newMemberPodName' is used if provided by a CDI GRPC plugin.
+	// Output of the action:
+	// - ERROR: Any error message if the action fails.
 	// Cannot be updated.
 	// +optional
 	MemberJoin *LifecycleActionHandler `json:"memberJoin,omitempty"`
@@ -582,17 +603,39 @@ type ComponentLifecycleActions struct {
 	// This action is typically invoked when a replica needs to be removed, such as during scale-in.
 	// It may involve configuration updates and notifying other members about the departure,
 	// but it is advisable to avoid performing data migration within this action.
+	// Args for the action:
+	// - KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the 'servicePort' argument.
+	// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges. 'serviceUser' is used if provided by a CDI GRPC plugin.
+	// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service. 'servicePassword' is used if provided by a CDI GRPC plugin.
+	// - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover. 'primaryPodFQDN' is used if provided by a CDI GRPC plugin.
+	// - KB_LEAVE_MEMBER_POD_NAME: The name of the leave member's Pod. 'leaveMemberPodName' is used if provided by a CDI GRPC plugin.
+	// Output of the action:
+	// - ERROR: Any error message if the action fails.
 	// Cannot be updated.
 	// +optional
 	MemberLeave *LifecycleActionHandler `json:"memberLeave,omitempty"`
 
 	// Readonly defines how to set a replica service as read-only.
 	// This action is used to protect a replica in case of volume space exhaustion or excessive traffic.
+	// Args for the action:
+	// - KB_POD_FQDN: The FQDN of the replica pod to check the role. If the action is implemented through a CDI GRPC plugin, this environment variable will be translated to the 'podFQDN' argument.
+	// - KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the 'servicePort' argument.
+	// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges. 'serviceUser' is used if provided by a CDI GRPC plugin.
+	// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service. 'servicePassword' is used if provided by a CDI GRPC plugin.
+	// Output of the action:
+	// - ERROR: Any error message if the action fails.
 	// Cannot be updated.
 	// +optional
 	Readonly *LifecycleActionHandler `json:"readonly,omitempty"`
 
 	// Readwrite defines how to set a replica service as read-write.
+	// Args for the action:
+	// - KB_POD_FQDN: The FQDN of the replica pod to check the role. If the action is implemented through a CDI GRPC plugin, this environment variable will be translated to the 'podFQDN' argument.
+	// - KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the 'servicePort' argument.
+	// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges. 'serviceUser' is used if provided by a CDI GRPC plugin.
+	// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service. 'servicePassword' is used if provided by a CDI GRPC plugin.
+	// Output of the action:
+	// - ERROR: Any error message if the action fails.
 	// Cannot be updated.
 	// +optional
 	Readwrite *LifecycleActionHandler `json:"readwrite,omitempty"`
@@ -646,7 +689,13 @@ type ComponentSwitchover struct {
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
-type Timer struct {
+type RoleProbe struct {
+	LifecycleActionHandler `json:",inline"`
+
+	// Number of seconds after the container has started before liveness probes are initiated.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +optional
+	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty" protobuf:"varint,2,opt,name=initialDelaySeconds"`
 	// Number of seconds after which the probe times out.
 	// Defaults to 1 second. Minimum value is 1.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
@@ -656,36 +705,4 @@ type Timer struct {
 	// Default to 10 seconds. Minimum value is 1.
 	// +optional
 	PeriodSeconds int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
-}
-
-// RoleProbeArgs defines the arguments for probing a role
-type RoleProbeArgs struct {
-	// Host is the argument containing the address of the db service to probe.
-	// This should specify where the database server is running, e.g. the service dns or IP address
-	// +optional
-	Host *corev1.EnvVar `json:"host,omitempty"`
-
-	// Port is the argument containing the port on which the db service is listening.
-	// +optional
-	Port *corev1.EnvVar `json:"port,omitempty"`
-
-	// UserName is the argument containing username which is used to authenticate the database connection.
-	// +optional
-	UserName *corev1.EnvVar `json:"user,omitempty"`
-
-	// Password is the argument containing password which is used to authenticate the database connection.
-	// +optional
-	Password *corev1.EnvVar `json:"password,omitempty"`
-}
-
-type RoleProbe struct {
-	LifecycleActionHandler `json:",inline"`
-
-	// Timer contains the settings for a periodic executor that will
-	// trigger an action on a repeating schedule.
-	Timer `json:",inline"`
-
-	// RoleProbeArgs defines the arguments for probing a role
-	// +optional
-	Args *RoleProbeArgs `json:"args,omitempty"`
 }

@@ -277,10 +277,6 @@ func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *
 	probe.TimeoutSeconds = roleProbe.TimeoutSeconds
 	probe.FailureThreshold = 3
 	roleChangedContainer.ReadinessProbe = probe
-	roleChangedContainer.Env = append(roleChangedContainer.Env, *roleProbe.Args.Host)
-	roleChangedContainer.Env = append(roleChangedContainer.Env, *roleProbe.Args.Port)
-	roleChangedContainer.Env = append(roleChangedContainer.Env, *roleProbe.Args.UserName)
-	roleChangedContainer.Env = append(roleChangedContainer.Env, *roleProbe.Args.Password)
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {

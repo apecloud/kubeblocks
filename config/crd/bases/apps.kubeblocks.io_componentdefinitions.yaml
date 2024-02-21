@@ -1034,11 +1034,23 @@ spec:
                         type: object
                     type: object
                   memberJoin:
-                    description: MemberJoin defines how to add a new replica to the
+                    description: 'MemberJoin defines how to add a new replica to the
                       replication group. This action is typically invoked when a new
                       replica needs to be added, such as during scale-out. It may
                       involve updating configuration, notifying other members, and
-                      ensuring data consistency. Cannot be updated.
+                      ensuring data consistency. Args for the action: - KB_SERVICE_PORT:
+                      The port on which the DB service listens. If the action is provided
+                      by a CDI GRPC plugin, this variable will be translated to the
+                      ''servicePort'' argument. - KB_SERVICE_USER: The username used
+                      to access the DB service with sufficient privileges. ''serviceUser''
+                      is used if provided by a CDI GRPC plugin. - KB_SERVICE_PASSWORD:
+                      The password of the user used to access the DB service . ''servicePassword''
+                      is used if provided by a CDI GRPC plugin. - KB_PRIMARY_POD_FQDN:
+                      The FQDN of the original primary Pod before switchover. ''primaryPodFQDN''
+                      is used if provided by a CDI GRPC plugin. - KB_NEW_MEMBER_POD_NAME:
+                      The name of the new member''s Pod. ''newMemberPodName'' is used
+                      if provided by a CDI GRPC plugin. Output of the action: - ERROR:
+                      Any error message if the action fails. Cannot be updated.'
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -1319,12 +1331,24 @@ spec:
                         type: object
                     type: object
                   memberLeave:
-                    description: MemberLeave defines how to remove a replica from
+                    description: 'MemberLeave defines how to remove a replica from
                       the replication group. This action is typically invoked when
                       a replica needs to be removed, such as during scale-in. It may
                       involve configuration updates and notifying other members about
                       the departure, but it is advisable to avoid performing data
-                      migration within this action. Cannot be updated.
+                      migration within this action. Args for the action: - KB_SERVICE_PORT:
+                      The port on which the DB service listens. If the action is provided
+                      by a CDI GRPC plugin, this variable will be translated to the
+                      ''servicePort'' argument. - KB_SERVICE_USER: The username used
+                      to access the DB service with sufficient privileges. ''serviceUser''
+                      is used if provided by a CDI GRPC plugin. - KB_SERVICE_PASSWORD:
+                      The password of the user used to access the DB service. ''servicePassword''
+                      is used if provided by a CDI GRPC plugin. - KB_PRIMARY_POD_FQDN:
+                      The FQDN of the original primary Pod before switchover. ''primaryPodFQDN''
+                      is used if provided by a CDI GRPC plugin. - KB_LEAVE_MEMBER_POD_NAME:
+                      The name of the leave member''s Pod. ''leaveMemberPodName''
+                      is used if provided by a CDI GRPC plugin. Output of the action:
+                      - ERROR: Any error message if the action fails. Cannot be updated.'
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -2191,9 +2215,21 @@ spec:
                         type: object
                     type: object
                   readonly:
-                    description: Readonly defines how to set a replica service as
+                    description: 'Readonly defines how to set a replica service as
                       read-only. This action is used to protect a replica in case
-                      of volume space exhaustion or excessive traffic. Cannot be updated.
+                      of volume space exhaustion or excessive traffic. Args for the
+                      action: - KB_POD_FQDN: The FQDN of the replica pod to check
+                      the role. If the action is implemented through a CDI GRPC plugin,
+                      this environment variable will be translated to the ''podFQDN''
+                      argument. - KB_SERVICE_PORT: The port on which the DB service
+                      listens. If the action is provided by a CDI GRPC plugin, this
+                      variable will be translated to the ''servicePort'' argument.
+                      - KB_SERVICE_USER: The username used to access the DB service
+                      with sufficient privileges. ''serviceUser'' is used if provided
+                      by a CDI GRPC plugin. - KB_SERVICE_PASSWORD: The password of
+                      the user used to access the DB service. ''servicePassword''
+                      is used if provided by a CDI GRPC plugin. Output of the action:
+                      - ERROR: Any error message if the action fails. Cannot be updated.'
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -2474,8 +2510,19 @@ spec:
                         type: object
                     type: object
                   readwrite:
-                    description: Readwrite defines how to set a replica service as
-                      read-write. Cannot be updated.
+                    description: 'Readwrite defines how to set a replica service as
+                      read-write. Args for the action: - KB_POD_FQDN: The FQDN of
+                      the replica pod to check the role. If the action is implemented
+                      through a CDI GRPC plugin, this environment variable will be
+                      translated to the ''podFQDN'' argument. - KB_SERVICE_PORT: The
+                      port on which the DB service listens. If the action is provided
+                      by a CDI GRPC plugin, this variable will be translated to the
+                      ''servicePort'' argument. - KB_SERVICE_USER: The username used
+                      to access the DB service with sufficient privileges. ''serviceUser''
+                      is used if provided by a CDI GRPC plugin. - KB_SERVICE_PASSWORD:
+                      The password of the user used to access the DB service. ''servicePassword''
+                      is used if provided by a CDI GRPC plugin. Output of the action:
+                      - ERROR: Any error message if the action fails. Cannot be updated.'
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -3038,480 +3085,32 @@ spec:
                         type: object
                     type: object
                   roleProbe:
-                    description: RoleProbe defines how to probe the role of replicas.
-                      Cannot be updated.
+                    description: 'RoleProbe defines the mechanism to probe the role
+                      of replicas periodically. The specified action will be executed
+                      by Lorry. If the execution is successful, the output will be
+                      used as the role of the replica. The role must be one of the
+                      names defined in the componentdefinition roles. The output will
+                      be compared with the last successful output. If there is a change,
+                      a rolechange event will be created to notify the controller
+                      to update the replica''s role. This action is required if the
+                      component has defined roles. Otherwise, the replicas'' pods
+                      will have no role information after cluster creation, and services
+                      will not route to the replica correctly. Args for the action:
+                      - KB_POD_IP: The pod IP of the replica to check the role. If
+                      the action is implemented through a CDI GRPC plugin, this environment
+                      variable will be translated to the ''podIP'' argument. - KB_SERVICE_PORT:
+                      The port on which the DB service listens. If the action is provided
+                      by a CDI GRPC plugin, this variable will be translated to the
+                      ''servicePort'' argument. - KB_SERVICE_USER: The username used
+                      to access the DB service and retrieve the role information with
+                      sufficient privileges. ''serviceUser'' is used if provided by
+                      a CDI GRPC plugin. - KB_SERVICE_PASSWORD: The password of the
+                      user used to access the DB service and retrieve the role information.
+                      ''servicePassword'' is used if provided by a CDI GRPC plugin.
+                      Output of the action: - ROLE: A string representing the role
+                      of the replica. It must be one of the names defined in the roles.
+                      - ERROR: Any error message if the action fails. Cannot be updated.'
                     properties:
-                      args:
-                        description: RoleProbeArgs defines the arguments for probing
-                          a role
-                        properties:
-                          host:
-                            description: Host is the argument containing the address
-                              of the db service to probe. This should specify where
-                              the database server is running, e.g. the service dns
-                              or IP address
-                            properties:
-                              name:
-                                description: Name of the environment variable. Must
-                                  be a C_IDENTIFIER.
-                                type: string
-                              value:
-                                description: 'Variable references $(VAR_NAME) are
-                                  expanded using the previously defined environment
-                                  variables in the container and any service environment
-                                  variables. If a variable cannot be resolved, the
-                                  reference in the input string will be unchanged.
-                                  Double $$ are reduced to a single $, which allows
-                                  for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)"
-                                  will produce the string literal "$(VAR_NAME)". Escaped
-                                  references will never be expanded, regardless of
-                                  whether the variable exists or not. Defaults to
-                                  "".'
-                                type: string
-                              valueFrom:
-                                description: Source for the environment variable's
-                                  value. Cannot be used if value is not empty.
-                                properties:
-                                  configMapKeyRef:
-                                    description: Selects a key of a ConfigMap.
-                                    properties:
-                                      key:
-                                        description: The key to select.
-                                        type: string
-                                      name:
-                                        description: 'Name of the referent. More info:
-                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion,
-                                          kind, uid?'
-                                        type: string
-                                      optional:
-                                        description: Specify whether the ConfigMap
-                                          or its key must be defined
-                                        type: boolean
-                                    required:
-                                    - key
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  fieldRef:
-                                    description: 'Selects a field of the pod: supports
-                                      metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
-                                      `metadata.annotations[''<KEY>'']`, spec.nodeName,
-                                      spec.serviceAccountName, status.hostIP, status.podIP,
-                                      status.podIPs.'
-                                    properties:
-                                      apiVersion:
-                                        description: Version of the schema the FieldPath
-                                          is written in terms of, defaults to "v1".
-                                        type: string
-                                      fieldPath:
-                                        description: Path of the field to select in
-                                          the specified API version.
-                                        type: string
-                                    required:
-                                    - fieldPath
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  resourceFieldRef:
-                                    description: 'Selects a resource of the container:
-                                      only resources limits and requests (limits.cpu,
-                                      limits.memory, limits.ephemeral-storage, requests.cpu,
-                                      requests.memory and requests.ephemeral-storage)
-                                      are currently supported.'
-                                    properties:
-                                      containerName:
-                                        description: 'Container name: required for
-                                          volumes, optional for env vars'
-                                        type: string
-                                      divisor:
-                                        anyOf:
-                                        - type: integer
-                                        - type: string
-                                        description: Specifies the output format of
-                                          the exposed resources, defaults to "1"
-                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                        x-kubernetes-int-or-string: true
-                                      resource:
-                                        description: 'Required: resource to select'
-                                        type: string
-                                    required:
-                                    - resource
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  secretKeyRef:
-                                    description: Selects a key of a secret in the
-                                      pod's namespace
-                                    properties:
-                                      key:
-                                        description: The key of the secret to select
-                                          from.  Must be a valid secret key.
-                                        type: string
-                                      name:
-                                        description: 'Name of the referent. More info:
-                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion,
-                                          kind, uid?'
-                                        type: string
-                                      optional:
-                                        description: Specify whether the Secret or
-                                          its key must be defined
-                                        type: boolean
-                                    required:
-                                    - key
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                type: object
-                            required:
-                            - name
-                            type: object
-                          password:
-                            description: Password is the argument containing password
-                              which is used to authenticate the database connection.
-                            properties:
-                              name:
-                                description: Name of the environment variable. Must
-                                  be a C_IDENTIFIER.
-                                type: string
-                              value:
-                                description: 'Variable references $(VAR_NAME) are
-                                  expanded using the previously defined environment
-                                  variables in the container and any service environment
-                                  variables. If a variable cannot be resolved, the
-                                  reference in the input string will be unchanged.
-                                  Double $$ are reduced to a single $, which allows
-                                  for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)"
-                                  will produce the string literal "$(VAR_NAME)". Escaped
-                                  references will never be expanded, regardless of
-                                  whether the variable exists or not. Defaults to
-                                  "".'
-                                type: string
-                              valueFrom:
-                                description: Source for the environment variable's
-                                  value. Cannot be used if value is not empty.
-                                properties:
-                                  configMapKeyRef:
-                                    description: Selects a key of a ConfigMap.
-                                    properties:
-                                      key:
-                                        description: The key to select.
-                                        type: string
-                                      name:
-                                        description: 'Name of the referent. More info:
-                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion,
-                                          kind, uid?'
-                                        type: string
-                                      optional:
-                                        description: Specify whether the ConfigMap
-                                          or its key must be defined
-                                        type: boolean
-                                    required:
-                                    - key
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  fieldRef:
-                                    description: 'Selects a field of the pod: supports
-                                      metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
-                                      `metadata.annotations[''<KEY>'']`, spec.nodeName,
-                                      spec.serviceAccountName, status.hostIP, status.podIP,
-                                      status.podIPs.'
-                                    properties:
-                                      apiVersion:
-                                        description: Version of the schema the FieldPath
-                                          is written in terms of, defaults to "v1".
-                                        type: string
-                                      fieldPath:
-                                        description: Path of the field to select in
-                                          the specified API version.
-                                        type: string
-                                    required:
-                                    - fieldPath
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  resourceFieldRef:
-                                    description: 'Selects a resource of the container:
-                                      only resources limits and requests (limits.cpu,
-                                      limits.memory, limits.ephemeral-storage, requests.cpu,
-                                      requests.memory and requests.ephemeral-storage)
-                                      are currently supported.'
-                                    properties:
-                                      containerName:
-                                        description: 'Container name: required for
-                                          volumes, optional for env vars'
-                                        type: string
-                                      divisor:
-                                        anyOf:
-                                        - type: integer
-                                        - type: string
-                                        description: Specifies the output format of
-                                          the exposed resources, defaults to "1"
-                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                        x-kubernetes-int-or-string: true
-                                      resource:
-                                        description: 'Required: resource to select'
-                                        type: string
-                                    required:
-                                    - resource
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  secretKeyRef:
-                                    description: Selects a key of a secret in the
-                                      pod's namespace
-                                    properties:
-                                      key:
-                                        description: The key of the secret to select
-                                          from.  Must be a valid secret key.
-                                        type: string
-                                      name:
-                                        description: 'Name of the referent. More info:
-                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion,
-                                          kind, uid?'
-                                        type: string
-                                      optional:
-                                        description: Specify whether the Secret or
-                                          its key must be defined
-                                        type: boolean
-                                    required:
-                                    - key
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                type: object
-                            required:
-                            - name
-                            type: object
-                          port:
-                            description: Port is the argument containing the port
-                              on which the db service is listening.
-                            properties:
-                              name:
-                                description: Name of the environment variable. Must
-                                  be a C_IDENTIFIER.
-                                type: string
-                              value:
-                                description: 'Variable references $(VAR_NAME) are
-                                  expanded using the previously defined environment
-                                  variables in the container and any service environment
-                                  variables. If a variable cannot be resolved, the
-                                  reference in the input string will be unchanged.
-                                  Double $$ are reduced to a single $, which allows
-                                  for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)"
-                                  will produce the string literal "$(VAR_NAME)". Escaped
-                                  references will never be expanded, regardless of
-                                  whether the variable exists or not. Defaults to
-                                  "".'
-                                type: string
-                              valueFrom:
-                                description: Source for the environment variable's
-                                  value. Cannot be used if value is not empty.
-                                properties:
-                                  configMapKeyRef:
-                                    description: Selects a key of a ConfigMap.
-                                    properties:
-                                      key:
-                                        description: The key to select.
-                                        type: string
-                                      name:
-                                        description: 'Name of the referent. More info:
-                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion,
-                                          kind, uid?'
-                                        type: string
-                                      optional:
-                                        description: Specify whether the ConfigMap
-                                          or its key must be defined
-                                        type: boolean
-                                    required:
-                                    - key
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  fieldRef:
-                                    description: 'Selects a field of the pod: supports
-                                      metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
-                                      `metadata.annotations[''<KEY>'']`, spec.nodeName,
-                                      spec.serviceAccountName, status.hostIP, status.podIP,
-                                      status.podIPs.'
-                                    properties:
-                                      apiVersion:
-                                        description: Version of the schema the FieldPath
-                                          is written in terms of, defaults to "v1".
-                                        type: string
-                                      fieldPath:
-                                        description: Path of the field to select in
-                                          the specified API version.
-                                        type: string
-                                    required:
-                                    - fieldPath
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  resourceFieldRef:
-                                    description: 'Selects a resource of the container:
-                                      only resources limits and requests (limits.cpu,
-                                      limits.memory, limits.ephemeral-storage, requests.cpu,
-                                      requests.memory and requests.ephemeral-storage)
-                                      are currently supported.'
-                                    properties:
-                                      containerName:
-                                        description: 'Container name: required for
-                                          volumes, optional for env vars'
-                                        type: string
-                                      divisor:
-                                        anyOf:
-                                        - type: integer
-                                        - type: string
-                                        description: Specifies the output format of
-                                          the exposed resources, defaults to "1"
-                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                        x-kubernetes-int-or-string: true
-                                      resource:
-                                        description: 'Required: resource to select'
-                                        type: string
-                                    required:
-                                    - resource
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  secretKeyRef:
-                                    description: Selects a key of a secret in the
-                                      pod's namespace
-                                    properties:
-                                      key:
-                                        description: The key of the secret to select
-                                          from.  Must be a valid secret key.
-                                        type: string
-                                      name:
-                                        description: 'Name of the referent. More info:
-                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion,
-                                          kind, uid?'
-                                        type: string
-                                      optional:
-                                        description: Specify whether the Secret or
-                                          its key must be defined
-                                        type: boolean
-                                    required:
-                                    - key
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                type: object
-                            required:
-                            - name
-                            type: object
-                          user:
-                            description: UserName is the argument containing username
-                              which is used to authenticate the database connection.
-                            properties:
-                              name:
-                                description: Name of the environment variable. Must
-                                  be a C_IDENTIFIER.
-                                type: string
-                              value:
-                                description: 'Variable references $(VAR_NAME) are
-                                  expanded using the previously defined environment
-                                  variables in the container and any service environment
-                                  variables. If a variable cannot be resolved, the
-                                  reference in the input string will be unchanged.
-                                  Double $$ are reduced to a single $, which allows
-                                  for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)"
-                                  will produce the string literal "$(VAR_NAME)". Escaped
-                                  references will never be expanded, regardless of
-                                  whether the variable exists or not. Defaults to
-                                  "".'
-                                type: string
-                              valueFrom:
-                                description: Source for the environment variable's
-                                  value. Cannot be used if value is not empty.
-                                properties:
-                                  configMapKeyRef:
-                                    description: Selects a key of a ConfigMap.
-                                    properties:
-                                      key:
-                                        description: The key to select.
-                                        type: string
-                                      name:
-                                        description: 'Name of the referent. More info:
-                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion,
-                                          kind, uid?'
-                                        type: string
-                                      optional:
-                                        description: Specify whether the ConfigMap
-                                          or its key must be defined
-                                        type: boolean
-                                    required:
-                                    - key
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  fieldRef:
-                                    description: 'Selects a field of the pod: supports
-                                      metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
-                                      `metadata.annotations[''<KEY>'']`, spec.nodeName,
-                                      spec.serviceAccountName, status.hostIP, status.podIP,
-                                      status.podIPs.'
-                                    properties:
-                                      apiVersion:
-                                        description: Version of the schema the FieldPath
-                                          is written in terms of, defaults to "v1".
-                                        type: string
-                                      fieldPath:
-                                        description: Path of the field to select in
-                                          the specified API version.
-                                        type: string
-                                    required:
-                                    - fieldPath
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  resourceFieldRef:
-                                    description: 'Selects a resource of the container:
-                                      only resources limits and requests (limits.cpu,
-                                      limits.memory, limits.ephemeral-storage, requests.cpu,
-                                      requests.memory and requests.ephemeral-storage)
-                                      are currently supported.'
-                                    properties:
-                                      containerName:
-                                        description: 'Container name: required for
-                                          volumes, optional for env vars'
-                                        type: string
-                                      divisor:
-                                        anyOf:
-                                        - type: integer
-                                        - type: string
-                                        description: Specifies the output format of
-                                          the exposed resources, defaults to "1"
-                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                        x-kubernetes-int-or-string: true
-                                      resource:
-                                        description: 'Required: resource to select'
-                                        type: string
-                                    required:
-                                    - resource
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                  secretKeyRef:
-                                    description: Selects a key of a secret in the
-                                      pod's namespace
-                                    properties:
-                                      key:
-                                        description: The key of the secret to select
-                                          from.  Must be a valid secret key.
-                                        type: string
-                                      name:
-                                        description: 'Name of the referent. More info:
-                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion,
-                                          kind, uid?'
-                                        type: string
-                                      optional:
-                                        description: Specify whether the Secret or
-                                          its key must be defined
-                                        type: boolean
-                                    required:
-                                    - key
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                type: object
-                            required:
-                            - name
-                            type: object
-                        type: object
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
                           name to do the action. the BuiltinHandler within the same
@@ -3789,6 +3388,11 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      initialDelaySeconds:
+                        description: 'Number of seconds after the container has started
+                          before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                        format: int32
+                        type: integer
                       periodSeconds:
                         description: How often (in seconds) to perform the probe.
                           Default to 10 seconds. Minimum value is 1.

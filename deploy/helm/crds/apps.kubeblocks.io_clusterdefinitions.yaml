@@ -52,77 +52,69 @@ spec:
             description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
             properties:
               componentDefs:
-                description: componentDefs provides cluster components definitions.
+                description: Provides the definitions for the cluster components.
                 items:
                   description: ClusterComponentDefinition provides a workload component
-                    specification template, with attributes that strongly work with
-                    stateful workloads and day-2 operations behaviors.
+                    specification template. Attributes are designed to work effectively
+                    with stateful workloads and day-2 operations behaviors.
                   properties:
                     characterType:
-                      description: "characterType defines well-known database component
-                        name, such as mongos(mongodb), proxy(redis), mariadb(mysql).
-                        KubeBlocks will generate proper monitor configs for well-known
-                        characterType when builtIn is true. \n It will also be used
-                        in role probe to decide which probe engine to use. current
-                        available candidates are: mysql, postgres, mongodb, redis,
-                        etcd, kafka."
+                      description: Defines well-known database component name, such
+                        as mongos(mongodb), proxy(redis), mariadb(mysql).
                       type: string
                     componentDefRef:
-                      description: componentDefRef is used to inject values from other
-                        components into the current component. values will be saved
-                        and updated in a configmap and mounted to the current component.
+                      description: Used to inject values from other components into
+                        the current component. Values will be saved and updated in
+                        a configmap and mounted to the current component.
                       items:
                         description: ComponentDefRef is used to select the component
                           and its fields to be referenced.
                         properties:
                           componentDefName:
-                            description: componentDefName is the name of the componentDef
-                              to select.
+                            description: The name of the componentDef to be selected.
                             type: string
                           componentRefEnv:
-                            description: componentRefEnv specifies a list of values
-                              to be injected as env variables to each component.
+                            description: The values that are to be injected as environment
+                              variables into each component.
                             items:
                               description: ComponentRefEnv specifies name and value
                                 of an env.
                               properties:
                                 name:
-                                  description: name is the name of the env to be injected,
-                                    and it must be a C identifier.
+                                  description: The name of the env, it must be a C
+                                    identifier.
                                   pattern: ^[A-Za-z_][A-Za-z0-9_]*$
                                   type: string
                                 value:
-                                  description: value is the value of the env to be
-                                    injected.
+                                  description: The value of the env.
                                   type: string
                                 valueFrom:
-                                  description: valueFrom specifies the source of the
-                                    env to be injected.
+                                  description: The source from which the value of
+                                    the env.
                                   properties:
                                     fieldPath:
-                                      description: "fieldRef is the jsonpath of the
-                                        source to select when type is `FieldRef`.
-                                        there are two objects registered in the jsonpath:
-                                        `componentDef` and `components`: \n - componentDef
-                                        is the component definition object specified
-                                        in `componentRef.componentDefName`. - components
-                                        is the component list objects referring to
-                                        the component definition object."
+                                      description: "The jsonpath of the source to
+                                        select when the Type is `FieldRef`. Two objects
+                                        are registered in the jsonpath: `componentDef`
+                                        and `components`: \n - `componentDef` is the
+                                        component definition object specified in `componentRef.componentDefName`.
+                                        - `components` are the component list objects
+                                        referring to the component definition object."
                                       type: string
                                     format:
                                       default: ="$POD_FQDN"
-                                      description: "format is the format of each headless
-                                        service address. there are three builtin variables
-                                        can be used as placeholder: $POD_ORDINAL,
-                                        $POD_FQDN, $POD_NAME \n - $POD_ORDINAL is
-                                        the ordinal of the pod. - $POD_FQDN is the
-                                        fully qualified domain name of the pod. -
-                                        $POD_NAME is the name of the pod"
+                                      description: "Defines the format of each headless
+                                        service address. Three builtin variables can
+                                        be used as placeholders: `$POD_ORDINAL`, `$POD_FQDN`,
+                                        `$POD_NAME` \n - `$POD_ORDINAL` represents
+                                        the ordinal of the pod. - `$POD_FQDN` represents
+                                        the fully qualified domain name of the pod.
+                                        - `$POD_NAME` represents the name of the pod."
                                       type: string
                                     joinWith:
                                       default: ','
-                                      description: joinWith is the string to join
-                                        the values of headless service addresses.
+                                      description: The string used to join the values
+                                        of headless service addresses.
                                       type: string
                                     type:
                                       allOf:
@@ -134,8 +126,8 @@ spec:
                                         - FieldRef
                                         - ServiceRef
                                         - HeadlessServiceRef
-                                      description: 'type is the type of the source
-                                        to select. There are three types: `FieldRef`,
+                                      description: 'Specifies the source to select.
+                                        It can be one of three types: `FieldRef`,
                                         `ServiceRef`, `HeadlessServiceRef`.'
                                       type: string
                                   required:
@@ -156,9 +148,8 @@ spec:
                             - enum:
                               - Ignore
                               - Fail
-                            description: failurePolicy is the failure policy of the
-                              component. If failed to find the component, the failure
-                              policy will be used.
+                            description: Defines the policy to be followed in case
+                              of a failure in finding the component.
                             type: string
                         required:
                         - componentDefName
@@ -168,14 +159,12 @@ spec:
                       - componentDefName
                       x-kubernetes-list-type: map
                     configSpecs:
-                      description: The configSpec field provided by provider, and
-                        finally this configTemplateRefs will be rendered into the
-                        user's own configuration file according to the user's cluster.
+                      description: Defines the template of configurations.
                       items:
                         properties:
                           asEnvFrom:
-                            description: 'asEnvFrom is optional: the list of containers
-                              will be injected into EnvFrom.'
+                            description: Specify the list of containers that will
+                              be injected into EnvFrom.
                             items:
                               type: string
                             type: array
@@ -187,27 +176,26 @@ spec:
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           defaultMode:
-                            description: "defaultMode is optional: mode bits used
-                              to set permissions on created files by default. \n Must
-                              be an octal value between 0000 and 0777 or a decimal
-                              value between 0 and 511. YAML accepts both octal and
-                              decimal values, JSON requires decimal values for mode
-                              bits. Defaults to 0644. \n Directories within the path
-                              are not affected by this setting. This might be in conflict
-                              with other options that affect the file mode, like fsGroup,
-                              and the result can be other mode bits set."
+                            description: "Specify mode bits used to set permissions
+                              on created files by default. \n Must be an octal value
+                              between 0000 and 0777 or a decimal value between 0 and
+                              511. YAML accepts both octal and decimal values, JSON
+                              requires decimal values for mode bits. Defaults to 0644.
+                              \n Directories within the path are not affected by this
+                              setting. This might be in conflict with other options
+                              that affect the file mode, like fsGroup, and the result
+                              can be other mode bits set."
                             format: int32
                             type: integer
                           keys:
                             description: Specify a list of keys. If empty, ConfigConstraint
-                              takes effect for all keys in configmap.
+                              applies to all keys in the configmap.
                             items:
                               type: string
                             type: array
                             x-kubernetes-list-type: set
                           legacyRenderedConfigSpec:
-                            description: 'lazyRenderedConfigSpec is optional: specify
-                              the secondary rendered config spec.'
+                            description: Defines the secondary rendered config spec
                             properties:
                               namespace:
                                 default: default
@@ -236,30 +224,29 @@ spec:
                             - templateRef
                             type: object
                           name:
-                            description: Specify the name of configuration template.
+                            description: Specify the name of the configuration template.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             default: default
-                            description: Specify the namespace of the referenced the
-                              configuration template ConfigMap object. An empty namespace
-                              is equivalent to the "default" namespace.
+                            description: Specify the namespace of the referenced configuration
+                              template ConfigMap object. An empty namespace is equivalent
+                              to the "default" namespace.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                           templateRef:
-                            description: Specify the name of the referenced the configuration
+                            description: Specify the name of the referenced configuration
                               template ConfigMap object.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           volumeName:
-                            description: volumeName is the volume name of PodTemplate,
-                              which the configuration file produced through the configuration
-                              template will be mounted to the corresponding volume.
-                              Must be a DNS_LABEL name. The volume name must be defined
-                              in podSpec.containers[*].volumeMounts.
+                            description: The volume name of PodTemplate, to which
+                              the configuration file produced through the configuration
+                              template will be mounted. Must be a DNS_LABEL name.
+                              The volume name must be defined in podSpec.containers[*].volumeMounts.
                             maxLength: 63
                             pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
@@ -273,17 +260,18 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     consensusSpec:
-                      description: consensusSpec defines consensus related spec if
-                        workloadType is Consensus, required if workloadType is Consensus.
+                      description: Defines spec for `Consensus` workloads. It's required
+                        if the workload type is `Consensus`.
                       properties:
                         followers:
-                          description: followers, has voting right but not Leader.
+                          description: Members of the consensus set that have voting
+                            rights but are not the leader.
                           items:
                             properties:
                               accessMode:
                                 default: ReadWrite
-                                description: accessMode, what service this member
-                                  capable.
+                                description: Specifies the services that this member
+                                  is capable of providing.
                                 enum:
                                 - None
                                 - Readonly
@@ -291,14 +279,13 @@ spec:
                                 type: string
                               name:
                                 default: leader
-                                description: name, role name.
+                                description: Specifies the name of the consensus member.
                                 type: string
                               replicas:
                                 default: 0
-                                description: "replicas, number of Pods of this role.
-                                  \n - default 1 for Leader - default 0 for Learner
-                                  - default `Cluster.spec.componentSpec[*].Replicas
-                                  - Leader.Replicas - Learner.Replicas` for Followers"
+                                description: Indicates the number of Pods that perform
+                                  this role. The default is 1 for `Leader`, 0 for
+                                  `Learner`, others for `Followers`.
                                 format: int32
                                 minimum: 0
                                 type: integer
@@ -308,11 +295,13 @@ spec:
                             type: object
                           type: array
                         leader:
-                          description: leader, one single leader.
+                          description: Represents a single leader in the consensus
+                            set.
                           properties:
                             accessMode:
                               default: ReadWrite
-                              description: accessMode, what service this member capable.
+                              description: Specifies the services that this member
+                                is capable of providing.
                               enum:
                               - None
                               - Readonly
@@ -320,14 +309,13 @@ spec:
                               type: string
                             name:
                               default: leader
-                              description: name, role name.
+                              description: Specifies the name of the consensus member.
                               type: string
                             replicas:
                               default: 0
-                              description: "replicas, number of Pods of this role.
-                                \n - default 1 for Leader - default 0 for Learner
-                                - default `Cluster.spec.componentSpec[*].Replicas
-                                - Leader.Replicas - Learner.Replicas` for Followers"
+                              description: Indicates the number of Pods that perform
+                                this role. The default is 1 for `Leader`, 0 for `Learner`,
+                                others for `Followers`.
                               format: int32
                               minimum: 0
                               type: integer
@@ -336,11 +324,13 @@ spec:
                           - name
                           type: object
                         learner:
-                          description: learner, no voting right.
+                          description: Represents a member of the consensus set that
+                            does not have voting rights.
                           properties:
                             accessMode:
                               default: ReadWrite
-                              description: accessMode, what service this member capable.
+                              description: Specifies the services that this member
+                                is capable of providing.
                               enum:
                               - None
                               - Readonly
@@ -348,14 +338,13 @@ spec:
                               type: string
                             name:
                               default: leader
-                              description: name, role name.
+                              description: Specifies the name of the consensus member.
                               type: string
                             replicas:
                               default: 0
-                              description: "replicas, number of Pods of this role.
-                                \n - default 1 for Leader - default 0 for Learner
-                                - default `Cluster.spec.componentSpec[*].Replicas
-                                - Leader.Replicas - Learner.Replicas` for Followers"
+                              description: Indicates the number of Pods that perform
+                                this role. The default is 1 for `Leader`, 0 for `Learner`,
+                                others for `Followers`.
                               format: int32
                               minimum: 0
                               type: integer
@@ -364,22 +353,20 @@ spec:
                           - name
                           type: object
                         llPodManagementPolicy:
-                          description: "llPodManagementPolicy is the low-level controls
-                            how pods are created during initial scale up, when replacing
-                            pods on nodes, or when scaling down. \n - `OrderedReady`
-                            policy specify where pods are created in increasing order
-                            (pod-0, then pod-1, etc) and the controller will wait
-                            until each pod is ready before continuing. When scaling
-                            down, the pods are removed in the opposite order. - `Parallel`
-                            policy specify create pods in parallel to match the desired
-                            scale without waiting, and on scale down will delete all
-                            pods at once."
+                          description: "Controls the creation of pods during initial
+                            scale up, replacement of pods on nodes, and scaling down.
+                            \n - `OrderedReady`: Creates pods in increasing order
+                            (pod-0, then pod-1, etc). The controller waits until each
+                            pod is ready before continuing. Pods are removed in reverse
+                            order when scaling down. - `Parallel`: Creates pods in
+                            parallel to match the desired scale without waiting. All
+                            pods are deleted at once when scaling down."
                           type: string
                         llUpdateStrategy:
-                          description: llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy
-                            that will be employed to update Pods in the StatefulSet
-                            when a revision is made to Template. Will ignore `updateStrategy`
-                            attribute if provided.
+                          description: Specifies the low-level StatefulSetUpdateStrategy
+                            to be used when updating Pods in the StatefulSet upon
+                            a revision to the Template. `UpdateStrategy` will be ignored
+                            if this is provided.
                           properties:
                             rollingUpdate:
                               description: RollingUpdate is used to communicate parameters
@@ -419,16 +406,13 @@ spec:
                           type: object
                         updateStrategy:
                           default: Serial
-                          description: "updateStrategy, Pods update strategy. In case
-                            of workloadType=Consensus the update strategy will be
-                            following: \n - serial: update Members one by one that
-                            guarantee minimum component unavailable time. `Learner
-                            -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly)
-                            -> Follower(with AccessMode=readWrite) -> Leader` - bestEffortParallel:
-                            update Members in parallel that guarantee minimum component
-                            un-writable time. `Learner, Follower(minority) in parallel
-                            -> Follower(majority) -> Leader`, keep majority online
-                            all the time. - parallel: force parallel"
+                          description: "Specifies the strategy for updating Pods.
+                            For workloadType=`Consensus`, the update strategy can
+                            be one of the following: \n - `Serial`: Updates Members
+                            sequentially to minimize component downtime. - `BestEffortParallel`:
+                            Updates Members in parallel to minimize component write
+                            downtime. Majority remains online at all times. - `Parallel`:
+                            Forces parallel updates."
                           enum:
                           - Serial
                           - BestEffortParallel
@@ -438,29 +422,29 @@ spec:
                       - leader
                       type: object
                     customLabelSpecs:
-                      description: customLabelSpecs is used for custom label tags
-                        which you want to add to the component resources.
+                      description: Used for custom label tags which you want to add
+                        to the component resources.
                       items:
                         properties:
                           key:
-                            description: key name of label
+                            description: The key of the label.
                             type: string
                           resources:
-                            description: resources defines the resources to be labeled.
+                            description: The resources that will be patched with the
+                              label.
                             items:
                               properties:
                                 gvk:
-                                  description: "gvk is Group/Version/Kind, for example
-                                    \"v1/Pod\", \"apps/v1/StatefulSet\", etc. \n when
-                                    the gvk resource filtered by the selector already
-                                    exists, if there is no corresponding custom label,
-                                    it will be added, and if label already exists,
-                                    it will be updated."
+                                  description: Represents the GVK of a resource, such
+                                    as "v1/Pod", "apps/v1/StatefulSet", etc. When
+                                    a resource matching this is found by the selector,
+                                    a custom label will be added if it doesn't already
+                                    exist, or updated if it does.
                                   type: string
                                 selector:
                                   additionalProperties:
                                     type: string
-                                  description: selector is a label query over a set
+                                  description: A label query used to filter a set
                                     of resources.
                                   type: object
                               required:
@@ -468,7 +452,7 @@ spec:
                               type: object
                             type: array
                           value:
-                            description: value of label
+                            description: The value of the label.
                             type: string
                         required:
                         - key
@@ -479,53 +463,51 @@ spec:
                       - key
                       x-kubernetes-list-type: map
                     description:
-                      description: The description of component definition.
+                      description: Description of the component definition.
                       type: string
                     horizontalScalePolicy:
-                      description: horizontalScalePolicy controls the behavior of
-                        horizontal scale.
+                      description: Defines the behavior of horizontal scale.
                       properties:
                         backupPolicyTemplateName:
-                          description: BackupPolicyTemplateName reference the backup
-                            policy template.
+                          description: Refers to the backup policy template.
                           type: string
                         type:
                           default: None
-                          description: "type controls what kind of data synchronization
-                            do when component scale out. Policy is in enum of {None,
-                            CloneVolume}. The default policy is `None`. \n - None:
-                            Default policy, create empty volume and no data clone.
-                            - CloneVolume: Do data clone to newly scaled pods. Prefer
-                            to use volume snapshot first, and will try backup tool
-                            if volume snapshot is not enabled, finally report error
-                            if both above cannot work. - Snapshot: Deprecated, alias
-                            for CloneVolume."
+                          description: "Determines the data synchronization method
+                            when a component scales out. The policy can be one of
+                            the following: {None, CloneVolume}. The default policy
+                            is `None`. \n - `None`: This is the default policy. It
+                            creates an empty volume without data cloning. - `CloneVolume`:
+                            This policy clones data to newly scaled pods. It first
+                            tries to use a volume snapshot. If volume snapshot is
+                            not enabled, it will attempt to use a backup tool. If
+                            neither method works, it will report an error. - `Snapshot`:
+                            This policy is deprecated and is an alias for CloneVolume."
                           enum:
                           - None
                           - CloneVolume
                           - Snapshot
                           type: string
                         volumeMountsName:
-                          description: volumeMountsName defines which volumeMount
-                            of the container to do backup, only work if Type is not
-                            None if not specified, the 1st volumeMount will be chosen
+                          description: Specifies the volumeMount of the container
+                            to backup. This only works if Type is not None. If not
+                            specified, the first volumeMount will be selected.
                           type: string
                       type: object
                     logConfigs:
-                      description: logConfigs is detail log file config which provided
-                        by provider.
+                      description: Specify the logging files which can be observed
+                        and configured by cluster users.
                       items:
                         properties:
                           filePathPattern:
-                            description: filePathPattern log file path pattern which
-                              indicate how to find this file corresponding to variable
-                              (log path) in database kernel. please don't set this
-                              casually.
+                            description: Indicates the path to the log file using
+                              a pattern, it corresponds to the variable (log path)
+                              in the database kernel.
                             maxLength: 4096
                             type: string
                           name:
-                            description: name log type name, such as slow for MySQL
-                              slow log file.
+                            description: Specifies the type of log, such as 'slow'
+                              for a MySQL slow log file.
                             maxLength: 128
                             type: string
                         required:
@@ -537,52 +519,47 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     monitor:
-                      description: monitor is monitoring config which provided by
-                        provider.
+                      description: Specify the config that how to monitor the component.
                       properties:
                         builtIn:
                           default: false
-                          description: builtIn is a switch to enable KubeBlocks builtIn
-                            monitoring. If BuiltIn is set to true, monitor metrics
-                            will be scraped automatically. If BuiltIn is set to false,
-                            the provider should set ExporterConfig and Sidecar container
-                            own.
+                          description: To enable the built-in monitoring. When set
+                            to true, monitoring metrics will be automatically scraped.
+                            When set to false, the provider is expected to configure
+                            the ExporterConfig and manage the Sidecar container.
                           type: boolean
                         exporterConfig:
-                          description: exporterConfig provided by provider, which
-                            specify necessary information to Time Series Database.
-                            exporterConfig is valid when builtIn is false.
+                          description: Provided by the provider and contains the necessary
+                            information for the Time Series Database. This field is
+                            only valid when BuiltIn is set to false.
                           properties:
                             scrapePath:
                               default: /metrics
-                              description: scrapePath is exporter url path for Time
-                                Series Database to scrape metrics.
+                              description: Specifies the URL path that the exporter
+                                uses for the Time Series Database to scrape metrics.
                               maxLength: 128
                               type: string
                             scrapePort:
                               anyOf:
                               - type: integer
                               - type: string
-                              description: scrapePort is exporter port for Time Series
-                                Database to scrape metrics.
+                              description: Defines the port that the exporter uses
+                                for the Time Series Database to scrape metrics.
                               x-kubernetes-int-or-string: true
                           required:
                           - scrapePort
                           type: object
                       type: object
                     name:
-                      description: A component definition name, this name could be
-                        used as default name of `Cluster.spec.componentSpecs.name`,
-                        and so this name is need to conform with same validation rules
-                        as `Cluster.spec.componentSpecs.name`, that is currently comply
-                        with IANA Service Naming rule. This name will apply to "apps.kubeblocks.io/component-name"
-                        object label value.
+                      description: This name could be used as default name of `cluster.spec.componentSpecs.name`,
+                        and needs to conform with same validation rules as `cluster.spec.componentSpecs.name`,
+                        currently complying with IANA Service Naming rule. This name
+                        will apply to cluster objects as the value of label "apps.kubeblocks.io/component-name".
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     podSpec:
-                      description: podSpec define pod spec template of the cluster
-                        component.
+                      description: Defines the pod spec template of component.
                       properties:
                         activeDeadlineSeconds:
                           description: Optional duration in seconds the pod may be
@@ -8308,27 +8285,28 @@ spec:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                     postStartSpec:
-                      description: postStartSpec defines the command to be executed
-                        when the component is ready, and the command will only be
-                        executed once after the component becomes ready.
+                      description: Defines the command to be executed when the component
+                        is ready, and the command will only be executed once after
+                        the component becomes ready.
                       properties:
                         cmdExecutorConfig:
-                          description: cmdExecutorConfig is the executor configuration
-                            of the post-start command.
+                          description: Specifies the  post-start command to be executed.
                           properties:
                             args:
-                              description: args is used to perform statements.
+                              description: Additional parameters used in the execution
+                                of the command.
                               items:
                                 type: string
                               type: array
                             command:
-                              description: command to perform statements.
+                              description: The command to be executed.
                               items:
                                 type: string
                               minItems: 1
                               type: array
                             env:
-                              description: envs is a list of environment variables.
+                              description: A list of environment variables that will
+                                be injected into the command execution context.
                               items:
                                 description: EnvVar represents an environment variable
                                   present in a Container.
@@ -8451,7 +8429,7 @@ spec:
                               type: array
                               x-kubernetes-preserve-unknown-fields: true
                             image:
-                              description: image for Connector when executing the
+                              description: Specifies the image used to execute the
                                 command.
                               type: string
                           required:
@@ -8459,15 +8437,14 @@ spec:
                           - image
                           type: object
                         scriptSpecSelectors:
-                          description: scriptSpecSelectors defines the selector of
-                            the scriptSpecs that need to be referenced. Once ScriptSpecSelectors
-                            is defined, the scripts defined in scriptSpecs can be
-                            referenced in the PostStartAction.CmdExecutorConfig.
+                          description: Used to select the script that need to be referenced.
+                            When defined, the scripts defined in scriptSpecs can be
+                            referenced within the CmdExecutorConfig.
                           items:
                             properties:
                               name:
-                                description: ScriptSpec name of the referent, refer
-                                  to componentDefs[x].scriptSpecs[y].Name.
+                                description: Represents the name of the ScriptSpec
+                                  referent.
                                 maxLength: 63
                                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                 type: string
@@ -8479,23 +8456,24 @@ spec:
                       - cmdExecutorConfig
                       type: object
                     probes:
-                      description: probes setting for healthy checks.
+                      description: Settings for health checks.
                       properties:
                         roleProbe:
-                          description: Probe for DB role changed check.
+                          description: Specifies the probe used for checking the role
+                            of the component.
                           properties:
                             commands:
-                              description: commands used to execute for probe.
+                              description: Commands used to execute for probe.
                               properties:
                                 queries:
-                                  description: Read check executed on probe sidecar,
-                                    used to check workload's readonly access.
+                                  description: Defines read checks that are executed
+                                    on the probe sidecar.
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: Write check executed on probe sidecar,
-                                    used to check workload's allow write access.
+                                  description: Defines write checks that are executed
+                                    on the probe sidecar.
                                   items:
                                     type: string
                                   type: array
@@ -8522,11 +8500,11 @@ spec:
                               type: integer
                           type: object
                         roleProbeTimeoutAfterPodsReady:
-                          description: "roleProbeTimeoutAfterPodsReady(in seconds),
-                            when all pods of the component are ready, it will detect
-                            whether the application is available in the pod. if pods
-                            exceed the InitializationTimeoutSeconds time without a
-                            role label, this component will enter the Failed/Abnormal
+                          description: "Defines the timeout (in seconds) for the role
+                            probe after all pods of the component are ready. The system
+                            will check if the application is available in the pod.
+                            If pods exceed the InitializationTimeoutSeconds time without
+                            a role label, this component will enter the Failed/Abnormal
                             phase. \n Note that this configuration will only take
                             effect if the component supports RoleProbe and will not
                             affect the life cycle of the pod. default values are 60
@@ -8535,20 +8513,21 @@ spec:
                           minimum: 30
                           type: integer
                         runningProbe:
-                          description: Probe for DB running check.
+                          description: Specifies the probe used for checking the running
+                            status of the component.
                           properties:
                             commands:
-                              description: commands used to execute for probe.
+                              description: Commands used to execute for probe.
                               properties:
                                 queries:
-                                  description: Read check executed on probe sidecar,
-                                    used to check workload's readonly access.
+                                  description: Defines read checks that are executed
+                                    on the probe sidecar.
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: Write check executed on probe sidecar,
-                                    used to check workload's allow write access.
+                                  description: Defines write checks that are executed
+                                    on the probe sidecar.
                                   items:
                                     type: string
                                   type: array
@@ -8575,20 +8554,21 @@ spec:
                               type: integer
                           type: object
                         statusProbe:
-                          description: Probe for DB status check.
+                          description: Specifies the probe used for checking the status
+                            of the component.
                           properties:
                             commands:
-                              description: commands used to execute for probe.
+                              description: Commands used to execute for probe.
                               properties:
                                 queries:
-                                  description: Read check executed on probe sidecar,
-                                    used to check workload's readonly access.
+                                  description: Defines read checks that are executed
+                                    on the probe sidecar.
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: Write check executed on probe sidecar,
-                                    used to check workload's allow write access.
+                                  description: Defines write checks that are executed
+                                    on the probe sidecar.
                                   items:
                                     type: string
                                   type: array
@@ -8616,26 +8596,23 @@ spec:
                           type: object
                       type: object
                     replicationSpec:
-                      description: replicationSpec defines replication related spec
-                        if workloadType is Replication.
+                      description: Defines spec for `Replication` workloads.
                       properties:
                         llPodManagementPolicy:
-                          description: "llPodManagementPolicy is the low-level controls
-                            how pods are created during initial scale up, when replacing
-                            pods on nodes, or when scaling down. \n - `OrderedReady`
-                            policy specify where pods are created in increasing order
-                            (pod-0, then pod-1, etc) and the controller will wait
-                            until each pod is ready before continuing. When scaling
-                            down, the pods are removed in the opposite order. - `Parallel`
-                            policy specify create pods in parallel to match the desired
-                            scale without waiting, and on scale down will delete all
-                            pods at once."
+                          description: "Controls the creation of pods during initial
+                            scale up, replacement of pods on nodes, and scaling down.
+                            \n - `OrderedReady`: Creates pods in increasing order
+                            (pod-0, then pod-1, etc). The controller waits until each
+                            pod is ready before continuing. Pods are removed in reverse
+                            order when scaling down. - `Parallel`: Creates pods in
+                            parallel to match the desired scale without waiting. All
+                            pods are deleted at once when scaling down."
                           type: string
                         llUpdateStrategy:
-                          description: llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy
-                            that will be employed to update Pods in the StatefulSet
-                            when a revision is made to Template. Will ignore `updateStrategy`
-                            attribute if provided.
+                          description: Specifies the low-level StatefulSetUpdateStrategy
+                            to be used when updating Pods in the StatefulSet upon
+                            a revision to the Template. `UpdateStrategy` will be ignored
+                            if this is provided.
                           properties:
                             rollingUpdate:
                               description: RollingUpdate is used to communicate parameters
@@ -8675,16 +8652,13 @@ spec:
                           type: object
                         updateStrategy:
                           default: Serial
-                          description: "updateStrategy, Pods update strategy. In case
-                            of workloadType=Consensus the update strategy will be
-                            following: \n - serial: update Members one by one that
-                            guarantee minimum component unavailable time. `Learner
-                            -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly)
-                            -> Follower(with AccessMode=readWrite) -> Leader` - bestEffortParallel:
-                            update Members in parallel that guarantee minimum component
-                            un-writable time. `Learner, Follower(minority) in parallel
-                            -> Follower(majority) -> Leader`, keep majority online
-                            all the time. - parallel: force parallel"
+                          description: "Specifies the strategy for updating Pods.
+                            For workloadType=`Consensus`, the update strategy can
+                            be one of the following: \n - `Serial`: Updates Members
+                            sequentially to minimize component downtime. - `BestEffortParallel`:
+                            Updates Members in parallel to minimize component write
+                            downtime. Majority remains online at all times. - `Parallel`:
+                            Forces parallel updates."
                           enum:
                           - Serial
                           - BestEffortParallel
@@ -8692,30 +8666,26 @@ spec:
                           type: string
                       type: object
                     rsmSpec:
-                      description: RSMSpec defines workload related spec of this component.
-                        start from KB 0.7.0, RSM(ReplicatedStateMachineSpec) will
-                        be the underlying CR which powers all kinds of workload in
-                        KB. RSM is an enhanced stateful workload extension dedicated
-                        for heavy-state workloads like databases.
+                      description: Defines workload spec of this component. From KB
+                        0.7.0, RSM(ReplicatedStateMachineSpec) will be the underlying
+                        CR which powers all kinds of workload in KB. RSM is an enhanced
+                        stateful workload extension dedicated for heavy-state workloads
+                        like databases.
                       properties:
                         memberUpdateStrategy:
-                          description: "MemberUpdateStrategy, Members(Pods) update
-                            strategy. \n - serial: update Members one by one that
-                            guarantee minimum component unavailable time. `Learner
-                            -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly)
-                            -> Follower(with AccessMode=readWrite) -> Leader` - bestEffortParallel:
-                            update Members in parallel that guarantee minimum component
-                            un-writable time. `Learner, Follower(minority) in parallel
-                            -> Follower(majority) -> Leader`, keep majority online
-                            all the time. - parallel: force parallel"
+                          description: "Describes the strategy for updating Members
+                            (Pods). \n - `Serial`: Updates Members sequentially to
+                            ensure minimum component downtime. - `BestEffortParallel`:
+                            Updates Members in parallel to ensure minimum component
+                            write downtime. - `Parallel`: Forces parallel updates."
                           enum:
                           - Serial
                           - BestEffortParallel
                           - Parallel
                           type: string
                         membershipReconfiguration:
-                          description: MembershipReconfiguration provides actions
-                            to do membership dynamic reconfiguration.
+                          description: Indicates the actions required for dynamic
+                            membership reconfiguration.
                           properties:
                             logSyncAction:
                               description: LogSyncAction specifies how to trigger
@@ -8838,7 +8808,7 @@ spec:
                               type: object
                           type: object
                         roleProbe:
-                          description: RoleProbe provides method to probe role.
+                          description: Defines the method used to probe a role.
                           properties:
                             builtinHandlerName:
                               description: 'BuiltinHandler specifies the builtin handler
@@ -8930,7 +8900,8 @@ spec:
                               type: integer
                           type: object
                         roles:
-                          description: Roles, a list of roles defined in the system.
+                          description: Specifies a list of roles defined within the
+                            system.
                           items:
                             properties:
                               accessMode:
@@ -8963,48 +8934,45 @@ spec:
                           type: array
                       type: object
                     scriptSpecs:
-                      description: The scriptSpec field provided by provider, and
-                        finally this configTemplateRefs will be rendered into the
-                        user's own configuration file according to the user's cluster.
+                      description: Defines the template of scripts.
                       items:
                         properties:
                           defaultMode:
-                            description: "defaultMode is optional: mode bits used
-                              to set permissions on created files by default. \n Must
-                              be an octal value between 0000 and 0777 or a decimal
-                              value between 0 and 511. YAML accepts both octal and
-                              decimal values, JSON requires decimal values for mode
-                              bits. Defaults to 0644. \n Directories within the path
-                              are not affected by this setting. This might be in conflict
-                              with other options that affect the file mode, like fsGroup,
-                              and the result can be other mode bits set."
+                            description: "Specify mode bits used to set permissions
+                              on created files by default. \n Must be an octal value
+                              between 0000 and 0777 or a decimal value between 0 and
+                              511. YAML accepts both octal and decimal values, JSON
+                              requires decimal values for mode bits. Defaults to 0644.
+                              \n Directories within the path are not affected by this
+                              setting. This might be in conflict with other options
+                              that affect the file mode, like fsGroup, and the result
+                              can be other mode bits set."
                             format: int32
                             type: integer
                           name:
-                            description: Specify the name of configuration template.
+                            description: Specify the name of the configuration template.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             default: default
-                            description: Specify the namespace of the referenced the
-                              configuration template ConfigMap object. An empty namespace
-                              is equivalent to the "default" namespace.
+                            description: Specify the namespace of the referenced configuration
+                              template ConfigMap object. An empty namespace is equivalent
+                              to the "default" namespace.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                           templateRef:
-                            description: Specify the name of the referenced the configuration
+                            description: Specify the name of the referenced configuration
                               template ConfigMap object.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           volumeName:
-                            description: volumeName is the volume name of PodTemplate,
-                              which the configuration file produced through the configuration
-                              template will be mounted to the corresponding volume.
-                              Must be a DNS_LABEL name. The volume name must be defined
-                              in podSpec.containers[*].volumeMounts.
+                            description: The volume name of PodTemplate, to which
+                              the configuration file produced through the configuration
+                              template will be mounted. Must be a DNS_LABEL name.
+                              The volume name must be defined in podSpec.containers[*].volumeMounts.
                             maxLength: 63
                             pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
@@ -9018,8 +8986,7 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     service:
-                      description: service defines the behavior of a service spec.
-                        provide read-write service when WorkloadType is Consensus.
+                      description: Defines the service spec.
                       properties:
                         ports:
                           description: 'The list of ports that are exposed by this
@@ -9080,50 +9047,49 @@ spec:
                           x-kubernetes-list-type: map
                       type: object
                     serviceRefDeclarations:
-                      description: serviceRefDeclarations is used to declare the service
-                        reference of the current component.
+                      description: Used to declare the service reference of the current
+                        component.
                       items:
                         properties:
                           name:
-                            description: The name of the service reference declaration.
-                              The service reference can come from an external service
-                              that is not part of KubeBlocks, or services provided
-                              by other KubeBlocks Cluster objects. The specific type
-                              of service reference depends on the binding declaration
-                              when creates a Cluster.
+                            description: "Specifies the name of the service reference
+                              declaration. \n The service reference may originate
+                              from an external service that is not part of KubeBlocks,
+                              or from services provided by other KubeBlocks Cluster
+                              objects. The specific type of service reference is determined
+                              by the binding declaration when a Cluster is created."
                             type: string
                           serviceRefDeclarationSpecs:
-                            description: "serviceRefDeclarationSpecs is a collection
-                              of service descriptions for a service reference declaration.
-                              \n Each ServiceRefDeclarationSpec defines a service
-                              Kind and Version. When multiple ServiceRefDeclarationSpecs
-                              are defined, it indicates that the ServiceRefDeclaration
+                            description: "Represents a collection of service descriptions
+                              for a service reference declaration. \n Each ServiceRefDeclarationSpec
+                              defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs
+                              are defined, it implies that the ServiceRefDeclaration
                               can be any one of the specified ServiceRefDeclarationSpecs.
-                              \n For example, when the ServiceRefDeclaration is declared
+                              \n For instance, when the ServiceRefDeclaration is declared
                               to require an OLTP database, which can be either MySQL
-                              or PostgreSQL, you can define a ServiceRefDeclarationSpec
-                              for MySQL and another ServiceRefDeclarationSpec for
-                              PostgreSQL, when referencing the service within the
-                              cluster, as long as the serviceKind and serviceVersion
-                              match either MySQL or PostgreSQL, it can be used."
+                              or PostgreSQL, a ServiceRefDeclarationSpec for MySQL
+                              and another for PostgreSQL can be defined. When referencing
+                              the service within the cluster, as long as the serviceKind
+                              and serviceVersion match either MySQL or PostgreSQL,
+                              it can be used."
                             items:
                               properties:
                                 serviceKind:
-                                  description: service kind, indicating the type or
-                                    nature of the service. It should be well-known
-                                    application cluster type, e.g. {mysql, redis,
-                                    mongodb}. The serviceKind is case-insensitive
-                                    and supports abbreviations for some well-known
-                                    databases. For example, both `zk` and `zookeeper`
-                                    will be considered as a ZooKeeper cluster, and
-                                    `pg`, `postgres`, `postgresql` will all be considered
-                                    as a PostgreSQL cluster.
+                                  description: Specifies the type or nature of the
+                                    service. This should be a well-known application
+                                    cluster type, such as {mysql, redis, mongodb}.
+                                    The field is case-insensitive and supports abbreviations
+                                    for some well-known databases. For instance, both
+                                    `zk` and `zookeeper` are considered as a ZooKeeper
+                                    cluster, while `pg`, `postgres`, `postgresql`
+                                    are all recognized as a PostgreSQL cluster.
                                   type: string
                                 serviceVersion:
-                                  description: The service version of the service
-                                    reference. It is a regular expression that matches
-                                    a version number pattern. For example, `^8.0.8$`,
-                                    `8.0.\d{1,2}$`, `^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$`
+                                  description: Defines the service version of the
+                                    service reference. This is a regular expression
+                                    that matches a version number pattern. For instance,
+                                    `^8.0.8$`, `8.0.\d{1,2}$`, `^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$`
+                                    are all valid patterns.
                                   type: string
                               required:
                               - serviceKind
@@ -9136,26 +9102,23 @@ spec:
                         type: object
                       type: array
                     statefulSpec:
-                      description: statefulSpec defines stateful related spec if workloadType
-                        is Stateful.
+                      description: Defines spec for `Stateful` workloads.
                       properties:
                         llPodManagementPolicy:
-                          description: "llPodManagementPolicy is the low-level controls
-                            how pods are created during initial scale up, when replacing
-                            pods on nodes, or when scaling down. \n - `OrderedReady`
-                            policy specify where pods are created in increasing order
-                            (pod-0, then pod-1, etc) and the controller will wait
-                            until each pod is ready before continuing. When scaling
-                            down, the pods are removed in the opposite order. - `Parallel`
-                            policy specify create pods in parallel to match the desired
-                            scale without waiting, and on scale down will delete all
-                            pods at once."
+                          description: "Controls the creation of pods during initial
+                            scale up, replacement of pods on nodes, and scaling down.
+                            \n - `OrderedReady`: Creates pods in increasing order
+                            (pod-0, then pod-1, etc). The controller waits until each
+                            pod is ready before continuing. Pods are removed in reverse
+                            order when scaling down. - `Parallel`: Creates pods in
+                            parallel to match the desired scale without waiting. All
+                            pods are deleted at once when scaling down."
                           type: string
                         llUpdateStrategy:
-                          description: llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy
-                            that will be employed to update Pods in the StatefulSet
-                            when a revision is made to Template. Will ignore `updateStrategy`
-                            attribute if provided.
+                          description: Specifies the low-level StatefulSetUpdateStrategy
+                            to be used when updating Pods in the StatefulSet upon
+                            a revision to the Template. `UpdateStrategy` will be ignored
+                            if this is provided.
                           properties:
                             rollingUpdate:
                               description: RollingUpdate is used to communicate parameters
@@ -9195,16 +9158,13 @@ spec:
                           type: object
                         updateStrategy:
                           default: Serial
-                          description: "updateStrategy, Pods update strategy. In case
-                            of workloadType=Consensus the update strategy will be
-                            following: \n - serial: update Members one by one that
-                            guarantee minimum component unavailable time. `Learner
-                            -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly)
-                            -> Follower(with AccessMode=readWrite) -> Leader` - bestEffortParallel:
-                            update Members in parallel that guarantee minimum component
-                            un-writable time. `Learner, Follower(minority) in parallel
-                            -> Follower(majority) -> Leader`, keep majority online
-                            all the time. - parallel: force parallel"
+                          description: "Specifies the strategy for updating Pods.
+                            For workloadType=`Consensus`, the update strategy can
+                            be one of the following: \n - `Serial`: Updates Members
+                            sequentially to minimize component downtime. - `BestEffortParallel`:
+                            Updates Members in parallel to minimize component write
+                            downtime. Majority remains online at all times. - `Parallel`:
+                            Forces parallel updates."
                           enum:
                           - Serial
                           - BestEffortParallel
@@ -9212,12 +9172,11 @@ spec:
                           type: string
                       type: object
                     statelessSpec:
-                      description: statelessSpec defines stateless related spec if
-                        workloadType is Stateless.
+                      description: Defines spec for `Stateless` workloads.
                       properties:
                         updateStrategy:
-                          description: updateStrategy defines the underlying deployment
-                            strategy to use to replace existing pods with new ones.
+                          description: Specifies the deployment strategy that will
+                            be used to replace existing pods with new ones.
                           properties:
                             rollingUpdate:
                               description: 'Rolling update config params. Present
@@ -9271,32 +9230,32 @@ spec:
                           type: object
                       type: object
                     switchoverSpec:
-                      description: switchoverSpec defines command to do switchover.
-                        in particular, when workloadType=Replication, the command
-                        defined in switchoverSpec will only be executed under the
-                        condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
+                      description: Defines command to do switchover. In particular,
+                        when workloadType=Replication, the command defined in switchoverSpec
+                        will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
                       properties:
                         withCandidate:
-                          description: withCandidate corresponds to the switchover
-                            of the specified candidate primary or leader instance.
+                          description: Represents the action of switching over to
+                            a specified candidate primary or leader instance.
                           properties:
                             cmdExecutorConfig:
-                              description: cmdExecutorConfig is the executor configuration
-                                of the switchover command.
+                              description: Specifies the switchover command.
                               properties:
                                 args:
-                                  description: args is used to perform statements.
+                                  description: Additional parameters used in the execution
+                                    of the command.
                                   items:
                                     type: string
                                   type: array
                                 command:
-                                  description: command to perform statements.
+                                  description: The command to be executed.
                                   items:
                                     type: string
                                   minItems: 1
                                   type: array
                                 env:
-                                  description: envs is a list of environment variables.
+                                  description: A list of environment variables that
+                                    will be injected into the command execution context.
                                   items:
                                     description: EnvVar represents an environment
                                       variable present in a Container.
@@ -9422,7 +9381,7 @@ spec:
                                   type: array
                                   x-kubernetes-preserve-unknown-fields: true
                                 image:
-                                  description: image for Connector when executing
+                                  description: Specifies the image used to execute
                                     the command.
                                   type: string
                               required:
@@ -9430,15 +9389,14 @@ spec:
                               - image
                               type: object
                             scriptSpecSelectors:
-                              description: scriptSpecSelectors defines the selector
-                                of the scriptSpecs that need to be referenced. Once
-                                ScriptSpecSelectors is defined, the scripts defined
-                                in scriptSpecs can be referenced in the SwitchoverAction.CmdExecutorConfig.
+                              description: Used to select the script that need to
+                                be referenced. When defined, the scripts defined in
+                                scriptSpecs can be referenced within the SwitchoverAction.CmdExecutorConfig.
                               items:
                                 properties:
                                   name:
-                                    description: ScriptSpec name of the referent,
-                                      refer to componentDefs[x].scriptSpecs[y].Name.
+                                    description: Represents the name of the ScriptSpec
+                                      referent.
                                     maxLength: 63
                                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                     type: string
@@ -9450,26 +9408,27 @@ spec:
                           - cmdExecutorConfig
                           type: object
                         withoutCandidate:
-                          description: withoutCandidate corresponds to a switchover
-                            that does not specify a candidate primary or leader instance.
+                          description: Represents the action of switching over without
+                            specifying a candidate primary or leader instance.
                           properties:
                             cmdExecutorConfig:
-                              description: cmdExecutorConfig is the executor configuration
-                                of the switchover command.
+                              description: Specifies the switchover command.
                               properties:
                                 args:
-                                  description: args is used to perform statements.
+                                  description: Additional parameters used in the execution
+                                    of the command.
                                   items:
                                     type: string
                                   type: array
                                 command:
-                                  description: command to perform statements.
+                                  description: The command to be executed.
                                   items:
                                     type: string
                                   minItems: 1
                                   type: array
                                 env:
-                                  description: envs is a list of environment variables.
+                                  description: A list of environment variables that
+                                    will be injected into the command execution context.
                                   items:
                                     description: EnvVar represents an environment
                                       variable present in a Container.
@@ -9595,7 +9554,7 @@ spec:
                                   type: array
                                   x-kubernetes-preserve-unknown-fields: true
                                 image:
-                                  description: image for Connector when executing
+                                  description: Specifies the image used to execute
                                     the command.
                                   type: string
                               required:
@@ -9603,15 +9562,14 @@ spec:
                               - image
                               type: object
                             scriptSpecSelectors:
-                              description: scriptSpecSelectors defines the selector
-                                of the scriptSpecs that need to be referenced. Once
-                                ScriptSpecSelectors is defined, the scripts defined
-                                in scriptSpecs can be referenced in the SwitchoverAction.CmdExecutorConfig.
+                              description: Used to select the script that need to
+                                be referenced. When defined, the scripts defined in
+                                scriptSpecs can be referenced within the SwitchoverAction.CmdExecutorConfig.
                               items:
                                 properties:
                                   name:
-                                    description: ScriptSpec name of the referent,
-                                      refer to componentDefs[x].scriptSpecs[y].Name.
+                                    description: Represents the name of the ScriptSpec
+                                      referent.
                                     maxLength: 63
                                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                     type: string
@@ -9624,16 +9582,18 @@ spec:
                           type: object
                       type: object
                     systemAccounts:
-                      description: Statement to create system account.
+                      description: Defines system accounts needed to manage the component,
+                        and the statement to create them.
                       properties:
                         accounts:
-                          description: accounts defines system account config settings.
+                          description: Defines the configuration settings for system
+                            accounts.
                           items:
                             description: SystemAccountConfig specifies how to create
                               and delete system accounts.
                             properties:
                               name:
-                                description: name is the name of a system account.
+                                description: The unique identifier of a system account.
                                 enum:
                                 - kbadmin
                                 - kbdataprotection
@@ -9642,59 +9602,61 @@ spec:
                                 - kbreplicator
                                 type: string
                               provisionPolicy:
-                                description: provisionPolicy defines how to create
+                                description: Outlines the strategy for creating the
                                   account.
                                 properties:
                                   scope:
                                     default: AnyPods
-                                    description: scope is the scope to provision account,
-                                      and the scope could be `AnyPods` or `AllPods`.
+                                    description: Defines the scope within which the
+                                      account is provisioned.
                                     type: string
                                   secretRef:
-                                    description: secretRef will be used when Type
-                                      is ReferToExisting.
+                                    description: The external secret to refer.
                                     properties:
                                       name:
-                                        description: name refers to the name of the
+                                        description: The unique identifier of the
                                           secret.
                                         type: string
                                       namespace:
-                                        description: namespace refers to the namespace
-                                          of the secret.
+                                        description: The namespace where the secret
+                                          is located.
                                         type: string
                                     required:
                                     - name
                                     - namespace
                                     type: object
                                   statements:
-                                    description: statements will be used when Type
-                                      is CreateByStmt.
+                                    description: The statement to provision an account.
                                     properties:
                                       creation:
-                                        description: creation specifies statement
-                                          how to create this account with required
+                                        description: Specifies the statement required
+                                          to create a new account with the necessary
                                           privileges.
                                         type: string
                                       deletion:
-                                        description: 'deletion specifies statement
-                                          how to delete this account. Used in combination
-                                          with `CreateionStatement` to delete the
-                                          account before create it. For instance,
-                                          one usually uses `drop user if exists` statement
-                                          followed by `create user` statement to create
-                                          an account. Deprecated: this field is deprecated,
-                                          use `update` instead.'
+                                        description: 'Defines the statement required
+                                          to delete an existing account. Typically
+                                          used in conjunction with the creation statement
+                                          to delete an account before recreating it.
+                                          For example, one might use a `drop user
+                                          if exists` statement followed by a `create
+                                          user` statement to ensure a fresh account.
+                                          Deprecated: This field is deprecated and
+                                          the update statement should be used instead.'
                                         type: string
                                       update:
-                                        description: update specifies statement how
-                                          to update account's password.
+                                        description: Defines the statement required
+                                          to update the password of an existing account.
                                         type: string
                                     required:
                                     - creation
                                     type: object
                                   type:
-                                    description: type defines the way to provision
-                                      an account, either `CreateByStmt` or `ReferToExisting`.
+                                    description: Specifies the method to provision
+                                      an account.
+                                    enum:
+                                    - CreateByStmt
+                                    - ReferToExisting
                                     type: string
                                 required:
                                 - scope
@@ -9710,22 +9672,24 @@ spec:
                           - name
                           x-kubernetes-list-type: map
                         cmdExecutorConfig:
-                          description: cmdExecutorConfig configs how to get client
-                            SDK and perform statements.
+                          description: Configures how to obtain the client SDK and
+                            execute statements.
                           properties:
                             args:
-                              description: args is used to perform statements.
+                              description: Additional parameters used in the execution
+                                of the command.
                               items:
                                 type: string
                               type: array
                             command:
-                              description: command to perform statements.
+                              description: The command to be executed.
                               items:
                                 type: string
                               minItems: 1
                               type: array
                             env:
-                              description: envs is a list of environment variables.
+                              description: A list of environment variables that will
+                                be injected into the command execution context.
                               items:
                                 description: EnvVar represents an environment variable
                                   present in a Container.
@@ -9848,7 +9812,7 @@ spec:
                               type: array
                               x-kubernetes-preserve-unknown-fields: true
                             image:
-                              description: image for Connector when executing the
+                              description: Specifies the image used to execute the
                                 command.
                               type: string
                           required:
@@ -9856,38 +9820,41 @@ spec:
                           - image
                           type: object
                         passwordConfig:
-                          description: passwordConfig defines the pattern to generate
-                            password.
+                          description: Defines the pattern used to generate passwords
+                            for system accounts.
                           properties:
                             length:
                               default: 16
-                              description: length defines the length of password.
+                              description: The length of the password.
                               format: int32
                               maximum: 32
                               minimum: 8
                               type: integer
                             letterCase:
                               default: MixedCases
-                              description: letterCase defines to use lower-cases,
-                                upper-cases or mixed-cases of letters.
+                              description: The case of the letters in the password.
+                              enum:
+                              - LowerCases
+                              - UpperCases
+                              - MixedCases
                               type: string
                             numDigits:
                               default: 4
-                              description: numDigits defines number of digits.
+                              description: The number of digits in the password.
                               format: int32
                               maximum: 8
                               minimum: 0
                               type: integer
                             numSymbols:
                               default: 0
-                              description: numSymbols defines number of symbols.
+                              description: The number of symbols in the password.
                               format: int32
                               maximum: 8
                               minimum: 0
                               type: integer
                             seed:
-                              description: seed specifies the seed used to generate
-                                the account's password. Cannot be updated.
+                              description: Seed to generate the account's password.
+                                Cannot be updated.
                               type: string
                           type: object
                       required:
@@ -9896,6 +9863,7 @@ spec:
                       - passwordConfig
                       type: object
                     volumeProtectionSpec:
+                      description: Defines settings to do volume protect.
                       properties:
                         highWatermark:
                           default: 90
@@ -9911,47 +9879,43 @@ spec:
                           minimum: 0
                           type: integer
                         volumes:
-                          description: Volumes to protect.
+                          description: The Volumes to be protected.
                           items:
                             properties:
                               highWatermark:
-                                description: Volume specified high watermark threshold,
-                                  it will override the component level threshold.
-                                  If the value is invalid, it will be ignored and
-                                  the component level threshold will be used.
+                                description: Defines the high watermark threshold
+                                  for the volume, it will override the component level
+                                  threshold. If the value is invalid, it will be ignored
+                                  and the component level threshold will be used.
                                 maximum: 100
                                 minimum: 0
                                 type: integer
                               name:
-                                description: Name of volume to protect.
+                                description: The Name of the volume to protect.
                                 type: string
                             type: object
                           type: array
                       type: object
                     volumeTypes:
-                      description: "volumeTypes is used to describe the purpose of
-                        the volumes mapping the name of the VolumeMounts in the PodSpec.Container
-                        field, such as data volume, log volume, etc. When backing
-                        up the volume, the volume can be correctly backed up according
-                        to the volumeType. \n For example: \n - `name: data, type:
-                        data` means that the volume named `data` is used to store
-                        `data`. - `name: binlog, type: log` means that the volume
-                        named `binlog` is used to store `log`. \n NOTE: When volumeTypes
-                        is not defined, the backup function will not be supported,
-                        even if a persistent volume has been specified."
+                      description: "Used to describe the purpose of the volumes mapping
+                        the name of the VolumeMounts in the PodSpec.Container field,
+                        such as data volume, log volume, etc. When backing up the
+                        volume, the volume can be correctly backed up according to
+                        the volumeType. \n For example: \n - `name: data, type: data`
+                        means that the volume named `data` is used to store `data`.
+                        - `name: binlog, type: log` means that the volume named `binlog`
+                        is used to store `log`. \n NOTE: When volumeTypes is not defined,
+                        the backup function will not be supported, even if a persistent
+                        volume has been specified."
                       items:
                         properties:
                           name:
-                            description: name definition is the same as the name of
-                              the VolumeMounts field in PodSpec.Container, similar
-                              to the relations of Volumes[*].name and VolumesMounts[*].name
-                              in Pod.Spec.
+                            description: Corresponds to the name of the VolumeMounts
+                              field in PodSpec.Container.
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           type:
-                            description: 'type is in enum of {data, log}. VolumeTypeData:
-                              the volume is for the persistent data storage. VolumeTypeLog:
-                              the volume is for the persistent log storage.'
+                            description: Type of data the volume will persistent.
                             enum:
                             - data
                             - log
@@ -9964,15 +9928,12 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     workloadType:
-                      description: "workloadType defines type of the workload. \n
-                        - `Stateless` is a stateless workload type used to describe
-                        stateless applications. - `Stateful` is a stateful workload
-                        type used to describe common stateful applications. - `Consensus`
-                        is a stateful workload type used to describe applications
-                        based on consensus protocols, common consensus protocols such
-                        as raft and paxos. - `Replication` is a stateful workload
-                        type used to describe applications based on the primary-secondary
-                        data replication protocol."
+                      description: "Defines the type of the workload. \n - `Stateless`
+                        describes stateless applications. - `Stateful` describes common
+                        stateful applications. - `Consensus` describes applications
+                        based on consensus protocols, such as raft and paxos. - `Replication`
+                        describes applications based on the primary-secondary data
+                        replication protocol."
                       enum:
                       - Stateless
                       - Stateful
@@ -9998,15 +9959,14 @@ spec:
                 additionalProperties:
                   type: string
                 description: "Connection credential template used for creating a connection
-                  credential secret for cluster.apps.kubeblocks.io object. \n Built-in
-                  objects are: \n - `$(RANDOM_PASSWD)` random 8 characters. dfjksgks
-                  - `$(STRONG_RANDOM_PASSWD)` random 16 characters, with mixed cases,
-                  digits and symbols. - `$(UUID)` generate a random UUID v4 string.
-                  - `$(UUID_B64)` generate a random UUID v4 BASE64 encoded string.
-                  - `$(UUID_STR_B64)` generate a random UUID v4 string then BASE64
-                  encoded. - `$(UUID_HEX)` generate a random UUID v4 HEX representation.
-                  - `$(HEADLESS_SVC_FQDN)` headless service FQDN placeholder, value
-                  pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`,
+                  credential secret for cluster objects. \n Built-in objects are:
+                  \n - `$(RANDOM_PASSWD)` random 8 characters. - `$(STRONG_RANDOM_PASSWD)`
+                  random 16 characters, with mixed cases, digits and symbols. - `$(UUID)`
+                  generate a random UUID v4 string. - `$(UUID_B64)` generate a random
+                  UUID v4 BASE64 encoded string. - `$(UUID_STR_B64)` generate a random
+                  UUID v4 string then BASE64 encoded. - `$(UUID_HEX)` generate a random
+                  UUID v4 HEX representation. - `$(HEADLESS_SVC_FQDN)` headless service
+                  FQDN placeholder, value pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`,
                   where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
                   attribute; - `$(SVC_FQDN)` service FQDN placeholder, value pattern
                   is `$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc`, where 1ST_COMP_NAME
@@ -10017,8 +9977,8 @@ spec:
                   and `$(SVC_PORT_mysql)` in the connection credential value is 3306."
                 type: object
               type:
-                description: Cluster definition type defines well known application
-                  cluster type, e.g. mysql/redis/mongodb
+                description: Specifies the well-known application cluster type, such
+                  as mysql, redis, or mongodb.
                 maxLength: 24
                 pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                 type: string
@@ -10029,18 +9989,18 @@ spec:
             description: ClusterDefinitionStatus defines the observed state of ClusterDefinition
             properties:
               message:
-                description: Extra message in current phase
+                description: Provides additional information about the current phase.
                 type: string
               observedGeneration:
-                description: observedGeneration is the most recent generation observed
-                  for this ClusterDefinition. It corresponds to the ClusterDefinition's
-                  generation, which is updated on mutation by the API Server.
+                description: Represents the most recent generation observed for this
+                  ClusterDefinition.
                 format: int64
                 type: integer
               phase:
-                description: ClusterDefinition phase, valid values are `empty`, `Available`,
-                  `Unavailable`. Available is ClusterDefinition become available,
-                  and can be referenced for co-related objects.
+                description: Specifies the current phase of the ClusterDefinition.
+                  Valid values are `empty`, `Available`, `Unavailable`. When `Available`,
+                  the ClusterDefinition is ready and can be referenced by related
+                  objects.
                 enum:
                 - Available
                 - Unavailable

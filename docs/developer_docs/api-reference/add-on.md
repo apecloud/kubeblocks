@@ -83,7 +83,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Add-on description.</p>
+<p>Specifies the description of the add-on.</p>
 </td>
 </tr>
 <tr>
@@ -96,7 +96,7 @@ AddonType
 </em>
 </td>
 <td>
-<p>Add-on type. The valid value is helm.</p>
+<p>Defines the type of the add-on. The only valid value is &lsquo;helm&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -108,7 +108,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Add-on version.</p>
+<p>Indicates the version of the add-on.</p>
 </td>
 </tr>
 <tr>
@@ -120,7 +120,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Add-on provider.</p>
+<p>Specifies the provider of the add-on.</p>
 </td>
 </tr>
 <tr>
@@ -134,7 +134,8 @@ HelmTypeInstallSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Helm installation spec. It&rsquo;s processed only when type=helm.</p>
+<p>Represents the Helm installation specifications. This is only processed
+when the type is set to &lsquo;helm&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -147,7 +148,7 @@ HelmTypeInstallSpec
 </em>
 </td>
 <td>
-<p>Default installation parameters.</p>
+<p>Specifies the default installation parameters.</p>
 </td>
 </tr>
 <tr>
@@ -161,7 +162,7 @@ AddonInstallSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Installation parameters.</p>
+<p>Defines the installation parameters.</p>
 </td>
 </tr>
 <tr>
@@ -175,7 +176,8 @@ InstallableSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Addon installable spec. It provides selector and auto-install settings.</p>
+<p>Represents the installable specifications of the add-on. This includes
+the selector and auto-install settings.</p>
 </td>
 </tr>
 <tr>
@@ -189,7 +191,7 @@ InstallableSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Plugin installation spec.</p>
+<p>Specifies the CLI plugin installation specifications.</p>
 </td>
 </tr>
 </table>
@@ -250,7 +252,7 @@ AddonInstallSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Add-on installs parameters selectors by default. If multiple selectors are provided,
+<p>Indicates the default selectors for add-on installations. If multiple selectors are provided,
 all selectors must evaluate to true.</p>
 </td>
 </tr>
@@ -294,7 +296,7 @@ string
 </em>
 </td>
 <td>
-<p>Name of the item.</p>
+<p>Specifies the name of the item.</p>
 </td>
 </tr>
 </tbody>
@@ -338,7 +340,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>enabled can be set if there are no specific installation attributes to be set.</p>
+<p>Can be set to true if there are no specific installation attributes to be set.</p>
 </td>
 </tr>
 <tr>
@@ -352,7 +354,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Installs spec. for extra items.</p>
+<p>Specifies the installation specifications for extra items.</p>
 </td>
 </tr>
 </tbody>
@@ -381,7 +383,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Replicas value.</p>
+<p>Specifies the number of replicas.</p>
 </td>
 </tr>
 <tr>
@@ -393,7 +395,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Persistent Volume Enabled value.</p>
+<p>Indicates whether the Persistent Volume is enabled or not.</p>
 </td>
 </tr>
 <tr>
@@ -405,7 +407,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Storage class name.</p>
+<p>Specifies the name of the storage class.</p>
 </td>
 </tr>
 <tr>
@@ -417,7 +419,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Tolerations JSON array string value.</p>
+<p>Specifies the tolerations in a JSON array string format.</p>
 </td>
 </tr>
 <tr>
@@ -431,7 +433,7 @@ ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>Resource requirements.</p>
+<p>Specifies the resource requirements.</p>
 </td>
 </tr>
 </tbody>
@@ -511,7 +513,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Add-on description.</p>
+<p>Specifies the description of the add-on.</p>
 </td>
 </tr>
 <tr>
@@ -524,7 +526,7 @@ AddonType
 </em>
 </td>
 <td>
-<p>Add-on type. The valid value is helm.</p>
+<p>Defines the type of the add-on. The only valid value is &lsquo;helm&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -536,7 +538,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Add-on version.</p>
+<p>Indicates the version of the add-on.</p>
 </td>
 </tr>
 <tr>
@@ -548,7 +550,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Add-on provider.</p>
+<p>Specifies the provider of the add-on.</p>
 </td>
 </tr>
 <tr>
@@ -562,7 +564,8 @@ HelmTypeInstallSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Helm installation spec. It&rsquo;s processed only when type=helm.</p>
+<p>Represents the Helm installation specifications. This is only processed
+when the type is set to &lsquo;helm&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -575,7 +578,7 @@ HelmTypeInstallSpec
 </em>
 </td>
 <td>
-<p>Default installation parameters.</p>
+<p>Specifies the default installation parameters.</p>
 </td>
 </tr>
 <tr>
@@ -589,7 +592,7 @@ AddonInstallSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Installation parameters.</p>
+<p>Defines the installation parameters.</p>
 </td>
 </tr>
 <tr>
@@ -603,7 +606,8 @@ InstallableSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Addon installable spec. It provides selector and auto-install settings.</p>
+<p>Represents the installable specifications of the add-on. This includes
+the selector and auto-install settings.</p>
 </td>
 </tr>
 <tr>
@@ -617,7 +621,7 @@ InstallableSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Plugin installation spec.</p>
+<p>Specifies the CLI plugin installation specifications.</p>
 </td>
 </tr>
 </tbody>
@@ -648,7 +652,8 @@ AddonPhase
 </em>
 </td>
 <td>
-<p>Add-on installation phases. Valid values are Disabled, Enabled, Failed, Enabling, Disabling.</p>
+<p>Defines the current installation phase of the add-on. It can take one of
+the following values: <code>Disabled</code>, <code>Enabled</code>, <code>Failed</code>, <code>Enabling</code>, <code>Disabling</code>.</p>
 </td>
 </tr>
 <tr>
@@ -662,7 +667,7 @@ AddonPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the current state of add-on API installation conditions.</p>
+<p>Provides a detailed description of the current state of add-on API installation.</p>
 </td>
 </tr>
 <tr>
@@ -674,9 +679,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the most recent generation observed for this
-add-on. It corresponds to the add-on&rsquo;s generation, which is
-updated on mutation by the API Server.</p>
+<p>Represents the most recent generation observed for this add-on. It corresponds
+to the add-on&rsquo;s generation, which is updated on mutation by the API Server.</p>
 </td>
 </tr>
 </tbody>
@@ -723,7 +727,7 @@ string
 </em>
 </td>
 <td>
-<p>Name of the plugin.</p>
+<p>Specifies the name of the plugin.</p>
 </td>
 </tr>
 <tr>
@@ -734,7 +738,7 @@ string
 </em>
 </td>
 <td>
-<p>The index repository of the plugin.</p>
+<p>Defines the index repository of the plugin.</p>
 </td>
 </tr>
 <tr>
@@ -746,7 +750,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The description of the plugin.</p>
+<p>Provides a brief description of the plugin.</p>
 </td>
 </tr>
 </tbody>
@@ -774,7 +778,7 @@ string
 </em>
 </td>
 <td>
-<p>Object name of the referent.</p>
+<p>Defines the name of the object being referred to.</p>
 </td>
 </tr>
 <tr>
@@ -785,7 +789,7 @@ string
 </em>
 </td>
 <td>
-<p>The key to select.</p>
+<p>Specifies the key to be selected.</p>
 </td>
 </tr>
 </tbody>
@@ -821,6 +825,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the URL location of the values file.</p>
 </td>
 </tr>
 <tr>
@@ -834,9 +839,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Selects a key of a ConfigMap item list. The value of ConfigMap can be
-a JSON or YAML string content. Use a key name with &ldquo;.json&rdquo; or &ldquo;.yaml&rdquo; or &ldquo;.yml&rdquo;
-extension name to specify a content type.</p>
+<p>Selects a key from a ConfigMap item list. The value can be
+a JSON or YAML string content. Use a key name with &ldquo;.json&rdquo;, &ldquo;.yaml&rdquo;, or &ldquo;.yml&rdquo;
+extension to specify a content type.</p>
 </td>
 </tr>
 <tr>
@@ -850,9 +855,9 @@ extension name to specify a content type.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Selects a key of a Secrets item list. The value of Secrets can be
-a JSON or YAML string content. Use a key name with &ldquo;.json&rdquo; or &ldquo;.yaml&rdquo; or &ldquo;.yml&rdquo;
-extension name to specify a content type.</p>
+<p>Selects a key from a Secrets item list. The value can be
+a JSON or YAML string content. Use a key name with &ldquo;.json&rdquo;, &ldquo;.yaml&rdquo;, or &ldquo;.yml&rdquo;
+extension to specify a content type.</p>
 </td>
 </tr>
 <tr>
@@ -864,7 +869,7 @@ extension name to specify a content type.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Helm install set values. It can specify multiple or separate values with commas(key1=val1,key2=val2).</p>
+<p>Values set during Helm installation. Multiple or separate values can be specified with commas (key1=val1,key2=val2).</p>
 </td>
 </tr>
 <tr>
@@ -876,7 +881,7 @@ extension name to specify a content type.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Helm install set JSON values. It can specify multiple or separate values with commas(key1=jsonval1,key2=jsonval2).</p>
+<p>JSON values set during Helm installation. Multiple or separate values can be specified with commas (key1=jsonval1,key2=jsonval2).</p>
 </td>
 </tr>
 </tbody>
@@ -905,7 +910,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>tolerations sets the toleration mapping key.</p>
+<p>Specifies the toleration mapping key.</p>
 </td>
 </tr>
 </tbody>
@@ -934,7 +939,7 @@ string
 </em>
 </td>
 <td>
-<p>A Helm Chart location URL.</p>
+<p>Specifies the URL location of the Helm Chart.</p>
 </td>
 </tr>
 <tr>
@@ -948,7 +953,7 @@ HelmInstallOptions
 </td>
 <td>
 <em>(Optional)</em>
-<p>installOptions defines Helm release installation options.</p>
+<p>Defines the options for Helm release installation.</p>
 </td>
 </tr>
 <tr>
@@ -962,7 +967,7 @@ HelmInstallValues
 </td>
 <td>
 <em>(Optional)</em>
-<p>HelmInstallValues defines Helm release installation set values.</p>
+<p>Defines the set values for Helm release installation.</p>
 </td>
 </tr>
 <tr>
@@ -976,7 +981,7 @@ HelmValuesMapping
 </td>
 <td>
 <em>(Optional)</em>
-<p>valuesMapping defines add-on normalized resources parameters mapped to Helm values&rsquo; keys.</p>
+<p>Defines the mapping of add-on normalized resources parameters to Helm values&rsquo; keys.</p>
 </td>
 </tr>
 <tr>
@@ -988,7 +993,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>chartsImage defines the image of Helm charts.</p>
+<p>Defines the image of Helm charts.</p>
 </td>
 </tr>
 <tr>
@@ -1000,8 +1005,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>chartsPathInImage defines the path of Helm charts in the image. It&rsquo;s used to copy
-Helm charts from the image to the shared volume.</p>
+<p>Defines the path of Helm charts in the image. This path is used to copy
+Helm charts from the image to the shared volume. The default path is &ldquo;/charts&rdquo;.</p>
 </td>
 </tr>
 </tbody>
@@ -1030,7 +1035,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>replicaCount sets the replicaCount value mapping key.</p>
+<p>Defines the key for setting the replica count in the Helm values map.</p>
 </td>
 </tr>
 <tr>
@@ -1042,7 +1047,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>persistentVolumeEnabled sets the persistent volume enabled mapping key.</p>
+<p>Indicates whether the persistent volume is enabled in the Helm values map.</p>
 </td>
 </tr>
 <tr>
@@ -1054,7 +1059,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>storageClass sets the storageClass mapping key.</p>
+<p>Specifies the key for setting the storage class in the Helm values map.</p>
 </td>
 </tr>
 </tbody>
@@ -1174,11 +1179,14 @@ HelmValueMapType
 </td>
 <td>
 <em>(Optional)</em>
-<p>valueMap define the &ldquo;key&rdquo; mapping values. Valid keys are replicaCount,
-persistentVolumeEnabled, and storageClass. Enum values explained:
-<code>&quot;replicaCount&quot;</code> sets the replicaCount value mapping key.
-<code>&quot;persistentVolumeEnabled&quot;</code> sets the persistent volume enabled mapping key.
-<code>&quot;storageClass&quot;</code> sets the storageClass mapping key.</p>
+<p>Defines the &ldquo;key&rdquo; mapping values. Valid keys include <code>replicaCount</code>,
+<code>persistentVolumeEnabled</code>, and <code>storageClass</code>.
+Enum values explained:</p>
+<ul>
+<li><code>replicaCount</code> sets the replicaCount value mapping key.</li>
+<li><code>persistentVolumeEnabled</code> sets the persistent volume enabled mapping key.</li>
+<li><code>storageClass</code> sets the storageClass mapping key.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -1192,9 +1200,11 @@ HelmJSONValueMapType
 </td>
 <td>
 <em>(Optional)</em>
-<p>jsonMap defines the &ldquo;key&rdquo; mapping values. The valid key is tolerations.
-Enum values explained:
-<code>&quot;tolerations&quot;</code> sets the toleration mapping key.</p>
+<p>Defines the &ldquo;key&rdquo; mapping values. The valid key is tolerations.
+Enum values explained:</p>
+<ul>
+<li><code>tolerations</code> sets the toleration mapping key.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -1208,7 +1218,7 @@ ResourceMappingItem
 </td>
 <td>
 <em>(Optional)</em>
-<p>resources sets resources related mapping keys.</p>
+<p>Sets resources related mapping keys.</p>
 </td>
 </tr>
 </tbody>
@@ -1239,8 +1249,8 @@ ResourceMappingItem
 </td>
 <td>
 <em>(Optional)</em>
-<p>Add-on installable selectors. If multiple selectors are provided,
-all selectors must evaluate to true.</p>
+<p>Specifies the selectors for add-on installation. If multiple selectors are provided,
+they must all evaluate to true for the add-on to be installed.</p>
 </td>
 </tr>
 <tr>
@@ -1251,7 +1261,7 @@ bool
 </em>
 </td>
 <td>
-<p>autoInstall defines an add-on should be installed automatically.</p>
+<p>Indicates whether an add-on should be installed automatically.</p>
 </td>
 </tr>
 </tbody>
@@ -1305,7 +1315,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>storage sets the storage size value mapping key.</p>
+<p>Specifies the key used for mapping the storage size value.</p>
 </td>
 </tr>
 <tr>
@@ -1319,7 +1329,7 @@ ResourceReqLimItem
 </td>
 <td>
 <em>(Optional)</em>
-<p>cpu sets CPU requests and limits mapping keys.</p>
+<p>Specifies the key used for mapping both CPU requests and limits.</p>
 </td>
 </tr>
 <tr>
@@ -1333,7 +1343,7 @@ ResourceReqLimItem
 </td>
 <td>
 <em>(Optional)</em>
-<p>memory sets Memory requests and limits mapping keys.</p>
+<p>Specifies the key used for mapping both Memory requests and limits.</p>
 </td>
 </tr>
 </tbody>
@@ -1362,7 +1372,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Requests value mapping key.</p>
+<p>Specifies the mapping key for the request value.</p>
 </td>
 </tr>
 <tr>
@@ -1374,7 +1384,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Limits value mapping key.</p>
+<p>Specifies the mapping key for the limit value.</p>
 </td>
 </tr>
 </tbody>
@@ -1453,10 +1463,12 @@ AddonSelectorKey
 </em>
 </td>
 <td>
-<p>The selector key. Valid values are KubeVersion, KubeGitVersion and KubeProvider.
-&ldquo;KubeVersion&rdquo; the semver expression of Kubernetes versions, i.e., v1.24.
-&ldquo;KubeGitVersion&rdquo; may contain distro. info., i.e., v1.24.4+eks.
-&ldquo;KubeProvider&rdquo; the Kubernetes provider, i.e., aws, gcp, azure, huaweiCloud, tencentCloud etc.</p>
+<p>The selector key. Valid values are KubeVersion, KubeGitVersion and KubeProvider.</p>
+<ul>
+<li><code>KubeVersion</code> the semver expression of Kubernetes versions, i.e., v1.24.</li>
+<li><code>KubeGitVersion</code> may contain distro. info., i.e., v1.24.4+eks.</li>
+<li><code>KubeProvider</code> the Kubernetes provider, i.e., aws, gcp, azure, huaweiCloud, tencentCloud etc.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -1471,11 +1483,13 @@ LineSelectorOperator
 <td>
 <p>Represents a key&rsquo;s relationship to a set of values.
 Valid operators are Contains, NotIn, DoesNotContain, MatchRegex, and DoesNoteMatchRegex.</p>
-<p>Possible enum values:
-<code>&quot;Contains&quot;</code> line contains a string.
-<code>&quot;DoesNotContain&quot;</code> line does not contain a string.
-<code>&quot;MatchRegex&quot;</code> line contains a match to the regular expression.
-<code>&quot;DoesNotMatchRegex&quot;</code> line does not contain a match to the regular expression.</p>
+<p>Possible enum values:</p>
+<ul>
+<li><code>Contains</code> line contains a string.</li>
+<li><code>DoesNotContain</code> line does not contain a string.</li>
+<li><code>MatchRegex</code> line contains a match to the regular expression.</li>
+<li><code>DoesNotMatchRegex</code> line does not contain a match to the regular expression.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -1487,7 +1501,7 @@ Valid operators are Contains, NotIn, DoesNotContain, MatchRegex, and DoesNoteMat
 </td>
 <td>
 <em>(Optional)</em>
-<p>An array of string values. It serves as an &ldquo;OR&rdquo; expression to the operator.</p>
+<p>Represents an array of string values. This serves as an &ldquo;OR&rdquo; expression to the operator.</p>
 </td>
 </tr>
 </tbody>

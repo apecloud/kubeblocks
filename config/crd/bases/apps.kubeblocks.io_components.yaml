@@ -59,35 +59,32 @@ spec:
                   nodeLabels:
                     additionalProperties:
                       type: string
-                    description: nodeLabels describes that pods must be scheduled
-                      to the nodes with the specified node labels.
+                    description: Indicates that pods must be scheduled to the nodes
+                      with the specified node labels.
                     type: object
                   podAntiAffinity:
                     default: Preferred
-                    description: podAntiAffinity describes the anti-affinity level
-                      of pods within a component. Preferred means try spread pods
-                      by `TopologyKeys`. Required means must spread pods by `TopologyKeys`.
+                    description: Specifies the anti-affinity level of pods within
+                      a component.
                     enum:
                     - Preferred
                     - Required
                     type: string
                   tenancy:
                     default: SharedNode
-                    description: tenancy describes how pods are distributed across
-                      node. SharedNode means multiple pods may share the same node.
-                      DedicatedNode means each pod runs on their own dedicated node.
+                    description: Defines how pods are distributed across nodes.
                     enum:
                     - SharedNode
                     - DedicatedNode
                     type: string
                   topologyKeys:
-                    description: topologyKey is the key of node labels. Nodes that
-                      have a label with this key and identical values are considered
-                      to be in the same topology. It's used as the topology domain
+                    description: "Represents the key of node labels. \n Nodes with
+                      a label containing this key and identical values are considered
+                      to be in the same topology. This is used as the topology domain
                       for pod anti-affinity and pod spread constraint. Some well-known
-                      label keys, such as `kubernetes.io/hostname` and `topology.kubernetes.io/zone`
-                      are often used as TopologyKey, as well as any other custom label
-                      key.
+                      label keys, such as `kubernetes.io/hostname` and `topology.kubernetes.io/zone`,
+                      are often used as TopologyKey, along with any other custom label
+                      key."
                     items:
                       type: string
                     type: array
@@ -97,11 +94,11 @@ spec:
                 description: References the class defined in ComponentClassDefinition.
                 properties:
                   class:
-                    description: Class refers to the name of the class that is defined
-                      in the ComponentClassDefinition.
+                    description: Defines the name of the class that is defined in
+                      the ComponentClassDefinition.
                     type: string
                   name:
-                    description: Name refers to the name of the ComponentClassDefinition.
+                    description: Specifies the name of the ComponentClassDefinition.
                     maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
@@ -116,8 +113,8 @@ spec:
                 items:
                   properties:
                     asEnvFrom:
-                      description: 'asEnvFrom is optional: the list of containers
-                        will be injected into EnvFrom.'
+                      description: Specify the list of containers that will be injected
+                        into EnvFrom.
                       items:
                         type: string
                       type: array
@@ -129,26 +126,25 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     defaultMode:
-                      description: "defaultMode is optional: mode bits used to set
-                        permissions on created files by default. \n Must be an octal
-                        value between 0000 and 0777 or a decimal value between 0 and
-                        511. YAML accepts both octal and decimal values, JSON requires
-                        decimal values for mode bits. Defaults to 0644. \n Directories
-                        within the path are not affected by this setting. This might
-                        be in conflict with other options that affect the file mode,
-                        like fsGroup, and the result can be other mode bits set."
+                      description: "Specify mode bits used to set permissions on created
+                        files by default. \n Must be an octal value between 0000 and
+                        0777 or a decimal value between 0 and 511. YAML accepts both
+                        octal and decimal values, JSON requires decimal values for
+                        mode bits. Defaults to 0644. \n Directories within the path
+                        are not affected by this setting. This might be in conflict
+                        with other options that affect the file mode, like fsGroup,
+                        and the result can be other mode bits set."
                       format: int32
                       type: integer
                     keys:
                       description: Specify a list of keys. If empty, ConfigConstraint
-                        takes effect for all keys in configmap.
+                        applies to all keys in the configmap.
                       items:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
                     legacyRenderedConfigSpec:
-                      description: 'lazyRenderedConfigSpec is optional: specify the
-                        secondary rendered config spec.'
+                      description: Defines the secondary rendered config spec
                       properties:
                         namespace:
                           default: default
@@ -177,29 +173,29 @@ spec:
                       - templateRef
                       type: object
                     name:
-                      description: Specify the name of configuration template.
+                      description: Specify the name of the configuration template.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     namespace:
                       default: default
-                      description: Specify the namespace of the referenced the configuration
+                      description: Specify the namespace of the referenced configuration
                         template ConfigMap object. An empty namespace is equivalent
                         to the "default" namespace.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     templateRef:
-                      description: Specify the name of the referenced the configuration
+                      description: Specify the name of the referenced configuration
                         template ConfigMap object.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     volumeName:
-                      description: volumeName is the volume name of PodTemplate, which
-                        the configuration file produced through the configuration
-                        template will be mounted to the corresponding volume. Must
-                        be a DNS_LABEL name. The volume name must be defined in podSpec.containers[*].volumeMounts.
+                      description: The volume name of PodTemplate, to which the configuration
+                        file produced through the configuration template will be mounted.
+                        Must be a DNS_LABEL name. The volume name must be defined
+                        in podSpec.containers[*].volumeMounts.
                       maxLength: 63
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
@@ -347,42 +343,40 @@ spec:
                 items:
                   properties:
                     cluster:
-                      description: "When referencing a service provided by other KubeBlocks
-                        cluster, you need to provide the name of the Cluster being
-                        referenced. \n By default, when other KubeBlocks Cluster are
-                        referenced, the ClusterDefinition.spec.connectionCredential
+                      description: "The name of the KubeBlocks cluster being referenced
+                        when a service provided by another KubeBlocks cluster is being
+                        referenced. \n By default, the clusterDefinition.spec.connectionCredential
                         secret corresponding to the referenced Cluster will be used
-                        to bind to the current component. Currently, if a KubeBlocks
-                        cluster is to be referenced, the connection credential secret
-                        should include and correspond to the following fields: endpoint,
-                        port, username, and password. \n Under this referencing approach,
-                        the ServiceKind and ServiceVersion of service reference declaration
+                        to bind to the current component. The connection credential
+                        secret should include and correspond to the following fields:
+                        endpoint, port, username, and password when a KubeBlocks cluster
+                        is being referenced. \n Under this referencing approach, the
+                        ServiceKind and ServiceVersion of service reference declaration
                         defined in the ClusterDefinition will not be validated. If
                         both Cluster and ServiceDescriptor are specified, the Cluster
                         takes precedence."
                       type: string
                     name:
-                      description: name of the service reference declaration. references
-                        the serviceRefDeclaration name defined in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name
+                      description: Specifies the identifier of the service reference
+                        declaration. It corresponds to the serviceRefDeclaration name
+                        defined in the clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name.
                       type: string
                     namespace:
-                      description: namespace defines the namespace of the referenced
-                        Cluster or the namespace of the referenced ServiceDescriptor
-                        object. If not set, the referenced Cluster and ServiceDescriptor
+                      description: Specifies the namespace of the referenced Cluster
+                        or the namespace of the referenced ServiceDescriptor object.
+                        If not provided, the referenced Cluster and ServiceDescriptor
                         will be searched in the namespace of the current cluster by
                         default.
                       type: string
                     serviceDescriptor:
-                      description: "serviceDescriptor defines the service descriptor
-                        of the service provided by external sources. \n When referencing
-                        a service provided by external sources, you need to provide
-                        the ServiceDescriptor object name to establish the service
-                        binding. And serviceDescriptor is the name of the ServiceDescriptor
-                        object, furthermore, the `ServiceDescriptor.spec.serviceKind`
-                        and `ServiceDescriptor.spec.serviceVersion` should match `clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind`
-                        and the regular expression defines in `clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion`.
-                        \n If both Cluster and ServiceDescriptor are specified, the
-                        Cluster takes precedence."
+                      description: "The service descriptor of the service provided
+                        by external sources. \n When referencing a service provided
+                        by external sources, the ServiceDescriptor object name is
+                        required to establish the service binding. The `serviceDescriptor.spec.serviceKind`
+                        and `serviceDescriptor.spec.serviceVersion` should match the
+                        serviceKind and serviceVersion defined in the service reference
+                        declaration in the ClusterDefinition. \n If both Cluster and
+                        ServiceDescriptor are specified, the Cluster takes precedence."
                       type: string
                   required:
                   - name
@@ -395,20 +389,23 @@ spec:
                     default: false
                     type: boolean
                   issuer:
-                    description: Issuer defines Tls certs issuer
+                    description: Issuer defines the TLS certificates issuer for the
+                      cluster.
                     properties:
                       name:
+                        allOf:
+                        - enum:
+                          - KubeBlocks
+                          - UserProvided
+                        - enum:
+                          - KubeBlocks
+                          - UserProvided
                         default: KubeBlocks
-                        description: "Name of issuer. Options supported: \n - KubeBlocks
-                          - Certificates signed by KubeBlocks Operator. - UserProvided
-                          - User provided own CA-signed certificates."
-                        enum:
-                        - KubeBlocks
-                        - UserProvided
+                        description: The issuer for TLS certificates.
                         type: string
                       secretRef:
-                        description: secretRef. TLS certs Secret reference required
-                          when from is UserProvided
+                        description: SecretRef is the reference to the TLS certificates
+                          secret. It is required when the issuer is set to UserProvided.
                         properties:
                           ca:
                             description: CA cert key in Secret
@@ -478,25 +475,25 @@ spec:
                 items:
                   properties:
                     name:
-                      description: Reference `ClusterDefinition.spec.componentDefs.containers.volumeMounts.name`.
+                      description: Refers to `clusterDefinition.spec.componentDefs.containers.volumeMounts.name`.
                       type: string
                     spec:
-                      description: spec defines the desired characteristics of a volume
+                      description: Defines the desired characteristics of a volume
                         requested by a pod author.
                       properties:
                         accessModes:
-                          description: 'accessModes contains the desired access modes
-                            the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1.'
+                          description: 'Contains the desired access modes the volume
+                            should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1.'
                           items:
                             type: string
                           type: array
                           x-kubernetes-preserve-unknown-fields: true
                         resources:
-                          description: 'resources represents the minimum resources
-                            the volume should have. If RecoverVolumeExpansionFailure
-                            feature is enabled users are allowed to specify resource
-                            requirements that are lower than previous value but must
-                            still be higher than capacity recorded in the status field
+                          description: 'Represents the minimum resources the volume
+                            should have. If the RecoverVolumeExpansionFailure feature
+                            is enabled, users are allowed to specify resource requirements
+                            that are lower than the previous value but must still
+                            be higher than the capacity recorded in the status field
                             of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources.'
                           properties:
                             claims:
@@ -548,12 +545,12 @@ spec:
                           type: object
                           x-kubernetes-preserve-unknown-fields: true
                         storageClassName:
-                          description: 'storageClassName is the name of the StorageClass
-                            required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.'
+                          description: 'The name of the StorageClass required by the
+                            claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.'
                           type: string
                         volumeMode:
-                          description: volumeMode defines what type of volume is required
-                            by the claim.
+                          description: Defines what type of volume is required by
+                            the claim.
                           type: string
                       type: object
                   required:

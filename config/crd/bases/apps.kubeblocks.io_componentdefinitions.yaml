@@ -66,8 +66,8 @@ spec:
                 items:
                   properties:
                     asEnvFrom:
-                      description: 'asEnvFrom is optional: the list of containers
-                        will be injected into EnvFrom.'
+                      description: Specify the list of containers that will be injected
+                        into EnvFrom.
                       items:
                         type: string
                       type: array
@@ -79,26 +79,25 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     defaultMode:
-                      description: "defaultMode is optional: mode bits used to set
-                        permissions on created files by default. \n Must be an octal
-                        value between 0000 and 0777 or a decimal value between 0 and
-                        511. YAML accepts both octal and decimal values, JSON requires
-                        decimal values for mode bits. Defaults to 0644. \n Directories
-                        within the path are not affected by this setting. This might
-                        be in conflict with other options that affect the file mode,
-                        like fsGroup, and the result can be other mode bits set."
+                      description: "Specify mode bits used to set permissions on created
+                        files by default. \n Must be an octal value between 0000 and
+                        0777 or a decimal value between 0 and 511. YAML accepts both
+                        octal and decimal values, JSON requires decimal values for
+                        mode bits. Defaults to 0644. \n Directories within the path
+                        are not affected by this setting. This might be in conflict
+                        with other options that affect the file mode, like fsGroup,
+                        and the result can be other mode bits set."
                       format: int32
                       type: integer
                     keys:
                       description: Specify a list of keys. If empty, ConfigConstraint
-                        takes effect for all keys in configmap.
+                        applies to all keys in the configmap.
                       items:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
                     legacyRenderedConfigSpec:
-                      description: 'lazyRenderedConfigSpec is optional: specify the
-                        secondary rendered config spec.'
+                      description: Defines the secondary rendered config spec
                       properties:
                         namespace:
                           default: default
@@ -127,29 +126,29 @@ spec:
                       - templateRef
                       type: object
                     name:
-                      description: Specify the name of configuration template.
+                      description: Specify the name of the configuration template.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     namespace:
                       default: default
-                      description: Specify the namespace of the referenced the configuration
+                      description: Specify the namespace of the referenced configuration
                         template ConfigMap object. An empty namespace is equivalent
                         to the "default" namespace.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     templateRef:
-                      description: Specify the name of the referenced the configuration
+                      description: Specify the name of the referenced configuration
                         template ConfigMap object.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     volumeName:
-                      description: volumeName is the volume name of PodTemplate, which
-                        the configuration file produced through the configuration
-                        template will be mounted to the corresponding volume. Must
-                        be a DNS_LABEL name. The volume name must be defined in podSpec.containers[*].volumeMounts.
+                      description: The volume name of PodTemplate, to which the configuration
+                        file produced through the configuration template will be mounted.
+                        Must be a DNS_LABEL name. The volume name must be defined
+                        in podSpec.containers[*].volumeMounts.
                       maxLength: 63
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
@@ -3482,8 +3481,7 @@ spec:
                         items:
                           properties:
                             name:
-                              description: ScriptSpec name of the referent, refer
-                                to componentDefs[x].scriptSpecs[y].Name.
+                              description: Represents the name of the ScriptSpec referent.
                               maxLength: 63
                               pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                               type: string
@@ -4058,14 +4056,14 @@ spec:
                 items:
                   properties:
                     filePathPattern:
-                      description: filePathPattern log file path pattern which indicate
-                        how to find this file corresponding to variable (log path)
-                        in database kernel. please don't set this casually.
+                      description: Indicates the path to the log file using a pattern,
+                        it corresponds to the variable (log path) in the database
+                        kernel.
                       maxLength: 4096
                       type: string
                     name:
-                      description: name log type name, such as slow for MySQL slow
-                        log file.
+                      description: Specifies the type of log, such as 'slow' for a
+                        MySQL slow log file.
                       maxLength: 128
                       type: string
                   required:
@@ -4091,28 +4089,28 @@ spec:
                 properties:
                   builtIn:
                     default: false
-                    description: builtIn is a switch to enable KubeBlocks builtIn
-                      monitoring. If BuiltIn is set to true, monitor metrics will
-                      be scraped automatically. If BuiltIn is set to false, the provider
-                      should set ExporterConfig and Sidecar container own.
+                    description: To enable the built-in monitoring. When set to true,
+                      monitoring metrics will be automatically scraped. When set to
+                      false, the provider is expected to configure the ExporterConfig
+                      and manage the Sidecar container.
                     type: boolean
                   exporterConfig:
-                    description: exporterConfig provided by provider, which specify
-                      necessary information to Time Series Database. exporterConfig
-                      is valid when builtIn is false.
+                    description: Provided by the provider and contains the necessary
+                      information for the Time Series Database. This field is only
+                      valid when BuiltIn is set to false.
                     properties:
                       scrapePath:
                         default: /metrics
-                        description: scrapePath is exporter url path for Time Series
-                          Database to scrape metrics.
+                        description: Specifies the URL path that the exporter uses
+                          for the Time Series Database to scrape metrics.
                         maxLength: 128
                         type: string
                       scrapePort:
                         anyOf:
                         - type: integer
                         - type: string
-                        description: scrapePort is exporter port for Time Series Database
-                          to scrape metrics.
+                        description: Defines the port that the exporter uses for the
+                          Time Series Database to scrape metrics.
                         x-kubernetes-int-or-string: true
                     required:
                     - scrapePort
@@ -11484,40 +11482,40 @@ spec:
                 items:
                   properties:
                     defaultMode:
-                      description: "defaultMode is optional: mode bits used to set
-                        permissions on created files by default. \n Must be an octal
-                        value between 0000 and 0777 or a decimal value between 0 and
-                        511. YAML accepts both octal and decimal values, JSON requires
-                        decimal values for mode bits. Defaults to 0644. \n Directories
-                        within the path are not affected by this setting. This might
-                        be in conflict with other options that affect the file mode,
-                        like fsGroup, and the result can be other mode bits set."
+                      description: "Specify mode bits used to set permissions on created
+                        files by default. \n Must be an octal value between 0000 and
+                        0777 or a decimal value between 0 and 511. YAML accepts both
+                        octal and decimal values, JSON requires decimal values for
+                        mode bits. Defaults to 0644. \n Directories within the path
+                        are not affected by this setting. This might be in conflict
+                        with other options that affect the file mode, like fsGroup,
+                        and the result can be other mode bits set."
                       format: int32
                       type: integer
                     name:
-                      description: Specify the name of configuration template.
+                      description: Specify the name of the configuration template.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     namespace:
                       default: default
-                      description: Specify the namespace of the referenced the configuration
+                      description: Specify the namespace of the referenced configuration
                         template ConfigMap object. An empty namespace is equivalent
                         to the "default" namespace.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     templateRef:
-                      description: Specify the name of the referenced the configuration
+                      description: Specify the name of the referenced configuration
                         template ConfigMap object.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     volumeName:
-                      description: volumeName is the volume name of PodTemplate, which
-                        the configuration file produced through the configuration
-                        template will be mounted to the corresponding volume. Must
-                        be a DNS_LABEL name. The volume name must be defined in podSpec.containers[*].volumeMounts.
+                      description: The volume name of PodTemplate, to which the configuration
+                        file produced through the configuration template will be mounted.
+                        Must be a DNS_LABEL name. The volume name must be defined
+                        in podSpec.containers[*].volumeMounts.
                       maxLength: 63
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
@@ -11542,41 +11540,41 @@ spec:
                 items:
                   properties:
                     name:
-                      description: The name of the service reference declaration.
-                        The service reference can come from an external service that
-                        is not part of KubeBlocks, or services provided by other KubeBlocks
-                        Cluster objects. The specific type of service reference depends
-                        on the binding declaration when creates a Cluster.
+                      description: "Specifies the name of the service reference declaration.
+                        \n The service reference may originate from an external service
+                        that is not part of KubeBlocks, or from services provided
+                        by other KubeBlocks Cluster objects. The specific type of
+                        service reference is determined by the binding declaration
+                        when a Cluster is created."
                       type: string
                     serviceRefDeclarationSpecs:
-                      description: "serviceRefDeclarationSpecs is a collection of
-                        service descriptions for a service reference declaration.
-                        \n Each ServiceRefDeclarationSpec defines a service Kind and
-                        Version. When multiple ServiceRefDeclarationSpecs are defined,
-                        it indicates that the ServiceRefDeclaration can be any one
-                        of the specified ServiceRefDeclarationSpecs. \n For example,
-                        when the ServiceRefDeclaration is declared to require an OLTP
-                        database, which can be either MySQL or PostgreSQL, you can
-                        define a ServiceRefDeclarationSpec for MySQL and another ServiceRefDeclarationSpec
-                        for PostgreSQL, when referencing the service within the cluster,
+                      description: "Represents a collection of service descriptions
+                        for a service reference declaration. \n Each ServiceRefDeclarationSpec
+                        defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs
+                        are defined, it implies that the ServiceRefDeclaration can
+                        be any one of the specified ServiceRefDeclarationSpecs. \n
+                        For instance, when the ServiceRefDeclaration is declared to
+                        require an OLTP database, which can be either MySQL or PostgreSQL,
+                        a ServiceRefDeclarationSpec for MySQL and another for PostgreSQL
+                        can be defined. When referencing the service within the cluster,
                         as long as the serviceKind and serviceVersion match either
                         MySQL or PostgreSQL, it can be used."
                       items:
                         properties:
                           serviceKind:
-                            description: service kind, indicating the type or nature
-                              of the service. It should be well-known application
-                              cluster type, e.g. {mysql, redis, mongodb}. The serviceKind
-                              is case-insensitive and supports abbreviations for some
-                              well-known databases. For example, both `zk` and `zookeeper`
-                              will be considered as a ZooKeeper cluster, and `pg`,
-                              `postgres`, `postgresql` will all be considered as a
-                              PostgreSQL cluster.
+                            description: Specifies the type or nature of the service.
+                              This should be a well-known application cluster type,
+                              such as {mysql, redis, mongodb}. The field is case-insensitive
+                              and supports abbreviations for some well-known databases.
+                              For instance, both `zk` and `zookeeper` are considered
+                              as a ZooKeeper cluster, while `pg`, `postgres`, `postgresql`
+                              are all recognized as a PostgreSQL cluster.
                             type: string
                           serviceVersion:
-                            description: The service version of the service reference.
-                              It is a regular expression that matches a version number
-                              pattern. For example, `^8.0.8$`, `8.0.\d{1,2}$`, `^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$`
+                            description: Defines the service version of the service
+                              reference. This is a regular expression that matches
+                              a version number pattern. For instance, `^8.0.8$`, `8.0.\d{1,2}$`,
+                              `^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$` are all valid patterns.
                             type: string
                         required:
                         - serviceKind
@@ -12022,33 +12020,36 @@ spec:
                       properties:
                         length:
                           default: 16
-                          description: length defines the length of password.
+                          description: The length of the password.
                           format: int32
                           maximum: 32
                           minimum: 8
                           type: integer
                         letterCase:
                           default: MixedCases
-                          description: letterCase defines to use lower-cases, upper-cases
-                            or mixed-cases of letters.
+                          description: The case of the letters in the password.
+                          enum:
+                          - LowerCases
+                          - UpperCases
+                          - MixedCases
                           type: string
                         numDigits:
                           default: 4
-                          description: numDigits defines number of digits.
+                          description: The number of digits in the password.
                           format: int32
                           maximum: 8
                           minimum: 0
                           type: integer
                         numSymbols:
                           default: 0
-                          description: numSymbols defines number of symbols.
+                          description: The number of symbols in the password.
                           format: int32
                           maximum: 8
                           minimum: 0
                           type: integer
                         seed:
-                          description: seed specifies the seed used to generate the
-                            account's password. Cannot be updated.
+                          description: Seed to generate the account's password. Cannot
+                            be updated.
                           type: string
                       type: object
                     secretRef:
@@ -12056,10 +12057,10 @@ spec:
                         to create the new account. This field is immutable once set.
                       properties:
                         name:
-                          description: name refers to the name of the secret.
+                          description: The unique identifier of the secret.
                           type: string
                         namespace:
-                          description: namespace refers to the namespace of the secret.
+                          description: The namespace where the secret is located.
                           type: string
                       required:
                       - name

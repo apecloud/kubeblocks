@@ -927,9 +927,11 @@ RsmTransformPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the policy generate sts using rsm.
-- ToSts: rsm transform to statefulSet
-- ToPod: rsm transform to pods</p>
+<p>Defines the policy generate sts using rsm.</p>
+<ul>
+<li>ToSts: rsm transform to statefulSet</li>
+<li>ToPod: rsm transform to pods</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -7611,9 +7613,11 @@ RsmTransformPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the policy generate sts using rsm.
-- ToSts: rsm transform to statefulSet
-- ToPod: rsm transform to pods</p>
+<p>Defines the policy generate sts using rsm.</p>
+<ul>
+<li>ToSts: rsm transform to statefulSet</li>
+<li>ToPod: rsm transform to pods</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -7700,15 +7704,17 @@ ClusterComponentPhase
 </em>
 </td>
 <td>
-<p>Indicates the phase of the component. Detailed information for each phase is as follows:
-- Creating: A special <code>Updating</code> phase with previous phase <code>empty</code>(means &ldquo;&rdquo;) or <code>Creating</code>.
-- Running: Component replicas &gt; 0 and all pod specs are latest with a Running state.
-- Updating: Component replicas &gt; 0 and no failed pods. The component is being updated.
-- Abnormal: Component replicas &gt; 0 but some pods have failed. The component is functional but in a fragile state.
-- Failed: Component replicas &gt; 0 but some pods have failed. The component is no longer functional.
-- Stopping: Component replicas = 0 and pods are terminating.
-- Stopped: Component replicas = 0 and all pods have been deleted.
-- Deleting: The component is being deleted.</p>
+<p>Indicates the phase of the component. Detailed information for each phase is as follows:</p>
+<ul>
+<li>Creating: A special <code>Updating</code> phase with previous phase <code>empty</code>(means &ldquo;&rdquo;) or <code>Creating</code>.</li>
+<li>Running: Component replicas &gt; 0 and all pod specs are latest with a Running state.</li>
+<li>Updating: Component replicas &gt; 0 and no failed pods. The component is being updated.</li>
+<li>Abnormal: Component replicas &gt; 0 but some pods have failed. The component is functional but in a fragile state.</li>
+<li>Failed: Component replicas &gt; 0 but some pods have failed. The component is no longer functional.</li>
+<li>Stopping: Component replicas = 0 and pods are terminating.</li>
+<li>Stopped: Component replicas = 0 and all pods have been deleted.</li>
+<li>Deleting: The component is being deleted.</li>
+</ul>
 </td>
 </tr>
 <tr>

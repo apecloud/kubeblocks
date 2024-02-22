@@ -112,6 +112,7 @@ type ComponentSpec struct {
 	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
 
 	// Defines the policy generate sts using rsm.
+	//
 	// - ToSts: rsm transform to statefulSet
 	// - ToPod: rsm transform to pods
 	//
@@ -148,6 +149,7 @@ type ComponentStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// Indicates the phase of the component. Detailed information for each phase is as follows:
+	//
 	// - Creating: A special `Updating` phase with previous phase `empty`(means "") or `Creating`.
 	// - Running: Component replicas > 0 and all pod specs are latest with a Running state.
 	// - Updating: Component replicas > 0 and no failed pods. The component is being updated.

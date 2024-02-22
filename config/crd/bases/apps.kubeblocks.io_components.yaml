@@ -317,8 +317,8 @@ spec:
                 x-kubernetes-preserve-unknown-fields: true
               rsmTransformPolicy:
                 default: ToSts
-                description: 'Defines the policy generate sts using rsm. - ToSts:
-                  rsm transform to statefulSet - ToPod: rsm transform to pods'
+                description: "Defines the policy generate sts using rsm. \n - ToSts:
+                  rsm transform to statefulSet - ToPod: rsm transform to pods"
                 enum:
                 - ToPod
                 - ToSts
@@ -652,9 +652,9 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: 'Indicates the phase of the component. Detailed information
-                  for each phase is as follows: - Creating: A special `Updating` phase
-                  with previous phase `empty`(means "") or `Creating`. - Running:
+                description: "Indicates the phase of the component. Detailed information
+                  for each phase is as follows: \n - Creating: A special `Updating`
+                  phase with previous phase `empty`(means \"\") or `Creating`. - Running:
                   Component replicas > 0 and all pod specs are latest with a Running
                   state. - Updating: Component replicas > 0 and no failed pods. The
                   component is being updated. - Abnormal: Component replicas > 0 but
@@ -663,7 +663,7 @@ spec:
                   The component is no longer functional. - Stopping: Component replicas
                   = 0 and pods are terminating. - Stopped: Component replicas = 0
                   and all pods have been deleted. - Deleting: The component is being
-                  deleted.'
+                  deleted."
                 enum:
                 - Creating
                 - Running

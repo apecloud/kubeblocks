@@ -1646,9 +1646,8 @@ ReloadOptions
 </td>
 <td>
 <em>(Optional)</em>
-<p>reloadOptions indicates whether the process supports reload.</p>
-<p>if set, the controller will determine the behavior of the engine instance based on the configuration templates,
-restart or reload depending on whether any parameters in the StaticParameters have been modified.</p>
+<p>Specifies whether the process supports reload. If set, the controller determines the behavior of the engine instance based on the configuration templates.
+It will either restart or reload depending on whether any parameters in the StaticParameters have been modified.</p>
 </td>
 </tr>
 <tr>
@@ -1660,8 +1659,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>forceHotUpdate indicates whether to execute hot update parameters when the pod needs to be restarted.
-if set true, the controller does the hot update and then restarts the pod.</p>
+<p>Indicates whether to execute hot update parameters when the pod needs to be restarted.
+If set to true, the controller performs the hot update and then restarts the pod.</p>
 </td>
 </tr>
 <tr>
@@ -1675,7 +1674,7 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>toolConfig used to config init container.</p>
+<p>Used to configure the init container.</p>
 </td>
 </tr>
 <tr>
@@ -1689,7 +1688,7 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>downwardAPIOptions is used to watch pod fields.</p>
+<p>Used to monitor pod fields.</p>
 </td>
 </tr>
 <tr>
@@ -1703,7 +1702,7 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>scriptConfigs, list of ScriptConfig, witch these scripts can be used by volume trigger,downward trigger, or tool image</p>
+<p>A list of ScriptConfig. These scripts can be used by volume trigger, downward trigger, or tool image.</p>
 </td>
 </tr>
 <tr>
@@ -1715,7 +1714,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>cfgSchemaTopLevelName is cue type name, which generates openapi schema.</p>
+<p>The cue type name, which generates the openapi schema.</p>
 </td>
 </tr>
 <tr>
@@ -1729,7 +1728,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>configurationSchema imposes restrictions on database parameter&rsquo;s rule.</p>
+<p>Imposes restrictions on database parameter&rsquo;s rule.</p>
 </td>
 </tr>
 <tr>
@@ -1741,7 +1740,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>staticParameters, list of StaticParameter, modifications of them trigger a process restart.</p>
+<p>A list of StaticParameter. Modifications of these parameters trigger a process restart.</p>
 </td>
 </tr>
 <tr>
@@ -1753,7 +1752,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>dynamicParameters, list of DynamicParameter, modifications of them trigger a config dynamic reload without process restart.</p>
+<p>A list of DynamicParameter. Modifications of these parameters trigger a config dynamic reload without process restart.</p>
 </td>
 </tr>
 <tr>
@@ -1765,7 +1764,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>immutableParameters describes parameters that prohibit user from modification.</p>
+<p>Describes parameters that users are prohibited from modifying.</p>
 </td>
 </tr>
 <tr>
@@ -1778,8 +1777,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>selector is used to match the label on the pod,
-for example, a pod of the primary is match on the patroni cluster.</p>
+<p>Used to match the label on the pod. For example, a pod of the primary matches on the patroni cluster.</p>
 </td>
 </tr>
 <tr>
@@ -1792,12 +1790,10 @@ FormatterConfig
 </em>
 </td>
 <td>
-<p>formatterConfig describes the format of the configuration file, the controller will:</p>
-<ol>
-<li>parses configuration file</li>
-<li>analyzes the modified parameters</li>
-<li>applies corresponding policies.</li>
-</ol>
+<p>Describes the format of the configuration file. The controller will:
+1. Parse the configuration file
+2. Analyze the modified parameters
+3. Apply corresponding policies.</p>
 </td>
 </tr>
 </table>
@@ -1880,7 +1876,7 @@ string
 </em>
 </td>
 <td>
-<p>clusterRef references Cluster name.</p>
+<p>Specifies the name of the cluster that this configuration is associated with.</p>
 </td>
 </tr>
 <tr>
@@ -1891,7 +1887,7 @@ string
 </em>
 </td>
 <td>
-<p>componentName is cluster component name.</p>
+<p>Represents the name of the cluster component that this configuration pertains to.</p>
 </td>
 </tr>
 <tr>
@@ -1905,7 +1901,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>customConfigurationItems describes user-defined config template.</p>
+<p>An array of ConfigurationItemDetail objects that describe user-defined configuration templates.</p>
 </td>
 </tr>
 </table>
@@ -2873,7 +2869,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>processName is process name</p>
+<p>The name of the process.</p>
 </td>
 </tr>
 </tbody>
@@ -6287,8 +6283,8 @@ ComponentTemplateSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specify a list of keys.
-If empty, ConfigConstraint applies to all keys in the configmap.</p>
+<p>Defines a list of keys.
+If left empty, ConfigConstraint applies to all keys in the configmap.</p>
 </td>
 </tr>
 <tr>
@@ -6302,7 +6298,7 @@ LegacyRenderedTemplateSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the secondary rendered config spec</p>
+<p>An optional field that defines the secondary rendered config spec.</p>
 </td>
 </tr>
 <tr>
@@ -6314,7 +6310,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specify the name of the referenced the configuration constraints object.</p>
+<p>An optional field that defines the name of the referenced configuration constraints object.</p>
 </td>
 </tr>
 <tr>
@@ -6326,7 +6322,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specify the list of containers that will be injected into EnvFrom.</p>
+<p>An optional field where the list of containers will be injected into EnvFrom.</p>
 </td>
 </tr>
 </tbody>
@@ -7809,7 +7805,7 @@ string
 </em>
 </td>
 <td>
-<p>Specify the name of the configuration template.</p>
+<p>Specifies the name of the configuration template.</p>
 </td>
 </tr>
 <tr>
@@ -7820,7 +7816,7 @@ string
 </em>
 </td>
 <td>
-<p>Specify the name of the referenced configuration template ConfigMap object.</p>
+<p>Specifies the name of the referenced configuration template ConfigMap object.</p>
 </td>
 </tr>
 <tr>
@@ -7832,7 +7828,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specify the namespace of the referenced configuration template ConfigMap object.
+<p>Specifies the namespace of the referenced configuration template ConfigMap object.
 An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p>
 </td>
 </tr>
@@ -7844,8 +7840,8 @@ string
 </em>
 </td>
 <td>
-<p>The volume name of PodTemplate, to which the configuration file produced through the configuration
-template will be mounted. Must be a DNS_LABEL name.
+<p>Refers to the volume name of PodTemplate. The configuration file produced through the configuration
+template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 The volume name must be defined in podSpec.containers[*].volumeMounts.</p>
 </td>
 </tr>
@@ -7858,13 +7854,13 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specify mode bits used to set permissions on created files by default.</p>
+<p>Refers to the mode bits used to set permissions on created files by default.</p>
 <p>Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
 YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
 Defaults to 0644.</p>
 <p>Directories within the path are not affected by this setting.
-This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other
-mode bits set.</p>
+This might be in conflict with other options that affect the file
+mode, like fsGroup, and the result can be other mode bits set.</p>
 </td>
 </tr>
 </tbody>
@@ -8084,9 +8080,8 @@ ReloadOptions
 </td>
 <td>
 <em>(Optional)</em>
-<p>reloadOptions indicates whether the process supports reload.</p>
-<p>if set, the controller will determine the behavior of the engine instance based on the configuration templates,
-restart or reload depending on whether any parameters in the StaticParameters have been modified.</p>
+<p>Specifies whether the process supports reload. If set, the controller determines the behavior of the engine instance based on the configuration templates.
+It will either restart or reload depending on whether any parameters in the StaticParameters have been modified.</p>
 </td>
 </tr>
 <tr>
@@ -8098,8 +8093,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>forceHotUpdate indicates whether to execute hot update parameters when the pod needs to be restarted.
-if set true, the controller does the hot update and then restarts the pod.</p>
+<p>Indicates whether to execute hot update parameters when the pod needs to be restarted.
+If set to true, the controller performs the hot update and then restarts the pod.</p>
 </td>
 </tr>
 <tr>
@@ -8113,7 +8108,7 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>toolConfig used to config init container.</p>
+<p>Used to configure the init container.</p>
 </td>
 </tr>
 <tr>
@@ -8127,7 +8122,7 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>downwardAPIOptions is used to watch pod fields.</p>
+<p>Used to monitor pod fields.</p>
 </td>
 </tr>
 <tr>
@@ -8141,7 +8136,7 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>scriptConfigs, list of ScriptConfig, witch these scripts can be used by volume trigger,downward trigger, or tool image</p>
+<p>A list of ScriptConfig. These scripts can be used by volume trigger, downward trigger, or tool image.</p>
 </td>
 </tr>
 <tr>
@@ -8153,7 +8148,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>cfgSchemaTopLevelName is cue type name, which generates openapi schema.</p>
+<p>The cue type name, which generates the openapi schema.</p>
 </td>
 </tr>
 <tr>
@@ -8167,7 +8162,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>configurationSchema imposes restrictions on database parameter&rsquo;s rule.</p>
+<p>Imposes restrictions on database parameter&rsquo;s rule.</p>
 </td>
 </tr>
 <tr>
@@ -8179,7 +8174,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>staticParameters, list of StaticParameter, modifications of them trigger a process restart.</p>
+<p>A list of StaticParameter. Modifications of these parameters trigger a process restart.</p>
 </td>
 </tr>
 <tr>
@@ -8191,7 +8186,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>dynamicParameters, list of DynamicParameter, modifications of them trigger a config dynamic reload without process restart.</p>
+<p>A list of DynamicParameter. Modifications of these parameters trigger a config dynamic reload without process restart.</p>
 </td>
 </tr>
 <tr>
@@ -8203,7 +8198,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>immutableParameters describes parameters that prohibit user from modification.</p>
+<p>Describes parameters that users are prohibited from modifying.</p>
 </td>
 </tr>
 <tr>
@@ -8216,8 +8211,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>selector is used to match the label on the pod,
-for example, a pod of the primary is match on the patroni cluster.</p>
+<p>Used to match the label on the pod. For example, a pod of the primary matches on the patroni cluster.</p>
 </td>
 </tr>
 <tr>
@@ -8230,12 +8224,10 @@ FormatterConfig
 </em>
 </td>
 <td>
-<p>formatterConfig describes the format of the configuration file, the controller will:</p>
-<ol>
-<li>parses configuration file</li>
-<li>analyzes the modified parameters</li>
-<li>applies corresponding policies.</li>
-</ol>
+<p>Describes the format of the configuration file. The controller will:
+1. Parse the configuration file
+2. Analyze the modified parameters
+3. Apply corresponding policies.</p>
 </td>
 </tr>
 </tbody>
@@ -8246,7 +8238,6 @@ FormatterConfig
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraint">ConfigConstraint</a>)
 </p>
 <div>
-<p>ConfigConstraintStatus defines the observed state of ConfigConstraint.</p>
 </div>
 <table>
 <thead>
@@ -8267,7 +8258,7 @@ ConfigConstraintPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>phase is status of configuration template, when set to CCAvailablePhase, it can be referenced by ClusterDefinition or ClusterVersion.</p>
+<p>Specifies the status of the configuration template. When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.</p>
 </td>
 </tr>
 <tr>
@@ -8279,7 +8270,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>message field describes the reasons of abnormal status.</p>
+<p>Provides a description of any abnormal statuses that may be present.</p>
 </td>
 </tr>
 <tr>
@@ -8291,9 +8282,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the latest generation observed for this
-ClusterDefinition. It refers to the ConfigConstraint&rsquo;s generation, which is
-updated by the API Server.</p>
+<p>Refers to the most recent generation observed for this ConfigConstraint. This value is updated by the API Server.</p>
 </td>
 </tr>
 </tbody>
@@ -8368,7 +8357,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>fileContent indicates the configuration file content.</p>
+<p>Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
+Refer to <a href="https://github.com/kubernetes-sigs/kubebuilder/issues/528">https://github.com/kubernetes-sigs/kubebuilder/issues/528</a> and <a href="https://github.com/kubernetes/code-generator/issues/50">https://github.com/kubernetes/code-generator/issues/50</a> for more details.</p>
+<p>Represents the content of the configuration file.</p>
 </td>
 </tr>
 <tr>
@@ -8380,7 +8371,7 @@ map[string]*string
 </td>
 <td>
 <em>(Optional)</em>
-<p>updated parameters for a single configuration file.</p>
+<p>Represents the updated parameters for a single configuration file.</p>
 </td>
 </tr>
 </tbody>
@@ -8408,7 +8399,7 @@ string
 </em>
 </td>
 <td>
-<p>Specify the name of the referenced the configuration template ConfigMap object.</p>
+<p>Specifies the name of the referenced configuration template ConfigMap object.</p>
 </td>
 </tr>
 <tr>
@@ -8420,7 +8411,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specify the namespace of the referenced the configuration template ConfigMap object.
+<p>Specifies the namespace of the referenced configuration template ConfigMap object.
 An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p>
 </td>
 </tr>
@@ -8435,7 +8426,7 @@ MergedPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>policy defines how to merge external imported templates into component templates.</p>
+<p>Defines the strategy for merging externally imported templates into component templates.</p>
 </td>
 </tr>
 </tbody>
@@ -8501,6 +8492,7 @@ UpgradePolicy
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationSpec">ConfigurationSpec</a>)
 </p>
 <div>
+<p>ConfigurationItemDetail represents a specific configuration item within a configuration template.</p>
 </div>
 <table>
 <thead>
@@ -8518,7 +8510,7 @@ string
 </em>
 </td>
 <td>
-<p>Specify the name of configuration template.</p>
+<p>Defines the unique identifier of the configuration template. It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters, hyphens, and periods. The name must start and end with an alphanumeric character.</p>
 </td>
 </tr>
 <tr>
@@ -8530,8 +8522,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Deprecated: Please use payload instead.
-version is the version of configuration template.</p>
+<p>Deprecated: No longer used. Please use &lsquo;Payload&rsquo; instead. Previously represented the version of the configuration template.</p>
 </td>
 </tr>
 <tr>
@@ -8545,7 +8536,7 @@ Payload
 </td>
 <td>
 <em>(Optional)</em>
-<p>Payload holds the configuration-related rerender.</p>
+<p>Holds the configuration-related rerender. Preserves unknown fields and is optional.</p>
 </td>
 </tr>
 <tr>
@@ -8559,7 +8550,7 @@ ComponentConfigSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>configSpec is used to set the configuration template.</p>
+<p>Used to set the configuration template. It is optional.</p>
 </td>
 </tr>
 <tr>
@@ -8573,7 +8564,7 @@ ConfigTemplateExtension
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specify the configuration template.</p>
+<p>Specifies the configuration template. It is optional.</p>
 </td>
 </tr>
 <tr>
@@ -8587,7 +8578,7 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ConfigParams
 </td>
 <td>
 <em>(Optional)</em>
-<p>configFileParams is used to set the parameters to be updated.</p>
+<p>Used to set the parameters to be updated. It is optional.</p>
 </td>
 </tr>
 </tbody>
@@ -8615,7 +8606,8 @@ string
 </em>
 </td>
 <td>
-<p>name is a config template name.</p>
+<p>Specifies the name of the configuration template. It is a required field and must be a string of maximum 63 characters.
+The name should only contain lowercase alphanumeric characters, hyphens, or periods. It should start and end with an alphanumeric character.</p>
 </td>
 </tr>
 <tr>
@@ -8629,7 +8621,7 @@ ConfigurationPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>phase is status of configurationItem.</p>
+<p>Indicates the current status of the configuration item. This field is optional.</p>
 </td>
 </tr>
 <tr>
@@ -8641,7 +8633,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>lastDoneRevision is the last done revision of configurationItem.</p>
+<p>Represents the last completed revision of the configuration item. This field is optional.</p>
 </td>
 </tr>
 <tr>
@@ -8653,7 +8645,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>updateRevision is the update revision of configurationItem.</p>
+<p>Represents the updated revision of the configuration item. This field is optional.</p>
 </td>
 </tr>
 <tr>
@@ -8665,7 +8657,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>message field describes the reasons of abnormal status.</p>
+<p>Provides a description of any abnormal status. This field is optional.</p>
 </td>
 </tr>
 <tr>
@@ -8679,7 +8671,7 @@ ReconcileDetail
 </td>
 <td>
 <em>(Optional)</em>
-<p>reconcileDetail describes the details of the configuration change execution.</p>
+<p>Provides detailed information about the execution of the configuration change. This field is optional.</p>
 </td>
 </tr>
 </tbody>
@@ -8857,7 +8849,7 @@ UpdatedParameters
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Configuration">Configuration</a>)
 </p>
 <div>
-<p>ConfigurationSpec defines the desired state of Configuration</p>
+<p>ConfigurationSpec defines the desired state of a Configuration resource.</p>
 </div>
 <table>
 <thead>
@@ -8875,7 +8867,7 @@ string
 </em>
 </td>
 <td>
-<p>clusterRef references Cluster name.</p>
+<p>Specifies the name of the cluster that this configuration is associated with.</p>
 </td>
 </tr>
 <tr>
@@ -8886,7 +8878,7 @@ string
 </em>
 </td>
 <td>
-<p>componentName is cluster component name.</p>
+<p>Represents the name of the cluster component that this configuration pertains to.</p>
 </td>
 </tr>
 <tr>
@@ -8900,7 +8892,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>customConfigurationItems describes user-defined config template.</p>
+<p>An array of ConfigurationItemDetail objects that describe user-defined configuration templates.</p>
 </td>
 </tr>
 </tbody>
@@ -8911,7 +8903,6 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Configuration">Configuration</a>)
 </p>
 <div>
-<p>ConfigurationStatus defines the observed state of Configuration</p>
 </div>
 <table>
 <thead>
@@ -8930,7 +8921,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>message field describes the reasons of abnormal status.</p>
+<p>Provides a description of any abnormal status.</p>
 </td>
 </tr>
 <tr>
@@ -8942,8 +8933,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the latest generation observed for this
-ClusterDefinition. It refers to the ConfigConstraint&rsquo;s generation, which is
+<p>Represents the latest generation observed for this
+ClusterDefinition. It corresponds to the ConfigConstraint&rsquo;s generation, which is
 updated by the API Server.</p>
 </td>
 </tr>
@@ -8958,7 +8949,7 @@ updated by the API Server.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>conditions describes opsRequest detail status.</p>
+<p>Provides detailed status information for opsRequest.</p>
 </td>
 </tr>
 <tr>
@@ -8971,7 +8962,7 @@ updated by the API Server.</p>
 </em>
 </td>
 <td>
-<p>configurationStatus describes the status of the component reconfiguring.</p>
+<p>Provides the status of each component undergoing reconfiguration.</p>
 </td>
 </tr>
 </tbody>
@@ -9489,7 +9480,7 @@ Kubernetes api extensions v1.JSONSchemaProps
 </em>
 </td>
 <td>
-<p>schema provides a way for providers to validate the changed parameters through json.</p>
+<p>Provides a mechanism that allows providers to validate the modified parameters using JSON.</p>
 </td>
 </tr>
 <tr>
@@ -9501,7 +9492,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>cue that to let provider verify user configuration through cue language.</p>
+<p>Enables providers to verify user configurations using the CUE language.</p>
 </td>
 </tr>
 </tbody>
@@ -9529,7 +9520,8 @@ string
 </em>
 </td>
 <td>
-<p>Specify the name of the field.</p>
+<p>Specifies the name of the field. This is a required field and must be a string of maximum length 63.
+The name should match the regex pattern <code>^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$</code>.</p>
 </td>
 </tr>
 <tr>
@@ -9540,7 +9532,7 @@ string
 </em>
 </td>
 <td>
-<p>mountPoint is the mount point of the scripts file.</p>
+<p>Specifies the mount point of the scripts file. This is a required field and must be a string of maximum length 128.</p>
 </td>
 </tr>
 <tr>
@@ -9553,7 +9545,7 @@ string
 </em>
 </td>
 <td>
-<p>Items is a list of downward API volume file</p>
+<p>Represents a list of downward API volume files. This is a required field.</p>
 </td>
 </tr>
 <tr>
@@ -9565,7 +9557,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>command used to execute for downwrad api.</p>
+<p>The command used to execute for the downward API. This field is optional.</p>
 </td>
 </tr>
 </tbody>
@@ -9932,8 +9924,8 @@ FormatterOptions
 (Members of <code>FormatterOptions</code> are embedded into this type.)
 </p>
 <em>(Optional)</em>
-<p>The FormatterOptions represents the special options of configuration file.
-This is optional for now. If not specified.</p>
+<p>Represents the special options of the configuration file.
+This is optional for now. If not specified, the default options will be used.</p>
 </td>
 </tr>
 <tr>
@@ -9947,7 +9939,7 @@ CfgFileFormat
 </td>
 <td>
 <p>The configuration file format. Valid values are <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>,
-<code>hcl</code>, <code>dotenv</code>, <code>properties</code> and <code>toml</code>.</p>
+<code>hcl</code>, <code>dotenv</code>, <code>properties</code> and <code>toml</code>. Each format has its own characteristics and use cases.</p>
 <ul>
 <li>ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a></li>
 <li>xml: reference wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a></li>
@@ -9969,8 +9961,6 @@ CfgFileFormat
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.FormatterConfig">FormatterConfig</a>)
 </p>
 <div>
-<p>FormatterOptions represents the special options of configuration file.
-Only one of its members may be specified.</p>
 </div>
 <table>
 <thead>
@@ -9991,7 +9981,7 @@ IniConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>iniConfig represents the ini options.</p>
+<p>A pointer to an IniConfig struct that holds the ini options.</p>
 </td>
 </tr>
 </tbody>
@@ -10335,7 +10325,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>sectionName describes ini section.</p>
+<p>A string that describes the name of the ini section.</p>
 </td>
 </tr>
 </tbody>
@@ -10597,6 +10587,7 @@ ConfigTemplateExtension
 <p>
 (Members of <code>ConfigTemplateExtension</code> are embedded into this type.)
 </p>
+<p>Extends the configuration template.</p>
 </td>
 </tr>
 </tbody>
@@ -12203,6 +12194,8 @@ map[string]any
 </td>
 <td>
 <em>(Optional)</em>
+<p>Holds the payload data. This field is optional and can contain any type of data.
+Not included in the JSON representation of the object.</p>
 </td>
 </tr>
 </tbody>
@@ -13056,7 +13049,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>policy is the policy of the latest execution.</p>
+<p>Represents the policy applied during the most recent execution.</p>
 </td>
 </tr>
 <tr>
@@ -13068,7 +13061,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>execResult is the result of the latest execution.</p>
+<p>Represents the outcome of the most recent execution.</p>
 </td>
 </tr>
 <tr>
@@ -13080,7 +13073,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>currentRevision is the current revision of configurationItem.</p>
+<p>Represents the current revision of the configuration item.</p>
 </td>
 </tr>
 <tr>
@@ -13092,7 +13085,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>succeedCount is the number of pods for which configuration changes were successfully executed.</p>
+<p>Represents the number of pods where configuration changes were successfully applied.</p>
 </td>
 </tr>
 <tr>
@@ -13104,7 +13097,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>expectedCount is the number of pods that need to be executed for configuration changes.</p>
+<p>Represents the total number of pods that require execution of configuration changes.</p>
 </td>
 </tr>
 <tr>
@@ -13116,7 +13109,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>errMessage is the error message when the configuration change execution fails.</p>
+<p>Represents the error message generated when the execution of configuration changes fails.</p>
 </td>
 </tr>
 </tbody>
@@ -13258,8 +13251,6 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
 </p>
 <div>
-<p>ReloadOptions defines reload options
-Only one of its members may be specified.</p>
 </div>
 <table>
 <thead>
@@ -13280,7 +13271,7 @@ UnixSignalTrigger
 </td>
 <td>
 <em>(Optional)</em>
-<p>unixSignalTrigger used to reload by sending a signal.</p>
+<p>Used to trigger a reload by sending a specific Unix signal to the process.</p>
 </td>
 </tr>
 <tr>
@@ -13294,7 +13285,7 @@ ShellTrigger
 </td>
 <td>
 <em>(Optional)</em>
-<p>shellTrigger performs the reload command.</p>
+<p>Used to perform the reload command via a shell script.</p>
 </td>
 </tr>
 <tr>
@@ -13308,7 +13299,7 @@ TPLScriptTrigger
 </td>
 <td>
 <em>(Optional)</em>
-<p>goTplTrigger performs the reload command.</p>
+<p>Used to perform the reload command via a Go template script.</p>
 </td>
 </tr>
 <tr>
@@ -13322,7 +13313,7 @@ AutoTrigger
 </td>
 <td>
 <em>(Optional)</em>
-<p>autoTrigger performs the reload command.</p>
+<p>Used to automatically perform the reload command when certain conditions are met.</p>
 </td>
 </tr>
 </tbody>
@@ -14030,7 +14021,7 @@ string
 </em>
 </td>
 <td>
-<p>scriptConfigMapRef used to execute for reload.</p>
+<p>Specifies the reference to the ConfigMap that contains the script to be executed for reload.</p>
 </td>
 </tr>
 <tr>
@@ -14042,8 +14033,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specify the namespace of the referenced the tpl script ConfigMap object.
-An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p>
+<p>Specifies the namespace where the referenced tpl script ConfigMap object resides.
+If left empty, it defaults to the &ldquo;default&rdquo; namespace.</p>
 </td>
 </tr>
 </tbody>
@@ -15582,7 +15573,7 @@ Resources and data associated with the corresponding Component will also be dele
 </em>
 </td>
 <td>
-<p>command used to execute for reload.</p>
+<p>Specifies the list of strings used to execute for reload.</p>
 </td>
 </tr>
 <tr>
@@ -15594,7 +15585,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specify synchronize updates parameters to the config manager.</p>
+<p>Specifies whether to synchronize updates parameters to the config manager.</p>
 </td>
 </tr>
 </tbody>
@@ -16389,6 +16380,7 @@ ScriptConfig
 <p>
 (Members of <code>ScriptConfig</code> are embedded into this type.)
 </p>
+<p>The configuration for the script.</p>
 </td>
 </tr>
 <tr>
@@ -16400,7 +16392,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specify synchronize updates parameters to the config manager.</p>
+<p>Specifies whether to synchronize updates parameters to the config manager.</p>
 </td>
 </tr>
 </tbody>
@@ -16589,7 +16581,7 @@ string
 </em>
 </td>
 <td>
-<p>Specify the name of initContainer. Must be a DNS_LABEL name.</p>
+<p>Specifies the name of the initContainer. This must be a DNS_LABEL name.</p>
 </td>
 </tr>
 <tr>
@@ -16601,7 +16593,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>tools Container image name.</p>
+<p>Represents the name of the container image for the tools.</p>
 </td>
 </tr>
 <tr>
@@ -16612,7 +16604,7 @@ string
 </em>
 </td>
 <td>
-<p>exec used to execute for init containers.</p>
+<p>Used to execute commands for init containers.</p>
 </td>
 </tr>
 </tbody>
@@ -16640,7 +16632,7 @@ string
 </em>
 </td>
 <td>
-<p>mountPoint is the mount point of the scripts file.</p>
+<p>Represents the location where the scripts file will be mounted.</p>
 </td>
 </tr>
 <tr>
@@ -16654,7 +16646,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>toolConfig used to config init container.</p>
+<p>Used to configure the initialization container.</p>
 </td>
 </tr>
 </tbody>
@@ -16684,9 +16676,8 @@ SignalType
 </em>
 </td>
 <td>
-<p>signal is valid for unix signal.
-e.g: SIGHUP
-url: ../../pkg/configuration/configmap/handler.go:allUnixSignals</p>
+<p>Represents a valid Unix signal.
+Refer to the following URL for a list of all Unix signals: ../../pkg/configuration/configmap/handler.go:allUnixSignals</p>
 </td>
 </tr>
 <tr>
@@ -16697,7 +16688,7 @@ string
 </em>
 </td>
 <td>
-<p>processName is process name, sends unix signal to proc.</p>
+<p>Represents the name of the process to which the Unix signal is sent.</p>
 </td>
 </tr>
 </tbody>

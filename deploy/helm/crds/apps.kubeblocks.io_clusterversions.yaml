@@ -52,77 +52,76 @@ spec:
             description: ClusterVersionSpec defines the desired state of ClusterVersion
             properties:
               clusterDefinitionRef:
-                description: ref ClusterDefinition.
+                description: Specifies a reference to the ClusterDefinition.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               componentVersions:
-                description: List of components' containers versioning context, i.e.,
-                  container image ID, container commands, args, and environments.
+                description: Contains a list of versioning contexts for the components'
+                  containers.
                 items:
                   description: ClusterComponentVersion is an application version component
                     spec.
                   properties:
                     componentDefRef:
-                      description: componentDefRef reference one of the cluster component
-                        definition names in ClusterDefinition API (spec.componentDefs.name).
+                      description: Specifies a reference to one of the cluster component
+                        definition names in the ClusterDefinition API (spec.componentDefs.name).
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     configSpecs:
-                      description: configSpecs defines a configuration extension mechanism
-                        to handle configuration differences between versions, the
-                        configTemplateRefs field, together with configTemplateRefs
-                        in the ClusterDefinition, determines the final configuration
-                        file.
+                      description: Defines a configuration extension mechanism to
+                        handle configuration differences between versions. The configTemplateRefs
+                        field, in conjunction with the configTemplateRefs in the ClusterDefinition,
+                        determines the final configuration file.
                       items:
                         properties:
                           asEnvFrom:
-                            description: 'asEnvFrom is optional: the list of containers
-                              will be injected into EnvFrom.'
+                            description: An optional field where the list of containers
+                              will be injected into EnvFrom.
                             items:
                               type: string
                             type: array
                             x-kubernetes-list-type: set
                           constraintRef:
-                            description: Specify the name of the referenced the configuration
-                              constraints object.
+                            description: An optional field that defines the name of
+                              the referenced configuration constraints object.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           defaultMode:
-                            description: "defaultMode is optional: mode bits used
-                              to set permissions on created files by default. \n Must
-                              be an octal value between 0000 and 0777 or a decimal
-                              value between 0 and 511. YAML accepts both octal and
-                              decimal values, JSON requires decimal values for mode
-                              bits. Defaults to 0644. \n Directories within the path
-                              are not affected by this setting. This might be in conflict
-                              with other options that affect the file mode, like fsGroup,
-                              and the result can be other mode bits set."
+                            description: "Refers to the mode bits used to set permissions
+                              on created files by default. \n Must be an octal value
+                              between 0000 and 0777 or a decimal value between 0 and
+                              511. YAML accepts both octal and decimal values, JSON
+                              requires decimal values for mode bits. Defaults to 0644.
+                              \n Directories within the path are not affected by this
+                              setting. This might be in conflict with other options
+                              that affect the file mode, like fsGroup, and the result
+                              can be other mode bits set."
                             format: int32
                             type: integer
                           keys:
-                            description: Specify a list of keys. If empty, ConfigConstraint
-                              takes effect for all keys in configmap.
+                            description: Defines a list of keys. If left empty, ConfigConstraint
+                              applies to all keys in the configmap.
                             items:
                               type: string
                             type: array
                             x-kubernetes-list-type: set
                           legacyRenderedConfigSpec:
-                            description: 'lazyRenderedConfigSpec is optional: specify
-                              the secondary rendered config spec.'
+                            description: An optional field that defines the secondary
+                              rendered config spec.
                             properties:
                               namespace:
                                 default: default
-                                description: Specify the namespace of the referenced
-                                  the configuration template ConfigMap object. An
-                                  empty namespace is equivalent to the "default" namespace.
+                                description: Specifies the namespace of the referenced
+                                  configuration template ConfigMap object. An empty
+                                  namespace is equivalent to the "default" namespace.
                                 maxLength: 63
                                 pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               policy:
                                 default: none
-                                description: policy defines how to merge external
+                                description: Defines the strategy for merging externally
                                   imported templates into component templates.
                                 enum:
                                 - patch
@@ -130,7 +129,7 @@ spec:
                                 - none
                                 type: string
                               templateRef:
-                                description: Specify the name of the referenced the
+                                description: Specifies the name of the referenced
                                   configuration template ConfigMap object.
                                 maxLength: 63
                                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
@@ -139,27 +138,27 @@ spec:
                             - templateRef
                             type: object
                           name:
-                            description: Specify the name of configuration template.
+                            description: Specifies the name of the configuration template.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             default: default
-                            description: Specify the namespace of the referenced the
+                            description: Specifies the namespace of the referenced
                               configuration template ConfigMap object. An empty namespace
                               is equivalent to the "default" namespace.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                           templateRef:
-                            description: Specify the name of the referenced the configuration
+                            description: Specifies the name of the referenced configuration
                               template ConfigMap object.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           volumeName:
-                            description: volumeName is the volume name of PodTemplate,
-                              which the configuration file produced through the configuration
+                            description: Refers to the volume name of PodTemplate.
+                              The configuration file produced through the configuration
                               template will be mounted to the corresponding volume.
                               Must be a DNS_LABEL name. The volume name must be defined
                               in podSpec.containers[*].volumeMounts.
@@ -176,15 +175,17 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     switchoverSpec:
-                      description: switchoverSpec defines images for the component
-                        to do switchover. It overrides `image` and `env` attributes
-                        defined in ClusterDefinition.spec.componentDefs.SwitchoverSpec.CommandExecutorEnvItem.
+                      description: Defines the images for the component to perform
+                        a switchover. This overrides the image and env attributes
+                        defined in clusterDefinition.spec.componentDefs.SwitchoverSpec.CommandExecutorEnvItem.
                       properties:
                         cmdExecutorConfig:
-                          description: CmdExecutorConfig is the command executor config.
+                          description: Represents the configuration for the command
+                            executor.
                           properties:
                             env:
-                              description: envs is a list of environment variables.
+                              description: A list of environment variables that will
+                                be injected into the command execution context.
                               items:
                                 description: EnvVar represents an environment variable
                                   present in a Container.
@@ -307,7 +308,7 @@ spec:
                               type: array
                               x-kubernetes-preserve-unknown-fields: true
                             image:
-                              description: image for Connector when executing the
+                              description: Specifies the image used to execute the
                                 command.
                               type: string
                           required:
@@ -317,18 +318,19 @@ spec:
                       - cmdExecutorConfig
                       type: object
                     systemAccountSpec:
-                      description: systemAccountSpec define image for the component
-                        to connect database or engines. It overrides `image` and `env`
-                        attributes defined in ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.
-                        To clean default envs settings, set `SystemAccountSpec.CmdExecutorConfig.Env`
-                        to empty list.
+                      description: Defines the image for the component to connect
+                        to databases or engines. This overrides the `image` and `env`
+                        attributes defined in clusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.
+                        To clear default environment settings, set systemAccountSpec.cmdExecutorConfig.env
+                        to an empty list.
                       properties:
                         cmdExecutorConfig:
-                          description: cmdExecutorConfig configs how to get client
-                            SDK and perform statements.
+                          description: Configures the method for obtaining the client
+                            SDK and executing statements.
                           properties:
                             env:
-                              description: envs is a list of environment variables.
+                              description: A list of environment variables that will
+                                be injected into the command execution context.
                               items:
                                 description: EnvVar represents an environment variable
                                   present in a Container.
@@ -451,7 +453,7 @@ spec:
                               type: array
                               x-kubernetes-preserve-unknown-fields: true
                             image:
-                              description: image for Connector when executing the
+                              description: Specifies the image used to execute the
                                 command.
                               type: string
                           required:
@@ -461,14 +463,14 @@ spec:
                       - cmdExecutorConfig
                       type: object
                     versionsContext:
-                      description: versionContext defines containers images' context
-                        for component versions, this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers
-                        | containers]
+                      description: Defines the context for container images for component
+                        versions. This value replaces the values in clusterDefinition.spec.componentDefs.podSpec.[initContainers
+                        | containers].
                       properties:
                         containers:
-                          description: Provide ClusterDefinition.spec.componentDefs.podSpec.containers
-                            override values, typical scenarios are application container
-                            image updates.
+                          description: Provides override values for ClusterDefinition.spec.componentDefs.podSpec.containers.
+                            Typically used in scenarios such as updating application
+                            container images.
                           items:
                             description: A single application container that you want
                               to run within a pod.
@@ -1882,9 +1884,9 @@ spec:
                           x-kubernetes-list-type: map
                           x-kubernetes-preserve-unknown-fields: true
                         initContainers:
-                          description: Provide ClusterDefinition.spec.componentDefs.podSpec.initContainers
-                            override values, typical scenarios are application container
-                            image updates.
+                          description: Provides override values for ClusterDefinition.spec.componentDefs.podSpec.initContainers.
+                            Typically used in scenarios such as updating application
+                            container images.
                           items:
                             description: A single application container that you want
                               to run within a pod.
@@ -3315,20 +3317,19 @@ spec:
             description: ClusterVersionStatus defines the observed state of ClusterVersion
             properties:
               clusterDefGeneration:
-                description: clusterDefGeneration represents the generation number
-                  of ClusterDefinition referenced.
+                description: The generation number of the ClusterDefinition that is
+                  currently being referenced.
                 format: int64
                 type: integer
               message:
-                description: A human readable message indicating details about why
-                  the ClusterVersion is in this phase.
+                description: Provides additional information about the current phase.
                 type: string
               observedGeneration:
-                description: generation number
+                description: The generation number that has been observed by the controller.
                 format: int64
                 type: integer
               phase:
-                description: phase - in list of [Available,Unavailable]
+                description: The current phase of the ClusterVersion.
                 enum:
                 - Available
                 - Unavailable

@@ -2269,18 +2269,20 @@ spec:
                         properties:
                           podName:
                             default: Unknown
-                            description: PodName pod name.
+                            description: Represents the name of the pod.
                             type: string
                           readyWithoutPrimary:
-                            description: Is it required for rsm to have at least one
-                              primary pod to be ready.
+                            description: Indicates whether it is required for the
+                              replica set manager (rsm) to have at least one primary
+                              pod ready.
                             type: boolean
                           role:
+                            description: Defines the role of the replica in the cluster.
                             properties:
                               accessMode:
                                 default: ReadWrite
-                                description: AccessMode, what service this member
-                                  capable.
+                                description: Specifies the service capabilities of
+                                  this member.
                                 enum:
                                 - None
                                 - Readonly
@@ -2288,17 +2290,15 @@ spec:
                                 type: string
                               canVote:
                                 default: true
-                                description: CanVote, whether this member has voting
-                                  rights
+                                description: Indicates if this member has voting rights.
                                 type: boolean
                               isLeader:
                                 default: false
-                                description: IsLeader, whether this member is the
-                                  leader
+                                description: Determines if this member is the leader.
                                 type: boolean
                               name:
                                 default: leader
-                                description: Name, role name.
+                                description: Defines the role name of the replica.
                                 type: string
                             required:
                             - accessMode

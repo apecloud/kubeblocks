@@ -17462,6 +17462,7 @@ Kubernetes meta/v1.ObjectMeta
 </em>
 </td>
 <td>
+<p>Contains the metadata for the particular object, such as name, namespace, labels, and annotations.</p>
 Refer to the Kubernetes API documentation for the fields of the
 <code>metadata</code> field.
 </td>
@@ -17476,6 +17477,7 @@ ReplicatedStateMachineSpec
 </em>
 </td>
 <td>
+<p>Defines the desired state of the state machine. It includes the configuration details for the state machine.</p>
 <br/>
 <br/>
 <table>
@@ -17488,10 +17490,9 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>replicas is the desired number of replicas of the given Template.
-These are replicas in the sense that they are instantiations of the
-same Template, but individual replicas also have a consistent identity.
-If unspecified, defaults to 1.</p>
+<p>Specifies the desired number of replicas of the given Template.
+These replicas are instantiations of the same Template, with each having a consistent identity.
+Defaults to 1 if unspecified.</p>
 </td>
 </tr>
 <tr>
@@ -17503,9 +17504,9 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Minimum number of seconds for which a newly created pod should be ready
-without any of its container crashing for it to be considered available.
-Defaults to 0 (pod will be considered available as soon as it is ready)</p>
+<p>Defines the minimum number of seconds a newly created pod should be ready
+without any of its container crashing to be considered available.
+Defaults to 0, meaning the pod will be considered available as soon as it is ready.</p>
 </td>
 </tr>
 <tr>
@@ -17518,7 +17519,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>selector is a label query over pods that should match the replica count.
+<p>Represents a label query over pods that should match the replica count.
 It must match the pod template&rsquo;s labels.
 More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
 </td>
@@ -17531,11 +17532,9 @@ string
 </em>
 </td>
 <td>
-<p>serviceName is the name of the service that governs this StatefulSet.
-This service must exist before the StatefulSet, and is responsible for
-the network identity of the set. Pods get DNS/hostnames that follow the
-pattern: pod-specific-string.serviceName.default.svc.cluster.local
-where &ldquo;pod-specific-string&rdquo; is managed by the StatefulSet controller.</p>
+<p>Refers to the name of the service that governs this StatefulSet.
+This service must exist before the StatefulSet and is responsible for
+the network identity of the set. Pods get DNS/hostnames that follow a specific pattern.</p>
 </td>
 </tr>
 <tr>
@@ -17549,8 +17548,8 @@ Kubernetes core/v1.Service
 </td>
 <td>
 <em>(Optional)</em>
-<p>service defines the behavior of a service spec.
-provides read-write service
+<p>Defines the behavior of a service spec.
+Provides read-write service.
 <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
 </td>
 </tr>
@@ -17565,8 +17564,8 @@ provides read-write service
 </td>
 <td>
 <em>(Optional)</em>
-<p>AlternativeServices defines Alternative Services selector pattern specifier.
-can be used for creating Readonly service.</p>
+<p>Defines Alternative Services selector pattern specifier.
+Can be used for creating Readonly service.</p>
 </td>
 </tr>
 <tr>
@@ -17592,7 +17591,7 @@ Kubernetes core/v1.PodTemplateSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeClaimTemplates is a list of claims that pods are allowed to reference.
+<p>Represents a list of claims that pods are allowed to reference.
 The ReplicatedStateMachine controller is responsible for mapping network identities to
 claims in a way that maintains the identity of a pod. Every claim in
 this list must have at least one matching (by name) volumeMount in one
@@ -17611,16 +17610,13 @@ Kubernetes apps/v1.PodManagementPolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>podManagementPolicy controls how pods are created during initial scale up,
+<p>Controls how pods are created during initial scale up,
 when replacing pods on nodes, or when scaling down.</p>
-<ul>
-<li>The default policy is <code>OrderedReady</code>, where pods are created in increasing order (pod-0, then
-pod-1, etc) and the controller will wait until each pod is ready before
-continuing. When scaling down, the pods are removed in the opposite order.</li>
-<li>The alternative policy is <code>Parallel</code> which will create pods in parallel
+<p>The default policy is <code>OrderedReady</code>, where pods are created in increasing order and the controller waits until each pod is ready before
+continuing. When scaling down, the pods are removed in the opposite order.
+The alternative policy is <code>Parallel</code> which will create pods in parallel
 to match the desired scale without waiting, and on scale down will delete
-all pods at once.</li>
-</ul>
+all pods at once.</p>
 </td>
 </tr>
 <tr>
@@ -17633,7 +17629,7 @@ Kubernetes apps/v1.StatefulSetUpdateStrategy
 </em>
 </td>
 <td>
-<p>updateStrategy indicates the StatefulSetUpdateStrategy that will be
+<p>Indicates the StatefulSetUpdateStrategy that will be
 employed to update Pods in the RSM when a revision is made to
 Template.
 UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
@@ -17650,7 +17646,7 @@ UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if Mem
 </td>
 <td>
 <em>(Optional)</em>
-<p>Roles, a list of roles defined in the system.</p>
+<p>A list of roles defined in the system.</p>
 </td>
 </tr>
 <tr>
@@ -17664,7 +17660,7 @@ RoleProbe
 </td>
 <td>
 <em>(Optional)</em>
-<p>RoleProbe provides method to probe role.</p>
+<p>Provides method to probe role.</p>
 </td>
 </tr>
 <tr>
@@ -17678,7 +17674,7 @@ MembershipReconfiguration
 </td>
 <td>
 <em>(Optional)</em>
-<p>MembershipReconfiguration provides actions to do membership dynamic reconfiguration.</p>
+<p>Provides actions to do membership dynamic reconfiguration.</p>
 </td>
 </tr>
 <tr>
@@ -17692,12 +17688,10 @@ MemberUpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberUpdateStrategy, Members(Pods) update strategy.</p>
+<p>Members(Pods) update strategy.</p>
 <ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.
-<code>Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader</code></li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
-<code>Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader</code>, keep majority online all the time.</li>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
 <li>parallel: force parallel</li>
 </ul>
 </td>
@@ -17711,7 +17705,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Paused indicates that the rsm is paused, means the reconciliation of this rsm object will be paused.</p>
+<p>Indicates that the rsm is paused, meaning the reconciliation of this rsm object will be paused.</p>
 </td>
 </tr>
 <tr>
@@ -17739,7 +17733,7 @@ RsmTransformPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>RsmTransformPolicy defines the policy generate sts using rsm. Passed from cluster.
+<p>Defines the policy to generate sts using rsm. Passed from cluster.
 ToSts: rsm transform to statefulSet
 ToPod: rsm transform to pod</p>
 </td>
@@ -17755,7 +17749,7 @@ ToPod: rsm transform to pod</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>NodeAssignment defines the expected assignment of nodes.</p>
+<p>Defines the expected assignment of nodes.</p>
 </td>
 </tr>
 </table>
@@ -17771,6 +17765,7 @@ ReplicatedStateMachineStatus
 </em>
 </td>
 <td>
+<p>Represents the current information about the state machine. This data may be out of date.</p>
 </td>
 </tr>
 </tbody>
@@ -17822,7 +17817,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>utility image contains command that can be used to retrieve of process role info</p>
+<p>Refers to the utility image that contains the command which can be utilized to retrieve or process role information.</p>
 </td>
 </tr>
 <tr>
@@ -17833,7 +17828,7 @@ string
 </em>
 </td>
 <td>
-<p>Command will be executed in Container to retrieve or process role info</p>
+<p>A set of instructions that will be executed within the Container to retrieve or process role information. This field is required.</p>
 </td>
 </tr>
 <tr>
@@ -17845,7 +17840,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Args is used to perform statements.</p>
+<p>Additional parameters used to perform specific statements. This field is optional.</p>
 </td>
 </tr>
 </tbody>
@@ -17875,8 +17870,8 @@ CredentialVar
 </em>
 </td>
 <td>
-<p>Username
-variable name will be KB_RSM_USERNAME</p>
+<p>Defines the user&rsquo;s name for the credential.
+The corresponding environment variable will be KB_RSM_USERNAME.</p>
 </td>
 </tr>
 <tr>
@@ -17889,8 +17884,8 @@ CredentialVar
 </em>
 </td>
 <td>
-<p>Password
-variable name will be KB_RSM_PASSWORD</p>
+<p>Represents the user&rsquo;s password for the credential.
+The corresponding environment variable will be KB_RSM_PASSWORD.</p>
 </td>
 </tr>
 </tbody>
@@ -17919,15 +17914,11 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Variable references $(VAR_NAME) are expanded
-using the previously defined environment variables in the container and
-any service environment variables. If a variable cannot be resolved,
-the reference in the input string will be unchanged. Double $$ are reduced
-to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-&ldquo;$$(VAR_NAME)&rdquo; will produce the string literal &ldquo;$(VAR_NAME)&rdquo;.
-Escaped references will never be expanded, regardless of whether the variable
-exists or not.
-Defaults to &ldquo;&rdquo;.</p>
+<p>Specifies the value of the environment variable. This field is optional and defaults to an empty string.
+The value can include variable references in the format $(VAR_NAME) which will be expanded using previously defined environment variables in the container and any service environment variables.</p>
+<p>If a variable cannot be resolved, the reference in the input string will remain unchanged.
+Double $$ can be used to escape the $(VAR_NAME) syntax, resulting in a single $ and producing the string literal &ldquo;$(VAR_NAME)&rdquo;.
+Escaped references will not be expanded, regardless of whether the variable exists or not.</p>
 </td>
 </tr>
 <tr>
@@ -17941,7 +17932,7 @@ Kubernetes core/v1.EnvVarSource
 </td>
 <td>
 <em>(Optional)</em>
-<p>Source for the environment variable&rsquo;s value. Cannot be used if value is not empty.</p>
+<p>Defines the source for the environment variable&rsquo;s value. This field is optional and cannot be used if the &lsquo;Value&rsquo; field is not empty.</p>
 </td>
 </tr>
 </tbody>
@@ -17969,7 +17960,7 @@ string
 </em>
 </td>
 <td>
-<p>PodName pod name.</p>
+<p>Represents the name of the pod.</p>
 </td>
 </tr>
 <tr>
@@ -17982,6 +17973,7 @@ ReplicaRole
 </em>
 </td>
 <td>
+<p>Defines the role of the replica in the cluster.</p>
 </td>
 </tr>
 <tr>
@@ -17993,7 +17985,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Is it required for rsm to have at least one primary pod to be ready.</p>
+<p>Indicates whether it is required for the replica set manager (rsm) to have at least one primary pod ready.</p>
 </td>
 </tr>
 </tbody>
@@ -18047,16 +18039,14 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Environment variables can be used in all following Actions:</p>
-<ul>
-<li>KB_RSM_USERNAME username part of credential</li>
-<li>KB_RSM_PASSWORD password part of credential</li>
-<li>KB_RSM_LEADER_HOST leader host</li>
-<li>KB_RSM_TARGET_HOST target host</li>
-<li>KB_RSM_SERVICE_PORT port</li>
-</ul>
-<p>SwitchoverAction specifies how to do switchover
-latest <a href="https://busybox.net/">BusyBox</a> image will be used if Image not configured</p>
+<p>Specifies the environment variables that can be used in all following Actions:
+- KB_RSM_USERNAME: Represents the username part of the credential
+- KB_RSM_PASSWORD: Represents the password part of the credential
+- KB_RSM_LEADER_HOST: Represents the leader host
+- KB_RSM_TARGET_HOST: Represents the target host
+- KB_RSM_SERVICE_PORT: Represents the service port</p>
+<p>Defines the action to perform a switchover.
+If the Image is not configured, the latest <a href="https://busybox.net/">BusyBox</a> image will be used.</p>
 </td>
 </tr>
 <tr>
@@ -18070,8 +18060,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberJoinAction specifies how to add member
-previous none-nil action&rsquo;s Image will be used if not configured</p>
+<p>Defines the action to add a member.
+If the Image is not configured, the Image from the previous non-nil action will be used.</p>
 </td>
 </tr>
 <tr>
@@ -18085,8 +18075,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberLeaveAction specifies how to remove member
-previous none-nil action&rsquo;s Image will be used if not configured</p>
+<p>Defines the action to remove a member.
+If the Image is not configured, the Image from the previous non-nil action will be used.</p>
 </td>
 </tr>
 <tr>
@@ -18100,8 +18090,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>LogSyncAction specifies how to trigger the new member to start log syncing
-previous none-nil action&rsquo;s Image will be used if not configured</p>
+<p>Defines the action to trigger the new member to start log syncing.
+If the Image is not configured, the Image from the previous non-nil action will be used.</p>
 </td>
 </tr>
 <tr>
@@ -18115,8 +18105,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>PromoteAction specifies how to tell the cluster that the new member can join voting now
-previous none-nil action&rsquo;s Image will be used if not configured</p>
+<p>Defines the action to inform the cluster that the new member can join voting now.
+If the Image is not configured, the Image from the previous non-nil action will be used.</p>
 </td>
 </tr>
 </tbody>
@@ -18145,7 +18135,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Name defines the name of statefulSet that needs to allocate node.</p>
+<p>Specifies the identifier for the statefulSet requiring node allocation.</p>
 </td>
 </tr>
 <tr>
@@ -18159,7 +18149,7 @@ NodeSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>NodeSpec defines the detailed node info that will assign to the statefulSet.</p>
+<p>Provides comprehensive details of the node to be assigned to the statefulSet.</p>
 </td>
 </tr>
 </tbody>
@@ -18190,6 +18180,7 @@ k8s.io/apimachinery/pkg/types.NodeName
 </td>
 <td>
 <em>(Optional)</em>
+<p>Represents the name of the node. This is a unique identifier within the cluster and is used to identify the specific node for scheduling, reporting, and other tasks.</p>
 </td>
 </tr>
 </tbody>
@@ -18217,7 +18208,7 @@ string
 </em>
 </td>
 <td>
-<p>Name, role name.</p>
+<p>Defines the role name of the replica.</p>
 </td>
 </tr>
 <tr>
@@ -18230,7 +18221,7 @@ AccessMode
 </em>
 </td>
 <td>
-<p>AccessMode, what service this member capable.</p>
+<p>Specifies the service capabilities of this member.</p>
 </td>
 </tr>
 <tr>
@@ -18242,7 +18233,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>CanVote, whether this member has voting rights</p>
+<p>Indicates if this member has voting rights.</p>
 </td>
 </tr>
 <tr>
@@ -18254,7 +18245,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>IsLeader, whether this member is the leader</p>
+<p>Determines if this member is the leader.</p>
 </td>
 </tr>
 </tbody>
@@ -18284,10 +18275,9 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>replicas is the desired number of replicas of the given Template.
-These are replicas in the sense that they are instantiations of the
-same Template, but individual replicas also have a consistent identity.
-If unspecified, defaults to 1.</p>
+<p>Specifies the desired number of replicas of the given Template.
+These replicas are instantiations of the same Template, with each having a consistent identity.
+Defaults to 1 if unspecified.</p>
 </td>
 </tr>
 <tr>
@@ -18299,9 +18289,9 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Minimum number of seconds for which a newly created pod should be ready
-without any of its container crashing for it to be considered available.
-Defaults to 0 (pod will be considered available as soon as it is ready)</p>
+<p>Defines the minimum number of seconds a newly created pod should be ready
+without any of its container crashing to be considered available.
+Defaults to 0, meaning the pod will be considered available as soon as it is ready.</p>
 </td>
 </tr>
 <tr>
@@ -18314,7 +18304,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>selector is a label query over pods that should match the replica count.
+<p>Represents a label query over pods that should match the replica count.
 It must match the pod template&rsquo;s labels.
 More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
 </td>
@@ -18327,11 +18317,9 @@ string
 </em>
 </td>
 <td>
-<p>serviceName is the name of the service that governs this StatefulSet.
-This service must exist before the StatefulSet, and is responsible for
-the network identity of the set. Pods get DNS/hostnames that follow the
-pattern: pod-specific-string.serviceName.default.svc.cluster.local
-where &ldquo;pod-specific-string&rdquo; is managed by the StatefulSet controller.</p>
+<p>Refers to the name of the service that governs this StatefulSet.
+This service must exist before the StatefulSet and is responsible for
+the network identity of the set. Pods get DNS/hostnames that follow a specific pattern.</p>
 </td>
 </tr>
 <tr>
@@ -18345,8 +18333,8 @@ Kubernetes core/v1.Service
 </td>
 <td>
 <em>(Optional)</em>
-<p>service defines the behavior of a service spec.
-provides read-write service
+<p>Defines the behavior of a service spec.
+Provides read-write service.
 <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
 </td>
 </tr>
@@ -18361,8 +18349,8 @@ provides read-write service
 </td>
 <td>
 <em>(Optional)</em>
-<p>AlternativeServices defines Alternative Services selector pattern specifier.
-can be used for creating Readonly service.</p>
+<p>Defines Alternative Services selector pattern specifier.
+Can be used for creating Readonly service.</p>
 </td>
 </tr>
 <tr>
@@ -18388,7 +18376,7 @@ Kubernetes core/v1.PodTemplateSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeClaimTemplates is a list of claims that pods are allowed to reference.
+<p>Represents a list of claims that pods are allowed to reference.
 The ReplicatedStateMachine controller is responsible for mapping network identities to
 claims in a way that maintains the identity of a pod. Every claim in
 this list must have at least one matching (by name) volumeMount in one
@@ -18407,16 +18395,13 @@ Kubernetes apps/v1.PodManagementPolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>podManagementPolicy controls how pods are created during initial scale up,
+<p>Controls how pods are created during initial scale up,
 when replacing pods on nodes, or when scaling down.</p>
-<ul>
-<li>The default policy is <code>OrderedReady</code>, where pods are created in increasing order (pod-0, then
-pod-1, etc) and the controller will wait until each pod is ready before
-continuing. When scaling down, the pods are removed in the opposite order.</li>
-<li>The alternative policy is <code>Parallel</code> which will create pods in parallel
+<p>The default policy is <code>OrderedReady</code>, where pods are created in increasing order and the controller waits until each pod is ready before
+continuing. When scaling down, the pods are removed in the opposite order.
+The alternative policy is <code>Parallel</code> which will create pods in parallel
 to match the desired scale without waiting, and on scale down will delete
-all pods at once.</li>
-</ul>
+all pods at once.</p>
 </td>
 </tr>
 <tr>
@@ -18429,7 +18414,7 @@ Kubernetes apps/v1.StatefulSetUpdateStrategy
 </em>
 </td>
 <td>
-<p>updateStrategy indicates the StatefulSetUpdateStrategy that will be
+<p>Indicates the StatefulSetUpdateStrategy that will be
 employed to update Pods in the RSM when a revision is made to
 Template.
 UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
@@ -18446,7 +18431,7 @@ UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if Mem
 </td>
 <td>
 <em>(Optional)</em>
-<p>Roles, a list of roles defined in the system.</p>
+<p>A list of roles defined in the system.</p>
 </td>
 </tr>
 <tr>
@@ -18460,7 +18445,7 @@ RoleProbe
 </td>
 <td>
 <em>(Optional)</em>
-<p>RoleProbe provides method to probe role.</p>
+<p>Provides method to probe role.</p>
 </td>
 </tr>
 <tr>
@@ -18474,7 +18459,7 @@ MembershipReconfiguration
 </td>
 <td>
 <em>(Optional)</em>
-<p>MembershipReconfiguration provides actions to do membership dynamic reconfiguration.</p>
+<p>Provides actions to do membership dynamic reconfiguration.</p>
 </td>
 </tr>
 <tr>
@@ -18488,12 +18473,10 @@ MemberUpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberUpdateStrategy, Members(Pods) update strategy.</p>
+<p>Members(Pods) update strategy.</p>
 <ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.
-<code>Learner -&gt; Follower(with AccessMode=none) -&gt; Follower(with AccessMode=readonly) -&gt; Follower(with AccessMode=readWrite) -&gt; Leader</code></li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
-<code>Learner, Follower(minority) in parallel -&gt; Follower(majority) -&gt; Leader</code>, keep majority online all the time.</li>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
 <li>parallel: force parallel</li>
 </ul>
 </td>
@@ -18507,7 +18490,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Paused indicates that the rsm is paused, means the reconciliation of this rsm object will be paused.</p>
+<p>Indicates that the rsm is paused, meaning the reconciliation of this rsm object will be paused.</p>
 </td>
 </tr>
 <tr>
@@ -18535,7 +18518,7 @@ RsmTransformPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>RsmTransformPolicy defines the policy generate sts using rsm. Passed from cluster.
+<p>Defines the policy to generate sts using rsm. Passed from cluster.
 ToSts: rsm transform to statefulSet
 ToPod: rsm transform to pod</p>
 </td>
@@ -18551,7 +18534,7 @@ ToPod: rsm transform to pod</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>NodeAssignment defines the expected assignment of nodes.</p>
+<p>Defines the expected assignment of nodes.</p>
 </td>
 </tr>
 </tbody>
@@ -18595,8 +18578,8 @@ int32
 </em>
 </td>
 <td>
-<p>InitReplicas is the number of pods(members) when cluster first initialized
-it&rsquo;s set to spec.Replicas at object creation time and never changes</p>
+<p>Defines the initial number of pods (members) when the cluster is first initialized.
+This value is set to spec.Replicas at the time of object creation and remains constant thereafter.</p>
 </td>
 </tr>
 <tr>
@@ -18608,8 +18591,8 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReadyInitReplicas is the number of pods(members) already in MembersStatus in the cluster initialization stage
-will never change once equals to InitReplicas</p>
+<p>Represents the number of pods (members) that have already reached the MembersStatus during the cluster initialization stage.
+This value remains constant once it equals InitReplicas.</p>
 </td>
 </tr>
 <tr>
@@ -18621,7 +18604,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>CurrentGeneration, if not empty, indicates the version of the RSM used to generate the underlying workload</p>
+<p>When not empty, indicates the version of the Replicated State Machine (RSM) used to generate the underlying workload.</p>
 </td>
 </tr>
 <tr>
@@ -18635,7 +18618,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>members&rsquo; status.</p>
+<p>Provides the status of each member in the cluster.</p>
 </td>
 </tr>
 </tbody>
@@ -18665,9 +18648,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>BuiltinHandler specifies the builtin handler name to use to probe the role of the main container.
-current available handlers: mysql, postgres, mongodb, redis, etcd, kafka.
-use CustomHandler to define your own role probe function if none of them satisfies the requirement.</p>
+<p>Specifies the builtin handler name to use to probe the role of the main container.
+Available handlers include: mysql, postgres, mongodb, redis, etcd, kafka.
+Use CustomHandler to define a custom role probe function if none of the built-in handlers meet the requirement.</p>
 </td>
 </tr>
 <tr>
@@ -18681,18 +18664,15 @@ use CustomHandler to define your own role probe function if none of them satisfi
 </td>
 <td>
 <em>(Optional)</em>
-<p>CustomHandler defines the custom way to do role probe.
-if the BuiltinHandler satisfies the requirement, use it instead.</p>
-<p>how the actions defined here works:</p>
-<p>Actions will be taken in serial.
-after all actions done, the final output should be a single string of the role name defined in spec.Roles
-latest <a href="https://busybox.net/">BusyBox</a> image will be used if Image not configured
-Environment variables can be used in Command:</p>
-<ul>
-<li>v_KB_RSM_LAST<em>STDOUT stdout from last action, watch &lsquo;v</em>&rsquo; prefixed</li>
-<li>KB_RSM_USERNAME username part of credential</li>
-<li>KB_RSM_PASSWORD password part of credential</li>
-</ul>
+<p>Defines a custom method for role probing.
+If the BuiltinHandler meets the requirement, use it instead.
+Actions defined here are executed in series.
+Upon completion of all actions, the final output should be a single string representing the role name defined in spec.Roles.
+The latest <a href="https://busybox.net/">BusyBox</a> image will be used if Image is not configured.
+Environment variables can be used in Command:
+- v_KB_RSM_LAST<em>STDOUT: stdout from the last action, watch for &lsquo;v</em>&rsquo; prefix
+- KB_RSM_USERNAME: username part of the credential
+- KB_RSM_PASSWORD: password part of the credential</p>
 </td>
 </tr>
 <tr>
@@ -18704,7 +18684,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Number of seconds after the container has started before role probe has started.</p>
+<p>Specifies the number of seconds to wait after the container has started before initiating role probing.</p>
 </td>
 </tr>
 <tr>
@@ -18716,8 +18696,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Number of seconds after which the probe times out.
-Defaults to 1 second. Minimum value is 1.</p>
+<p>Specifies the number of seconds after which the probe times out.</p>
 </td>
 </tr>
 <tr>
@@ -18729,8 +18708,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>How often (in seconds) to perform the probe.
-Default to 2 seconds. Minimum value is 1.</p>
+<p>Specifies the frequency (in seconds) of probe execution.</p>
 </td>
 </tr>
 <tr>
@@ -18742,8 +18720,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Minimum consecutive successes for the probe to be considered successful after having failed.
-Defaults to 1. Minimum value is 1.</p>
+<p>Specifies the minimum number of consecutive successes for the probe to be considered successful after having failed.</p>
 </td>
 </tr>
 <tr>
@@ -18755,8 +18732,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Minimum consecutive failures for the probe to be considered failed after having succeeded.
-Defaults to 3. Minimum value is 1.</p>
+<p>Specifies the minimum number of consecutive failures for the probe to be considered failed after having succeeded.</p>
 </td>
 </tr>
 <tr>
@@ -18770,7 +18746,7 @@ RoleUpdateMechanism
 </td>
 <td>
 <em>(Optional)</em>
-<p>RoleUpdateMechanism specifies the way how pod role label being updated.</p>
+<p>Specifies the method for updating the pod role label.</p>
 </td>
 </tr>
 </tbody>

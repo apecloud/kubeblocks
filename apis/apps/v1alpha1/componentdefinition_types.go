@@ -561,12 +561,13 @@ type ComponentLifecycleActions struct {
 	// +optional
 	PreTerminate *LifecycleActionHandler `json:"preTerminate,omitempty"`
 
-	// RoleProbe defines the mechanism to probe the role of replicas periodically. The specified action will be executed by Lorry.
-	// If the execution is successful, the output will be used as the role of the replica. The role must be one of
-	// the names defined in the componentdefinition roles. The output will be compared with the last successful output.
-	// If there is a change, a rolechange event will be created to notify the controller to update the replica's role.
-	// This action is required if the component has defined roles. Otherwise, the replicas' pods will have no role
-	// information after cluster creation, and services will not route to the replica correctly.
+	// RoleProbe defines the mechanism to probe the role of replicas periodically. The specified action will be
+	// executed by Lorry at the configured interval. If the execution is successful, the output will be used as
+	// the replica's assigned role, and the role must be one of the names defined in the componentdefinition roles.
+	// The output will be compared with the last successful result.  If there is a change, a role change event will
+	// be created to notify the controller and trigger updating the replica's role.
+	// Defining a RoleProbe is required if roles are configured for the component. Otherwise, the replicas' pods will
+	// lack role information after the cluster is created, and services will not route to the replica correctly.
 	// Available variables for the action:
 	// - KB_POD_FQDN: The pod FQDN of the replica to check the role.
 	// - KB_SERVICE_PORT: The port on which the DB service listens.

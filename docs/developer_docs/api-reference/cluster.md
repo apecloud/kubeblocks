@@ -744,7 +744,7 @@ string
 </em>
 </td>
 <td>
-<p>CompDef is the name of the referenced ComponentDefinition.</p>
+<p>Specifies the name of the referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -758,7 +758,7 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>ClassDefRef references the class defined in ComponentClassDefinition.</p>
+<p>References the class defined in ComponentClassDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -772,11 +772,9 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:</p>
-<ul>
-<li>Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.</li>
-<li>Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.</li>
-</ul>
+<p>Define service references for the current component. Based on the referenced services, they can be categorized into two types:
+- Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
+- Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.</p>
 <p>Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
 It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.</p>
 </td>
@@ -792,7 +790,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>Resources requests and limits of workload.</p>
+<p>Requests and limits of workload resources.</p>
 </td>
 </tr>
 <tr>
@@ -806,7 +804,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.</p>
+<p>Information for statefulset.spec.volumeClaimTemplates.</p>
 </td>
 </tr>
 <tr>
@@ -817,7 +815,7 @@ int32
 </em>
 </td>
 <td>
-<p>Replicas specifies the desired number of replicas for the component&rsquo;s workload.</p>
+<p>Specifies the desired number of replicas for the component&rsquo;s workload.</p>
 </td>
 </tr>
 <tr>
@@ -831,7 +829,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Configs defines the configuration for the component.</p>
+<p>Defines the configuration for the component.</p>
 </td>
 </tr>
 <tr>
@@ -843,7 +841,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Monitor is a switch to enable monitoring and is set as false by default.
+<p>A switch to enable monitoring and is set as false by default.
 KubeBlocks provides an extension mechanism to support component level monitoring,
 which will scrape metrics auto or manually from servers in component and export
 metrics to Time Series Database.</p>
@@ -858,7 +856,7 @@ metrics to Time Series Database.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>EnabledLogs indicates which log file takes effect in the database cluster,
+<p>Indicates which log file takes effect in the database cluster,
 element is the log type which is defined in ComponentDefinition logConfig.name.</p>
 </td>
 </tr>
@@ -871,7 +869,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceAccountName is the name of the ServiceAccount that running component depends on.</p>
+<p>The name of the ServiceAccount that running component depends on.</p>
 </td>
 </tr>
 <tr>
@@ -885,7 +883,7 @@ Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>Affinity specifies the scheduling constraints for the component&rsquo;s workload.
+<p>Specifies the scheduling constraints for the component&rsquo;s workload.
 If specified, it will override the cluster-wide affinity.</p>
 </td>
 </tr>
@@ -900,7 +898,7 @@ If specified, it will override the cluster-wide affinity.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Tolerations specify the tolerations for the component&rsquo;s workload.
+<p>Specify the tolerations for the component&rsquo;s workload.
 If specified, they will override the cluster-wide toleration settings.</p>
 </td>
 </tr>
@@ -915,7 +913,7 @@ TLSConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>TLSConfig specifies the TLS configuration for the component.</p>
+<p>Specifies the TLS configuration for the component.</p>
 </td>
 </tr>
 <tr>
@@ -929,9 +927,9 @@ RsmTransformPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>RsmTransformPolicy defines the policy generate sts using rsm.
-ToSts: rsm transform to statefulSet
-ToPod: rsm transform to pods</p>
+<p>Defines the policy generate sts using rsm.
+- ToSts: rsm transform to statefulSet
+- ToPod: rsm transform to pods</p>
 </td>
 </tr>
 <tr>
@@ -945,7 +943,7 @@ ToPod: rsm transform to pods</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Nodes defines the list of nodes that pods can schedule
+<p>Defines the list of nodes that pods can schedule
 If the RsmTransformPolicy is specified as OneToMul,the list of nodes will be used. If the list of nodes is empty,
 no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
 across the nodes in the list.</p>
@@ -960,7 +958,7 @@ across the nodes in the list.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Instances defines the list of instance to be deleted priorly</p>
+<p>Defines the list of instance to be deleted priorly</p>
 </td>
 </tr>
 </table>
@@ -1130,7 +1128,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provider is the name of the component provider.</p>
+<p>Specifies the name of the component provider.</p>
 </td>
 </tr>
 <tr>
@@ -1142,7 +1140,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Description is a brief description of the component.</p>
+<p>Provides a brief description of the component.</p>
 </td>
 </tr>
 <tr>
@@ -1154,8 +1152,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceKind defines what kind of well-known service that the component provides (e.g., MySQL, Redis, ETCD, case insensitive).
-Cannot be updated.</p>
+<p>Defines the type of well-known service that the component provides (e.g., MySQL, Redis, ETCD, case insensitive).
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1167,8 +1165,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceVersion defines the version of the well-known service that the component provides.
-Cannot be updated.</p>
+<p>Specifies the version of the well-known service that the component provides.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1181,7 +1179,7 @@ Kubernetes core/v1.PodSpec
 </em>
 </td>
 <td>
-<p>Runtime defines primarily runtime information for the component, including:</p>
+<p>Primarily defines runtime information for the component, including:</p>
 <ul>
 <li>Init containers</li>
 <li>Containers
@@ -1199,7 +1197,7 @@ Kubernetes core/v1.PodSpec
 <li>Volumes</li>
 </ul>
 <p>CPU and memory resource limits, as well as scheduling settings (affinity, toleration, priority), should not be configured within this structure.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1213,10 +1211,10 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Vars represents user-defined variables.</p>
+<p>Represents user-defined variables.</p>
 <p>These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
 When used as environment variables, these variables are placed in front of the environment variables declared in the Pod.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1230,9 +1228,9 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Volumes defines the persistent volumes needed by the component.
-The users are responsible for providing these volumes when creating a component instance.
-Cannot be updated.</p>
+<p>Defines the persistent volumes needed by the component.
+Users are responsible for providing these volumes when creating a component instance.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1246,9 +1244,9 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Services defines endpoints that can be used to access the component service to manage the component.</p>
+<p>Defines endpoints that can be used to access the component service to manage the component.</p>
 <p>In addition, a reserved headless service will be created by default, with the name pattern <code>&#123;clusterName&#125;-&#123;componentName&#125;-headless</code>.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1262,9 +1260,9 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The configs field provided by provider, and
-finally this configTemplateRefs will be rendered into the user&rsquo;s own configuration file according to the user&rsquo;s cluster.
-Cannot be updated.</p>
+<p>The configs field is provided by the provider, and
+finally, these configTemplateRefs will be rendered into the user&rsquo;s own configuration file according to the user&rsquo;s cluster.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1278,8 +1276,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>LogConfigs is detail log file config which provided by provider.
-Cannot be updated.</p>
+<p>LogConfigs is a detailed log file config provided by the provider.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1293,8 +1291,8 @@ MonitorConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Monitor is monitoring config which provided by provider.
-Cannot be updated.</p>
+<p>Monitor is a monitoring config provided by the provider.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1308,9 +1306,9 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The scripts field provided by provider, and
-finally this configTemplateRefs will be rendered into the user&rsquo;s own configuration file according to the user&rsquo;s cluster.
-Cannot be updated.</p>
+<p>The scripts field is provided by the provider, and
+finally, these configTemplateRefs will be rendered into the user&rsquo;s own configuration file according to the user&rsquo;s cluster.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1324,9 +1322,9 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>PolicyRules defines the namespaced policy rules required by the component.
+<p>Defines the namespaced policy rules required by the component.
 If any rule application fails (e.g., due to lack of permissions), the provisioning of the component instance will also fail.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1338,9 +1336,9 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Labels defines static labels that will be patched to all k8s resources created for the component.
+<p>Defines static labels that will be patched to all k8s resources created for the component.
 If a label key conflicts with any other system labels or user-specified labels, it will be silently ignored.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1354,8 +1352,8 @@ ReplicasLimit
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReplicasLimit defines the limit of valid replicas supported.
-Cannot be updated.</p>
+<p>Defines the limit of valid replicas supported.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1369,8 +1367,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>SystemAccounts defines the pre-defined system accounts required to manage the component.
-Cannot be updated.</p>
+<p>Defines the pre-defined system accounts required to manage the component.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1384,8 +1382,8 @@ UpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
-<p>UpdateStrategy defines the strategy for updating the component instance.
-Cannot be updated.</p>
+<p>Defines the strategy for updating the component instance.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1399,8 +1397,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Roles defines all the roles that the component can assume.
-Cannot be updated.</p>
+<p>Defines all the roles that the component can assume.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1414,8 +1412,8 @@ RoleArbitrator
 </td>
 <td>
 <em>(Optional)</em>
-<p>RoleArbitrator defines the strategy for electing the component&rsquo;s active role.
-Cannot be updated.</p>
+<p>Defines the strategy for electing the component&rsquo;s active role.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1429,9 +1427,9 @@ ComponentLifecycleActions
 </td>
 <td>
 <em>(Optional)</em>
-<p>LifecycleActions defines the operational actions that needed to interoperate with the component
+<p>Defines the operational actions needed to interoperate with the component
 service and processes for lifecycle management.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1445,8 +1443,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceRefDeclarations is used to declare the service reference of the current component.
-Cannot be updated.</p>
+<p>Used to declare the service reference of the current component.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1458,7 +1456,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Minimum number of seconds for which a newly created pod should be ready
+<p>Specifies the minimum number of seconds for which a newly created pod should be ready
 without any of its container crashing for it to be considered available.
 Defaults to 0 (pod will be considered available as soon as it is ready)</p>
 </td>
@@ -2623,8 +2621,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Image defines the container image to run the action.
-Cannot be updated.</p>
+<p>Specifies the container image to run the action.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -2638,8 +2636,8 @@ ExecAction
 </td>
 <td>
 <em>(Optional)</em>
-<p>Exec specifies the action to take.
-Cannot be updated.</p>
+<p>Defines the action to take.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -2653,8 +2651,8 @@ HTTPAction
 </td>
 <td>
 <em>(Optional)</em>
-<p>HTTP specifies the http request to perform.
-Cannot be updated.</p>
+<p>Specifies the HTTP request to perform.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -2668,8 +2666,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of environment variables to set in the container.
-Cannot be updated.</p>
+<p>Represents a list of environment variables to set in the container.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -2683,9 +2681,9 @@ TargetPodSelector
 </td>
 <td>
 <em>(Optional)</em>
-<p>TargetPodSelector defines the way that how to select the target Pod where the action will be performed,
+<p>Defines how to select the target Pod where the action will be performed,
 if there may not have a target replica by default.
-Cannot be updated.</p>
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -2697,10 +2695,10 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>MatchingKey uses to select the target pod(s) actually.
-If the selector is AnyReplica or AllReplicas, the matchingKey will be ignored.
-If the selector is RoleSelector, any replica which has the same role with matchingKey will be chosen.
-Cannot be updated.</p>
+<p>Used to select the target pod(s) actually.
+If the selector is AnyReplica or AllReplicas, this field will be ignored.
+If the selector is RoleSelector, any replica which has the same role with this field will be chosen.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -2712,10 +2710,10 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Container defines the name of the container within the target Pod where the action will be executed.
+<p>Defines the name of the container within the target Pod where the action will be executed.
 If specified, it must be one of container declared in @Runtime.
 If not specified, the first container declared in @Runtime will be used.
-Cannot be updated.</p>
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -2727,8 +2725,8 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>TimeoutSeconds defines the timeout duration for the action in seconds.
-Cannot be updated.</p>
+<p>Defines the timeout duration for the action in seconds.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -2742,8 +2740,8 @@ RetryPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>RetryPolicy defines the strategy for retrying the action in case of failure.
-Cannot be updated.</p>
+<p>Defines the strategy for retrying the action in case of failure.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -2757,18 +2755,18 @@ PreConditionType
 </td>
 <td>
 <em>(Optional)</em>
-<p>PreCondition defines the condition when the action will be executed.</p>
+<p>Defines the condition when the action will be executed.</p>
 <ul>
 <li>Immediately: The Action is executed immediately after the Component object is created,
-without guaranteeing the availability of the Component and its underlying resources. only after the action is successfully executed will the Component&rsquo;s state turn to ready.</li>
+without guaranteeing the availability of the Component and its underlying resources. Only after the action is successfully executed will the Component&rsquo;s state turn to ready.</li>
 <li>RuntimeReady: The Action is executed after the Component object is created and once all underlying Runtimes are ready.
-only after the action is successfully executed will the Component&rsquo;s state turn to ready.</li>
+Only after the action is successfully executed will the Component&rsquo;s state turn to ready.</li>
 <li>ComponentReady: The Action is executed after the Component object is created and once the Component is ready.
-the execution process does not impact the state of the Component and the Cluster.</li>
+The execution process does not impact the state of the Component and the Cluster.</li>
 <li>ClusterReady: The Action is executed after the Cluster object is created and once the Cluster is ready.</li>
 </ul>
-<p>the execution process does not impact the state of the Component and the Cluster.
-Cannot be updated.</p>
+<p>The execution process does not impact the state of the Component and the Cluster.
+This field cannot be updated.</p>
 </td>
 </tr>
 </tbody>
@@ -6493,7 +6491,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provider is the name of the component provider.</p>
+<p>Specifies the name of the component provider.</p>
 </td>
 </tr>
 <tr>
@@ -6505,7 +6503,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Description is a brief description of the component.</p>
+<p>Provides a brief description of the component.</p>
 </td>
 </tr>
 <tr>
@@ -6517,8 +6515,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceKind defines what kind of well-known service that the component provides (e.g., MySQL, Redis, ETCD, case insensitive).
-Cannot be updated.</p>
+<p>Defines the type of well-known service that the component provides (e.g., MySQL, Redis, ETCD, case insensitive).
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6530,8 +6528,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceVersion defines the version of the well-known service that the component provides.
-Cannot be updated.</p>
+<p>Specifies the version of the well-known service that the component provides.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6544,7 +6542,7 @@ Kubernetes core/v1.PodSpec
 </em>
 </td>
 <td>
-<p>Runtime defines primarily runtime information for the component, including:</p>
+<p>Primarily defines runtime information for the component, including:</p>
 <ul>
 <li>Init containers</li>
 <li>Containers
@@ -6562,7 +6560,7 @@ Kubernetes core/v1.PodSpec
 <li>Volumes</li>
 </ul>
 <p>CPU and memory resource limits, as well as scheduling settings (affinity, toleration, priority), should not be configured within this structure.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6576,10 +6574,10 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Vars represents user-defined variables.</p>
+<p>Represents user-defined variables.</p>
 <p>These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
 When used as environment variables, these variables are placed in front of the environment variables declared in the Pod.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6593,9 +6591,9 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Volumes defines the persistent volumes needed by the component.
-The users are responsible for providing these volumes when creating a component instance.
-Cannot be updated.</p>
+<p>Defines the persistent volumes needed by the component.
+Users are responsible for providing these volumes when creating a component instance.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6609,9 +6607,9 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Services defines endpoints that can be used to access the component service to manage the component.</p>
+<p>Defines endpoints that can be used to access the component service to manage the component.</p>
 <p>In addition, a reserved headless service will be created by default, with the name pattern <code>&#123;clusterName&#125;-&#123;componentName&#125;-headless</code>.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6625,9 +6623,9 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The configs field provided by provider, and
-finally this configTemplateRefs will be rendered into the user&rsquo;s own configuration file according to the user&rsquo;s cluster.
-Cannot be updated.</p>
+<p>The configs field is provided by the provider, and
+finally, these configTemplateRefs will be rendered into the user&rsquo;s own configuration file according to the user&rsquo;s cluster.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6641,8 +6639,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>LogConfigs is detail log file config which provided by provider.
-Cannot be updated.</p>
+<p>LogConfigs is a detailed log file config provided by the provider.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6656,8 +6654,8 @@ MonitorConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Monitor is monitoring config which provided by provider.
-Cannot be updated.</p>
+<p>Monitor is a monitoring config provided by the provider.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6671,9 +6669,9 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The scripts field provided by provider, and
-finally this configTemplateRefs will be rendered into the user&rsquo;s own configuration file according to the user&rsquo;s cluster.
-Cannot be updated.</p>
+<p>The scripts field is provided by the provider, and
+finally, these configTemplateRefs will be rendered into the user&rsquo;s own configuration file according to the user&rsquo;s cluster.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6687,9 +6685,9 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>PolicyRules defines the namespaced policy rules required by the component.
+<p>Defines the namespaced policy rules required by the component.
 If any rule application fails (e.g., due to lack of permissions), the provisioning of the component instance will also fail.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6701,9 +6699,9 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Labels defines static labels that will be patched to all k8s resources created for the component.
+<p>Defines static labels that will be patched to all k8s resources created for the component.
 If a label key conflicts with any other system labels or user-specified labels, it will be silently ignored.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6717,8 +6715,8 @@ ReplicasLimit
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReplicasLimit defines the limit of valid replicas supported.
-Cannot be updated.</p>
+<p>Defines the limit of valid replicas supported.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6732,8 +6730,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>SystemAccounts defines the pre-defined system accounts required to manage the component.
-Cannot be updated.</p>
+<p>Defines the pre-defined system accounts required to manage the component.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6747,8 +6745,8 @@ UpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
-<p>UpdateStrategy defines the strategy for updating the component instance.
-Cannot be updated.</p>
+<p>Defines the strategy for updating the component instance.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6762,8 +6760,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Roles defines all the roles that the component can assume.
-Cannot be updated.</p>
+<p>Defines all the roles that the component can assume.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6777,8 +6775,8 @@ RoleArbitrator
 </td>
 <td>
 <em>(Optional)</em>
-<p>RoleArbitrator defines the strategy for electing the component&rsquo;s active role.
-Cannot be updated.</p>
+<p>Defines the strategy for electing the component&rsquo;s active role.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6792,9 +6790,9 @@ ComponentLifecycleActions
 </td>
 <td>
 <em>(Optional)</em>
-<p>LifecycleActions defines the operational actions that needed to interoperate with the component
+<p>Defines the operational actions needed to interoperate with the component
 service and processes for lifecycle management.
-Cannot be updated.</p>
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6808,8 +6806,8 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceRefDeclarations is used to declare the service reference of the current component.
-Cannot be updated.</p>
+<p>Used to declare the service reference of the current component.
+This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -6821,7 +6819,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Minimum number of seconds for which a newly created pod should be ready
+<p>Specifies the minimum number of seconds for which a newly created pod should be ready
 without any of its container crashing for it to be considered available.
 Defaults to 0 (pod will be considered available as soon as it is ready)</p>
 </td>
@@ -6853,7 +6851,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>ObservedGeneration is the most recent generation observed for this ComponentDefinition.</p>
+<p>Refers to the most recent generation that has been observed for the ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -6867,8 +6865,8 @@ Phase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Phase valid values are `<code>,</code>Available<code>,</code>Unavailable`.
-Available is ComponentDefinition become available, and can be used for co-related objects.</p>
+<p>Represents the current status of the ComponentDefinition. Valid values include `<code>,</code>Available<code>, and</code>Unavailable<code>.
+When the status is</code>Available`, the ComponentDefinition is ready and can be utilized by related objects.</p>
 </td>
 </tr>
 <tr>
@@ -6880,7 +6878,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Extra message for current phase.</p>
+<p>Provides additional information about the current phase.</p>
 </td>
 </tr>
 </tbody>
@@ -6912,18 +6910,18 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>PostProvision defines the actions to be executed and the corresponding policy when a component is created.
-You can define the preCondition for executing PostProvision using Action.PreCondition. The default PostProvision action preCondition is ComponentReady.
+<p>Specifies the actions and corresponding policy to be executed when a component is created.
+The precondition for executing PostProvision can be defined using Action.PreCondition. The default precondition for PostProvision action is ComponentReady.
 The PostProvision Action will be executed only once.
-Dedicated env vars for the action:</p>
+The following dedicated environment variables are available for the action:</p>
 <ul>
-<li>KB_CLUSTER_COMPONENT_LIST: The list of all components in the cluster, joined by &lsquo;,&rsquo; (e.g., &ldquo;comp1,comp2&rdquo;).</li>
-<li>KB_CLUSTER_COMPONENT_POD_NAME_LIST: The list of all pods name in this component, joined by &lsquo;,&rsquo; (e.g., &ldquo;pod1,pod2&rdquo;).</li>
-<li>KB_CLUSTER_COMPONENT_POD_IP_LIST: The list of pod IPs where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by &lsquo;,&rsquo; (e.g., &ldquo;podIp1,podIp2&rdquo;).</li>
-<li>KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: The list of hostName where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by &lsquo;,&rsquo; (e.g., &ldquo;hostName1,hostName2&rdquo;).</li>
-<li>KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: The list of host IPs where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by &lsquo;,&rsquo; (e.g., &ldquo;hostIp1,hostIp2&rdquo;).</li>
+<li>KB_CLUSTER_COMPONENT_LIST: Lists all components in the cluster, joined by &lsquo;,&rsquo; (e.g., &ldquo;comp1,comp2&rdquo;).</li>
+<li>KB_CLUSTER_COMPONENT_POD_NAME_LIST: Lists all pod names in this component, joined by &lsquo;,&rsquo; (e.g., &ldquo;pod1,pod2&rdquo;).</li>
+<li>KB_CLUSTER_COMPONENT_POD_IP_LIST: Lists the IP addresses of each pod in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by &lsquo;,&rsquo; (e.g., &ldquo;podIp1,podIp2&rdquo;).</li>
+<li>KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Lists the host names where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by &lsquo;,&rsquo; (e.g., &ldquo;hostName1,hostName2&rdquo;).</li>
+<li>KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Lists the host IP addresses where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by &lsquo;,&rsquo; (e.g., &ldquo;hostIp1,hostIp2&rdquo;).</li>
 </ul>
-<p>Cannot be updated.</p>
+<p>This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -6937,10 +6935,10 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>PreTerminate defines the actions to be executed when a component is terminated due to an API request.
+<p>Defines the actions to be executed when a component is terminated due to an API request.
 The PreTerminate Action will be executed only once. Upon receiving a scale-down command for the Component, it is executed immediately.
-Only after the preTerminate action is successfully executed, the destruction of the Component and its underlying resources proceeds.
-Cannot be updated.</p>
+The destruction of the Component and its underlying resources proceeds only after the preTerminate action is successfully executed.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -6954,8 +6952,8 @@ RoleProbe
 </td>
 <td>
 <em>(Optional)</em>
-<p>RoleProbe defines how to probe the role of replicas.
-Cannot be updated.</p>
+<p>Defines the method to probe the role of replicas.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -6969,7 +6967,7 @@ ComponentSwitchover
 </td>
 <td>
 <em>(Optional)</em>
-<p>Switchover defines how to proactively switch the current leader to a new replica to minimize the impact on availability.
+<p>Defines the method to proactively switch the current leader to a new replica to minimize the impact on availability.
 This action is typically invoked when the leader is about to become unavailable due to events, such as:</p>
 <ul>
 <li>switchover</li>
@@ -6977,7 +6975,7 @@ This action is typically invoked when the leader is about to become unavailable 
 <li>restart</li>
 <li>scale-in</li>
 </ul>
-<p>Dedicated env vars for the action:</p>
+<p>The following dedicated environment variables are available for the action:</p>
 <ul>
 <li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the new candidate replica&rsquo;s Pod. It may be empty.</li>
 <li>KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new candidate replica. It may be empty.</li>
@@ -6985,12 +6983,12 @@ This action is typically invoked when the leader is about to become unavailable 
 <li>KB_LEADER_POD_NAME: The name of the original leader&rsquo;s Pod before switchover.</li>
 <li>KB_LEADER_POD_FQDN: The FQDN of the original leader&rsquo;s Pod before switchover.</li>
 </ul>
-<p>The env vars with following prefix are deprecated and will be removed in the future:</p>
+<p>The environment variables with the following prefixes are deprecated and will be removed in the future:</p>
 <ul>
 <li>KB_REPLICATION_PRIMARY<em>POD</em>: The prefix of the environment variables of the original primary&rsquo;s Pod before switchover.</li>
 <li>KB_CONSENSUS_LEADER<em>POD</em>: The prefix of the environment variables of the original leader&rsquo;s Pod before switchover.</li>
 </ul>
-<p>Cannot be updated.</p>
+<p>This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7004,10 +7002,10 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberJoin defines how to add a new replica to the replication group.
+<p>Defines the method to add a new replica to the replication group.
 This action is typically invoked when a new replica needs to be added, such as during scale-out.
 It may involve updating configuration, notifying other members, and ensuring data consistency.
-Cannot be updated.</p>
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7021,11 +7019,11 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberLeave defines how to remove a replica from the replication group.
+<p>Defines the method to remove a replica from the replication group.
 This action is typically invoked when a replica needs to be removed, such as during scale-in.
 It may involve configuration updates and notifying other members about the departure,
 but it is advisable to avoid performing data migration within this action.
-Cannot be updated.</p>
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7039,9 +7037,9 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>Readonly defines how to set a replica service as read-only.
+<p>Defines the method to set a replica service as read-only.
 This action is used to protect a replica in case of volume space exhaustion or excessive traffic.
-Cannot be updated.</p>
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7055,8 +7053,8 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>Readwrite defines how to set a replica service as read-write.
-Cannot be updated.</p>
+<p>Defines the method to set a replica service as read-write.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7070,7 +7068,7 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>DataPopulate defines how to populate the data to create new replicas.
+<p>Defines the method to populate the data to create new replicas.
 This action is typically used when a new replica needs to be constructed, such as:</p>
 <ul>
 <li>scale-out</li>
@@ -7078,7 +7076,7 @@ This action is typically used when a new replica needs to be constructed, such a
 <li>clone</li>
 </ul>
 <p>It should write the valid data to stdout without including any extraneous information.
-Cannot be updated.</p>
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7092,7 +7090,7 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>DataAssemble defines how to assemble data synchronized from external before starting the service for a new replica.
+<p>Defines the method to assemble data synchronized from external before starting the service for a new replica.
 This action is typically used when creating a new replica, such as:</p>
 <ul>
 <li>scale-out</li>
@@ -7101,7 +7099,7 @@ This action is typically used when creating a new replica, such as:</p>
 </ul>
 <p>The data will be streamed in via stdin. If any error occurs during the assembly process,
 the action must be able to guarantee idempotence to allow for retries from the beginning.
-Cannot be updated.</p>
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7115,8 +7113,8 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>Reconfigure defines how to notify the replica service that there is a configuration update.
-Cannot be updated.</p>
+<p>Defines the method to notify the replica service that there is a configuration update.
+This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7130,8 +7128,8 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>AccountProvision defines how to provision accounts.
-Cannot be updated.</p>
+<p>Defines the method to provision accounts.
+This field cannot be updated.</p>
 </td>
 </tr>
 </tbody>
@@ -7430,7 +7428,7 @@ string
 </em>
 </td>
 <td>
-<p>CompDef is the name of the referenced ComponentDefinition.</p>
+<p>Specifies the name of the referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -7444,7 +7442,7 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>ClassDefRef references the class defined in ComponentClassDefinition.</p>
+<p>References the class defined in ComponentClassDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -7458,11 +7456,9 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:</p>
-<ul>
-<li>Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.</li>
-<li>Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.</li>
-</ul>
+<p>Define service references for the current component. Based on the referenced services, they can be categorized into two types:
+- Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
+- Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.</p>
 <p>Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
 It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.</p>
 </td>
@@ -7478,7 +7474,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>Resources requests and limits of workload.</p>
+<p>Requests and limits of workload resources.</p>
 </td>
 </tr>
 <tr>
@@ -7492,7 +7488,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.</p>
+<p>Information for statefulset.spec.volumeClaimTemplates.</p>
 </td>
 </tr>
 <tr>
@@ -7503,7 +7499,7 @@ int32
 </em>
 </td>
 <td>
-<p>Replicas specifies the desired number of replicas for the component&rsquo;s workload.</p>
+<p>Specifies the desired number of replicas for the component&rsquo;s workload.</p>
 </td>
 </tr>
 <tr>
@@ -7517,7 +7513,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Configs defines the configuration for the component.</p>
+<p>Defines the configuration for the component.</p>
 </td>
 </tr>
 <tr>
@@ -7529,7 +7525,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Monitor is a switch to enable monitoring and is set as false by default.
+<p>A switch to enable monitoring and is set as false by default.
 KubeBlocks provides an extension mechanism to support component level monitoring,
 which will scrape metrics auto or manually from servers in component and export
 metrics to Time Series Database.</p>
@@ -7544,7 +7540,7 @@ metrics to Time Series Database.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>EnabledLogs indicates which log file takes effect in the database cluster,
+<p>Indicates which log file takes effect in the database cluster,
 element is the log type which is defined in ComponentDefinition logConfig.name.</p>
 </td>
 </tr>
@@ -7557,7 +7553,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceAccountName is the name of the ServiceAccount that running component depends on.</p>
+<p>The name of the ServiceAccount that running component depends on.</p>
 </td>
 </tr>
 <tr>
@@ -7571,7 +7567,7 @@ Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>Affinity specifies the scheduling constraints for the component&rsquo;s workload.
+<p>Specifies the scheduling constraints for the component&rsquo;s workload.
 If specified, it will override the cluster-wide affinity.</p>
 </td>
 </tr>
@@ -7586,7 +7582,7 @@ If specified, it will override the cluster-wide affinity.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Tolerations specify the tolerations for the component&rsquo;s workload.
+<p>Specify the tolerations for the component&rsquo;s workload.
 If specified, they will override the cluster-wide toleration settings.</p>
 </td>
 </tr>
@@ -7601,7 +7597,7 @@ TLSConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>TLSConfig specifies the TLS configuration for the component.</p>
+<p>Specifies the TLS configuration for the component.</p>
 </td>
 </tr>
 <tr>
@@ -7615,9 +7611,9 @@ RsmTransformPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>RsmTransformPolicy defines the policy generate sts using rsm.
-ToSts: rsm transform to statefulSet
-ToPod: rsm transform to pods</p>
+<p>Defines the policy generate sts using rsm.
+- ToSts: rsm transform to statefulSet
+- ToPod: rsm transform to pods</p>
 </td>
 </tr>
 <tr>
@@ -7631,7 +7627,7 @@ ToPod: rsm transform to pods</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Nodes defines the list of nodes that pods can schedule
+<p>Defines the list of nodes that pods can schedule
 If the RsmTransformPolicy is specified as OneToMul,the list of nodes will be used. If the list of nodes is empty,
 no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
 across the nodes in the list.</p>
@@ -7646,7 +7642,7 @@ across the nodes in the list.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Instances defines the list of instance to be deleted priorly</p>
+<p>Defines the list of instance to be deleted priorly</p>
 </td>
 </tr>
 </tbody>
@@ -7657,7 +7653,7 @@ across the nodes in the list.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Component">Component</a>)
 </p>
 <div>
-<p>ComponentStatus defines the observed state of Component</p>
+<p>ComponentStatus represents the observed state of a Component within the cluster.</p>
 </div>
 <table>
 <thead>
@@ -7676,9 +7672,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the most recent generation observed for this Component.
-It corresponds to the Cluster&rsquo;s generation, which is
-updated on mutation by the API Server.</p>
+<p>Specifies the most recent generation observed for this Component.
+This corresponds to the Cluster&rsquo;s generation, which is updated by the API Server upon mutation.</p>
 </td>
 </tr>
 <tr>
@@ -7692,7 +7687,7 @@ updated on mutation by the API Server.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describe current state of component API Resource, like warning.</p>
+<p>Defines the current state of the component API Resource, such as warnings.</p>
 </td>
 </tr>
 <tr>
@@ -7705,17 +7700,15 @@ ClusterComponentPhase
 </em>
 </td>
 <td>
-<p>phase describes the phase of the component and the detail information of the phases are as following:</p>
-<ul>
-<li>Creating: <code>Creating</code> is a special <code>Updating</code> with previous phase <code>empty</code>(means &ldquo;&rdquo;) or <code>Creating</code>.</li>
-<li>Running: component replicas &gt; 0 and all pod specs are latest with a Running state.</li>
-<li>Updating: component replicas &gt; 0 and has no failed pods. the component is being updated.</li>
-<li>Abnormal: component replicas &gt; 0 but having some failed pods. the component basically works but in a fragile state.</li>
-<li>Failed: component replicas &gt; 0 but having some failed pods. the component doesn&rsquo;t work anymore.</li>
-<li>Stopping: component replicas = 0 and has terminating pods.</li>
-<li>Stopped: component replicas = 0 and all pods have been deleted.</li>
-<li>Deleting: the component is being deleted.</li>
-</ul>
+<p>Indicates the phase of the component. Detailed information for each phase is as follows:
+- Creating: A special <code>Updating</code> phase with previous phase <code>empty</code>(means &ldquo;&rdquo;) or <code>Creating</code>.
+- Running: Component replicas &gt; 0 and all pod specs are latest with a Running state.
+- Updating: Component replicas &gt; 0 and no failed pods. The component is being updated.
+- Abnormal: Component replicas &gt; 0 but some pods have failed. The component is functional but in a fragile state.
+- Failed: Component replicas &gt; 0 but some pods have failed. The component is no longer functional.
+- Stopping: Component replicas = 0 and pods are terminating.
+- Stopped: Component replicas = 0 and all pods have been deleted.
+- Deleting: The component is being deleted.</p>
 </td>
 </tr>
 <tr>
@@ -7729,8 +7722,8 @@ ComponentMessageMap
 </td>
 <td>
 <em>(Optional)</em>
-<p>message records the component details message in current phase.
-Keys are podName or deployName or statefulSetName. The format is <code>ObjectKind/Name</code>.</p>
+<p>Records the detailed message of the component in its current phase.
+Keys can be podName, deployName, or statefulSetName. The format is <code>ObjectKind/Name</code>.</p>
 </td>
 </tr>
 </tbody>
@@ -7761,8 +7754,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>WithCandidate corresponds to the switchover of the specified candidate primary or leader instance.
-Currently, only Action.Exec is supported, Action.HTTP is not supported.</p>
+<p>Represents the switchover process for a specified candidate primary or leader instance.
+Note that only Action.Exec is currently supported, while Action.HTTP is not.</p>
 </td>
 </tr>
 <tr>
@@ -7776,8 +7769,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>WithoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
-Currently, only Action.Exec is supported, Action.HTTP is not supported.</p>
+<p>Represents a switchover process that does not involve a specific candidate primary or leader instance.
+As with the previous field, only Action.Exec is currently supported, not Action.HTTP.</p>
 </td>
 </tr>
 <tr>
@@ -7791,8 +7784,8 @@ Currently, only Action.Exec is supported, Action.HTTP is not supported.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ScriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
-Once ScriptSpecSelectors is defined, the scripts defined in scripts can be referenced in the Action.</p>
+<p>Used to define the selectors for the scriptSpecs that need to be referenced.
+When this field is defined, the scripts specified in the scripts field can be referenced in the Action.</p>
 </td>
 </tr>
 </tbody>
@@ -8003,10 +7996,10 @@ string
 </em>
 </td>
 <td>
-<p>The Name of the volume.
-Must be a DNS_LABEL and unique within the pod.
-More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names">https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names</a>
-Cannot be updated.</p>
+<p>Specifies the name of the volume.
+It must be a DNS_LABEL and unique within the pod.
+More info can be found at: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names">https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names</a>
+Note: This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -8018,8 +8011,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>NeedSnapshot indicates whether the volume need to snapshot when making a backup for the component.
-Cannot be updated.</p>
+<p>Indicates whether a snapshot is required when creating a backup for the component.
+Note: This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -8031,12 +8024,13 @@ int
 </td>
 <td>
 <em>(Optional)</em>
-<p>HighWatermark defines the high watermark threshold for the volume space usage.</p>
-<p>If there is any specified volumes who&rsquo;s space usage is over the threshold, the pre-defined &ldquo;LOCK&rdquo; action
-will be triggered to degrade the service to protect volume from space exhaustion, such as to set the instance
-as read-only. And after that, if all volumes&rsquo; space usage drops under the threshold later, the pre-defined
-&ldquo;UNLOCK&rdquo; action will be performed to recover the service normally.
-Cannot be updated.</p>
+<p>Defines the high watermark threshold for the volume space usage.</p>
+<p>If the space usage of any specified volume exceeds this threshold, a pre-defined &ldquo;LOCK&rdquo; action
+will be triggered. This action degrades the service to protect the volume from space exhaustion,
+for example, by setting the instance to read-only.</p>
+<p>If the space usage of all volumes drops below the threshold, a pre-defined &ldquo;UNLOCK&rdquo; action
+will be performed to restore the service to normal operation.
+Note: This field cannot be updated.</p>
 </td>
 </tr>
 </tbody>

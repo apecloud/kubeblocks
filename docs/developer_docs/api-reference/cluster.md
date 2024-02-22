@@ -6945,13 +6945,13 @@ the names defined in the componentdefinition roles. The output will be compared 
 If there is a change, a rolechange event will be created to notify the controller to update the replica&rsquo;s role.
 This action is required if the component has defined roles. Otherwise, the replicas&rsquo; pods will have no role
 information after cluster creation, and services will not route to the replica correctly.
-Args for the action:
-- KB_POD_FQDN: The pod FQDN of the replica to check the role. If the action is implemented through a CDI GRPC plugin, this environment variable will be translated to the &lsquo;podIP&rsquo; argument.
-- KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the &lsquo;servicePort&rsquo; argument.
-- KB_SERVICE_USER: The username used to access the DB service and retrieve the role information with sufficient privileges. &lsquo;serviceUser&rsquo; is used if provided by a CDI GRPC plugin.
-- KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information. &lsquo;servicePassword&rsquo; is used if provided by a CDI GRPC plugin.
+Available variables for the action:
+- KB_POD_FQDN: The pod FQDN of the replica to check the role.
+- KB_SERVICE_PORT: The port on which the DB service listens.
+- KB_SERVICE_USER: The username used to access the DB service and retrieve the role information with sufficient privileges.
+- KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information.
 Output of the action:
-- ROLE: A string representing the role of the replica. It must be one of the names defined in the roles.
+- ROLE: the role of the replica. It must be one of the names defined in the roles.
 - ERROR: Any error message if the action fails.
 Cannot be updated.</p>
 </td>
@@ -7005,12 +7005,12 @@ LifecycleActionHandler
 <p>MemberJoin defines how to add a new replica to the replication group.
 This action is typically invoked when a new replica needs to be added, such as during scale-out.
 It may involve updating configuration, notifying other members, and ensuring data consistency.
-Args for the action:
-- KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the &lsquo;servicePort&rsquo; argument.
-- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges. &lsquo;serviceUser&rsquo; is used if provided by a CDI GRPC plugin.
-- KB_SERVICE_PASSWORD: The password of the user used to access the DB service . &lsquo;servicePassword&rsquo; is used if provided by a CDI GRPC plugin.
-- KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover. &lsquo;primaryPodFQDN&rsquo; is used if provided by a CDI GRPC plugin.
-- KB_NEW_MEMBER_POD_NAME: The name of the new member&rsquo;s Pod. &lsquo;newMemberPodName&rsquo; is used if provided by a CDI GRPC plugin.
+Available variables for the action:
+- KB_SERVICE_PORT: The port on which the DB service listens.
+- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+- KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+- KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
+- KB_NEW_MEMBER_POD_NAME: The name of the new member&rsquo;s Pod.
 Output of the action:
 - ERROR: Any error message if the action fails.
 Cannot be updated.</p>
@@ -7031,12 +7031,12 @@ LifecycleActionHandler
 This action is typically invoked when a replica needs to be removed, such as during scale-in.
 It may involve configuration updates and notifying other members about the departure,
 but it is advisable to avoid performing data migration within this action.
-Args for the action:
-- KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the &lsquo;servicePort&rsquo; argument.
-- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges. &lsquo;serviceUser&rsquo; is used if provided by a CDI GRPC plugin.
-- KB_SERVICE_PASSWORD: The password of the user used to access the DB service. &lsquo;servicePassword&rsquo; is used if provided by a CDI GRPC plugin.
-- KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover. &lsquo;primaryPodFQDN&rsquo; is used if provided by a CDI GRPC plugin.
-- KB_LEAVE_MEMBER_POD_NAME: The name of the leave member&rsquo;s Pod. &lsquo;leaveMemberPodName&rsquo; is used if provided by a CDI GRPC plugin.
+Available variables for the action:
+- KB_SERVICE_PORT: The port on which the DB service listens.
+- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+- KB_SERVICE_PASSWORD: The password of the user used to access the DB service.
+- KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
+- KB_LEAVE_MEMBER_POD_NAME: The name of the leave member&rsquo;s Pod.
 Output of the action:
 - ERROR: Any error message if the action fails.
 Cannot be updated.</p>
@@ -7055,11 +7055,11 @@ LifecycleActionHandler
 <em>(Optional)</em>
 <p>Readonly defines how to set a replica service as read-only.
 This action is used to protect a replica in case of volume space exhaustion or excessive traffic.
-Args for the action:
-- KB_POD_FQDN: The FQDN of the replica pod to check the role. If the action is implemented through a CDI GRPC plugin, this environment variable will be translated to the &lsquo;podFQDN&rsquo; argument.
-- KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the &lsquo;servicePort&rsquo; argument.
-- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges. &lsquo;serviceUser&rsquo; is used if provided by a CDI GRPC plugin.
-- KB_SERVICE_PASSWORD: The password of the user used to access the DB service. &lsquo;servicePassword&rsquo; is used if provided by a CDI GRPC plugin.
+Available variables for the action:
+- KB_POD_FQDN: The FQDN of the replica pod to check the role.
+- KB_SERVICE_PORT: The port on which the DB service listens.
+- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+- KB_SERVICE_PASSWORD: The password of the user used to access the DB service.
 Output of the action:
 - ERROR: Any error message if the action fails.
 Cannot be updated.</p>
@@ -7077,11 +7077,11 @@ LifecycleActionHandler
 <td>
 <em>(Optional)</em>
 <p>Readwrite defines how to set a replica service as read-write.
-Args for the action:
-- KB_POD_FQDN: The FQDN of the replica pod to check the role. If the action is implemented through a CDI GRPC plugin, this environment variable will be translated to the &lsquo;podFQDN&rsquo; argument.
-- KB_SERVICE_PORT: The port on which the DB service listens. If the action is provided by a CDI GRPC plugin, this variable will be translated to the &lsquo;servicePort&rsquo; argument.
-- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges. &lsquo;serviceUser&rsquo; is used if provided by a CDI GRPC plugin.
-- KB_SERVICE_PASSWORD: The password of the user used to access the DB service. &lsquo;servicePassword&rsquo; is used if provided by a CDI GRPC plugin.
+Available variables for the action:
+- KB_POD_FQDN: The FQDN of the replica pod to check the role.
+- KB_SERVICE_PORT: The port on which the DB service listens.
+- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+- KB_SERVICE_PASSWORD: The password of the user used to access the DB service.
 Output of the action:
 - ERROR: Any error message if the action fails.
 Cannot be updated.</p>

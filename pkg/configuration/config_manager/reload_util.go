@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"text/template/parse"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -61,6 +62,16 @@ func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *appsv1alpha1.F
 	return func(ctx context.Context, configSpec string, updatedParams map[string]string) error {
 		return wrapGoTemplateRun(ctx, tplScriptPath, string(tplContent), updatedParams, formatConfig, dataType, dsn)
 	}, nil
+}
+
+func renderDSN(dsn string) (string, error) {
+	engine := gotemplate.NewTplEngine(nil, nil, "render-dsn", nil, nil, gotemplate.WithCustomizedWithType(gotemplate.KBDSL))
+	renderedDSN, err := engine.Render(dsn)
+	if err != nil {
+		logger.Error(err, fmt.Sprintf("failed to render dsn:[%s]", dsn))
+		return dsn, err
+	}
+	return strings.TrimSpace(renderedDSN), nil
 }
 
 func checkTPLScript(tplName string, tplContent string) error {

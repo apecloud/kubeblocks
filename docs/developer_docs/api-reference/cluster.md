@@ -1646,8 +1646,8 @@ ReloadOptions
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether the process supports reload. If set, the controller determines the behavior of the engine instance based on the configuration templates.
-It will either restart or reload depending on whether any parameters in the StaticParameters have been modified.</p>
+<p>Specifies the dynamic reload actions supported by the engine. If set, the controller call the scripts defined in the actions for a dynamic parameter upgrade.
+The actions are called only when the modified parameter is defined in dynamicParameters part &amp;&amp; DynamicReloadActions != nil</p>
 </td>
 </tr>
 <tr>
@@ -1659,8 +1659,10 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates whether to execute hot update parameters when the pod needs to be restarted.
-If set to true, the controller performs the hot update and then restarts the pod.</p>
+<p>Indicates the dynamic reload action and restart action can be merged to a restart action.</p>
+<p>When a batch of parameters updates incur both restart &amp; dynamic reload, it works as:
+- set to true, the two actions merged to only one restart action
+- set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]</p>
 </td>
 </tr>
 <tr>
@@ -1674,7 +1676,8 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Used to configure the init container.</p>
+<p>Tools used by the dynamic reload actions.
+Usually it is referenced by the &lsquo;init container&rsquo; for &lsquo;cp&rsquo; it to a binary volume.</p>
 </td>
 </tr>
 <tr>
@@ -1688,7 +1691,10 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Used to monitor pod fields.</p>
+<p>A set of actions for regenerating local configs.</p>
+<p>It works when:
+- different engine roles have different config, such as redis primary &amp; secondary
+- after a role switch, the local config will be regenerated with the help of DownwardActions</p>
 </td>
 </tr>
 <tr>
@@ -1702,7 +1708,7 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>A list of ScriptConfig. These scripts can be used by volume trigger, downward trigger, or tool image.</p>
+<p>A list of ScriptConfig used by the actions defined in dynamic reload and downward actions.</p>
 </td>
 </tr>
 <tr>
@@ -1714,7 +1720,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The cue type name, which generates the openapi schema.</p>
+<p>Top level key used to get the cue rules to validate the config file.
+It must exist in &lsquo;ConfigSchema&rsquo;</p>
 </td>
 </tr>
 <tr>
@@ -1728,7 +1735,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>Imposes restrictions on database parameter&rsquo;s rule.</p>
+<p>List constraints rules for each config parameters.</p>
 </td>
 </tr>
 <tr>
@@ -1740,7 +1747,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>A list of StaticParameter. Modifications of these parameters trigger a process restart.</p>
+<p>A list of StaticParameter. Modifications of static parameters trigger a process restart.</p>
 </td>
 </tr>
 <tr>
@@ -1752,7 +1759,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>A list of DynamicParameter. Modifications of these parameters trigger a config dynamic reload without process restart.</p>
+<p>A list of DynamicParameter. Modifications of dynamic parameters trigger a reload action without process restart.</p>
 </td>
 </tr>
 <tr>
@@ -1764,7 +1771,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes parameters that users are prohibited from modifying.</p>
+<p>Describes parameters that are prohibited to do any modifications.</p>
 </td>
 </tr>
 <tr>
@@ -1777,7 +1784,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>Used to match the label on the pod. For example, a pod of the primary matches on the patroni cluster.</p>
+<p>Used to match labels on the pod to do a dynamic reload</p>
 </td>
 </tr>
 <tr>
@@ -1790,10 +1797,11 @@ FormatterConfig
 </em>
 </td>
 <td>
-<p>Describes the format of the configuration file. The controller will:
-1. Parse the configuration file
-2. Analyze the modified parameters
-3. Apply corresponding policies.</p>
+<p>Describes the format of the config file.
+The controller works as follows:
+1. Parse the config file
+2. Get the modified parameters
+3. Trigger the corresponding action</p>
 </td>
 </tr>
 </table>
@@ -8080,8 +8088,8 @@ ReloadOptions
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether the process supports reload. If set, the controller determines the behavior of the engine instance based on the configuration templates.
-It will either restart or reload depending on whether any parameters in the StaticParameters have been modified.</p>
+<p>Specifies the dynamic reload actions supported by the engine. If set, the controller call the scripts defined in the actions for a dynamic parameter upgrade.
+The actions are called only when the modified parameter is defined in dynamicParameters part &amp;&amp; DynamicReloadActions != nil</p>
 </td>
 </tr>
 <tr>
@@ -8093,8 +8101,10 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates whether to execute hot update parameters when the pod needs to be restarted.
-If set to true, the controller performs the hot update and then restarts the pod.</p>
+<p>Indicates the dynamic reload action and restart action can be merged to a restart action.</p>
+<p>When a batch of parameters updates incur both restart &amp; dynamic reload, it works as:
+- set to true, the two actions merged to only one restart action
+- set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]</p>
 </td>
 </tr>
 <tr>
@@ -8108,7 +8118,8 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Used to configure the init container.</p>
+<p>Tools used by the dynamic reload actions.
+Usually it is referenced by the &lsquo;init container&rsquo; for &lsquo;cp&rsquo; it to a binary volume.</p>
 </td>
 </tr>
 <tr>
@@ -8122,7 +8133,10 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Used to monitor pod fields.</p>
+<p>A set of actions for regenerating local configs.</p>
+<p>It works when:
+- different engine roles have different config, such as redis primary &amp; secondary
+- after a role switch, the local config will be regenerated with the help of DownwardActions</p>
 </td>
 </tr>
 <tr>
@@ -8136,7 +8150,7 @@ ToolsImageSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>A list of ScriptConfig. These scripts can be used by volume trigger, downward trigger, or tool image.</p>
+<p>A list of ScriptConfig used by the actions defined in dynamic reload and downward actions.</p>
 </td>
 </tr>
 <tr>
@@ -8148,7 +8162,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The cue type name, which generates the openapi schema.</p>
+<p>Top level key used to get the cue rules to validate the config file.
+It must exist in &lsquo;ConfigSchema&rsquo;</p>
 </td>
 </tr>
 <tr>
@@ -8162,7 +8177,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>Imposes restrictions on database parameter&rsquo;s rule.</p>
+<p>List constraints rules for each config parameters.</p>
 </td>
 </tr>
 <tr>
@@ -8174,7 +8189,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>A list of StaticParameter. Modifications of these parameters trigger a process restart.</p>
+<p>A list of StaticParameter. Modifications of static parameters trigger a process restart.</p>
 </td>
 </tr>
 <tr>
@@ -8186,7 +8201,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>A list of DynamicParameter. Modifications of these parameters trigger a config dynamic reload without process restart.</p>
+<p>A list of DynamicParameter. Modifications of dynamic parameters trigger a reload action without process restart.</p>
 </td>
 </tr>
 <tr>
@@ -8198,7 +8213,7 @@ CustomParametersValidation
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes parameters that users are prohibited from modifying.</p>
+<p>Describes parameters that are prohibited to do any modifications.</p>
 </td>
 </tr>
 <tr>
@@ -8211,7 +8226,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>Used to match the label on the pod. For example, a pod of the primary matches on the patroni cluster.</p>
+<p>Used to match labels on the pod to do a dynamic reload</p>
 </td>
 </tr>
 <tr>
@@ -8224,10 +8239,11 @@ FormatterConfig
 </em>
 </td>
 <td>
-<p>Describes the format of the configuration file. The controller will:
-1. Parse the configuration file
-2. Analyze the modified parameters
-3. Apply corresponding policies.</p>
+<p>Describes the format of the config file.
+The controller works as follows:
+1. Parse the config file
+2. Get the modified parameters
+3. Trigger the corresponding action</p>
 </td>
 </tr>
 </tbody>
@@ -8258,7 +8274,8 @@ ConfigConstraintPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the status of the configuration template. When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.</p>
+<p>Specifies the status of the configuration template.
+When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.</p>
 </td>
 </tr>
 <tr>
@@ -8270,7 +8287,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides a description of any abnormal statuses that may be present.</p>
+<p>Provides descriptions for abnormal states.</p>
 </td>
 </tr>
 <tr>
@@ -9480,7 +9497,7 @@ Kubernetes api extensions v1.JSONSchemaProps
 </em>
 </td>
 <td>
-<p>Provides a mechanism that allows providers to validate the modified parameters using JSON.</p>
+<p>Transforms the schema from CUE to json for further OpenAPI validation</p>
 </td>
 </tr>
 <tr>
@@ -9520,7 +9537,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the field. This is a required field and must be a string of maximum length 63.
+<p>Specifies the name of the field. It must be a string of maximum length 63.
 The name should match the regex pattern <code>^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$</code>.</p>
 </td>
 </tr>
@@ -9532,7 +9549,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the mount point of the scripts file. This is a required field and must be a string of maximum length 128.</p>
+<p>Specifies the mount point of the scripts file.</p>
 </td>
 </tr>
 <tr>
@@ -9545,7 +9562,7 @@ string
 </em>
 </td>
 <td>
-<p>Represents a list of downward API volume files. This is a required field.</p>
+<p>Represents a list of downward API volume files.</p>
 </td>
 </tr>
 <tr>
@@ -9557,7 +9574,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The command used to execute for the downward API. This field is optional.</p>
+<p>The command used to execute for the downward API.</p>
 </td>
 </tr>
 </tbody>
@@ -9924,8 +9941,8 @@ FormatterOptions
 (Members of <code>FormatterOptions</code> are embedded into this type.)
 </p>
 <em>(Optional)</em>
-<p>Represents the special options of the configuration file.
-This is optional for now. If not specified, the default options will be used.</p>
+<p>Represents the additional actions for formatting the config file.
+If not specified, the default options will be applied.</p>
 </td>
 </tr>
 <tr>
@@ -9938,18 +9955,18 @@ CfgFileFormat
 </em>
 </td>
 <td>
-<p>The configuration file format. Valid values are <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>,
+<p>The config file format. Valid values are <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>,
 <code>hcl</code>, <code>dotenv</code>, <code>properties</code> and <code>toml</code>. Each format has its own characteristics and use cases.</p>
 <ul>
-<li>ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a></li>
-<li>xml: reference wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a></li>
-<li>yaml: a configuration file support for complex data types and structures.</li>
-<li>json: reference wiki: <a href="https://en.wikipedia.org/wiki/JSON">https://en.wikipedia.org/wiki/JSON</a></li>
+<li>ini: is a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a></li>
+<li>xml: refers to wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a></li>
+<li>yaml: supports for complex data types and structures.</li>
+<li>json: refers to wiki: <a href="https://en.wikipedia.org/wiki/JSON">https://en.wikipedia.org/wiki/JSON</a></li>
 <li>hcl: The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: <a href="https://www.linode.com/docs/guides/introduction-to-hcl/">https://www.linode.com/docs/guides/introduction-to-hcl/</a></li>
-<li>dotenv: this was a plain text file with simple key–value pairs, reference wiki: <a href="https://en.wikipedia.org/wiki/Configuration_file#MS-DOS">https://en.wikipedia.org/wiki/Configuration_file#MS-DOS</a></li>
+<li>dotenv: is a plain text file with simple key–value pairs, reference wiki: <a href="https://en.wikipedia.org/wiki/Configuration_file#MS-DOS">https://en.wikipedia.org/wiki/Configuration_file#MS-DOS</a></li>
 <li>properties: a file extension mainly used in Java, reference wiki: <a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a></li>
-<li>toml: reference wiki: <a href="https://en.wikipedia.org/wiki/TOML">https://en.wikipedia.org/wiki/TOML</a></li>
-<li>props-plus: a file extension mainly used in Java, support CamelCase(e.g: brokerMaxConnectionsPerIp)</li>
+<li>toml: refers to wiki: <a href="https://en.wikipedia.org/wiki/TOML">https://en.wikipedia.org/wiki/TOML</a></li>
+<li>props-plus: a file extension mainly used in Java, supports CamelCase(e.g: brokerMaxConnectionsPerIp)</li>
 </ul>
 </td>
 </tr>
@@ -13271,7 +13288,7 @@ UnixSignalTrigger
 </td>
 <td>
 <em>(Optional)</em>
-<p>Used to trigger a reload by sending a specific Unix signal to the process.</p>
+<p>Used to trigger a reload by sending a Unix signal to the process.</p>
 </td>
 </tr>
 <tr>
@@ -13285,7 +13302,7 @@ ShellTrigger
 </td>
 <td>
 <em>(Optional)</em>
-<p>Used to perform the reload command via a shell script.</p>
+<p>Used to perform the reload command in shell script.</p>
 </td>
 </tr>
 <tr>
@@ -13299,7 +13316,7 @@ TPLScriptTrigger
 </td>
 <td>
 <em>(Optional)</em>
-<p>Used to perform the reload command via a Go template script.</p>
+<p>Used to perform the reload command by Go template script.</p>
 </td>
 </tr>
 <tr>
@@ -13313,7 +13330,7 @@ AutoTrigger
 </td>
 <td>
 <em>(Optional)</em>
-<p>Used to automatically perform the reload command when certain conditions are met.</p>
+<p>Used to automatically perform the reload command when conditions are met.</p>
 </td>
 </tr>
 </tbody>
@@ -14033,8 +14050,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the namespace where the referenced tpl script ConfigMap object resides.
-If left empty, it defaults to the &ldquo;default&rdquo; namespace.</p>
+<p>Specifies the namespace where the referenced tpl script ConfigMap in.
+If left empty, by default in the &ldquo;default&rdquo; namespace.</p>
 </td>
 </tr>
 </tbody>
@@ -15573,7 +15590,7 @@ Resources and data associated with the corresponding Component will also be dele
 </em>
 </td>
 <td>
-<p>Specifies the list of strings used to execute for reload.</p>
+<p>Specifies the list of commands for reload.</p>
 </td>
 </tr>
 <tr>
@@ -15585,7 +15602,10 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether to synchronize updates parameters to the config manager.</p>
+<p>Specifies whether to synchronize updates parameters to the config manager.
+Specifies two ways of controller to reload the parameter:
+- set to &lsquo;True&rsquo;, execute the reload action in sync mode, wait for the completion of reload
+- set to &lsquo;False&rsquo;, execute the reload action in async mode, just update the &lsquo;Configmap&rsquo;, no need to wait</p>
 </td>
 </tr>
 </tbody>
@@ -16380,7 +16400,7 @@ ScriptConfig
 <p>
 (Members of <code>ScriptConfig</code> are embedded into this type.)
 </p>
-<p>The configuration for the script.</p>
+<p>Config for the script.</p>
 </td>
 </tr>
 <tr>
@@ -16392,7 +16412,10 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether to synchronize updates parameters to the config manager.</p>
+<p>Specifies whether to synchronize updates parameters to the config manager.
+Specifies two ways of controller to reload the parameter:
+- set to &lsquo;True&rsquo;, execute the reload action in sync mode, wait for the completion of reload
+- set to &lsquo;False&rsquo;, execute the reload action in async mode, just update the &lsquo;Configmap&rsquo;, no need to wait</p>
 </td>
 </tr>
 </tbody>
@@ -16581,7 +16604,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the initContainer. This must be a DNS_LABEL name.</p>
+<p>Specifies the name of the initContainer.</p>
 </td>
 </tr>
 <tr>
@@ -16593,7 +16616,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the name of the container image for the tools.</p>
+<p>Represents the url of the tool container image.</p>
 </td>
 </tr>
 <tr>
@@ -16604,7 +16627,7 @@ string
 </em>
 </td>
 <td>
-<p>Used to execute commands for init containers.</p>
+<p>Commands to be executed when init containers.</p>
 </td>
 </tr>
 </tbody>
@@ -16632,7 +16655,7 @@ string
 </em>
 </td>
 <td>
-<p>Represents the location where the scripts file will be mounted.</p>
+<p>Represents the point where the scripts file will be mounted.</p>
 </td>
 </tr>
 <tr>
@@ -16688,7 +16711,7 @@ string
 </em>
 </td>
 <td>
-<p>Represents the name of the process to which the Unix signal is sent.</p>
+<p>Represents the name of the process that the Unix signal sent to.</p>
 </td>
 </tr>
 </tbody>

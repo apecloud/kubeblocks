@@ -90,15 +90,16 @@ const (
 )
 
 type ConfigParams struct {
-	// Data holds the configuration keys and values.
-	// This field exists to work around https://github.com/kubernetes-sigs/kubebuilder/issues/528
-	// https://github.com/kubernetes/code-generator/issues/50
-
-	// fileContent indicates the configuration file content.
+	// Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
+	// Refer to https://github.com/kubernetes-sigs/kubebuilder/issues/528 and https://github.com/kubernetes/code-generator/issues/50 for more details.
+	//
+	// Represents the content of the configuration file.
+	//
 	// +optional
 	Content *string `json:"content"`
 
-	// updated parameters for a single configuration file.
+	// Represents the updated parameters for a single configuration file.
+	//
 	// +optional
 	Parameters map[string]*string `json:"parameters,omitempty"`
 }

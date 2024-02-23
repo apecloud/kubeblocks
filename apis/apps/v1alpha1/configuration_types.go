@@ -26,60 +26,67 @@ import (
 )
 
 type Payload struct {
+	// Holds the payload data. This field is optional and can contain any type of data.
+	// Not included in the JSON representation of the object.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Data map[string]any `json:"-"`
 }
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
+// ConfigurationItemDetail represents a specific configuration item within a configuration template.
 type ConfigurationItemDetail struct {
-	// Specify the name of configuration template.
+	// Defines the unique identifier of the configuration template. It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters, hyphens, and periods. The name must start and end with an alphanumeric character.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Deprecated: Please use payload instead.
-	// version is the version of configuration template.
+	// Deprecated: No longer used. Please use 'Payload' instead. Previously represented the version of the configuration template.
+	//
 	// +optional
 	Version string `json:"version,omitempty"`
 
-	// Payload holds the configuration-related rerender.
+	// Holds the configuration-related rerender. Preserves unknown fields and is optional.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Payload Payload `json:"payload,omitempty"`
 
-	// configSpec is used to set the configuration template.
+	// Used to set the configuration template. It is optional.
+	//
 	// +optional
 	ConfigSpec *ComponentConfigSpec `json:"configSpec"`
 
-	// Specify the configuration template.
+	// Specifies the configuration template. It is optional.
+	//
 	// +optional
 	ImportTemplateRef *ConfigTemplateExtension `json:"importTemplateRef"`
 
-	// configFileParams is used to set the parameters to be updated.
+	// Used to set the parameters to be updated. It is optional.
+	//
 	// +optional
 	ConfigFileParams map[string]ConfigParams `json:"configFileParams,omitempty"`
 }
 
-// ConfigurationSpec defines the desired state of Configuration
+// ConfigurationSpec defines the desired state of a Configuration resource.
 type ConfigurationSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 
-	// clusterRef references Cluster name.
+	// Specifies the name of the cluster that this configuration is associated with.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
 
-	// componentName is cluster component name.
+	// Represents the name of the cluster component that this configuration pertains to.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ComponentName string `json:"componentName"`
 
-	// customConfigurationItems describes user-defined config template.
+	// An array of ConfigurationItemDetail objects that describe user-defined configuration templates.
+	//
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -89,80 +96,96 @@ type ConfigurationSpec struct {
 }
 
 type ReconcileDetail struct {
-	// policy is the policy of the latest execution.
+	// Represents the policy applied during the most recent execution.
+	//
 	// +optional
 	Policy string `json:"policy"`
-	// execResult is the result of the latest execution.
+
+	// Represents the outcome of the most recent execution.
+	//
 	// +optional
 	ExecResult string `json:"execResult"`
 
-	// currentRevision is the current revision of configurationItem.
+	// Represents the current revision of the configuration item.
+	//
 	// +optional
 	CurrentRevision string `json:"currentRevision,omitempty"`
 
-	// succeedCount is the number of pods for which configuration changes were successfully executed.
+	// Represents the number of pods where configuration changes were successfully applied.
+	//
 	// +kubebuilder:default=-1
 	// +optional
 	SucceedCount int32 `json:"succeedCount,omitempty"`
 
-	// expectedCount is the number of pods that need to be executed for configuration changes.
+	// Represents the total number of pods that require execution of configuration changes.
+	//
 	// +kubebuilder:default=-1
 	// +optional
 	ExpectedCount int32 `json:"expectedCount,omitempty"`
 
-	// errMessage is the error message when the configuration change execution fails.
+	// Represents the error message generated when the execution of configuration changes fails.
+	//
 	// +optional
 	ErrMessage string `json:"errMessage,omitempty"`
 }
 
 type ConfigurationItemDetailStatus struct {
-	// name is a config template name.
+	// Specifies the name of the configuration template. It is a required field and must be a string of maximum 63 characters.
+	// The name should only contain lowercase alphanumeric characters, hyphens, or periods. It should start and end with an alphanumeric character.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// phase is status of configurationItem.
+	// Indicates the current status of the configuration item. This field is optional.
+	//
 	// +optional
 	Phase ConfigurationPhase `json:"phase,omitempty"`
 
-	// lastDoneRevision is the last done revision of configurationItem.
+	// Represents the last completed revision of the configuration item. This field is optional.
+	//
 	// +optional
 	LastDoneRevision string `json:"lastDoneRevision,omitempty"`
 
-	// currentRevision is the current revision of configurationItem.
+	// Represents the current revision of the configuration item. This field is optional.
+	//
 	// +optional
 	// CurrentRevision string `json:"currentRevision,omitempty"`
 
-	// updateRevision is the update revision of configurationItem.
+	// Represents the updated revision of the configuration item. This field is optional.
+	//
 	// +optional
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
-	// message field describes the reasons of abnormal status.
+	// Provides a description of any abnormal status. This field is optional.
+	//
 	// +optional
 	Message *string `json:"message,omitempty"`
 
-	// reconcileDetail describes the details of the configuration change execution.
+	// Provides detailed information about the execution of the configuration change. This field is optional.
+	//
 	// +optional
 	ReconcileDetail *ReconcileDetail `json:"reconcileDetail,omitempty"`
 }
 
-// ConfigurationStatus defines the observed state of Configuration
+// Represents the observed state of a Configuration resource.
+
 type ConfigurationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// This is a placeholder for additional fields that describe the observed state of the cluster.
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// message field describes the reasons of abnormal status.
+	// Provides a description of any abnormal status.
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// observedGeneration is the latest generation observed for this
-	// ClusterDefinition. It refers to the ConfigConstraint's generation, which is
+	// Represents the latest generation observed for this
+	// ClusterDefinition. It corresponds to the ConfigConstraint's generation, which is
 	// updated by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// conditions describes opsRequest detail status.
+	// Provides detailed status information for opsRequest.
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
@@ -170,7 +193,7 @@ type ConfigurationStatus struct {
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// configurationStatus describes the status of the component reconfiguring.
+	// Provides the status of each component undergoing reconfiguration.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map

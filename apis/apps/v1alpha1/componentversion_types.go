@@ -26,12 +26,14 @@ import (
 // ComponentVersionSpec defines the desired state of ComponentVersion
 type ComponentVersionSpec struct {
 	// CompatibilityRules defines compatibility rules between sets of component definitions and releases.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	CompatibilityRules []ComponentVersionCompatibilityRule `json:"compatibilityRules"`
 
 	// Releases represents different releases of component instances within this ComponentVersion.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
@@ -42,7 +44,9 @@ type ComponentVersionSpec struct {
 type ComponentVersionCompatibilityRule struct {
 	// CompDefs specifies names for the component definitions associated with this ComponentVersion.
 	// Each name in the list can represent an exact name, or a name prefix.
-	// Examples:
+	//
+	// For example:
+	//
 	// - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
 	// - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
 	//
@@ -52,6 +56,7 @@ type ComponentVersionCompatibilityRule struct {
 	CompDefs []string `json:"compDefs"`
 
 	// Releases is a list of identifiers for the releases.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
@@ -62,11 +67,13 @@ type ComponentVersionCompatibilityRule struct {
 type ComponentVersionRelease struct {
 	// Name is a unique identifier for this release.
 	// Cannot be updated.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	Name string `json:"name"`
 
 	// Changes provides information about the changes made in this release.
+	//
 	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	Changes string `json:"changes,omitempty"`
@@ -75,11 +82,13 @@ type ComponentVersionRelease struct {
 	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	// If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
 	// Cannot be updated.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	ServiceVersion string `json:"serviceVersion"`
 
 	// Images define the new images for different containers within the release.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinProperties=1
 	// +kubebuilder:validation:MaxProperties=128

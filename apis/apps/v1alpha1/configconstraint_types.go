@@ -24,24 +24,32 @@ import (
 
 // ConfigConstraintSpec defines the desired state of ConfigConstraint
 type ConfigConstraintSpec struct {
-	// reloadOptions indicates whether the process supports reload.
-	//
-	// if set, the controller will determine the behavior of the engine instance based on the configuration templates,
-	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
+	// Specifies whether the process supports reload. If set, the controller determines the behavior of the engine instance based on the configuration templates.
+	// It will either restart or reload depending on whether any parameters in the StaticParameters have been modified.
 	//
 	// +optional
 	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
 
-	// toolConfig used to config init container.
+	// Indicates whether to execute hot update parameters when the pod needs to be restarted.
+	// If set to true, the controller performs the hot update and then restarts the pod.
+	//
+	// +optional
+	ForceHotUpdate *bool `json:"forceHotUpdate,omitempty"`
+
+	// Used to configure the init container.
+	//
 	// +optional
 	ToolsImageSpec *ToolsImageSpec `json:"toolsImageSpec,omitempty"`
+
 	// ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
 
-	// downwardAPIOptions is used to watch pod fields.
+	// Used to monitor pod fields.
+	//
 	// +optional
 	DownwardAPIOptions []DownwardAPIOption `json:"downwardAPIOptions,omitempty"`
 
-	// scriptConfigs, list of ScriptConfig, witch these scripts can be used by volume trigger,downward trigger, or tool image
+	// A list of ScriptConfig. These scripts can be used by volume trigger, downward trigger, or tool image.
+	//
 	// +optional
 	// +patchMergeKey=scriptConfigMapRef
 	// +patchStrategy=merge,retainKeys
@@ -49,56 +57,62 @@ type ConfigConstraintSpec struct {
 	// +listMapKey=scriptConfigMapRef
 	ScriptConfigs []ScriptConfig `json:"scriptConfigs,omitempty"`
 
-	// cfgSchemaTopLevelName is cue type name, which generates openapi schema.
+	// The cue type name, which generates the openapi schema.
+	//
 	// +optional
 	CfgSchemaTopLevelName string `json:"cfgSchemaTopLevelName,omitempty"`
 
-	// configurationSchema imposes restrictions on database parameter's rule.
+	// Imposes restrictions on database parameter's rule.
+	//
 	// +optional
 	ConfigurationSchema *CustomParametersValidation `json:"configurationSchema,omitempty"`
 
-	// staticParameters, list of StaticParameter, modifications of them trigger a process restart.
+	// A list of StaticParameter. Modifications of these parameters trigger a process restart.
+	//
 	// +listType=set
 	// +optional
 	StaticParameters []string `json:"staticParameters,omitempty"`
 
-	// dynamicParameters, list of DynamicParameter, modifications of them trigger a config dynamic reload without process restart.
+	// A list of DynamicParameter. Modifications of these parameters trigger a config dynamic reload without process restart.
+	//
 	// +listType=set
 	// +optional
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
-	// immutableParameters describes parameters that prohibit user from modification.
+	// Describes parameters that users are prohibited from modifying.
+	//
 	// +listType=set
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
-	// selector is used to match the label on the pod,
-	// for example, a pod of the primary is match on the patroni cluster.
+	// Used to match the label on the pod. For example, a pod of the primary matches on the patroni cluster.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
-	// formatterConfig describes the format of the configuration file, the controller will:
-	//
-	// 1. parses configuration file
-	// 2. analyzes the modified parameters
-	// 3. applies corresponding policies.
+	// Describes the format of the configuration file. The controller will:
+	// 1. Parse the configuration file
+	// 2. Analyze the modified parameters
+	// 3. Apply corresponding policies.
 	//
 	// +kubebuilder:validation:Required
 	FormatterConfig *FormatterConfig `json:"formatterConfig"`
 }
 
-// ConfigConstraintStatus defines the observed state of ConfigConstraint.
+// Represents the observed state of a ConfigConstraint.
+
 type ConfigConstraintStatus struct {
-	// phase is status of configuration template, when set to CCAvailablePhase, it can be referenced by ClusterDefinition or ClusterVersion.
+
+	// Specifies the status of the configuration template. When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.
+	//
 	// +optional
 	Phase ConfigConstraintPhase `json:"phase,omitempty"`
 
-	// message field describes the reasons of abnormal status.
+	// Provides a description of any abnormal statuses that may be present.
+	//
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// observedGeneration is the latest generation observed for this
-	// ClusterDefinition. It refers to the ConfigConstraint's generation, which is
-	// updated by the API Server.
+	// Refers to the most recent generation observed for this ConfigConstraint. This value is updated by the API Server.
+	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
@@ -108,150 +122,177 @@ func (cs ConfigConstraintStatus) IsConfigConstraintTerminalPhases() bool {
 }
 
 type CustomParametersValidation struct {
-	// schema provides a way for providers to validate the changed parameters through json.
+	// Provides a mechanism that allows providers to validate the modified parameters using JSON.
+	//
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:ComponentDefRef=object
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Schema *apiext.JSONSchemaProps `json:"schema,omitempty"`
 
-	// cue that to let provider verify user configuration through cue language.
+	// Enables providers to verify user configurations using the CUE language.
+	//
 	// +optional
 	CUE string `json:"cue,omitempty"`
 }
 
-// ReloadOptions defines reload options
-// Only one of its members may be specified.
+// Defines the options for reloading a service or application within the Kubernetes cluster.
+// Only one of its members may be specified at a time.
+
 type ReloadOptions struct {
-	// unixSignalTrigger used to reload by sending a signal.
+	// Used to trigger a reload by sending a specific Unix signal to the process.
+	//
 	// +optional
 	UnixSignalTrigger *UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
 
-	// shellTrigger performs the reload command.
+	// Used to perform the reload command via a shell script.
+	//
 	// +optional
 	ShellTrigger *ShellTrigger `json:"shellTrigger,omitempty"`
 
-	// goTplTrigger performs the reload command.
+	// Used to perform the reload command via a Go template script.
+	//
 	// +optional
 	TPLScriptTrigger *TPLScriptTrigger `json:"tplScriptTrigger"`
 
-	// autoTrigger performs the reload command.
+	// Used to automatically perform the reload command when certain conditions are met.
+	//
 	// +optional
 	AutoTrigger *AutoTrigger `json:"autoTrigger,omitempty"`
 }
 
 type UnixSignalTrigger struct {
-	// signal is valid for unix signal.
-	// e.g: SIGHUP
-	// url: ../../pkg/configuration/configmap/handler.go:allUnixSignals
+	// Represents a valid Unix signal.
+	// Refer to the following URL for a list of all Unix signals: ../../pkg/configuration/configmap/handler.go:allUnixSignals
+	//
 	// +kubebuilder:validation:Required
 	Signal SignalType `json:"signal"`
 
-	// processName is process name, sends unix signal to proc.
+	// Represents the name of the process to which the Unix signal is sent.
+	//
 	// +kubebuilder:validation:Required
 	ProcessName string `json:"processName"`
 }
 
 type ToolsImageSpec struct {
-	// auto generate
-	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
-	// The volume name must be defined in podSpec.containers[*].volumeMounts.
+	// Represents the name of the volume in the PodTemplate. This is where the configuration file, produced through the configuration template, will be mounted.
+	// This volume name must be defined within podSpec.containers[*].volumeMounts.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	// VolumeName string `json:"volumeName"`
 
-	// mountPoint is the mount point of the scripts file.
+	// Represents the location where the scripts file will be mounted.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	MountPoint string `json:"mountPoint"`
 
-	// toolConfig used to config init container.
+	// Used to configure the initialization container.
+	//
 	// +optional
 	ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
 }
 
 type ToolConfig struct {
-	// Specify the name of initContainer. Must be a DNS_LABEL name.
+	// Specifies the name of the initContainer. This must be a DNS_LABEL name.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name,omitempty"`
 
-	// tools Container image name.
+	// Represents the name of the container image for the tools.
+	//
 	// +optional
 	Image string `json:"image,omitempty"`
 
-	// exec used to execute for init containers.
+	// Used to execute commands for init containers.
+	//
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
 }
 
 type DownwardAPIOption struct {
-	// Specify the name of the field.
+	// Specifies the name of the field. This is a required field and must be a string of maximum length 63.
+	// The name should match the regex pattern `^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// mountPoint is the mount point of the scripts file.
+	// Specifies the mount point of the scripts file. This is a required field and must be a string of maximum length 128.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	MountPoint string `json:"mountPoint"`
 
-	// Items is a list of downward API volume file
+	// Represents a list of downward API volume files. This is a required field.
+	//
 	// +kubebuilder:validation:Required
 	Items []corev1.DownwardAPIVolumeFile `json:"items"`
 
-	// command used to execute for downwrad api.
+	// The command used to execute for the downward API. This field is optional.
+	//
 	// +optional
 	Command []string `json:"command,omitempty"`
 }
 
 type ScriptConfig struct {
-	// scriptConfigMapRef used to execute for reload.
+	// Specifies the reference to the ConfigMap that contains the script to be executed for reload.
+	//
 	// +kubebuilder:validation:Required
 	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
 
-	// Specify the namespace of the referenced the tpl script ConfigMap object.
-	// An empty namespace is equivalent to the "default" namespace.
+	// Specifies the namespace where the referenced tpl script ConfigMap object resides.
+	// If left empty, it defaults to the "default" namespace.
+	//
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:default="default"
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
+	//
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 }
 
 type ShellTrigger struct {
-	// command used to execute for reload.
+	// Specifies the list of strings used to execute for reload.
+	//
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
 
-	// Specify synchronize updates parameters to the config manager.
+	// Specifies whether to synchronize updates parameters to the config manager.
+	//
 	// +optional
 	Sync *bool `json:"sync,omitempty"`
 }
 
 type TPLScriptTrigger struct {
+	// The configuration for the script.
 	ScriptConfig `json:",inline"`
 
-	// Specify synchronize updates parameters to the config manager.
+	// Specifies whether to synchronize updates parameters to the config manager.
+	//
 	// +optional
 	Sync *bool `json:"sync,omitempty"`
 }
 
 type AutoTrigger struct {
-	// processName is process name
+	// The name of the process.
+	//
 	// +optional
 	ProcessName string `json:"processName,omitempty"`
 }
 
 type FormatterConfig struct {
-	// The FormatterOptions represents the special options of configuration file.
-	// This is optional for now. If not specified.
+	// Represents the special options of the configuration file.
+	// This is optional for now. If not specified, the default options will be used.
+	//
 	// +optional
 	FormatterOptions `json:",inline"`
 
 	// The configuration file format. Valid values are `ini`, `xml`, `yaml`, `json`,
-	// `hcl`, `dotenv`, `properties` and `toml`.
+	// `hcl`, `dotenv`, `properties` and `toml`. Each format has its own characteristics and use cases.
 	//
 	// - ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
 	// - xml: reference wiki: https://en.wikipedia.org/wiki/XML
@@ -267,19 +308,26 @@ type FormatterConfig struct {
 	Format CfgFileFormat `json:"format"`
 }
 
-// FormatterOptions represents the special options of configuration file.
-// Only one of its members may be specified.
+// Encapsulates the unique options for a configuration file.
+// It is important to note that only one of its members can be specified at a time.
+
 type FormatterOptions struct {
-	// iniConfig represents the ini options.
+
+	// A pointer to an IniConfig struct that holds the ini options.
+	//
 	// +optional
 	IniConfig *IniConfig `json:"iniConfig,omitempty"`
 
-	// xmlConfig represents the ini options.
+	// A pointer to an XMLConfig struct that holds the xml options.
 	// XMLConfig *XMLConfig `json:"xmlConfig,omitempty"`
 }
 
+// Encapsulates the section name of an ini configuration.
+
 type IniConfig struct {
-	// sectionName describes ini section.
+
+	// A string that describes the name of the ini section.
+	//
 	// +optional
 	SectionName string `json:"sectionName,omitempty"`
 }
@@ -313,4 +361,11 @@ type ConfigConstraintList struct {
 
 func init() {
 	SchemeBuilder.Register(&ConfigConstraint{}, &ConfigConstraintList{})
+}
+
+func (in *ConfigConstraintSpec) NeedForceUpdateHot() bool {
+	if in.ForceHotUpdate != nil {
+		return *in.ForceHotUpdate
+	}
+	return false
 }

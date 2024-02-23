@@ -25,9 +25,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -35,9 +38,9 @@ import (
 
 func TestReflect(t *testing.T) {
 	var list client.ObjectList
-	sts := v1.StatefulSet{}
+	sts := appsv1.StatefulSet{}
 	sts.SetName("hello")
-	list = &v1.StatefulSetList{Items: []v1.StatefulSet{sts}}
+	list = &appsv1.StatefulSetList{Items: []appsv1.StatefulSet{sts}}
 	v := reflect.ValueOf(list).Elem().FieldByName("Items")
 	if v.Kind() != reflect.Slice {
 		t.Error("not slice")
@@ -89,4 +92,31 @@ func TestIsResourceRequirementsEqual(t *testing.T) {
 	a := buildRR("1", "1Gi")
 	b := buildRR("1000m", "1024Mi")
 	assert.True(t, isResourceRequirementsEqual(a, b))
+}
+
+func TestIsPolicyV1DiscoveryNotFoundError(t *testing.T) {
+	var (
+		notFoundErr     = apierrors.NewNotFound(schema.GroupResource{}, "abc")
+		alreadyExistErr = apierrors.NewAlreadyExists(schema.GroupResource{}, "abc")
+		discoveryErr    = &discovery.ErrGroupDiscoveryFailed{Groups: map[schema.GroupVersion]error{}}
+	)
+
+	// normal not-found error
+	assert.True(t, apierrors.IsNotFound(notFoundErr))
+	assert.False(t, isPolicyV1DiscoveryNotFoundError(notFoundErr))
+
+	// not-found error for core/v1
+	discoveryErr.Groups[schema.GroupVersion{Group: "core", Version: "v1"}] = notFoundErr
+	assert.False(t, isPolicyV1DiscoveryNotFoundError(discoveryErr))
+
+	// policy/v1 already-exist error
+	discoveryErr.Groups[schema.GroupVersion{Group: "policy", Version: "v1"}] = alreadyExistErr
+	assert.False(t, isPolicyV1DiscoveryNotFoundError(discoveryErr))
+
+	// policy/v1 not-found error
+	discoveryErr.Groups[schema.GroupVersion{Group: "policy", Version: "v1"}] = notFoundErr
+	assert.True(t, isPolicyV1DiscoveryNotFoundError(discoveryErr))
+
+	// wrapped policy/v1 not-found error
+	assert.True(t, isPolicyV1DiscoveryNotFoundError(fmt.Errorf("%w", discoveryErr)))
 }

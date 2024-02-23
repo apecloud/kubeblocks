@@ -23,12 +23,14 @@ import (
 
 // ClusterVersionSpec defines the desired state of ClusterVersion
 type ClusterVersionSpec struct {
-	// ref ClusterDefinition.
+	// Specifies a reference to the ClusterDefinition.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefinitionRef string `json:"clusterDefinitionRef"`
 
-	// List of components' containers versioning context, i.e., container image ID, container commands, args, and environments.
+	// Contains a list of versioning contexts for the components' containers.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=componentDefRef
@@ -40,19 +42,23 @@ type ClusterVersionSpec struct {
 
 // ClusterVersionStatus defines the observed state of ClusterVersion
 type ClusterVersionStatus struct {
-	// phase - in list of [Available,Unavailable]
+	// The current phase of the ClusterVersion.
+	//
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// A human readable message indicating details about why the ClusterVersion is in this phase.
+	// Provides additional information about the current phase.
+	//
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// generation number
+	// The generation number that has been observed by the controller.
+	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// clusterDefGeneration represents the generation number of ClusterDefinition referenced.
+	// The generation number of the ClusterDefinition that is currently being referenced.
+	//
 	// +optional
 	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
 }
@@ -63,55 +69,62 @@ func (r ClusterVersionStatus) GetTerminalPhases() []Phase {
 
 // ClusterComponentVersion is an application version component spec.
 type ClusterComponentVersion struct {
-	// componentDefRef reference one of the cluster component definition names in ClusterDefinition API (spec.componentDefs.name).
+	// Specifies a reference to one of the cluster component definition names in the ClusterDefinition API (spec.componentDefs.name).
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
-	// configSpecs defines a configuration extension mechanism to handle configuration differences between versions,
-	// the configTemplateRefs field, together with configTemplateRefs in the ClusterDefinition,
-	// determines the final configuration file.
-	// +optional
+	// Defines a configuration extension mechanism to handle configuration differences between versions.
+	// The configTemplateRefs field, in conjunction with the configTemplateRefs in the ClusterDefinition, determines
+	// the final configuration file.
+	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// systemAccountSpec define image for the component to connect database or engines.
-	// It overrides `image` and `env` attributes defined in ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.
-	// To clean default envs settings, set `SystemAccountSpec.CmdExecutorConfig.Env` to empty list.
+	// Defines the image for the component to connect to databases or engines.
+	// This overrides the `image` and `env` attributes defined in clusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.
+	// To clear default environment settings, set systemAccountSpec.cmdExecutorConfig.env to an empty list.
+	//
 	// +optional
 	SystemAccountSpec *SystemAccountShortSpec `json:"systemAccountSpec,omitempty"`
 
-	// versionContext defines containers images' context for component versions,
-	// this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers | containers]
+	// Defines the context for container images for component versions.
+	// This value replaces the values in clusterDefinition.spec.componentDefs.podSpec.[initContainers | containers].
 	VersionsCtx VersionsContext `json:"versionsContext"`
 
-	// switchoverSpec defines images for the component to do switchover.
-	// It overrides `image` and `env` attributes defined in ClusterDefinition.spec.componentDefs.SwitchoverSpec.CommandExecutorEnvItem.
+	// Defines the images for the component to perform a switchover.
+	// This overrides the image and env attributes defined in clusterDefinition.spec.componentDefs.SwitchoverSpec.CommandExecutorEnvItem.
+	//
 	// +optional
 	SwitchoverSpec *SwitchoverShortSpec `json:"switchoverSpec,omitempty"`
 }
 
-// SystemAccountShortSpec is a short version of SystemAccountSpec, with only CmdExecutorConfig field.
+// SystemAccountShortSpec represents a condensed version of the SystemAccountSpec.
 type SystemAccountShortSpec struct {
-	// cmdExecutorConfig configs how to get client SDK and perform statements.
+	// Configures the method for obtaining the client SDK and executing statements.
+	//
 	// +kubebuilder:validation:Required
 	CmdExecutorConfig *CommandExecutorEnvItem `json:"cmdExecutorConfig"`
 }
 
-// SwitchoverShortSpec is a short version of SwitchoverSpec, with only CommandExecutorEnvItem field.
+// SwitchoverShortSpec represents a condensed version of the SwitchoverSpec.
 type SwitchoverShortSpec struct {
-	// CmdExecutorConfig is the command executor config.
+	// Represents the configuration for the command executor.
+	//
 	// +kubebuilder:validation:Required
 	CmdExecutorConfig *CommandExecutorEnvItem `json:"cmdExecutorConfig"`
 }
 
 type VersionsContext struct {
-	// Provide ClusterDefinition.spec.componentDefs.podSpec.initContainers override
-	// values, typical scenarios are application container image updates.
+	// Provides override values for ClusterDefinition.spec.componentDefs.podSpec.initContainers.
+	// Typically used in scenarios such as updating application container images.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +patchMergeKey=name
 	// +patchStrategy=merge
@@ -120,8 +133,9 @@ type VersionsContext struct {
 	// +optional
 	InitContainers []corev1.Container `json:"initContainers,omitempty"`
 
-	// Provide ClusterDefinition.spec.componentDefs.podSpec.containers override
-	// values, typical scenarios are application container image updates.
+	// Provides override values for ClusterDefinition.spec.componentDefs.podSpec.containers.
+	// Typically used in scenarios such as updating application container images.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +patchMergeKey=name
 	// +patchStrategy=merge

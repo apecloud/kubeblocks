@@ -29,130 +29,148 @@ import (
 
 // ComponentSpec defines the desired state of Component
 type ComponentSpec struct {
-	// compDef is the name of the referenced componentDefinition.
+	// Specifies the name of the referenced ComponentDefinition.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	CompDef string `json:"compDef"`
 
 	// ServiceVersion specifies the version of the service provisioned by the component.
 	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+	//
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
-	// classDefRef references the class defined in ComponentClassDefinition.
+	// References the class defined in ComponentClassDefinition.
+	//
 	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
-	// serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
-	//
+	// Define service references for the current component. Based on the referenced services, they can be categorized into two types:
 	// - Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
 	// - Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
 	//
 	// Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
 	// It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.
-	//
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
-	// Resources requests and limits of workload.
+	// Requests and limits of workload resources.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
+	// Information for statefulset.spec.volumeClaimTemplates.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Replicas specifies the desired number of replicas for the component's workload.
+	// Specifies the desired number of replicas for the component's workload.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
+	// Defines the configuration for the component.
+	//
 	// +optional
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
 
-	// monitor is a switch to enable monitoring and is set as false by default.
+	// A switch to enable monitoring and is set as false by default.
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
 	// metrics to Time Series Database.
+	//
 	// +kubebuilder:default=false
 	// +optional
 	Monitor bool `json:"monitor,omitempty"`
 
-	// enabledLogs indicates which log file takes effect in the database cluster,
+	// Indicates which log file takes effect in the database cluster,
 	// element is the log type which is defined in ComponentDefinition logConfig.name.
+	//
 	// +listType=set
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
-	// serviceAccountName is the name of the ServiceAccount that running component depends on.
+	// The name of the ServiceAccount that running component depends on.
+	//
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// Affinity specifies the scheduling constraints for the component's workload.
+	// Specifies the scheduling constraints for the component's workload.
 	// If specified, it will override the cluster-wide affinity.
+	//
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
-	// Tolerations specify the tolerations for the component's workload.
+	// Specify the tolerations for the component's workload.
 	// If specified, they will override the cluster-wide toleration settings.
+	//
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
+	// Specifies the TLS configuration for the component.
+	//
 	// +optional
 	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
 
-	// RsmTransformPolicy defines the policy generate sts using rsm.
-	// ToSts: rsm transform to statefulSet
-	// ToPod: rsm transform to pods
+	// Defines the policy generate sts using rsm.
+	//
+	// - ToSts: rsm transform to statefulSet
+	// - ToPod: rsm transform to pods
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=ToSts
 	// +optional
 	RsmTransformPolicy workloads.RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
 
-	// Nodes defines the list of nodes that pods can schedule
+	// Defines the list of nodes that pods can schedule
 	// If the RsmTransformPolicy is specified as OneToMul,the list of nodes will be used. If the list of nodes is empty,
 	// no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
 	// across the nodes in the list.
+	//
 	// +optional
 	Nodes []types.NodeName `json:"nodes,omitempty"`
 
-	// Instances defines the list of instance to be deleted priorly
+	// Defines the list of instance to be deleted priorly
+	//
 	// +optional
 	Instances []string `json:"instances,omitempty"`
 }
 
-// ComponentStatus defines the observed state of Component
+// ComponentStatus represents the observed state of a Component within the cluster.
 type ComponentStatus struct {
-	// observedGeneration is the most recent generation observed for this Component.
-	// It corresponds to the Cluster's generation, which is
-	// updated on mutation by the API Server.
+	// Specifies the most recent generation observed for this Component.
+	// This corresponds to the Cluster's generation, which is updated by the API Server upon mutation.
+	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Describe current state of component API Resource, like warning.
+	// Defines the current state of the component API Resource, such as warnings.
+	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// phase describes the phase of the component and the detail information of the phases are as following:
+	// Indicates the phase of the component. Detailed information for each phase is as follows:
 	//
-	// - Creating: `Creating` is a special `Updating` with previous phase `empty`(means "") or `Creating`.
-	// - Running: component replicas > 0 and all pod specs are latest with a Running state.
-	// - Updating: component replicas > 0 and has no failed pods. the component is being updated.
-	// - Abnormal: component replicas > 0 but having some failed pods. the component basically works but in a fragile state.
-	// - Failed: component replicas > 0 but having some failed pods. the component doesn't work anymore.
-	// - Stopping: component replicas = 0 and has terminating pods.
-	// - Stopped: component replicas = 0 and all pods have been deleted.
-	// - Deleting: the component is being deleted.
+	// - Creating: A special `Updating` phase with previous phase `empty`(means "") or `Creating`.
+	// - Running: Component replicas > 0 and all pod specs are latest with a Running state.
+	// - Updating: Component replicas > 0 and no failed pods. The component is being updated.
+	// - Abnormal: Component replicas > 0 but some pods have failed. The component is functional but in a fragile state.
+	// - Failed: Component replicas > 0 but some pods have failed. The component is no longer functional.
+	// - Stopping: Component replicas = 0 and pods are terminating.
+	// - Stopped: Component replicas = 0 and all pods have been deleted.
+	// - Deleting: The component is being deleted.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
-	// message records the component details message in current phase.
-	// Keys are podName or deployName or statefulSetName. The format is `ObjectKind/Name`.
+	// Records the detailed message of the component in its current phase.
+	// Keys can be podName, deployName, or statefulSetName. The format is `ObjectKind/Name`.
+	//
 	// +optional
 	Message ComponentMessageMap `json:"message,omitempty"`
 }

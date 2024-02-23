@@ -898,11 +898,11 @@ spec:
                       description: A reference to a class defined in ComponentClassDefinition.
                       properties:
                         class:
-                          description: Class refers to the name of the class that
-                            is defined in the ComponentClassDefinition.
+                          description: Defines the name of the class that is defined
+                            in the ComponentClassDefinition.
                           type: string
                         name:
-                          description: Name refers to the name of the ComponentClassDefinition.
+                          description: Specifies the name of the ComponentClassDefinition.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
@@ -1199,11 +1199,11 @@ spec:
                           description: References a class defined in ComponentClassDefinition.
                           properties:
                             class:
-                              description: Class refers to the name of the class that
-                                is defined in the ComponentClassDefinition.
+                              description: Defines the name of the class that is defined
+                                in the ComponentClassDefinition.
                               type: string
                             name:
-                              description: Name refers to the name of the ComponentClassDefinition.
+                              description: Specifies the name of the ComponentClassDefinition.
                               maxLength: 63
                               pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                               type: string
@@ -1245,19 +1245,19 @@ spec:
                                 additionalProperties:
                                   type: string
                                 description: 'If ServiceType is LoadBalancer, cloud
-                                  provider related parameters can be put here More
+                                  provider related parameters can be put here. More
                                   info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                                 type: object
                               name:
-                                description: Service name
+                                description: The name of the service.
                                 maxLength: 15
                                 type: string
                               serviceType:
                                 default: ClusterIP
-                                description: "serviceType determines how the Service
-                                  is exposed. Valid options are ClusterIP, NodePort,
-                                  and LoadBalancer. \n - `ClusterIP` allocates a cluster-internal
-                                  IP address for load-balancing to endpoints. Endpoints
+                                description: "Determines how the Service is exposed.
+                                  Valid options are ClusterIP, NodePort, and LoadBalancer.
+                                  \n - `ClusterIP` allocates a cluster-internal IP
+                                  address for load-balancing to endpoints. Endpoints
                                   are determined by the selector or if that is not
                                   specified, they are determined by manual construction
                                   of an Endpoints object or EndpointSlice objects.

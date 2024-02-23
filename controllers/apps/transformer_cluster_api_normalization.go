@@ -51,15 +51,12 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	}()
 
-	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
-	transCtx.ShardingComponentSpecs = make(map[string][]*appsv1alpha1.ClusterComponentSpec, 0)
-	transCtx.Labels = make(map[string]map[string]string, 0)
-
 	// build all component specs
 	transCtx.ComponentSpecs, err = t.buildCompSpecs(transCtx, cluster)
 	if err != nil {
 		return err
 	}
+	transCtx.Labels = t.buildCompLabelsInheritedFromCluster(transCtx, cluster)
 
 	// resolve all component definitions referenced
 	if err = t.resolveCompDefinitions(transCtx); err != nil {
@@ -72,7 +69,8 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	return nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext,
+	cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	if withClusterTopology(cluster) {
 		return t.buildCompSpecs4Topology(transCtx.ClusterDef, cluster)
 	}
@@ -127,7 +125,8 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 	return compSpecs, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Specified(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Specified(transCtx *clusterTransformContext,
+	cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	for i := range cluster.Spec.ComponentSpecs {
 		compSpecs = append(compSpecs, cluster.Spec.ComponentSpecs[i].DeepCopy())
@@ -142,8 +141,12 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Specified(transCtx *
 	return compSpecs, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Sharding(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Sharding(transCtx *clusterTransformContext,
+	cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	if transCtx.ShardingComponentSpecs == nil {
+		transCtx.ShardingComponentSpecs = make(map[string][]*appsv1alpha1.ClusterComponentSpec, 0)
+	}
 	for i, sharding := range cluster.Spec.ShardingSpecs {
 		shardingComps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &cluster.Spec.ShardingSpecs[i])
 		if err != nil {
@@ -161,6 +164,20 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Sharding(transCtx *c
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs4SimplifiedAPI(clusterDef *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster) []*appsv1alpha1.ClusterComponentSpec {
 	return []*appsv1alpha1.ClusterComponentSpec{apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster)}
+}
+
+func (t *ClusterAPINormalizationTransformer) buildCompLabelsInheritedFromCluster(transCtx *clusterTransformContext,
+	cluster *appsv1alpha1.Cluster) map[string]map[string]string {
+	labels := make(map[string]map[string]string)
+	for _, compSpec := range transCtx.ComponentSpecs {
+		labels[compSpec.Name] = cluster.Labels
+	}
+	for name, shardingCompSpecs := range transCtx.ShardingComponentSpecs {
+		for _, compSpec := range shardingCompSpecs {
+			labels[compSpec.Name] = controllerutil.MergeMetadataMaps(cluster.Labels, constant.GetShardingNameLabel(name))
+		}
+	}
+	return labels
 }
 
 func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext) error {

@@ -402,9 +402,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>backupRepoName is the name of BackupRepo and the backup data will be
-stored in this repository. If not set, will be stored in the default
-backup repository.</p>
+<p>Specifies the name of BackupRepo where the backup data will be stored.
+If not set, data will be stored in the default backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -416,8 +415,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>pathPrefix is the directory inside the backup repository to store the backup content.
-It is a relative to the path of the backup repository.</p>
+<p>Specifies the directory inside the backup repository to store the backup.
+This path is relative to the path of the backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -429,7 +428,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the number of retries before marking the backup failed.</p>
+<p>Specifies the number of retries before marking the backup as failed.</p>
 </td>
 </tr>
 <tr>
@@ -442,7 +441,8 @@ BackupTarget
 </em>
 </td>
 <td>
-<p>target specifies the target information to back up.</p>
+<p>Specifies the target information to back up, such as the target pod, the
+cluster connection credential.</p>
 </td>
 </tr>
 <tr>
@@ -455,7 +455,7 @@ BackupTarget
 </em>
 </td>
 <td>
-<p>backupMethods defines the backup methods.</p>
+<p>Defines the backup methods.</p>
 </td>
 </tr>
 <tr>
@@ -467,13 +467,12 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>useKopia specifies whether backup data should be stored in a Kopia repository.</p>
+<p>Specifies whether backup data should be stored in a Kopia repository.</p>
 <p>Data within the Kopia repository is both compressed and encrypted. Furthermore,
 data deduplication is implemented across various backups of the same cluster.
-This approach significantly reduces the actual storage usage, particularly for
-clusters with a low update frequency.</p>
-<p>NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
-otherwise the backup will not be processed.</p>
+This approach significantly reduces the actual storage usage, particularly
+for clusters with a low update frequency.</p>
+<p>NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition, otherwise the backup will not be processed.</p>
 </td>
 </tr>
 </table>
@@ -706,7 +705,7 @@ string
 </em>
 </td>
 <td>
-<p>Which backupPolicy is applied to perform this backup.</p>
+<p>Specifies the backupPolicy to be applied for the <code>schedules</code>.</p>
 </td>
 </tr>
 <tr>
@@ -718,8 +717,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>startingDeadlineMinutes defines the deadline in minutes for starting the
-backup workload if it misses scheduled time for any reason.</p>
+<p>Defines the deadline in minutes for starting the backup workload if it
+misses its scheduled time for any reason.</p>
 </td>
 </tr>
 <tr>
@@ -732,7 +731,7 @@ backup workload if it misses scheduled time for any reason.</p>
 </em>
 </td>
 <td>
-<p>schedules defines the list of backup schedules.</p>
+<p>Defines the list of backup schedules.</p>
 </td>
 </tr>
 </table>
@@ -817,7 +816,7 @@ BackupRef
 </em>
 </td>
 <td>
-<p>backup to be restored. The restore behavior based on the backup type:</p>
+<p>Specifies the backup to be restored. The restore behavior is based on the backup type:</p>
 <ol>
 <li>Full: will be restored the full backup directly.</li>
 <li>Incremental: will be restored sequentially from the most recent full backup of this incremental backup.</li>
@@ -835,7 +834,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>restoreTime is the point in time for restoring.</p>
+<p>Specifies the point in time for restoring.</p>
 </td>
 </tr>
 <tr>
@@ -849,7 +848,7 @@ RestoreKubeResources
 </td>
 <td>
 <em>(Optional)</em>
-<p>restore the specified resources of kubernetes.</p>
+<p>Restores the specified resources of Kubernetes.</p>
 </td>
 </tr>
 <tr>
@@ -863,7 +862,7 @@ PrepareDataConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>configuration for the action of &ldquo;prepareData&rdquo; phase, including the persistent volume claims
+<p>Configuration for the action of &ldquo;prepareData&rdquo; phase, including the persistent volume claims
 that need to be restored and scheduling strategy of temporary recovery pod.</p>
 </td>
 </tr>
@@ -876,7 +875,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>service account name which needs for recovery pod.</p>
+<p>Specifies the service account name needed for recovery pod.</p>
 </td>
 </tr>
 <tr>
@@ -890,7 +889,7 @@ ReadyConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>configuration for the action of &ldquo;postReady&rdquo; phase.</p>
+<p>Configuration for the action of &ldquo;postReady&rdquo; phase.</p>
 </td>
 </tr>
 <tr>
@@ -904,7 +903,7 @@ ReadyConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>list of environment variables to set in the container for restore and will be
+<p>List of environment variables to set in the container for restore. These will be
 merged with the env of Backup and ActionSet.</p>
 <p>The priority of merging is as follows: <code>Restore env &gt; Backup env &gt; ActionSet env</code>.</p>
 </td>
@@ -920,7 +919,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>specified the required resources of restore job&rsquo;s container.</p>
+<p>Specifies the required resources of restore job&rsquo;s container.</p>
 </td>
 </tr>
 <tr>
@@ -1255,7 +1254,8 @@ string
 </em>
 </td>
 <td>
-<p>name is the name of the action.</p>
+<em>(Optional)</em>
+<p>The name of the action.</p>
 </td>
 </tr>
 <tr>
@@ -1269,7 +1269,7 @@ ActionPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>phase is the current state of the action.</p>
+<p>The current phase of the action.</p>
 </td>
 </tr>
 <tr>
@@ -1283,7 +1283,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>startTimestamp records the time an action was started.</p>
+<p>Records the time an action was started.</p>
 </td>
 </tr>
 <tr>
@@ -1297,7 +1297,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>completionTimestamp records the time an action was completed.</p>
+<p>Records the time an action was completed.</p>
 </td>
 </tr>
 <tr>
@@ -1309,7 +1309,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>failureReason is an error that caused the backup to fail.</p>
+<p>An error that caused the action to fail.</p>
 </td>
 </tr>
 <tr>
@@ -1323,7 +1323,7 @@ ActionType
 </td>
 <td>
 <em>(Optional)</em>
-<p>actionType is the type of the action.</p>
+<p>The type of the action.</p>
 </td>
 </tr>
 <tr>
@@ -1335,7 +1335,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>availableReplicas available replicas for statefulSet action.</p>
+<p>Available replicas for statefulSet action.</p>
 </td>
 </tr>
 <tr>
@@ -1349,7 +1349,7 @@ Kubernetes core/v1.ObjectReference
 </td>
 <td>
 <em>(Optional)</em>
-<p>objectRef is the object reference for the action.</p>
+<p>The object reference for the action.</p>
 </td>
 </tr>
 <tr>
@@ -1361,8 +1361,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>totalSize is the total size of backed up data size.
-A string with capacity units in the format of &ldquo;1Gi&rdquo;, &ldquo;1Mi&rdquo;, &ldquo;1Ki&rdquo;.</p>
+<p>The total size of backed up data size.
+A string with capacity units in the format of &ldquo;1Gi&rdquo;, &ldquo;1Mi&rdquo;, &ldquo;1Ki&rdquo;.
+If no capacity unit is specified, it is assumed to be in bytes.</p>
 </td>
 </tr>
 <tr>
@@ -1376,8 +1377,8 @@ BackupTimeRange
 </td>
 <td>
 <em>(Optional)</em>
-<p>timeRange records the time range of backed up data, for PITR, this is the
-time range of recoverable data.</p>
+<p>Records the time range of backed up data, for PITR, this is the time
+range of recoverable data.</p>
 </td>
 </tr>
 <tr>
@@ -1391,7 +1392,7 @@ time range of recoverable data.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeSnapshots records the volume snapshot status for the action.</p>
+<p>Records the volume snapshot status for the action.</p>
 </td>
 </tr>
 </tbody>
@@ -1545,7 +1546,7 @@ for synchronization in seconds.</p>
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSpec">BackupSpec</a>)
 </p>
 <div>
-<p>BackupDeletionPolicy describes a policy for end-of-life maintenance of backup content.</p>
+<p>BackupDeletionPolicy describes the policy for end-of-life maintenance of backup content.</p>
 </div>
 <table>
 <thead>
@@ -1584,7 +1585,7 @@ string
 </em>
 </td>
 <td>
-<p>the name of backup method.</p>
+<p>The name of backup method.</p>
 </td>
 </tr>
 <tr>
@@ -1596,9 +1597,9 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>snapshotVolumes specifies whether to take snapshots of persistent volumes.
-if true, the BackupScript is not required, the controller will use the CSI
-volume snapshotter to create the snapshot.</p>
+<p>Specifies whether to take snapshots of persistent volumes. If true,
+the ActionSetName is not required, the controller will use the CSI volume
+snapshotter to create the snapshot.</p>
 </td>
 </tr>
 <tr>
@@ -1610,7 +1611,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>actionSetName refers to the ActionSet object that defines the backup actions.
+<p>Refers to the ActionSet object that defines the backup actions.
 For volume snapshot backup, the actionSet is not required, the controller
 will use the CSI volume snapshotter to create the snapshot.</p>
 </td>
@@ -1626,8 +1627,7 @@ TargetVolumeInfo
 </td>
 <td>
 <em>(Optional)</em>
-<p>targetVolumes specifies which volumes from the target should be mounted in
-the backup workload.</p>
+<p>Specifies which volumes from the target should be mounted in the backup workload.</p>
 </td>
 </tr>
 <tr>
@@ -1641,7 +1641,7 @@ the backup workload.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>env specifies the environment variables for the backup workload.</p>
+<p>Specifies the environment variables for the backup workload.</p>
 </td>
 </tr>
 <tr>
@@ -1655,7 +1655,7 @@ RuntimeSettings
 </td>
 <td>
 <em>(Optional)</em>
-<p>runtimeSettings specifies runtime settings for the backup workload container.</p>
+<p>Specifies runtime settings for the backup workload container.</p>
 </td>
 </tr>
 <tr>
@@ -1669,7 +1669,7 @@ BackupTarget
 </td>
 <td>
 <em>(Optional)</em>
-<p>target specifies the target information to back up, it will override the global target policy.</p>
+<p>Specifies the target information to back up, it will override the target in backup policy.</p>
 </td>
 </tr>
 </tbody>
@@ -1680,7 +1680,7 @@ BackupTarget
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatus">BackupStatus</a>)
 </p>
 <div>
-<p>BackupPhase is a string representation of the lifecycle phase of a Backup.</p>
+<p>BackupPhase describes the lifecycle phase of a Backup.</p>
 </div>
 <table>
 <thead>
@@ -1751,9 +1751,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>backupRepoName is the name of BackupRepo and the backup data will be
-stored in this repository. If not set, will be stored in the default
-backup repository.</p>
+<p>Specifies the name of BackupRepo where the backup data will be stored.
+If not set, data will be stored in the default backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -1765,8 +1764,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>pathPrefix is the directory inside the backup repository to store the backup content.
-It is a relative to the path of the backup repository.</p>
+<p>Specifies the directory inside the backup repository to store the backup.
+This path is relative to the path of the backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -1778,7 +1777,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the number of retries before marking the backup failed.</p>
+<p>Specifies the number of retries before marking the backup as failed.</p>
 </td>
 </tr>
 <tr>
@@ -1791,7 +1790,8 @@ BackupTarget
 </em>
 </td>
 <td>
-<p>target specifies the target information to back up.</p>
+<p>Specifies the target information to back up, such as the target pod, the
+cluster connection credential.</p>
 </td>
 </tr>
 <tr>
@@ -1804,7 +1804,7 @@ BackupTarget
 </em>
 </td>
 <td>
-<p>backupMethods defines the backup methods.</p>
+<p>Defines the backup methods.</p>
 </td>
 </tr>
 <tr>
@@ -1816,13 +1816,12 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>useKopia specifies whether backup data should be stored in a Kopia repository.</p>
+<p>Specifies whether backup data should be stored in a Kopia repository.</p>
 <p>Data within the Kopia repository is both compressed and encrypted. Furthermore,
 data deduplication is implemented across various backups of the same cluster.
-This approach significantly reduces the actual storage usage, particularly for
-clusters with a low update frequency.</p>
-<p>NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
-otherwise the backup will not be processed.</p>
+This approach significantly reduces the actual storage usage, particularly
+for clusters with a low update frequency.</p>
+<p>NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition, otherwise the backup will not be processed.</p>
 </td>
 </tr>
 </tbody>
@@ -1854,7 +1853,7 @@ Phase
 </td>
 <td>
 <em>(Optional)</em>
-<p>phase - in list of [Available,Unavailable]</p>
+<p>Phase - in list of [Available,Unavailable]</p>
 </td>
 </tr>
 <tr>
@@ -1866,8 +1865,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A human-readable message indicating details about why the BackupPolicy is
-in this phase.</p>
+<p>A human-readable message indicating details about why the BackupPolicy
+is in this phase.</p>
 </td>
 </tr>
 <tr>
@@ -1879,9 +1878,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the most recent generation observed for this
-BackupPolicy. It refers to the BackupPolicy&rsquo;s generation, which is
-updated on mutation by the API Server.</p>
+<p>ObservedGeneration is the most recent generation observed for this BackupPolicy.
+It refers to the BackupPolicy&rsquo;s generation, which is updated on mutation by the API Server.</p>
 </td>
 </tr>
 </tbody>
@@ -1910,7 +1908,7 @@ string
 </em>
 </td>
 <td>
-<p>backup name</p>
+<p>Specifies the backup name.</p>
 </td>
 </tr>
 <tr>
@@ -1921,7 +1919,7 @@ string
 </em>
 </td>
 <td>
-<p>backup namespace</p>
+<p>Specifies the backup namespace.</p>
 </td>
 </tr>
 </tbody>
@@ -2188,10 +2186,10 @@ bool
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Available&#34;</p></td>
-<td><p>BackupSchedulePhaseAvailable means the backup schedule is available.</p>
+<td><p>BackupSchedulePhaseAvailable indicates the backup schedule is available.</p>
 </td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>BackupSchedulePhaseFailed means the backup schedule is failed.</p>
+<td><p>BackupSchedulePhaseFailed indicates the backup schedule has failed.</p>
 </td>
 </tr></tbody>
 </table>
@@ -2219,7 +2217,7 @@ string
 </em>
 </td>
 <td>
-<p>Which backupPolicy is applied to perform this backup.</p>
+<p>Specifies the backupPolicy to be applied for the <code>schedules</code>.</p>
 </td>
 </tr>
 <tr>
@@ -2231,8 +2229,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>startingDeadlineMinutes defines the deadline in minutes for starting the
-backup workload if it misses scheduled time for any reason.</p>
+<p>Defines the deadline in minutes for starting the backup workload if it
+misses its scheduled time for any reason.</p>
 </td>
 </tr>
 <tr>
@@ -2245,7 +2243,7 @@ backup workload if it misses scheduled time for any reason.</p>
 </em>
 </td>
 <td>
-<p>schedules defines the list of backup schedules.</p>
+<p>Defines the list of backup schedules.</p>
 </td>
 </tr>
 </tbody>
@@ -2277,7 +2275,7 @@ BackupSchedulePhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>phase describes the phase of the BackupSchedule.</p>
+<p>Describes the phase of the BackupSchedule.</p>
 </td>
 </tr>
 <tr>
@@ -2289,9 +2287,9 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the most recent generation observed for this
-BackupSchedule. It refers to the BackupSchedule&rsquo;s generation, which is
-updated on mutation by the API Server.</p>
+<p>Represents the most recent generation observed for this BackupSchedule.
+It refers to the BackupSchedule&rsquo;s generation, which is updated on mutation
+by the API Server.</p>
 </td>
 </tr>
 <tr>
@@ -2303,7 +2301,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>failureReason is an error that caused the backup to fail.</p>
+<p>Represents an error that caused the backup to fail.</p>
 </td>
 </tr>
 <tr>
@@ -2317,7 +2315,7 @@ map[string]github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.ScheduleS
 </td>
 <td>
 <em>(Optional)</em>
-<p>schedules describes the status of each schedule.</p>
+<p>Describes the status of each schedule.</p>
 </td>
 </tr>
 </tbody>
@@ -2710,8 +2708,7 @@ PodSelector
 </em>
 </td>
 <td>
-<p>podSelector is used to find the target pod. The volumes of the target pod
-will be backed up.</p>
+<p>Used to find the target pod. The volumes of the target pod will be backed up.</p>
 </td>
 </tr>
 <tr>
@@ -2725,8 +2722,7 @@ ConnectionCredential
 </td>
 <td>
 <em>(Optional)</em>
-<p>connectionCredential specifies the connection credential to connect to the
-target database cluster.</p>
+<p>Specifies the connection credential to connect to the target database cluster.</p>
 </td>
 </tr>
 <tr>
@@ -2740,7 +2736,7 @@ KubeResources
 </td>
 <td>
 <em>(Optional)</em>
-<p>resources specifies the kubernetes resources to back up.</p>
+<p>Specifies the kubernetes resources to back up.</p>
 </td>
 </tr>
 <tr>
@@ -2751,7 +2747,7 @@ string
 </em>
 </td>
 <td>
-<p>serviceAccountName specifies the service account to run the backup workload.</p>
+<p>Specifies the service account to run the backup workload.</p>
 </td>
 </tr>
 </tbody>
@@ -2782,7 +2778,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>time zone, only support zone offset, value range: &ldquo;-12:59 ~ +13:00&rdquo;</p>
+<p>time zone, supports only zone offset, with a value range of &ldquo;-12:59 ~ +13:00&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -2796,7 +2792,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>start records the start time of backup(Coordinated Universal Time, UTC).</p>
+<p>Records the start time of the backup, in Coordinated Universal Time (UTC).</p>
 </td>
 </tr>
 <tr>
@@ -2810,7 +2806,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>end records the end time of backup(Coordinated Universal Time, UTC).</p>
+<p>Records the end time of the backup, in Coordinated Universal Time (UTC).</p>
 </td>
 </tr>
 </tbody>
@@ -2905,7 +2901,7 @@ string
 </em>
 </td>
 <td>
-<p>secretName refers to the Secret object that contains the connection credential.</p>
+<p>Refers to the Secret object that contains the connection credential.</p>
 </td>
 </tr>
 <tr>
@@ -2916,7 +2912,7 @@ string
 </em>
 </td>
 <td>
-<p>usernameKey specifies the map key of the user in the connection credential secret.</p>
+<p>Specifies the map key of the user in the connection credential secret.</p>
 </td>
 </tr>
 <tr>
@@ -2927,7 +2923,7 @@ string
 </em>
 </td>
 <td>
-<p>passwordKey specifies the map key of the password in the connection credential secret.
+<p>Specifies the map key of the password in the connection credential secret.
 This password will be saved in the backup annotation for full backup.
 You can use the environment variable DP_ENCRYPTION_KEY to specify encryption key.</p>
 </td>
@@ -2940,7 +2936,8 @@ string
 </em>
 </td>
 <td>
-<p>hostKey specifies the map key of the host in the connection credential secret.</p>
+<em>(Optional)</em>
+<p>Specifies the map key of the host in the connection credential secret.</p>
 </td>
 </tr>
 <tr>
@@ -2951,7 +2948,8 @@ string
 </em>
 </td>
 <td>
-<p>portKey specifies the map key of the port in the connection credential secret.</p>
+<em>(Optional)</em>
+<p>Specifies the map key of the port in the connection credential secret.</p>
 </td>
 </tr>
 </tbody>
@@ -2982,8 +2980,8 @@ ExecActionTarget
 </td>
 <td>
 <em>(Optional)</em>
-<p>execActionTarget defines the pods that need to be executed for the exec action.
-will execute on all pods that meet the conditions.</p>
+<p>Defines the pods that need to be executed for the exec action.
+Execution will occur on all pods that meet the conditions.</p>
 </td>
 </tr>
 </tbody>
@@ -3085,7 +3083,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>kubectl exec in all selected pods.</p>
+<p>Executes kubectl in all selected pods.</p>
 </td>
 </tr>
 </tbody>
@@ -3126,7 +3124,7 @@ Kubernetes meta/v1.LabelSelector
 </td>
 <td>
 <em>(Optional)</em>
-<p>select the specified resource for recovery by label.</p>
+<p>Selects the specified resource for recovery by label.</p>
 </td>
 </tr>
 </tbody>
@@ -3156,8 +3154,8 @@ JobActionTarget
 </em>
 </td>
 <td>
-<p>jobActionTarget defines the pod that need to be executed for the job action.
-will select a pod that meets the conditions to execute.</p>
+<p>Defines the pod that needs to be executed for the job action.
+A pod that meets the conditions will be selected for execution.</p>
 </td>
 </tr>
 </tbody>
@@ -3248,7 +3246,8 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>select one of the pods which selected by labels to build the job spec, such as mount required volumes and inject built-in env of the selected pod.</p>
+<p>Selects one of the pods, identified by labels, to build the job spec.
+This includes mounting required volumes and injecting built-in environment variables of the selected pod.</p>
 </td>
 </tr>
 <tr>
@@ -3262,7 +3261,7 @@ Kubernetes meta/v1.LabelSelector
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeMounts defines which volumes of the selected pod need to be mounted on the restoring pod.</p>
+<p>Defines which volumes of the selected pod need to be mounted on the restoring pod.</p>
 </td>
 </tr>
 </tbody>
@@ -3293,9 +3292,8 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>selector is a metav1.LabelSelector to filter the target kubernetes resources
-that need to be backed up.
-If not set, will do not back up any kubernetes resources.</p>
+<p>A metav1.LabelSelector to filter the target kubernetes resources that need
+to be backed up. If not set, will do not back up any kubernetes resources.</p>
 </td>
 </tr>
 <tr>
@@ -3309,7 +3307,7 @@ If not set, will do not back up any kubernetes resources.</p>
 <em>(Optional)</em>
 <p>included is a slice of namespaced-scoped resource type names to include in
 the kubernetes resources.
-The default value is &ldquo;*&rdquo;, which means all resource types will be included.</p>
+The default value is empty.</p>
 </td>
 </tr>
 <tr>
@@ -3414,12 +3412,11 @@ PodSelectionStrategy
 </em>
 </td>
 <td>
-<p>strategy specifies the strategy to select the target pod when multiple pods
-are selected.
-Valid values are:</p>
+<p>Specifies the strategy to select the target pod when multiple pods are selected.
+Valid values are: Any: select any one pod that match the labelsSelector.</p>
 <ul>
-<li>Any: select any one pod that match the labelsSelector.</li>
-<li>All: select all pods that match the labelsSelector.</li>
+<li><code>Any</code>: select any one pod that match the labelsSelector.</li>
+<li><code>All</code>: select all pods that match the labelsSelector.</li>
 </ul>
 </td>
 </tr>
@@ -3451,8 +3448,8 @@ VolumeConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>dataSourceRef describes the configuration when using <code>persistentVolumeClaim.spec.dataSourceRef</code> method for restoring.
-it describes the source volume of the backup targetVolumes and how to mount path in the restoring container.</p>
+<p>Specifies the configuration when using <code>persistentVolumeClaim.spec.dataSourceRef</code> method for restoring.
+Describes the source volume of the backup targetVolumes and the mount path in the restoring container.</p>
 </td>
 </tr>
 <tr>
@@ -3466,8 +3463,8 @@ it describes the source volume of the backup targetVolumes and how to mount path
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeClaims defines the persistent Volume claims that need to be restored and mount them together into the restore job.
-these persistent Volume claims will be created if not exist.</p>
+<p>Defines the persistent Volume claims that need to be restored and mounted together into the restore job.
+These persistent Volume claims will be created if they do not exist.</p>
 </td>
 </tr>
 <tr>
@@ -3481,8 +3478,8 @@ RestoreVolumeClaimsTemplate
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeClaimsTemplate defines a template to build persistent Volume claims that need to be restored.
-these claims will be created in an orderly manner based on the number of replicas or reused if already exist.</p>
+<p>Defines a template to build persistent Volume claims that need to be restored.
+These claims will be created in an orderly manner based on the number of replicas or reused if they already exist.</p>
 </td>
 </tr>
 <tr>
@@ -3495,12 +3492,12 @@ VolumeClaimRestorePolicy
 </em>
 </td>
 <td>
-<p>VolumeClaimRestorePolicy defines restore policy for persistent volume claim.
+<p>Defines restore policy for persistent volume claim.
 Supported policies are as follows:</p>
-<ol>
-<li>Parallel: parallel recovery of persistent volume claim.</li>
-<li>Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.</li>
-</ol>
+<ul>
+<li><code>Parallel</code>: parallel recovery of persistent volume claim.</li>
+<li><code>Serial</code>: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -3514,7 +3511,7 @@ SchedulingSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>scheduling spec for restoring pod.</p>
+<p>Specifies the scheduling spec for the restoring pod.</p>
 </td>
 </tr>
 </tbody>
@@ -3543,7 +3540,7 @@ int
 </td>
 <td>
 <em>(Optional)</em>
-<p>number of seconds after the container has started before probe is initiated.</p>
+<p>Specifies the number of seconds after the container has started before the probe is initiated.</p>
 </td>
 </tr>
 <tr>
@@ -3555,8 +3552,8 @@ int
 </td>
 <td>
 <em>(Optional)</em>
-<p>number of seconds after which the probe times out.
-defaults to 30 second, minimum value is 1.</p>
+<p>Specifies the number of seconds after which the probe times out.
+The default value is 30 seconds, and the minimum value is 1.</p>
 </td>
 </tr>
 <tr>
@@ -3568,8 +3565,8 @@ int
 </td>
 <td>
 <em>(Optional)</em>
-<p>how often (in seconds) to perform the probe.
-defaults to 5 second, minimum value is 1.</p>
+<p>Specifies how often (in seconds) to perform the probe.
+The default value is 5 seconds, and the minimum value is 1.</p>
 </td>
 </tr>
 <tr>
@@ -3582,7 +3579,7 @@ ReadinessProbeExecAction
 </em>
 </td>
 <td>
-<p>exec specifies the action to take.</p>
+<p>Specifies the action to take.</p>
 </td>
 </tr>
 </tbody>
@@ -3610,7 +3607,7 @@ string
 </em>
 </td>
 <td>
-<p>refer to container image.</p>
+<p>Refers to the container image.</p>
 </td>
 </tr>
 <tr>
@@ -3621,7 +3618,7 @@ string
 </em>
 </td>
 <td>
-<p>refer to container command.</p>
+<p>Refers to the container command.</p>
 </td>
 </tr>
 </tbody>
@@ -3652,7 +3649,7 @@ JobAction
 </td>
 <td>
 <em>(Optional)</em>
-<p>configuration for job action.</p>
+<p>Specifies the configuration for a job action.</p>
 </td>
 </tr>
 <tr>
@@ -3666,7 +3663,7 @@ ExecAction
 </td>
 <td>
 <em>(Optional)</em>
-<p>configuration for exec action.</p>
+<p>Specifies the configuration for an exec action.</p>
 </td>
 </tr>
 <tr>
@@ -3680,7 +3677,7 @@ ConnectionCredential
 </td>
 <td>
 <em>(Optional)</em>
-<p>credential template used for creating a connection credential</p>
+<p>Defines the credential template used to create a connection credential.</p>
 </td>
 </tr>
 <tr>
@@ -3694,8 +3691,9 @@ ReadinessProbe
 </td>
 <td>
 <em>(Optional)</em>
-<p>periodic probe of the service readiness.
-controller will perform postReadyHooks of BackupScript.spec.restore after the service readiness when readinessProbe is configured.</p>
+<p>Defines a periodic probe of the service readiness.
+The controller will perform postReadyHooks of BackupScript.spec.restore
+after the service readiness when readinessProbe is configured.</p>
 </td>
 </tr>
 </tbody>
@@ -3794,7 +3792,8 @@ JobActionSpec
 </em>
 </td>
 <td>
-<p>will restore the specified resources</p>
+<em>(Optional)</em>
+<p>Restores the specified resources.</p>
 </td>
 </tr>
 </tbody>
@@ -3850,7 +3849,7 @@ BackupRef
 </em>
 </td>
 <td>
-<p>backup to be restored. The restore behavior based on the backup type:</p>
+<p>Specifies the backup to be restored. The restore behavior is based on the backup type:</p>
 <ol>
 <li>Full: will be restored the full backup directly.</li>
 <li>Incremental: will be restored sequentially from the most recent full backup of this incremental backup.</li>
@@ -3868,7 +3867,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>restoreTime is the point in time for restoring.</p>
+<p>Specifies the point in time for restoring.</p>
 </td>
 </tr>
 <tr>
@@ -3882,7 +3881,7 @@ RestoreKubeResources
 </td>
 <td>
 <em>(Optional)</em>
-<p>restore the specified resources of kubernetes.</p>
+<p>Restores the specified resources of Kubernetes.</p>
 </td>
 </tr>
 <tr>
@@ -3896,7 +3895,7 @@ PrepareDataConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>configuration for the action of &ldquo;prepareData&rdquo; phase, including the persistent volume claims
+<p>Configuration for the action of &ldquo;prepareData&rdquo; phase, including the persistent volume claims
 that need to be restored and scheduling strategy of temporary recovery pod.</p>
 </td>
 </tr>
@@ -3909,7 +3908,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>service account name which needs for recovery pod.</p>
+<p>Specifies the service account name needed for recovery pod.</p>
 </td>
 </tr>
 <tr>
@@ -3923,7 +3922,7 @@ ReadyConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>configuration for the action of &ldquo;postReady&rdquo; phase.</p>
+<p>Configuration for the action of &ldquo;postReady&rdquo; phase.</p>
 </td>
 </tr>
 <tr>
@@ -3937,7 +3936,7 @@ ReadyConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>list of environment variables to set in the container for restore and will be
+<p>List of environment variables to set in the container for restore. These will be
 merged with the env of Backup and ActionSet.</p>
 <p>The priority of merging is as follows: <code>Restore env &gt; Backup env &gt; ActionSet env</code>.</p>
 </td>
@@ -3953,7 +3952,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>specified the required resources of restore job&rsquo;s container.</p>
+<p>Specifies the required resources of restore job&rsquo;s container.</p>
 </td>
 </tr>
 <tr>
@@ -4014,6 +4013,7 @@ RestorePhase
 </td>
 <td>
 <em>(Optional)</em>
+<p>Represents the current phase of the restore.</p>
 </td>
 </tr>
 <tr>
@@ -4027,7 +4027,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Date/time when the restore started being processed.</p>
+<p>Records the date/time when the restore started being processed.</p>
 </td>
 </tr>
 <tr>
@@ -4041,7 +4041,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Date/time when the restore finished being processed.</p>
+<p>Records the date/time when the restore finished being processed.</p>
 </td>
 </tr>
 <tr>
@@ -4055,7 +4055,7 @@ Kubernetes meta/v1.Duration
 </td>
 <td>
 <em>(Optional)</em>
-<p>The duration time of restore execution.
+<p>Records the duration of the restore execution.
 When converted to a string, the form is &ldquo;1h2m0.5s&rdquo;.</p>
 </td>
 </tr>
@@ -4070,7 +4070,7 @@ RestoreStatusActions
 </td>
 <td>
 <em>(Optional)</em>
-<p>recorded all restore actions performed.</p>
+<p>Records all restore actions performed.</p>
 </td>
 </tr>
 <tr>
@@ -4084,7 +4084,7 @@ RestoreStatusActions
 </td>
 <td>
 <em>(Optional)</em>
-<p>describe current state of restore API Resource, like warning.</p>
+<p>Describes the current state of the restore API Resource, like warning.</p>
 </td>
 </tr>
 </tbody>
@@ -4112,7 +4112,7 @@ string
 </em>
 </td>
 <td>
-<p>name describes the name of the recovery action based on the current backup.</p>
+<p>Describes the name of the restore action based on the current backup.</p>
 </td>
 </tr>
 <tr>
@@ -4123,7 +4123,7 @@ string
 </em>
 </td>
 <td>
-<p>which backup&rsquo;s restore action belongs to.</p>
+<p>Describes which backup&rsquo;s restore action belongs to.</p>
 </td>
 </tr>
 <tr>
@@ -4134,7 +4134,7 @@ string
 </em>
 </td>
 <td>
-<p>the execution object of the restore action.</p>
+<p>Describes the execution object of the restore action.</p>
 </td>
 </tr>
 <tr>
@@ -4146,7 +4146,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>message is a human-readable message indicating details about the object condition.</p>
+<p>Provides a human-readable message indicating details about the object condition.</p>
 </td>
 </tr>
 <tr>
@@ -4159,7 +4159,7 @@ RestoreActionStatus
 </em>
 </td>
 <td>
-<p>the status of this action.</p>
+<p>The status of this action.</p>
 </td>
 </tr>
 <tr>
@@ -4173,7 +4173,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>startTime is the start time for the restore job.</p>
+<p>The start time of the restore job.</p>
 </td>
 </tr>
 <tr>
@@ -4187,7 +4187,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>endTime is the completion time for the restore job.</p>
+<p>The completion time of the restore job.</p>
 </td>
 </tr>
 </tbody>
@@ -4218,7 +4218,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>record the actions for prepareData phase.</p>
+<p>Records the actions for the prepareData phase.</p>
 </td>
 </tr>
 <tr>
@@ -4232,7 +4232,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>record the actions for postReady phase.</p>
+<p>Records the actions for the postReady phase.</p>
 </td>
 </tr>
 </tbody>
@@ -4262,7 +4262,7 @@ Kubernetes meta/v1.ObjectMeta
 </em>
 </td>
 <td>
-<p>Standard object&rsquo;s metadata.
+<p>Specifies the standard metadata for the object.
 More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata</a></p>
 Refer to the Kubernetes API documentation for the fields of the
 <code>metadata</code> field.
@@ -4278,7 +4278,7 @@ Kubernetes core/v1.PersistentVolumeClaimSpec
 </em>
 </td>
 <td>
-<p>volumeClaimSpec defines the desired characteristics of a persistent volume claim.</p>
+<p>Defines the desired characteristics of a persistent volume claim.</p>
 </td>
 </tr>
 <tr>
@@ -4294,7 +4294,8 @@ VolumeConfig
 <p>
 (Members of <code>VolumeConfig</code> are embedded into this type.)
 </p>
-<p>describing the source volume of the backup targetVolumes and how to mount path in the restoring container.</p>
+<p>Describes the source volume of the backup target volumes and the mount path in the restoring container.
+At least one must exist for volumeSource and mountPath.</p>
 </td>
 </tr>
 </tbody>
@@ -4324,7 +4325,7 @@ VolumeConfig
 </em>
 </td>
 <td>
-<p>templates is a list of volume claims.</p>
+<p>Contains a list of volume claims.</p>
 </td>
 </tr>
 <tr>
@@ -4335,8 +4336,8 @@ int32
 </em>
 </td>
 <td>
-<p>the replicas of persistent volume claim which need to be created and restored.
-the format of created claim name is <code>$(template-name)-$(index)</code>.</p>
+<p>Specifies the replicas of persistent volume claim that need to be created and restored.
+The format of the created claim name is <code>$(template-name)-$(index)</code>.</p>
 </td>
 </tr>
 <tr>
@@ -4347,8 +4348,8 @@ int32
 </em>
 </td>
 <td>
-<p>the starting index for the created persistent volume claim by according to template.
-minimum is 0.</p>
+<p>Specifies the starting index for the created persistent volume claim according to the template.
+The minimum value is 0.</p>
 </td>
 </tr>
 </tbody>
@@ -4388,7 +4389,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>resources specifies the resource required by container.
+<p>Specifies the resource required by container.
 More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/">https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/</a></p>
 </td>
 </tr>
@@ -4400,7 +4401,7 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-com
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ScheduleStatus">ScheduleStatus</a>)
 </p>
 <div>
-<p>SchedulePhase defines the phase of schedule</p>
+<p>SchedulePhase represents the phase of a schedule.</p>
 </div>
 <table>
 <thead>
@@ -4439,7 +4440,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>enabled specifies whether the backup schedule is enabled or not.</p>
+<p>Specifies whether the backup schedule is enabled or not.</p>
 </td>
 </tr>
 <tr>
@@ -4450,7 +4451,7 @@ string
 </em>
 </td>
 <td>
-<p>backupMethod specifies the backup method name that is defined in backupPolicy.</p>
+<p>Specifies the backup method name that is defined in backupPolicy.</p>
 </td>
 </tr>
 <tr>
@@ -4461,7 +4462,7 @@ string
 </em>
 </td>
 <td>
-<p>the cron expression for schedule, the timezone is in UTC.
+<p>Specifies the cron expression for the schedule. The timezone is in UTC.
 see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p>
 </td>
 </tr>
@@ -4476,8 +4477,8 @@ RetentionPeriod
 </td>
 <td>
 <em>(Optional)</em>
-<p>retentionPeriod determines a duration up to which the backup should be kept.
-controller will remove all backups that are older than the RetentionPeriod.
+<p>Determines the duration for which the backup should be kept.
+KubeBlocks will remove all backups that are older than the RetentionPeriod.
 For example, RetentionPeriod of <code>30d</code> will keep only the backups of last 30 days.
 Sample duration format:</p>
 <ul>
@@ -4498,7 +4499,7 @@ Sample duration format:</p>
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupScheduleStatus">BackupScheduleStatus</a>)
 </p>
 <div>
-<p>ScheduleStatus defines the status of each schedule.</p>
+<p>ScheduleStatus represents the status of each schedule.</p>
 </div>
 <table>
 <thead>
@@ -4519,7 +4520,7 @@ SchedulePhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>phase describes the phase of the schedule.</p>
+<p>Describes the phase of the schedule.</p>
 </td>
 </tr>
 <tr>
@@ -4531,7 +4532,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>failureReason is an error that caused the backup to fail.</p>
+<p>Represents an error that caused the backup to fail.</p>
 </td>
 </tr>
 <tr>
@@ -4545,7 +4546,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>lastScheduleTime records the last time the backup was scheduled.</p>
+<p>Records the last time the backup was scheduled.</p>
 </td>
 </tr>
 <tr>
@@ -4559,7 +4560,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>lastSuccessfulTime records the last time the backup was successfully completed.</p>
+<p>Records the last time the backup was successfully completed.</p>
 </td>
 </tr>
 </tbody>
@@ -4590,7 +4591,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>the restoring pod&rsquo;s tolerations.</p>
+<p>Specifies the tolerations for the restoring pod.</p>
 </td>
 </tr>
 <tr>
@@ -4602,8 +4603,8 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>nodeSelector is a selector which must be true for the pod to fit on a node.
-Selector which must match a node&rsquo;s labels for the pod to be scheduled on that node.
+<p>Defines a selector which must be true for the pod to fit on a node.
+The selector must match a node&rsquo;s labels for the pod to be scheduled on that node.
 More info: <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
 </td>
 </tr>
@@ -4616,7 +4617,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>nodeName is a request to schedule this pod onto a specific node. If it is non-empty,
+<p>Specifies a request to schedule this pod onto a specific node. If it is non-empty,
 the scheduler simply schedules this pod onto that node, assuming that it fits resource
 requirements.</p>
 </td>
@@ -4632,8 +4633,8 @@ Kubernetes core/v1.Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>affinity is a group of affinity scheduling rules.
-refer to <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
+<p>Contains a group of affinity scheduling rules.
+Refer to <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
 </td>
 </tr>
 <tr>
@@ -4647,9 +4648,9 @@ refer to <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-n
 </td>
 <td>
 <em>(Optional)</em>
-<p>topologySpreadConstraints describes how a group of pods ought to spread across topology
-domains. Scheduler will schedule pods in a way which abides by the constraints.
-refer to <a href="https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/">https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/</a></p>
+<p>Describes how a group of pods ought to spread across topology
+domains. The scheduler will schedule pods in a way which abides by the constraints.
+Refer to <a href="https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/">https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/</a></p>
 </td>
 </tr>
 <tr>
@@ -4661,8 +4662,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>If specified, the pod will be dispatched by specified scheduler.
-If not specified, the pod will be dispatched by default scheduler.</p>
+<p>Specifies the scheduler to dispatch the pod.
+If not specified, the pod will be dispatched by the default scheduler.</p>
 </td>
 </tr>
 </tbody>
@@ -4736,8 +4737,8 @@ that should be mounted in backup workload.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Volumes indicates the list of volumes of targeted application that should
-be mounted on the backup job.</p>
+<p>Specifies the list of volumes of targeted application that should be mounted
+on the backup workload.</p>
 </td>
 </tr>
 <tr>
@@ -4751,7 +4752,7 @@ be mounted on the backup job.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeMounts specifies the mount for the volumes specified in <code>Volumes</code> section.</p>
+<p>Specifies the mount for the volumes specified in <code>volumes</code> section.</p>
 </td>
 </tr>
 </tbody>
@@ -4806,8 +4807,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeSource describes the volume will be restored from the specified volume of the backup targetVolumes.
-required if the backup uses volume snapshot.</p>
+<p>Describes the volume that will be restored from the specified volume of the backup targetVolumes.
+This is required if the backup uses a volume snapshot.</p>
 </td>
 </tr>
 <tr>
@@ -4819,7 +4820,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>mountPath path within the restoring container at which the volume should be mounted.</p>
+<p>Specifies the path within the restoring container at which the volume should be mounted.</p>
 </td>
 </tr>
 </tbody>
@@ -4847,7 +4848,8 @@ string
 </em>
 </td>
 <td>
-<p>name is the name of the volume snapshot.</p>
+<em>(Optional)</em>
+<p>The name of the volume snapshot.</p>
 </td>
 </tr>
 <tr>
@@ -4858,7 +4860,8 @@ string
 </em>
 </td>
 <td>
-<p>contentName is the name of the volume snapshot content.</p>
+<em>(Optional)</em>
+<p>The name of the volume snapshot content.</p>
 </td>
 </tr>
 <tr>
@@ -4870,7 +4873,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeName is the name of the volume.</p>
+<p>The name of the volume.</p>
 </td>
 </tr>
 <tr>
@@ -4882,7 +4885,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>size is the size of the volume snapshot.</p>
+<p>The size of the volume snapshot.</p>
 </td>
 </tr>
 </tbody>

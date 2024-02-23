@@ -2446,7 +2446,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>formatVersion is the backup format version, including major, minor and patch version.</p>
+<p>Specifies the backup format version, which includes major, minor, and patch versions.</p>
 </td>
 </tr>
 <tr>
@@ -2460,7 +2460,7 @@ BackupPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>phase is the current state of the Backup.</p>
+<p>Indicates the current state of the backup operation.</p>
 </td>
 </tr>
 <tr>
@@ -2474,8 +2474,8 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>expiration is when this backup is eligible for garbage collection.
-&lsquo;null&rsquo; means the Backup will NOT be cleaned except delete manual.</p>
+<p>Indicates when this backup becomes eligible for garbage collection.
+A &lsquo;null&rsquo; value implies that the backup will not be cleaned up unless manually deleted.</p>
 </td>
 </tr>
 <tr>
@@ -2489,8 +2489,8 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>startTimestamp records the time a backup was started.
-The server&rsquo;s time is used for StartTimestamp.</p>
+<p>Records the time when the backup operation was started.
+The server&rsquo;s time is used for this timestamp.</p>
 </td>
 </tr>
 <tr>
@@ -2504,9 +2504,9 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>completionTimestamp records the time a backup was completed.
-Completion time is recorded even on failed backups.
-The server&rsquo;s time is used for CompletionTimestamp.</p>
+<p>Records the time when the backup operation was completed.
+This timestamp is recorded even if the backup operation fails.
+The server&rsquo;s time is used for this timestamp.</p>
 </td>
 </tr>
 <tr>
@@ -2520,7 +2520,7 @@ Kubernetes meta/v1.Duration
 </td>
 <td>
 <em>(Optional)</em>
-<p>The duration time of backup execution.
+<p>Records the duration of the backup operation.
 When converted to a string, the format is &ldquo;1h2m0.5s&rdquo;.</p>
 </td>
 </tr>
@@ -2533,8 +2533,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>totalSize is the total size of backed up data size.
-A string with capacity units in the format of &ldquo;1Gi&rdquo;, &ldquo;1Mi&rdquo;, &ldquo;1Ki&rdquo;.
+<p>Records the total size of the data backed up.
+The size is represented as a string with capacity units in the format of &ldquo;1Gi&rdquo;, &ldquo;1Mi&rdquo;, &ldquo;1Ki&rdquo;.
 If no capacity unit is specified, it is assumed to be in bytes.</p>
 </td>
 </tr>
@@ -2547,7 +2547,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>failureReason is an error that caused the backup to fail.</p>
+<p>Any error that caused the backup operation to fail.</p>
 </td>
 </tr>
 <tr>
@@ -2559,7 +2559,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>backupRepoName is the name of the backup repository.</p>
+<p>The name of the backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -2571,8 +2571,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>path is the directory inside the backup repository where the backup data is stored.
-It is an absolute path in the backup repository.</p>
+<p>The directory within the backup repository where the backup data is stored.
+This is an absolute path within the backup repository.</p>
 </td>
 </tr>
 <tr>
@@ -2584,7 +2584,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>kopiaRepoPath records the path of the Kopia repository.</p>
+<p>Records the path of the Kopia repository.</p>
 </td>
 </tr>
 <tr>
@@ -2596,8 +2596,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>persistentVolumeClaimName is the name of the persistent volume claim that
-is used to store the backup data.</p>
+<p>Records the name of the persistent volume claim used to store the backup data.</p>
 </td>
 </tr>
 <tr>
@@ -2611,8 +2610,8 @@ BackupTimeRange
 </td>
 <td>
 <em>(Optional)</em>
-<p>timeRange records the time range of backed up data, for PITR, this is the
-time range of recoverable data.</p>
+<p>Records the time range of the data backed up. For Point-in-Time Recovery (PITR),
+this is the time range of recoverable data.</p>
 </td>
 </tr>
 <tr>
@@ -2626,7 +2625,7 @@ BackupTarget
 </td>
 <td>
 <em>(Optional)</em>
-<p>target records the target information for this backup.</p>
+<p>Records the target information for this backup.</p>
 </td>
 </tr>
 <tr>
@@ -2640,7 +2639,7 @@ BackupMethod
 </td>
 <td>
 <em>(Optional)</em>
-<p>backupMethod records the backup method information for this backup.
+<p>Records the backup method information for this backup.
 Refer to BackupMethod for more details.</p>
 </td>
 </tr>
@@ -2655,7 +2654,7 @@ Refer to BackupMethod for more details.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>actions records the actions information for this backup.</p>
+<p>Records the actions status for this backup.</p>
 </td>
 </tr>
 <tr>
@@ -2669,7 +2668,7 @@ Refer to BackupMethod for more details.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeSnapshots records the volume snapshot status for the action.</p>
+<p>Records the volume snapshot status for the action.</p>
 </td>
 </tr>
 <tr>
@@ -2680,7 +2679,8 @@ Refer to BackupMethod for more details.</p>
 </em>
 </td>
 <td>
-<p>extra records the extra info for the backup.</p>
+<em>(Optional)</em>
+<p>Records any additional information for the backup.</p>
 </td>
 </tr>
 </tbody>

@@ -23,34 +23,38 @@ import (
 
 // BackupSpec defines the desired state of Backup.
 type BackupSpec struct {
-	// Which backupPolicy is applied to perform this backup.
+	// Specifies the backup policy to be applied for this backup.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupPolicyName"
 	BackupPolicyName string `json:"backupPolicyName"`
 
-	// backupMethod specifies the backup method name that is defined in backupPolicy.
+	// Specifies the backup method name that is defined in the backup policy.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupMethod"
 	BackupMethod string `json:"backupMethod"`
 
-	// deletionPolicy determines whether the backup contents stored in backup repository
-	// should be deleted when the backup custom resource is deleted.
+	// Determines whether the backup contents stored in the backup repository
+	// should be deleted when the backup custom resource(CR) is deleted.
 	// Supported values are `Retain` and `Delete`.
 	//
 	// - `Retain` means that the backup content and its physical snapshot on backup repository are kept.
 	// - `Delete` means that the backup content and its physical snapshot on backup repository are deleted.
 	//
 	// TODO: for the retain policy, we should support in the future for only deleting
-	//   the backup custom objects but retaining the backup contents in backup repository.
+	//   the backup CR but retaining the backup contents in backup repository.
 	//   The current implementation only prevent accidental deletion of backup data.
+	//
 	// +kubebuilder:validation:Enum=Delete;Retain
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Delete
 	DeletionPolicy BackupDeletionPolicy `json:"deletionPolicy,omitempty"`
 
-	// retentionPeriod determines a duration up to which the backup should be kept.
+	// Determines a duration up to which the backup should be kept.
 	// Controller will remove all backups that are older than the RetentionPeriod.
+	// If not set, the backup will be kept forever.
 	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
 	// Sample duration format:
 	//
@@ -61,13 +65,12 @@ type BackupSpec struct {
 	// - minutes: 	30m
 	//
 	// You can also combine the above durations. For example: 30d12h30m.
-	// If not set, the backup will be kept forever.
 	//
 	// +optional
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 
-	// parentBackupName determines the parent backup name for incremental or
-	// differential backup.
+	// Determines the parent backup name for incremental or differential backup.
+	//
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parentBackupName"
 	ParentBackupName string `json:"parentBackupName,omitempty"`
@@ -75,86 +78,104 @@ type BackupSpec struct {
 
 // BackupStatus defines the observed state of Backup.
 type BackupStatus struct {
-	// formatVersion is the backup format version, including major, minor and patch version.
+	// Specifies the backup format version, which includes major, minor, and patch versions.
+	//
 	// +optional
 	FormatVersion string `json:"formatVersion,omitempty"`
 
-	// phase is the current state of the Backup.
+	// Indicates the current state of the backup operation.
+	//
 	// +optional
 	Phase BackupPhase `json:"phase,omitempty"`
 
-	// expiration is when this backup is eligible for garbage collection.
-	// 'null' means the Backup will NOT be cleaned except delete manual.
+	// Indicates when this backup becomes eligible for garbage collection.
+	// A 'null' value implies that the backup will not be cleaned up unless manually deleted.
+	//
 	// +optional
 	Expiration *metav1.Time `json:"expiration,omitempty"`
 
-	// startTimestamp records the time a backup was started.
-	// The server's time is used for StartTimestamp.
+	// Records the time when the backup operation was started.
+	// The server's time is used for this timestamp.
+	//
 	// +optional
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 
-	// completionTimestamp records the time a backup was completed.
-	// Completion time is recorded even on failed backups.
-	// The server's time is used for CompletionTimestamp.
+	// Records the time when the backup operation was completed.
+	// This timestamp is recorded even if the backup operation fails.
+	// The server's time is used for this timestamp.
+	//
 	// +optional
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
-	// The duration time of backup execution.
+	// Records the duration of the backup operation.
 	// When converted to a string, the format is "1h2m0.5s".
+	//
 	// +optional
 	Duration *metav1.Duration `json:"duration,omitempty"`
 
-	// totalSize is the total size of backed up data size.
-	// A string with capacity units in the format of "1Gi", "1Mi", "1Ki".
+	// Records the total size of the data backed up.
+	// The size is represented as a string with capacity units in the format of "1Gi", "1Mi", "1Ki".
 	// If no capacity unit is specified, it is assumed to be in bytes.
+	//
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
 
-	// failureReason is an error that caused the backup to fail.
+	// Any error that caused the backup operation to fail.
+	//
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
-	// backupRepoName is the name of the backup repository.
+	// The name of the backup repository.
+	//
 	// +optional
 	BackupRepoName string `json:"backupRepoName,omitempty"`
 
-	// path is the directory inside the backup repository where the backup data is stored.
-	// It is an absolute path in the backup repository.
+	// The directory within the backup repository where the backup data is stored.
+	// This is an absolute path within the backup repository.
+	//
 	// +optional
 	Path string `json:"path,omitempty"`
 
-	// kopiaRepoPath records the path of the Kopia repository.
+	// Records the path of the Kopia repository.
+	//
 	// +optional
 	KopiaRepoPath string `json:"kopiaRepoPath,omitempty"`
 
-	// persistentVolumeClaimName is the name of the persistent volume claim that
-	// is used to store the backup data.
+	// Records the name of the persistent volume claim used to store the backup data.
+	//
 	// +optional
 	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"`
 
-	// timeRange records the time range of backed up data, for PITR, this is the
-	// time range of recoverable data.
+	// Records the time range of the data backed up. For Point-in-Time Recovery (PITR),
+	// this is the time range of recoverable data.
+	//
 	// +optional
 	TimeRange *BackupTimeRange `json:"timeRange,omitempty"`
 
-	// target records the target information for this backup.
+	// Records the target information for this backup.
+	//
 	// +optional
 	Target *BackupTarget `json:"target,omitempty"`
 
-	// backupMethod records the backup method information for this backup.
+	// Records the backup method information for this backup.
 	// Refer to BackupMethod for more details.
+	//
 	// +optional
 	BackupMethod *BackupMethod `json:"backupMethod,omitempty"`
 
-	// actions records the actions information for this backup.
+	// Records the actions status for this backup.
+	//
 	// +optional
 	Actions []ActionStatus `json:"actions,omitempty"`
 
-	// volumeSnapshots records the volume snapshot status for the action.
+	// Records the volume snapshot status for the action.
+	//
 	// +optional
 	VolumeSnapshots []VolumeSnapshotStatus `json:"volumeSnapshots,omitempty"`
 
-	// extra records the extra info for the backup.
+	// Records any additional information for the backup.
+	//
+	// +optional
 	Extras []map[string]string `json:"extras,omitempty"`
 }
 

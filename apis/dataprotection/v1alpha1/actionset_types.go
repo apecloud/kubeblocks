@@ -160,12 +160,12 @@ type RestoreActionSpec struct {
 
 // ActionSpec defines an action that should be executed. Only one of the fields may be set.
 type ActionSpec struct {
-	// Indicates that the action should be executed using the pod's exec API within a container.
+	// Specifies that the action should be executed using the pod's exec API within a container.
 	//
 	// +optional
 	Exec *ExecActionSpec `json:"exec,omitempty"`
 
-	// Indicates that the action should be executed by a Kubernetes Job.
+	// Specifies that the action should be executed by a Kubernetes Job.
 	//
 	// +optional
 	Job *JobActionSpec `json:"job,omitempty"`
@@ -174,22 +174,26 @@ type ActionSpec struct {
 // ExecActionSpec is an action that uses the pod exec API to execute a command in a container
 // in a pod.
 type ExecActionSpec struct {
-	// container is the container in the pod where the command should be executed.
-	// If not specified, the pod's first container is used.
+	// Specifies the container within the pod where the command should be executed.
+	// If not specified, the first container in the pod is used by default.
+	//
 	// +optional
 	Container string `json:"container,omitempty"`
 
-	// Command is the command and arguments to execute.
+	// Defines the command and arguments to be executed.
+	//
 	// +kubebuilder:validation:MinItems=1
 	Command []string `json:"command"`
 
-	// OnError specifies how should behave if it encounters an error executing this action.
+	// Indicates how to behave if an error is encountered during the execution of this action.
+	//
 	// +optional
 	// +kubebuilder:default=Fail
 	OnError ActionErrorMode `json:"onError,omitempty"`
 
-	// Timeout defines the maximum amount of time should wait for the hook to complete before
+	// Specifies the maximum duration to wait for the hook to complete before
 	// considering the execution a failure.
+	//
 	// +optional
 	Timeout metav1.Duration `json:"timeout,omitempty"`
 }
@@ -198,16 +202,16 @@ type ExecActionSpec struct {
 type JobActionSpec struct {
 	BaseJobActionSpec `json:",inline"`
 
-	// runOnTargetPodNode specifies whether to run the job workload on the
-	// target pod node. If backup container should mount the target pod's
-	// volumes, this field should be set to true. otherwise the target pod's
-	// volumes will be ignored.
+	// Determines whether to run the job workload on the target pod node.
+	// If the backup container needs to mount the target pod's volumes, this field
+	// should be set to true. Otherwise, the target pod's volumes will be ignored.
+	//
 	// +optional
 	// +kubebuilder:default=false
 	RunOnTargetPodNode *bool `json:"runOnTargetPodNode,omitempty"`
 
-	// OnError specifies how should behave if it encounters an error executing
-	// this action.
+	// Indicates how to behave if an error is encountered during the execution of this action.
+	//
 	// +optional
 	// +kubebuilder:default=Fail
 	OnError ActionErrorMode `json:"onError,omitempty"`
@@ -215,25 +219,28 @@ type JobActionSpec struct {
 
 // BaseJobActionSpec is an action that creates a Kubernetes Job to execute a command.
 type BaseJobActionSpec struct {
-	// image specifies the image of backup container.
+	// Specifies the image of the backup container.
+	//
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// command specifies the commands to back up the volume data.
+	// Defines the commands to back up the volume data.
+	//
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
 }
 
-// ActionErrorMode defines how should treat an error from an action.
-// TODO: now, only support Fail mode, will support Continue mode in the future.
+// ActionErrorMode defines how to handle an error from an action.
+// Currently, only the Fail mode is supported, but the Continue mode will be supported in the future.
+//
 // +kubebuilder:validation:Enum=Continue;Fail
 type ActionErrorMode string
 
 const (
-	// ActionErrorModeContinue means that an error from an action is acceptable.
+	// ActionErrorModeContinue signifies that an error from an action is acceptable and can be ignored.
 	ActionErrorModeContinue ActionErrorMode = "Continue"
 
-	// ActionErrorModeFail means that an error from an action is problematic.
+	// ActionErrorModeFail signifies that an error from an action is problematic and should be treated as a failure.
 	ActionErrorModeFail ActionErrorMode = "Fail"
 )
 

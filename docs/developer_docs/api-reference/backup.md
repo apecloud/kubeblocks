@@ -97,14 +97,14 @@ BackupType
 </em>
 </td>
 <td>
-<p>backupType specifies the backup type, supported values:</p>
+<p>Specifies the backup type. Supported values include:</p>
 <ul>
-<li><code>Full</code> means full backup.</li>
-<li><code>Incremental</code> means back up data that have changed since the last backup (full or incremental).</li>
-<li><code>Differential</code> means back up data that have changed since the last full backup.</li>
-<li><code>Continuous</code> will back up the transaction log continuously, the PITR (Point in Time Recovery)
-can be performed based on the continuous backup and full backup.</li>
+<li><code>Full</code> for a full backup.</li>
+<li><code>Incremental</code> back up data that have changed since the last backup (either full or incremental).</li>
+<li><code>Differential</code> back up data that has changed since the last full backup.</li>
+<li><code>Continuous</code> back up transaction logs continuously, such as MySQL binlog, PostgreSQL WAL, etc.</li>
 </ul>
+<p>Continuous backup is essential for implementing Point-in-Time Recovery (PITR).</p>
 </td>
 </tr>
 <tr>
@@ -118,7 +118,7 @@ can be performed based on the continuous backup and full backup.</li>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of environment variables to set in the container.</p>
+<p>Specifies a list of environment variables to be set in the container.</p>
 </td>
 </tr>
 <tr>
@@ -132,12 +132,12 @@ can be performed based on the continuous backup and full backup.</li>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of sources to populate environment variables in the container.
-The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-will be reported as an event when the container is starting. When a key exists in multiple
-sources, the value associated with the last source will take precedence.
-Values defined by an Env with a duplicate key will take precedence.
-Cannot be updated.</p>
+<p>Specifies a list of sources to populate environment variables in the container.
+The keys within a source must be a C_IDENTIFIER. Any invalid keys will be
+reported as an event when the container starts. If a key exists in multiple
+sources, the value from the last source will take precedence. Any values
+defined by an Env with a duplicate key will take precedence.</p>
+<p>This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -151,7 +151,7 @@ BackupActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>backup specifies the backup action.</p>
+<p>Specifies the backup action.</p>
 </td>
 </tr>
 <tr>
@@ -165,7 +165,7 @@ RestoreActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>restore specifies the restore action.</p>
+<p>Specifies the restore action.</p>
 </td>
 </tr>
 </table>
@@ -248,7 +248,7 @@ string
 </em>
 </td>
 <td>
-<p>Which backupPolicy is applied to perform this backup.</p>
+<p>Specifies the backup policy to be applied for this backup.</p>
 </td>
 </tr>
 <tr>
@@ -259,7 +259,7 @@ string
 </em>
 </td>
 <td>
-<p>backupMethod specifies the backup method name that is defined in backupPolicy.</p>
+<p>Specifies the backup method name that is defined in the backup policy.</p>
 </td>
 </tr>
 <tr>
@@ -272,14 +272,14 @@ BackupDeletionPolicy
 </em>
 </td>
 <td>
-<p>deletionPolicy determines whether the backup contents stored in backup repository
-should be deleted when the backup custom resource is deleted.
+<p>Determines whether the backup contents stored in the backup repository
+should be deleted when the backup custom resource(CR) is deleted.
 Supported values are <code>Retain</code> and <code>Delete</code>.</p>
 <ul>
 <li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.</li>
 <li><code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</li>
 </ul>
-<p>the backup custom objects but retaining the backup contents in backup repository.
+<p>the backup CR but retaining the backup contents in backup repository.
 The current implementation only prevent accidental deletion of backup data.</p>
 </td>
 </tr>
@@ -294,8 +294,9 @@ RetentionPeriod
 </td>
 <td>
 <em>(Optional)</em>
-<p>retentionPeriod determines a duration up to which the backup should be kept.
+<p>Determines a duration up to which the backup should be kept.
 Controller will remove all backups that are older than the RetentionPeriod.
+If not set, the backup will be kept forever.
 For example, RetentionPeriod of <code>30d</code> will keep only the backups of last 30 days.
 Sample duration format:</p>
 <ul>
@@ -305,8 +306,7 @@ Sample duration format:</p>
 <li>hours: 	12h</li>
 <li>minutes: 	30m</li>
 </ul>
-<p>You can also combine the above durations. For example: 30d12h30m.
-If not set, the backup will be kept forever.</p>
+<p>You can also combine the above durations. For example: 30d12h30m.</p>
 </td>
 </tr>
 <tr>
@@ -318,8 +318,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>parentBackupName determines the parent backup name for incremental or
-differential backup.</p>
+<p>Determines the parent backup name for incremental or differential backup.</p>
 </td>
 </tr>
 </table>
@@ -985,7 +984,8 @@ tool for accessing the storage.</p>
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ExecActionSpec">ExecActionSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.JobActionSpec">JobActionSpec</a>)
 </p>
 <div>
-<p>ActionErrorMode defines how should treat an error from an action.</p>
+<p>ActionErrorMode defines how to handle an error from an action.
+Currently, only the Fail mode is supported, but the Continue mode will be supported in the future.</p>
 </div>
 <table>
 <thead>
@@ -995,10 +995,10 @@ tool for accessing the storage.</p>
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Continue&#34;</p></td>
-<td><p>ActionErrorModeContinue means that an error from an action is acceptable.</p>
+<td><p>ActionErrorModeContinue signifies that an error from an action is acceptable and can be ignored.</p>
 </td>
 </tr><tr><td><p>&#34;Fail&#34;</p></td>
-<td><p>ActionErrorModeFail means that an error from an action is problematic.</p>
+<td><p>ActionErrorModeFail signifies that an error from an action is problematic and should be treated as a failure.</p>
 </td>
 </tr></tbody>
 </table>
@@ -1057,14 +1057,14 @@ BackupType
 </em>
 </td>
 <td>
-<p>backupType specifies the backup type, supported values:</p>
+<p>Specifies the backup type. Supported values include:</p>
 <ul>
-<li><code>Full</code> means full backup.</li>
-<li><code>Incremental</code> means back up data that have changed since the last backup (full or incremental).</li>
-<li><code>Differential</code> means back up data that have changed since the last full backup.</li>
-<li><code>Continuous</code> will back up the transaction log continuously, the PITR (Point in Time Recovery)
-can be performed based on the continuous backup and full backup.</li>
+<li><code>Full</code> for a full backup.</li>
+<li><code>Incremental</code> back up data that have changed since the last backup (either full or incremental).</li>
+<li><code>Differential</code> back up data that has changed since the last full backup.</li>
+<li><code>Continuous</code> back up transaction logs continuously, such as MySQL binlog, PostgreSQL WAL, etc.</li>
 </ul>
+<p>Continuous backup is essential for implementing Point-in-Time Recovery (PITR).</p>
 </td>
 </tr>
 <tr>
@@ -1078,7 +1078,7 @@ can be performed based on the continuous backup and full backup.</li>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of environment variables to set in the container.</p>
+<p>Specifies a list of environment variables to be set in the container.</p>
 </td>
 </tr>
 <tr>
@@ -1092,12 +1092,12 @@ can be performed based on the continuous backup and full backup.</li>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of sources to populate environment variables in the container.
-The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-will be reported as an event when the container is starting. When a key exists in multiple
-sources, the value associated with the last source will take precedence.
-Values defined by an Env with a duplicate key will take precedence.
-Cannot be updated.</p>
+<p>Specifies a list of sources to populate environment variables in the container.
+The keys within a source must be a C_IDENTIFIER. Any invalid keys will be
+reported as an event when the container starts. If a key exists in multiple
+sources, the value from the last source will take precedence. Any values
+defined by an Env with a duplicate key will take precedence.</p>
+<p>This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -1111,7 +1111,7 @@ BackupActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>backup specifies the backup action.</p>
+<p>Specifies the backup action.</p>
 </td>
 </tr>
 <tr>
@@ -1125,7 +1125,7 @@ RestoreActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>restore specifies the restore action.</p>
+<p>Specifies the restore action.</p>
 </td>
 </tr>
 </tbody>
@@ -1157,7 +1157,7 @@ Phase
 </td>
 <td>
 <em>(Optional)</em>
-<p>phase - in list of [Available,Unavailable]</p>
+<p>Indicates the phase of the ActionSet. This can be either &lsquo;Available&rsquo; or &lsquo;Unavailable&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -1169,7 +1169,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>A human-readable message indicating details about why the ActionSet is in this phase.</p>
+<p>Provides a human-readable explanation detailing the reason for the current phase of the ActionSet.</p>
 </td>
 </tr>
 <tr>
@@ -1181,7 +1181,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>generation number</p>
+<p>Represents the generation number that has been observed by the controller.</p>
 </td>
 </tr>
 </tbody>
@@ -1213,7 +1213,7 @@ ExecActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>exec specifies the action should be executed by the pod exec API in a container.</p>
+<p>Specifies that the action should be executed using the pod&rsquo;s exec API within a container.</p>
 </td>
 </tr>
 <tr>
@@ -1227,7 +1227,7 @@ JobActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>job specifies the action should be executed by a Kubernetes Job.</p>
+<p>Specifies that the action should be executed by a Kubernetes Job.</p>
 </td>
 </tr>
 </tbody>
@@ -1443,7 +1443,7 @@ BackupDataActionSpec
 </em>
 </td>
 <td>
-<p>backupData specifies the backup data action.</p>
+<p>Represents the action to be performed for backing up data.</p>
 </td>
 </tr>
 <tr>
@@ -1457,7 +1457,7 @@ BackupDataActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>preBackup specifies a hook that should be executed before the backup.</p>
+<p>Represents a set of actions that should be executed before the backup process begins.</p>
 </td>
 </tr>
 <tr>
@@ -1471,7 +1471,7 @@ BackupDataActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>postBackup specifies a hook that should be executed after the backup.</p>
+<p>Represents a set of actions that should be executed after the backup process has completed.</p>
 </td>
 </tr>
 <tr>
@@ -1485,8 +1485,8 @@ BaseJobActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>preDelete defines that custom deletion action which can be executed before executing the built-in deletion action.
-note that preDelete action job will ignore the env/envFrom.</p>
+<p>Represents a custom deletion action that can be executed before the built-in deletion action.
+Note: The preDelete action job will ignore the env/envFrom.</p>
 </td>
 </tr>
 </tbody>
@@ -1533,7 +1533,8 @@ SyncProgress
 </td>
 <td>
 <em>(Optional)</em>
-<p>syncProgress specifies whether to sync the backup progress and its interval seconds.</p>
+<p>Determines if the backup progress should be synchronized and the interval
+for synchronization in seconds.</p>
 </td>
 </tr>
 </tbody>
@@ -2345,7 +2346,7 @@ string
 </em>
 </td>
 <td>
-<p>Which backupPolicy is applied to perform this backup.</p>
+<p>Specifies the backup policy to be applied for this backup.</p>
 </td>
 </tr>
 <tr>
@@ -2356,7 +2357,7 @@ string
 </em>
 </td>
 <td>
-<p>backupMethod specifies the backup method name that is defined in backupPolicy.</p>
+<p>Specifies the backup method name that is defined in the backup policy.</p>
 </td>
 </tr>
 <tr>
@@ -2369,14 +2370,14 @@ BackupDeletionPolicy
 </em>
 </td>
 <td>
-<p>deletionPolicy determines whether the backup contents stored in backup repository
-should be deleted when the backup custom resource is deleted.
+<p>Determines whether the backup contents stored in the backup repository
+should be deleted when the backup custom resource(CR) is deleted.
 Supported values are <code>Retain</code> and <code>Delete</code>.</p>
 <ul>
 <li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.</li>
 <li><code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</li>
 </ul>
-<p>the backup custom objects but retaining the backup contents in backup repository.
+<p>the backup CR but retaining the backup contents in backup repository.
 The current implementation only prevent accidental deletion of backup data.</p>
 </td>
 </tr>
@@ -2391,8 +2392,9 @@ RetentionPeriod
 </td>
 <td>
 <em>(Optional)</em>
-<p>retentionPeriod determines a duration up to which the backup should be kept.
+<p>Determines a duration up to which the backup should be kept.
 Controller will remove all backups that are older than the RetentionPeriod.
+If not set, the backup will be kept forever.
 For example, RetentionPeriod of <code>30d</code> will keep only the backups of last 30 days.
 Sample duration format:</p>
 <ul>
@@ -2402,8 +2404,7 @@ Sample duration format:</p>
 <li>hours: 	12h</li>
 <li>minutes: 	30m</li>
 </ul>
-<p>You can also combine the above durations. For example: 30d12h30m.
-If not set, the backup will be kept forever.</p>
+<p>You can also combine the above durations. For example: 30d12h30m.</p>
 </td>
 </tr>
 <tr>
@@ -2415,8 +2416,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>parentBackupName determines the parent backup name for incremental or
-differential backup.</p>
+<p>Determines the parent backup name for incremental or differential backup.</p>
 </td>
 </tr>
 </tbody>
@@ -2864,7 +2864,7 @@ string
 </em>
 </td>
 <td>
-<p>image specifies the image of backup container.</p>
+<p>Specifies the image of the backup container.</p>
 </td>
 </tr>
 <tr>
@@ -2875,7 +2875,7 @@ string
 </em>
 </td>
 <td>
-<p>command specifies the commands to back up the volume data.</p>
+<p>Defines the commands to back up the volume data.</p>
 </td>
 </tr>
 </tbody>
@@ -3014,8 +3014,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>container is the container in the pod where the command should be executed.
-If not specified, the pod&rsquo;s first container is used.</p>
+<p>Specifies the container within the pod where the command should be executed.
+If not specified, the first container in the pod is used by default.</p>
 </td>
 </tr>
 <tr>
@@ -3026,7 +3026,7 @@ If not specified, the pod&rsquo;s first container is used.</p>
 </em>
 </td>
 <td>
-<p>Command is the command and arguments to execute.</p>
+<p>Defines the command and arguments to be executed.</p>
 </td>
 </tr>
 <tr>
@@ -3040,7 +3040,7 @@ ActionErrorMode
 </td>
 <td>
 <em>(Optional)</em>
-<p>OnError specifies how should behave if it encounters an error executing this action.</p>
+<p>Indicates how to behave if an error is encountered during the execution of this action.</p>
 </td>
 </tr>
 <tr>
@@ -3054,7 +3054,7 @@ Kubernetes meta/v1.Duration
 </td>
 <td>
 <em>(Optional)</em>
-<p>Timeout defines the maximum amount of time should wait for the hook to complete before
+<p>Specifies the maximum duration to wait for the hook to complete before
 considering the execution a failure.</p>
 </td>
 </tr>
@@ -3202,10 +3202,9 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>runOnTargetPodNode specifies whether to run the job workload on the
-target pod node. If backup container should mount the target pod&rsquo;s
-volumes, this field should be set to true. otherwise the target pod&rsquo;s
-volumes will be ignored.</p>
+<p>Determines whether to run the job workload on the target pod node.
+If the backup container needs to mount the target pod&rsquo;s volumes, this field
+should be set to true. Otherwise, the target pod&rsquo;s volumes will be ignored.</p>
 </td>
 </tr>
 <tr>
@@ -3219,8 +3218,7 @@ ActionErrorMode
 </td>
 <td>
 <em>(Optional)</em>
-<p>OnError specifies how should behave if it encounters an error executing
-this action.</p>
+<p>Indicates how to behave if an error is encountered during the execution of this action.</p>
 </td>
 </tr>
 </tbody>
@@ -3729,7 +3727,7 @@ JobActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>prepareData specifies the action to prepare data.</p>
+<p>Specifies the action required to prepare data for restoration.</p>
 </td>
 </tr>
 <tr>
@@ -3743,7 +3741,7 @@ JobActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>postReady specifies the action to execute after the data is ready.</p>
+<p>Specifies the actions that should be executed after the data has been prepared and is ready for restoration.</p>
 </td>
 </tr>
 </tbody>
@@ -4693,9 +4691,9 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>enabled specifies whether to sync the backup progress. If enabled,
-a sidecar container will be created to sync the backup progress to the
-Backup CR status.</p>
+<p>Determines if the backup progress should be synchronized. If set to true,
+a sidecar container will be instantiated to synchronize the backup progress with the
+Backup Custom Resource (CR) status.</p>
 </td>
 </tr>
 <tr>
@@ -4707,7 +4705,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>intervalSeconds specifies the interval seconds to sync the backup progress.</p>
+<p>Defines the interval in seconds for synchronizing the backup progress.</p>
 </td>
 </tr>
 </tbody>

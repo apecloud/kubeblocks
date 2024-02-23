@@ -1236,20 +1236,6 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
-<code>hostNetwork</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
-HostNetwork
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the host-network capability and resources.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
@@ -1992,6 +1978,35 @@ OpsDefinitionSpec
 <table>
 <tr>
 <td>
+<code>preConditions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PreCondition">
+[]PreCondition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the preconditions that must be met to run the actions for the operation.
+if set, it will check the condition before the component run this operation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetPodTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.TargetPodTemplate">
+[]TargetPodTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the targetPodTemplate to be referenced by the action.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>componentDefinitionRefs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionRef">
@@ -2000,23 +2015,10 @@ OpsDefinitionSpec
 </em>
 </td>
 <td>
-<p>Specifies the types of componentDefinitions that are supported by the operation.
-It can refer to some variables of the componentDefinition.
-If set, any component that does not meet the conditions will be intercepted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>varsRef</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VarsRef">
-VarsRef
-</a>
-</em>
-</td>
-<td>
 <em>(Optional)</em>
-<p>Defines the environment variables that need to be referenced from the target component pod, and will be injected into the job&rsquo;s containers.</p>
+<p>Specifies the types of componentDefinitions supported by the operation.
+It can reference certain variables of the componentDefinition.
+If set, any component not meeting these conditions will be intercepted.</p>
 </td>
 </tr>
 <tr>
@@ -2035,29 +2037,15 @@ ParametersSchema
 </tr>
 <tr>
 <td>
-<code>jobSpec</code><br/>
+<code>actions</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jobspec-v1-batch">
-Kubernetes batch/v1.JobSpec
+<a href="#apps.kubeblocks.io/v1alpha1.OpsAction">
+[]OpsAction
 </a>
 </em>
 </td>
 <td>
-<p>Describes the job specification for the operation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>preConditions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PreCondition">
-[]PreCondition
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the preconditions that must be met to run the job for the operation.</p>
+<p>The actions to be executed in the opsRequest are performed sequentially.</p>
 </td>
 </tr>
 </table>
@@ -5110,7 +5098,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.</p>
@@ -6001,6 +5989,75 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.CompletionProbe">CompletionProbe
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsResourceModifierAction">OpsResourceModifierAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>initialDelaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of seconds to wait after the resource has been patched before initiating completion probes.
+The default value is 5 seconds, with a minimum value of 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>timeoutSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the number of seconds after which the probe times out.
+The default value is 60 seconds, with a minimum value of 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>periodSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the frequency (in seconds) at which the probe should be performed.
+The default value is 5 seconds, with a minimum value of 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>matchExpressions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MatchExpressions">
+MatchExpressions
+</a>
+</em>
+</td>
+<td>
+<p>Executes expressions regularly, based on the value of PeriodSeconds, to determine if the action has been completed.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentClass">ComponentClass
 </h3>
 <p>
@@ -6451,21 +6508,6 @@ If provided, the service name and ports will be mapped to the job environment va
 Note that the portName will replace the characters &lsquo;-&rsquo; with &lsquo;_&rsquo; and convert to uppercase.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>varsRef</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VarsRef">
-VarsRef
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the environment variables that need to be referenced from the target component pod and will be injected into the job&rsquo;s containers.
-If this field is set, the global &ldquo;varsRef&rdquo; will be ignored.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec
@@ -6596,20 +6638,6 @@ This field is immutable.</p>
 <p>Defines the persistent volumes needed by the component.
 Users are responsible for providing these volumes when creating a component instance.
 This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>hostNetwork</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
-HostNetwork
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the host-network capability and resources.</p>
 </td>
 </tr>
 <tr>
@@ -9287,49 +9315,6 @@ ConsensusMember
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVars">PodVars</a>)
-</p>
-<div>
-<p>ContainerVars defines the vars can be referenced from a Container.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The name of the container.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>port</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.NamedVar">
-NamedVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Container port to reference.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CredentialVar">CredentialVar
 </h3>
 <p>
@@ -9527,6 +9512,48 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsSpec">CustomOpsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the unique identifier of the cluster component</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Parameter">
+[]Parameter
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the parameters for this operation as declared in the opsDefinition.spec.parametersSchema.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CustomOpsSpec">CustomOpsSpec
 </h3>
 <p>
@@ -9544,17 +9571,6 @@ string
 <tbody>
 <tr>
 <td>
-<code>componentName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Refers to the name of the cluster component.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>opsDefinitionRef</code><br/>
 <em>
 string
@@ -9566,16 +9582,34 @@ string
 </tr>
 <tr>
 <td>
-<code>params</code><br/>
+<code>parallelism</code><br/>
 <em>
-[]string
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the input for this operation as declared in the opsDefinition.spec.parametersSchema.
-It will create corresponding jobs for each array element.
-If the param type is an array, the format must be &ldquo;v1,v2,v3&rdquo;.</p>
+<p>Defines the execution concurrency. By default, all incoming Components will be executed simultaneously.
+The value can be an absolute number (e.g., 5) or a percentage of desired components (e.g., 10%).
+The absolute number is calculated from the percentage by rounding up.
+For instance, if the percentage value is 10% and the components length is 1,
+the calculated number will be rounded up to 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">
+[]CustomOpsComponent
+</a>
+</em>
+</td>
+<td>
+<p>Defines which components need to perform the actions defined by this OpsDefinition.
+At least one component is required. The components are identified by their name and can be merged or retained.</p>
 </td>
 </tr>
 </tbody>
@@ -10000,7 +10034,7 @@ If set to Enable, the corresponding service will be exposed. Conversely, if set 
 <h3 id="apps.kubeblocks.io/v1alpha1.FailurePolicyType">FailurePolicyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsAction">OpsAction</a>)
 </p>
 <div>
 <p>FailurePolicyType specifies the type of failure policy.</p>
@@ -10426,95 +10460,6 @@ will select from NodeAssignment.</li>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>containerPorts</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkContainerPort">
-[]HostNetworkContainerPort
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The list of container ports that are required by the component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dnsPolicy</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#dnspolicy-v1-core">
-Kubernetes core/v1.DNSPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Set DNS policy for the component.
-Defaults to &ldquo;ClusterFirst&rdquo;.
-Valid values are &lsquo;ClusterFirstWithHostNet&rsquo;, &lsquo;ClusterFirst&rsquo;, &lsquo;Default&rsquo; or &lsquo;None&rsquo;.
-DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
-To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to &lsquo;ClusterFirstWithHostNet&rsquo;.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkContainerPort">HostNetworkContainerPort
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>container</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Container specifies the target container within the pod.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ports</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<p>Ports are named container ports within the specified container.
-These container ports must be defined in the container for proper port allocation.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.IniConfig">IniConfig
 </h3>
 <p>
@@ -10612,6 +10557,56 @@ It is required when the issuer is set to UserProvided.</p>
 <td><p>IssuerUserProvided indicates that the user has provided their own CA-signed certificates.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.JsonPatchOperation">JsonPatchOperation
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsResourceModifierAction">OpsResourceModifierAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>op</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the type of JSON patch operation. It supports the following values: &lsquo;add&rsquo;, &lsquo;remove&rsquo;, &lsquo;replace&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>path</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the json patch path.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the value to be used in the JSON patch operation.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.KBAccountType">KBAccountType
 (<code>byte</code> alias)</h3>
@@ -10918,6 +10913,52 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MatchExpressions">MatchExpressions
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CompletionProbe">CompletionProbe</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>failure</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a failure condition for an action using a Go template expression.
+Should evaluate to either <code>true</code> or <code>false</code>.
+The current resource object is parsed into the Go template.
+for example, you can use &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>success</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines a success condition for an action using a Go template expression.
+Should evaluate to either <code>true</code> or <code>false</code>.
+The current resource object is parsed into the Go template.
+for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.MemoryConstraint">MemoryConstraint
 </h3>
 <p>
@@ -11059,7 +11100,7 @@ This field is only valid when BuiltIn is set to false.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 </div>
@@ -11097,6 +11138,107 @@ VarOption
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.OpsAction">OpsAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionSpec">OpsDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>action name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failurePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.FailurePolicyType">
+FailurePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>failurePolicy is the failure policy of the action. valid values Fail and Ignore.
+- Fail: if the action failed, the opsRequest will be failed.
+- Ignore: opsRequest will ignore the failure if the action is failed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the parameter of the ParametersSchema.
+The parameter will be used in the action.
+If it is a &lsquo;workload&rsquo; and &lsquo;exec&rsquo; Action, they will be injected into the corresponding environment variable.
+If it is a &lsquo;resourceModifier&rsquo; Action, parameter can be referenced using $() in completionProbe.matchExpressions and JsonPatches[*].Value.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>workload</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OpsWorkloadAction">
+OpsWorkloadAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the workload action and a corresponding workload will be created to execute this action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>exec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OpsExecAction">
+OpsExecAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the exec action. This will call the kubectl exec interface.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resourceModifier</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OpsResourceModifierAction">
+OpsResourceModifierAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the resource modifier to update the custom resource.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsDefinitionSpec">OpsDefinitionSpec
 </h3>
 <p>
@@ -11115,6 +11257,35 @@ VarOption
 <tbody>
 <tr>
 <td>
+<code>preConditions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PreCondition">
+[]PreCondition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the preconditions that must be met to run the actions for the operation.
+if set, it will check the condition before the component run this operation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetPodTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.TargetPodTemplate">
+[]TargetPodTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the targetPodTemplate to be referenced by the action.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>componentDefinitionRefs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionRef">
@@ -11123,23 +11294,10 @@ VarOption
 </em>
 </td>
 <td>
-<p>Specifies the types of componentDefinitions that are supported by the operation.
-It can refer to some variables of the componentDefinition.
-If set, any component that does not meet the conditions will be intercepted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>varsRef</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VarsRef">
-VarsRef
-</a>
-</em>
-</td>
-<td>
 <em>(Optional)</em>
-<p>Defines the environment variables that need to be referenced from the target component pod, and will be injected into the job&rsquo;s containers.</p>
+<p>Specifies the types of componentDefinitions supported by the operation.
+It can reference certain variables of the componentDefinition.
+If set, any component not meeting these conditions will be intercepted.</p>
 </td>
 </tr>
 <tr>
@@ -11158,29 +11316,15 @@ ParametersSchema
 </tr>
 <tr>
 <td>
-<code>jobSpec</code><br/>
+<code>actions</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jobspec-v1-batch">
-Kubernetes batch/v1.JobSpec
+<a href="#apps.kubeblocks.io/v1alpha1.OpsAction">
+[]OpsAction
 </a>
 </em>
 </td>
 <td>
-<p>Describes the job specification for the operation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>preConditions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PreCondition">
-[]PreCondition
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the preconditions that must be met to run the job for the operation.</p>
+<p>The actions to be executed in the opsRequest are performed sequentially.</p>
 </td>
 </tr>
 </tbody>
@@ -11245,7 +11389,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsEnvVar">OpsEnvVar
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarsRef">VarsRef</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.TargetPodTemplate">TargetPodTemplate</a>)
 </p>
 <div>
 </div>
@@ -11279,6 +11423,70 @@ OpsVarSource
 </td>
 <td>
 <p>Defines the source for the variable&rsquo;s value.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.OpsExecAction">OpsExecAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsAction">OpsAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>targetPodTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refers to the spec.targetPodTemplates. Defines the target pods that need to execute exec actions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backoffLimit</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of retries before marking the action as failed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>command</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>The command to execute.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>containerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the container in the target pod to execute the command.
+If not set, the first container is used.</p>
 </td>
 </tr>
 </tbody>
@@ -11442,6 +11650,20 @@ Kubernetes meta/v1.Time
 <td>
 <em>(Optional)</em>
 <p>Indicates the last time the component phase transitioned to Failed or Abnormal.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preCheck</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PreCheckResult">
+PreCheckResult
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the outcome of the preConditions check for the opsRequest. This result is crucial for determining the next steps in the operation.</p>
 </td>
 </tr>
 <tr>
@@ -11860,6 +12082,17 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponent
 </tr>
 <tr>
 <td>
+<code>extras</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>A collection of additional key-value pairs that provide supplementary information for the opsRequest.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>startTimestamp</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
@@ -11982,6 +12215,62 @@ string
 </td>
 <td>
 <p>A reference to the volumeClaimTemplate name from the cluster components.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.OpsResourceModifierAction">OpsResourceModifierAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsAction">OpsAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>resource</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.TypedObjectRef">
+TypedObjectRef
+</a>
+</em>
+</td>
+<td>
+<p>Refers to the Kubernetes objects that are required to be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>jsonPatches</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.JsonPatchOperation">
+[]JsonPatchOperation
+</a>
+</em>
+</td>
+<td>
+<p>Defines the set of patches that are used to perform updates on the resource object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>completionProbe</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.CompletionProbe">
+CompletionProbe
+</a>
+</em>
+</td>
+<td>
+<p>Provides a method to check if the action has been completed.</p>
 </td>
 </tr>
 </tbody>
@@ -12166,6 +12455,136 @@ EnvVarRef
 <td>
 <p>Specifies a reference to a specific environment variable within a container.
 Used to specify the source of the variable, which can be either &ldquo;env&rdquo; or &ldquo;envFrom&rdquo;.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.OpsWorkloadAction">OpsWorkloadAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsAction">OpsAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OpsWorkloadType">
+OpsWorkloadType
+</a>
+</em>
+</td>
+<td>
+<p>Defines the workload type of the action. Valid values include &ldquo;Job&rdquo; and &ldquo;Pod&rdquo;.
+&ldquo;Job&rdquo; creates a job to execute the action.
+&ldquo;Pod&rdquo; creates a pod to execute the action. Note that unlike jobs, if a pod is manually deleted, it will not consume backoffLimit times.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetPodTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refers to the spec.targetPodTemplates.
+This field defines the target pod for the current action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backoffLimit</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of retries before marking the action as failed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podSpec</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podspec-v1-core">
+Kubernetes core/v1.PodSpec
+</a>
+</em>
+</td>
+<td>
+<p>Represents the pod spec of the workload.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.OpsWorkloadType">OpsWorkloadType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsWorkloadAction">OpsWorkloadAction</a>)
+</p>
+<div>
+<p>OpsWorkloadType policy after action failure.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Job&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Pod&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.Parameter">Parameter
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the identifier of the parameter as defined in the OpsDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Holds the data associated with the parameter.
+If the parameter type is an array, the format should be &ldquo;v1,v2,v3&rdquo;.</p>
 </td>
 </tr>
 </tbody>
@@ -12539,13 +12958,13 @@ the rules are met.</p>
 </td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PodSelectionStrategy">PodSelectionStrategy
+<h3 id="apps.kubeblocks.io/v1alpha1.PodAvailabilityPolicy">PodAvailabilityPolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarsRef">VarsRef</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodSelector">PodSelector</a>)
 </p>
 <div>
-<p>PodSelectionStrategy pod selection strategy.</p>
+<p>PodAvailabilityPolicy pod availability strategy.</p>
 </div>
 <table>
 <thead>
@@ -12556,66 +12975,39 @@ the rules are met.</p>
 </thead>
 <tbody><tr><td><p>&#34;Available&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;PreferredAvailable&#34;</p></td>
+</tr><tr><td><p>&#34;None&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;UnAvailable&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector
-</h3>
+<h3 id="apps.kubeblocks.io/v1alpha1.PodSelectionPolicy">PodSelectionPolicy
+(<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodSelector">PodSelector</a>)
 </p>
 <div>
-<p>PodVarSelector selects a var from a Pod.</p>
+<p>PodSelectionPolicy pod selection strategy.</p>
 </div>
 <table>
 <thead>
 <tr>
-<th>Field</th>
+<th>Value</th>
 <th>Description</th>
 </tr>
 </thead>
-<tbody>
-<tr>
-<td>
-<code>ClusterObjectReference</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
-ClusterObjectReference
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ClusterObjectReference</code> are embedded into this type.)
-</p>
-<p>The pod to select from.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>PodVars</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PodVars">
-PodVars
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>PodVars</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-</tbody>
+<tbody><tr><td><p>&#34;All&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Any&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PodVars">PodVars
+<h3 id="apps.kubeblocks.io/v1alpha1.PodSelector">PodSelector
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.TargetPodTemplate">TargetPodTemplate</a>)
 </p>
 <div>
-<p>PodVars defines the vars can be referenced from a Pod.</p>
 </div>
 <table>
 <thead>
@@ -12627,15 +13019,46 @@ PodVars
 <tbody>
 <tr>
 <td>
-<code>container</code><br/>
+<code>role</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">
-ContainerVars
-</a>
+string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the role of the target pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selectionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PodSelectionPolicy">
+PodSelectionPolicy
+</a>
+</em>
+</td>
+<td>
+<p>Defines the policy for selecting the target pod when multiple pods match the podSelector.
+It can be either &lsquo;Any&rsquo; (select any one pod that matches the podSelector)
+or &lsquo;All&rsquo; (select all pods that match the podSelector).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availability</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PodAvailabilityPolicy">
+PodAvailabilityPolicy
+</a>
+</em>
+</td>
+<td>
+<p>Indicates the desired availability status of the pods to be selected.
+valid values:
+- &lsquo;Available&rsquo;: selects only available pods and terminates the action if none are found.
+- &lsquo;PreferredAvailable&rsquo;: prioritizes the selection of available pods。
+- &lsquo;None&rsquo;: there are no requirements for the availability of pods.</p>
 </td>
 </tr>
 </tbody>
@@ -12730,6 +13153,46 @@ When defined, the scripts defined in scriptSpecs can be referenced within the Cm
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.PreCheckResult">PreCheckResult
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">OpsRequestComponentStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>pass</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>Indicates whether the preCheck operation was successful or not.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides additional details about the preCheck operation in a human-readable format.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.PreCondition">PreCondition
 </h3>
 <p>
@@ -12758,28 +13221,10 @@ Rule
 <p>Defines the conditions under which the operation can be executed.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>exec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PreConditionExec">
-PreConditionExec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents a job that will be run to execute the PreCondition.
-The operation will only be executed if the job is successful.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.PreConditionExec">PreConditionExec
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PreCondition">PreCondition</a>)
-</p>
 <div>
 </div>
 <table>
@@ -12927,7 +13372,22 @@ string
 </em>
 </td>
 <td>
-<p>Represents the unique key of the object.</p>
+<em>(Optional)</em>
+<p>Represents the unique key of the object.
+at least one exists for objectKey and actionName.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>actionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refer to the action name of the OpsDefinition.spec.actions[*].name.
+at least one exists for objectKey and actionName.</p>
 </td>
 </tr>
 <tr>
@@ -16753,6 +17213,75 @@ It will be ignored when the &ldquo;account&rdquo; is set.</p>
 <td></td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.TargetPodTemplate">TargetPodTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionSpec">OpsDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the template name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>varsRefs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OpsEnvVar">
+[]OpsEnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the environment variables that need to be referenced from the target component pod, and will be injected into the pod&rsquo;s containers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podSelector</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PodSelector">
+PodSelector
+</a>
+</em>
+</td>
+<td>
+<p>Used to identify the target pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMounts</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
+[]Kubernetes core/v1.VolumeMount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the mount points for the volumes defined in the <code>Volumes</code> section for the action pod.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.TenancyType">TenancyType
 (<code>string</code> alias)</h3>
 <p>
@@ -16894,6 +17423,58 @@ string
 <td>
 <em>(Optional)</em>
 <p>Used to configure the initialization container.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.TypedObjectRef">TypedObjectRef
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsResourceModifierAction">OpsResourceModifierAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiGroup</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the group for the resource being referenced.
+If not specified, the referenced Kind must belong to the core API group.
+For all third-party types, this is mandatory.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the type of resource being referenced.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Indicates the name of the resource being referenced.</p>
 </td>
 </tr>
 </tbody>
@@ -17266,20 +17847,6 @@ Kubernetes core/v1.SecretKeySelector
 </tr>
 <tr>
 <td>
-<code>podVarRef</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">
-PodVarSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Selects a defined var of a Pod.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>serviceVarRef</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">
@@ -17318,51 +17885,6 @@ ServiceRefVarSelector
 <td>
 <em>(Optional)</em>
 <p>Selects a defined var of a ServiceRef.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.VarsRef">VarsRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionRef">ComponentDefinitionRef</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionSpec">OpsDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>podSelectionStrategy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PodSelectionStrategy">
-PodSelectionStrategy
-</a>
-</em>
-</td>
-<td>
-<p>Defines the method to select the target component pod for variable references.
-The strategy can be either &lsquo;PreferredAvailable&rsquo; which prioritizes the selection of available pods,
-or &lsquo;Available&rsquo; which selects only available pods and terminates the operation if none are found.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>vars</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.OpsEnvVar">
-[]OpsEnvVar
-</a>
-</em>
-</td>
-<td>
-<p>Represents a list of environment variables to be set in the job&rsquo;s container.</p>
 </td>
 </tr>
 </tbody>

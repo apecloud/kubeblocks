@@ -271,14 +271,35 @@ const (
 	OpsFailedPhase     OpsPhase = "Failed"
 )
 
-// PodSelectionStrategy pod selection strategy.
+// PodSelectionPolicy pod selection strategy.
 // +enum
-// +kubebuilder:validation:Enum={Available,PreferredAvailable}
-type PodSelectionStrategy string
+// +kubebuilder:validation:Enum={All,Any}
+type PodSelectionPolicy string
 
 const (
-	Available          PodSelectionStrategy = "Available"
-	PreferredAvailable PodSelectionStrategy = "PreferredAvailable"
+	All PodSelectionPolicy = "All"
+	Any PodSelectionPolicy = "Any"
+)
+
+// PodAvailabilityPolicy pod availability strategy.
+// +enum
+// +kubebuilder:validation:Enum={Available,PreferredAvailable,None}
+type PodAvailabilityPolicy string
+
+const (
+	AvailablePolicy        PodAvailabilityPolicy = "Available"
+	UnAvailablePolicy      PodAvailabilityPolicy = "UnAvailable"
+	NoneAvailabilityPolicy PodAvailabilityPolicy = "None"
+)
+
+// OpsWorkloadType policy after action failure.
+// +enum
+// +kubebuilder:validation:Enum={Job,Pod}
+type OpsWorkloadType string
+
+const (
+	PodWorkload OpsWorkloadType = "Pod"
+	JobWorkload OpsWorkloadType = "Job"
 )
 
 // OpsType defines operation types.
@@ -482,6 +503,17 @@ const (
 	ProcessingProgressStatus ProgressStatus = "Processing"
 	FailedProgressStatus     ProgressStatus = "Failed"
 	SucceedProgressStatus    ProgressStatus = "Succeed"
+)
+
+// ActionTaskStatus
+// +enum
+// +kubebuilder:validation:Enum={Processing,Failed,Succeed}
+type ActionTaskStatus string
+
+const (
+	ProcessingActionTaskStatus ActionTaskStatus = "Processing"
+	FailedActionTaskStatus     ActionTaskStatus = "Failed"
+	SucceedActionTaskStatus    ActionTaskStatus = "Succeed"
 )
 
 type OpsRequestBehaviour struct {

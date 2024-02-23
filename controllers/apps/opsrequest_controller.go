@@ -46,6 +46,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // OpsRequestReconciler reconciles a OpsRequest object
@@ -89,6 +90,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&workloadsv1alpha1.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.parseFirstOpsRequestForRSM)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
 		Owns(&batchv1.Job{}).
 		Complete(r)
 }
@@ -116,6 +118,9 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 		return nil, nil
 	}
 	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
+		if err := r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest); err != nil {
+			return nil, err
+		}
 		return nil, operations.DequeueOpsRequestInClusterAnnotation(reqCtx.Ctx, r.Client, opsRes)
 	})
 }
@@ -402,6 +407,44 @@ func (r *OpsRequestReconciler) parseBackupOpsRequest(ctx context.Context, object
 		})
 	}
 	return requests
+}
+
+func (r *OpsRequestReconciler) parsePod(ctx context.Context, object client.Object) []reconcile.Request {
+	pod := object.(*corev1.Pod)
+	var (
+		requests []reconcile.Request
+	)
+	opsName := pod.Labels[constant.OpsRequestNameLabelKey]
+	opsNamespace := pod.Labels[constant.OpsRequestNamespaceLabelKey]
+	if opsName != "" && opsNamespace != "" {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: opsNamespace,
+				Name:      opsName,
+			},
+		})
+	}
+	return requests
+}
+
+func (r *OpsRequestReconciler) deleteCreatedPodsInKBNamespace(reqCtx intctrlutil.RequestCtx, opsRequest *appsv1alpha1.OpsRequest) error {
+	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	if namespace == "" {
+		return nil
+	}
+	podList := &corev1.PodList{}
+	if err := r.Client.List(reqCtx.Ctx, podList, client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS)), client.MatchingLabels{
+		constant.OpsRequestNameLabelKey:      opsRequest.Name,
+		constant.OpsRequestNamespaceLabelKey: opsRequest.Namespace,
+	}); err != nil {
+		return err
+	}
+	for i := range podList.Items {
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &podList.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type opsRequestStep func(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error)

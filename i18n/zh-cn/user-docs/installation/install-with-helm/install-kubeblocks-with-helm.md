@@ -81,14 +81,13 @@ KubeBlocks 是基于 Kubernetes 的原生应用，你可以使用 Helm 来进行
 
    如果想安装 KubeBlocks 的指定版本，请按照以下步骤操作：
 
-     1. 在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)查看可用的版本。
-     2. 使用 `--version` 指定版本，并执行以下命令。
+   1. 在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)查看可用的版本。
+   2. 使用 `--version` 指定版本，并执行以下命令。
 
-
-         ```bash
-         helm install kubeblocks kubeblocks/kubeblocks \
-         --namespace kb-system --create-namespace --version="x.x.x"
-         ```
+      ```bash
+      helm install kubeblocks kubeblocks/kubeblocks \
+      --namespace kb-system --create-namespace --version="x.x.x"
+      ```
 
 :::note
 

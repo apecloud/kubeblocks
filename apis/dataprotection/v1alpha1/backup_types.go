@@ -182,21 +182,24 @@ type BackupStatus struct {
 // BackupTimeRange records the time range of backed up data, for PITR, this is the
 // time range of recoverable data.
 type BackupTimeRange struct {
-	// time zone, only support zone offset, value range: "-12:59 ~ +13:00"
+	// time zone, supports only zone offset, with a value range of "-12:59 ~ +13:00".
+	//
 	// +kubebuilder:validation:Pattern:=`^(\+|\-)(0[0-9]|1[0-3]):([0-5][0-9])$`
 	// +optional
 	TimeZone string `json:"timeZone,omitempty"`
 
-	// start records the start time of backup(Coordinated Universal Time, UTC).
+	// Records the start time of the backup, in Coordinated Universal Time (UTC).
+	//
 	// +optional
 	Start *metav1.Time `json:"start,omitempty"`
 
-	// end records the end time of backup(Coordinated Universal Time, UTC).
+	// Records the end time of the backup, in Coordinated Universal Time (UTC).
+	//
 	// +optional
 	End *metav1.Time `json:"end,omitempty"`
 }
 
-// BackupDeletionPolicy describes a policy for end-of-life maintenance of backup content.
+// BackupDeletionPolicy describes the policy for end-of-life maintenance of backup content.
 // +enum
 // +kubebuilder:validation:Enum={Delete,Retain}
 type BackupDeletionPolicy string
@@ -206,7 +209,7 @@ const (
 	BackupDeletionPolicyRetain BackupDeletionPolicy = "Retain"
 )
 
-// BackupPhase is a string representation of the lifecycle phase of a Backup.
+// BackupPhase describes the lifecycle phase of a Backup.
 // +enum
 // +kubebuilder:validation:Enum={New,InProgress,Running,Completed,Failed,Deleting}
 type BackupPhase string
@@ -231,64 +234,83 @@ const (
 )
 
 type ActionStatus struct {
-	// name is the name of the action.
+	// The name of the action.
+	//
+	// +optional
 	Name string `json:"name,omitempty"`
 
-	// phase is the current state of the action.
+	// The current phase of the action.
+	//
 	// +optional
 	Phase ActionPhase `json:"phase,omitempty"`
 
-	// startTimestamp records the time an action was started.
+	// Records the time an action was started.
+	//
 	// +optional
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 
-	// completionTimestamp records the time an action was completed.
+	// Records the time an action was completed.
+	//
 	// +optional
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
-	// failureReason is an error that caused the backup to fail.
+	// An error that caused the action to fail.
+	//
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
-	// actionType is the type of the action.
+	// The type of the action.
+	//
 	// +optional
 	ActionType ActionType `json:"actionType,omitempty"`
 
-	// availableReplicas available replicas for statefulSet action.
+	// Available replicas for statefulSet action.
+	//
 	// +optional
 	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
 
-	// objectRef is the object reference for the action.
+	// The object reference for the action.
+	//
 	// +optional
 	ObjectRef *corev1.ObjectReference `json:"objectRef,omitempty"`
 
-	// totalSize is the total size of backed up data size.
+	// The total size of backed up data size.
 	// A string with capacity units in the format of "1Gi", "1Mi", "1Ki".
+	// If no capacity unit is specified, it is assumed to be in bytes.
+	//
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
 
-	// timeRange records the time range of backed up data, for PITR, this is the
-	// time range of recoverable data.
+	// Records the time range of backed up data, for PITR, this is the time
+	// range of recoverable data.
+	//
 	// +optional
 	TimeRange *BackupTimeRange `json:"timeRange,omitempty"`
 
-	// volumeSnapshots records the volume snapshot status for the action.
+	// Records the volume snapshot status for the action.
+	//
 	// +optional
 	VolumeSnapshots []VolumeSnapshotStatus `json:"volumeSnapshots,omitempty"`
 }
 
 type VolumeSnapshotStatus struct {
-	// name is the name of the volume snapshot.
+	// The name of the volume snapshot.
+	//
+	// +optional
 	Name string `json:"name,omitempty"`
 
-	// contentName is the name of the volume snapshot content.
+	// The name of the volume snapshot content.
+	//
+	// +optional
 	ContentName string `json:"contentName,omitempty"`
 
-	// volumeName is the name of the volume.
+	// The name of the volume.
+	//
 	// +optional
 	VolumeName string `json:"volumeName,omitempty"`
 
-	// size is the size of the volume snapshot.
+	// The size of the volume snapshot.
+	//
 	// +optional
 	Size string `json:"size,omitempty"`
 }

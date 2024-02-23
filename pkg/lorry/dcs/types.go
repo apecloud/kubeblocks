@@ -21,6 +21,7 @@ package dcs
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -67,7 +68,7 @@ func (c *Cluster) GetMemberWithName(name string) *Member {
 
 func (c *Cluster) GetMemberWithHost(host string) *Member {
 	for _, m := range c.Members {
-		if host == c.GetMemberAddr(m) {
+		if strings.HasPrefix(host, m.Name) || strings.HasPrefix(host, m.PodIP) {
 			return &m
 		}
 	}

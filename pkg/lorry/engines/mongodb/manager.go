@@ -619,9 +619,10 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 	var leader string
 	for _, member := range rsStatus.Members {
 		if member.Health == 1 {
-			memberName := strings.Split(member.Name, ".")[0]
+			m := cluster.GetMemberWithHost(member.Name)
+			memberName := m.Name
 			if memberName == candidate {
-				return cluster.GetMemberWithName(candidate)
+				return m
 			}
 			healthyMembers = append(healthyMembers, memberName)
 			if member.State == 1 {
@@ -654,7 +655,7 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 	healthMembers := map[string]struct{}{}
 	var otherLeader string
 	for _, member := range rsStatus.Members {
-		memberName := strings.Split(member.Name, ".")[0]
+		memberName := member.Name
 		if member.State == 1 || member.State == 2 {
 			healthMembers[memberName] = struct{}{}
 		}
@@ -662,12 +663,12 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 		if member.State != 1 {
 			continue
 		}
-		if memberName != mgr.CurrentMemberName {
+		if !strings.HasPrefix(memberName, mgr.CurrentMemberName) && !strings.HasPrefix(memberName, mgr.CurrentMemberIP) {
 			otherLeader = memberName
 		}
 	}
 	if otherLeader != "" {
-		return cluster.GetMemberWithName(otherLeader)
+		return cluster.GetMemberWithHost(otherLeader)
 	}
 
 	rsConfig, err := mgr.GetReplSetConfig(ctx)
@@ -677,8 +678,8 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 	}
 
 	for _, mb := range rsConfig.Members {
-		memberName := strings.Split(mb.Host, ".")[0]
-		if mb.Priority == PrimaryPriority && memberName != mgr.CurrentMemberName {
+		memberName := mb.Host
+		if mb.Priority == PrimaryPriority && !strings.HasPrefix(memberName, mgr.CurrentMemberName) && !strings.HasPrefix(memberName, mgr.CurrentMemberIP) {
 			if _, ok := healthMembers[memberName]; ok {
 				otherLeader = memberName
 			}
@@ -686,7 +687,7 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 	}
 
 	if otherLeader != "" {
-		return cluster.GetMemberWithName(otherLeader)
+		return cluster.GetMemberWithHost(otherLeader)
 	}
 
 	return nil
@@ -701,17 +702,18 @@ func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Clu
 	}
 
 	for _, member := range rsStatus.Members {
+		if member == nil {
+			continue
+		}
 		if member.Health != 1 {
 			continue
 		}
-		memberName := strings.Split(member.Name, ".")[0]
+		m := cluster.GetMemberWithHost(member.Name)
+		memberName := m.Name
 		if memberName == leader {
 			continue
 		}
-		member := cluster.GetMemberWithName(memberName)
-		if member != nil {
-			members = append(members, member)
-		}
+		members = append(members, m)
 	}
 
 	return members

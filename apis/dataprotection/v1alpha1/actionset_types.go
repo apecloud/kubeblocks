@@ -23,54 +23,63 @@ import (
 
 // ActionSetSpec defines the desired state of ActionSet
 type ActionSetSpec struct {
-	// backupType specifies the backup type, supported values:
+	// Specifies the backup type. Supported values include:
 	//
-	// - `Full` means full backup.
-	// - `Incremental` means back up data that have changed since the last backup (full or incremental).
-	// - `Differential` means back up data that have changed since the last full backup.
-	// - `Continuous` will back up the transaction log continuously, the PITR (Point in Time Recovery)
-	//   can be performed based on the continuous backup and full backup.
+	// - `Full` for a full backup.
+	// - `Incremental` back up data that have changed since the last backup (either full or incremental).
+	// - `Differential` back up data that has changed since the last full backup.
+	// - `Continuous` back up transaction logs continuously, such as MySQL binlog, PostgreSQL WAL, etc.
+	//
+	// Continuous backup is essential for implementing Point-in-Time Recovery (PITR).
 	//
 	// +kubebuilder:validation:Enum={Full,Incremental,Differential,Continuous}
 	// +kubebuilder:default=Full
 	// +kubebuilder:validation:Required
 	BackupType BackupType `json:"backupType"`
 
-	// List of environment variables to set in the container.
+	// Specifies a list of environment variables to be set in the container.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
-	// List of sources to populate environment variables in the container.
-	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-	// will be reported as an event when the container is starting. When a key exists in multiple
-	// sources, the value associated with the last source will take precedence.
-	// Values defined by an Env with a duplicate key will take precedence.
-	// Cannot be updated.
+	// Specifies a list of sources to populate environment variables in the container.
+	// The keys within a source must be a C_IDENTIFIER. Any invalid keys will be
+	// reported as an event when the container starts. If a key exists in multiple
+	// sources, the value from the last source will take precedence. Any values
+	// defined by an Env with a duplicate key will take precedence.
+	//
+	// This field cannot be updated.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 
-	// backup specifies the backup action.
+	// Specifies the backup action.
+	//
 	// +optional
 	Backup *BackupActionSpec `json:"backup,omitempty"`
 
-	// restore specifies the restore action.
+	// Specifies the restore action.
+	//
 	// +optional
 	Restore *RestoreActionSpec `json:"restore,omitempty"`
 }
 
 // ActionSetStatus defines the observed state of ActionSet
 type ActionSetStatus struct {
-	// phase - in list of [Available,Unavailable]
+	// Indicates the phase of the ActionSet. This can be either 'Available' or 'Unavailable'.
+	//
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// A human-readable message indicating details about why the ActionSet is in this phase.
+	// Provides a human-readable explanation detailing the reason for the current phase of the ActionSet.
+	//
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// generation number
+	// Represents the generation number that has been observed by the controller.
+	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
@@ -88,20 +97,24 @@ const (
 )
 
 type BackupActionSpec struct {
-	// backupData specifies the backup data action.
+	// Represents the action to be performed for backing up data.
+	//
 	// +kubebuilder:validation:Required
 	BackupData *BackupDataActionSpec `json:"backupData,omitempty"`
 
-	// preBackup specifies a hook that should be executed before the backup.
+	// Represents a set of actions that should be executed before the backup process begins.
+	//
 	// +optional
 	PreBackup []ActionSpec `json:"preBackup,omitempty"`
 
-	// postBackup specifies a hook that should be executed after the backup.
+	// Represents a set of actions that should be executed after the backup process has completed.
+	//
 	// +optional
 	PostBackup []ActionSpec `json:"postBackup,omitempty"`
 
-	// preDelete defines that custom deletion action which can be executed before executing the built-in deletion action.
-	// note that preDelete action job will ignore the env/envFrom.
+	// Represents a custom deletion action that can be executed before the built-in deletion action.
+	// Note: The preDelete action job will ignore the env/envFrom.
+	//
 	// +optional
 	PreDeleteBackup *BaseJobActionSpec `json:"preDelete,omitempty"`
 }
@@ -110,19 +123,23 @@ type BackupActionSpec struct {
 type BackupDataActionSpec struct {
 	JobActionSpec `json:",inline"`
 
-	// syncProgress specifies whether to sync the backup progress and its interval seconds.
+	// Determines if the backup progress should be synchronized and the interval
+	// for synchronization in seconds.
+	//
 	// +optional
 	SyncProgress *SyncProgress `json:"syncProgress,omitempty"`
 }
 
 type SyncProgress struct {
-	// enabled specifies whether to sync the backup progress. If enabled,
-	// a sidecar container will be created to sync the backup progress to the
-	// Backup CR status.
+	// Determines if the backup progress should be synchronized. If set to true,
+	// a sidecar container will be instantiated to synchronize the backup progress with the
+	// Backup Custom Resource (CR) status.
+	//
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// intervalSeconds specifies the interval seconds to sync the backup progress.
+	// Defines the interval in seconds for synchronizing the backup progress.
+	//
 	// +optional
 	// +kubebuilder:default=60
 	IntervalSeconds *int32 `json:"intervalSeconds,omitempty"`
@@ -130,22 +147,26 @@ type SyncProgress struct {
 
 // RestoreActionSpec defines how to restore data.
 type RestoreActionSpec struct {
-	// prepareData specifies the action to prepare data.
+	// Specifies the action required to prepare data for restoration.
+	//
 	// +optional
 	PrepareData *JobActionSpec `json:"prepareData,omitempty"`
 
-	// postReady specifies the action to execute after the data is ready.
+	// Specifies the actions that should be executed after the data has been prepared and is ready for restoration.
+	//
 	// +optional
 	PostReady []ActionSpec `json:"postReady,omitempty"`
 }
 
 // ActionSpec defines an action that should be executed. Only one of the fields may be set.
 type ActionSpec struct {
-	// exec specifies the action should be executed by the pod exec API in a container.
+	// Indicates that the action should be executed using the pod's exec API within a container.
+	//
 	// +optional
 	Exec *ExecActionSpec `json:"exec,omitempty"`
 
-	// job specifies the action should be executed by a Kubernetes Job.
+	// Indicates that the action should be executed by a Kubernetes Job.
+	//
 	// +optional
 	Job *JobActionSpec `json:"job,omitempty"`
 }

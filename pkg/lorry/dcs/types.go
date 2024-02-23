@@ -94,6 +94,9 @@ func (c *Cluster) GetMemberAddrWithPort(member Member) string {
 }
 
 func (c *Cluster) GetMemberAddr(member Member) string {
+	if member.UseIP {
+		return member.PodIP
+	}
 	clusterDomain := viper.GetString(constant.KubernetesClusterDomainEnv)
 	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", member.Name, c.ClusterCompName, c.Namespace, clusterDomain)
 }
@@ -201,6 +204,7 @@ type Member struct {
 	DBPort    string
 	LorryPort string
 	UID       string
+	UseIP     bool
 	resource  any
 }
 

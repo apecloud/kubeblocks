@@ -35,6 +35,7 @@ import (
 
 type DBManagerBase struct {
 	CurrentMemberName string
+	CurrentMemberIP   string
 	ClusterCompName   string
 	Namespace         string
 	DataDir           string
@@ -52,6 +53,7 @@ func NewDBManagerBase(logger logr.Logger) (*DBManagerBase, error) {
 
 	mgr := DBManagerBase{
 		CurrentMemberName: currentMemberName,
+		CurrentMemberIP:   viper.GetString(constant.KBEnvPodIP),
 		ClusterCompName:   viper.GetString(constant.KBEnvClusterCompName),
 		Namespace:         viper.GetString(constant.KBEnvNamespace),
 		Logger:            logger,

@@ -113,7 +113,7 @@ func (mgr *Manager) InitiateReplSet(ctx context.Context, cluster *dcs.Cluster) e
 	for i, member := range cluster.Members {
 		configMembers[i].ID = i
 		configMembers[i].Host = cluster.GetMemberAddrWithPort(member)
-		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
+		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) || strings.HasPrefix(member.Name, mgr.CurrentMemberIP) {
 			configMembers[i].Priority = PrimaryPriority
 		} else {
 			configMembers[i].Priority = SecondaryPriority
@@ -306,7 +306,7 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, dc
 		return false, err
 	}
 	for _, member := range status.Members {
-		if strings.HasPrefix(member.Name, dcsMember.Name) {
+		if strings.HasPrefix(member.Name, dcsMember.Name) || strings.HasPrefix(member.Name, dcsMember.PodIP) {
 			if member.StateStr == "PRIMARY" {
 				return true, nil
 			}
@@ -423,7 +423,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 	}
 
 	for _, member := range rsConfig.Members {
-		if strings.HasPrefix(member.Host, mgr.GetCurrentMemberName()) {
+		if strings.HasPrefix(member.Host, mgr.CurrentMemberName) || strings.HasPrefix(member.Host, mgr.CurrentMemberIP) {
 			return true
 		}
 	}
@@ -449,7 +449,8 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 	}
 
 	for _, member := range rsStatus.Members {
-		if strings.HasPrefix(member.Name, memberName) && member.Health == 1 {
+		if (strings.HasPrefix(member.Name, memberName) || strings.HasPrefix(member.Name, mgr.CurrentMemberIP)) &&
+			member.Health == 1 {
 			return true
 		}
 	}
@@ -508,7 +509,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 	configMembers := make([]ConfigMember, 0, len(rsConfig.Members)-1)
 	isDeleted := true
 	for _, configMember := range rsConfig.Members {
-		if strings.HasPrefix(configMember.Host, memberName) {
+		if strings.HasPrefix(configMember.Host, memberName) || strings.HasPrefix(configMember.Host, mgr.CurrentMemberIP) {
 			isDeleted = false
 			continue
 		}
@@ -557,7 +558,8 @@ func (mgr *Manager) IsPromoted(ctx context.Context) bool {
 		return false
 	}
 	for i := range rsConfig.Members {
-		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
+		host := rsConfig.Members[i].Host
+		if strings.HasPrefix(host, mgr.CurrentMemberName) || strings.HasPrefix(host, mgr.CurrentMemberIP) {
 			if rsConfig.Members[i].Priority == PrimaryPriority {
 				return true
 			}
@@ -574,7 +576,8 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	}
 
 	for i := range rsConfig.Members {
-		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
+		host := rsConfig.Members[i].Host
+		if strings.HasPrefix(host, mgr.CurrentMemberName) || strings.HasPrefix(host, mgr.CurrentMemberIP) {
 			if rsConfig.Members[i].Priority == PrimaryPriority {
 				mgr.Logger.Info("Current member already has the highest priority!")
 				return nil

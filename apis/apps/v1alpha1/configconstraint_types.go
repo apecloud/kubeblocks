@@ -138,7 +138,6 @@ func (cs ConfigConstraintStatus) IsConfigConstraintTerminalPhases() bool {
 	return cs.Phase == CCAvailablePhase
 }
 
-// TODO (refactored to ConfigSchema)
 type CustomParametersValidation struct {
 	// Transforms the schema from CUE to json for further OpenAPI validation
 	// TODO (refactored to SchemaInJson)

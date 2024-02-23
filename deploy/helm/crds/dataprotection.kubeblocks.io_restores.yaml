@@ -67,19 +67,19 @@ spec:
                 minimum: 0
                 type: integer
               backup:
-                description: "backup to be restored. The restore behavior based on
-                  the backup type: \n 1. Full: will be restored the full backup directly.
-                  2. Incremental: will be restored sequentially from the most recent
-                  full backup of this incremental backup. 3. Differential: will be
-                  restored sequentially from the parent backup of the differential
+                description: "Specifies the backup to be restored. The restore behavior
+                  is based on the backup type: \n 1. Full: will be restored the full
+                  backup directly. 2. Incremental: will be restored sequentially from
+                  the most recent full backup of this incremental backup. 3. Differential:
+                  will be restored sequentially from the parent backup of the differential
                   backup. 4. Continuous: will find the most recent full backup at
                   this time point and the continuous backups after it to restore."
                 properties:
                   name:
-                    description: backup name
+                    description: Specifies the backup name.
                     type: string
                   namespace:
-                    description: backup namespace
+                    description: Specifies the backup namespace.
                     type: string
                 required:
                 - name
@@ -89,7 +89,7 @@ spec:
                 - message: forbidden to update spec.backupName
                   rule: self == oldSelf
               containerResources:
-                description: specified the required resources of restore job's container.
+                description: Specifies the required resources of restore job's container.
                 properties:
                   claims:
                     description: "Claims lists the names of resources, defined in
@@ -137,8 +137,8 @@ spec:
                     type: object
                 type: object
               env:
-                description: "list of environment variables to set in the container
-                  for restore and will be merged with the env of Backup and ActionSet.
+                description: "List of environment variables to set in the container
+                  for restore. These will be merged with the env of Backup and ActionSet.
                   \n The priority of merging is as follows: `Restore env > Backup
                   env > ActionSet env`."
                 items:
@@ -250,24 +250,23 @@ spec:
                 type: array
                 x-kubernetes-preserve-unknown-fields: true
               prepareDataConfig:
-                description: configuration for the action of "prepareData" phase,
+                description: Configuration for the action of "prepareData" phase,
                   including the persistent volume claims that need to be restored
                   and scheduling strategy of temporary recovery pod.
                 properties:
                   dataSourceRef:
-                    description: dataSourceRef describes the configuration when using
-                      `persistentVolumeClaim.spec.dataSourceRef` method for restoring.
-                      it describes the source volume of the backup targetVolumes and
-                      how to mount path in the restoring container.
+                    description: Specifies the configuration when using `persistentVolumeClaim.spec.dataSourceRef`
+                      method for restoring. Describes the source volume of the backup
+                      targetVolumes and the mount path in the restoring container.
                     properties:
                       mountPath:
-                        description: mountPath path within the restoring container
+                        description: Specifies the path within the restoring container
                           at which the volume should be mounted.
                         type: string
                       volumeSource:
-                        description: volumeSource describes the volume will be restored
-                          from the specified volume of the backup targetVolumes. required
-                          if the backup uses volume snapshot.
+                        description: Describes the volume that will be restored from
+                          the specified volume of the backup targetVolumes. This is
+                          required if the backup uses a volume snapshot.
                         type: string
                     type: object
                     x-kubernetes-validations:
@@ -276,11 +275,11 @@ spec:
                     - message: forbidden to update spec.prepareDataConfig.dataSourceRef
                       rule: self == oldSelf
                   schedulingSpec:
-                    description: scheduling spec for restoring pod.
+                    description: Specifies the scheduling spec for the restoring pod.
                     properties:
                       affinity:
-                        description: affinity is a group of affinity scheduling rules.
-                          refer to https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+                        description: Contains a group of affinity scheduling rules.
+                          Refer to https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
                         properties:
                           nodeAffinity:
                             description: Describes node affinity scheduling rules
@@ -1182,7 +1181,7 @@ spec:
                             type: object
                         type: object
                       nodeName:
-                        description: nodeName is a request to schedule this pod onto
+                        description: Specifies a request to schedule this pod onto
                           a specific node. If it is non-empty, the scheduler simply
                           schedules this pod onto that node, assuming that it fits
                           resource requirements.
@@ -1190,19 +1189,19 @@ spec:
                       nodeSelector:
                         additionalProperties:
                           type: string
-                        description: 'nodeSelector is a selector which must be true
-                          for the pod to fit on a node. Selector which must match
-                          a node''s labels for the pod to be scheduled on that node.
-                          More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
+                        description: 'Defines a selector which must be true for the
+                          pod to fit on a node. The selector must match a node''s
+                          labels for the pod to be scheduled on that node. More info:
+                          https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
                         type: object
                         x-kubernetes-map-type: atomic
                       schedulerName:
-                        description: If specified, the pod will be dispatched by specified
-                          scheduler. If not specified, the pod will be dispatched
-                          by default scheduler.
+                        description: Specifies the scheduler to dispatch the pod.
+                          If not specified, the pod will be dispatched by the default
+                          scheduler.
                         type: string
                       tolerations:
-                        description: the restoring pod's tolerations.
+                        description: Specifies the tolerations for the restoring pod.
                         items:
                           description: The pod this Toleration is attached to tolerates
                             any taint that matches the triple <key,value,effect> using
@@ -1244,10 +1243,9 @@ spec:
                           type: object
                         type: array
                       topologySpreadConstraints:
-                        description: topologySpreadConstraints describes how a group
-                          of pods ought to spread across topology domains. Scheduler
-                          will schedule pods in a way which abides by the constraints.
-                          refer to https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+                        description: Describes how a group of pods ought to spread
+                          across topology domains. The scheduler will schedule pods
+                          in a way which abides by the constraints. Refer to https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
                         items:
                           description: TopologySpreadConstraint specifies how to spread
                             matching pods among the given topology.
@@ -1439,24 +1437,24 @@ spec:
                       rule: self == oldSelf
                   volumeClaimRestorePolicy:
                     default: Parallel
-                    description: "VolumeClaimRestorePolicy defines restore policy
-                      for persistent volume claim. Supported policies are as follows:
-                      \n 1. Parallel: parallel recovery of persistent volume claim.
-                      2. Serial: restore the persistent volume claim in sequence,
-                      and wait until the previous persistent volume claim is restored
-                      before restoring a new one."
+                    description: "Defines restore policy for persistent volume claim.
+                      Supported policies are as follows: \n - `Parallel`: parallel
+                      recovery of persistent volume claim. - `Serial`: restore the
+                      persistent volume claim in sequence, and wait until the previous
+                      persistent volume claim is restored before restoring a new one."
                     enum:
                     - Parallel
                     - Serial
                     type: string
                   volumeClaims:
-                    description: volumeClaims defines the persistent Volume claims
-                      that need to be restored and mount them together into the restore
-                      job. these persistent Volume claims will be created if not exist.
+                    description: Defines the persistent Volume claims that need to
+                      be restored and mounted together into the restore job. These
+                      persistent Volume claims will be created if they do not exist.
                     items:
                       properties:
                         metadata:
-                          description: 'Standard object''s metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
+                          description: 'Specifies the standard metadata for the object.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
                           properties:
                             annotations:
                               additionalProperties:
@@ -1476,12 +1474,12 @@ spec:
                               type: string
                           type: object
                         mountPath:
-                          description: mountPath path within the restoring container
+                          description: Specifies the path within the restoring container
                             at which the volume should be mounted.
                           type: string
                         volumeClaimSpec:
-                          description: volumeClaimSpec defines the desired characteristics
-                            of a persistent volume claim.
+                          description: Defines the desired characteristics of a persistent
+                            volume claim.
                           properties:
                             accessModes:
                               description: 'accessModes contains the desired access
@@ -1700,9 +1698,9 @@ spec:
                               type: string
                           type: object
                         volumeSource:
-                          description: volumeSource describes the volume will be restored
+                          description: Describes the volume that will be restored
                             from the specified volume of the backup targetVolumes.
-                            required if the backup uses volume snapshot.
+                            This is required if the backup uses a volume snapshot.
                           type: string
                       required:
                       - metadata
@@ -1716,31 +1714,32 @@ spec:
                     - message: forbidden to update spec.prepareDataConfig.volumeClaims
                       rule: self == oldSelf
                   volumeClaimsTemplate:
-                    description: volumeClaimsTemplate defines a template to build
-                      persistent Volume claims that need to be restored. these claims
-                      will be created in an orderly manner based on the number of
-                      replicas or reused if already exist.
+                    description: Defines a template to build persistent Volume claims
+                      that need to be restored. These claims will be created in an
+                      orderly manner based on the number of replicas or reused if
+                      they already exist.
                     properties:
                       replicas:
-                        description: the replicas of persistent volume claim which
-                          need to be created and restored. the format of created claim
-                          name is `$(template-name)-$(index)`.
+                        description: Specifies the replicas of persistent volume claim
+                          that need to be created and restored. The format of the
+                          created claim name is `$(template-name)-$(index)`.
                         format: int32
                         minimum: 1
                         type: integer
                       startingIndex:
-                        description: the starting index for the created persistent
-                          volume claim by according to template. minimum is 0.
+                        description: Specifies the starting index for the created
+                          persistent volume claim according to the template. The minimum
+                          value is 0.
                         format: int32
                         minimum: 0
                         type: integer
                       templates:
-                        description: templates is a list of volume claims.
+                        description: Contains a list of volume claims.
                         items:
                           properties:
                             metadata:
-                              description: 'Standard object''s metadata. More info:
-                                https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
+                              description: 'Specifies the standard metadata for the
+                                object. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
                               properties:
                                 annotations:
                                   additionalProperties:
@@ -1760,12 +1759,12 @@ spec:
                                   type: string
                               type: object
                             mountPath:
-                              description: mountPath path within the restoring container
-                                at which the volume should be mounted.
+                              description: Specifies the path within the restoring
+                                container at which the volume should be mounted.
                               type: string
                             volumeClaimSpec:
-                              description: volumeClaimSpec defines the desired characteristics
-                                of a persistent volume claim.
+                              description: Defines the desired characteristics of
+                                a persistent volume claim.
                               properties:
                                 accessModes:
                                   description: 'accessModes contains the desired access
@@ -1997,10 +1996,9 @@ spec:
                                   type: string
                               type: object
                             volumeSource:
-                              description: volumeSource describes the volume will
-                                be restored from the specified volume of the backup
-                                targetVolumes. required if the backup uses volume
-                                snapshot.
+                              description: Describes the volume that will be restored
+                                from the specified volume of the backup targetVolumes.
+                                This is required if the backup uses a volume snapshot.
                               type: string
                           required:
                           - metadata
@@ -2021,51 +2019,51 @@ spec:
                 - volumeClaimRestorePolicy
                 type: object
               readyConfig:
-                description: configuration for the action of "postReady" phase.
+                description: Configuration for the action of "postReady" phase.
                 properties:
                   connectionCredential:
-                    description: credential template used for creating a connection
-                      credential
+                    description: Defines the credential template used to create a
+                      connection credential.
                     properties:
                       hostKey:
-                        description: hostKey specifies the map key of the host in
-                          the connection credential secret.
+                        description: Specifies the map key of the host in the connection
+                          credential secret.
                         type: string
                       passwordKey:
                         default: password
-                        description: passwordKey specifies the map key of the password
-                          in the connection credential secret. This password will
-                          be saved in the backup annotation for full backup. You can
-                          use the environment variable DP_ENCRYPTION_KEY to specify
-                          encryption key.
+                        description: Specifies the map key of the password in the
+                          connection credential secret. This password will be saved
+                          in the backup annotation for full backup. You can use the
+                          environment variable DP_ENCRYPTION_KEY to specify encryption
+                          key.
                         type: string
                       portKey:
-                        description: portKey specifies the map key of the port in
-                          the connection credential secret.
+                        description: Specifies the map key of the port in the connection
+                          credential secret.
                         type: string
                       secretName:
-                        description: secretName refers to the Secret object that contains
-                          the connection credential.
+                        description: Refers to the Secret object that contains the
+                          connection credential.
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       usernameKey:
                         default: username
-                        description: usernameKey specifies the map key of the user
-                          in the connection credential secret.
+                        description: Specifies the map key of the user in the connection
+                          credential secret.
                         type: string
                     required:
                     - secretName
                     type: object
                   execAction:
-                    description: configuration for exec action.
+                    description: Specifies the configuration for an exec action.
                     properties:
                       target:
-                        description: execActionTarget defines the pods that need to
-                          be executed for the exec action. will execute on all pods
-                          that meet the conditions.
+                        description: Defines the pods that need to be executed for
+                          the exec action. Execution will occur on all pods that meet
+                          the conditions.
                         properties:
                           podSelector:
-                            description: kubectl exec in all selected pods.
+                            description: Executes kubectl in all selected pods.
                             properties:
                               matchExpressions:
                                 description: matchExpressions is a list of label selector
@@ -2115,17 +2113,18 @@ spec:
                         type: object
                     type: object
                   jobAction:
-                    description: configuration for job action.
+                    description: Specifies the configuration for a job action.
                     properties:
                       target:
-                        description: jobActionTarget defines the pod that need to
-                          be executed for the job action. will select a pod that meets
-                          the conditions to execute.
+                        description: Defines the pod that needs to be executed for
+                          the job action. A pod that meets the conditions will be
+                          selected for execution.
                         properties:
                           podSelector:
-                            description: select one of the pods which selected by
-                              labels to build the job spec, such as mount required
-                              volumes and inject built-in env of the selected pod.
+                            description: Selects one of the pods, identified by labels,
+                              to build the job spec. This includes mounting required
+                              volumes and injecting built-in environment variables
+                              of the selected pod.
                             properties:
                               matchExpressions:
                                 description: matchExpressions is a list of label selector
@@ -2171,8 +2170,8 @@ spec:
                             type: object
                             x-kubernetes-map-type: atomic
                           volumeMounts:
-                            description: volumeMounts defines which volumes of the
-                              selected pod need to be mounted on the restoring pod.
+                            description: Defines which volumes of the selected pod
+                              need to be mounted on the restoring pod.
                             items:
                               description: VolumeMount describes a mounting of a Volume
                                 within a container.
@@ -2221,40 +2220,42 @@ spec:
                     - target
                     type: object
                   readinessProbe:
-                    description: periodic probe of the service readiness. controller
-                      will perform postReadyHooks of BackupScript.spec.restore after
-                      the service readiness when readinessProbe is configured.
+                    description: Defines a periodic probe of the service readiness.
+                      The controller will perform postReadyHooks of BackupScript.spec.restore
+                      after the service readiness when readinessProbe is configured.
                     properties:
                       exec:
-                        description: exec specifies the action to take.
+                        description: Specifies the action to take.
                         properties:
                           command:
-                            description: refer to container command.
+                            description: Refers to the container command.
                             items:
                               type: string
                             type: array
                           image:
-                            description: refer to container image.
+                            description: Refers to the container image.
                             type: string
                         required:
                         - command
                         - image
                         type: object
                       initialDelaySeconds:
-                        description: number of seconds after the container has started
-                          before probe is initiated.
+                        description: Specifies the number of seconds after the container
+                          has started before the probe is initiated.
                         minimum: 0
                         type: integer
                       periodSeconds:
                         default: 5
-                        description: how often (in seconds) to perform the probe.
-                          defaults to 5 second, minimum value is 1.
+                        description: Specifies how often (in seconds) to perform the
+                          probe. The default value is 5 seconds, and the minimum value
+                          is 1.
                         minimum: 1
                         type: integer
                       timeoutSeconds:
                         default: 30
-                        description: number of seconds after which the probe times
-                          out. defaults to 30 second, minimum value is 1.
+                        description: Specifies the number of seconds after which the
+                          probe times out. The default value is 30 seconds, and the
+                          minimum value is 1.
                         minimum: 1
                         type: integer
                     required:
@@ -2265,16 +2266,16 @@ spec:
                 - message: at least one exists for jobAction and execAction.
                   rule: has(self.jobAction) || has(self.execAction)
               resources:
-                description: restore the specified resources of kubernetes.
+                description: Restores the specified resources of Kubernetes.
                 properties:
                   included:
-                    description: will restore the specified resources
+                    description: Restores the specified resources.
                     items:
                       properties:
                         groupResource:
                           type: string
                         labelSelector:
-                          description: select the specified resource for recovery
+                          description: Selects the specified resource for recovery
                             by label.
                           properties:
                             matchExpressions:
@@ -2329,14 +2330,15 @@ spec:
                 - message: forbidden to update spec.resources
                   rule: self == oldSelf
               restoreTime:
-                description: restoreTime is the point in time for restoring.
+                description: Specifies the point in time for restoring.
                 pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.restoreTime
                   rule: self == oldSelf
               serviceAccountName:
-                description: service account name which needs for recovery pod.
+                description: Specifies the service account name needed for recovery
+                  pod.
                 type: string
             required:
             - backup
@@ -2345,38 +2347,38 @@ spec:
             description: RestoreStatus defines the observed state of Restore
             properties:
               actions:
-                description: recorded all restore actions performed.
+                description: Records all restore actions performed.
                 properties:
                   postReady:
-                    description: record the actions for postReady phase.
+                    description: Records the actions for the postReady phase.
                     items:
                       properties:
                         backupName:
-                          description: which backup's restore action belongs to.
+                          description: Describes which backup's restore action belongs
+                            to.
                           type: string
                         endTime:
-                          description: endTime is the completion time for the restore
-                            job.
+                          description: The completion time of the restore job.
                           format: date-time
                           type: string
                         message:
-                          description: message is a human-readable message indicating
+                          description: Provides a human-readable message indicating
                             details about the object condition.
                           type: string
                         name:
-                          description: name describes the name of the recovery action
-                            based on the current backup.
+                          description: Describes the name of the restore action based
+                            on the current backup.
                           type: string
                         objectKey:
-                          description: the execution object of the restore action.
+                          description: Describes the execution object of the restore
+                            action.
                           type: string
                         startTime:
-                          description: startTime is the start time for the restore
-                            job.
+                          description: The start time of the restore job.
                           format: date-time
                           type: string
                         status:
-                          description: the status of this action.
+                          description: The status of this action.
                           enum:
                           - Processing
                           - Completed
@@ -2389,35 +2391,35 @@ spec:
                       type: object
                     type: array
                   prepareData:
-                    description: record the actions for prepareData phase.
+                    description: Records the actions for the prepareData phase.
                     items:
                       properties:
                         backupName:
-                          description: which backup's restore action belongs to.
+                          description: Describes which backup's restore action belongs
+                            to.
                           type: string
                         endTime:
-                          description: endTime is the completion time for the restore
-                            job.
+                          description: The completion time of the restore job.
                           format: date-time
                           type: string
                         message:
-                          description: message is a human-readable message indicating
+                          description: Provides a human-readable message indicating
                             details about the object condition.
                           type: string
                         name:
-                          description: name describes the name of the recovery action
-                            based on the current backup.
+                          description: Describes the name of the restore action based
+                            on the current backup.
                           type: string
                         objectKey:
-                          description: the execution object of the restore action.
+                          description: Describes the execution object of the restore
+                            action.
                           type: string
                         startTime:
-                          description: startTime is the start time for the restore
-                            job.
+                          description: The start time of the restore job.
                           format: date-time
                           type: string
                         status:
-                          description: the status of this action.
+                          description: The status of this action.
                           enum:
                           - Processing
                           - Completed
@@ -2431,12 +2433,13 @@ spec:
                     type: array
                 type: object
               completionTimestamp:
-                description: Date/time when the restore finished being processed.
+                description: Records the date/time when the restore finished being
+                  processed.
                 format: date-time
                 type: string
               conditions:
-                description: describe current state of restore API Resource, like
-                  warning.
+                description: Describes the current state of the restore API Resource,
+                  like warning.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -2505,12 +2508,11 @@ spec:
                   type: object
                 type: array
               duration:
-                description: The duration time of restore execution. When converted
+                description: Records the duration of the restore execution. When converted
                   to a string, the form is "1h2m0.5s".
                 type: string
               phase:
-                description: RestorePhase The current phase. Valid values are Running,
-                  Completed, Failed, AsDataSource.
+                description: Represents the current phase of the restore.
                 enum:
                 - Running
                 - Completed
@@ -2518,7 +2520,8 @@ spec:
                 - AsDataSource
                 type: string
               startTimestamp:
-                description: Date/time when the restore started being processed.
+                description: Records the date/time when the restore started being
+                  processed.
                 format: date-time
                 type: string
             type: object

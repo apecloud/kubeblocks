@@ -199,3 +199,14 @@ func buildPayloadAsUnstructuredObject(payload interface{}) (interface{}, error) 
 	}
 	return unstructuredObj, nil
 }
+
+func ResourcesPayloadForComponent(resources corev1.ResourceRequirements) any {
+	if len(resources.Requests) == 0 && len(resources.Limits) == 0 {
+		return nil
+	}
+
+	return map[string]any{
+		"limits":   resources.Limits,
+		"requests": resources.Requests,
+	}
+}

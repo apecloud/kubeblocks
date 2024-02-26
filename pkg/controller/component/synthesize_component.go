@@ -163,6 +163,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		SystemAccounts:     compDefObj.Spec.SystemAccounts,
 		RoleArbitrator:     compDefObj.Spec.RoleArbitrator,
 		Replicas:           comp.Spec.Replicas,
+		Resources:          comp.Spec.Resources,
 		TLSConfig:          comp.Spec.TLSConfig,
 		ServiceAccountName: comp.Spec.ServiceAccountName,
 		Nodes:              comp.Spec.Nodes,
@@ -717,4 +718,23 @@ func updateResources(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.C
 	}
 	synthesizedComp.PodSpec.Containers[0].Resources = actualResources
 	return nil
+}
+
+// UpdateConfigPayload updates the configuration payload
+func UpdateConfigPayload(config *appsv1alpha1.Configuration, component *SynthesizedComponent) (bool, error) {
+	if config == nil || len(config.Spec.ConfigItemDetails) == 0 {
+		return false, nil
+	}
+	// TODO: Which configSpecs are associated with resources?
+	configSpec := &config.Spec.ConfigItemDetails[0]
+	resourcePayload := intctrlutil.ResourcesPayloadForComponent(component.Resources)
+	updated, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload)
+	if err != nil {
+		return false, err
+	}
+	updated2, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas)
+	if err != nil {
+		return false, err
+	}
+	return updated || updated2, nil
 }

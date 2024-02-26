@@ -32,7 +32,7 @@ import (
 
 type Action interface {
 	// Execute executes the action.
-	Execute(ctx Context) (*dpv1alpha1.ActionStatus, error)
+	Execute(actCtx ActionContext) (*dpv1alpha1.ActionStatus, error)
 
 	// GetName returns the Name of the action.
 	GetName() string
@@ -41,7 +41,7 @@ type Action interface {
 	Type() dpv1alpha1.ActionType
 }
 
-type Context struct {
+type ActionContext struct {
 	Ctx      context.Context
 	Client   client.Client
 	Recorder record.EventRecorder

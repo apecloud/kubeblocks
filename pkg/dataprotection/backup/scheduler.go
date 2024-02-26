@@ -42,6 +42,7 @@ import (
 type Scheduler struct {
 	intctrlutil.RequestCtx
 	Client               client.Client
+	CompatClient         dputils.CompatClient
 	Scheme               *k8sruntime.Scheme
 	BackupSchedule       *dpv1alpha1.BackupSchedule
 	BackupPolicy         *dpv1alpha1.BackupPolicy

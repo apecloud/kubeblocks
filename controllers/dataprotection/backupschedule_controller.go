@@ -25,6 +25,7 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -91,10 +92,16 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&dpv1alpha1.BackupSchedule{}).
-		Owns(&batchv1.CronJob{}).
-		Complete(r)
+	b := ctrl.NewControllerManagedBy(mgr).
+		For(&dpv1alpha1.BackupSchedule{})
+
+	// Compatible with kubernetes versions prior to K8s 1.21, only supports batch v1beta1.
+	if dputils.SupportsCronJobV1() {
+		b.Owns(&batchv1.CronJob{})
+	} else {
+		b.Owns(&batchv1beta1.CronJob{})
+	}
+	return b.Complete(r)
 }
 
 func (r *BackupScheduleReconciler) deleteExternalResources(

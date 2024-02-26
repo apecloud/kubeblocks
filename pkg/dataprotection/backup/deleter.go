@@ -340,13 +340,9 @@ func (d *Deleter) doPreDeleteAction(
 
 func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
 	// initialize volume snapshot client that is compatible with both v1beta1 and v1
-	vsCli := &ctrlutil.VolumeSnapshotCompatClient{
-		Client: d.Client,
-		Ctx:    d.Ctx,
-	}
-
+	vsCli := utils.NewCompatClient(d.Client)
 	snaps := &vsv1.VolumeSnapshotList{}
-	if err := vsCli.List(snaps, client.InNamespace(backup.Namespace),
+	if err := vsCli.List(d.Ctx, snaps, client.InNamespace(backup.Namespace),
 		client.MatchingLabels(map[string]string{
 			dptypes.BackupNameLabelKey: backup.Name,
 		})); err != nil {
@@ -355,9 +351,9 @@ func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
 
 	deleteVolumeSnapshot := func(vs *vsv1.VolumeSnapshot) error {
 		if controllerutil.ContainsFinalizer(vs, dptypes.DataProtectionFinalizerName) {
-			patch := vs.DeepCopy()
+			patch := client.MergeFrom(vs.DeepCopy())
 			controllerutil.RemoveFinalizer(vs, dptypes.DataProtectionFinalizerName)
-			if err := vsCli.Patch(vs, patch); err != nil {
+			if err := vsCli.Patch(d.Ctx, vs, patch); err != nil {
 				return err
 			}
 		}
@@ -365,7 +361,7 @@ func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
 			return nil
 		}
 		d.Log.V(1).Info("delete volume snapshot", "volume snapshot", vs)
-		if err := vsCli.Delete(vs); err != nil {
+		if err := vsCli.Delete(d.Ctx, vs); err != nil {
 			return err
 		}
 		return nil

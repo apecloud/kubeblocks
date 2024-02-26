@@ -443,7 +443,12 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 		memberName = mgr.CurrentMemberName
 	}
 
-	rsStatus, _ := mgr.GetReplSetStatus(ctx)
+	rsStatus, err := mgr.GetReplSetStatus(ctx)
+	if err != nil {
+		mgr.Logger.Info("get replset status failed", "error", err.Error())
+		return false
+	}
+
 	if rsStatus == nil {
 		return false
 	}
@@ -480,7 +485,7 @@ func (mgr *Manager) UpdateCurrentMemberHost(ctx context.Context, cluster *dcs.Cl
 	}
 
 	var invalidMembers []*ConfigMember
-	for _, configMember := range rsConfig.Members {
+	for i, configMember := range rsConfig.Members {
 		host := configMember.Host
 		isInvalid := true
 		for _, member := range cluster.Members {
@@ -490,7 +495,7 @@ func (mgr *Manager) UpdateCurrentMemberHost(ctx context.Context, cluster *dcs.Cl
 			}
 		}
 		if isInvalid {
-			invalidMembers = append(invalidMembers, &configMember)
+			invalidMembers = append(invalidMembers, &rsConfig.Members[i])
 		}
 	}
 	if len(invalidMembers) > 1 {

@@ -6946,16 +6946,18 @@ the replica&rsquo;s assigned role, and the role must be one of the names defined
 The output will be compared with the last successful result.  If there is a change, a role change event will
 be created to notify the controller and trigger updating the replica&rsquo;s role.
 Defining a RoleProbe is required if roles are configured for the component. Otherwise, the replicas&rsquo; pods will
-lack role information after the cluster is created, and services will not route to the replica correctly.
-Available variables for the action:
-- KB_POD_FQDN: The pod FQDN of the replica to check the role.
-- KB_SERVICE_PORT: The port on which the DB service listens.
-- KB_SERVICE_USER: The username used to access the DB service and retrieve the role information with sufficient privileges.
-- KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information.
-Output of the action:
+lack role information after the cluster is created, and services will not route to the replica correctly.</p>
+<p>The following dedicated environment variables are available for the action:</p>
+<ul>
+<li>KB_POD_FQDN: The pod FQDN of the replica to check the role.</li>
+<li>KB_SERVICE_PORT: The port on which the DB service listens.</li>
+<li>KB_SERVICE_USER: The username used to access the DB service and retrieve the role information with sufficient privileges.</li>
+<li>KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information.</li>
+</ul>
+<p>Output of the action:
 - ROLE: the role of the replica. It must be one of the names defined in the roles.
-- ERROR: Any error message if the action fails.
-Cannot be updated.</p>
+- ERROR: Any error message if the action fails.</p>
+<p>This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7006,16 +7008,18 @@ LifecycleActionHandler
 <em>(Optional)</em>
 <p>Defines the method to add a new replica to the replication group.
 This action is typically invoked when a new replica needs to be added, such as during scale-out.
-It may involve updating configuration, notifying other members, and ensuring data consistency.
-Available variables for the action:
-- KB_SERVICE_PORT: The port on which the DB service listens.
-- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
-- KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
-- KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
-- KB_NEW_MEMBER_POD_NAME: The name of the new member&rsquo;s Pod.
-Output of the action:
-- ERROR: Any error message if the action fails.
-Cannot be updated.</p>
+It may involve updating configuration, notifying other members, and ensuring data consistency.</p>
+<p>The following dedicated environment variables are available for the action:</p>
+<ul>
+<li>KB_SERVICE_PORT: The port on which the DB service listens.</li>
+<li>KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.</li>
+<li>KB_SERVICE_PASSWORD: The password of the user used to access the DB service .</li>
+<li>KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.</li>
+<li>KB_NEW_MEMBER_POD_NAME: The name of the new member&rsquo;s Pod.</li>
+</ul>
+<p>Output of the action:
+- ERROR: Any error message if the action fails.</p>
+<p>This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7032,16 +7036,18 @@ LifecycleActionHandler
 <p>Defines the method to remove a replica from the replication group.
 This action is typically invoked when a replica needs to be removed, such as during scale-in.
 It may involve configuration updates and notifying other members about the departure,
-but it is advisable to avoid performing data migration within this action.
-Available variables for the action:
-- KB_SERVICE_PORT: The port on which the DB service listens.
-- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
-- KB_SERVICE_PASSWORD: The password of the user used to access the DB service.
-- KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
-- KB_LEAVE_MEMBER_POD_NAME: The name of the leave member&rsquo;s Pod.
-Output of the action:
-- ERROR: Any error message if the action fails.
-Cannot be updated.</p>
+but it is advisable to avoid performing data migration within this action.</p>
+<p>The following dedicated environment variables are available for the action:</p>
+<ul>
+<li>KB_SERVICE_PORT: The port on which the DB service listens.</li>
+<li>KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.</li>
+<li>KB_SERVICE_PASSWORD: The password of the user used to access the DB service.</li>
+<li>KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.</li>
+<li>KB_LEAVE_MEMBER_POD_NAME: The name of the leave member&rsquo;s Pod.</li>
+</ul>
+<p>Output of the action:
+- ERROR: Any error message if the action fails.</p>
+<p>This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7056,15 +7062,17 @@ LifecycleActionHandler
 <td>
 <em>(Optional)</em>
 <p>Defines the method to set a replica service as read-only.
-This action is used to protect a replica in case of volume space exhaustion or excessive traffic.
-Available variables for the action:
-- KB_POD_FQDN: The FQDN of the replica pod to check the role.
-- KB_SERVICE_PORT: The port on which the DB service listens.
-- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
-- KB_SERVICE_PASSWORD: The password of the user used to access the DB service.
-Output of the action:
-- ERROR: Any error message if the action fails.
-Cannot be updated.</p>
+This action is used to protect a replica in case of volume space exhaustion or excessive traffic.</p>
+<p>The following dedicated environment variables are available for the action:</p>
+<ul>
+<li>KB_POD_FQDN: The FQDN of the replica pod to check the role.</li>
+<li>KB_SERVICE_PORT: The port on which the DB service listens.</li>
+<li>KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.</li>
+<li>KB_SERVICE_PASSWORD: The password of the user used to access the DB service.</li>
+</ul>
+<p>Output of the action:
+- ERROR: Any error message if the action fails.</p>
+<p>This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7078,15 +7086,17 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>Readwrite defines how to set a replica service as read-write.
-Available variables for the action:
-- KB_POD_FQDN: The FQDN of the replica pod to check the role.
-- KB_SERVICE_PORT: The port on which the DB service listens.
-- KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
-- KB_SERVICE_PASSWORD: The password of the user used to access the DB service.
-Output of the action:
-- ERROR: Any error message if the action fails.
-Cannot be updated.</p>
+<p>Readwrite defines how to set a replica service as read-write.</p>
+<p>The following dedicated environment variables are available for the action:</p>
+<ul>
+<li>KB_POD_FQDN: The FQDN of the replica pod to check the role.</li>
+<li>KB_SERVICE_PORT: The port on which the DB service listens.</li>
+<li>KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.</li>
+<li>KB_SERVICE_PASSWORD: The password of the user used to access the DB service.</li>
+</ul>
+<p>Output of the action:
+- ERROR: Any error message if the action fails.</p>
+<p>This field cannot be updated.</p>
 </td>
 </tr>
 <tr>

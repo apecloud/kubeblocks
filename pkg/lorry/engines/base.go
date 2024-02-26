@@ -97,8 +97,8 @@ func (mgr *DBManagerBase) Follow(context.Context, *dcs.Cluster) error {
 	return errors.New("not implemented")
 }
 
-func (mgr *DBManagerBase) Recover(context.Context) error {
-	return errors.New("not implemented")
+func (mgr *DBManagerBase) Recover(context.Context, *dcs.Cluster) error {
+	return nil
 }
 
 func (mgr *DBManagerBase) IsLeader(context.Context, *dcs.Cluster) (bool, error) {

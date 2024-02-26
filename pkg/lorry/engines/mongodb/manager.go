@@ -457,8 +457,53 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 	return false
 }
 
-func (mgr *Manager) Recover(context.Context) error {
-	return nil
+func (mgr *Manager) Recover(ctx context.Context, cluster *dcs.Cluster) error {
+	if mgr.IsCurrentMemberInCluster(ctx, cluster) {
+		return nil
+	}
+	return mgr.UpdateCurrentMemberHost(ctx, cluster)
+}
+
+func (mgr *Manager) UpdateCurrentMemberHost(ctx context.Context, cluster *dcs.Cluster) error {
+	client, err := mgr.GetReplSetClient(ctx, cluster)
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(ctx) //nolint:errcheck
+
+	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
+	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
+	rsConfig, err := GetReplSetConfig(ctx, client)
+	if rsConfig == nil {
+		mgr.Logger.Error(err, "Get replSet config failed")
+		return err
+	}
+
+	var invalidMembers []*ConfigMember
+	for _, configMember := range rsConfig.Members {
+		host := configMember.Host
+		isInvalid := true
+		for _, member := range cluster.Members {
+			if strings.HasPrefix(host, member.Name) || strings.HasPrefix(host, member.PodIP) {
+				isInvalid = false
+				continue
+			}
+		}
+		if isInvalid {
+			invalidMembers = append(invalidMembers, &configMember)
+		}
+	}
+	if len(invalidMembers) > 1 {
+		return errors.Errorf("the replica set has more than one invalid members: %v", invalidMembers)
+	}
+	if len(invalidMembers) == 0 {
+		return nil
+	}
+	configMember := invalidMembers[0]
+	configMember.Host = currentHost
+
+	rsConfig.Version++
+	return SetReplSetConfig(ctx, client, rsConfig)
 }
 
 func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {

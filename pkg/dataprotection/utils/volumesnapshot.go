@@ -22,7 +22,7 @@ package utils
 import (
 	"context"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,7 +47,7 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, pvName stri
 		return false, nil
 	}
 	vsCli := NewCompatClient(cli)
-	vscList := snapshotv1.VolumeSnapshotClassList{}
+	vscList := vsv1.VolumeSnapshotClassList{}
 	if err := vsCli.List(ctx, &vscList); err != nil {
 		return false, err
 	}

@@ -124,7 +124,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 :::
 
-1. 安装 KubeBlocks 时指定配置文件。
+2. 安装 KubeBlocks 时指定配置文件。
 
    ```bash
    kbcli kubeblocks install -f backuprepo.yaml

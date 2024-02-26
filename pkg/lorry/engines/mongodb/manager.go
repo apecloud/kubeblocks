@@ -670,6 +670,9 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 	for _, member := range rsStatus.Members {
 		if member.Health == 1 {
 			m := cluster.GetMemberWithHost(member.Name)
+			if m == nil {
+				continue
+			}
 			memberName := m.Name
 			if memberName == candidate {
 				return m
@@ -759,6 +762,9 @@ func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Clu
 			continue
 		}
 		m := cluster.GetMemberWithHost(member.Name)
+		if m == nil {
+			continue
+		}
 		memberName := m.Name
 		if memberName == leader {
 			continue

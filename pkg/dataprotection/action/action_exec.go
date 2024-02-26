@@ -54,7 +54,7 @@ type ExecAction struct {
 	Timeout metav1.Duration
 }
 
-func (e *ExecAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
+func (e *ExecAction) Execute(ctx ActionContext) (*dpv1alpha1.ActionStatus, error) {
 	if err := e.validate(); err != nil {
 		return nil, err
 	}

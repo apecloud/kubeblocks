@@ -24,7 +24,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
@@ -34,7 +34,7 @@ type componentRelatedParametersTransformer struct {
 
 var _ = componentRelatedParametersTransformer{}
 
-func (c *componentRelatedParametersTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (c *componentRelatedParametersTransformer) Transform(ctx graph.TransformContext, _ *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	synthesizedComp := transCtx.SynthesizeComponent
 
@@ -46,7 +46,7 @@ func (c *componentRelatedParametersTransformer) Transform(ctx graph.TransformCon
 	}
 
 	configNew := config.DeepCopy()
-	updated, err := component.UpdateConfigPayload(configNew, synthesizedComp)
+	updated, err := configuration.UpdateConfigPayload(&configNew.Spec, synthesizedComp)
 	if err != nil {
 		return err
 	}

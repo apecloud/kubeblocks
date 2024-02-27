@@ -135,7 +135,22 @@ type ComponentConfigSpec struct {
 	// +listType=set
 	// +optional
 	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
+
+	// An optional field defines which resources change trigger re-render config.
+	// +listType=set
+	// +optional
+	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`
 }
+
+// RerenderResourceType defines the resource requirements for a component.
+// +enum
+// +kubebuilder:validation:Enum={resources,replcias,tls}
+type RerenderResourceType string
+
+const (
+	ComponentResourceType RerenderResourceType = "resources"
+	ComponentReplicasType RerenderResourceType = "replicas"
+)
 
 // MergedPolicy defines how to merge external imported templates into component templates.
 // +enum

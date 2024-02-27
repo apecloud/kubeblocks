@@ -539,7 +539,7 @@ type Action struct {
 	//
 	// +kubebuilder:default=0
 	// +optional
-	TimeoutSeconds int32 `json:"timeoutSeconds:omitempty"`
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
 
 	// Defines the strategy for retrying the action in case of failure.
 	// This field cannot be updated.

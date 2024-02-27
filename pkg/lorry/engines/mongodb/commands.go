@@ -57,11 +57,11 @@ mongosh mongodb://%s:%s@%s/%s
 func (r Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	userName := r.info.UserEnv
 	userPass := r.info.PasswordEnv
-	dsn := fmt.Sprintf("mongodb://%s:%s@$KB_POD_FQDN:27017/admin?replicaSet=$KB_CLUSTER_COMP_NAME", userName, userPass)
+	dsn := fmt.Sprintf("mongodb://%s:%s@$KB_POD_FQDN:$SERVICE_PORT/admin?replicaSet=$KB_CLUSTER_COMP_NAME", userName, userPass)
 	if connectInfo != nil {
 		userName = connectInfo.UserName
 		userPass = connectInfo.UserPasswd
-		dsn = fmt.Sprintf("mongodb://%s:%s@$KB_POD_FQDN:27017/admin?replicaSet=$KB_CLUSTER_COMP_NAME", userName, userPass)
+		dsn = fmt.Sprintf("mongodb://%s:%s@$KB_POD_FQDN:$SERVICE_PORT/admin?replicaSet=$KB_CLUSTER_COMP_NAME", userName, userPass)
 	}
 
 	mongodbCmd := fmt.Sprintf("export CLIENT=`which mongosh>/dev/null&&echo %s||echo mongo`; $CLIENT %s", r.info.Client, dsn)

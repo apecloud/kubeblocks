@@ -415,7 +415,7 @@ func (mgr *Manager) GetMasterStatus(context.Context, *sql.DB) (RowMap, error) {
 	return rowMap, nil
 }
 
-func (mgr *Manager) Recover(context.Context) error {
+func (mgr *Manager) Recover(context.Context, *dcs.Cluster) error {
 	return nil
 }
 

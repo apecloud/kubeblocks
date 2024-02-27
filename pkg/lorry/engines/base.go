@@ -35,6 +35,7 @@ import (
 
 type DBManagerBase struct {
 	CurrentMemberName string
+	CurrentMemberIP   string
 	ClusterCompName   string
 	Namespace         string
 	DataDir           string
@@ -52,6 +53,7 @@ func NewDBManagerBase(logger logr.Logger) (*DBManagerBase, error) {
 
 	mgr := DBManagerBase{
 		CurrentMemberName: currentMemberName,
+		CurrentMemberIP:   viper.GetString(constant.KBEnvPodIP),
 		ClusterCompName:   viper.GetString(constant.KBEnvClusterCompName),
 		Namespace:         viper.GetString(constant.KBEnvNamespace),
 		Logger:            logger,
@@ -60,7 +62,7 @@ func NewDBManagerBase(logger logr.Logger) (*DBManagerBase, error) {
 }
 
 func (mgr *DBManagerBase) IsDBStartupReady() bool {
-	return true
+	return mgr.DBStartupReady
 }
 
 func (mgr *DBManagerBase) GetLogger() logr.Logger {
@@ -95,8 +97,8 @@ func (mgr *DBManagerBase) Follow(context.Context, *dcs.Cluster) error {
 	return errors.New("not implemented")
 }
 
-func (mgr *DBManagerBase) Recover(context.Context) error {
-	return errors.New("not implemented")
+func (mgr *DBManagerBase) Recover(context.Context, *dcs.Cluster) error {
+	return nil
 }
 
 func (mgr *DBManagerBase) IsLeader(context.Context, *dcs.Cluster) (bool, error) {

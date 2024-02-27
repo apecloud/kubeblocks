@@ -123,7 +123,7 @@ func (*MockManager) Follow(context.Context, *dcs.Cluster) error {
 	return fmt.Errorf("NotSupported")
 }
 
-func (*MockManager) Recover(context.Context) error {
+func (*MockManager) Recover(context.Context, *dcs.Cluster) error {
 	return nil
 
 }

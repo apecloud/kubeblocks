@@ -122,7 +122,10 @@ func (ha *Ha) RunCycle() {
 		if ha.dcs.HasLease() {
 			_ = ha.dcs.ReleaseLease()
 		}
-	//	dbManager.Recover()
+		err = ha.dbManager.Recover(ha.ctx, cluster)
+		if err != nil {
+			ha.logger.Info("recover member failed", "error", err.Error())
+		}
 
 	case !cluster.IsLocked():
 		ha.logger.Info("Cluster has no leader, attempt to take the leader")

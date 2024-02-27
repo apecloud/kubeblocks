@@ -236,6 +236,9 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.DBPort = getDBPort(&pod)
 		member.LorryPort = getLorryPort(&pod)
 		member.UID = string(pod.UID)
+		if pod.Spec.HostNetwork {
+			member.UseIP = true
+		}
 		member.resource = pod.DeepCopy()
 	}
 

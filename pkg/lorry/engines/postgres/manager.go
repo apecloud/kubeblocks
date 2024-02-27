@@ -99,7 +99,7 @@ func (mgr *Manager) newProcessFromPidFile() error {
 	return nil
 }
 
-func (mgr *Manager) Recover(context.Context) error {
+func (mgr *Manager) Recover(context.Context, *dcs.Cluster) error {
 	return nil
 }
 

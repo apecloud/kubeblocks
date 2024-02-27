@@ -21,6 +21,7 @@ package dcs
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -67,7 +68,7 @@ func (c *Cluster) GetMemberWithName(name string) *Member {
 
 func (c *Cluster) GetMemberWithHost(host string) *Member {
 	for _, m := range c.Members {
-		if host == c.GetMemberAddr(m) {
+		if strings.HasPrefix(host, m.Name) || strings.HasPrefix(host, m.PodIP) {
 			return &m
 		}
 	}
@@ -94,6 +95,9 @@ func (c *Cluster) GetMemberAddrWithPort(member Member) string {
 }
 
 func (c *Cluster) GetMemberAddr(member Member) string {
+	if member.UseIP {
+		return member.PodIP
+	}
 	clusterDomain := viper.GetString(constant.KubernetesClusterDomainEnv)
 	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", member.Name, c.ClusterCompName, c.Namespace, clusterDomain)
 }
@@ -201,6 +205,7 @@ type Member struct {
 	DBPort    string
 	LorryPort string
 	UID       string
+	UseIP     bool
 	resource  any
 }
 

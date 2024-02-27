@@ -113,7 +113,7 @@ func (mgr *Manager) InitiateReplSet(ctx context.Context, cluster *dcs.Cluster) e
 	for i, member := range cluster.Members {
 		configMembers[i].ID = i
 		configMembers[i].Host = cluster.GetMemberAddrWithPort(member)
-		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
+		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) || strings.HasPrefix(member.Name, mgr.CurrentMemberIP) {
 			configMembers[i].Priority = PrimaryPriority
 		} else {
 			configMembers[i].Priority = SecondaryPriority
@@ -306,7 +306,7 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, dc
 		return false, err
 	}
 	for _, member := range status.Members {
-		if strings.HasPrefix(member.Name, dcsMember.Name) {
+		if strings.HasPrefix(member.Name, dcsMember.Name) || strings.HasPrefix(member.Name, dcsMember.PodIP) {
 			if member.StateStr == "PRIMARY" {
 				return true, nil
 			}
@@ -423,7 +423,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 	}
 
 	for _, member := range rsConfig.Members {
-		if strings.HasPrefix(member.Host, mgr.GetCurrentMemberName()) {
+		if strings.HasPrefix(member.Host, mgr.CurrentMemberName) || strings.HasPrefix(member.Host, mgr.CurrentMemberIP) {
 			return true
 		}
 	}
@@ -443,21 +443,72 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 		memberName = mgr.CurrentMemberName
 	}
 
-	rsStatus, _ := mgr.GetReplSetStatus(ctx)
+	rsStatus, err := mgr.GetReplSetStatus(ctx)
+	if err != nil {
+		mgr.Logger.Info("get replset status failed", "error", err.Error())
+		return false
+	}
+
 	if rsStatus == nil {
 		return false
 	}
 
 	for _, member := range rsStatus.Members {
-		if strings.HasPrefix(member.Name, memberName) && member.Health == 1 {
+		if (strings.HasPrefix(member.Name, memberName) || strings.HasPrefix(member.Name, mgr.CurrentMemberIP)) &&
+			member.Health == 1 {
 			return true
 		}
 	}
 	return false
 }
 
-func (mgr *Manager) Recover(context.Context) error {
-	return nil
+func (mgr *Manager) Recover(ctx context.Context, cluster *dcs.Cluster) error {
+	if mgr.IsCurrentMemberInCluster(ctx, cluster) {
+		return nil
+	}
+	return mgr.UpdateCurrentMemberHost(ctx, cluster)
+}
+
+func (mgr *Manager) UpdateCurrentMemberHost(ctx context.Context, cluster *dcs.Cluster) error {
+	client, err := mgr.GetReplSetClient(ctx, cluster)
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(ctx) //nolint:errcheck
+
+	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
+	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
+	rsConfig, err := GetReplSetConfig(ctx, client)
+	if rsConfig == nil {
+		mgr.Logger.Error(err, "Get replSet config failed")
+		return err
+	}
+
+	var invalidMembers []*ConfigMember
+	for i, configMember := range rsConfig.Members {
+		host := configMember.Host
+		isInvalid := true
+		for _, member := range cluster.Members {
+			if strings.HasPrefix(host, member.Name) || strings.HasPrefix(host, member.PodIP) {
+				isInvalid = false
+				continue
+			}
+		}
+		if isInvalid {
+			invalidMembers = append(invalidMembers, &rsConfig.Members[i])
+		}
+	}
+	if len(invalidMembers) > 1 {
+		return errors.Errorf("the replica set has more than one invalid members: %v", invalidMembers)
+	}
+	if len(invalidMembers) == 0 {
+		return nil
+	}
+	configMember := invalidMembers[0]
+	configMember.Host = currentHost
+
+	rsConfig.Version++
+	return SetReplSetConfig(ctx, client, rsConfig)
 }
 
 func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
@@ -508,7 +559,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 	configMembers := make([]ConfigMember, 0, len(rsConfig.Members)-1)
 	isDeleted := true
 	for _, configMember := range rsConfig.Members {
-		if strings.HasPrefix(configMember.Host, memberName) {
+		if strings.HasPrefix(configMember.Host, memberName) || strings.HasPrefix(configMember.Host, mgr.CurrentMemberIP) {
 			isDeleted = false
 			continue
 		}
@@ -557,7 +608,8 @@ func (mgr *Manager) IsPromoted(ctx context.Context) bool {
 		return false
 	}
 	for i := range rsConfig.Members {
-		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
+		host := rsConfig.Members[i].Host
+		if strings.HasPrefix(host, mgr.CurrentMemberName) || strings.HasPrefix(host, mgr.CurrentMemberIP) {
 			if rsConfig.Members[i].Priority == PrimaryPriority {
 				return true
 			}
@@ -574,7 +626,8 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	}
 
 	for i := range rsConfig.Members {
-		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
+		host := rsConfig.Members[i].Host
+		if strings.HasPrefix(host, mgr.CurrentMemberName) || strings.HasPrefix(host, mgr.CurrentMemberIP) {
 			if rsConfig.Members[i].Priority == PrimaryPriority {
 				mgr.Logger.Info("Current member already has the highest priority!")
 				return nil
@@ -616,9 +669,13 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 	var leader string
 	for _, member := range rsStatus.Members {
 		if member.Health == 1 {
-			memberName := strings.Split(member.Name, ".")[0]
+			m := cluster.GetMemberWithHost(member.Name)
+			if m == nil {
+				continue
+			}
+			memberName := m.Name
 			if memberName == candidate {
-				return cluster.GetMemberWithName(candidate)
+				return m
 			}
 			healthyMembers = append(healthyMembers, memberName)
 			if member.State == 1 {
@@ -651,7 +708,7 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 	healthMembers := map[string]struct{}{}
 	var otherLeader string
 	for _, member := range rsStatus.Members {
-		memberName := strings.Split(member.Name, ".")[0]
+		memberName := member.Name
 		if member.State == 1 || member.State == 2 {
 			healthMembers[memberName] = struct{}{}
 		}
@@ -659,12 +716,12 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 		if member.State != 1 {
 			continue
 		}
-		if memberName != mgr.CurrentMemberName {
+		if !strings.HasPrefix(memberName, mgr.CurrentMemberName) && !strings.HasPrefix(memberName, mgr.CurrentMemberIP) {
 			otherLeader = memberName
 		}
 	}
 	if otherLeader != "" {
-		return cluster.GetMemberWithName(otherLeader)
+		return cluster.GetMemberWithHost(otherLeader)
 	}
 
 	rsConfig, err := mgr.GetReplSetConfig(ctx)
@@ -674,8 +731,8 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 	}
 
 	for _, mb := range rsConfig.Members {
-		memberName := strings.Split(mb.Host, ".")[0]
-		if mb.Priority == PrimaryPriority && memberName != mgr.CurrentMemberName {
+		memberName := mb.Host
+		if mb.Priority == PrimaryPriority && !strings.HasPrefix(memberName, mgr.CurrentMemberName) && !strings.HasPrefix(memberName, mgr.CurrentMemberIP) {
 			if _, ok := healthMembers[memberName]; ok {
 				otherLeader = memberName
 			}
@@ -683,7 +740,7 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 	}
 
 	if otherLeader != "" {
-		return cluster.GetMemberWithName(otherLeader)
+		return cluster.GetMemberWithHost(otherLeader)
 	}
 
 	return nil
@@ -698,17 +755,21 @@ func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Clu
 	}
 
 	for _, member := range rsStatus.Members {
+		if member == nil {
+			continue
+		}
 		if member.Health != 1 {
 			continue
 		}
-		memberName := strings.Split(member.Name, ".")[0]
+		m := cluster.GetMemberWithHost(member.Name)
+		if m == nil {
+			continue
+		}
+		memberName := m.Name
 		if memberName == leader {
 			continue
 		}
-		member := cluster.GetMemberWithName(memberName)
-		if member != nil {
-			members = append(members, member)
-		}
+		members = append(members, m)
 	}
 
 	return members

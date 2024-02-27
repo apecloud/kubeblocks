@@ -1236,6 +1236,20 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
+<code>HostNetwork</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
+HostNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the host-network capability and resources.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
@@ -5096,7 +5110,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.</p>
@@ -6582,6 +6596,20 @@ This field is immutable.</p>
 <p>Defines the persistent volumes needed by the component.
 Users are responsible for providing these volumes when creating a component instance.
 This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>HostNetwork</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
+HostNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the host-network capability and resources.</p>
 </td>
 </tr>
 <tr>
@@ -10355,6 +10383,171 @@ will select from NodeAssignment.</li>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ports</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkPort">
+[]HostNetworkPort
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The list of ports that are required by this component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dnsPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#dnspolicy-v1-core">
+Kubernetes core/v1.DNSPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Set DNS policy for the component.
+Defaults to &ldquo;ClusterFirst&rdquo;.
+Valid values are &lsquo;ClusterFirstWithHostNet&rsquo;, &lsquo;ClusterFirst&rsquo;, &lsquo;Default&rsquo; or &lsquo;None&rsquo;.
+DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
+To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to &lsquo;ClusterFirstWithHostNet&rsquo;.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkPort">HostNetworkPort
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If not specified, a dynamic port will be assigned.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector
+</h3>
+<div>
+<p>HostNetworkVarSelector selects a var from host-network resources.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The host-network to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>HostNetworkVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVars">
+HostNetworkVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>HostNetworkVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkVars">HostNetworkVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>)
+</p>
+<div>
+<p>HostNetworkVars defines the vars can be referenced from the host-network.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.NamedVar">
+NamedVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.IniConfig">IniConfig
 </h3>
 <p>
@@ -10899,7 +11092,7 @@ This field is only valid when BuiltIn is set to false.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVars">HostNetworkVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 </div>

@@ -94,7 +94,7 @@ podSpec:
           value: "$(MYSQL_MONITOR_USER):$(MYSQL_MONITOR_PASSWORD)@(localhost:3306)/"
 ```
 
-As shown from Line 4 to 21, a new container has been added to the original PodSpec. `DATA_SOURCE_NAME` is an environment variable specific to the mysql-exporter.
+As shown, a new container has been added to the original PodSpec. `DATA_SOURCE_NAME` is an environment variable specific to the mysql-exporter.
 
 :::caution
 
@@ -216,7 +216,7 @@ kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0
    kbcli cluster update mycluster --monitor='true'
    ```
 
-3. Open the dashboard
+### Open the dashboard
 
    ```bash
    # View available dashboards
@@ -231,7 +231,7 @@ kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0
    kbcli dashboard open kubeblocks-grafana
    ```
 
-4. Sign in to the dashboard
+### Sign in to the dashboard
 
 ![Grafana Homepage](./../../img/addon-monitoring-signin.png)
 

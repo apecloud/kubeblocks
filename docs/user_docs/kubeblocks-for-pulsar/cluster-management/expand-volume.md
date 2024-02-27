@@ -27,25 +27,25 @@ kbcli cluster list pulsar
 
     :::note
 
-    Expand volume for `journal` first. `Ledger` volume expansion must be performed after the `journal` volume expansion.
+    Expand volume for `journal` first. `ledger` volume expansion must be performed after the `journal` volume expansion.
 
     :::
 
-   - Expand volume for `journal`.
+    - Expand volume for `journal`.
 
-     ```bash
-     kbcli cluster volume-expand pulsar --storage=40Gi --components=bookies -t journal  
-     ```
+      ```bash
+      kbcli cluster volume-expand pulsar --storage=40Gi --components=bookies -t journal  
+      ```
 
-     - `--components` describes the component name for volume expansion.
-     - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
-     - `--storage` describes the volume storage size.
+      - `--components` describes the component name for volume expansion.
+      - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
+      - `--storage` describes the volume storage size.
 
-   - Expand volume for `ledger`.
+    - Expand volume for `ledger`.
 
-     ```bash
-     kbcli cluster volume-expand pulsar --storage=200Gi --components=bookies -t ledgers  
-     ```
+      ```bash
+      kbcli cluster volume-expand pulsar --storage=200Gi --components=bookies -t ledgers  
+      ```
 
     **Option 2.** Create an OpsRequest
 

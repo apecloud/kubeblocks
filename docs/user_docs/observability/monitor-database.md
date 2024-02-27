@@ -118,15 +118,15 @@ The monitoring function is enabled by default when a database is created. The op
     kbcli cluster create mysql <clustername> 
     ```
 
-:::note
+ :::note
 
-You can change `--monitoring-interval` as `0` to disable the monitoring function but it is not recommended.
+ You can change `--monitoring-interval` as `0` to disable the monitoring function but it is not recommended.
 
-```bash
-kbcli cluster create mysql mycluster --monitoring-interval=0
-```
+ ```bash
+ kbcli cluster create mysql mycluster --monitoring-interval=0
+ ```
 
-:::
+ :::
 
 * For the existing cluster with the monitoring function disabled, you can update it to enable the monitor function by the `update` command.
 

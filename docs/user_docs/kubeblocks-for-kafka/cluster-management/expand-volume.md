@@ -2,7 +2,7 @@
 title: Expand volume
 description: How to expand the volume of a kafka cluster
 keywords: [kafka, expand volume, volume expansion]
-sidebar_position: 3
+sidebar_position: 4
 sidebar_label: Expand volume
 ---
 
@@ -23,10 +23,10 @@ kbcli cluster list kafka
 Use `kbcli cluster volume-expand` command, configure the resources required and enter the cluster name again to expand the volume.
 
 ```bash
-kbcli cluster volume-expand --storage=30G --component-names=kafka --volume-claim-templates=data kafka
+kbcli cluster volume-expand --storage=30G --components=kafka --volume-claim-templates=data kafka
 ```
 
-- `--component-names` describes the component name for volume expansion.
+- `--components` describes the component name for volume expansion.
 - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
 - `--storage` describes the volume storage size.
 

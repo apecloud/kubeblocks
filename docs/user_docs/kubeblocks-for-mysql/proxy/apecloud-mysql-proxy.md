@@ -269,15 +269,15 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
       kbcli cluster edit-config myproxy --component vtgate
       ```
 
-:::note
+    :::note
 
-After the `vtgate` parameter values configuration command is executed, a new vtgate Pod is started and the old vtgate Pod is terminated. You can run the command below to monitor whether the old Pod is terminated.
+    After the `vtgate` parameter values configuration command is executed, a new vtgate Pod is started and the old vtgate Pod is terminated. You can run the command below to monitor whether the old Pod is terminated.
 
-```bash
-kubectl get pod <vtgate-pod-name> -w
-```
+    ```bash
+    kubectl get pod <vtgate-pod-name> -w
+    ```
 
-:::
+    :::
 
 3. Use the output command to view the configuration status. For example,
 
@@ -285,11 +285,11 @@ kubectl get pod <vtgate-pod-name> -w
    kbcli cluster describe-ops myproxy -reconfiguring-lth8d -n default
    ```
 
-:::note
+   :::note
 
-For more information about parameter configuration, refer to [Configuration](./../configuration/configuration.md).
+   For more information about parameter configuration, refer to [Configuration](./../configuration/configuration.md).
 
-:::
+   :::
 
 ## Log
 

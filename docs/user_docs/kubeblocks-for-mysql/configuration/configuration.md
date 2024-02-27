@@ -3,6 +3,7 @@ title: Configure cluster parameters
 description: Configure cluster parameters
 keywords: [mysql, parameter, configuration, reconfiguration]
 sidebar_position: 1
+sidebar_label: Configuration
 ---
 
 # Configure cluster parameters
@@ -72,9 +73,9 @@ You can also view the details of this configuration file and parameters.
 
 ### Configure parameters with configure command
 
-The example below takes configuring `max_connection` and `innodb_buffer_pool_size` as an example.
+The example below takes configuring `max_connections` and `innodb_buffer_pool_size` as an example.
 
-1. View the current values of `max_connection` and `innodb_buffer_pool_size`.
+1. View the current values of `max_connections` and `innodb_buffer_pool_size`.
 
    ```bash
    kbcli cluster connect mysql-cluster
@@ -139,7 +140,7 @@ The example below takes configuring `max_connection` and `innodb_buffer_pool_siz
      Name: mysql-cluster-reconfiguring-z2wvn        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
 
     Command:
-      kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set innodb_buffer_pool_size=512M --set max_connections=600
+      kbcli cluster configure mysql-cluster --components=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set innodb_buffer_pool_size=512M --set max_connections=600
 
     Status:
       Start Time:         Mar 13,2023 02:55 UTC+0800
@@ -204,31 +205,31 @@ The following steps take configuring MySQL Standalone as an example.
    kbcli cluster edit-config mysql-cluster --config-spec=mysql-consensusset-config
    ```
 
-:::note
+   :::note
 
-* `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mysql-cluster` to view all template names.
-* If there are multiple components in a cluster, use `--component` to specify a component.
+   * Since ApeCloud MySQL currently supports multiple templates, it is required to use `--config-spec` to specify a configuration template. You can run `kbcli cluster describe-config mysql-cluster` to view all template names.
+   * If there are multiple components in a cluster, use `--component` to specify a component.
 
-:::
+   :::
 
-1. View the status of the parameter configuration.
+2. View the status of the parameter configuration.
 
    ```bash
    kbcli cluster describe-ops xxx -n default
    ```
 
-2. Connect to the database to verify whether the parameters are configured as expected.
+3. Connect to the database to verify whether the parameters are configured as expected.
 
    ```bash
    kbcli cluster connect mysql-cluster
    ```
 
-:::note
+   :::note
 
-1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
-2. Deleting a parameter will be supported later.
+   1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+   2. Deleting a parameter will be supported later.
 
-:::
+   :::
 
 ## View history and compare differences
 

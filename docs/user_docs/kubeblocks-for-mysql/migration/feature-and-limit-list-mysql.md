@@ -1,6 +1,6 @@
 ---
 title: Full feature and limit list
-description: The full feature and limit list of KubeBlocks migration function for PostgreSQL
+description: The full feature and limit list of KubeBlocks migration function for MySQL
 keywords: [mysql, migration, migrate data in MySQL to KubeBlocks, full feature, limit]
 sidebar_position: 1
 sidebar_label: Full feature and limit list
@@ -17,11 +17,10 @@ sidebar_label: Full feature and limit list
   * The existence of the table structure
   * Whether the table structure of the source database is supported
 * Structure initialization
-  * PostgreSQL
-    * Table Struct
-    * Table Constraint
-    * Table Index
-    * Comment
+  * Table Struct
+  * Table Constraint
+  * Table Index
+  * Comment
 * Data initialization
   * Supports all major data types
 * Incremental data migration
@@ -40,7 +39,7 @@ sidebar_label: Full feature and limit list
 * Precheck module: None
 * Structure initialization module
   * The user-defined type is not supported.
-  * The database character set other than UTF-8 is not supported.
+  * The database character set other than UTF-8 is not supported. (If the source library is utf8mb4, characters in the source library that exceed the expression range of UTF-8 can't be correctly parsed during the module migration process.)
 * Data initialization module
   * Character sets of the source and sink databases should be the same.
 * Data incremental migration module

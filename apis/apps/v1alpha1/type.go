@@ -35,19 +35,21 @@ const (
 )
 
 type ComponentTemplateSpec struct {
-	// Specify the name of configuration template.
+	// Specifies the name of the configuration template.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Specify the name of the referenced the configuration template ConfigMap object.
+	// Specifies the name of the referenced configuration template ConfigMap object.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TemplateRef string `json:"templateRef"`
 
-	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// Specifies the namespace of the referenced configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
@@ -55,7 +57,7 @@ type ComponentTemplateSpec struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration
+	// Refers to the volume name of PodTemplate. The configuration file produced through the configuration
 	// template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	// +kubebuilder:validation:Required
@@ -63,7 +65,7 @@ type ComponentTemplateSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	VolumeName string `json:"volumeName"`
 
-	// defaultMode is optional: mode bits used to set permissions on created files by default.
+	// Refers to the mode bits used to set permissions on created files by default.
 	//
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
 	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
@@ -78,50 +80,58 @@ type ComponentTemplateSpec struct {
 }
 
 type ConfigTemplateExtension struct {
-	// Specify the name of the referenced the configuration template ConfigMap object.
+	// Specifies the name of the referenced configuration template ConfigMap object.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TemplateRef string `json:"templateRef"`
 
-	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// Specifies the namespace of the referenced configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
+	//
 	// +kubebuilder:default="default"
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	// policy defines how to merge external imported templates into component templates.
+	// Defines the strategy for merging externally imported templates into component templates.
+	//
 	// +kubebuilder:default="none"
 	// +optional
 	Policy MergedPolicy `json:"policy,omitempty"`
 }
 
 type LegacyRenderedTemplateSpec struct {
+	// Extends the configuration template.
 	ConfigTemplateExtension `json:",inline"`
 }
 
 type ComponentConfigSpec struct {
 	ComponentTemplateSpec `json:",inline"`
 
-	// Specify a list of keys.
-	// If empty, ConfigConstraint takes effect for all keys in configmap.
+	// Defines a list of keys.
+	// If left empty, ConfigConstraint applies to all keys in the configmap.
+	//
 	// +listType=set
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
-	// lazyRenderedConfigSpec is optional: specify the secondary rendered config spec.
+	// An optional field that defines the secondary rendered config spec.
+	//
 	// +optional
 	LegacyRenderedConfigSpec *LegacyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
 
-	// Specify the name of the referenced the configuration constraints object.
+	// An optional field that defines the name of the referenced configuration constraints object.
+	//
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 
-	// asEnvFrom is optional: the list of containers will be injected into EnvFrom.
+	// An optional field where the list of containers will be injected into EnvFrom.
+	//
 	// +listType=set
 	// +optional
 	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
@@ -139,35 +149,75 @@ const (
 	NoneMergePolicy MergedPolicy = "none"
 )
 
-// ClusterPhase defines the Cluster CR .status.phase
+// ClusterPhase defines the phase of the Cluster within the .status.phase field.
+//
 // +enum
 // +kubebuilder:validation:Enum={Creating,Running,Updating,Stopping,Stopped,Deleting,Failed,Abnormal}
 type ClusterPhase string
 
 const (
+	// CreatingClusterPhase represents all components are in `Creating` phase.
 	CreatingClusterPhase ClusterPhase = "Creating"
-	RunningClusterPhase  ClusterPhase = "Running"
+
+	// RunningClusterPhase represents all components are in `Running` phase, indicates that the cluster is functioning properly.
+	RunningClusterPhase ClusterPhase = "Running"
+
+	// UpdatingClusterPhase represents all components are in `Creating`, `Running` or `Updating` phase, and at least one
+	// component is in `Creating` or `Updating` phase, indicates that the cluster is undergoing an update.
 	UpdatingClusterPhase ClusterPhase = "Updating"
+
+	// StoppingClusterPhase represents at least one component is in `Stopping` phase, indicates that the cluster is in
+	// the process of stopping.
 	StoppingClusterPhase ClusterPhase = "Stopping"
-	StoppedClusterPhase  ClusterPhase = "Stopped"
+
+	// StoppedClusterPhase represents all components are in `Stopped` phase, indicates that the cluster has stopped and
+	// is not providing any functionality.
+	StoppedClusterPhase ClusterPhase = "Stopped"
+
+	// DeletingClusterPhase indicates the cluster is being deleted.
 	DeletingClusterPhase ClusterPhase = "Deleting"
-	FailedClusterPhase   ClusterPhase = "Failed"
+
+	// FailedClusterPhase represents all components are in `Failed` phase, indicates that the cluster is unavailable.
+	FailedClusterPhase ClusterPhase = "Failed"
+
+	// AbnormalClusterPhase represents some components are in `Failed` or `Abnormal` phase, indicates that the cluster
+	// is in a fragile state and troubleshooting is required.
 	AbnormalClusterPhase ClusterPhase = "Abnormal"
 )
 
-// ClusterComponentPhase defines the Cluster CR .status.components.phase
+// ClusterComponentPhase defines the phase of a cluster component as represented in cluster.status.components.phase field.
+//
 // +enum
 // +kubebuilder:validation:Enum={Creating,Running,Updating,Stopping,Stopped,Deleting,Failed,Abnormal}
 type ClusterComponentPhase string
 
 const (
+	// CreatingClusterCompPhase indicates the component is being created.
 	CreatingClusterCompPhase ClusterComponentPhase = "Creating"
-	RunningClusterCompPhase  ClusterComponentPhase = "Running"
+
+	// RunningClusterCompPhase indicates the component has more than zero replicas, and all pods are up-to-date and
+	// in a 'Running' state.
+	RunningClusterCompPhase ClusterComponentPhase = "Running"
+
+	// UpdatingClusterCompPhase indicates the component has more than zero replicas, and there are no failed pods,
+	// it is currently being updated.
 	UpdatingClusterCompPhase ClusterComponentPhase = "Updating"
+
+	// StoppingClusterCompPhase indicates the component has zero replicas, and there are pods that are terminating.
 	StoppingClusterCompPhase ClusterComponentPhase = "Stopping"
-	StoppedClusterCompPhase  ClusterComponentPhase = "Stopped"
+
+	// StoppedClusterCompPhase indicates the component has zero replicas, and all pods have been deleted.
+	StoppedClusterCompPhase ClusterComponentPhase = "Stopped"
+
+	// DeletingClusterCompPhase indicates the component is currently being deleted.
 	DeletingClusterCompPhase ClusterComponentPhase = "Deleting"
-	FailedClusterCompPhase   ClusterComponentPhase = "Failed"
+
+	// FailedClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
+	// The component is not functioning.
+	FailedClusterCompPhase ClusterComponentPhase = "Failed"
+
+	// AbnormalClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
+	// The component is functioning, but it is in a fragile state.
 	AbnormalClusterCompPhase ClusterComponentPhase = "Abnormal"
 )
 
@@ -181,13 +231,17 @@ const (
 	ConditionTypeSwitchoverPrefix    = "Switchover-"         // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
-// Phase defines the ClusterDefinition and ClusterVersion  CR .status.phase
+// Phase represents the current status of the ClusterDefinition and ClusterVersion CR.
+//
 // +enum
 // +kubebuilder:validation:Enum={Available,Unavailable}
 type Phase string
 
 const (
-	AvailablePhase   Phase = "Available"
+	// AvailablePhase indicates that the object is in an available state.
+	AvailablePhase Phase = "Available"
+
+	// UnavailablePhase indicates that the object is in an unavailable state.
 	UnavailablePhase Phase = "Unavailable"
 )
 
@@ -256,25 +310,41 @@ type ComponentResourceKey string
 
 const PodsCompResourceKey ComponentResourceKey = "pods"
 
-// AccessMode defines SVC access mode enums.
+// AccessMode defines the modes of access granted to the SVC.
+// The modes can be `None`, `Readonly`, or `ReadWrite`.
+//
 // +enum
 // +kubebuilder:validation:Enum={None,Readonly,ReadWrite}
 type AccessMode string
 
 const (
+	// ReadWrite permits both read and write operations.
 	ReadWrite AccessMode = "ReadWrite"
-	Readonly  AccessMode = "Readonly"
-	None      AccessMode = "None"
+
+	// Readonly allows only read operations.
+	Readonly AccessMode = "Readonly"
+
+	// None implies no access.
+	None AccessMode = "None"
 )
 
-// UpdateStrategy defines Cluster Component update strategy.
+// UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
+// across the cluster.
+// The available strategies are `Serial`, `BestEffortParallel`, and `Parallel`.
+//
 // +enum
 // +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 type UpdateStrategy string
 
 const (
-	SerialStrategy             UpdateStrategy = "Serial"
-	ParallelStrategy           UpdateStrategy = "Parallel"
+	// SerialStrategy indicates that updates are applied one at a time in a sequential manner.
+	SerialStrategy UpdateStrategy = "Serial"
+
+	// ParallelStrategy indicates that updates are applied simultaneously across all components.
+	ParallelStrategy UpdateStrategy = "Parallel"
+
+	// BestEffortParallelStrategy indicates that updates are applied as quickly as possible, but not necessarily all at once.
+	// This strategy attempts to strike a balance between speed and stability.
 	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
 
@@ -283,21 +353,32 @@ var DefaultLeader = ConsensusMember{
 	AccessMode: ReadWrite,
 }
 
-// WorkloadType defines ClusterDefinition's component workload type.
+// WorkloadType defines the type of workload for the components of the ClusterDefinition.
+// It can be one of the following: `Stateless`, `Stateful`, `Consensus`, or `Replication`.
+//
 // +enum
 // +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 type WorkloadType string
 
 const (
-	Stateless   WorkloadType = "Stateless"
-	Stateful    WorkloadType = "Stateful"
-	Consensus   WorkloadType = "Consensus"
+	// Stateless represents a workload type where components do not maintain state, and instances are interchangeable.
+	Stateless WorkloadType = "Stateless"
+
+	// Stateful represents a workload type where components maintain state, and each instance has a unique identity.
+	Stateful WorkloadType = "Stateful"
+
+	// Consensus represents a workload type involving distributed consensus algorithms for coordinated decision-making.
+	Consensus WorkloadType = "Consensus"
+
+	// Replication represents a workload type that involves replication, typically used for achieving high availability
+	// and fault tolerance.
 	Replication WorkloadType = "Replication"
 )
 
 var WorkloadTypes = []string{"Stateless", "Stateful", "Consensus", "Replication"}
 
 // TerminationPolicyType defines termination policy types.
+//
 // +enum
 // +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 type TerminationPolicyType string
@@ -305,53 +386,89 @@ type TerminationPolicyType string
 const (
 	// DoNotTerminate will block delete operation.
 	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
+
 	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
 	Halt TerminationPolicyType = "Halt"
+
 	// Delete is based on Halt and deletes PVCs.
 	Delete TerminationPolicyType = "Delete"
+
 	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
 	WipeOut TerminationPolicyType = "WipeOut"
 )
 
-// HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
+// HScaleDataClonePolicyType defines the data clone policy to be used during horizontal scaling.
+// This policy determines how data is handled when new nodes are added to the cluster.
+// The policy can be set to `None`, `CloneVolume`, or `Snapshot`.
+//
 // +enum
 // +kubebuilder:validation:Enum={None,CloneVolume,Snapshot}
 type HScaleDataClonePolicyType string
 
 const (
-	HScaleDataClonePolicyNone         HScaleDataClonePolicyType = "None"
-	HScaleDataClonePolicyCloneVolume  HScaleDataClonePolicyType = "CloneVolume"
+	// HScaleDataClonePolicyNone indicates that no data cloning will occur during horizontal scaling.
+	HScaleDataClonePolicyNone HScaleDataClonePolicyType = "None"
+
+	// HScaleDataClonePolicyCloneVolume indicates that data will be cloned from existing volumes during horizontal scaling.
+	HScaleDataClonePolicyCloneVolume HScaleDataClonePolicyType = "CloneVolume"
+
+	// HScaleDataClonePolicyFromSnapshot indicates that data will be cloned from a snapshot during horizontal scaling.
 	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
 )
 
-// PodAntiAffinity defines pod anti-affinity strategy.
+// PodAntiAffinity defines the pod anti-affinity strategy.
+//
+// This strategy determines how pods are scheduled in relation to other pods, with the aim of either spreading pods
+// across nodes (Preferred) or ensuring that certain pods do not share a node (Required).
+//
 // +enum
 // +kubebuilder:validation:Enum={Preferred,Required}
 type PodAntiAffinity string
 
 const (
+	// Preferred indicates that the scheduler will try to enforce the anti-affinity rules, but it will not guarantee it.
 	Preferred PodAntiAffinity = "Preferred"
-	Required  PodAntiAffinity = "Required"
+
+	// Required indicates that the scheduler must enforce the anti-affinity rules and will not schedule the pods unless
+	// the rules are met.
+	Required PodAntiAffinity = "Required"
 )
 
-// TenancyType for cluster tenant resources.
+// TenancyType defines the type of tenancy for cluster tenant resources.
+//
 // +enum
 // +kubebuilder:validation:Enum={SharedNode,DedicatedNode}
 type TenancyType string
 
 const (
-	SharedNode    TenancyType = "SharedNode"
+	// SharedNode means multiple pods may share the same node.
+	SharedNode TenancyType = "SharedNode"
+
+	// DedicatedNode means each pod runs on their own dedicated node.
 	DedicatedNode TenancyType = "DedicatedNode"
 )
 
-// AvailabilityPolicyType for cluster affinity policy.
+// AvailabilityPolicyType defines the type of availability policy to be applied for cluster affinity, influencing how
+// resources are distributed across zones or nodes for high availability and resilience.
+//
 // +enum
 // +kubebuilder:validation:Enum={zone,node,none}
 type AvailabilityPolicyType string
 
 const (
+	// AvailabilityPolicyZone specifies that resources should be distributed across different availability zones.
+	// This policy aims to ensure high availability and protect against zone failures, spreading the resources to reduce
+	// the risk of simultaneous downtime.
 	AvailabilityPolicyZone AvailabilityPolicyType = "zone"
+
+	// AvailabilityPolicyNode specifies that resources should be distributed across different nodes within the same zone.
+	// This policy aims to provide resilience against node failures, ensuring that the failure of a single node does not
+	// impact the overall service availability.
 	AvailabilityPolicyNode AvailabilityPolicyType = "node"
+
+	// AvailabilityPolicyNone specifies that no specific availability policy is applied.
+	// Resources may not be explicitly distributed for high availability, potentially concentrating them in a single
+	// zone or node based on other scheduling decisions.
 	AvailabilityPolicyNone AvailabilityPolicyType = "none"
 )
 
@@ -382,24 +499,29 @@ type OpsRecorder struct {
 }
 
 // ProvisionPolicyType defines the policy for creating accounts.
+//
 // +enum
+// +kubebuilder:validation:Enum={CreateByStmt,ReferToExisting}
 type ProvisionPolicyType string
 
 const (
 	// CreateByStmt will create account w.r.t. deletion and creation statement given by provider.
 	CreateByStmt ProvisionPolicyType = "CreateByStmt"
+
 	// ReferToExisting will not create account, but create a secret by copying data from referred secret file.
 	ReferToExisting ProvisionPolicyType = "ReferToExisting"
 )
 
-// ProvisionScope defines the scope (within component) of provision.
+// ProvisionScope defines the scope of provision within a component.
+//
 // +enum
 type ProvisionScope string
 
 const (
-	// AllPods will create accounts for all pods belong to the component.
+	// AllPods indicates that accounts will be created for all pods within the component.
 	AllPods ProvisionScope = "AllPods"
-	// AnyPods will only create accounts on one pod.
+
+	// AnyPods indicates that accounts will be created only on a single pod within the component.
 	AnyPods ProvisionScope = "AnyPods"
 )
 
@@ -446,13 +568,20 @@ func (r AccountName) GetAccountID() KBAccountType {
 	return KBAccountInvalid
 }
 
-// LetterCase defines cases to use in password generation.
+// LetterCase defines the available cases to be used in password generation.
+//
 // +enum
+// +kubebuilder:validation:Enum={LowerCases,UpperCases,MixedCases}
 type LetterCase string
 
 const (
+	// LowerCases represents the use of lower case letters only.
 	LowerCases LetterCase = "LowerCases"
+
+	// UpperCases represents the use of upper case letters only.
 	UpperCases LetterCase = "UpperCases"
+
+	// MixedCases represents the use of a mix of both lower and upper case letters.
 	MixedCases LetterCase = "MixedCases"
 )
 
@@ -486,12 +615,13 @@ const (
 type UpgradePolicy string
 
 const (
-	NonePolicy         UpgradePolicy = "none"
-	NormalPolicy       UpgradePolicy = "simple"
-	RestartPolicy      UpgradePolicy = "parallel"
-	RollingPolicy      UpgradePolicy = "rolling"
-	AutoReload         UpgradePolicy = "autoReload"
-	OperatorSyncUpdate UpgradePolicy = "operatorSyncUpdate"
+	NonePolicy                UpgradePolicy = "none"
+	NormalPolicy              UpgradePolicy = "simple"
+	RestartPolicy             UpgradePolicy = "parallel"
+	RollingPolicy             UpgradePolicy = "rolling"
+	AutoReload                UpgradePolicy = "autoReload"
+	HotUpdateAndRestartPolicy UpgradePolicy = "reloadAndRestart"
+	OperatorSyncUpdate        UpgradePolicy = "operatorSyncUpdate"
 )
 
 // CfgReloadType defines reload method.
@@ -546,45 +676,71 @@ const (
 	SIGSYS    SignalType = "SIGSYS"
 )
 
-// IssuerName defines Tls certs issuer name
+// IssuerName defines the name of the TLS certificates issuer.
 // +enum
+// +kubebuilder:validation:Enum={KubeBlocks,UserProvided}
 type IssuerName string
 
 const (
-	// IssuerKubeBlocks Certificates signed by KubeBlocks Operator.
+	// IssuerKubeBlocks represents certificates that are signed by the KubeBlocks Operator.
 	IssuerKubeBlocks IssuerName = "KubeBlocks"
-	// IssuerUserProvided User provided own CA-signed certificates.
+
+	// IssuerUserProvided indicates that the user has provided their own CA-signed certificates.
 	IssuerUserProvided IssuerName = "UserProvided"
 )
 
-// SwitchPolicyType defines switchPolicy type.
-// Currently, only Noop is supported. MaximumAvailability and MaximumDataProtection will be supported in the future.
+// SwitchPolicyType defines the types of switch policies that can be applied to a cluster.
+//
+// Currently, only the Noop policy is supported. Support for MaximumAvailability and MaximumDataProtection policies is
+// planned for future releases.
+//
 // +enum
 // +kubebuilder:validation:Enum={Noop}
 type SwitchPolicyType string
 
 const (
-	MaximumAvailability   SwitchPolicyType = "MaximumAvailability"
+	// MaximumAvailability represents a switch policy that aims for maximum availability. This policy will switch if the
+	// primary is active and the synchronization delay is 0 according to the user-defined lagProbe data delay detection
+	// logic. If the primary is down, it will switch immediately.
+	// This policy is intended for future support.
+	MaximumAvailability SwitchPolicyType = "MaximumAvailability"
+
+	// MaximumDataProtection represents a switch policy focused on maximum data protection. This policy will only switch
+	// if the primary is active and the synchronization delay is 0, based on the user-defined lagProbe data lag detection
+	// logic. If the primary is down, it will switch only if it can be confirmed that the primary and secondary data are
+	// consistent. Otherwise, it will not switch.
+	// This policy is planned for future implementation.
 	MaximumDataProtection SwitchPolicyType = "MaximumDataProtection"
-	Noop                  SwitchPolicyType = "Noop"
+
+	// Noop indicates that KubeBlocks will not perform any high-availability switching for the components. Users are
+	// required to implement their own HA solution or integrate an existing open-source HA solution.
+	Noop SwitchPolicyType = "Noop"
 )
 
-// VolumeType defines volume type for backup data or log.
+// VolumeType defines the type of volume, specifically distinguishing between volumes used for backup data and those used for logs.
+//
 // +enum
 // +kubebuilder:validation:Enum={data,log}
 type VolumeType string
 
 const (
+	// VolumeTypeData indicates a volume designated for storing backup data. This type of volume is optimized for the
+	// storage and retrieval of data backups, ensuring data persistence and reliability.
 	VolumeTypeData VolumeType = "data"
-	VolumeTypeLog  VolumeType = "log"
+
+	// VolumeTypeLog indicates a volume designated for storing logs. This type of volume is optimized for log data,
+	// facilitating efficient log storage, retrieval, and management.
+	VolumeTypeLog VolumeType = "log"
 )
 
 // BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.
+//
 // +enum
 // +kubebuilder:validation:Enum={full,snapshot}
 type BaseBackupType string
 
 // BackupStatusUpdateStage defines the stage of backup status update.
+//
 // +enum
 // +kubebuilder:validation:Enum={pre,post}
 type BackupStatusUpdateStage string
@@ -612,14 +768,16 @@ type StatefulSetWorkload interface {
 type ClusterService struct {
 	Service `json:",inline"`
 
-	// ShardingSelector extends the ServiceSpec.Selector by allowing you to specify a sharding name
-	// defined in Cluster.Spec.ShardingSpecs[x].Name as selectors for the service.
-	// ShardingSelector and ComponentSelector cannot be set at the same time.
+	// Extends the ServiceSpec.Selector by allowing the specification of a sharding name, which is defined in
+	// cluster.spec.shardingSpecs[x].name, to be used as a selector for the service.
+	// Note that this and the ComponentSelector are mutually exclusive and cannot be set simultaneously.
+	//
 	// +optional
 	ShardingSelector string `json:"shardingSelector,omitempty"`
 
-	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
-	// ComponentSelector and ShardingSelector cannot be set at the same time.
+	// Extends the ServiceSpec.Selector by allowing the specification of a component, to be used as a selector for the service.
+	// Note that this and the ShardingSelector are mutually exclusive and cannot be set simultaneously.
+	//
 	// +optional
 	ComponentSelector string `json:"componentSelector,omitempty"`
 }

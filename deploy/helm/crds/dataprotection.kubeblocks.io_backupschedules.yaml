@@ -47,34 +47,34 @@ spec:
             description: BackupScheduleSpec defines the desired state of BackupSchedule.
             properties:
               backupPolicyName:
-                description: Which backupPolicy is applied to perform this backup.
+                description: Specifies the backupPolicy to be applied for the `schedules`.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               schedules:
-                description: schedules defines the list of backup schedules.
+                description: Defines the list of backup schedules.
                 items:
                   properties:
                     backupMethod:
-                      description: backupMethod specifies the backup method name that
-                        is defined in backupPolicy.
+                      description: Specifies the backup method name that is defined
+                        in backupPolicy.
                       type: string
                     cronExpression:
-                      description: the cron expression for schedule, the timezone
-                        is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                      description: Specifies the cron expression for the schedule.
+                        The timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
                       type: string
                     enabled:
-                      description: enabled specifies whether the backup schedule is
-                        enabled or not.
+                      description: Specifies whether the backup schedule is enabled
+                        or not.
                       type: boolean
                     retentionPeriod:
                       default: 7d
-                      description: "retentionPeriod determines a duration up to which
-                        the backup should be kept. controller will remove all backups
-                        that are older than the RetentionPeriod. For example, RetentionPeriod
-                        of `30d` will keep only the backups of last 30 days. Sample
-                        duration format: \n - years: \t2y - months: \t6mo - days:
-                        \t\t30d - hours: \t12h - minutes: \t30m \n You can also combine
-                        the above durations. For example: 30d12h30m"
+                      description: "Determines the duration for which the backup should
+                        be kept. KubeBlocks will remove all backups that are older
+                        than the RetentionPeriod. For example, RetentionPeriod of
+                        `30d` will keep only the backups of last 30 days. Sample duration
+                        format: \n - years: \t2y - months: \t6mo - days: \t\t30d -
+                        hours: \t12h - minutes: \t30m \n You can also combine the
+                        above durations. For example: 30d12h30m"
                       type: string
                   required:
                   - backupMethod
@@ -83,9 +83,8 @@ spec:
                 minItems: 1
                 type: array
               startingDeadlineMinutes:
-                description: startingDeadlineMinutes defines the deadline in minutes
-                  for starting the backup workload if it misses scheduled time for
-                  any reason.
+                description: Defines the deadline in minutes for starting the backup
+                  workload if it misses its scheduled time for any reason.
                 format: int64
                 maximum: 1440
                 minimum: 0
@@ -98,40 +97,38 @@ spec:
             description: BackupScheduleStatus defines the observed state of BackupSchedule.
             properties:
               failureReason:
-                description: failureReason is an error that caused the backup to fail.
+                description: Represents an error that caused the backup to fail.
                 type: string
               observedGeneration:
-                description: observedGeneration is the most recent generation observed
-                  for this BackupSchedule. It refers to the BackupSchedule's generation,
-                  which is updated on mutation by the API Server.
+                description: Represents the most recent generation observed for this
+                  BackupSchedule. It refers to the BackupSchedule's generation, which
+                  is updated on mutation by the API Server.
                 format: int64
                 type: integer
               phase:
-                description: phase describes the phase of the BackupSchedule.
+                description: Describes the phase of the BackupSchedule.
                 type: string
               schedules:
                 additionalProperties:
-                  description: ScheduleStatus defines the status of each schedule.
+                  description: ScheduleStatus represents the status of each schedule.
                   properties:
                     failureReason:
-                      description: failureReason is an error that caused the backup
-                        to fail.
+                      description: Represents an error that caused the backup to fail.
                       type: string
                     lastScheduleTime:
-                      description: lastScheduleTime records the last time the backup
-                        was scheduled.
+                      description: Records the last time the backup was scheduled.
                       format: date-time
                       type: string
                     lastSuccessfulTime:
-                      description: lastSuccessfulTime records the last time the backup
-                        was successfully completed.
+                      description: Records the last time the backup was successfully
+                        completed.
                       format: date-time
                       type: string
                     phase:
-                      description: phase describes the phase of the schedule.
+                      description: Describes the phase of the schedule.
                       type: string
                   type: object
-                description: schedules describes the status of each schedule.
+                description: Describes the status of each schedule.
                 type: object
             type: object
         type: object

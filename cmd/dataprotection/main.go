@@ -52,6 +52,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -211,6 +212,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	cli, err := discoverycli.NewDiscoveryClientForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create discovery client")
+		os.Exit(1)
+	}
+
+	ver, err := cli.ServerVersion()
+	if err != nil {
+		setupLog.Error(err, "unable to discover version info")
+		os.Exit(1)
+	}
+	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
+
 	if err = (&dpcontrollers.ActionSetReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
@@ -258,7 +272,7 @@ func main() {
 	}
 
 	if err = (&dpcontrollers.BackupScheduleReconciler{
-		Client:   mgr.GetClient(),
+		Client:   dputils.NewCompatClient(mgr.GetClient()),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("backup-schedule-controller"),
 	}).SetupWithManager(mgr); err != nil {
@@ -285,6 +299,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&dpcontrollers.LogCollectionReconciler{
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		Recorder:   mgr.GetEventRecorderFor("log-collection-controller"),
+		RestConfig: mgr.GetConfig(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "logCollectionController")
+		os.Exit(1)
+	}
+
 	if err = dpcontrollers.NewGCReconciler(mgr).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GarbageCollection")
 		os.Exit(1)
@@ -300,19 +324,6 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
-
-	cli, err := discoverycli.NewDiscoveryClientForConfig(mgr.GetConfig())
-	if err != nil {
-		setupLog.Error(err, "unable to create discovery client")
-		os.Exit(1)
-	}
-
-	ver, err := cli.ServerVersion()
-	if err != nil {
-		setupLog.Error(err, "unable to discover version info")
-		os.Exit(1)
-	}
-	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

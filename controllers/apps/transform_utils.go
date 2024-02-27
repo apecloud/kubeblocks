@@ -20,11 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"errors"
 	"reflect"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -83,6 +87,10 @@ func getClusterOwningObjectsWithOptions(transCtx *clusterTransformContext,
 	objs := make(clusterOwningObjects)
 	for _, list := range kinds {
 		if err := transCtx.Client.List(transCtx.Context, list, opts...); err != nil {
+			// check for policy/v1 discovery error, to support k8s clusters before 1.21.
+			if isPolicyV1DiscoveryNotFoundError(err) {
+				continue
+			}
 			return nil, err
 		}
 		// reflect get list.Items
@@ -155,4 +163,21 @@ func isVolumeClaimTemplatesEqual(a, b []appsv1alpha1.ClusterComponentVolumeClaim
 		}
 	}
 	return true
+}
+
+// isPolicyV1DiscoveryNotFoundError checks whether the @err is an error of type ErrGroupDiscoveryFailed for policy/v1 resource.
+func isPolicyV1DiscoveryNotFoundError(err error) bool {
+	wrappedErr := errors.Unwrap(err)
+	if wrappedErr != nil {
+		err = wrappedErr
+	}
+	if !discovery.IsGroupDiscoveryFailedError(err) {
+		return false
+	}
+	discoveryErr, _ := err.(*discovery.ErrGroupDiscoveryFailed)
+	statusErr := discoveryErr.Groups[schema.GroupVersion{Group: "policy", Version: "v1"}]
+	if statusErr == nil {
+		return false
+	}
+	return apierrors.IsNotFound(statusErr)
 }

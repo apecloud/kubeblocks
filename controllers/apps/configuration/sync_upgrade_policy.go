@@ -48,7 +48,7 @@ func (o *syncPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 		return makeReturnedStatus(ESNone), nil
 	}
 
-	updatedParameters := getOnlineUpdateParams(configPatch, params.ConfigConstraint.FormatterConfig)
+	updatedParameters := getOnlineUpdateParams(configPatch, params.ConfigConstraint)
 	if len(updatedParameters) == 0 {
 		return makeReturnedStatus(ESNone), nil
 	}
@@ -127,12 +127,16 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
 }
 
-func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig) map[string]string {
+func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) map[string]string {
 	r := make(map[string]string)
-	parameters := core.GenerateVisualizedParamsList(configPatch, formatConfig, nil)
+	forceUpdate := cc.NeedForceUpdateHot()
+	parameters := core.GenerateVisualizedParamsList(configPatch, cc.FormatterConfig, nil)
 	for _, key := range parameters {
 		if key.UpdateType == core.UpdatedType {
 			for _, p := range key.Parameters {
+				if forceUpdate && !core.IsDynamicParameter(p.Key, cc) {
+					continue
+				}
 				if p.Value != nil {
 					r[p.Key] = *p.Value
 				}

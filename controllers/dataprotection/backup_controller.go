@@ -135,16 +135,16 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupJob))
 
-	if intctrlutil.InVolumeSnapshotV1Beta1() {
-		b.Owns(&vsv1beta1.VolumeSnapshot{}, builder.Predicates{})
-	} else {
+	if dputils.SupportsVolumeSnapshotV1() {
 		b.Owns(&vsv1.VolumeSnapshot{}, builder.Predicates{})
+	} else {
+		b.Owns(&vsv1beta1.VolumeSnapshot{}, builder.Predicates{})
 	}
 	return b.WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter)).
 		Complete(r)
 }
 
-func (r *BackupReconciler) parseBackupJob(ctx context.Context, object client.Object) []reconcile.Request {
+func (r *BackupReconciler) parseBackupJob(_ context.Context, object client.Object) []reconcile.Request {
 	job := object.(*batchv1.Job)
 	var requests []reconcile.Request
 	backupName := job.Labels[dptypes.BackupNameLabelKey]
@@ -399,7 +399,7 @@ func (r *BackupReconciler) handleRunningPhase(
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 	}
 
-	actionCtx := action.Context{
+	actionCtx := action.ActionContext{
 		Ctx:              reqCtx.Ctx,
 		Client:           r.Client,
 		Recorder:         r.Recorder,

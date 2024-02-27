@@ -51,9 +51,9 @@ type ComponentReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/finalizers,verbs=update
 
 // owned K8s core API resources controller-gen RBAC marker
 // full access on core API resources
@@ -230,16 +230,16 @@ func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj 
 	}
 }
 
-func (r *ComponentReconciler) configurationEventHandler(ctx context.Context, obj client.Object) []reconcile.Request {
-	if _, ok := obj.(*appsv1alpha1.Configuration); !ok {
+func (r *ComponentReconciler) configurationEventHandler(_ context.Context, obj client.Object) []reconcile.Request {
+	cr, ok := obj.(*appsv1alpha1.Configuration)
+	if !ok {
 		return []reconcile.Request{}
 	}
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
-				// hack: depends on that the name of configuration object is same as Component, check GenerateComponentConfigurationName for reference.
-				Name: obj.GetName(),
+				Name:      constant.GenerateClusterComponentName(cr.Spec.ClusterRef, cr.Spec.ComponentName),
 			},
 		},
 	}

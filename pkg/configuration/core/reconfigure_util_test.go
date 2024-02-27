@@ -334,3 +334,71 @@ func TestValidateConfigPatch(t *testing.T) {
 		})
 	}
 }
+
+func TestIsDynamicParameter(t *testing.T) {
+	type args struct {
+		paramName string
+		ccSpec    *appsv1alpha1.ConfigConstraintSpec
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{{
+		name: "test",
+		// null
+		args: args{
+			paramName: "test",
+			ccSpec:    &appsv1alpha1.ConfigConstraintSpec{},
+		},
+		want: false,
+	}, {
+		name: "test",
+		// static parameters contains
+		args: args{
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+				StaticParameters: []string{"param1", "param2", "param3"},
+			},
+			paramName: "param3",
+		},
+		want: false,
+	}, {
+		name: "test",
+		// static parameters not contains
+		args: args{
+			paramName: "param4",
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+				StaticParameters: []string{"param1", "param2", "param3"},
+			},
+		},
+		want: true,
+	}, {
+		name: "test",
+		// dynamic parameters contains
+		args: args{
+			paramName: "param1",
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+				DynamicParameters: []string{"param1", "param2", "param3"},
+			},
+		},
+		want: true,
+	}, {
+		name: "test",
+		// dynamic/static parameters not contains
+		args: args{
+			paramName: "test",
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+				DynamicParameters: []string{"dparam1", "dparam2", "dparam3"},
+				StaticParameters:  []string{"sparam1", "sparam2", "sparam3"},
+			},
+		},
+		want: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsDynamicParameter(tt.args.paramName, tt.args.ccSpec); got != tt.want {
+				t.Errorf("IsDynamicParameter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

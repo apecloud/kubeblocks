@@ -16,7 +16,6 @@ KubeBlocks 是基于 Kubernetes 的原生应用，你可以使用 Helm 来进行
 
 请确保已安装 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/) 和 [Helm](https://helm.sh/zh/docs/intro/install/)。
 
-
 :::
 
 ## 环境准备
@@ -52,40 +51,49 @@ KubeBlocks 是基于 Kubernetes 的原生应用，你可以使用 Helm 来进行
 
 **使用 Helm 安装 KubeBlocks**
 
-执行:
+1. 创建 CRD 依赖。
 
-```bash
-helm repo add kubeblocks https://apecloud.github.io/helm-charts
-helm repo update
-helm install kubeblocks kubeblocks/kubeblocks \
-    --namespace kb-system --create-namespace
-```
+   ```bash
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.8.1/kubeblocks_crds.yaml
+   ```
 
+2. 添加 Helm 仓库。
 
-如果想要使用自定义的 tolerations 安装 KubeBlocks，可以使用以下命令：
+   ```bash
+   helm repo add kubeblocks https://apecloud.github.io/helm-charts
+   
+   helm repo update
+   ```
 
-```bash
-helm install kubeblocks kubeblocks/kubeblocks \
-    --namespace kb-system --create-namespace \
+3. 安装 KubeBlocks。
+
+   ```bash
+   helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
+   ```
+
+   如果想要使用自定义的 tolerations 安装 KubeBlocks，可以使用以下命令：
+
+   ```bash
+   helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace \
     --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' \
-    --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
-```
+    --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true"    }]'
+   ```
 
-如果想安装 KubeBlocks 的指定版本，请按照以下步骤操作：
+   如果想安装 KubeBlocks 的指定版本，请按照以下步骤操作：
 
-1. 在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)查看可用的版本。
-2. 使用 `--version` 指定版本，并执行以下命令。
+   1. 在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)查看可用的版本。
+   2. 使用 `--version` 指定版本，并执行以下命令。
 
-    ```bash
-    helm install kubeblocks kubeblocks/kubeblocks \
-    --namespace kb-system --create-namespace --version="x.x.x"
-    ```
+      ```bash
+      helm install kubeblocks kubeblocks/kubeblocks \
+      --namespace kb-system --create-namespace --version="x.x.x"
+      ```
 
-    :::note
+:::note
 
-    默认安装最新版本。
+默认安装最新版本。
 
-    :::
+:::
 
 ## 验证 KubeBlocks 安装
 

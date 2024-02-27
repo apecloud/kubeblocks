@@ -1236,7 +1236,7 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
-<code>HostNetwork</code><br/>
+<code>hostNetwork</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
 HostNetwork
@@ -5110,7 +5110,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.</p>
@@ -6600,7 +6600,7 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
-<code>HostNetwork</code><br/>
+<code>hostNetwork</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
 HostNetwork
@@ -9287,6 +9287,48 @@ ConsensusMember
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVars">PodVars</a>)
+</p>
+<div>
+<p>ContainerVars defines the vars can be referenced from a Container.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>containerPort</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.NamedVar">
+NamedVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Container port to reference.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CredentialVar">CredentialVar
 </h3>
 <p>
@@ -10471,83 +10513,6 @@ int32
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector
-</h3>
-<div>
-<p>HostNetworkVarSelector selects a var from host-network resources.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ClusterObjectReference</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
-ClusterObjectReference
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ClusterObjectReference</code> are embedded into this type.)
-</p>
-<p>The host-network to select from.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>HostNetworkVars</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVars">
-HostNetworkVars
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>HostNetworkVars</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkVars">HostNetworkVars
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>)
-</p>
-<div>
-<p>HostNetworkVars defines the vars can be referenced from the host-network.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>port</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.NamedVar">
-NamedVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.IniConfig">IniConfig
 </h3>
 <p>
@@ -11092,7 +11057,7 @@ This field is only valid when BuiltIn is set to false.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVars">HostNetworkVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 </div>
@@ -12592,6 +12557,86 @@ the rules are met.</p>
 </tr><tr><td><p>&#34;PreferredAvailable&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>PodVarSelector selects a var from a Pod.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The pod to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>PodVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PodVars">
+PodVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>PodVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.PodVars">PodVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>)
+</p>
+<div>
+<p>PodVars defines the vars can be referenced from a Pod.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">
+ContainerVars
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.PointInTimeRefSpec">PointInTimeRefSpec
 </h3>
@@ -17215,6 +17260,20 @@ Kubernetes core/v1.SecretKeySelector
 <td>
 <em>(Optional)</em>
 <p>Selects a key of a Secret.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">
+PodVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Pod.</p>
 </td>
 </tr>
 <tr>

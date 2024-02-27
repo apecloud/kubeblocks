@@ -40,13 +40,13 @@ var _ = Describe("Lorry Utils", func() {
 	Context("build probe containers", func() {
 		var container *corev1.Container
 		var component *SynthesizedComponent
-		var probeServiceHTTPPort int
-		var probeServiceGRPCPort int
+		var lorryHTTPPort int
+		var lorryGRPCPort int
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
-			probeServiceHTTPPort = 3501
-			probeServiceGRPCPort = 50001
+			lorryHTTPPort = 3501
+			lorryGRPCPort = 50001
 
 			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
 			clusterDefProbe.PeriodSeconds = 1
@@ -80,11 +80,11 @@ var _ = Describe("Lorry Utils", func() {
 					AccessMode: appsv1alpha1.Readonly,
 				},
 			}
-			component.Probes = &appsv1alpha1.ClusterDefinitionProbes{
-				RunningProbe: &appsv1alpha1.ClusterDefinitionProbe{},
-				StatusProbe:  &appsv1alpha1.ClusterDefinitionProbe{},
-				RoleProbe:    &appsv1alpha1.ClusterDefinitionProbe{},
-			}
+			// component.Probes = &appsv1alpha1.ClusterDefinitionProbes{
+			// 	RunningProbe: &appsv1alpha1.ClusterDefinitionProbe{},
+			// 	StatusProbe:  &appsv1alpha1.ClusterDefinitionProbe{},
+			// 	RoleProbe:    &appsv1alpha1.ClusterDefinitionProbe{},
+			// }
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
 				RoleProbe: &appsv1alpha1.RoleProbe{},
 			}
@@ -92,7 +92,7 @@ var _ = Describe("Lorry Utils", func() {
 				Containers: []corev1.Container{},
 			}
 
-			container = buildBasicContainer(component)
+			container = buildBasicContainer(component, lorryHTTPPort)
 		})
 
 		It("build role probe containers", func() {
@@ -110,15 +110,18 @@ var _ = Describe("Lorry Utils", func() {
 			}
 			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(1))
+			Expect(component.PodSpec.InitContainers).Should(HaveLen(0))
 			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.LorryContainerName))
 		})
 
 		It("should build role service container", func() {
-			buildLorryServiceContainer(component, container, probeServiceHTTPPort, probeServiceGRPCPort, nil)
+			buildLorryServiceContainer(component, container, lorryHTTPPort, lorryGRPCPort, nil)
 			Expect(container.Command).ShouldNot(BeEmpty())
+			Expect(container.Name).Should(Equal(constant.LorryContainerName))
+			Expect(len(container.Ports)).Should(Equal(2))
 		})
 
-		It("build lorry container", func() {
+		It("build lorry container if any builtinhandler specified", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -132,6 +135,31 @@ var _ = Describe("Lorry Utils", func() {
 			}
 			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(1))
+			Expect(component.PodSpec.InitContainers).Should(HaveLen(0))
+			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.LorryContainerName))
+		})
+
+		It("build lorry container if any exec specified", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: logger,
+			}
+			image := "testimage"
+			// all other services are disabled
+			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
+				MemberJoin: &appsv1alpha1.LifecycleActionHandler{
+					CustomHandler: &appsv1alpha1.Action{
+						Exec: &appsv1alpha1.ExecAction{
+							Command: []string{"test"},
+						},
+						Image: image,
+					},
+				},
+			}
+			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
+			Expect(component.PodSpec.Containers).Should(HaveLen(1))
+			Expect(component.PodSpec.InitContainers).Should(HaveLen(1))
+			Expect(component.PodSpec.Containers[0].Image).Should(Equal(image))
 			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.LorryContainerName))
 		})
 

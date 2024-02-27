@@ -208,17 +208,17 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 	}
 
 	rsmRoleProbe := &workloads.RoleProbe{
-		InitialDelaySeconds: synthesizeComp.LifecycleActions.RoleProbe.InitialDelaySeconds,
 		TimeoutSeconds:      synthesizeComp.LifecycleActions.RoleProbe.TimeoutSeconds,
 		PeriodSeconds:       synthesizeComp.LifecycleActions.RoleProbe.PeriodSeconds,
-		SuccessThreshold:    synthesizeComp.LifecycleActions.RoleProbe.SuccessThreshold,
-		FailureThreshold:    synthesizeComp.LifecycleActions.RoleProbe.FailureThreshold,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
 		RoleUpdateMechanism: workloads.DirectAPIServerEventUpdate,
 	}
 
 	if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
 		builtinHandler := string(*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler)
 		rsmRoleProbe.BuiltinHandler = &builtinHandler
+		return rsmRoleProbe, nil
 	}
 
 	// TODO(xingran): RSM Action does not support args[] yet

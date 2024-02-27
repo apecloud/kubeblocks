@@ -817,13 +817,10 @@ var _ = Describe("Component Definition Convertor", func() {
 					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
 						BuiltinHandler: wesqlBuiltinHandler(),
 					},
-					TimeoutSeconds:   clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
-					PeriodSeconds:    clusterCompDef.Probes.RoleProbe.PeriodSeconds,
-					FailureThreshold: clusterCompDef.Probes.RoleProbe.FailureThreshold,
+					TimeoutSeconds: clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
+					PeriodSeconds:  clusterCompDef.Probes.RoleProbe.PeriodSeconds,
 				}
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
-				Expect(*actions.RoleProbe).ShouldNot(BeEquivalentTo(*expectedRoleProbe))
-				expectedRoleProbe.SuccessThreshold = actions.RoleProbe.SuccessThreshold
 				Expect(*actions.RoleProbe).Should(BeEquivalentTo(*expectedRoleProbe))
 			})
 

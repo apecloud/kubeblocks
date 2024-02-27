@@ -411,6 +411,13 @@ func CreateTPLScriptHandler(name, configPath string, dirs []string, backupPath s
 	if err != nil {
 		return nil, err
 	}
+	dsn := tplConfig.DSN
+	if dsn != "" {
+		dsn, err = renderDSN(dsn)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if err := backupConfigFiles(dirs, filter, backupPath); err != nil {
 		return nil, err
 	}
@@ -420,7 +427,7 @@ func CreateTPLScriptHandler(name, configPath string, dirs []string, backupPath s
 		tplScripts:             tplScripts,
 		fileFilter:             filter,
 		engineType:             tplConfig.DataType,
-		dsn:                    tplConfig.DSN,
+		dsn:                    dsn,
 		backupPath:             backupPath,
 	}
 	return tplHandler, nil

@@ -154,9 +154,6 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Sharding(transCtx *c
 		}
 		compSpecs = append(compSpecs, shardingComps...)
 		transCtx.ShardingComponentSpecs[sharding.Name] = shardingComps
-		for _, comp := range shardingComps {
-			transCtx.Labels[comp.Name] = constant.GetShardingNameLabel(sharding.Name)
-		}
 	}
 	return compSpecs, nil
 }

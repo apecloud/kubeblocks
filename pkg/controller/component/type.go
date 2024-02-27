@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -69,15 +70,16 @@ type SynthesizedComponent struct {
 	NodesAssignment []workloads.NodeAssignment `json:"nodesAssignment,omitempty"`
 
 	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
-	Roles             []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
-	Labels            map[string]string                   `json:"labels,omitempty"`
-	UpdateStrategy    *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
-	PolicyRules       []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
-	LifecycleActions  *v1alpha1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
-	SystemAccounts    []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
-	RoleArbitrator    *v1alpha1.RoleArbitrator            `json:"roleArbitrator,omitempty"`
-	Volumes           []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
-	ComponentServices []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
+	Roles               []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
+	Labels              map[string]string                   `json:"labels,omitempty"`
+	UpdateStrategy      *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
+	PodManagementPolicy *appsv1.PodManagementPolicyType     `json:"podManagementPolicy,omitempty"`
+	PolicyRules         []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
+	LifecycleActions    *v1alpha1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
+	SystemAccounts      []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
+	RoleArbitrator      *v1alpha1.RoleArbitrator            `json:"roleArbitrator,omitempty"`
+	Volumes             []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
+	ComponentServices   []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.
 	CustomLabelSpecs    []v1alpha1.CustomLabelSpec        `json:"customLabelSpecs,omitempty"`    // The CustomLabelSpecs will be replaced with Labels in the future.

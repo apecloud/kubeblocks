@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -474,6 +475,17 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
+	buildPodManagementPolicy := func() {
+		var podManagementPolicy appsv1.PodManagementPolicyType
+		w := clusterCompDef.GetStatefulSetWorkload()
+		if w == nil {
+			podManagementPolicy = ""
+		} else {
+			podManagementPolicy, _ = w.FinalStsUpdateStrategy()
+		}
+		synthesizeComp.PodManagementPolicy = &podManagementPolicy
+	}
+
 	// build workload
 	buildWorkload()
 
@@ -482,6 +494,9 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 
 	// build services
 	buildServices()
+
+	// build pod management policy
+	buildPodManagementPolicy()
 
 	// build componentRefEnvs
 	if err := buildComponentRef(clusterDef, cluster, clusterCompDef, synthesizeComp); err != nil {

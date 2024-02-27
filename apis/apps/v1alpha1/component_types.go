@@ -32,7 +32,7 @@ type ComponentSpec struct {
 	// Specifies the name of the referenced ComponentDefinition.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:validation:MaxLength=64
 	CompDef string `json:"compDef"`
 
 	// ServiceVersion specifies the version of the service provisioned by the component.

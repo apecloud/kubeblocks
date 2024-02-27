@@ -10019,7 +10019,7 @@ spec:
                             description: CompDef specifies the component definition
                               to use, either as a specific name or a name prefix.
                               Cannot be updated.
-                            maxLength: 128
+                            maxLength: 64
                             type: string
                           name:
                             description: Name defines the name of the component. This

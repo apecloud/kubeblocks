@@ -107,7 +107,7 @@ spec:
                 type: object
               compDef:
                 description: Specifies the name of the referenced ComponentDefinition.
-                maxLength: 128
+                maxLength: 64
                 type: string
               configs:
                 description: Defines the configuration for the component.

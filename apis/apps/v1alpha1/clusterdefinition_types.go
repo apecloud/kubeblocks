@@ -119,7 +119,7 @@ type ClusterTopologyComponent struct {
 	// Cannot be updated.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:validation:MaxLength=64
 	CompDef string `json:"compDef"`
 
 	// ServiceVersion specifies the service version associated with the referenced component definition.

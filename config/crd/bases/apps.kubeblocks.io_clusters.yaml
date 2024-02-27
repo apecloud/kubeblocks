@@ -228,7 +228,7 @@ spec:
                       description: References the name of the ComponentDefinition.
                         If both componentDefRef and componentDef are provided, the
                         componentDef will take precedence over componentDefRef.
-                      maxLength: 128
+                      maxLength: 64
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     componentDefRef:
@@ -1470,7 +1470,7 @@ spec:
                           description: References the name of the ComponentDefinition.
                             If both componentDefRef and componentDef are provided,
                             the componentDef will take precedence over componentDefRef.
-                          maxLength: 128
+                          maxLength: 64
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         componentDefRef:

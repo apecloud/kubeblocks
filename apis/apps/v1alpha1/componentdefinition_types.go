@@ -475,7 +475,7 @@ type Action struct {
 	// Cannot be updated.
 	// +kubebuilder:default=0
 	// +optional
-	TimeoutSeconds int32 `json:"timeoutSeconds:omitempty"`
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
 
 	// RetryPolicy defines the strategy for retrying the action in case of failure.
 	// Cannot be updated.

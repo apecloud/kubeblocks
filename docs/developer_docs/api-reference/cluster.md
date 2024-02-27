@@ -2719,7 +2719,7 @@ This field cannot be updated.</p>
 </tr>
 <tr>
 <td>
-<code>timeoutSeconds:omitempty</code><br/>
+<code>timeoutSeconds</code><br/>
 <em>
 int32
 </em>

@@ -257,7 +257,7 @@ func (r *ComponentDefinitionReconciler) validateReplicasLimit(cli client.Client,
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	for _, v := range cmpd.Spec.SystemAccounts {
-		if v.SecretRef == nil && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
+		if v.SecretRef == nil && !v.InitAccount && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
 			return fmt.Errorf(`the AccountProvision action is needed to provision system account %s`, v.Name)
 		}
 	}

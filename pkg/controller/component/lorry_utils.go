@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -56,7 +57,6 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 		return nil
 	}
 
-	container := buildBasicContainer(synthesizeComp)
 	var lorryContainers []corev1.Container
 	lorryHTTPPort := viper.GetInt32(constant.KBEnvLorryHTTPPort)
 	lorryGRPCPort := viper.GetInt32(constant.KBEnvLorryGRPCPort)
@@ -78,6 +78,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 		}
 	}
 
+	container := buildBasicContainer(synthesizeComp, int(lorryHTTPPort))
 	// inject role probe container
 	var compRoleProbe *appsv1alpha1.RoleProbe
 	if synthesizeComp.LifecycleActions != nil {
@@ -104,26 +105,75 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	}
 
 	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort), clusterCompSpec)
+	adaptLorryIfCustomHandlerDefined(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort))
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)
+
 	return nil
 }
 
-func buildBasicContainer(synthesizeComp *SynthesizedComponent) *corev1.Container {
+func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container,
+	lorryHTTPPort, lorryGRPCPort int) {
+	actionCommands, execImage, containerName := getActionCommandsWithExecImageOrContainerName(synthesizeComp)
+	if len(actionCommands) == 0 {
+		return
+	}
+	initContainer := buildLorryInitContainer(synthesizeComp)
+	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
+	execContainer := getExecContainer(synthesizeComp.PodSpec.Containers, containerName)
+	if execImage == "" {
+		if execContainer == nil {
+			return
+		}
+		execImage = execContainer.Image
+	}
+
+	lorryContainer.Image = execImage
+	lorryContainer.VolumeMounts = append(lorryContainer.VolumeMounts, corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"})
+
+	lorryContainer.Command = []string{"/kubeblocks/lorry",
+		"--port", strconv.Itoa(lorryHTTPPort),
+		"--grpcport", strconv.Itoa(lorryGRPCPort),
+		"--config-path", "/kubeblocks/config/lorry/components/",
+	}
+	actionJSON, _ := json.Marshal(actionCommands)
+	lorryContainer.Env = append(lorryContainer.Env, corev1.EnvVar{
+		Name:  constant.KBEnvActionCommands,
+		Value: string(actionJSON),
+	})
+
+	if execContainer == nil {
+		return
+	}
+
+	envSet := sets.New([]string{}...)
+	for _, env := range lorryContainer.Env {
+		envSet.Insert(env.Name)
+	}
+
+	for _, env := range execContainer.Env {
+		if envSet.Has(env.Name) {
+			continue
+		}
+		lorryContainer.Env = append(lorryContainer.Env, env)
+	}
+}
+
+func buildBasicContainer(synthesizeComp *SynthesizedComponent, lorryHTTPPort int) *corev1.Container {
 	return builder.NewContainerBuilder("string").
 		SetImage("infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/google_containers/pause:3.6").
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands("/pause").
 		SetStartupProbe(corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(3501)},
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(lorryHTTPPort)},
 			}}).
 		GetObject()
 }
 
-func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container *corev1.Container, lorryHTTPPort,
-	lorryGRPCPort int, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
+func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container *corev1.Container,
+	lorryHTTPPort, lorryGRPCPort int, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
 	container.Name = constant.LorryContainerName
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
@@ -148,26 +198,20 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 	buildLorryEnvs(container, synthesizeComp, clusterCompSpec)
 }
 
-func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
-	var (
-		secretName     string
-		sysInitAccount *appsv1alpha1.SystemAccount
-	)
+func buildLorryInitContainer(component *SynthesizedComponent) *corev1.Container {
+	container := &corev1.Container{}
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.Name = constant.LorryInitContainerName
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+	container.Command = []string{"cp", "-r", "/bin/lorry", "/config", "/kubeblocks/"}
+	container.StartupProbe = nil
+	container.ReadinessProbe = nil
+	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
+	container.VolumeMounts = []corev1.VolumeMount{volumeMount}
+	return container
+}
 
-	// TODO(lorry): use the buildIn kbprobe system account as the default credential
-	for index, sysAccount := range synthesizeComp.SystemAccounts {
-		if sysAccount.InitAccount {
-			sysInitAccount = &synthesizeComp.SystemAccounts[index]
-			break
-		}
-	}
-	if clusterCompSpec == nil || clusterCompSpec.ComponentDef != "" {
-		if sysInitAccount != nil {
-			secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
-		}
-	} else {
-		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
-	}
+func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
 	envs := []corev1.EnvVar{
 		// inject the default built-in handler env to lorry container.
 		{
@@ -176,34 +220,11 @@ func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComp
 			ValueFrom: nil,
 		},
 	}
-	if secretName != "" {
-		envs = append(envs,
-			corev1.EnvVar{
-				Name: constant.KBEnvServiceUser,
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
-						Key: constant.AccountNameForSecret,
-					},
-				},
-			},
-			corev1.EnvVar{
-				Name: constant.KBEnvServicePassword,
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
-						Key: constant.AccountPasswdForSecret,
-					},
-				},
-			})
-	}
 
-	if len(synthesizeComp.PodSpec.Containers) > 0 {
-		mainContainer := synthesizeComp.PodSpec.Containers[0]
+	envs = append(envs, buildEnv4DBAccount(synthesizeComp, clusterCompSpec)...)
+
+	mainContainer := getMainContainer(synthesizeComp.PodSpec.Containers)
+	if mainContainer != nil {
 		if len(mainContainer.Ports) > 0 {
 			port := mainContainer.Ports[0]
 			dbPort := port.ContainerPort
@@ -254,9 +275,8 @@ func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = roleProbe.PeriodSeconds
 	probe.TimeoutSeconds = roleProbe.TimeoutSeconds
-	probe.FailureThreshold = roleProbe.FailureThreshold
+	probe.FailureThreshold = 3
 	roleChangedContainer.ReadinessProbe = probe
-	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {
@@ -274,7 +294,57 @@ func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Contain
 	probe.TimeoutSeconds = defaultVolumeProtectionProbe.TimeoutSeconds
 	probe.FailureThreshold = defaultVolumeProtectionProbe.FailureThreshold
 	c.ReadinessProbe = probe
-	c.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
+}
+
+func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) []corev1.EnvVar {
+	var (
+		secretName     string
+		sysInitAccount *appsv1alpha1.SystemAccount
+	)
+
+	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		if sysAccount.InitAccount {
+			sysInitAccount = &synthesizeComp.SystemAccounts[index]
+			break
+		}
+	}
+
+	if clusterCompSpec == nil || clusterCompSpec.ComponentDef != "" {
+		if sysInitAccount != nil {
+			secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
+		}
+	} else {
+		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
+	}
+	envs := []corev1.EnvVar{}
+	if secretName == "" {
+		return envs
+	}
+
+	envs = append(envs,
+		corev1.EnvVar{
+			Name: constant.KBEnvServiceUser,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountNameForSecret,
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: constant.KBEnvServicePassword,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountPasswdForSecret,
+				},
+			},
+		})
+	return envs
 }
 
 func buildEnv4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar {
@@ -329,4 +399,64 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		return appsv1alpha1.CustomActionHandler
 	}
 	return appsv1alpha1.UnknownBuiltinActionHandler
+}
+
+func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedComponent) (map[string][]string, string, string) {
+	if synthesizeComp.LifecycleActions == nil {
+		return nil, "", ""
+	}
+
+	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
+		// "postProvision":    synthesizeComp.LifecycleActions.PostProvision,
+		// "preTerminate":     synthesizeComp.LifecycleActions.PreTerminate,
+		"memberJoin":  synthesizeComp.LifecycleActions.MemberJoin,
+		"memberLeave": synthesizeComp.LifecycleActions.MemberLeave,
+		"readonly":    synthesizeComp.LifecycleActions.Readonly,
+		"readwrite":   synthesizeComp.LifecycleActions.Readwrite,
+		// "dataPopulate":     synthesizeComp.LifecycleActions.DataPopulate,
+		// "dataAssemble":     synthesizeComp.LifecycleActions.DataAssemble,
+		// "reconfigure":      synthesizeComp.LifecycleActions.Reconfigure,
+		// "accountProvision": synthesizeComp.LifecycleActions.AccountProvision,
+	}
+
+	if synthesizeComp.LifecycleActions.RoleProbe != nil {
+		actions["roleProbe"] = &synthesizeComp.LifecycleActions.RoleProbe.LifecycleActionHandler
+	}
+
+	var toolImage string
+	var containerName string
+	actionCommands := map[string][]string{}
+	for action, handler := range actions {
+		if handler != nil && handler.CustomHandler != nil && handler.CustomHandler.Exec != nil {
+			actionCommands[action] = handler.CustomHandler.Exec.Command
+			if handler.CustomHandler.Image != "" {
+				toolImage = handler.CustomHandler.Image
+			}
+			if handler.CustomHandler.Container != "" {
+				containerName = handler.CustomHandler.Container
+			}
+		}
+	}
+
+	return actionCommands, toolImage, containerName
+}
+
+func getExecContainer(containers []corev1.Container, name string) *corev1.Container {
+	if name == "" {
+		return getMainContainer(containers)
+	}
+
+	for i := range containers {
+		if containers[i].Name == name {
+			return &containers[i]
+		}
+	}
+	return nil
+}
+
+func getMainContainer(containers []corev1.Container) *corev1.Container {
+	if len(containers) > 0 {
+		return &containers[0]
+	}
+	return nil
 }

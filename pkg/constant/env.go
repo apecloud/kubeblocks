@@ -83,13 +83,13 @@ const (
 const (
 	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
 	KBEnvBuiltinHandler  = "KB_BUILTIN_HANDLER"
+	KBEnvActionCommands  = "KB_ACTION_COMMANDS"
 	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
 	KBEnvServiceUser     = "KB_SERVICE_USER"
 	KBEnvServicePassword = "KB_SERVICE_PASSWORD"
 	KBEnvLorryHTTPPort   = "LORRY_HTTP_PORT"
 	KBEnvLorryGRPCPort   = "LORRY_GRPC_PORT"
 	KBEnvLorryLogLevel   = "LORRY_LOG_LEVEL"
-
 	// KBEnvServiceRoles defines the Roles configured in the cluster definition that are visible to users.
 	KBEnvServiceRoles = "KB_SERVICE_ROLES"
 

@@ -1236,7 +1236,7 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
-<code>HostNetwork</code><br/>
+<code>hostNetwork</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
 HostNetwork
@@ -6600,7 +6600,7 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
-<code>HostNetwork</code><br/>
+<code>hostNetwork</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
 HostNetwork
@@ -10473,6 +10473,9 @@ int32
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector
 </h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
 <div>
 <p>HostNetworkVarSelector selects a var from host-network resources.</p>
 </div>
@@ -17215,6 +17218,20 @@ Kubernetes core/v1.SecretKeySelector
 <td>
 <em>(Optional)</em>
 <p>Selects a key of a Secret.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostNetworkVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">
+HostNetworkVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of host-network.</p>
 </td>
 </tr>
 <tr>

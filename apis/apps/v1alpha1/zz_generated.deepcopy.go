@@ -5670,6 +5670,7 @@ func (in *VarSource) DeepCopyInto(out *VarSource) {
 		*out = new(v1.SecretKeySelector)
 		(*in).DeepCopyInto(*out)
 	}
+	in.HostNetworkVarRef.DeepCopyInto(&out.HostNetworkVarRef)
 	if in.ServiceVarRef != nil {
 		in, out := &in.ServiceVarRef, &out.ServiceVarRef
 		*out = new(ServiceVarSelector)

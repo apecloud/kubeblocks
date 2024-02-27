@@ -383,6 +383,7 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 			Value: sidecarRenderedParam.CharacterType,
 		})
 	}
+	// TODO: Remove hard coding
 	if sidecarRenderedParam.CharacterType == "mysql" {
 		env = append(env, corev1.EnvVar{
 			Name: "MYSQL_USER",

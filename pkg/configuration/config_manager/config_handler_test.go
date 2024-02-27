@@ -199,12 +199,16 @@ var _ = Describe("Config Handler Test", func() {
 			configFile := filepath.Join(tmpWorkDir, "config.yaml")
 			Expect(os.WriteFile(tplFile, []byte(``), fs.ModePerm)).Should(Succeed())
 
-			tplConfig := TPLScriptConfig{Scripts: "test.tpl"}
+			os.Setenv("MYSQL_USER", "admin")
+			os.Setenv("MYSQL_PASSWORD", "admin")
+			tplConfig := TPLScriptConfig{Scripts: "test.tpl", DSN: `{%- expandenv "${MYSQL_USER}:${MYSQL_PASSWORD}@(localhost:3306)/" | trim %}`}
 			b, _ := util.ToYamlConfig(tplConfig)
 			Expect(os.WriteFile(configFile, b, fs.ModePerm)).Should(Succeed())
 
-			_, err := CreateTPLScriptHandler("", configFile, []string{filepath.Join(tmpWorkDir, "config")}, "")
+			handler, err := CreateTPLScriptHandler("", configFile, []string{filepath.Join(tmpWorkDir, "config")}, "")
 			Expect(err).Should(Succeed())
+			tplHandler := handler.(*tplScriptHandler)
+			Expect(tplHandler.dsn).Should(BeEquivalentTo("admin:admin@(localhost:3306)/"))
 		})
 
 	})

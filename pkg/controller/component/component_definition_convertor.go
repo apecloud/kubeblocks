@@ -558,15 +558,13 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 
 	clusterCompDefRoleProbe := clusterCompDef.Probes.RoleProbe
 	roleProbe := &appsv1alpha1.RoleProbe{
-		TimeoutSeconds:   clusterCompDefRoleProbe.TimeoutSeconds,
-		PeriodSeconds:    clusterCompDefRoleProbe.PeriodSeconds,
-		SuccessThreshold: 1, // default non-zero value
-		FailureThreshold: clusterCompDefRoleProbe.FailureThreshold,
+		TimeoutSeconds: clusterCompDefRoleProbe.TimeoutSeconds,
+		PeriodSeconds:  clusterCompDefRoleProbe.PeriodSeconds,
 	}
 
-	if clusterCompDefRoleProbe.Commands == nil || len(clusterCompDefRoleProbe.Commands.Writes) == 0 || len(clusterCompDefRoleProbe.Commands.Queries) == 0 {
-		builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
-		roleProbe.BuiltinHandler = &builtinHandler
+	builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
+	roleProbe.BuiltinHandler = &builtinHandler
+	if clusterCompDefRoleProbe.Commands == nil || len(clusterCompDefRoleProbe.Commands.Queries) == 0 {
 		roleProbe.CustomHandler = nil
 		return roleProbe
 	}
@@ -575,7 +573,6 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 	if len(clusterCompDefRoleProbe.Commands.Writes) == 0 {
 		commands = clusterCompDefRoleProbe.Commands.Queries
 	}
-	roleProbe.BuiltinHandler = nil
 	roleProbe.CustomHandler = &appsv1alpha1.Action{
 		Exec: &appsv1alpha1.ExecAction{
 			Command: commands,

@@ -51,6 +51,7 @@ type CheckRole struct {
 	FailedEventReportFrequency int
 	ProbeTimeout               time.Duration
 	DBRoles                    map[string]AccessMode
+	Command                    []string
 }
 
 var checkrole operations.Operation = &CheckRole{}
@@ -68,10 +69,11 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
+	s.logger = ctrl.Log.WithName("checkrole")
 	val := viper.GetString(constant.KBEnvServiceRoles)
 	if val != "" {
 		if err := json.Unmarshal([]byte(val), &s.DBRoles); err != nil {
-			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
+			s.logger.Info("KB_DB_ROLES env format error", "error", err)
 		}
 	}
 
@@ -89,8 +91,20 @@ func (s *CheckRole) Init(ctx context.Context) error {
 	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
 	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
 	s.ProbeTimeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
-	s.logger = ctrl.Log.WithName("checkrole")
+	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	if actionJSON != "" {
+		actionCommands := map[string][]string{}
+		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
+		if err != nil {
+			s.logger.Info("get action commands failed", "error", err)
+		}
+		roleProbeCmd, ok := actionCommands["roleProbe"]
+		if ok && len(roleProbeCmd) > 0 {
+			s.Command = roleProbeCmd
+		}
+	}
 	return nil
+
 }
 
 func (s *CheckRole) IsReadonly(ctx context.Context) bool {
@@ -98,27 +112,34 @@ func (s *CheckRole) IsReadonly(ctx context.Context) bool {
 }
 
 func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager()
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
 	resp := &operations.OpsResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.CheckRoleOperation
 	resp.Data["originalRole"] = s.OriRole
+	var role string
+	var err error
 
-	if !manager.IsDBStartupReady() {
-		resp.Data["message"] = "db not ready"
-		return resp, nil
+	if len(s.Command) == 0 {
+		manager, err1 := register.GetDBManager()
+		if err1 != nil {
+			return nil, errors.Wrap(err1, "get manager failed")
+		}
+
+		if !manager.IsDBStartupReady() {
+			resp.Data["message"] = "db not ready"
+			return resp, nil
+		}
+
+		cluster := s.dcsStore.GetClusterFromCache()
+
+		ctx1, cancel := context.WithTimeout(ctx, s.ProbeTimeout)
+		defer cancel()
+		role, err = manager.GetReplicaRole(ctx1, cluster)
+	} else {
+		role, err = util.ExecCommand(s.Command)
 	}
 
-	cluster := s.dcsStore.GetClusterFromCache()
-
-	ctx1, cancel := context.WithTimeout(ctx, s.ProbeTimeout)
-	defer cancel()
-	role, err := manager.GetReplicaRole(ctx1, cluster)
 	if err != nil {
 		s.logger.Info("executing checkRole error", "error", err.Error())
 		// do not return err, as it will cause readinessprobe to fail

@@ -82,7 +82,7 @@ type DBManager interface {
 	Promote(context.Context, *dcs.Cluster) error
 	Demote(context.Context) error
 	Follow(context.Context, *dcs.Cluster) error
-	Recover(context.Context) error
+	Recover(context.Context, *dcs.Cluster) error
 
 	// Start and Stop just send signal to lorryctl
 	Start(context.Context, *dcs.Cluster) error

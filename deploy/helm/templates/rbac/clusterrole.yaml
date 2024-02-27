@@ -38,6 +38,7 @@ rules:
   resources:
   - backups
   verbs:
+  - create
   - get
   - patch
   - update

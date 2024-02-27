@@ -285,11 +285,11 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
    kbcli cluster describe-ops myproxy -reconfiguring-lth8d -n default
    ```
 
-    :::note
+   :::note
 
-    关于参数配置的更多信息，请参考[配置](./../../kubeblocks-for-postgresql/configuration/configuration.md)。
+   关于参数配置的更多信息，请参考[配置](./../../kubeblocks-for-postgresql/configuration/configuration.md)。
 
-    :::
+   :::
 
 ## 日志
 

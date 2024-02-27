@@ -34,11 +34,11 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
       kbcli cluster update mycluster --enable-all-logs=true -n <namespace>
       ```
 
-      :::note
+    :::note
 
-      创建集群时的默认命名空间是 `default`。如果在创建集群时指定了命名空间，请将 `<namespace>` 填写为你自定义的命名空间。
+    创建集群时的默认命名空间是 `default`。如果在创建集群时指定了命名空间，请将 `<namespace>` 填写为你自定义的命名空间。
 
-      :::
+    :::
 
 2. 查看支持的日志。
 

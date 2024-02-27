@@ -66,58 +66,59 @@ spec:
                 items:
                   properties:
                     asEnvFrom:
-                      description: Specify the list of containers that will be injected
-                        into EnvFrom.
+                      description: An optional field where the list of containers
+                        will be injected into EnvFrom.
                       items:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
                     constraintRef:
-                      description: Specify the name of the referenced the configuration
-                        constraints object.
+                      description: An optional field that defines the name of the
+                        referenced configuration constraints object.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     defaultMode:
-                      description: "Specify mode bits used to set permissions on created
-                        files by default. \n Must be an octal value between 0000 and
-                        0777 or a decimal value between 0 and 511. YAML accepts both
-                        octal and decimal values, JSON requires decimal values for
-                        mode bits. Defaults to 0644. \n Directories within the path
-                        are not affected by this setting. This might be in conflict
+                      description: "Refers to the mode bits used to set permissions
+                        on created files by default. \n Must be an octal value between
+                        0000 and 0777 or a decimal value between 0 and 511. YAML accepts
+                        both octal and decimal values, JSON requires decimal values
+                        for mode bits. Defaults to 0644. \n Directories within the
+                        path are not affected by this setting. This might be in conflict
                         with other options that affect the file mode, like fsGroup,
                         and the result can be other mode bits set."
                       format: int32
                       type: integer
                     keys:
-                      description: Specify a list of keys. If empty, ConfigConstraint
+                      description: Defines a list of keys. If left empty, ConfigConstraint
                         applies to all keys in the configmap.
                       items:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
                     legacyRenderedConfigSpec:
-                      description: Defines the secondary rendered config spec
+                      description: An optional field that defines the secondary rendered
+                        config spec.
                       properties:
                         namespace:
                           default: default
-                          description: Specify the namespace of the referenced the
-                            configuration template ConfigMap object. An empty namespace
-                            is equivalent to the "default" namespace.
+                          description: Specifies the namespace of the referenced configuration
+                            template ConfigMap object. An empty namespace is equivalent
+                            to the "default" namespace.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                           type: string
                         policy:
                           default: none
-                          description: policy defines how to merge external imported
-                            templates into component templates.
+                          description: Defines the strategy for merging externally
+                            imported templates into component templates.
                           enum:
                           - patch
                           - replace
                           - none
                           type: string
                         templateRef:
-                          description: Specify the name of the referenced the configuration
+                          description: Specifies the name of the referenced configuration
                             template ConfigMap object.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
@@ -126,29 +127,29 @@ spec:
                       - templateRef
                       type: object
                     name:
-                      description: Specify the name of the configuration template.
+                      description: Specifies the name of the configuration template.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     namespace:
                       default: default
-                      description: Specify the namespace of the referenced configuration
+                      description: Specifies the namespace of the referenced configuration
                         template ConfigMap object. An empty namespace is equivalent
                         to the "default" namespace.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     templateRef:
-                      description: Specify the name of the referenced configuration
+                      description: Specifies the name of the referenced configuration
                         template ConfigMap object.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     volumeName:
-                      description: The volume name of PodTemplate, to which the configuration
-                        file produced through the configuration template will be mounted.
-                        Must be a DNS_LABEL name. The volume name must be defined
-                        in podSpec.containers[*].volumeMounts.
+                      description: Refers to the volume name of PodTemplate. The configuration
+                        file produced through the configuration template will be mounted
+                        to the corresponding volume. Must be a DNS_LABEL name. The
+                        volume name must be defined in podSpec.containers[*].volumeMounts.
                       maxLength: 63
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
@@ -11482,40 +11483,40 @@ spec:
                 items:
                   properties:
                     defaultMode:
-                      description: "Specify mode bits used to set permissions on created
-                        files by default. \n Must be an octal value between 0000 and
-                        0777 or a decimal value between 0 and 511. YAML accepts both
-                        octal and decimal values, JSON requires decimal values for
-                        mode bits. Defaults to 0644. \n Directories within the path
-                        are not affected by this setting. This might be in conflict
+                      description: "Refers to the mode bits used to set permissions
+                        on created files by default. \n Must be an octal value between
+                        0000 and 0777 or a decimal value between 0 and 511. YAML accepts
+                        both octal and decimal values, JSON requires decimal values
+                        for mode bits. Defaults to 0644. \n Directories within the
+                        path are not affected by this setting. This might be in conflict
                         with other options that affect the file mode, like fsGroup,
                         and the result can be other mode bits set."
                       format: int32
                       type: integer
                     name:
-                      description: Specify the name of the configuration template.
+                      description: Specifies the name of the configuration template.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     namespace:
                       default: default
-                      description: Specify the namespace of the referenced configuration
+                      description: Specifies the namespace of the referenced configuration
                         template ConfigMap object. An empty namespace is equivalent
                         to the "default" namespace.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     templateRef:
-                      description: Specify the name of the referenced configuration
+                      description: Specifies the name of the referenced configuration
                         template ConfigMap object.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     volumeName:
-                      description: The volume name of PodTemplate, to which the configuration
-                        file produced through the configuration template will be mounted.
-                        Must be a DNS_LABEL name. The volume name must be defined
-                        in podSpec.containers[*].volumeMounts.
+                      description: Refers to the volume name of PodTemplate. The configuration
+                        file produced through the configuration template will be mounted
+                        to the corresponding volume. Must be a DNS_LABEL name. The
+                        volume name must be defined in podSpec.containers[*].volumeMounts.
                       maxLength: 63
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string

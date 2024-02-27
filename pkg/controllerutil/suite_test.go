@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -98,9 +97,6 @@ var _ = BeforeSuite(func() {
 	scheme := scheme.Scheme
 
 	err = appsv1alpha1.AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = snapshotv1beta1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})

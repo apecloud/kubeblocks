@@ -266,6 +266,20 @@ func GetContainerID(pod *corev1.Pod, containerName string) string {
 	return ""
 }
 
+// GetPodContainer gets the pod container by name. if containerName is empty, return the first container.
+func GetPodContainer(pod *corev1.Pod, containerName string) *corev1.Container {
+	if containerName == "" {
+		return &pod.Spec.Containers[0]
+	}
+	for i := range pod.Spec.Containers {
+		container := pod.Spec.Containers[i]
+		if container.Name == containerName {
+			return &container
+		}
+	}
+	return nil
+}
+
 func isRunning(pod *corev1.Pod) bool {
 	return pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil
 }

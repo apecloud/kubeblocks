@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -85,7 +86,35 @@ type BackupPolicy struct {
 
 type BackupMethod struct {
 	// Method for backup
-	dpv1alpha1.BackupMethod `json:",inline"`
+	// The name of backup method.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specifies whether to take snapshots of persistent volumes. If true,
+	// the ActionSetName is not required, the controller will use the CSI volume
+	// snapshotter to create the snapshot.
+	// +optional
+	// +kubebuilder:default=false
+	SnapshotVolumes *bool `json:"snapshotVolumes,omitempty"`
+
+	// Refers to the ActionSet object that defines the backup actions.
+	// For volume snapshot backup, the actionSet is not required, the controller
+	// will use the CSI volume snapshotter to create the snapshot.
+	// +optional
+	ActionSetName string `json:"actionSetName,omitempty"`
+
+	// Specifies which volumes from the target should be mounted in the backup workload.
+	// +optional
+	TargetVolumes *dpv1alpha1.TargetVolumeInfo `json:"targetVolumes,omitempty"`
+
+	// Specifies the environment variables for the backup workload.
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Specifies runtime settings for the backup workload container.
+	// +optional
+	RuntimeSettings *dpv1alpha1.RuntimeSettings `json:"runtimeSettings,omitempty"`
 
 	// Specifies the instance where the backup will be stored.
 	//
@@ -207,6 +236,10 @@ type TargetInstance struct {
 	//
 	// +optional
 	ConnectionCredentialKey ConnectionCredentialKey `json:"connectionCredentialKey,omitempty"`
+
+	// Represents a list of environment variables to be set in the job's container.
+	// +optional
+	Vars []dpv1alpha1.EnvVar `json:"vars,omitempty"`
 }
 
 type ConnectionCredentialKey struct {

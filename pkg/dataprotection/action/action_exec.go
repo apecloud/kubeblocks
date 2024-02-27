@@ -27,6 +27,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -52,13 +53,23 @@ type ExecAction struct {
 
 	// Timeout is the timeout for the command.
 	Timeout metav1.Duration
+
+	BackupPolicy *dpv1alpha1.BackupPolicy
+
+	BackupMethod *dpv1alpha1.BackupMethod
+
+	TargetPod *corev1.Pod
 }
 
 func (e *ExecAction) Execute(ctx ActionContext) (*dpv1alpha1.ActionStatus, error) {
 	if err := e.validate(); err != nil {
 		return nil, err
 	}
-	e.JobAction.PodSpec = e.buildPodSpec()
+	podSpec, err := e.buildPodSpec(ctx)
+	if err != nil {
+		return nil, err
+	}
+	e.JobAction.PodSpec = podSpec
 	return e.JobAction.Execute(ctx)
 }
 
@@ -75,17 +86,23 @@ func (e *ExecAction) validate() error {
 	return nil
 }
 
-func (e *ExecAction) buildPodSpec() *corev1.PodSpec {
+func (e *ExecAction) buildPodSpec(ctx ActionContext) (*corev1.PodSpec, error) {
+	envVars, err := utils.BuildEnvVarByTargetVars(ctx.Ctx, ctx.Client, e.TargetPod, e.BackupPolicy.Spec.Target.Vars)
+	if err != nil {
+		return nil, err
+	}
+	envVars = utils.MergeEnv(envVars, e.BackupMethod.Env)
 	container := &corev1.Container{
 		Name:            e.Name,
 		Image:           viper.GetString(constant.KBToolsImage),
+		Env:             envVars,
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		Command:         []string{"kubectl"},
 		Args: append([]string{
 			"-n",
-			e.Namespace,
+			e.TargetPod.Namespace,
 			"exec",
-			e.PodName,
+			e.TargetPod.Name,
 			"-c",
 			e.Container,
 			"--",
@@ -105,7 +122,7 @@ func (e *ExecAction) buildPodSpec() *corev1.PodSpec {
 		},
 		Affinity:     &corev1.Affinity{},
 		NodeSelector: map[string]string{},
-	}
+	}, nil
 }
 
 var _ Action = &ExecAction{}

@@ -301,6 +301,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp *appsv1alpha1.Clu
 
 	// convert role labelSelector based on the replicas of the component automatically.
 	r.syncRoleLabelSelector(backupPolicy.Spec.Target, r.backupPolicy.Target.Role)
+	backupPolicy.Spec.Target.Vars = r.backupPolicy.Target.Vars
 }
 
 func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(target *dpv1alpha1.BackupTarget, role string) {
@@ -360,13 +361,21 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 		oldBackupMethodMap[v.Name] = v
 	}
 	for _, v := range r.backupPolicy.BackupMethods {
-		backupMethod := v.BackupMethod
+		backupMethod := dpv1alpha1.BackupMethod{
+			Name:            v.Name,
+			RuntimeSettings: v.RuntimeSettings,
+			Env:             v.Env,
+			SnapshotVolumes: v.SnapshotVolumes,
+			TargetVolumes:   v.TargetVolumes,
+			ActionSetName:   v.ActionSetName,
+		}
 		if m, ok := oldBackupMethodMap[backupMethod.Name]; ok {
 			backupMethod = m
 			delete(oldBackupMethodMap, backupMethod.Name)
 		} else if v.Target != nil {
 			backupMethod.Target = r.buildBackupTarget(*v.Target, comp)
 			r.syncRoleLabelSelector(backupMethod.Target, v.Target.Role)
+			backupMethod.Target.Vars = v.Target.Vars
 		}
 		mappingEnv := r.doEnvMapping(comp, v.EnvMapping)
 		backupMethod.Env = dputils.MergeEnv(backupMethod.Env, mappingEnv)
@@ -448,6 +457,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 	if cc.SecretName != "" {
 		target.ConnectionCredential = &cc
 	}
+	target.Vars = targetTpl.Vars
 	return target
 }
 

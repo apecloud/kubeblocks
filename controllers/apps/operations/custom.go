@@ -431,104 +431,34 @@ func (c CustomOpsHandler) buildEnvVars(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	containerEnvMap := map[string]map[string]corev1.EnvVar{}
-	for i := range targetPod.Spec.Containers {
-		envMap := map[string]corev1.EnvVar{}
-		container := targetPod.Spec.Containers[i]
-		for j := range container.Env {
-			envMap[container.Env[j].Name] = container.Env[j]
-		}
-		containerEnvMap[container.Name] = envMap
-	}
 
-	getContainer := func(containerName string) *corev1.Container {
-		if containerName == "" {
-			return &targetPod.Spec.Containers[0]
-		}
-		for i := range targetPod.Spec.Containers {
-			container := targetPod.Spec.Containers[i]
-			if container.Name == containerName {
-				return &container
-			}
-		}
-		return nil
-	}
-
-	getVarWithEnv := func(container *corev1.Container, envName string) *corev1.EnvVar {
-		for i := range container.Env {
-			env := container.Env[i]
-			if env.Name != envName {
-				continue
-			}
-			if env.ValueFrom != nil && env.ValueFrom.FieldRef != nil {
-				// handle fieldRef
-				value, _ := common.GetFieldRef(targetPod, env.ValueFrom)
-				return &corev1.EnvVar{Name: envName, Value: value}
-			}
-			return &env
-		}
-		return nil
-	}
-
-	envFromMap := map[string]map[string]*corev1.EnvVar{}
-	getVarWithEnvFrom := func(container *corev1.Container, envName string) (*corev1.EnvVar, error) {
-		envMap := envFromMap[container.Name]
-		if envMap != nil {
-			return envMap[envName], nil
-		}
-		envMap = map[string]*corev1.EnvVar{}
-		for _, env := range container.EnvFrom {
-			prefix := env.Prefix
-			if env.ConfigMapRef != nil {
-				configMap := &corev1.ConfigMap{}
-				if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: env.ConfigMapRef.Name, Namespace: targetPod.Namespace}, configMap); err != nil {
-					return nil, err
-				}
-				for k, v := range configMap.Data {
-					name := prefix + k
-					envMap[name] = &corev1.EnvVar{Name: name, Value: v}
-				}
-			} else if env.SecretRef != nil {
-				secret := &corev1.Secret{}
-				if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: env.SecretRef.Name, Namespace: targetPod.Namespace}, secret); err != nil {
-					return nil, err
-				}
-				for k := range secret.Data {
-					name := prefix + k
-					envMap[name] = &corev1.EnvVar{Name: name, ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: env.SecretRef.Name},
-						Key:                  k,
-					}}}
-				}
-			}
-		}
-		envFromMap[container.Name] = envMap
-		return envMap[envName], nil
-	}
-
-	// build vars
-	existsEnvVarMap := map[string]struct{}{}
-	var envVars []corev1.EnvVar
+	// build vars.
+	var (
+		envVars    []corev1.EnvVar
+		envFromMap map[string]*corev1.EnvVar
+	)
 	for i := range varsRef.Vars {
 		envVarRef := varsRef.Vars[i].ValueFrom.EnvVarRef
-		container := getContainer(envVarRef.ContainerName)
+		container := intctrlutil.GetPodContainer(targetPod, envVarRef.ContainerName)
 		if container == nil {
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find container "%s" in the component "%s"`, envVarRef.ContainerName, compName))
 		}
-		envVar := getVarWithEnv(container, envVarRef.EnvName)
+		envVar := intctrlutil.BuildVarWithEnv(targetPod, container, envVarRef.EnvName)
 		if envVar == nil {
 			// if the var not found in container.env, try to find from container.envFrom.
-			envVar, err = getVarWithEnvFrom(container, envVarRef.EnvName)
-			if err != nil {
-				return nil, err
+			if envFromMap == nil {
+				envFromMap, err = intctrlutil.GetEnvVarsFromEnvFrom(reqCtx.Ctx, cli, targetPod.Namespace, container)
+				if err != nil {
+					return nil, err
+				}
 			}
+			envVar = envFromMap[envVarRef.EnvName]
 		}
 		if envVar == nil {
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find the env "%s" in the container "%s"`, envVarRef.EnvName, envVarRef.ContainerName))
 		}
 		envVar.Name = varsRef.Vars[i].Name
 		envVars = append(envVars, *envVar)
-		existsEnvVarMap[envVar.Name] = struct{}{}
 	}
 	return envVars, nil
 }

@@ -588,6 +588,52 @@ spec:
                         description: Specifies the service account to run the backup
                           workload.
                         type: string
+                      vars:
+                        description: Represents a list of environment variables to
+                          be set in the job's container.
+                        items:
+                          properties:
+                            name:
+                              description: Specifies the name of the variable. This
+                                must be a C_IDENTIFIER.
+                              type: string
+                            valueFrom:
+                              description: Defines the source for the variable's value.
+                              properties:
+                                envRef:
+                                  description: Specifies a reference to a specific
+                                    environment variable within a container. Used
+                                    to specify the source of the variable, which can
+                                    be either "env" or "envFrom".
+                                  properties:
+                                    containerName:
+                                      description: Specifies the name of the container
+                                        as defined in the componentDefinition or as
+                                        injected by the kubeBlocks controller. If
+                                        not specified, the first container will be
+                                        used by default.
+                                      type: string
+                                    envName:
+                                      description: Defines the name of the environment
+                                        variable.
+                                      type: string
+                                  required:
+                                  - envName
+                                  type: object
+                                fieldPath:
+                                  description: Represents the JSONPath of the target
+                                    pod. This is used to specify the exact location
+                                    of the data within the JSON structure of the pod.
+                                  type: string
+                              type: object
+                              x-kubernetes-validations:
+                              - message: either fieldPath and envRef.
+                                rule: has(self.envRef) || has(self.fieldPath)
+                          required:
+                          - name
+                          - valueFrom
+                          type: object
+                        type: array
                     type: object
                   targetVolumes:
                     description: Specifies which volumes from the target should be
@@ -867,6 +913,50 @@ spec:
                   serviceAccountName:
                     description: Specifies the service account to run the backup workload.
                     type: string
+                  vars:
+                    description: Represents a list of environment variables to be
+                      set in the job's container.
+                    items:
+                      properties:
+                        name:
+                          description: Specifies the name of the variable. This must
+                            be a C_IDENTIFIER.
+                          type: string
+                        valueFrom:
+                          description: Defines the source for the variable's value.
+                          properties:
+                            envRef:
+                              description: Specifies a reference to a specific environment
+                                variable within a container. Used to specify the source
+                                of the variable, which can be either "env" or "envFrom".
+                              properties:
+                                containerName:
+                                  description: Specifies the name of the container
+                                    as defined in the componentDefinition or as injected
+                                    by the kubeBlocks controller. If not specified,
+                                    the first container will be used by default.
+                                  type: string
+                                envName:
+                                  description: Defines the name of the environment
+                                    variable.
+                                  type: string
+                              required:
+                              - envName
+                              type: object
+                            fieldPath:
+                              description: Represents the JSONPath of the target pod.
+                                This is used to specify the exact location of the
+                                data within the JSON structure of the pod.
+                              type: string
+                          type: object
+                          x-kubernetes-validations:
+                          - message: either fieldPath and envRef.
+                            rule: has(self.envRef) || has(self.fieldPath)
+                      required:
+                      - name
+                      - valueFrom
+                      type: object
+                    type: array
                 type: object
               timeRange:
                 description: Records the time range of the data backed up. For Point-in-Time

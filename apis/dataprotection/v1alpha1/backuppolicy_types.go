@@ -74,6 +74,10 @@ type BackupTarget struct {
 	// +kube:validation:Required
 	PodSelector *PodSelector `json:"podSelector,omitempty"`
 
+	// Represents a list of environment variables to be set in the job's container.
+	// +optional
+	Vars []EnvVar `json:"vars,omitempty"`
+
 	// Specifies the connection credential to connect to the target database cluster.
 	//
 	// +optional
@@ -88,6 +92,43 @@ type BackupTarget struct {
 	//
 	// +kubebuilder:validation:Required
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+}
+
+type EnvVar struct {
+	// Specifies the name of the variable. This must be a C_IDENTIFIER.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Defines the source for the variable's value.
+	// +kubebuilder:validation:Required
+	ValueFrom *VarSource `json:"valueFrom"`
+}
+
+// +kubebuilder:validation:XValidation:rule="has(self.envRef) || has(self.fieldPath)", message="either fieldPath and envRef."
+
+type VarSource struct {
+	// Specifies a reference to a specific environment variable within a container.
+	// Used to specify the source of the variable, which can be either "env" or "envFrom".
+	// +optional
+	EnvVarRef *EnvVarRef `json:"envRef,omitempty"`
+
+	// Represents the JSONPath of the target pod. This is used to specify the exact location of the data within the JSON structure of the pod.
+	// +optional
+	FieldPath string `json:"fieldPath,omitempty"`
+}
+
+type EnvVarRef struct {
+	// Specifies the name of the container as defined in the componentDefinition or as injected by the kubeBlocks controller.
+	// If not specified, the first container will be used by default.
+	//
+	// +optional
+	ContainerName string `json:"containerName,omitempty"`
+
+	// Defines the name of the environment variable.
+	//
+	// +kubebuilder:validation:Required
+	EnvName string `json:"envName"`
 }
 
 type PodSelector struct {

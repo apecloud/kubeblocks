@@ -274,8 +274,9 @@ func (r *Request) buildExecAction(targetPod *corev1.Pod,
 		},
 		Command:            exec.Command,
 		Container:          containerName,
-		Namespace:          targetPod.Namespace,
-		PodName:            targetPod.Name,
+		TargetPod:          targetPod,
+		BackupPolicy:       r.BackupPolicy,
+		BackupMethod:       r.BackupMethod,
 		Timeout:            exec.Timeout,
 		ServiceAccountName: viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName),
 	}
@@ -304,7 +305,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	// build environment variables, include built-in envs, envs from backupMethod
 	// and envs from actionSet. Latter will override former for the same name.
 	// env from backupMethod has the highest priority.
-	buildEnv := func() []corev1.EnvVar {
+	buildEnv := func() ([]corev1.EnvVar, error) {
 		envVars := []corev1.EnvVar{
 			{
 				Name:  dptypes.DPBackupName,
@@ -345,7 +346,13 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		setKBClusterEnv(constant.AppInstanceLabelKey, constant.KBEnvClusterName)
 		setKBClusterEnv(constant.KBAppComponentLabelKey, constant.KBEnvCompName)
 		envVars = append(envVars, corev1.EnvVar{Name: constant.KBEnvNamespace, Value: r.Namespace})
-		return utils.MergeEnv(envVars, r.BackupMethod.Env)
+
+		varEnvs, err := utils.BuildEnvVarByTargetVars(r.Ctx, r.Client, targetPod, r.BackupPolicy.Spec.Target.Vars)
+		if err != nil {
+			return nil, err
+		}
+		envVars = append(envVars, varEnvs...)
+		return utils.MergeEnv(envVars, r.BackupMethod.Env), nil
 	}
 
 	runOnTargetPodNode := func() bool {
@@ -383,7 +390,10 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	}
 
 	runAsUser := int64(0)
-	env := buildEnv()
+	env, err := buildEnv()
+	if err != nil {
+		return nil, err
+	}
 	container := corev1.Container{
 		Name: name,
 		// expand the image value with the env variables.

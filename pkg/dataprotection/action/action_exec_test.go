@@ -45,19 +45,36 @@ var _ = Describe("ExecAction Test", func() {
 	)
 
 	var (
-		command = []string{"ls"}
+		command      = []string{"ls"}
+		clusterInfo  *testdp.BackupClusterInfo
+		backupPolicy *dpv1alpha1.BackupPolicy
 	)
 
 	cleanEnv := func() {
 		By("clean resources")
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS)
+		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 	}
 
 	BeforeEach(func() {
 		cleanEnv()
+		clusterInfo = testdp.NewFakeCluster(&testCtx)
+		backupPolicy = testdp.NewBackupPolicyFactory(testCtx.DefaultNamespace, "test-policy").
+			SetTarget(constant.AppInstanceLabelKey, clusterInfo.Cluster.Name,
+				constant.KBAppComponentLabelKey, "test-comp",
+				constant.RoleLabelKey, constant.Leader).
+			AddBackupMethod("test-method", false, "test-actionset").
+			Create(&testCtx).GetObject()
+
 		viper.Set(constant.KBToolsImage, testdp.KBToolImage)
 	})
 
@@ -68,7 +85,11 @@ var _ = Describe("ExecAction Test", func() {
 
 	Context("create exec action", func() {
 		It("should return error when pod name is empty", func() {
-			act := &action.ExecAction{}
+			act := &action.ExecAction{
+				TargetPod:    clusterInfo.TargetPod,
+				BackupPolicy: backupPolicy,
+				BackupMethod: &backupPolicy.Spec.BackupMethods[0],
+			}
 			status, err := act.Execute(buildActionCtx())
 			Expect(err).To(HaveOccurred())
 			Expect(status).Should(BeNil())
@@ -79,9 +100,12 @@ var _ = Describe("ExecAction Test", func() {
 				JobAction: action.JobAction{
 					Name: actionName,
 				},
-				PodName:   podName,
-				Namespace: testCtx.DefaultNamespace,
-				Command:   command,
+				PodName:      podName,
+				Namespace:    testCtx.DefaultNamespace,
+				Command:      command,
+				TargetPod:    clusterInfo.TargetPod,
+				BackupPolicy: backupPolicy,
+				BackupMethod: &backupPolicy.Spec.BackupMethods[0],
 			}
 			status, err := act.Execute(buildActionCtx())
 			Expect(err).To(HaveOccurred())
@@ -110,6 +134,9 @@ var _ = Describe("ExecAction Test", func() {
 				Command:            command,
 				Container:          container,
 				ServiceAccountName: serviceAccountName,
+				TargetPod:          clusterInfo.TargetPod,
+				BackupPolicy:       backupPolicy,
+				BackupMethod:       &backupPolicy.Spec.BackupMethods[0],
 			}
 
 			By("should success to execute")

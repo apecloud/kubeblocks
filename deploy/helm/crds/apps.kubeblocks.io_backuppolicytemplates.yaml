@@ -254,7 +254,7 @@ spec:
                               type: object
                             type: array
                           name:
-                            description: The name of backup method.
+                            description: Method for backup The name of backup method.
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           runtimeSettings:
@@ -323,8 +323,8 @@ spec:
                               create the snapshot.
                             type: boolean
                           target:
-                            description: Specifies the target information to back
-                              up, it will override the target in backup policy.
+                            description: Specifies the instance where the backup will
+                              be stored.
                             properties:
                               account:
                                 description: "Refers to spec.componentDef.systemAccounts.accounts[*].name
@@ -335,39 +335,6 @@ spec:
                                   be transformed into a secret for the BackupPolicy's
                                   target secret."
                                 type: string
-                              connectionCredential:
-                                description: Specifies the connection credential to
-                                  connect to the target database cluster.
-                                properties:
-                                  hostKey:
-                                    description: Specifies the map key of the host
-                                      in the connection credential secret.
-                                    type: string
-                                  passwordKey:
-                                    default: password
-                                    description: Specifies the map key of the password
-                                      in the connection credential secret. This password
-                                      will be saved in the backup annotation for full
-                                      backup. You can use the environment variable
-                                      DP_ENCRYPTION_KEY to specify encryption key.
-                                    type: string
-                                  portKey:
-                                    description: Specifies the map key of the port
-                                      in the connection credential secret.
-                                    type: string
-                                  secretName:
-                                    description: Refers to the Secret object that
-                                      contains the connection credential.
-                                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                                    type: string
-                                  usernameKey:
-                                    default: username
-                                    description: Specifies the map key of the user
-                                      in the connection credential secret.
-                                    type: string
-                                required:
-                                - secretName
-                                type: object
                               connectionCredentialKey:
                                 description: Defines the connection credential key
                                   in the secret created by spec.ConnectionCredential
@@ -393,140 +360,6 @@ spec:
                                       the default key "username" is used.
                                     type: string
                                 type: object
-                              podSelector:
-                                description: Used to find the target pod. The volumes
-                                  of the target pod will be backed up.
-                                properties:
-                                  matchExpressions:
-                                    description: matchExpressions is a list of label
-                                      selector requirements. The requirements are
-                                      ANDed.
-                                    items:
-                                      description: A label selector requirement is
-                                        a selector that contains values, a key, and
-                                        an operator that relates the key and values.
-                                      properties:
-                                        key:
-                                          description: key is the label key that the
-                                            selector applies to.
-                                          type: string
-                                        operator:
-                                          description: operator represents a key's
-                                            relationship to a set of values. Valid
-                                            operators are In, NotIn, Exists and DoesNotExist.
-                                          type: string
-                                        values:
-                                          description: values is an array of string
-                                            values. If the operator is In or NotIn,
-                                            the values array must be non-empty. If
-                                            the operator is Exists or DoesNotExist,
-                                            the values array must be empty. This array
-                                            is replaced during a strategic merge patch.
-                                          items:
-                                            type: string
-                                          type: array
-                                      required:
-                                      - key
-                                      - operator
-                                      type: object
-                                    type: array
-                                  matchLabels:
-                                    additionalProperties:
-                                      type: string
-                                    description: matchLabels is a map of {key,value}
-                                      pairs. A single {key,value} in the matchLabels
-                                      map is equivalent to an element of matchExpressions,
-                                      whose key field is "key", the operator is "In",
-                                      and the values array contains only "value".
-                                      The requirements are ANDed.
-                                    type: object
-                                  strategy:
-                                    default: Any
-                                    description: "Specifies the strategy to select
-                                      the target pod when multiple pods are selected.
-                                      Valid values are: Any: select any one pod that
-                                      match the labelsSelector. \n - `Any`: select
-                                      any one pod that match the labelsSelector. -
-                                      `All`: select all pods that match the labelsSelector."
-                                    enum:
-                                    - Any
-                                    - All
-                                    type: string
-                                type: object
-                                x-kubernetes-map-type: atomic
-                              resources:
-                                description: Specifies the kubernetes resources to
-                                  back up.
-                                properties:
-                                  excluded:
-                                    description: excluded is a slice of namespaced-scoped
-                                      resource type names to exclude in the kubernetes
-                                      resources. The default value is empty.
-                                    items:
-                                      type: string
-                                    type: array
-                                  included:
-                                    description: included is a slice of namespaced-scoped
-                                      resource type names to include in the kubernetes
-                                      resources. The default value is empty.
-                                    items:
-                                      type: string
-                                    type: array
-                                  selector:
-                                    description: A metav1.LabelSelector to filter
-                                      the target kubernetes resources that need to
-                                      be backed up. If not set, will do not back up
-                                      any kubernetes resources.
-                                    properties:
-                                      matchExpressions:
-                                        description: matchExpressions is a list of
-                                          label selector requirements. The requirements
-                                          are ANDed.
-                                        items:
-                                          description: A label selector requirement
-                                            is a selector that contains values, a
-                                            key, and an operator that relates the
-                                            key and values.
-                                          properties:
-                                            key:
-                                              description: key is the label key that
-                                                the selector applies to.
-                                              type: string
-                                            operator:
-                                              description: operator represents a key's
-                                                relationship to a set of values. Valid
-                                                operators are In, NotIn, Exists and
-                                                DoesNotExist.
-                                              type: string
-                                            values:
-                                              description: values is an array of string
-                                                values. If the operator is In or NotIn,
-                                                the values array must be non-empty.
-                                                If the operator is Exists or DoesNotExist,
-                                                the values array must be empty. This
-                                                array is replaced during a strategic
-                                                merge patch.
-                                              items:
-                                                type: string
-                                              type: array
-                                          required:
-                                          - key
-                                          - operator
-                                          type: object
-                                        type: array
-                                      matchLabels:
-                                        additionalProperties:
-                                          type: string
-                                        description: matchLabels is a map of {key,value}
-                                          pairs. A single {key,value} in the matchLabels
-                                          map is equivalent to an element of matchExpressions,
-                                          whose key field is "key", the operator is
-                                          "In", and the values array contains only
-                                          "value". The requirements are ANDed.
-                                        type: object
-                                    type: object
-                                    x-kubernetes-map-type: atomic
-                                type: object
                               role:
                                 description: "Specifies the instance of the corresponding
                                   role for backup. The roles can be: \n - Leader,
@@ -540,10 +373,6 @@ spec:
                                   will be transformed into a role LabelSelector for
                                   the BackupPolicy's target attribute."
                                 type: string
-                              serviceAccountName:
-                                description: Specifies the service account to run
-                                  the backup workload.
-                                type: string
                               strategy:
                                 description: "Specifies the PodSelectionStrategy to
                                   use when multiple pods are selected for the backup
@@ -554,6 +383,55 @@ spec:
                                 - Any
                                 - All
                                 type: string
+                              vars:
+                                description: Represents a list of environment variables
+                                  to be set in the job's container.
+                                items:
+                                  properties:
+                                    name:
+                                      description: Specifies the name of the variable.
+                                        This must be a C_IDENTIFIER.
+                                      type: string
+                                    valueFrom:
+                                      description: Defines the source for the variable's
+                                        value.
+                                      properties:
+                                        envRef:
+                                          description: Specifies a reference to a
+                                            specific environment variable within a
+                                            container. Used to specify the source
+                                            of the variable, which can be either "env"
+                                            or "envFrom".
+                                          properties:
+                                            containerName:
+                                              description: Specifies the name of the
+                                                container as defined in the componentDefinition
+                                                or as injected by the kubeBlocks controller.
+                                                If not specified, the first container
+                                                will be used by default.
+                                              type: string
+                                            envName:
+                                              description: Defines the name of the
+                                                environment variable.
+                                              type: string
+                                          required:
+                                          - envName
+                                          type: object
+                                        fieldPath:
+                                          description: Represents the JSONPath of
+                                            the target pod. This is used to specify
+                                            the exact location of the data within
+                                            the JSON structure of the pod.
+                                          type: string
+                                      type: object
+                                      x-kubernetes-validations:
+                                      - message: either fieldPath and envRef.
+                                        rule: has(self.envRef) || has(self.fieldPath)
+                                  required:
+                                  - name
+                                  - valueFrom
+                                  type: object
+                                type: array
                             required:
                             - role
                             type: object
@@ -720,6 +598,54 @@ spec:
                           - Any
                           - All
                           type: string
+                        vars:
+                          description: Represents a list of environment variables
+                            to be set in the job's container.
+                          items:
+                            properties:
+                              name:
+                                description: Specifies the name of the variable. This
+                                  must be a C_IDENTIFIER.
+                                type: string
+                              valueFrom:
+                                description: Defines the source for the variable's
+                                  value.
+                                properties:
+                                  envRef:
+                                    description: Specifies a reference to a specific
+                                      environment variable within a container. Used
+                                      to specify the source of the variable, which
+                                      can be either "env" or "envFrom".
+                                    properties:
+                                      containerName:
+                                        description: Specifies the name of the container
+                                          as defined in the componentDefinition or
+                                          as injected by the kubeBlocks controller.
+                                          If not specified, the first container will
+                                          be used by default.
+                                        type: string
+                                      envName:
+                                        description: Defines the name of the environment
+                                          variable.
+                                        type: string
+                                    required:
+                                    - envName
+                                    type: object
+                                  fieldPath:
+                                    description: Represents the JSONPath of the target
+                                      pod. This is used to specify the exact location
+                                      of the data within the JSON structure of the
+                                      pod.
+                                    type: string
+                                type: object
+                                x-kubernetes-validations:
+                                - message: either fieldPath and envRef.
+                                  rule: has(self.envRef) || has(self.fieldPath)
+                            required:
+                            - name
+                            - valueFrom
+                            type: object
+                          type: array
                       required:
                       - role
                       type: object

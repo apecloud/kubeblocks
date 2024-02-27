@@ -20,7 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
+	"context"
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -64,4 +69,49 @@ func buildEnvBySecretKey(name, secretName, key string) corev1.EnvVar {
 			},
 		},
 	}
+}
+
+// BuildEnvVarByTargetVars resolves the target pod vars
+func BuildEnvVarByTargetVars(ctx context.Context,
+	cli client.Client,
+	targetPod *corev1.Pod,
+	vars []dpv1alpha1.EnvVar) ([]corev1.EnvVar, error) {
+	var (
+		envVars    []corev1.EnvVar
+		envFromMap map[string]*corev1.EnvVar
+		err        error
+	)
+	buildEnvVarByEnvRef := func(envVarRef *dpv1alpha1.EnvVarRef) (*corev1.EnvVar, error) {
+		container := intctrlutil.GetPodContainer(targetPod, envVarRef.ContainerName)
+		if container == nil {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find container "%s" of the pod "%s"`, envVarRef.ContainerName, targetPod.Name))
+		}
+		envVar := intctrlutil.BuildVarWithEnv(targetPod, container, envVarRef.EnvName)
+		if envVar == nil {
+			// if the var not found in container.env, try to find from container.envFrom.
+			if envFromMap == nil {
+				envFromMap, err = intctrlutil.GetEnvVarsFromEnvFrom(ctx, cli, targetPod.Namespace, container)
+				if err != nil {
+					return nil, err
+				}
+			}
+			envVar = envFromMap[envVarRef.EnvName]
+		}
+		return envVar, nil
+	}
+	for i := range vars {
+		envVarRef := vars[i].ValueFrom.EnvVarRef
+		var envVar *corev1.EnvVar
+		if envVarRef != nil {
+			envVar, err = buildEnvVarByEnvRef(envVarRef)
+		} else {
+			envVar, err = intctrlutil.BuildVarWithFieldPath(targetPod, vars[i].ValueFrom.FieldPath)
+		}
+		if envVar == nil {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find the env "%s" in the container "%s"`, envVarRef.EnvName, envVarRef.ContainerName))
+		}
+		envVar.Name = vars[i].Name
+		envVars = append(envVars, *envVar)
+	}
+	return envVars, nil
 }

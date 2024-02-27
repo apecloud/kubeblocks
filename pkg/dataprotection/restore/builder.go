@@ -240,7 +240,16 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		env = pod.Spec.Containers[0].Env
 		r.envFrom = pod.Spec.Containers[0].EnvFrom
 	}
+
+	findSVCPort := func() int32 {
+		container := pod.Spec.Containers[0]
+		if len(container.Ports) > 0 {
+			return container.Ports[0].ContainerPort
+		}
+		return 0
+	}
 	env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
+	env = append(env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(findSVCPort()))})
 	if connectionCredential != nil {
 		appendEnvFromSecret := func(envName, keyName string) {
 			if keyName == "" {
@@ -257,7 +266,9 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		}
 		appendEnvFromSecret(dptypes.DPDBUser, connectionCredential.UsernameKey)
 		appendEnvFromSecret(dptypes.DPDBPassword, connectionCredential.PasswordKey)
-		appendEnvFromSecret(dptypes.DPDBPort, connectionCredential.PortKey)
+		if connectionCredential.PortKey != "" {
+			appendEnvFromSecret(dptypes.DPDBPort, connectionCredential.PortKey)
+		}
 		if connectionCredential.HostKey != "" {
 			appendEnvFromSecret(dptypes.DPDBHost, connectionCredential.HostKey)
 		}

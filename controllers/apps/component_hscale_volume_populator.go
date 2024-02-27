@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 type dataClone interface {
@@ -454,7 +455,7 @@ func isVolumeSnapshotEnabled(ctx context.Context, cli client.Client,
 		return false, client.IgnoreNotFound(err)
 	}
 
-	return intctrlutil.IsVolumeSnapshotEnabled(ctx, cli, pvc.Spec.VolumeName)
+	return dputils.IsVolumeSnapshotEnabled(ctx, cli, pvc.Spec.VolumeName)
 }
 
 func getBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy, useVolumeSnapshot bool) []string {

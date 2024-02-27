@@ -17,17 +17,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package controllerutil
+package utils
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rtclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -41,54 +42,55 @@ var _ = Describe("VolumeSnapshot compat client", func() {
 
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", "true")
 
-	It("test create/get/list/patch/delete", func() {
-		compatClient := VolumeSnapshotCompatClient{Client: k8sClient, Ctx: ctx}
-		snap := &snapshotv1.VolumeSnapshot{
+	It("test compat client create/get/list/patch/delete", func() {
+		compatClient := NewCompatClient(k8sClient)
+		snap := &vsv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      snapName,
 				Namespace: "default",
 			},
-			Spec: snapshotv1.VolumeSnapshotSpec{
-				Source: snapshotv1.VolumeSnapshotSource{
+			Spec: vsv1.VolumeSnapshotSpec{
+				Source: vsv1.VolumeSnapshotSource{
 					PersistentVolumeClaimName: &pvcName,
 				},
 			},
 		}
-		snapKey := rtclient.ObjectKeyFromObject(snap)
-		snapGet := &snapshotv1.VolumeSnapshot{}
+		snapKey := client.ObjectKeyFromObject(snap)
+		snapGet := &vsv1.VolumeSnapshot{}
 
-		By("create volumesnapshot")
-		// check object not found
-		exists, err := compatClient.CheckResourceExists(snapKey, snapGet)
+		By("check object not found")
+		exists, err := intctrlutil.CheckResourceExists(ctx, compatClient, snapKey, snapGet)
 		Expect(err).Should(BeNil())
 		Expect(exists).Should(BeFalse())
-		// create
-		Expect(compatClient.Create(snap)).Should(Succeed())
-		// check object exists
-		exists, err = compatClient.CheckResourceExists(snapKey, snapGet)
+
+		By("create volumesnapshot")
+		Expect(compatClient.Create(ctx, snap)).Should(Succeed())
+
+		By("check object exists")
+		exists, err = intctrlutil.CheckResourceExists(ctx, compatClient, snapKey, snapGet)
 		Expect(err).Should(BeNil())
 		Expect(exists).Should(BeTrue())
 
 		By("get volumesnapshot")
-		Expect(compatClient.Get(snapKey, snapGet)).Should(Succeed())
+		Expect(compatClient.Get(ctx, snapKey, snapGet)).Should(Succeed())
 		Expect(snapKey.Name).Should(Equal(snapName))
 
 		By("list volumesnapshots")
-		snapList := &snapshotv1.VolumeSnapshotList{}
-		Expect(compatClient.List(snapList)).Should(Succeed())
+		snapList := &vsv1.VolumeSnapshotList{}
+		Expect(compatClient.List(ctx, snapList)).Should(Succeed())
 		Expect(snapList.Items).ShouldNot(BeEmpty())
 
 		By("patch volumesnapshot")
-		snapPatch := snap.DeepCopy()
+		snapPatch := client.MergeFrom(snap.DeepCopy())
 		snap.Spec.VolumeSnapshotClassName = &snapClassName
-		Expect(compatClient.Patch(snap, snapPatch)).Should(Succeed())
-		Expect(compatClient.Get(snapKey, snapGet)).Should(Succeed())
+		Expect(compatClient.Patch(ctx, snap, snapPatch)).Should(Succeed())
+		Expect(compatClient.Get(ctx, snapKey, snapGet)).Should(Succeed())
 		Expect(*snapGet.Spec.VolumeSnapshotClassName).Should(Equal(snapClassName))
 
 		By("delete volumesnapshot")
-		Expect(compatClient.Delete(snap)).Should(Succeed())
+		Expect(compatClient.Delete(ctx, snap)).Should(Succeed())
 		Eventually(func() error {
-			return compatClient.Get(snapKey, snapGet)
+			return compatClient.Get(ctx, snapKey, snapGet)
 		}).Should(Satisfy(apierrors.IsNotFound))
 	})
 })

@@ -64,11 +64,11 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
    ![backup-and-restore-backup-repo-2](../../../img/backup-and-restore-backup-repo-2.png)
    ![backup-and-restore-backup-repo3](../../../img/backup-and-restore-backup-repo-3.png)
 
-    :::note
+  :::note
 
-    安装的 MinIO 的访问地址（端口）为 `http://minio.kb-system.svc.cluster.local:9000`，用于配置 BackupRepo。在本例中，`kb-system` 是安装 MinIO 的命名空间的名称。
+  安装的 MinIO 的访问地址（端口）为 `http://minio.kb-system.svc.cluster.local:9000`，用于配置 BackupRepo。在本例中，`kb-system` 是安装 MinIO 的命名空间的名称。
 
-    :::
+  :::
 
 ## 配置 BackupRepo
 
@@ -116,13 +116,13 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
     * `secretAccessKey` 表示 AWS 的 Secret Key。
     * `storageProvider` 表示对象存储提供者，该示例中为 s3。
 
-    :::note
+:::note
 
-    * 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`ftp`、`nfs`。
-    * 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 s3。
-    * 执行 `kubectl get storageproviders.storage.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
+* 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`ftp`、`nfs`。
+* 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 s3。
+* 执行 `kubectl get storageproviders.storage.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
 
-    :::
+:::
 
 2. 安装 KubeBlocks 时指定配置文件。
 

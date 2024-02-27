@@ -77,7 +77,7 @@ func (c *CreateVolumeSnapshotAction) Type() dpv1alpha1.ActionType {
 	return dpv1alpha1.ActionTypeNone
 }
 
-func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
+func (c *CreateVolumeSnapshotAction) Execute(actCtx ActionContext) (*dpv1alpha1.ActionStatus, error) {
 	sb := newStatusBuilder(c)
 	handleErr := func(err error) (*dpv1alpha1.ActionStatus, error) {
 		return sb.withErr(err).build(), err
@@ -85,11 +85,6 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 
 	if err := c.validate(); err != nil {
 		return handleErr(err)
-	}
-
-	vsCli := intctrlutil.VolumeSnapshotCompatClient{
-		Client: ctx.Client,
-		Ctx:    ctx.Ctx,
 	}
 
 	var (
@@ -103,11 +98,11 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 			Name:      utils.GetBackupVolumeSnapshotName(c.ObjectMeta.Name, w.VolumeName),
 		}
 		// create volume snapshot
-		if err = c.createVolumeSnapshotIfNotExist(ctx, vsCli, &w.PersistentVolumeClaim, key); err != nil {
+		if err = c.createVolumeSnapshotIfNotExist(actCtx, &w.PersistentVolumeClaim, key); err != nil {
 			return handleErr(err)
 		}
 
-		ok, snap, err = ensureVolumeSnapshotReady(vsCli, key)
+		ok, snap, err = ensureVolumeSnapshotReady(actCtx.Ctx, actCtx.Client, key)
 		if err != nil {
 			return handleErr(err)
 		}
@@ -136,17 +131,18 @@ func (c *CreateVolumeSnapshotAction) validate() error {
 }
 
 // createVolumeSnapshotIfNotExist check volume snapshot exists, if not, create it.
-func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
-	vsCli intctrlutil.VolumeSnapshotCompatClient,
+func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(
+	ctx ActionContext,
 	pvc *corev1.PersistentVolumeClaim,
-	key client.ObjectKey) error {
+	key client.ObjectKey,
+) error {
 	var (
 		err     error
 		vscName string
 	)
 
 	snap := &vsv1.VolumeSnapshot{}
-	exists, err := vsCli.CheckResourceExists(key, snap)
+	exists, err := intctrlutil.CheckResourceExists(ctx.Ctx, ctx.Client, key, snap)
 	if err != nil {
 		return err
 	}
@@ -169,7 +165,7 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 		},
 	}
 
-	if vscName, err = c.getVolumeSnapshotClassName(ctx.Ctx, ctx.Client, vsCli, pvc.Spec.VolumeName); err != nil {
+	if vscName, err = c.getVolumeSnapshotClassName(ctx.Ctx, ctx.Client, pvc.Spec.VolumeName); err != nil {
 		return err
 	}
 
@@ -184,7 +180,7 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 
 	msg := fmt.Sprintf("creating volume snapshot %s/%s", snap.Namespace, snap.Name)
 	ctx.Recorder.Event(c.Owner, corev1.EventTypeNormal, "CreatingVolumeSnapshot", msg)
-	if err = vsCli.Create(snap); err != nil {
+	if err = ctx.Client.Create(ctx.Ctx, snap); err != nil {
 		return err
 	}
 	return nil
@@ -193,7 +189,6 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 func (c *CreateVolumeSnapshotAction) getVolumeSnapshotClassName(
 	ctx context.Context,
 	cli client.Client,
-	vsCli intctrlutil.VolumeSnapshotCompatClient,
 	pvName string) (string, error) {
 	pv := &corev1.PersistentVolume{}
 	if err := cli.Get(ctx, types.NamespacedName{Name: pvName}, pv); err != nil {
@@ -203,7 +198,7 @@ func (c *CreateVolumeSnapshotAction) getVolumeSnapshotClassName(
 		return "", nil
 	}
 	vscList := vsv1.VolumeSnapshotClassList{}
-	if err := vsCli.List(&vscList); err != nil {
+	if err := cli.List(ctx, &vscList); err != nil {
 		return "", err
 	}
 	for _, item := range vscList.Items {
@@ -215,11 +210,13 @@ func (c *CreateVolumeSnapshotAction) getVolumeSnapshotClassName(
 }
 
 func ensureVolumeSnapshotReady(
-	vsCli intctrlutil.VolumeSnapshotCompatClient,
-	key client.ObjectKey) (bool, *vsv1.VolumeSnapshot, error) {
+	ctx context.Context,
+	cli client.Client,
+	key client.ObjectKey,
+) (bool, *vsv1.VolumeSnapshot, error) {
 	snap := &vsv1.VolumeSnapshot{}
 	// not found, continue the creation process
-	exists, err := vsCli.CheckResourceExists(key, snap)
+	exists, err := intctrlutil.CheckResourceExists(ctx, cli, key, snap)
 	if err != nil {
 		return false, nil, err
 	}

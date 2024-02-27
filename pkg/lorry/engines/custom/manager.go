@@ -55,6 +55,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		return nil, err
 	}
 
+	managerBase.DBStartupReady = true
 	mgr := &Manager{
 		actionSvcPorts: &[]int{},
 		DBManagerBase:  *managerBase,

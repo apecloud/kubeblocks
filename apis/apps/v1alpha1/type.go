@@ -764,6 +764,30 @@ type StatefulSetWorkload interface {
 	GetUpdateStrategy() UpdateStrategy
 }
 
+type HostNetwork struct {
+	// The list of ports that are required by this component.
+	// +optional
+	Ports []HostNetworkPort `json:"ports,omitempty"`
+
+	// Set DNS policy for the component.
+	// Defaults to "ClusterFirst".
+	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
+	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
+	// To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.
+	//
+	// +optional
+	DNSPolicy corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
+}
+
+type HostNetworkPort struct {
+	// +required
+	Name string `json:"name"`
+
+	// If not specified, a dynamic port will be assigned.
+	// +optional
+	Port *int32 `json:"port"`
+}
+
 // ClusterService defines the service of a cluster.
 type ClusterService struct {
 	Service `json:",inline"`
@@ -931,6 +955,12 @@ type NamedVar struct {
 	Option *VarOption `json:"option,omitempty"`
 }
 
+// HostNetworkVars defines the vars can be referenced from the host-network.
+type HostNetworkVars struct {
+	// +optional
+	Port *NamedVar `json:"port,omitempty"`
+}
+
 // ServiceVars defines the vars can be referenced from a Service.
 type ServiceVars struct {
 	// +optional
@@ -962,6 +992,14 @@ type ServiceRefVars struct {
 	Port *VarOption `json:"port,omitempty"`
 
 	CredentialVars `json:",inline"`
+}
+
+// HostNetworkVarSelector selects a var from host-network resources.
+type HostNetworkVarSelector struct {
+	// The host-network to select from.
+	ClusterObjectReference `json:",inline"`
+
+	HostNetworkVars `json:",inline"`
 }
 
 // ServiceVarSelector selects a var from a Service.

@@ -47,12 +47,13 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	transCtx.ShardingComponentSpecs = make(map[string][]*appsv1alpha1.ClusterComponentSpec, 0)
 	transCtx.Labels = make(map[string]map[string]string, 0)
 	cluster := transCtx.Cluster
+	filteredClusterLabels := filterReservedLabels(cluster.Labels)
 
 	for i := range cluster.Spec.ComponentSpecs {
 		clusterComSpec := cluster.Spec.ComponentSpecs[i]
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
 		// inherit cluster labels
-		transCtx.Labels[clusterComSpec.Name] = cluster.Labels
+		transCtx.Labels[clusterComSpec.Name] = filteredClusterLabels
 	}
 	for i := range cluster.Spec.ShardingSpecs {
 		shardingSpec := cluster.Spec.ShardingSpecs[i]
@@ -64,13 +65,13 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 		for j := range genShardingCompSpecList {
 			genShardCompSpec := genShardingCompSpecList[j]
 			transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, genShardCompSpec)
-			transCtx.Labels[genShardCompSpec.Name] = controllerutil.MergeMetadataMaps(cluster.Labels, constant.GetShardingNameLabel(shardingSpec.Name))
+			transCtx.Labels[genShardCompSpec.Name] = controllerutil.MergeMetadataMaps(filteredClusterLabels, constant.GetShardingNameLabel(shardingSpec.Name))
 		}
 	}
 
 	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)
-		transCtx.Labels[compSpec.Name] = cluster.Labels
+		transCtx.Labels[compSpec.Name] = filteredClusterLabels
 	}
 
 	// validate componentDef and componentDefRef
@@ -118,4 +119,20 @@ func validateComponentDefNComponentDefRef(transCtx *clusterTransformContext) err
 		}
 	}
 	return nil
+}
+
+func filterReservedLabels(labels map[string]string) map[string]string {
+	reservedLabelKeys := constant.GetKBReservedLabelKeys()
+	reservedLabelSet := make(map[string]struct{}, len(reservedLabelKeys))
+	for _, k := range reservedLabelKeys {
+		reservedLabelSet[k] = struct{}{}
+	}
+	filteredLabels := make(map[string]string)
+	for k, v := range labels {
+		if _, exists := reservedLabelSet[k]; exists {
+			continue
+		}
+		filteredLabels[k] = v
+	}
+	return filteredLabels
 }

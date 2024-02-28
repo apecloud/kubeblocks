@@ -38,6 +38,8 @@ const (
 	repUser      = "rep_user"
 	repPassword  = "rep_user"
 	normalStatus = "NORMAL"
+	MYSQL        = "MYSQL"
+	ORACLE       = "ORACLE"
 )
 
 func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primary, candidate string, force bool) error {
@@ -49,50 +51,20 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 		return mgr.Failover(ctx, cluster, candidate)
 	}
 
-	primaryComponentName, err := getCompnentName(primary)
+	primaryMember, err := getMember(primary)
 	if err != nil {
-		return err
-	}
-	candidateComponentName, err := getCompnentName(candidate)
-	if err != nil {
-		return err
-	}
-	primaryStore, _ := dcs.NewKubernetesStore()
-	primaryStore.SetCompName(primaryComponentName)
-	candidateStore, _ := dcs.NewKubernetesStore()
-	candidateStore.SetCompName(candidateComponentName)
-	primaryCluster, err := primaryStore.GetCluster()
-	if err != nil {
-		return err
-	}
-	candidateCluster, err := candidateStore.GetCluster()
-	if err != nil {
-		return err
+		return errors.Wrapf(err, "get primary %s failed", primary)
 	}
 
-	if len(primaryCluster.Members) != 1 || len(candidateCluster.Members) != 1 {
-		return errors.Errorf("primary component has %d replicas, candidate component has %d replicas, "+
-			"the replicas count need to be 1", len(primaryCluster.Members), len(candidateCluster.Members))
-	}
-
-	primaryMember := primaryCluster.Members[0]
-	candidateMember := candidateCluster.Members[0]
-	if !strings.EqualFold(primaryMember.Role, PRIMARY) {
-		return errors.Errorf("primary member's role is %s, not %s", primaryCluster.Members[0].Role, PRIMARY)
-	}
-
-	if !strings.EqualFold(candidateMember.Role, STANDBY) {
-		return errors.Errorf("candidate member's role is %s, not %s", candidateCluster.Members[0].Role, STANDBY)
+	candidateMember, err := getMember(candidate)
+	if err != nil {
+		return errors.Wrapf(err, "get candidate %s failed", candidate)
 	}
 
 	primaryAddr := fmt.Sprintf("%s:%s", primaryMember.PodIP, primaryMember.DBPort)
 	primaryDB, err := config.GetDBConnWithAddr(primaryAddr)
 	if err != nil {
 		mgr.Logger.Info("new primarydb connection failed", "error", err)
-		return err
-	}
-	err = mgr.standbyTenant(ctx, primaryDB)
-	if err != nil {
 		return err
 	}
 
@@ -103,41 +75,67 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 		return err
 	}
 
+	compatibilityMode, err := mgr.validateAndGetCompatibilityMode(ctx, primaryDB, candidateDB)
+	if err != nil {
+		return err
+	}
+
+	err = mgr.standbyTenant(ctx, primaryDB)
+	if err != nil {
+		return err
+	}
+
 	err = mgr.primaryTenant(ctx, candidateDB)
 	if err != nil {
 		return err
 	}
 
-	tenantDB, err := mgr.getTenantConn(candidateMember)
-	if err != nil {
-		return errors.Wrap(err, "get DB connection failed")
-	}
-	err = mgr.createUser(ctx, tenantDB)
+	err = mgr.createUser(ctx, candidateMember, compatibilityMode)
 	if err != nil {
 		mgr.Logger.Info("create user failed", "error", err)
 		return err
 	}
 
-	err = mgr.setLogSource(ctx, primaryDB, candidateMember)
+	err = mgr.setLogSource(ctx, primaryDB, *candidateMember)
 	if err != nil {
 		mgr.Logger.Info("set log source failed", "error", err)
 	}
 	return nil
 }
 
-func (mgr *Manager) getTenantConn(member dcs.Member) (*sql.DB, error) {
-	// "root@alice@tcp(10.1.0.47:2881)/oceanbase?multiStatements=true"
-	dsn := fmt.Sprintf("root@%s@tcp(%s:%s)/oceanbase?multiStatements=true", mgr.ReplicaTenant, member.PodIP, member.DBPort)
-	_, err := mysql.ParseDSN(dsn)
+func (mgr *Manager) validateAndGetCompatibilityMode(ctx context.Context, primaryDB, candidateDB *sql.DB) (string, error) {
+	var primaryMode, candidateMode, role string
+	queryTenant := fmt.Sprintf("SELECT COMPATIBILITY_MODE, TENANT_ROLE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
+	err := primaryDB.QueryRowContext(ctx, queryTenant).Scan(&primaryMode, &role)
 	if err != nil {
-		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS): %s", dsn)
+		mgr.Logger.Info("query primary tenant info failed", "error", err.Error())
+		return "", err
+	}
+	if role != PRIMARY {
+		err = errors.Errorf("the primary role is not PRIMARY: %s", role)
+		mgr.Logger.Info(err.Error())
+		return "", err
 	}
 
-	tenantdb, err := sql.Open("mysql", dsn)
+	err = candidateDB.QueryRowContext(ctx, queryTenant).Scan(&candidateMode, &role)
 	if err != nil {
-		return nil, errors.Wrap(err, "get DB connection failed")
+		mgr.Logger.Info("query candidate tenant info failed", "error", err.Error())
+		return "", err
 	}
-	return tenantdb, nil
+
+	if role != STANDBY {
+		err = errors.Errorf("the candidate role is not STANDBY: %s", role)
+		mgr.Logger.Info(err.Error())
+		return "", err
+	}
+
+	if primaryMode != candidateMode {
+		err = errors.Errorf("the compatibility modes of primary and candidate are different: %s, %s", primaryMode, candidateMode)
+		mgr.Logger.Info(err.Error())
+		return "", err
+	}
+
+	return primaryMode, nil
 }
 
 func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMember dcs.Member) error {
@@ -169,7 +167,50 @@ func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMembe
 	return nil
 }
 
-func (mgr *Manager) createUser(ctx context.Context, db *sql.DB) error {
+func (mgr *Manager) createUser(ctx context.Context, member *dcs.Member, compatibilityMode string) error {
+	tenantDB, err := mgr.getConnWithMode(member, compatibilityMode)
+	if err != nil {
+		return errors.Wrap(err, "get DB connection failed")
+	}
+	if compatibilityMode == MYSQL {
+		return mgr.createUserForMySQLMode(ctx, tenantDB)
+	} else if compatibilityMode == ORACLE {
+		return mgr.createUserForOracleMode(ctx, tenantDB)
+	} else {
+		return errors.Errorf("the compatibility mode is invalid: %s", compatibilityMode)
+	}
+}
+
+func (mgr *Manager) createUserForOracleMode(ctx context.Context, db *sql.DB) error {
+	queryUser := fmt.Sprintf("SELECT count(*) FROM SYS.USER_USERS WHERE user='%s'", repUser)
+	var userCount int
+	err := db.QueryRowContext(ctx, queryUser).Scan(&userCount)
+	if err != nil {
+		mgr.Logger.Info(queryUser+" failed", "error", err)
+		return err
+	}
+	if userCount > 0 {
+		return nil
+	}
+	createUser := fmt.Sprintf("CREATE USER %s IDENTIFIED BY %s;", repUser, repPassword)
+	createUser += fmt.Sprintf("GRANT CONNECT TO %s;", repUser)
+	createUser += fmt.Sprintf("GRANT SELECT on SYS.GV$OB_LOG_STAT to %s;", repUser)
+	createUser += fmt.Sprintf("GRANT SELECT on SYS.GV$OB_UNITS to %s;", repUser)
+	createUser += fmt.Sprintf("GRANT SELECT on SYS.GV$OB_PARAMETERS to %s;", repUser)
+	createUser += fmt.Sprintf("GRANT SELECT on SYS.DBA_OB_ACCESS_POINT to %s;", repUser)
+	createUser += fmt.Sprintf("GRANT SELECT on SYS.DBA_OB_TENANTS to %s;", repUser)
+	createUser += fmt.Sprintf("GRANT SELECT on SYS.DBA_OB_LS to %s;", repUser)
+	createUser += "SET GLOBAL ob_tcp_invited_nodes='%';"
+	_, err = db.Exec(createUser)
+	if err != nil {
+		mgr.Logger.Info(createUser+" failed", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+func (mgr *Manager) createUserForMySQLMode(ctx context.Context, db *sql.DB) error {
 	queryUser := fmt.Sprintf("SELECT count(*) FROM mysql.user WHERE user='%s'", repUser)
 	var userCount int
 	err := db.QueryRowContext(ctx, queryUser).Scan(&userCount)
@@ -246,6 +287,33 @@ func (mgr *Manager) standbyTenant(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
+func (mgr *Manager) getConnWithMode(member *dcs.Member, compatibilityMode string) (*sql.DB, error) {
+	var user string
+	if compatibilityMode == MYSQL {
+		user = "root"
+	} else if compatibilityMode == ORACLE {
+		user = "SYS"
+	}
+
+	if user == "" {
+		err := errors.Errorf("the compatibility mode is invalid: %s", compatibilityMode)
+		return nil, err
+	}
+
+	// "root@alice@tcp(10.1.0.47:2881)/oceanbase?multiStatements=true"
+	dsn := fmt.Sprintf("%s@%s@tcp(%s:%s)/oceanbase?multiStatements=true", user, mgr.ReplicaTenant, member.PodIP, member.DBPort)
+	_, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS): %s", dsn)
+	}
+
+	tenantdb, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, errors.Wrap(err, "get DB connection failed")
+	}
+	return tenantdb, nil
+}
+
 func getCompnentName(memberName string) (string, error) {
 	clusterName := os.Getenv(constant.KBEnvClusterName)
 	componentName := strings.TrimPrefix(memberName, clusterName+"-")
@@ -255,4 +323,31 @@ func getCompnentName(memberName string) (string, error) {
 	}
 	componentName = componentName[:i]
 	return componentName, nil
+}
+
+func getDCSCluster(memberName string) (*dcs.Cluster, error) {
+	componentName, err := getCompnentName(memberName)
+	if err != nil {
+		return nil, err
+	}
+	k8sStore, _ := dcs.NewKubernetesStore()
+	k8sStore.SetCompName(componentName)
+	cluster, err := k8sStore.GetCluster()
+	if err != nil {
+		return nil, errors.Wrapf(err, "get cluster %s failed", componentName)
+	}
+
+	return cluster, nil
+}
+
+func getMember(memberName string) (*dcs.Member, error) {
+	cluster, err := getDCSCluster(memberName)
+	if err != nil {
+		return nil, err
+	}
+	if len(cluster.Members) != 1 {
+		return nil, errors.Errorf("component has %d replicas, "+
+			"the replicas count need to be 1", len(cluster.Members))
+	}
+	return &cluster.Members[0], nil
 }

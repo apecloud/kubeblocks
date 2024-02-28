@@ -299,3 +299,10 @@ func SupportsCronJobV1() bool {
 	}
 	return semver.Compare(kubeVersion, "v1.21") >= 0
 }
+func GetPodFirstContainerPort(pod *corev1.Pod) int32 {
+	container := pod.Spec.Containers
+	if len(container[0].Ports) == 0 {
+		return 0
+	}
+	return container[0].Ports[0].ContainerPort
+}

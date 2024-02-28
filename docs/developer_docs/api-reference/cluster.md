@@ -9311,6 +9311,7 @@ string
 </em>
 </td>
 <td>
+<p>The name of the container.</p>
 </td>
 </tr>
 <tr>
@@ -10442,16 +10443,16 @@ will select from NodeAssignment.</li>
 <tbody>
 <tr>
 <td>
-<code>ports</code><br/>
+<code>containerPorts</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkPort">
-[]HostNetworkPort
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkContainerPort">
+[]HostNetworkContainerPort
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The list of ports that are required by this component.</p>
+<p>The list of container ports that are required by the component.</p>
 </td>
 </tr>
 <tr>
@@ -10474,7 +10475,7 @@ To have DNS options set along with hostNetwork, you have to specify DNS policy e
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkPort">HostNetworkPort
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkContainerPort">HostNetworkContainerPort
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork</a>)
@@ -10491,24 +10492,25 @@ To have DNS options set along with hostNetwork, you have to specify DNS policy e
 <tbody>
 <tr>
 <td>
-<code>name</code><br/>
+<code>container</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
+<p>Container specifies the target container within the pod.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>port</code><br/>
+<code>ports</code><br/>
 <em>
-int32
+[]string
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>If not specified, a dynamic port will be assigned.</p>
+<p>Ports are named container ports within the specified container.
+These container ports must be defined in the container for proper port allocation.</p>
 </td>
 </tr>
 </tbody>

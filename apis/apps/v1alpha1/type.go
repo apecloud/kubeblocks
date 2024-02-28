@@ -765,9 +765,10 @@ type StatefulSetWorkload interface {
 }
 
 type HostNetwork struct {
-	// The list of ports that are required by this component.
+	// The list of container ports that are required by the component.
+	//
 	// +optional
-	Ports []HostNetworkPort `json:"ports,omitempty"`
+	ContainerPorts []HostNetworkContainerPort `json:"containerPorts,omitempty"`
 
 	// Set DNS policy for the component.
 	// Defaults to "ClusterFirst".
@@ -776,16 +777,21 @@ type HostNetwork struct {
 	// To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.
 	//
 	// +optional
-	DNSPolicy corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
+	DNSPolicy *corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
 }
 
-type HostNetworkPort struct {
+type HostNetworkContainerPort struct {
+	// Container specifies the target container within the pod.
+	//
 	// +required
-	Name string `json:"name"`
+	Container string `json:"container"`
 
-	// If not specified, a dynamic port will be assigned.
-	// +optional
-	Port *int32 `json:"port"`
+	// Ports are named container ports within the specified container.
+	// These container ports must be defined in the container for proper port allocation.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +required
+	Ports []string `json:"ports"`
 }
 
 // ClusterService defines the service of a cluster.
@@ -909,6 +915,7 @@ type EnvVar struct {
 	//
 	// +optional
 	Value string `json:"value,omitempty"`
+
 	// Source for the variable's value. Cannot be used if value is not empty.
 	// +optional
 	ValueFrom *VarSource `json:"valueFrom,omitempty"`
@@ -926,7 +933,7 @@ type VarSource struct {
 
 	// Selects a defined var of a Pod.
 	// +optional
-	PodVarRef PodVarSelector `json:"podVarRef,omitempty"`
+	PodVarRef *PodVarSelector `json:"podVarRef,omitempty"`
 
 	// Selects a defined var of a Service.
 	// +optional
@@ -967,6 +974,7 @@ type PodVars struct {
 
 // ContainerVars defines the vars can be referenced from a Container.
 type ContainerVars struct {
+	// The name of the container.
 	// +required
 	Name string `json:"name"`
 

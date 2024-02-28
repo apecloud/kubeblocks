@@ -125,6 +125,7 @@ type ComponentDefinitionSpec struct {
 	Volumes []ComponentVolume `json:"volumes"`
 
 	// Defines the host-network capability and resources.
+	//
 	// +optional
 	HostNetwork *HostNetwork `json:"hostNetwork,omitempty"`
 

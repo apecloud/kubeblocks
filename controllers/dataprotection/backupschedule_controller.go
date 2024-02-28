@@ -33,7 +33,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -93,7 +92,7 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&dpv1alpha1.BackupSchedule{})
 
 	// Compatible with kubernetes versions prior to K8s 1.21, only supports batch v1beta1.
@@ -102,8 +101,7 @@ func (r *BackupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	} else {
 		b.Owns(&batchv1beta1.CronJob{})
 	}
-	return b.WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter)).
-		Complete(r)
+	return b.Complete(r)
 }
 
 func (r *BackupScheduleReconciler) deleteExternalResources(

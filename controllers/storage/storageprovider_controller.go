@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
@@ -192,7 +191,7 @@ func (r *StorageProviderReconciler) deleteExternalResources(
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *StorageProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&storagev1alpha1.StorageProvider{}).
 		Watches(&storagev1.CSIDriver{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
@@ -210,6 +209,5 @@ func (r *StorageProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 				return ret
 			})).
-		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter)).
 		Complete(r)
 }

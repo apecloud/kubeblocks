@@ -100,13 +100,12 @@ func (r *LogCollectionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *LogCollectionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&batchv1.Job{}, builder.WithPredicates(
 			failedJobUpdatePredicate{
 				Funcs: predicate.NewPredicateFuncs(func(object client.Object) bool { return false }),
 				r:     r,
 			})).
-		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter)).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: runtime.NumCPU(),
 		}).

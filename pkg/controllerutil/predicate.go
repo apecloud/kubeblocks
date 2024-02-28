@@ -23,7 +23,11 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -33,7 +37,12 @@ var (
 	managedNamespaces *sets.Set[string]
 )
 
-func NamespacePredicateFilter(object client.Object) bool {
+func NewNamespacedControllerManagedBy(mgr manager.Manager) *builder.Builder {
+	return ctrl.NewControllerManagedBy(mgr).
+		WithEventFilter(predicate.NewPredicateFuncs(namespacePredicateFilter))
+}
+
+func namespacePredicateFilter(object client.Object) bool {
 	if managedNamespaces == nil {
 		set := &sets.Set[string]{}
 		namespaces := viper.GetString(strings.ReplaceAll(constant.ManagedNamespacesFlag, "-", "_"))

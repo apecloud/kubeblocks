@@ -43,7 +43,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -127,7 +126,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
@@ -140,8 +139,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	} else {
 		b.Owns(&vsv1beta1.VolumeSnapshot{}, builder.Predicates{})
 	}
-	return b.WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.NamespacePredicateFilter)).
-		Complete(r)
+	return b.Complete(r)
 }
 
 func (r *BackupReconciler) parseBackupJob(_ context.Context, object client.Object) []reconcile.Request {

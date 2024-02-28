@@ -172,12 +172,13 @@ func (mgr *Manager) createUser(ctx context.Context, member *dcs.Member, compatib
 	if err != nil {
 		return errors.Wrap(err, "get DB connection failed")
 	}
-	if compatibilityMode == MYSQL {
+	switch compatibilityMode {
+	case MYSQL:
 		return mgr.createUserForMySQLMode(ctx, tenantDB)
-	} else if compatibilityMode == ORACLE {
+	case ORACLE:
+		// rep user is auto synced for standby
 		return nil
-		// return mgr.createUserForOracleMode(ctx, tenantDB)
-	} else {
+	default:
 		return errors.Errorf("the compatibility mode is invalid: %s", compatibilityMode)
 	}
 }
@@ -292,16 +293,15 @@ func (mgr *Manager) standbyTenant(ctx context.Context, db *sql.DB) error {
 
 func (mgr *Manager) getConnWithMode(member *dcs.Member, compatibilityMode string) (*sql.DB, error) {
 	var user, dsn string
-	if compatibilityMode == MYSQL {
+	switch compatibilityMode {
+	case MYSQL:
 		user = "root"
 		// "root@alice@tcp(10.1.0.47:2881)/oceanbase?multiStatements=true"
 		dsn = fmt.Sprintf("%s@%s@tcp(%s:%s)/oceanbase?multiStatements=true", user, mgr.ReplicaTenant, member.PodIP, member.DBPort)
-	} else if compatibilityMode == ORACLE {
+	case ORACLE:
 		user = "SYS"
 		dsn = fmt.Sprintf("%s@%s@tcp(%s:%s)/SYS?multiStatements=true", user, mgr.ReplicaTenant, member.PodIP, member.DBPort)
-	}
-
-	if user == "" {
+	default:
 		err := errors.Errorf("the compatibility mode is invalid: %s", compatibilityMode)
 		return nil, err
 	}

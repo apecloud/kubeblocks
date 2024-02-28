@@ -148,7 +148,6 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateRuntime,
 		r.validateVars,
 		r.validateVolumes,
-		r.validateHostNetwork,
 		r.validateServices,
 		r.validateConfigs,
 		r.validateScripts,
@@ -193,40 +192,6 @@ func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx 
 	if hasVolumeToProtect {
 		if cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.Readonly == nil || cmpd.Spec.LifecycleActions.Readwrite == nil {
 			return fmt.Errorf("the Readonly and Readwrite actions are needed to protect volumes")
-		}
-	}
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateHostNetwork(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if cmpd.Spec.HostNetwork == nil {
-		return nil
-	}
-	if !checkUniqueItemWithValue(cmpd.Spec.HostNetwork.ContainerPorts, "Container", nil) {
-		return fmt.Errorf("duplicate container of host-network are not allowed")
-	}
-
-	containerPorts := make(map[string]map[string]bool)
-	for _, cc := range [][]corev1.Container{cmpd.Spec.Runtime.InitContainers, cmpd.Spec.Runtime.Containers} {
-		for _, c := range cc {
-			ports := make(map[string]bool)
-			for _, p := range c.Ports {
-				ports[p.Name] = true
-			}
-			containerPorts[c.Name] = ports
-		}
-	}
-
-	for _, c := range cmpd.Spec.HostNetwork.ContainerPorts {
-		ports, ok := containerPorts[c.Container]
-		if !ok {
-			return fmt.Errorf("the container that host-network referenced is not defined: %s", c.Container)
-		}
-		for _, p := range c.Ports {
-			if _, ok = ports[p]; !ok {
-				return fmt.Errorf("the container port that host-network referenced is not defined: %s.%s", c.Container, p)
-			}
 		}
 	}
 	return nil

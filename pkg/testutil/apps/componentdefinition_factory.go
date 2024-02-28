@@ -117,18 +117,6 @@ func (f *MockComponentDefinitionFactory) AddVolume(name string, snapshot bool, w
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddHostNetworkContainerPort(container string, ports []string) *MockComponentDefinitionFactory {
-	containerPort := appsv1alpha1.HostNetworkContainerPort{
-		Container: container,
-		Ports:     ports,
-	}
-	if f.Get().Spec.HostNetwork == nil {
-		f.Get().Spec.HostNetwork = &appsv1alpha1.HostNetwork{}
-	}
-	f.Get().Spec.HostNetwork.ContainerPorts = append(f.Get().Spec.HostNetwork.ContainerPorts, containerPort)
-	return f
-}
-
 func (f *MockComponentDefinitionFactory) AddService(name, serviceName string, port int32, roleSelector string) *MockComponentDefinitionFactory {
 	serviceSpec := corev1.ServiceSpec{
 		Ports: []corev1.ServicePort{{

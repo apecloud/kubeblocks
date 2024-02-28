@@ -124,11 +124,6 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Volumes []ComponentVolume `json:"volumes"`
 
-	// Defines the host-network capability and resources.
-	//
-	// +optional
-	HostNetwork *HostNetwork `json:"hostNetwork,omitempty"`
-
 	// Defines endpoints that can be used to access the component service to manage the component.
 	//
 	// In addition, a reserved headless service will be created by default, with the name pattern `{clusterName}-{componentName}-headless`.

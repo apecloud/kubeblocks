@@ -35,9 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var (
@@ -503,7 +503,7 @@ func resolvePodVarRef(ctx context.Context, cli client.Reader, synthesizedComp *S
 	defineKey string, selector appsv1alpha1.PodVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.PodVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error)
 	switch {
-	case selector.Container != nil && selector.Container.ContainerPort != nil:
+	case selector.Container != nil && selector.Container.Port != nil:
 		resolveFunc = resolveContainerPortRef
 	default:
 		return nil, nil, nil
@@ -519,26 +519,22 @@ func resolvePodVarRef(ctx context.Context, cli client.Reader, synthesizedComp *S
 func resolveContainerPortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.PodVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
 	resolveContainerPort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
-		comp := obj.(*appsv1alpha1.Component)
-		if comp.Annotations == nil {
-			return nil, nil
+		podSpec := obj.(*corev1.PodSpec)
+		for _, c := range podSpec.Containers {
+			if c.Name == selector.Container.Name {
+				for _, p := range c.Ports {
+					if p.Name == selector.Container.Port.Name {
+						return &corev1.EnvVar{
+							Name:  defineKey,
+							Value: strconv.Itoa(int(p.ContainerPort)),
+						}, nil
+					}
+				}
+			}
 		}
-		compName, err := ShortName(synthesizedComp.ClusterName, comp.Name)
-		if err != nil {
-			return nil, nil
-		}
-		portKey := intctrlutil.BuildHostPortName(synthesizedComp.ClusterName, compName,
-			selector.Container.Name, selector.Container.ContainerPort.Name)
-		port, ok := comp.Annotations[portKey]
-		if !ok {
-			return nil, nil
-		}
-		return &corev1.EnvVar{
-			Name:  defineKey,
-			Value: port,
-		}, nil
+		return nil, nil
 	}
-	return resolvePodVarRefLow(ctx, cli, synthesizedComp, selector, selector.Container.ContainerPort.Option, resolveContainerPort)
+	return resolvePodVarRefLow(ctx, cli, synthesizedComp, selector, selector.Container.Port.Option, resolveContainerPort)
 }
 
 func resolveServiceVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -821,12 +817,32 @@ func resolveServiceRefPasswordRef(synthesizedComp *SynthesizedComponent, defineK
 func resolvePodVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	selector appsv1alpha1.PodVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar)) (*corev1.EnvVar, *corev1.EnvVar, error) {
 	resolveObj := func() (any, error) {
-		objName := func(compName string) string {
-			return FullName(synthesizedComp.ClusterName, compName)
+		compName, err := resolveReferentComponent(synthesizedComp, selector.ClusterObjectReference)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, nil
+			}
+			return nil, err
 		}
-		return resolveReferentObject(ctx, cli, synthesizedComp, selector.ClusterObjectReference, objName, &appsv1alpha1.Component{})
+		// refer to self
+		if compName == synthesizedComp.Name {
+			return synthesizedComp.PodSpec, nil
+		}
+
+		rsmName := func(compName string) string {
+			return constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, compName)
+		}
+		obj, err := resolveReferentObject(ctx, cli, synthesizedComp, selector.ClusterObjectReference, rsmName, &workloads.ReplicatedStateMachine{})
+		if err != nil {
+			return nil, err
+		}
+		if obj == nil {
+			return nil, nil
+		}
+		rsm := obj.(*workloads.ReplicatedStateMachine)
+		return &rsm.Spec.Template.Spec, nil
 	}
-	return resolveClusterObjectVar("Component", selector.ClusterObjectReference, option, resolveObj, resolveVar)
+	return resolveClusterObjectVar("Pod", selector.ClusterObjectReference, option, resolveObj, resolveVar)
 }
 
 func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -916,19 +932,19 @@ func resolveClusterObjectVar(kind string, objRef appsv1alpha1.ClusterObjectRefer
 	varOptional := func() bool {
 		return option != nil && *option == appsv1alpha1.VarOptional
 	}
-	if len(objRef.Name) == 0 {
-		if objOptional() {
-			return nil, nil, nil
-		}
-		return nil, nil, fmt.Errorf("the name of %s object is empty when resolving vars", kind)
-	}
+	// if len(objRef.Name) == 0 {
+	//	if objOptional() {
+	//		return nil, nil, nil
+	//	}
+	//	return nil, nil, fmt.Errorf("the name of %s object is empty when resolving vars", kind)
+	// }
 
 	obj, err := resolveObj()
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolving vars from %s object %s error: %s", kind, objRef.Name, err.Error())
 	}
 	if obj == nil {
-		if varOptional() {
+		if objOptional() {
 			return nil, nil, nil
 		}
 		return nil, nil, fmt.Errorf("%s object %s is not found when resolving vars", kind, objRef.Name)

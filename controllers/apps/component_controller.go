@@ -133,8 +133,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentLoadResourcesTransformer{Client: r.Client},
 			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
-			// allocate port for hostNetwork component
-			&componentHostPortTransformer{},
+			// allocate ports for host-network component
+			&componentHostNetworkTransformer{},
 			// handle component services
 			&componentServiceTransformer{},
 			// handle component system accounts

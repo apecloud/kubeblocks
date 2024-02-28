@@ -21,6 +21,7 @@ package component
 
 import (
 	"fmt"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -47,6 +48,7 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"runtime":                &compDefRuntimeConvertor{},
 		"vars":                   &compDefVarsConvertor{},
 		"volumes":                &compDefVolumesConvertor{},
+		"hostnetwork":            &compDefHostNetworkConvertor{},
 		"services":               &compDefServicesConvertor{},
 		"configs":                &compDefConfigsConvertor{},
 		"logconfigs":             &compDefLogConfigsConvertor{},
@@ -163,6 +165,42 @@ func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
 		}
 	}
 	return volumes, nil
+}
+
+// compDefHostNetworkConvertor converts the given object into ComponentDefinition.Spec.HostNetwork.
+type compDefHostNetworkConvertor struct{}
+
+func (c *compDefHostNetworkConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	if clusterCompDef.PodSpec == nil || !clusterCompDef.PodSpec.HostNetwork {
+		return nil, nil
+	}
+
+	hostNetwork := &appsv1alpha1.HostNetwork{
+		ContainerPorts: []appsv1alpha1.HostNetworkContainerPort{},
+	}
+	for _, container := range clusterCompDef.PodSpec.Containers {
+		cp := appsv1alpha1.HostNetworkContainerPort{
+			Container: container.Name,
+			Ports:     []string{},
+		}
+		for _, port := range container.Ports {
+			// HACK
+			if port.ContainerPort <= 100 {
+				cp.Ports = append(cp.Ports, strconv.Itoa(int(port.ContainerPort)))
+			}
+		}
+		if len(cp.Ports) > 0 {
+			hostNetwork.ContainerPorts = append(hostNetwork.ContainerPorts, cp)
+		}
+	}
+	if len(clusterCompDef.PodSpec.DNSPolicy) > 0 && clusterCompDef.PodSpec.DNSPolicy != corev1.DNSClusterFirst {
+		hostNetwork.DNSPolicy = func() *corev1.DNSPolicy {
+			policy := clusterCompDef.PodSpec.DNSPolicy
+			return &policy
+		}()
+	}
+	return hostNetwork, nil
 }
 
 // compDefServicesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Services.

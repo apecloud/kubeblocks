@@ -1236,6 +1236,20 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
+<code>hostNetwork</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
+HostNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the host-network capability and resources.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
@@ -6586,6 +6600,20 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
+<code>hostNetwork</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
+HostNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the host-network capability and resources.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
@@ -10394,6 +10422,95 @@ will select from NodeAssignment.</li>
 <li><code>current replicas - expected replicas &lt; len(Instances)</code>: Scale down from the list of Instances.</li>
 <li><code>current replicas - expected replicas &lt; len(Instances)</code>: Scale down from a part of Instances.</li>
 </ul>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>containerPorts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkContainerPort">
+[]HostNetworkContainerPort
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The list of container ports that are required by the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dnsPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#dnspolicy-v1-core">
+Kubernetes core/v1.DNSPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Set DNS policy for the component.
+Defaults to &ldquo;ClusterFirst&rdquo;.
+Valid values are &lsquo;ClusterFirstWithHostNet&rsquo;, &lsquo;ClusterFirst&rsquo;, &lsquo;Default&rsquo; or &lsquo;None&rsquo;.
+DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
+To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to &lsquo;ClusterFirstWithHostNet&rsquo;.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkContainerPort">HostNetworkContainerPort
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Container specifies the target container within the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ports</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Ports are named container ports within the specified container.
+These container ports must be defined in the container for proper port allocation.</p>
 </td>
 </tr>
 </tbody>

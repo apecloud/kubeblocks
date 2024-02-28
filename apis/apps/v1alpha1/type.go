@@ -764,6 +764,36 @@ type StatefulSetWorkload interface {
 	GetUpdateStrategy() UpdateStrategy
 }
 
+type HostNetwork struct {
+	// The list of container ports that are required by the component.
+	//
+	// +optional
+	ContainerPorts []HostNetworkContainerPort `json:"containerPorts,omitempty"`
+
+	// Set DNS policy for the component.
+	// Defaults to "ClusterFirst".
+	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
+	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
+	// To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.
+	//
+	// +optional
+	DNSPolicy *corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
+}
+
+type HostNetworkContainerPort struct {
+	// Container specifies the target container within the pod.
+	//
+	// +required
+	Container string `json:"container"`
+
+	// Ports are named container ports within the specified container.
+	// These container ports must be defined in the container for proper port allocation.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +required
+	Ports []string `json:"ports"`
+}
+
 // ClusterService defines the service of a cluster.
 type ClusterService struct {
 	Service `json:",inline"`

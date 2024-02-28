@@ -332,3 +332,8 @@ const (
 const (
 	KBGeneratedVirtualCompDefPrefix = "KB_GENERATED_VIRTUAL_COMP_DEF"
 )
+
+const (
+	// TODO: remove this after addons are migrated to the new API.
+	HostNetworkDynamicPortThreshold = 100
+)

@@ -186,7 +186,7 @@ func (c *compDefHostNetworkConvertor) convert(args ...any) (any, error) {
 		}
 		for _, port := range container.Ports {
 			// HACK
-			if port.ContainerPort <= 100 {
+			if port.ContainerPort <= constant.HostNetworkDynamicPortThreshold {
 				cp.Ports = append(cp.Ports, strconv.Itoa(int(port.ContainerPort)))
 			}
 		}
@@ -194,7 +194,7 @@ func (c *compDefHostNetworkConvertor) convert(args ...any) (any, error) {
 			hostNetwork.ContainerPorts = append(hostNetwork.ContainerPorts, cp)
 		}
 	}
-	if len(clusterCompDef.PodSpec.DNSPolicy) > 0 && clusterCompDef.PodSpec.DNSPolicy != corev1.DNSClusterFirst {
+	if len(clusterCompDef.PodSpec.DNSPolicy) > 0 {
 		hostNetwork.DNSPolicy = func() *corev1.DNSPolicy {
 			policy := clusterCompDef.PodSpec.DNSPolicy
 			return &policy

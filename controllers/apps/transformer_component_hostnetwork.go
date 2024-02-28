@@ -28,43 +28,16 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 		return nil
 	}
 
-	var (
-		synthesizedComp = transCtx.SynthesizeComponent
-		ports           map[string]map[string]int32
-		err             error
-	)
-	if synthesizedComp.HostNetwork != nil {
-		ports, err = allocateHostPorts(synthesizedComp)
-	}
-	// else {
-	//    ports, err = allocateHostPortsLegacy(synthesizedComp)
-	// }
+	synthesizedComp := transCtx.SynthesizeComponent
+	ports, err := allocateHostPorts(synthesizedComp)
 	if err != nil {
 		return err
 	}
-
-	// comp := transCtx.Component
-	// compObj := comp.DeepCopy()
-	if err = updateObjectsWithAllocatedPorts(synthesizedComp, ports); err != nil {
-		return err
-	}
-
-	// if reflect.DeepEqual(comp, compObj) {
-	//	return nil
-	// }
-	//
-	// graphCli, _ := transCtx.Client.(model.GraphClient)
-	// graphCli.Update(dag, compObj, comp)
-	// return graph.ErrPrematureStop
-	return nil
+	return updateObjectsWithAllocatedPorts(synthesizedComp, ports)
 }
 
 func isHostNetworkEnabled4Comp(transCtx *componentTransformContext) bool {
-	var (
-		synthesizedComp = transCtx.SynthesizeComponent
-	)
-	// return synthesizedComp.PodSpec.HostNetwork || synthesizedComp.HostNetwork != nil
-	return synthesizedComp.HostNetwork != nil
+	return transCtx.SynthesizeComponent.HostNetwork != nil
 }
 
 func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[string]map[string]int32, error) {
@@ -87,14 +60,6 @@ func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[str
 	}
 	return allocateHostPortsWithFunc(pm, synthesizedComp, needAllocate)
 }
-
-// func allocateHostPortsLegacy(synthesizedComp *component.SynthesizedComponent) (map[string]map[string]int32, error) {
-//	pm := intctrlutil.GetPortManager()
-//	needAllocate := func(_ string, _ string, port int32) bool {
-//		return pm.NeedAllocate(port)
-//	}
-//	return allocateHostPortsWithFunc(pm, synthesizedComp, needAllocate)
-// }
 
 func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *component.SynthesizedComponent,
 	needAllocate func(string, string, int32) bool) (map[string]map[string]int32, error) {

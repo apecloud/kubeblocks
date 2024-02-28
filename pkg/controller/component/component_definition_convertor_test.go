@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"strconv"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -413,6 +415,107 @@ var _ = Describe("Component Definition Convertor", func() {
 					})
 				}
 				Expect(res).Should(BeEquivalentTo(expectedVolumes))
+			})
+		})
+
+		Context("host network", func() {
+			It("w/o pod spec", func() {
+				clusterCompDef.PodSpec = nil
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).Should(BeNil())
+			})
+
+			It("host network disabled", func() {
+				clusterCompDef.PodSpec.HostNetwork = false
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).Should(BeNil())
+			})
+
+			It("empty container ports", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				for i := range clusterCompDef.PodSpec.Containers {
+					clusterCompDef.PodSpec.Containers[i].Ports = nil
+				}
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
+				Expect(ok).Should(BeTrue())
+				Expect(hostNetwork.ContainerPorts).Should(HaveLen(0))
+				Expect(hostNetwork.DNSPolicy).Should(BeNil())
+			})
+
+			It("no dynamic ports", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				// default ports are 3306 and 13306
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
+				Expect(ok).Should(BeTrue())
+				Expect(hostNetwork.ContainerPorts).Should(HaveLen(0))
+				Expect(hostNetwork.DNSPolicy).Should(BeNil())
+			})
+
+			It("part dynamic ports", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				// default ports are 3306 and 13306
+				clusterCompDef.PodSpec.Containers[0].Ports[0].ContainerPort = 36
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
+				Expect(ok).Should(BeTrue())
+				Expect(hostNetwork.ContainerPorts).Should(HaveLen(1))
+				Expect(hostNetwork.ContainerPorts[0].Container).Should(Equal(clusterCompDef.PodSpec.Containers[0].Name))
+				Expect(hostNetwork.ContainerPorts[0].Ports).Should(HaveLen(1))
+				Expect(hostNetwork.ContainerPorts[0].Ports[0]).Should(Equal(strconv.Itoa(36)))
+				Expect(hostNetwork.DNSPolicy).Should(BeNil())
+			})
+
+			It("w/ dns policy ClusterFirst", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				clusterCompDef.PodSpec.DNSPolicy = corev1.DNSClusterFirst
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
+				Expect(ok).Should(BeTrue())
+				Expect(hostNetwork.DNSPolicy).ShouldNot(BeNil())
+				Expect(*hostNetwork.DNSPolicy).Should(Equal(corev1.DNSClusterFirst))
+			})
+
+			It("w/ dns policy non-ClusterFirst", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				clusterCompDef.PodSpec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
+				Expect(ok).Should(BeTrue())
+				Expect(hostNetwork.DNSPolicy).ShouldNot(BeNil())
+				Expect(*hostNetwork.DNSPolicy).Should(Equal(corev1.DNSClusterFirstWithHostNet))
 			})
 		})
 

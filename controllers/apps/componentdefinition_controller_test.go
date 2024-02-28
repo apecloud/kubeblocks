@@ -178,7 +178,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 		})
 	})
 
-	Context("host-network", func() {
+	Context("host network", func() {
 		It("ok", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).

@@ -2924,16 +2924,80 @@ the risk of simultaneous downtime.</p>
 <tbody>
 <tr>
 <td>
-<code>BackupMethod</code><br/>
+<code>name</code><br/>
 <em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.BackupMethod
+string
 </em>
 </td>
 <td>
-<p>
-(Members of <code>BackupMethod</code> are embedded into this type.)
-</p>
-<p>Method for backup</p>
+<p>Method for backup
+The name of backup method.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>snapshotVolumes</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to take snapshots of persistent volumes. If true,
+the ActionSetName is not required, the controller will use the CSI volume
+snapshotter to create the snapshot.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>actionSetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the ActionSet object that defines the backup actions.
+For volume snapshot backup, the actionSet is not required, the controller
+will use the CSI volume snapshotter to create the snapshot.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetVolumes</code><br/>
+<em>
+github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.TargetVolumeInfo
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies which volumes from the target should be mounted in the backup workload.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the environment variables for the backup workload.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>runtimeSettings</code><br/>
+<em>
+github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RuntimeSettings
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies runtime settings for the backup workload container.</p>
 </td>
 </tr>
 <tr>
@@ -16477,6 +16541,18 @@ ConnectionCredentialKey
 <p>Defines the connection credential key in the secret
 created by spec.ConnectionCredential of the ClusterDefinition.
 It will be ignored when the &ldquo;account&rdquo; is set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>vars</code><br/>
+<em>
+[]github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.EnvVar
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a list of environment variables to be set in the job&rsquo;s container.</p>
 </td>
 </tr>
 </tbody>

@@ -2713,6 +2713,20 @@ PodSelector
 </tr>
 <tr>
 <td>
+<code>vars</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.EnvVar">
+[]EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a list of environment variables to be set in the job&rsquo;s container.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>connectionCredential</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.ConnectionCredential">
@@ -2950,6 +2964,88 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the map key of the port in the connection credential secret.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.EnvVar">EnvVar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the variable. This must be a C_IDENTIFIER.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>valueFrom</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.VarSource">
+VarSource
+</a>
+</em>
+</td>
+<td>
+<p>Defines the source for the variable&rsquo;s value.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.EnvVarRef">EnvVarRef
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>containerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the container as defined in the componentDefinition or as injected by the kubeBlocks controller.
+If not specified, the first container will be used by default.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>envName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the name of the environment variable.</p>
 </td>
 </tr>
 </tbody>
@@ -4753,6 +4849,50 @@ on the backup workload.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies the mount for the volumes specified in <code>volumes</code> section.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.VarSource">VarSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.EnvVar">EnvVar</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>envRef</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.EnvVarRef">
+EnvVarRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a reference to a specific environment variable within a container.
+Used to specify the source of the variable, which can be either &ldquo;env&rdquo; or &ldquo;envFrom&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fieldPath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the JSONPath of the target pod. This is used to specify the exact location of the data within the JSON structure of the pod.</p>
 </td>
 </tr>
 </tbody>

@@ -175,14 +175,17 @@ func (mgr *Manager) createUser(ctx context.Context, member *dcs.Member, compatib
 	if compatibilityMode == MYSQL {
 		return mgr.createUserForMySQLMode(ctx, tenantDB)
 	} else if compatibilityMode == ORACLE {
-		return mgr.createUserForOracleMode(ctx, tenantDB)
+		return nil
+		// return mgr.createUserForOracleMode(ctx, tenantDB)
 	} else {
 		return errors.Errorf("the compatibility mode is invalid: %s", compatibilityMode)
 	}
 }
 
-func (mgr *Manager) createUserForOracleMode(ctx context.Context, db *sql.DB) error {
-	queryUser := fmt.Sprintf("SELECT count(*) FROM SYS.USER_USERS WHERE user='%s'", repUser)
+func (mgr *Manager) CreateUserForOracleMode(ctx context.Context, db *sql.DB) error {
+	// mysql sdk driver does not support oracle tenant:
+	// Error 1235 (0A000): Oracle tenant for current client driver is not supported
+	queryUser := fmt.Sprintf("SELECT count(*) FROM ALL_USERS WHERE user='%s'", repUser)
 	var userCount int
 	err := db.QueryRowContext(ctx, queryUser).Scan(&userCount)
 	if err != nil {
@@ -288,11 +291,14 @@ func (mgr *Manager) standbyTenant(ctx context.Context, db *sql.DB) error {
 }
 
 func (mgr *Manager) getConnWithMode(member *dcs.Member, compatibilityMode string) (*sql.DB, error) {
-	var user string
+	var user, dsn string
 	if compatibilityMode == MYSQL {
 		user = "root"
+		// "root@alice@tcp(10.1.0.47:2881)/oceanbase?multiStatements=true"
+		dsn = fmt.Sprintf("%s@%s@tcp(%s:%s)/oceanbase?multiStatements=true", user, mgr.ReplicaTenant, member.PodIP, member.DBPort)
 	} else if compatibilityMode == ORACLE {
 		user = "SYS"
+		dsn = fmt.Sprintf("%s@%s@tcp(%s:%s)/SYS?multiStatements=true", user, mgr.ReplicaTenant, member.PodIP, member.DBPort)
 	}
 
 	if user == "" {
@@ -300,8 +306,6 @@ func (mgr *Manager) getConnWithMode(member *dcs.Member, compatibilityMode string
 		return nil, err
 	}
 
-	// "root@alice@tcp(10.1.0.47:2881)/oceanbase?multiStatements=true"
-	dsn := fmt.Sprintf("%s@%s@tcp(%s:%s)/oceanbase?multiStatements=true", user, mgr.ReplicaTenant, member.PodIP, member.DBPort)
 	_, err := mysql.ParseDSN(dsn)
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS): %s", dsn)

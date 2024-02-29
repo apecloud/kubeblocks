@@ -183,36 +183,36 @@ func (mgr *Manager) createUser(ctx context.Context, member *dcs.Member, compatib
 	}
 }
 
-func (mgr *Manager) CreateUserForOracleMode(ctx context.Context, db *sql.DB) error {
-	// mysql sdk driver does not support oracle tenant:
-	// Error 1235 (0A000): Oracle tenant for current client driver is not supported
-	queryUser := fmt.Sprintf("SELECT count(*) FROM ALL_USERS WHERE user='%s'", repUser)
-	var userCount int
-	err := db.QueryRowContext(ctx, queryUser).Scan(&userCount)
-	if err != nil {
-		mgr.Logger.Info(queryUser+" failed", "error", err)
-		return err
-	}
-	if userCount > 0 {
-		return nil
-	}
-	createUser := fmt.Sprintf("CREATE USER %s IDENTIFIED BY %s;", repUser, repPassword)
-	createUser += fmt.Sprintf("GRANT CONNECT TO %s;", repUser)
-	createUser += fmt.Sprintf("GRANT SELECT on SYS.GV$OB_LOG_STAT to %s;", repUser)
-	createUser += fmt.Sprintf("GRANT SELECT on SYS.GV$OB_UNITS to %s;", repUser)
-	createUser += fmt.Sprintf("GRANT SELECT on SYS.GV$OB_PARAMETERS to %s;", repUser)
-	createUser += fmt.Sprintf("GRANT SELECT on SYS.DBA_OB_ACCESS_POINT to %s;", repUser)
-	createUser += fmt.Sprintf("GRANT SELECT on SYS.DBA_OB_TENANTS to %s;", repUser)
-	createUser += fmt.Sprintf("GRANT SELECT on SYS.DBA_OB_LS to %s;", repUser)
-	createUser += "SET GLOBAL ob_tcp_invited_nodes='%';"
-	_, err = db.Exec(createUser)
-	if err != nil {
-		mgr.Logger.Info(createUser+" failed", "error", err)
-		return err
-	}
-
-	return nil
-}
+// // mysql sdk driver does not support oracle tenant:
+// // Error 1235 (0A000): Oracle tenant for current client driver is not supported
+// func (mgr *Manager) createUserForOracleMode(ctx context.Context, db *sql.DB) error {
+// 	queryUser := fmt.Sprintf("SELECT count(*) FROM ALL_USERS WHERE user='%s'", repUser)
+// 	var userCount int
+// 	err := db.QueryRowContext(ctx, queryUser).Scan(&userCount)
+// 	if err != nil {
+// 		mgr.Logger.Info(queryUser+" failed", "error", err)
+// 		return err
+// 	}
+// 	if userCount > 0 {
+// 		return nil
+// 	}
+// 	createUser := fmt.Sprintf("CREATE USER %s IDENTIFIED BY %s;", repUser, repPassword)
+// 	createUser += fmt.Sprintf("GRANT CONNECT TO %s;", repUser)
+// 	createUser += fmt.Sprintf("GRANT SELECT on SYS.GV$OB_LOG_STAT to %s;", repUser)
+// 	createUser += fmt.Sprintf("GRANT SELECT on SYS.GV$OB_UNITS to %s;", repUser)
+// 	createUser += fmt.Sprintf("GRANT SELECT on SYS.GV$OB_PARAMETERS to %s;", repUser)
+// 	createUser += fmt.Sprintf("GRANT SELECT on SYS.DBA_OB_ACCESS_POINT to %s;", repUser)
+// 	createUser += fmt.Sprintf("GRANT SELECT on SYS.DBA_OB_TENANTS to %s;", repUser)
+// 	createUser += fmt.Sprintf("GRANT SELECT on SYS.DBA_OB_LS to %s;", repUser)
+// 	createUser += "SET GLOBAL ob_tcp_invited_nodes='%';"
+// 	_, err = db.Exec(createUser)
+// 	if err != nil {
+// 		mgr.Logger.Info(createUser+" failed", "error", err)
+// 		return err
+// 	}
+//
+// 	return nil
+// }
 
 func (mgr *Manager) createUserForMySQLMode(ctx context.Context, db *sql.DB) error {
 	queryUser := fmt.Sprintf("SELECT count(*) FROM mysql.user WHERE user='%s'", repUser)

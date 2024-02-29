@@ -26,7 +26,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 
@@ -47,26 +46,21 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 	return mgr.GetReplicaRoleThroughCommands(ctx, cluster)
 }
 
+// GetReplicaRoleThroughCommands must provides the following dedicated environment variables for the action:
+//
+// - KB_POD_FQDN: The pod FQDN of the replica to check the role.
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service and retrieve the role information with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information.
 func (mgr *Manager) GetReplicaRoleThroughCommands(ctx context.Context, cluster *dcs.Cluster) (string, error) {
 	roleProbeCmd, ok := mgr.actionCommands[constant.RoleProbeAction]
 	if !ok && len(roleProbeCmd) == 0 {
 		return "", errors.New("role probe commands is empty!")
 	}
-	envs := os.Environ()
-	var isUserSet, isPasswordSet bool
-	for _, env := range envs {
-		if strings.HasPrefix(env, constant.KBEnvServiceUser+"=") {
-			isUserSet = true
-		}
-
-		if strings.HasPrefix(env, constant.KBEnvServicePassword+"=") {
-			isPasswordSet = true
-		}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return "", err
 	}
-	if !isUserSet || !isPasswordSet {
-		return "", errors.Errorf("envs is not set")
-	}
-
 	return util.ExecCommand(ctx, roleProbeCmd, envs)
 }
 

@@ -27,6 +27,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -141,7 +142,7 @@ func (r *ResourceFetcher[T]) ConfigMap(configSpec string) *T {
 
 	return r.Wrap(func() error {
 		r.ConfigMapObj = &corev1.ConfigMap{}
-		return r.Client.Get(r.Context, cmKey, r.ConfigMapObj)
+		return r.Client.Get(r.Context, cmKey, r.ConfigMapObj, multicluster.InLocalContextUnspecified())
 	})
 }
 

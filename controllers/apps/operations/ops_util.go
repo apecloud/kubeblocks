@@ -189,6 +189,7 @@ func opsRequestHasProcessed(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 		return false
 	}
 	for _, rsm := range rsmList.Items {
+		// TODO(placement)
 		isLatestRevision, err := intctrlcomp.IsComponentPodsWithLatestRevision(reqCtx.Ctx, cli, opsRes.Cluster, &rsm)
 		if err != nil {
 			return false

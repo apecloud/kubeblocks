@@ -37,13 +37,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object) error {
 	for _, obj := range objs {
-		if err := cli.Create(ctx, obj); err != nil {
+		if err := cli.Create(ctx, obj, multicluster.InLocalContext()); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				return err
 			}
@@ -51,7 +52,7 @@ func createConfigObjects(cli client.Client, ctx context.Context, objs []client.O
 			if core.IsSchedulableConfigResource(obj) {
 				continue
 			}
-			if err := cli.Update(ctx, obj); err != nil {
+			if err := cli.Update(ctx, obj, multicluster.InLocalContext()); err != nil {
 				return err
 			}
 		}

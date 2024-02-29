@@ -22,6 +22,7 @@ package rsm
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -158,7 +159,8 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 		pod.Annotations = map[string]string{}
 	}
 	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	return cli.Patch(ctx, pod, patch)
+	// TODO(placement): optimize
+	return cli.Patch(ctx, pod, patch, multicluster.InLocalContextUnspecified())
 }
 
 func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
@@ -230,9 +232,8 @@ func getPodsOfStatefulSet(ctx context.Context, cli client.Reader, stsObj *appsv1
 	if err != nil {
 		return nil, err
 	}
-	if err := cli.List(ctx, podList,
-		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels(selector)); err != nil {
+	if err := cli.List(ctx, podList, &client.ListOptions{Namespace: stsObj.Namespace},
+		client.MatchingLabels(selector), multicluster.InLocalContext()); err != nil {
 		return nil, err
 	}
 	isMemberOf := func(stsName string, pod *corev1.Pod) bool {
@@ -276,7 +277,7 @@ func getActionList(transCtx *rsmTransformContext, actionScenario string) ([]*bat
 
 	var actionList []*batchv1.Job
 	jobList := &batchv1.JobList{}
-	if err := transCtx.Client.List(transCtx.Context, jobList, ml); err != nil {
+	if err := transCtx.Client.List(transCtx.Context, jobList, ml, multicluster.InLocalContextOneshot()); err != nil {
 		return nil, err
 	}
 	for i := range jobList.Items {
@@ -325,7 +326,7 @@ func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.Replicat
 	if err := setOwnership(rsm, action, model.GetScheme(), getFinalizer(action)); err != nil {
 		return err
 	}
-	cli.Create(dag, action)
+	cli.Create(dag, action, inLocalContextOneshot())
 	return nil
 }
 
@@ -498,7 +499,7 @@ func doActionCleanup(dag *graph.DAG, graphCli model.GraphClient, action *batchv1
 	actionOld := action.DeepCopy()
 	actionNew := actionOld.DeepCopy()
 	actionNew.Labels[jobHandledLabel] = jobHandledTrue
-	graphCli.Update(dag, actionOld, actionNew)
+	graphCli.Update(dag, actionOld, actionNew, inLocalContextOneshot())
 }
 
 func emitEvent(transCtx *rsmTransformContext, action *batchv1.Job) {
@@ -707,7 +708,9 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 		return false
 	}
 	for i := 0; i < int(*rsm.Spec.Replicas); i++ {
-		podName := getPodName(rsm.Name, i)
+		// TODO(leon): sts
+		// podName := getPodName(rsm.Name, i)
+		podName := fmt.Sprintf("%s-0", getPodName(rsm.Name, i))
 		if !isMemberReady(podName, membersStatus) {
 			return false
 		}
@@ -810,29 +813,53 @@ func IsOwnedByRsm(obj client.Object) bool {
 	return false
 }
 
-// func placement(rsm workloads.ReplicatedStateMachine) string {
-//	if rsm.Annotations == nil {
-//		return ""
-//	}
-//	return rsm.Annotations[constant.KBAppMultiClusterPlacementKey]
-// }
-//
-// func inLocalContext() model.GraphOption {
-//	return model.WithClientOption(multicluster.InLocalContext())
-// }
-//
-// func inLocalContextOneshot() model.GraphOption {
-//	return model.WithClientOption(multicluster.InLocalContextOneshot())
-// }
+// readCacheSnapshot reads all objects owned by our cluster
+func readCacheSnapshot(ctx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (model.ObjectSnapshot, error) {
+	// list what kinds of object cluster owns
+	snapshot := make(model.ObjectSnapshot)
+	inNS := client.InNamespace(root.GetNamespace())
+	for _, list := range kinds {
+		if err := ctx.GetClient().List(ctx.GetContext(), list, inNS, ml, multicluster.InLocalContext()); err != nil {
+			return nil, err
+		}
+		// reflect get list.Items
+		items := reflect.ValueOf(list).Elem().FieldByName("Items")
+		l := items.Len()
+		for i := 0; i < l; i++ {
+			// get the underlying object
+			object := items.Index(i).Addr().Interface().(client.Object)
+			name, err := model.GetGVKName(object)
+			if err != nil {
+				return nil, err
+			}
+			snapshot[*name] = object
+		}
+	}
+	return snapshot, nil
+}
+
+func placement(rsm workloads.ReplicatedStateMachine) string {
+	if rsm.Annotations == nil {
+		return ""
+	}
+	return rsm.Annotations[constant.KBAppMultiClusterPlacementKey]
+}
+
+func inLocalContext() model.GraphOption {
+	return model.WithClientOption(multicluster.InLocalContext())
+}
+
+func inLocalContextOneshot() model.GraphOption {
+	return model.WithClientOption(multicluster.InLocalContextOneshot())
+}
 
 func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
-	// if v.ClientOpt != nil {
-	//	opt, ok := v.ClientOpt.(*multicluster.ClientOption)
-	//	if ok {
-	//		return opt
-	//	}
-	//	panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
-	// }
-	// return multicluster.InGlobalContext()
-	return nil
+	if v.ClientOpt != nil {
+		opt, ok := v.ClientOpt.(*multicluster.ClientOption)
+		if ok {
+			return opt
+		}
+		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
+	}
+	return multicluster.InGlobalContext()
 }

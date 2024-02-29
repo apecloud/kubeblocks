@@ -93,7 +93,10 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 		objs, err := getClusterOwningNamespacedObjects(transCtx, *cluster, ml, toPreserveKinds)
 		if err != nil {
-			return err
+			// TODO(leon)
+			if !strings.Contains(err.Error(), "the server could not find the requested resource") {
+				return err
+			}
 		}
 		// construct cluster spec JSON string
 		clusterSpec := cluster.DeepCopy()
@@ -127,7 +130,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			// annotated last-applied Cluster spec
 			annot[constant.LastAppliedClusterAnnotationKey] = clusterJSON
 			o.SetAnnotations(annot)
-			graphCli.Update(dag, origObj, o)
+			graphCli.Update(dag, origObj, o) // TODO(leon): not-supported
 		}
 		return nil
 	}
@@ -151,20 +154,26 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	// add namespaced objects deletion vertex
 	namespacedObjs, err := getClusterOwningNamespacedObjects(transCtx, *cluster, ml, toDeleteNamespacedKinds)
 	if err != nil {
-		return err
+		// TODO(leon)
+		if !strings.Contains(err.Error(), "the server could not find the requested resource") {
+			return err
+		}
 	}
 	delObjs := toDeleteObjs(namespacedObjs)
 
 	// add non-namespaced objects deletion vertex
 	nonNamespacedObjs, err := getClusterOwningNonNamespacedObjects(transCtx, *cluster, ml, toDeleteNonNamespacedKinds)
 	if err != nil {
-		return err
+		// TODO(leon)
+		if !strings.Contains(err.Error(), "the server could not find the requested resource") {
+			return err
+		}
 	}
 	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
 
 	for _, o := range delObjs {
 		if !rsm.IsOwnedByRsm(o) {
-			graphCli.Delete(dag, o)
+			graphCli.Delete(dag, o, inUniversalContext())
 		}
 	}
 	// set cluster action to noop until all the sub-resources deleted

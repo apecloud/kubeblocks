@@ -69,7 +69,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		if err != nil {
 			return err
 		}
-		graphCli.Create(dag, secret)
+		graphCli.Create(dag, secret, inUniversalContext())
 	}
 	return nil
 }

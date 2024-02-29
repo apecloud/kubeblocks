@@ -95,29 +95,28 @@ func mergeMap(dst, src map[string]string) {
 	}
 }
 
-// func placement(obj client.Object) string {
-//	if obj.GetAnnotations() == nil {
-//		return ""
-//	}
-//	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
-// }
-//
-// func inLocalContext() model.GraphOption {
-//	return model.WithClientOption(multicluster.InLocalContext())
-// }
-//
-// func inUniversalContext() model.GraphOption {
-//	return model.WithClientOption(multicluster.InUniversalContext())
-// }
+func placement(obj client.Object) string {
+	if obj.GetAnnotations() == nil {
+		return ""
+	}
+	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
+}
+
+func inLocalContext() model.GraphOption {
+	return model.WithClientOption(multicluster.InLocalContext())
+}
+
+func inUniversalContext() model.GraphOption {
+	return model.WithClientOption(multicluster.InUniversalContext())
+}
 
 func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
-	// if v.ClientOpt != nil {
-	//	opt, ok := v.ClientOpt.(*multicluster.ClientOption)
-	//	if ok {
-	//		return opt
-	//	}
-	//	panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
-	//}
-	// return multicluster.InGlobalContext()
-	return nil
+	if v.ClientOpt != nil {
+		opt, ok := v.ClientOpt.(*multicluster.ClientOption)
+		if ok {
+			return opt
+		}
+		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
+	}
+	return multicluster.InGlobalContext()
 }

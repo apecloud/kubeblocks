@@ -28,6 +28,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -100,8 +101,10 @@ func (c *configReconcileContext) RSM() *configReconcileContext {
 		// fix uid mismatch bug: convert rsm to sts
 		// NODE: all components use the StatefulSet
 		for _, rsm := range c.RSMList {
+			// TODO(leon): sts, get -> list, ctx or obj annotation
+			stsKey := client.ObjectKeyFromObject(rsmcore.ConvertRSMToSTS(&rsm))
 			var stsObject appv1.StatefulSet
-			if err = c.Client.Get(c.Context, client.ObjectKeyFromObject(rsmcore.ConvertRSMToSTS(&rsm)), &stsObject); err != nil {
+			if err = c.Client.Get(c.Context, stsKey, &stsObject, multicluster.InLocalContext()); err != nil {
 				return
 			}
 			c.StatefulSets = append(c.StatefulSets, stsObject)

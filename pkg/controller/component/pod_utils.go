@@ -21,21 +21,24 @@ package component
 
 import (
 	"context"
+	"slices"
 	"strconv"
+	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-func ListPodOwnedByComponent(ctx context.Context, cli client.Reader, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
-	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
+func ListPodOwnedByComponent(ctx context.Context, cli client.Reader, namespace string, labels client.MatchingLabels, opts ...client.ListOption) ([]*corev1.Pod, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels, opts...)
 }
 
 // GetComponentPodList gets the pod list by cluster and componentName
@@ -81,23 +84,26 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 		}
 	}
 
-	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels)
+	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels, multicluster.InLocalContext())
 	if err != nil {
 		return false, err
 	}
 	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
 		// TODO pod ObservedGeneration
 	} else {
+		// TODO(leon): sts
 		// check whether the underlying workload(sts) has sent the latest template to pods
-		sts := &appsv1.StatefulSet{}
-		if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
-			return false, err
-		}
+		sts := rsmcore.ConvertRSMToSTS(rsm)
+		// sts := &appsv1.StatefulSet{}
+		// if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts, multicluster.InLocalContext()); err != nil {
+		//	return false, err
+		// }
 		if sts.Status.ObservedGeneration != sts.Generation {
 			return false, nil
 		}
+		updateRevisions := strings.Split(sts.Status.UpdateRevision, ",")
 		for _, pod := range pods {
-			if intctrlutil.GetPodRevision(pod) != sts.Status.UpdateRevision {
+			if !slices.Contains(updateRevisions, intctrlutil.GetPodRevision(pod)) {
 				return false, nil
 			}
 		}

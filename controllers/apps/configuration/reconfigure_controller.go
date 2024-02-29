@@ -32,8 +32,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
@@ -41,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -91,7 +94,8 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	config := &corev1.ConfigMap{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
+	// TODO(leon): local or universal?
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config, multicluster.InLocalContextUnspecified()); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configmap")
 	}
 
@@ -133,11 +137,24 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.ConfigMap{}).
-		WithEventFilter(predicate.NewPredicateFuncs(checkConfigurationObject)).
-		Complete(r)
+func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	b := ctrl.NewControllerManagedBy(mgr).For(&corev1.ConfigMap{})
+
+	if multiClusterMgr != nil {
+		eventHandler := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+			return []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Namespace: obj.GetNamespace(),
+						Name:      obj.GetName(),
+					},
+				},
+			}
+		})
+		multiClusterMgr.Watch(b, &corev1.ConfigMap{}, eventHandler)
+	}
+
+	return b.WithEventFilter(predicate.NewPredicateFuncs(checkConfigurationObject)).Complete(r)
 }
 
 func checkConfigurationObject(object client.Object) bool {

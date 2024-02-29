@@ -55,9 +55,3 @@ type gvkNObjKey struct {
 }
 
 type clusterOwningObjects map[gvkNObjKey]client.Object
-
-type delegateClient struct {
-	client.Client
-}
-
-var _ client.Reader = delegateClient{}

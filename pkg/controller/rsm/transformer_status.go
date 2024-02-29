@@ -21,6 +21,7 @@ package rsm
 
 import (
 	"strconv"
+	"strings"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 // ObjectStatusTransformer computes the current status:
@@ -58,7 +60,7 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 		if rsm.Spec.RsmTransformPolicy == v1alpha1.ToPod {
 			ml := GetPodsLabels(rsm.Labels)
 			pods := &corev1.PodList{}
-			if err := transCtx.Client.List(transCtx, pods, client.InNamespace(rsm.Namespace), ml); err != nil {
+			if err := transCtx.Client.List(transCtx, pods, client.InNamespace(rsm.Namespace), ml, multicluster.InLocalContext()); err != nil {
 				return err
 			}
 			fliteredPods := FilterActivePods(pods.Items)
@@ -72,28 +74,43 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 			setMembersStatus(rsm, pods.Items)
 		} else {
 			// read the underlying sts
-			sts := &apps.StatefulSet{}
-			if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts); err != nil {
+			stsList := &apps.StatefulSetList{}
+			if err := transCtx.Client.List(transCtx.Context, stsList, client.InNamespace(rsm.Namespace),
+				client.MatchingLabels(rsm.Labels), multicluster.InLocalContext()); err != nil {
 				return err
 			}
 			// keep rsm's ObservedGeneration to avoid override by sts's ObservedGeneration
 			generation := rsm.Status.ObservedGeneration
-			rsm.Status.StatefulSetStatus = sts.Status
+			rsm.Status.StatefulSetStatus = mergeStsStatus(stsList.Items)
 			rsm.Status.ObservedGeneration = generation
-			if currentGenerationLabel, ok := sts.Labels[rsmGenerationLabelKey]; ok {
-				currentGeneration, err := strconv.ParseInt(currentGenerationLabel, 10, 64)
-				if err != nil {
-					return err
+			minCurrentGeneration := int64(0)
+			for _, sts := range stsList.Items {
+				if currentGenerationLabel, ok := sts.Labels[rsmGenerationLabelKey]; ok {
+					currentGeneration, err := strconv.ParseInt(currentGenerationLabel, 10, 64)
+					if err != nil {
+						return err
+					}
+					if minCurrentGeneration == 0 {
+						minCurrentGeneration = currentGeneration
+					}
+					if minCurrentGeneration > currentGeneration {
+						minCurrentGeneration = currentGeneration
+					}
 				}
-				rsm.Status.CurrentGeneration = currentGeneration
 			}
+			rsm.Status.CurrentGeneration = minCurrentGeneration
 			// read all pods belong to the sts, hence belong to the rsm
-			pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
-			if err != nil {
+			// pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
+			// if err != nil {
+			//	return err
+			// }
+			podList := &corev1.PodList{}
+			if err := transCtx.Client.List(transCtx.Context, podList, client.InNamespace(rsm.Namespace),
+				client.MatchingLabels(rsm.Labels), multicluster.InLocalContext()); err != nil {
 				return err
 			}
 			// update role fields
-			setMembersStatus(rsm, pods)
+			setMembersStatus(rsm, podList.Items)
 		}
 	}
 
@@ -101,6 +118,23 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 	graphCli.Status(dag, rsmOrig, rsm)
 
 	return nil
+}
+
+func mergeStsStatus(stsList []apps.StatefulSet) apps.StatefulSetStatus {
+	status := stsList[0].Status
+	for _, sts := range stsList[1:] {
+		status.Replicas += sts.Status.Replicas
+		status.ReadyReplicas += sts.Status.ReadyReplicas
+		status.CurrentReplicas += sts.Status.CurrentReplicas
+		status.UpdatedReplicas += sts.Status.UpdatedReplicas
+		status.AvailableReplicas += sts.Status.AvailableReplicas
+	}
+	var updateRevisions []string
+	for _, sts := range stsList {
+		updateRevisions = append(updateRevisions, sts.Status.UpdateRevision)
+	}
+	status.UpdateRevision = strings.Join(updateRevisions, ",")
+	return status
 }
 
 func calculateStatus(rsm *v1alpha1.ReplicatedStateMachine, pods []*corev1.Pod) (int, int) {

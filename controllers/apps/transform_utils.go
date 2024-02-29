@@ -35,6 +35,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -68,7 +69,7 @@ func getClusterOwningNamespacedObjects(transCtx *clusterTransformContext,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (clusterOwningObjects, error) {
 	inNS := client.InNamespace(cluster.Namespace)
-	return getClusterOwningObjectsWithOptions(transCtx, kinds, inNS, labels)
+	return getClusterOwningObjectsWithOptions(transCtx, kinds, inNS, labels, multicluster.InUniversalContext())
 }
 
 // getClusterOwningNonNamespacedObjects reads non-namespaced objects owned by our cluster with kinds.
@@ -76,7 +77,7 @@ func getClusterOwningNonNamespacedObjects(transCtx *clusterTransformContext,
 	_ appsv1alpha1.Cluster,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (clusterOwningObjects, error) {
-	return getClusterOwningObjectsWithOptions(transCtx, kinds, labels)
+	return getClusterOwningObjectsWithOptions(transCtx, kinds, labels, multicluster.InUniversalContext())
 }
 
 // getClusterOwningObjectsWithOptions reads objects owned by our cluster with kinds and specified options.

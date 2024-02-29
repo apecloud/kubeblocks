@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
+	"slices"
+	"strings"
+
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,6 +30,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -47,20 +51,16 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
 		podList := &corev1.PodList{}
 		ml := GetPodsLabels(rsm.Labels)
-		if err := transCtx.Client.List(transCtx, podList, client.InNamespace(rsm.Namespace), ml); err != nil {
+		if err := transCtx.Client.List(transCtx, podList, client.InNamespace(rsm.Namespace), ml, multicluster.InLocalContext()); err != nil {
 			return err
 		}
 		pods = podList.Items
 	} else {
 		var err error
 		// read the underlying sts
-		stsObj := &apps.StatefulSet{}
-		if err = transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), stsObj); err != nil {
-			return err
-		}
-		// read all pods belong to the sts, hence belong to the rsm
-		pods, err = getPodsOfStatefulSet(transCtx.Context, transCtx.Client, stsObj)
-		if err != nil {
+		stsList := &apps.StatefulSetList{}
+		if err = transCtx.Client.List(transCtx.Context, stsList, client.InNamespace(rsm.Namespace),
+			client.MatchingLabels(rsm.Labels), multicluster.InLocalContext()); err != nil {
 			return err
 		}
 
@@ -68,13 +68,21 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 		// the stateful_set reconciler will do the others.
 		// to simplify the process, we do pods Deletion after stateful_set reconcile done,
 		// that is stsObj.Generation == stsObj.Status.ObservedGeneration
-		if stsObj.Generation != stsObj.Status.ObservedGeneration {
-			return nil
+		for _, sts := range stsList.Items {
+			if sts.Generation != sts.Status.ObservedGeneration {
+				return nil
+			}
 		}
 
 		// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
 		// only then, we have enough info about the previous pods before delete the current one
-		if len(pods) != int(*stsObj.Spec.Replicas) {
+		podList := &corev1.PodList{}
+		if err := transCtx.Client.List(transCtx.Context, podList, client.InNamespace(rsm.Namespace),
+			client.MatchingLabels(rsm.Labels), multicluster.InLocalContext()); err != nil {
+			return err
+		}
+		pods = podList.Items
+		if len(pods) != int(*rsm.Spec.Replicas) {
 			return nil
 		}
 	}
@@ -168,9 +176,10 @@ func createSwitchoverAction(dag *graph.DAG, cli model.GraphClient, rsm *workload
 }
 
 func selectSwitchoverTarget(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) int {
+	updateRevisions := strings.Split(rsm.Status.UpdateRevision, ",")
 	var podUpdated, podUpdatedWithLabel string
 	for _, pod := range pods {
-		if intctrlutil.GetPodRevision(&pod) != rsm.Status.UpdateRevision {
+		if !slices.Contains(updateRevisions, intctrlutil.GetPodRevision(&pod)) {
 			continue
 		}
 		if len(podUpdated) == 0 {

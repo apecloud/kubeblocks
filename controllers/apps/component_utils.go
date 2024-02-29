@@ -38,6 +38,7 @@ import (
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -77,9 +78,14 @@ func IsProbeTimeout(probes *appsv1alpha1.ClusterDefinitionProbes, podsReadyTime 
 
 // getObjectListByCustomLabels gets k8s workload list with custom labels
 func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster,
-	objectList client.ObjectList, matchLabels client.ListOption) error {
+	objectList client.ObjectList, matchLabels client.ListOption, opts ...client.ListOption) error {
 	inNamespace := client.InNamespace(cluster.Namespace)
-	return cli.List(ctx, objectList, matchLabels, inNamespace)
+	if opts == nil {
+		opts = []client.ListOption{matchLabels, inNamespace}
+	} else {
+		opts = append(opts, matchLabels, inNamespace)
+	}
+	return cli.List(ctx, objectList, opts...)
 }
 
 // parseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
@@ -166,8 +172,8 @@ func getImageName(image string) string {
 	}
 }
 
-// UpdateComponentInfoToPods patches current component's replicas to all belonging pods, as an annotation.
-func UpdateComponentInfoToPods(
+// updateComponentInfoToPods patches current component's replicas to all belonging pods, as an annotation.
+func updateComponentInfoToPods(
 	ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
@@ -182,7 +188,7 @@ func UpdateComponentInfoToPods(
 	}
 	// list all pods in cache
 	podList := corev1.PodList{}
-	if err := cli.List(ctx, &podList, client.InNamespace(cluster.Namespace), ml); err != nil {
+	if err := cli.List(ctx, &podList, client.InNamespace(cluster.Namespace), ml, multicluster.InLocalContext()); err != nil {
 		return err
 	}
 	// list all pods in dag
@@ -215,13 +221,13 @@ func UpdateComponentInfoToPods(
 		}
 		// pod not in dag, add a new vertex
 		updateAnnotation(pod)
-		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
+		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil, inLocalContext())
 	}
 	return nil
 }
 
-// UpdateCustomLabelToPods updates custom label to pods
-func UpdateCustomLabelToPods(ctx context.Context,
+// updateCustomLabelToPods updates custom label to pods
+func updateCustomLabelToPods(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomp.SynthesizedComponent,
@@ -236,7 +242,7 @@ func UpdateCustomLabelToPods(ctx context.Context,
 	for labelKey, labelValue := range component.Labels {
 		podList := &corev1.PodList{}
 		matchLabels := constant.GetComponentWellKnownLabels(cluster.Name, component.Name)
-		if err := getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels)); err != nil {
+		if err := getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels), multicluster.InLocalContext()); err != nil {
 			return err
 		}
 
@@ -251,7 +257,7 @@ func UpdateCustomLabelToPods(ctx context.Context,
 			}
 			pod := &podList.Items[i]
 			updateObjLabel(labelKey, labelValue, pod)
-			graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
+			graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil, inLocalContext())
 		}
 	}
 	return nil

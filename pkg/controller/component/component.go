@@ -75,6 +75,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, compDefName()).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+		AddAnnotations(constant.KBAppMultiClusterPlacementKey, cluster.Annotations[constant.KBAppMultiClusterPlacementKey]).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetAffinity(affinities).

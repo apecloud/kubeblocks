@@ -39,6 +39,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -109,7 +110,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	reqCtx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
-	planBuilder := newComponentPlanBuilder(reqCtx, r.Client, req)
+	planBuilder := newComponentPlanBuilder(reqCtx, r.Client)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -130,7 +131,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// handle finalizers and referenced definition labels
 			&componentMetaTransformer{},
 			// validate referenced componentDefinition objects, and build synthesized component
-			&componentLoadResourcesTransformer{Client: r.Client},
+			&componentLoadResourcesTransformer{},
 			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
 			// allocate port for hostNetwork component
@@ -176,7 +177,14 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	if multiClusterMgr == nil {
+		return r.setupWithManager(mgr)
+	}
+	return r.setupWithMultiClusterManager(mgr, multiClusterMgr)
+}
+
+func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
 	if retryDurationMS != 0 {
 		requeueDuration = time.Millisecond * time.Duration(retryDurationMS)
@@ -203,6 +211,28 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			Watches(&rbacv1.RoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 			Watches(&corev1.ServiceAccount{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 	}
+
+	return b.Complete(r)
+}
+
+func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	b := ctrl.NewControllerManagedBy(mgr).
+		For(&appsv1alpha1.Component{}).
+		Owns(&workloads.ReplicatedStateMachine{}).
+		Owns(&dpv1alpha1.Backup{}).
+		Owns(&dpv1alpha1.Restore{}).
+		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
+
+	eventHandler := handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)
+	multiClusterMgr.Watch(b, &corev1.Service{}, eventHandler).
+		Watch(b, &corev1.Secret{}, eventHandler).
+		Watch(b, &corev1.ConfigMap{}, eventHandler).
+		Watch(b, &corev1.PersistentVolumeClaim{}, eventHandler).
+		Watch(b, &batchv1.Job{}, eventHandler).
+		Watch(b, &corev1.ServiceAccount{}, eventHandler).
+		Watch(b, &rbacv1.RoleBinding{}, eventHandler).
+		Watch(b, &rbacv1.ClusterRoleBinding{}, eventHandler).
+		Watch(b, &corev1.Pod{}, eventHandler)
 
 	return b.Complete(r)
 }

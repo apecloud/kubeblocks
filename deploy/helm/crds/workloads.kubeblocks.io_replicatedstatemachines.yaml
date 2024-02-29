@@ -976,27 +976,6 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
-              nodeAssignment:
-                description: Defines the expected assignment of nodes.
-                items:
-                  properties:
-                    name:
-                      description: Specifies the identifier for the statefulSet requiring
-                        node allocation.
-                      type: string
-                    nodeSpec:
-                      description: Provides comprehensive details of the node to be
-                        assigned to the statefulSet.
-                      properties:
-                        nodeName:
-                          description: Represents the name of the node. This is a
-                            unique identifier within the cluster and is used to identify
-                            the specific node for scheduling, reporting, and other
-                            tasks.
-                          type: string
-                      type: object
-                  type: object
-                type: array
               paused:
                 description: Indicates that the rsm is paused, meaning the reconciliation
                   of this rsm object will be paused.
@@ -1135,15 +1114,6 @@ spec:
                   - name
                   type: object
                 type: array
-              rsmTransformPolicy:
-                default: ToSts
-                description: 'Defines the policy to generate sts using rsm. Passed
-                  from cluster. ToSts: rsm transform to statefulSet ToPod: rsm transform
-                  to pod'
-                enum:
-                - ToPod
-                - ToSts
-                type: string
               selector:
                 description: 'Represents a label query over pods that should match
                   the replica count. It must match the pod template''s labels. More

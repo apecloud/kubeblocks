@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
+	"strconv"
+
 	corev1 "k8s.io/api/core/v1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -48,6 +50,8 @@ func BuildEnvByCredential(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCred
 	}
 	if credential.PortKey != "" {
 		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey))
+	} else {
+		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))})
 	}
 	return envVars
 }

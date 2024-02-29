@@ -453,7 +453,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -740,7 +740,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -1025,7 +1025,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -1310,7 +1310,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -1596,7 +1596,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -1895,7 +1895,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -2182,7 +2182,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -2465,7 +2465,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -2747,7 +2747,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -3029,7 +3029,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -3311,7 +3311,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -3666,7 +3666,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.
@@ -3938,7 +3938,7 @@ spec:
                             - Role
                             - Ordinal
                             type: string
-                          timeoutSeconds:omitempty:
+                          timeoutSeconds:
                             default: 0
                             description: TimeoutSeconds defines the timeout duration
                               for the action in seconds. Cannot be updated.

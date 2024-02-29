@@ -295,3 +295,17 @@ func GetKubeVersion() (string, error) {
 	}
 	return semver.MajorMinor(ver.GitVersion), nil
 }
+func SupportsCronJobV1() bool {
+	kubeVersion, err := GetKubeVersion()
+	if err != nil {
+		return true
+	}
+	return semver.Compare(kubeVersion, "v1.21") >= 0
+}
+func GetPodFirstContainerPort(pod *corev1.Pod) int32 {
+	ports := pod.Spec.Containers[0].Ports
+	if len(ports) == 0 {
+		return 0
+	}
+	return ports[0].ContainerPort
+}

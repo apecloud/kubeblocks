@@ -64,6 +64,7 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 	for _, expose := range exposeMap {
 		clusterCompSpecName := ""
 		clusterCompDef := ""
+		clusterCompDefRefName := ""
 		if len(expose.ComponentName) > 0 {
 			clusterCompSpec, ok := compMap[expose.ComponentName]
 			if !ok {
@@ -71,11 +72,12 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 			}
 			clusterCompSpecName = clusterCompSpec.Name
 			clusterCompDef = clusterCompSpec.ComponentDef
+			clusterCompDefRefName = clusterCompSpec.ComponentDefRef
 		}
 
 		switch expose.Switch {
 		case appsv1alpha1.EnableExposeSwitch:
-			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, clusterCompSpecName, clusterCompDef, expose.Services); err != nil {
+			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, clusterCompSpecName, clusterCompDef, clusterCompDefRefName, expose.Services); err != nil {
 				return err
 			}
 		case appsv1alpha1.DisableExposeSwitch:
@@ -262,6 +264,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpecName string,
 	clusterCompDefName string,
+	clusterCompDefRefName string,
 	exposeServices []appsv1alpha1.OpsService) error {
 	if cluster == nil || len(exposeServices) == 0 {
 		return nil
@@ -326,14 +329,14 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			}
 			return convertDefaultCompDefServicePorts(compDef.Spec.Services)
 		}
-		if cluster.Spec.ClusterDefRef != "" && clusterCompDefName != "" {
+		if cluster.Spec.ClusterDefRef != "" && clusterCompDefRefName != "" {
 			clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli, cluster.Spec.ClusterDefRef)
 			if err != nil {
 				return nil, err
 			}
-			clusterCompDef := clusterDef.GetComponentDefByName(clusterCompDefName)
+			clusterCompDef := clusterDef.GetComponentDefByName(clusterCompDefRefName)
 			if clusterCompDef == nil || clusterCompDef.Service == nil {
-				return nil, fmt.Errorf("referenced cluster component definition or services is not defined: %s", clusterCompDefName)
+				return nil, fmt.Errorf("referenced cluster component definition or services is not defined: %s", clusterCompDefRefName)
 			}
 			return clusterCompDef.Service.ToSVCPorts(), nil
 		}
@@ -356,14 +359,14 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			}
 			return "", nil
 		}
-		if cluster.Spec.ClusterDefRef != "" && clusterCompDefName != "" {
+		if cluster.Spec.ClusterDefRef != "" && clusterCompDefRefName != "" {
 			clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli, cluster.Spec.ClusterDefRef)
 			if err != nil {
 				return "", err
 			}
-			clusterCompDef := clusterDef.GetComponentDefByName(clusterCompDefName)
+			clusterCompDef := clusterDef.GetComponentDefByName(clusterCompDefRefName)
 			if clusterCompDef == nil {
-				return "", fmt.Errorf("referenced cluster component definition is not defined: %s", clusterCompDefName)
+				return "", fmt.Errorf("referenced cluster component definition is not defined: %s", clusterCompDefRefName)
 			}
 			switch clusterCompDef.WorkloadType {
 			case appsv1alpha1.Replication:
@@ -407,7 +410,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		// set service ports
 		if len(exposeService.Ports) != 0 {
 			clusterService.Spec.Ports = exposeService.Ports
-		} else if len(clusterCompDefName) > 0 {
+		} else {
 			defaultServicePorts, err := defaultServicePortsFunc()
 			if err != nil {
 				return err

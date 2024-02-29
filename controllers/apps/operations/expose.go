@@ -247,12 +247,7 @@ func (e ExposeOpsHandler) removeClusterServices(cluster *appsv1alpha1.Cluster,
 		return nil
 	}
 	for _, exposeService := range exposeServices {
-		var genServiceName string
-		if len(clusterCompSpecName) > 0 {
-			genServiceName = fmt.Sprintf("%s-%s", clusterCompSpecName, exposeService.Name)
-		} else {
-			genServiceName = exposeService.Name
-		}
+		genServiceName := generateServiceName(clusterCompSpecName, exposeService.Name)
 		for i, clusterService := range cluster.Spec.Services {
 			// remove service from cluster
 			if clusterService.Name == genServiceName && clusterService.ComponentSelector == clusterCompSpecName {
@@ -280,12 +275,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			return false
 		}
 
-		var genServiceName string
-		if len(clusterCompDefName) > 0 {
-			genServiceName = fmt.Sprintf("%s-%s", clusterCompSpecName, exposeService.Name)
-		} else {
-			genServiceName = exposeService.Name
-		}
+		genServiceName := generateServiceName(clusterCompSpecName, exposeService.Name)
 
 		for _, clusterService := range cluster.Spec.Services {
 			if clusterService.ComponentSelector != clusterCompSpecName {
@@ -396,12 +386,8 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			reqCtx.Log.Info("cluster service already exists, skip", "service", exposeService.Name)
 			continue
 		}
-		var genServiceName string
-		if len(clusterCompDefName) > 0 {
-			genServiceName = fmt.Sprintf("%s-%s", clusterCompSpecName, exposeService.Name)
-		} else {
-			genServiceName = exposeService.Name
-		}
+
+		genServiceName := generateServiceName(clusterCompSpecName, exposeService.Name)
 
 		clusterService := appsv1alpha1.ClusterService{
 			Service: appsv1alpha1.Service{
@@ -446,4 +432,11 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		cluster.Spec.Services = append(cluster.Spec.Services, clusterService)
 	}
 	return nil
+}
+
+func generateServiceName(clusterCompSpecName, exposeServiceName string) string {
+	if len(clusterCompSpecName) > 0 {
+		return fmt.Sprintf("%s-%s", clusterCompSpecName, exposeServiceName)
+	}
+	return exposeServiceName
 }

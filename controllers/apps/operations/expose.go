@@ -275,7 +275,12 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			return false
 		}
 
-		genServiceName := fmt.Sprintf("%s-%s", clusterCompSpecName, exposeService.Name)
+		var genServiceName string
+		if len(clusterCompDefName) > 0 {
+			genServiceName = fmt.Sprintf("%s-%s", clusterCompSpecName, exposeService.Name)
+		} else {
+			genServiceName := exposeService.Name
+		}
 
 		for _, clusterService := range cluster.Spec.Services {
 			if clusterService.ComponentSelector != clusterCompSpecName {
@@ -386,10 +391,13 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			reqCtx.Log.Info("cluster service already exists, skip", "service", exposeService.Name)
 			continue
 		}
-		genServiceName := exposeService.Name
+		var genServiceName string
 		if len(clusterCompDefName) > 0 {
 			genServiceName = fmt.Sprintf("%s-%s", clusterCompSpecName, exposeService.Name)
+		} else {
+			genServiceName = exposeService.Name
 		}
+
 		clusterService := appsv1alpha1.ClusterService{
 			Service: appsv1alpha1.Service{
 				Name:        genServiceName,

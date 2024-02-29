@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"strconv"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -30,6 +28,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/apiutil"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -372,6 +371,45 @@ var _ = Describe("Component Definition Convertor", func() {
 			})
 		})
 
+		Context("vars", func() {
+			It("host network ports", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				// default ports are 3306 and 13306
+				clusterCompDef.PodSpec.Containers[0].Ports[0].ContainerPort = 36
+
+				convertor := &compDefVarsConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				vars, ok := res.([]appsv1alpha1.EnvVar)
+				Expect(ok).Should(BeTrue())
+				Expect(vars).Should(HaveLen(1))
+
+				container := clusterCompDef.PodSpec.Containers[0]
+				expectedVar := appsv1alpha1.EnvVar{
+					Name: apiutil.HostNetworkDynamicPortVarName(container.Name, container.Ports[0].Name),
+					ValueFrom: &appsv1alpha1.VarSource{
+						PodVarRef: &appsv1alpha1.PodVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Optional: func() *bool { optional := false; return &optional }(),
+							},
+							PodVars: appsv1alpha1.PodVars{
+								Container: &appsv1alpha1.ContainerVars{
+									Name: container.Name,
+									Port: &appsv1alpha1.NamedVar{
+										Name:   container.Ports[0].Name,
+										Option: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+				}
+				Expect(vars[0]).Should(BeEquivalentTo(expectedVar))
+			})
+		})
+
 		Context("volumes", func() {
 			It("w/o volume types", func() {
 				clusterCompDefCopy := clusterCompDef.DeepCopy()
@@ -472,6 +510,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			It("part dynamic ports", func() {
 				clusterCompDef.PodSpec.HostNetwork = true
 				// default ports are 3306 and 13306
+				container := clusterCompDef.PodSpec.Containers[0]
 				clusterCompDef.PodSpec.Containers[0].Ports[0].ContainerPort = 36
 
 				convertor := &compDefHostNetworkConvertor{}
@@ -482,9 +521,9 @@ var _ = Describe("Component Definition Convertor", func() {
 				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
 				Expect(ok).Should(BeTrue())
 				Expect(hostNetwork.ContainerPorts).Should(HaveLen(1))
-				Expect(hostNetwork.ContainerPorts[0].Container).Should(Equal(clusterCompDef.PodSpec.Containers[0].Name))
+				Expect(hostNetwork.ContainerPorts[0].Container).Should(Equal(container.Name))
 				Expect(hostNetwork.ContainerPorts[0].Ports).Should(HaveLen(1))
-				Expect(hostNetwork.ContainerPorts[0].Ports[0]).Should(Equal(strconv.Itoa(36)))
+				Expect(hostNetwork.ContainerPorts[0].Ports[0]).Should(Equal(container.Ports[0].Name))
 				Expect(hostNetwork.DNSPolicy).Should(BeNil())
 			})
 

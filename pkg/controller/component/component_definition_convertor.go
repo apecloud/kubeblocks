@@ -21,12 +21,12 @@ package component
 
 import (
 	"fmt"
-	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/apiutil"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -129,7 +129,40 @@ func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 type compDefVarsConvertor struct{}
 
 func (c *compDefVarsConvertor) convert(args ...any) (any, error) {
-	return nil, nil
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return c.convertHostNetworkVars(clusterCompDef), nil
+}
+
+func (c *compDefVarsConvertor) convertHostNetworkVars(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) []appsv1alpha1.EnvVar {
+	hostNetwork, err := convertHostNetwork(clusterCompDef)
+	if err != nil || hostNetwork == nil || len(hostNetwork.ContainerPorts) == 0 {
+		return nil
+	}
+	vars := make([]appsv1alpha1.EnvVar, 0)
+	for _, cc := range hostNetwork.ContainerPorts {
+		for _, port := range cc.Ports {
+			vars = append(vars, appsv1alpha1.EnvVar{
+				Name: apiutil.HostNetworkDynamicPortVarName(cc.Container, port),
+				ValueFrom: &appsv1alpha1.VarSource{
+					PodVarRef: &appsv1alpha1.PodVarSelector{
+						ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+							Optional: func() *bool { optional := false; return &optional }(),
+						},
+						PodVars: appsv1alpha1.PodVars{
+							Container: &appsv1alpha1.ContainerVars{
+								Name: cc.Container,
+								Port: &appsv1alpha1.NamedVar{
+									Name:   port,
+									Option: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+				},
+			})
+		}
+	}
+	return vars
 }
 
 // compDefVolumesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Volumes.
@@ -172,6 +205,10 @@ type compDefHostNetworkConvertor struct{}
 
 func (c *compDefHostNetworkConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return convertHostNetwork(clusterCompDef)
+}
+
+func convertHostNetwork(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (*appsv1alpha1.HostNetwork, error) {
 	if clusterCompDef.PodSpec == nil || !clusterCompDef.PodSpec.HostNetwork {
 		return nil, nil
 	}
@@ -185,9 +222,8 @@ func (c *compDefHostNetworkConvertor) convert(args ...any) (any, error) {
 			Ports:     []string{},
 		}
 		for _, port := range container.Ports {
-			// HACK
-			if port.ContainerPort <= constant.HostNetworkDynamicPortThreshold {
-				cp.Ports = append(cp.Ports, strconv.Itoa(int(port.ContainerPort)))
+			if apiutil.IsHostNetworkDynamicPort(port.ContainerPort) {
+				cp.Ports = append(cp.Ports, port.Name)
 			}
 		}
 		if len(cp.Ports) > 0 {

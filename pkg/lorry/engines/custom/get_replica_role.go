@@ -46,7 +46,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 	return mgr.GetReplicaRoleThroughCommands(ctx, cluster)
 }
 
-// GetReplicaRoleThroughCommands must provides the following dedicated environment variables for the action:
+// GetReplicaRoleThroughCommands provides the following dedicated environment variables for the action:
 //
 // - KB_POD_FQDN: The pod FQDN of the replica to check the role.
 // - KB_SERVICE_PORT: The port on which the DB service listens.

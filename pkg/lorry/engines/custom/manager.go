@@ -20,16 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package custom
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Manager struct {
@@ -106,4 +110,37 @@ func (mgr *Manager) InitComponentDefintionActions() error {
 		}
 	}
 	return nil
+}
+
+// JoinCurrentMemberToCluster provides the following dedicated environment variables for the action:
+//
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+// - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
+// - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
+func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
+	memberJoinCmd, ok := mgr.actionCommands[constant.MemberJoinAction]
+	if !ok && len(memberJoinCmd) == 0 {
+		return errors.New("member join command is empty!")
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+
+	if cluster.Leader == nil || cluster.Leader.Name == "" {
+		return errors.New("cluster has no leader")
+	}
+
+	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
+	fqdn := cluster.GetMemberAddr(*leaderMember)
+	envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+fqdn)
+	envs = append(envs, "KB_NEW_MEMBER_POD_NAME"+"="+mgr.CurrentMemberName)
+	output, err := util.ExecCommand(ctx, memberJoinCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("member join", "output", output)
+	}
+	return err
 }

@@ -99,7 +99,7 @@ func (s *CheckRole) Init(ctx context.Context) error {
 			s.logger.Info("get action commands failed", "error", err.Error())
 			return err
 		}
-		roleProbeCmd, ok := actionCommands["roleProbe"]
+		roleProbeCmd, ok := actionCommands[constant.RoleProbeAction]
 		if ok && len(roleProbeCmd) > 0 {
 			s.Command = roleProbeCmd
 		}

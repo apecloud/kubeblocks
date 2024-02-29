@@ -33,7 +33,7 @@ type Unlock struct {
 }
 
 func (ops *Unlock) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager()
+	manager, err := register.GetDBManager(nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "Get DB manager failed")
 	}

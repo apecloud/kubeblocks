@@ -20,17 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"context"
 	"errors"
-	"os"
 	"os/exec"
 )
 
-func ExecCommand(command []string) (string, error) {
+func ExecCommand(ctx context.Context, command []string, envs []string) (string, error) {
 	if len(command) == 0 {
 		return "", errors.New("command can not be empty")
 	}
-	cmd := exec.Command(command[0], command[1:]...)
-	cmd.Env = os.Environ()
+	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
+	cmd.Env = envs
 	bytes, err := cmd.Output()
 	if exitErr, ok := err.(*exec.ExitError); ok {
 		err = errors.New(string(exitErr.Stderr))

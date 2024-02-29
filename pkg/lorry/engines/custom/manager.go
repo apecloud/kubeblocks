@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 )
 
@@ -37,6 +38,9 @@ type Manager struct {
 	// For ASM Actions
 	actionSvcPorts *[]int
 	client         *http.Client
+
+	// For ComponentDefinition Actions
+	actionCommands map[string][]string
 }
 
 func NewManager(properties engines.Properties) (engines.DBManager, error) {
@@ -53,14 +57,20 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		DBManagerBase:  *managerBase,
 	}
 
-	err = mgr.InitASMAction()
+	err = mgr.InitASMActions()
 	if err != nil {
+		mgr.Logger.Info("init RSM commands failed", "error", err.Error())
+		return nil, err
+	}
+	err = mgr.InitComponentDefintionActions()
+	if err != nil {
+		mgr.Logger.Info("init component definition commands failed", "error", err.Error())
 		return nil, err
 	}
 	return mgr, nil
 }
 
-func (mgr *Manager) InitASMAction() error {
+func (mgr *Manager) InitASMActions() error {
 	actionSvcList := viper.GetString("KB_RSM_ACTION_SVC_LIST")
 	if actionSvcList == "" {
 		return nil
@@ -84,5 +94,16 @@ func (mgr *Manager) InitASMAction() error {
 		Transport: netTransport,
 	}
 
+	return nil
+}
+
+func (mgr *Manager) InitComponentDefintionActions() error {
+	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	if actionJSON != "" {
+		err := json.Unmarshal([]byte(actionJSON), &mgr.actionCommands)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

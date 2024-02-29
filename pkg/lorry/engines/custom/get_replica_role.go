@@ -26,20 +26,48 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 var perNodeRegx = regexp.MustCompile("^[^,]*$")
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
-	if mgr.actionSvcPorts == nil {
+	if mgr.actionSvcPorts != nil {
 		return mgr.GetReplicaRoleThroughASMAction(ctx, cluster)
 	}
-	return "", nil
+	return mgr.GetReplicaRoleThroughCommands(ctx, cluster)
+}
+
+func (mgr *Manager) GetReplicaRoleThroughCommands(ctx context.Context, cluster *dcs.Cluster) (string, error) {
+	roleProbeCmd, ok := mgr.actionCommands[constant.RoleProbeAction]
+	if !ok && len(roleProbeCmd) == 0 {
+		return "", errors.New("role probe commands is empty!")
+	}
+	envs := os.Environ()
+	var isUserSet, isPasswordSet bool
+	for _, env := range envs {
+		if strings.HasPrefix(env, constant.KBEnvServiceUser+"=") {
+			isUserSet = true
+		}
+
+		if strings.HasPrefix(env, constant.KBEnvServicePassword+"=") {
+			isPasswordSet = true
+		}
+	}
+	if !isUserSet || !isPasswordSet {
+		return "", errors.Errorf("envs is not set")
+	}
+
+	return util.ExecCommand(ctx, roleProbeCmd, envs)
 }
 
 func (mgr *Manager) GetReplicaRoleThroughASMAction(ctx context.Context, cluster *dcs.Cluster) (string, error) {

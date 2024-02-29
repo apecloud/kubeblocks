@@ -409,10 +409,10 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
 		// "postProvision":    synthesizeComp.LifecycleActions.PostProvision,
 		// "preTerminate":     synthesizeComp.LifecycleActions.PreTerminate,
-		"memberJoin":  synthesizeComp.LifecycleActions.MemberJoin,
-		"memberLeave": synthesizeComp.LifecycleActions.MemberLeave,
-		"readonly":    synthesizeComp.LifecycleActions.Readonly,
-		"readwrite":   synthesizeComp.LifecycleActions.Readwrite,
+		constant.MemberJoinAction:  synthesizeComp.LifecycleActions.MemberJoin,
+		constant.MemberLeaveAction: synthesizeComp.LifecycleActions.MemberLeave,
+		constant.ReadonlyAction:    synthesizeComp.LifecycleActions.Readonly,
+		constant.ReadWriteAction:   synthesizeComp.LifecycleActions.Readwrite,
 		// "dataPopulate":     synthesizeComp.LifecycleActions.DataPopulate,
 		// "dataAssemble":     synthesizeComp.LifecycleActions.DataAssemble,
 		// "reconfigure":      synthesizeComp.LifecycleActions.Reconfigure,
@@ -420,7 +420,7 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 	}
 
 	if synthesizeComp.LifecycleActions.RoleProbe != nil {
-		actions["roleProbe"] = &synthesizeComp.LifecycleActions.RoleProbe.LifecycleActionHandler
+		actions[constant.RoleProbeAction] = &synthesizeComp.LifecycleActions.RoleProbe.LifecycleActionHandler
 	}
 
 	var toolImage string

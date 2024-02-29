@@ -30,7 +30,6 @@ import (
 
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -186,7 +185,7 @@ func randomString(length int) string {
 }
 
 func strongRandomString(length int) string {
-	str, _ := password.Generate(length, 1, 1, false, false)
+	str, _ := common.GeneratePassword(length, 3, 3, false, "")
 	return str
 }
 

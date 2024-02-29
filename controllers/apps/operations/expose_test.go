@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -81,6 +82,50 @@ var _ = Describe("", func() {
 						{
 							Name:        testapps.ServiceVPCName,
 							ServiceType: corev1.ServiceTypeLoadBalancer,
+						},
+					},
+				},
+			}
+			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+
+			By("mock expose OpsRequest phase is Creating")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			// do expose action
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("Test OpsManager.MainEnter function")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("Test expose OpsRequest with empty ComponentName", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+
+			By("create Expose opsRequest")
+			ops := testapps.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,
+				clusterObject.Name, appsv1alpha1.ExposeType)
+			ops.Spec.ExposeList = []appsv1alpha1.Expose{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: ""},
+					Switch:       appsv1alpha1.EnableExposeSwitch,
+					Services: []appsv1alpha1.OpsService{
+						{
+							Name:        testapps.ServiceVPCName,
+							ServiceType: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name:       "http",
+									Port:       80,
+									TargetPort: intstr.FromInt(80),
+								},
+							},
 						},
 					},
 				},

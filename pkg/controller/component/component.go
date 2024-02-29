@@ -87,10 +87,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 		SetEnabledLogs(clusterCompSpec.EnabledLogs).
 		SetServiceRefs(clusterCompSpec.ServiceRefs).
 		SetClassRef(clusterCompSpec.ClassDefRef).
-		SetTLSConfig(clusterCompSpec.TLS, clusterCompSpec.Issuer).
-		SetNodes(clusterCompSpec.Nodes).
-		SetInstances(clusterCompSpec.Instances).
-		SetTransformPolicy(clusterCompSpec.RsmTransformPolicy)
+		SetTLSConfig(clusterCompSpec.TLS, clusterCompSpec.Issuer)
 	// sync cluster ignore resource constraint annotation to component
 	value, ok := cluster.GetAnnotations()[constant.IgnoreResourceConstraint]
 	if ok {

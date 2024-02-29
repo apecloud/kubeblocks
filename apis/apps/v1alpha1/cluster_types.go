@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -497,27 +496,6 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
-
-	// Defines the policy to generate sts using rsm.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=ToSts
-	// +optional
-	RsmTransformPolicy workloads.RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
-
-	// Defines the list of nodes that pods can schedule.
-	// If the RsmTransformPolicy is specified as ToPod, the list of nodes will be used. If the list of nodes is empty,
-	// no specific node will be assigned. However, if the list of nodes is filled, all pods will be evenly scheduled
-	// across the nodes in the list.
-	//
-	// +optional
-	Nodes []types.NodeName `json:"nodes,omitempty"`
-
-	// Defines the list of instances to be deleted priorly.
-	// If the RsmTransformPolicy is specified as ToPod, the list of instances will be used.
-	//
-	// +optional
-	Instances []string `json:"instances,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

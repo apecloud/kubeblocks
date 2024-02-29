@@ -45,16 +45,14 @@ import (
 )
 
 var (
-	controller      *gomock.Controller
-	k8sMock         *mocks.MockClient
-	graphCli        model.GraphClient
-	ctx             context.Context
-	logger          logr.Logger
-	transCtx        *rsmTransformContext
-	transCtxForPods *rsmTransformContext
-	dag             *graph.DAG
-	dagForPods      *graph.DAG
-	transformer     graph.Transformer
+	controller  *gomock.Controller
+	k8sMock     *mocks.MockClient
+	graphCli    model.GraphClient
+	ctx         context.Context
+	logger      logr.Logger
+	transCtx    *rsmTransformContext
+	dag         *graph.DAG
+	transformer graph.Transformer
 )
 
 const (
@@ -158,8 +156,6 @@ var (
 	observeActions = []workloads.Action{{Command: []string{"cmd"}}}
 
 	rsm *workloads.ReplicatedStateMachine
-
-	rsmForPods *workloads.ReplicatedStateMachine
 )
 
 func less(v1, v2 graph.Vertex) bool {
@@ -201,12 +197,6 @@ func mockUnderlyingPods(rsm workloads.ReplicatedStateMachine) []corev1.Pod {
 		pods[i] = *podList[i]
 	}
 	return pods
-}
-
-func mockDAGForPods() *graph.DAG {
-	d := graph.NewDAG()
-	graphCli.Root(d, transCtxForPods.rsmOrig, transCtxForPods.rsm, model.ActionStatusPtr())
-	return d
 }
 
 func mockDAG() *graph.DAG {

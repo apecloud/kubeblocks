@@ -20,11 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type ComponentBuilder struct {
@@ -84,21 +81,6 @@ func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBui
 
 func (builder *ComponentBuilder) SetMonitor(monitor bool) *ComponentBuilder {
 	builder.get().Spec.Monitor = monitor
-	return builder
-}
-
-func (builder *ComponentBuilder) SetTransformPolicy(transformPolicy workloads.RsmTransformPolicy) *ComponentBuilder {
-	builder.get().Spec.RsmTransformPolicy = transformPolicy
-	return builder
-}
-
-func (builder *ComponentBuilder) SetNodes(nodes []types.NodeName) *ComponentBuilder {
-	builder.get().Spec.Nodes = nodes
-	return builder
-}
-
-func (builder *ComponentBuilder) SetInstances(instances []string) *ComponentBuilder {
-	builder.get().Spec.Instances = instances
 	return builder
 }
 

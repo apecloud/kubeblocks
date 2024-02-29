@@ -58,40 +58,6 @@ var _ = Describe("object generation transformer test.", func() {
 			rsm:           rsm,
 		}
 
-		nodeAssignment := []workloads.NodeAssignment{
-			{
-				Name: name + "1",
-			},
-			{
-				Name: name + "2",
-			},
-			{
-				Name: name + "3",
-			},
-		}
-		rsmForPods = builder.NewReplicatedStateMachineBuilder(namespace, name).
-			SetUID(uid).
-			AddLabels(constant.AppComponentLabelKey, name).
-			SetReplicas(3).
-			AddMatchLabelsInMap(selectors).
-			SetServiceName(headlessSvcName).
-			SetNodeAssignment(nodeAssignment).
-			SetRsmTransformPolicy(workloads.ToPod).
-			SetService(service).
-			SetCredential(credential).
-			SetTemplate(template).
-			SetCustomHandler(observeActions).
-			GetObject()
-
-		transCtxForPods = &rsmTransformContext{
-			Context:       ctx,
-			Client:        graphCli,
-			EventRecorder: nil,
-			Logger:        logger,
-			rsmOrig:       rsmForPods.DeepCopy(),
-			rsm:           rsmForPods,
-		}
-
 		transformer = &ObjectGenerationTransformer{}
 	})
 
@@ -151,39 +117,6 @@ var _ = Describe("object generation transformer test.", func() {
 				}).Times(1)
 			dag = mockDAG()
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-		})
-	})
-
-	Context("Transform function for rsm managing pods", func() {
-		It("should work well", func() {
-			pods := mockUnderlyingPods(*rsmForPods)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.ServiceList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.ServiceList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.ConfigMapList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.ConfigMapList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-
-			dagExpected := mockDAGForPods()
-			for i := range pods {
-				graphCli.Create(dagExpected, &pods[i])
-			}
-
-			// do Transform
-			dag := mockDAGForPods()
-			Expect(transformer.Transform(transCtxForPods, dag)).Should(Succeed())
-
-			// compare DAGs
-			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 		})
 	})
 

@@ -23,22 +23,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
 	ReplicatedStateMachineKind = "ReplicatedStateMachine"
-)
-
-// RsmTransformPolicy defines rsm transform type
-// ToSts and ToPod is supported
-// +enum
-// +kubebuilder:validation:Enum={ToPod,ToSts}
-type RsmTransformPolicy string
-
-const (
-	ToSts RsmTransformPolicy = "ToSts"
-	ToPod RsmTransformPolicy = "ToPod"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -142,37 +130,6 @@ type ReplicatedStateMachineSpec struct {
 	// Credential used to connect to DB engine
 	// +optional
 	Credential *Credential `json:"credential,omitempty"`
-
-	// Defines the policy to generate sts using rsm. Passed from cluster.
-	// ToSts: rsm transform to statefulSet
-	// ToPod: rsm transform to pod
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=ToSts
-	// +optional
-	RsmTransformPolicy RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
-
-	// Defines the expected assignment of nodes.
-	// +optional
-	NodeAssignment []NodeAssignment `json:"nodeAssignment,omitempty"`
-}
-
-type NodeAssignment struct {
-	// Specifies the identifier for the statefulSet requiring node allocation.
-	//
-	// +optional
-	Name string `json:"name,omitempty"`
-
-	// Provides comprehensive details of the node to be assigned to the statefulSet.
-	//
-	// +optional
-	NodeSpec NodeSpec `json:"nodeSpec,omitempty"`
-}
-
-type NodeSpec struct {
-	// Represents the name of the node. This is a unique identifier within the cluster and is used to identify the specific node for scheduling, reporting, and other tasks.
-	//
-	// +optional
-	NodeName types.NodeName `json:"nodeName,omitempty"`
 }
 
 // ReplicatedStateMachineStatus defines the observed state of ReplicatedStateMachine

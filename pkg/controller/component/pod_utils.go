@@ -75,32 +75,28 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 	if rsm.Status.ObservedGeneration != rsm.Generation {
 		return false, nil
 	}
-	if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
-		if rsm.Status.CurrentGeneration != rsm.Generation {
-			return false, nil
-		}
+	if rsm.Status.CurrentGeneration != rsm.Generation {
+		return false, nil
 	}
 
 	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels)
 	if err != nil {
 		return false, err
 	}
-	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
-		// TODO pod ObservedGeneration
-	} else {
-		// check whether the underlying workload(sts) has sent the latest template to pods
-		sts := &appsv1.StatefulSet{}
-		if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
-			return false, err
-		}
-		if sts.Status.ObservedGeneration != sts.Generation {
+
+	// check whether the underlying workload(sts) has sent the latest template to pods
+	sts := &appsv1.StatefulSet{}
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
+		return false, err
+	}
+	if sts.Status.ObservedGeneration != sts.Generation {
+		return false, nil
+	}
+	for _, pod := range pods {
+		if intctrlutil.GetPodRevision(pod) != sts.Status.UpdateRevision {
 			return false, nil
 		}
-		for _, pod := range pods {
-			if intctrlutil.GetPodRevision(pod) != sts.Status.UpdateRevision {
-				return false, nil
-			}
-		}
 	}
+
 	return true, nil
 }

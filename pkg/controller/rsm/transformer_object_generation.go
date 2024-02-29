@@ -58,27 +58,17 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// generate objects by current spec
-	var objects []client.Object
-	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
-		pods := buildPods(*rsm)
-		for idx := range pods {
-			pod := pods[idx]
-			objects = append(objects, pod)
-		}
-	} else {
-		svc := buildSvc(*rsm)
-		altSvs := buildAlternativeSvs(*rsm)
-		headLessSvc := buildHeadlessSvc(*rsm)
-		envConfig := buildEnvConfigMap(*rsm)
-		sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
-		objects = append(objects, sts)
-		objects = append(objects, headLessSvc, envConfig)
-		if svc != nil {
-			objects = append(objects, svc)
-		}
-		for _, s := range altSvs {
-			objects = append(objects, s)
-		}
+	svc := buildSvc(*rsm)
+	altSvs := buildAlternativeSvs(*rsm)
+	headLessSvc := buildHeadlessSvc(*rsm)
+	envConfig := buildEnvConfigMap(*rsm)
+	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
+	objects := []client.Object{sts, headLessSvc, envConfig}
+	if svc != nil {
+		objects = append(objects, svc)
+	}
+	for _, s := range altSvs {
+		objects = append(objects, s)
 	}
 
 	for _, object := range objects {
@@ -89,7 +79,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	// read cache snapshot
 	ml := getLabels(rsm)
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds(rsm.Spec.RsmTransformPolicy)...)
+	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
 	if err != nil {
 		return err
 	}
@@ -121,9 +111,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := copyAndMerge(oldObj, newSnapshot[name])
-			if reflect.DeepEqual(oldObj, newObj) {
-				continue
-			}
 			cli.Update(dag, oldObj, newObj)
 		}
 	}
@@ -139,11 +126,8 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 	}
 	handleDependencies := func() {
-		// RsmTransformPolicy might be "", treat empty as ToSts for backward compatibility
-		if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
-			// objects[0] is the sts object
-			cli.DependOn(dag, objects[0], objects[1:]...)
-		}
+		// objects[0] is the sts object
+		cli.DependOn(dag, objects[0], objects[1:]...)
 	}
 
 	// objects to be created
@@ -244,18 +228,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return oldCm
 	}
 
-	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
-		oldPod.Spec.ActiveDeadlineSeconds = newPod.Spec.ActiveDeadlineSeconds
-		for idx := range oldPod.Spec.Containers {
-			oldPod.Spec.Containers[idx].Image = newPod.Spec.Containers[idx].Image
-		}
-		for idx := range oldPod.Spec.InitContainers {
-			oldPod.Spec.InitContainers[idx].Image = newPod.Spec.InitContainers[idx].Image
-		}
-		// TODO `spec.tolerations` (only additions to existing tolerations),`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)
-		return oldPod
-	}
-
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
 	case *apps.StatefulSet:
@@ -264,8 +236,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
 	case *corev1.ConfigMap:
 		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
-	case *corev1.Pod:
-		return copyAndMergePod(targetObj.(*corev1.Pod), o)
 	default:
 		return newObj
 	}

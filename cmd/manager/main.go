@@ -125,7 +125,6 @@ func init() {
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
-	viper.SetDefault(rsm.FeatureGateRSMToPod, true)
 	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
 }
 

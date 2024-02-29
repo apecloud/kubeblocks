@@ -155,24 +155,6 @@ const (
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
 
-	// EnabledNodePortSvcAnnotationKey defines the feature gate of NodePort Service defined in ComponentDefinition.Spec.Services.
-	// Components defined in the annotation value, their all services of type NodePort defined in ComponentDefinition will be created; otherwise, they will be ignored.
-	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-node-port-svc: comp1,comp2"
-	EnabledNodePortSvcAnnotationKey = "kubeblocks.io/enabled-node-port-svc"
-	// EnabledPodOrdinalSvcAnnotationKey defines the feature gate of PodOrdinal Service defined in ComponentDefinition.Spec.Services.
-	// Components defined in the annotation value, their all Services defined in the ComponentDefinition with the GeneratePodOrdinalService attribute set to true will be created; otherwise, they will be ignored.
-	// This can generate a corresponding Service for each Pod, which can be used in certain specific scenarios: for example, creating a dedicated access service for each read-only Pod.
-	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-pod-ordinal-svc: comp1,comp2"
-	EnabledPodOrdinalSvcAnnotationKey = "kubeblocks.io/enabled-pod-ordinal-svc"
-	// DisabledClusterIPSvcAnnotationKey defines whether the feature gate of ClusterIp Service defined in ComponentDefinition.Spec.Services will be effected.
-	// Components defined in the annotation value, their all services of type ClusterIp defined in ComponentDefinition will be ignored; otherwise, they will be created.
-	// Multiple components are separated by ','. for example: "kubeblocks.io/disabled-cluster-ip-svc: comp1,comp2"
-	DisabledClusterIPSvcAnnotationKey = "kubeblocks.io/disabled-cluster-ip-svc"
-	// ShardSvcAnnotationKey defines the feature gate of creating service for each shard.
-	// Sharding name defined in the annotation value, a set of Service defined in Cluster.Spec.Services with the ShardingSelector will be automatically generated for each shard when Cluster.Spec.ShardingSpecs[x].shards is not nil.
-	// Multiple sharding names are separated by ','. for example: "kubeblocks.io/enabled-shard-svc: proxy-shard,db-shard"
-	ShardSvcAnnotationKey = "kubeblocks.io/enabled-shard-svc"
-
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
 	DBComponentFinalizerName           = "component.kubeblocks.io/finalizer"

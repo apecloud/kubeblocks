@@ -2,7 +2,9 @@ package apps
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -24,7 +26,7 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 		return nil
 	}
 
-	if !isHostNetworkEnabled4Comp(transCtx) {
+	if !isHostNetworkEnabled(transCtx) {
 		return nil
 	}
 
@@ -36,8 +38,25 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 	return updateObjectsWithAllocatedPorts(synthesizedComp, ports)
 }
 
-func isHostNetworkEnabled4Comp(transCtx *componentTransformContext) bool {
-	return transCtx.SynthesizeComponent.HostNetwork != nil
+func isHostNetworkEnabled(transCtx *componentTransformContext) bool {
+	synthesizedComp := transCtx.SynthesizeComponent
+	if synthesizedComp.HostNetwork == nil {
+		return false
+	}
+	// legacy definition, ignore the cluster annotations
+	if synthesizedComp.PodSpec.HostNetwork {
+		return true
+	}
+	// TODO: use component.annotations
+	cluster := transCtx.Cluster
+	if cluster.Annotations == nil {
+		return false
+	}
+	comps, ok := cluster.Annotations[constant.HostNetworkAnnotationKey]
+	if !ok {
+		return false
+	}
+	return slices.Index(strings.Split(comps, ","), synthesizedComp.Name) >= 0
 }
 
 func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[string]map[string]int32, error) {

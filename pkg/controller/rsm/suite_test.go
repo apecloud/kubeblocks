@@ -190,15 +190,6 @@ func mockUnderlyingSts(rsm workloads.ReplicatedStateMachine, generation int64) *
 	return sts
 }
 
-func mockUnderlyingPods(rsm workloads.ReplicatedStateMachine) []corev1.Pod {
-	podList := buildPods(rsm)
-	pods := make([]corev1.Pod, len(podList))
-	for i := range podList {
-		pods[i] = *podList[i]
-	}
-	return pods
-}
-
 func mockDAG() *graph.DAG {
 	d := graph.NewDAG()
 	graphCli.Root(d, transCtx.rsmOrig, transCtx.rsm, model.ActionStatusPtr())

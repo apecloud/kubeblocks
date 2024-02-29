@@ -247,7 +247,12 @@ func (e ExposeOpsHandler) removeClusterServices(cluster *appsv1alpha1.Cluster,
 		return nil
 	}
 	for _, exposeService := range exposeServices {
-		genServiceName := fmt.Sprintf("%s-%s", clusterCompSpecName, exposeService.Name)
+		var genServiceName string
+		if len(clusterCompSpecName) > 0 {
+			genServiceName = fmt.Sprintf("%s-%s", clusterCompSpecName, exposeService.Name)
+		} else {
+			genServiceName = exposeService.Name
+		}
 		for i, clusterService := range cluster.Spec.Services {
 			// remove service from cluster
 			if clusterService.Name == genServiceName && clusterService.ComponentSelector == clusterCompSpecName {
@@ -279,7 +284,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		if len(clusterCompDefName) > 0 {
 			genServiceName = fmt.Sprintf("%s-%s", clusterCompSpecName, exposeService.Name)
 		} else {
-			genServiceName := exposeService.Name
+			genServiceName = exposeService.Name
 		}
 
 		for _, clusterService := range cluster.Spec.Services {

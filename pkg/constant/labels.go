@@ -102,3 +102,18 @@ func GetClusterDefTypeLabel(clusterDefType string) map[string]string {
 		KBAppClusterDefTypeLabelKey: clusterDefType,
 	}
 }
+
+// GetKBReservedLabelKeys returns the reserved label keys for KubeBlocks
+func GetKBReservedLabelKeys() []string {
+	return []string{
+		AppManagedByLabelKey,
+		AppNameLabelKey,
+		AppInstanceLabelKey,
+		AppComponentLabelKey,
+		AppVersionLabelKey,
+		KBAppComponentLabelKey,
+		KBAppShardingNameLabelKey,
+		KBManagedByKey,
+		RoleLabelKey,
+	}
+}

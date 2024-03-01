@@ -551,6 +551,36 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 	})
 
+	Context("post provision", func() {
+		var lorryClient *HTTPClient
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+		})
+
+		It("not implemented", func() {
+			err := lorryClient.PostProvision(context.TODO(), "", "", "", "", "")
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("operation exec failed: no implemented"))
+		})
+	})
+
+	Context("pre terminate", func() {
+		var lorryClient *HTTPClient
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+		})
+
+		It("not implemented", func() {
+			err := lorryClient.PreTerminate(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("operation exec failed: no implemented"))
+		})
+	})
+
 })
 
 func newHTTPServer(resp []byte) (*httptest.Server, int) {

@@ -21,6 +21,7 @@ package register
 
 import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
+	_ "github.com/apecloud/kubeblocks/pkg/lorry/operations/component"
 	_ "github.com/apecloud/kubeblocks/pkg/lorry/operations/replica"
 	_ "github.com/apecloud/kubeblocks/pkg/lorry/operations/sql"
 	_ "github.com/apecloud/kubeblocks/pkg/lorry/operations/user"

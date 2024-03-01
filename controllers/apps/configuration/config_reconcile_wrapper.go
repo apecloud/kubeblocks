@@ -24,62 +24,49 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
-
-type configSpecList []appsv1alpha1.ComponentConfigSpec
 
 type configReconcileContext struct {
 	configctrl.ResourceFetcher[configReconcileContext]
 
-	Name           string
-	MatchingLabels client.MatchingLabels
-	ConfigSpec     *appsv1alpha1.ComponentConfigSpec
-	ConfigMap      *corev1.ConfigMap
+	Name             string
+	MatchingLabels   client.MatchingLabels
+	ConfigMap        *corev1.ConfigMap
+	BuiltinComponent *component.SynthesizedComponent
 
 	Containers   []string
 	StatefulSets []appv1.StatefulSet
 	RSMList      []workloads.ReplicatedStateMachine
 	Deployments  []appv1.Deployment
 
-	ConfigConstraint *appsv1alpha1.ConfigConstraint
+	reqCtx intctrlutil.RequestCtx
 }
 
 func newConfigReconcileContext(resourceCtx *configctrl.ResourceCtx,
 	cm *corev1.ConfigMap,
-	cc *appsv1alpha1.ConfigConstraint,
 	configSpecName string,
+	reqCtx intctrlutil.RequestCtx,
 	matchingLabels client.MatchingLabels) *configReconcileContext {
 	configContext := configReconcileContext{
-		ConfigMap:        cm,
-		ConfigConstraint: cc,
-		Name:             configSpecName,
-		MatchingLabels:   matchingLabels,
+		reqCtx:         reqCtx,
+		ConfigMap:      cm,
+		Name:           configSpecName,
+		MatchingLabels: matchingLabels,
 	}
 	return configContext.Init(resourceCtx, &configContext)
 }
 
-func (l configSpecList) findByName(name string) *appsv1alpha1.ComponentConfigSpec {
-	for i := range l {
-		configSpec := &l[i]
-		if configSpec.Name == name {
-			return configSpec
-		}
-	}
-	return nil
-}
-
 func (c *configReconcileContext) GetRelatedObjects() error {
 	return c.Cluster().
-		ClusterDef().
-		ClusterVer().
 		ClusterComponent().
 		RSM().
+		SynthesizedComponent().
 		Complete()
 }
 
@@ -111,35 +98,9 @@ func (c *configReconcileContext) RSM() *configReconcileContext {
 	return c.Wrap(stsFn)
 }
 
-func (c *configReconcileContext) Complete() (err error) {
-	err = c.Err
-	if err != nil {
-		return
-	}
-
-	var configSpecs configSpecList
-	if configSpecs, err = cfgcore.GetConfigTemplatesFromComponent(
-		c.clusterComponents(),
-		c.clusterDefComponents(),
-		c.clusterVerComponents(),
-		c.ComponentName); err != nil {
-		return
-	}
-	c.ConfigSpec = configSpecs.findByName(c.Name)
-	return
-}
-
-func (c *configReconcileContext) clusterComponents() []appsv1alpha1.ClusterComponentSpec {
-	return c.ClusterObj.Spec.ComponentSpecs
-}
-
-func (c *configReconcileContext) clusterDefComponents() []appsv1alpha1.ClusterComponentDefinition {
-	return c.ClusterDefObj.Spec.ComponentDefs
-}
-
-func (c *configReconcileContext) clusterVerComponents() []appsv1alpha1.ClusterComponentVersion {
-	if c.ClusterVerObj == nil {
-		return nil
-	}
-	return c.ClusterVerObj.Spec.ComponentVersions
+func (c *configReconcileContext) SynthesizedComponent() *configReconcileContext {
+	return c.Wrap(func() (err error) {
+		c.BuiltinComponent, err = component.BuildSynthesizedComponentWrapper(c.reqCtx, c.Client, c.ClusterObj, c.ClusterComObj)
+		return err
+	})
 }

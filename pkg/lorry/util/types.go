@@ -51,6 +51,10 @@ const (
 	UnlockOperation  OperationKind = "unlockInstance"
 	VolumeProtection OperationKind = "volumeProtection"
 
+	// for component
+	PostProvisionOperation OperationKind = "postProvision"
+	PreTerminateOperation  OperationKind = "preTerminate"
+
 	// actions for cluster accounts management
 	ListUsersOp          OperationKind = "listUsers"
 	CreateUserOp         OperationKind = "createUser"

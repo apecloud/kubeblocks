@@ -155,7 +155,7 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	memberLeaveCmd, ok := mgr.actionCommands[constant.MemberLeaveAction]
 	if !ok || len(memberLeaveCmd) == 0 {
-		return errors.New("member join command is empty!")
+		return errors.New("member leave command is empty!")
 	}
 	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {
@@ -187,7 +187,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 	readonlyCmd, ok := mgr.actionCommands[constant.ReadonlyAction]
 	if !ok || len(readonlyCmd) == 0 {
-		return errors.New("member join command is empty!")
+		return errors.New("member lock command is empty!")
 	}
 	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {
@@ -210,7 +210,7 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 func (mgr *Manager) Unlock(ctx context.Context) error {
 	readWriteCmd, ok := mgr.actionCommands[constant.ReadWriteAction]
 	if !ok || len(readWriteCmd) == 0 {
-		return errors.New("member join command is empty!")
+		return errors.New("member unlock command is empty!")
 	}
 	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {
@@ -220,6 +220,62 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 
 	if output != "" {
 		mgr.Logger.Info("member unlock", "output", output)
+	}
+	return err
+}
+
+// PostProvision provides the following dedicated environment variables for the action:
+//
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+// - KB_CLUSTER_COMPONENT_LIST: Lists all components in the cluster, joined by ',' (e.g., "comp1,comp2").
+// - KB_CLUSTER_COMPONENT_POD_NAME_LIST: Lists all pod names in this component, joined by ',' (e.g., "pod1,pod2").
+// - KB_CLUSTER_COMPONENT_POD_IP_LIST: Lists the IP addresses of each pod in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "podIp1,podIp2").
+// - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Lists the host names where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "hostName1,hostName2").
+// - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Lists the host IP addresses where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "hostIp1,hostIp2").
+func (mgr *Manager) PostProvision(ctx context.Context, componentNames, podNames, podIPs, podHostNames, podHostIPs string) error {
+	postProvisionCmd, ok := mgr.actionCommands[constant.PostProvisionAction]
+	if !ok || len(postProvisionCmd) == 0 {
+		return errors.New("component postprovision command is empty!")
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+
+	envs = append(envs, "KB_CLUSTER_COMPONENT_LIST"+"="+componentNames)
+	envs = append(envs, "KB_CLUSTER_COMPONENT_POD_NAME_LIST"+"="+podNames)
+	envs = append(envs, "KB_CLUSTER_COMPONENT_POD_IP_LIST"+"="+podIPs)
+	envs = append(envs, "KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST"+"="+podHostNames)
+	envs = append(envs, "KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST"+"="+podHostIPs)
+	output, err := util.ExecCommand(ctx, postProvisionCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("component postprovision", "output", output)
+	}
+	return err
+}
+
+// PreTerminate provides the following dedicated environment variables for the action:
+//
+// - KB_POD_FQDN: The FQDN of the replica pod to check the role.
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+func (mgr *Manager) PreTerminate(ctx context.Context) error {
+	preTerminateCmd, ok := mgr.actionCommands[constant.PreTerminateAction]
+	if !ok || len(preTerminateCmd) == 0 {
+		return errors.New("component preterminate command is empty!")
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+	output, err := util.ExecCommand(ctx, preTerminateCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("component preterminate", "output", output)
 	}
 	return err
 }

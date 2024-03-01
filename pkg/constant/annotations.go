@@ -30,5 +30,6 @@ func GetKBGenerationAnnotation(generation string) map[string]string {
 func GetKBReservedAnnotationKeys() []string {
 	return []string{
 		KubeBlocksGenerationKey,
+		ReconcileAnnotationKey,
 	}
 }

@@ -166,6 +166,40 @@ spec:
                 description: Provides a brief description of the component.
                 maxLength: 256
                 type: string
+              hostNetwork:
+                description: Defines the host-network capability and resources.
+                properties:
+                  containerPorts:
+                    description: The list of container ports that are required by
+                      the component.
+                    items:
+                      properties:
+                        container:
+                          description: Container specifies the target container within
+                            the pod.
+                          type: string
+                        ports:
+                          description: Ports are named container ports within the
+                            specified container. These container ports must be defined
+                            in the container for proper port allocation.
+                          items:
+                            type: string
+                          minItems: 1
+                          type: array
+                      required:
+                      - container
+                      - ports
+                      type: object
+                    type: array
+                  dnsPolicy:
+                    description: Set DNS policy for the component. Defaults to "ClusterFirst".
+                      Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst',
+                      'Default' or 'None'. DNS parameters given in DNSConfig will
+                      be merged with the policy selected with DNSPolicy. To have DNS
+                      options set along with hostNetwork, you have to specify DNS
+                      policy explicitly to 'ClusterFirstWithHostNet'.
+                    type: string
+                type: object
               labels:
                 additionalProperties:
                   type: string
@@ -12178,6 +12212,43 @@ spec:
                               - Required
                               - Optional
                               type: string
+                          type: object
+                        podVarRef:
+                          description: Selects a defined var of a Pod.
+                          properties:
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
+                              type: string
+                            container:
+                              description: ContainerVars defines the vars can be referenced
+                                from a Container.
+                              properties:
+                                name:
+                                  description: The name of the container.
+                                  type: string
+                                port:
+                                  description: Container port to reference.
+                                  properties:
+                                    name:
+                                      type: string
+                                    option:
+                                      description: VarOption defines whether a variable
+                                        is required or optional.
+                                      enum:
+                                      - Required
+                                      - Optional
+                                      type: string
+                                  type: object
+                              required:
+                              - name
+                              type: object
+                            name:
+                              description: Name of the referent object.
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
                           type: object
                         secretKeyRef:
                           description: Selects a key of a Secret.

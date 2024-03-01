@@ -407,12 +407,12 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 	}
 
 	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
-		// "postProvision":    synthesizeComp.LifecycleActions.PostProvision,
-		// "preTerminate":     synthesizeComp.LifecycleActions.PreTerminate,
-		constant.MemberJoinAction:  synthesizeComp.LifecycleActions.MemberJoin,
-		constant.MemberLeaveAction: synthesizeComp.LifecycleActions.MemberLeave,
-		constant.ReadonlyAction:    synthesizeComp.LifecycleActions.Readonly,
-		constant.ReadWriteAction:   synthesizeComp.LifecycleActions.Readwrite,
+		constant.PostProvisionAction: synthesizeComp.LifecycleActions.PostProvision,
+		constant.PreTerminateAction:  synthesizeComp.LifecycleActions.PreTerminate,
+		constant.MemberJoinAction:    synthesizeComp.LifecycleActions.MemberJoin,
+		constant.MemberLeaveAction:   synthesizeComp.LifecycleActions.MemberLeave,
+		constant.ReadonlyAction:      synthesizeComp.LifecycleActions.Readonly,
+		constant.ReadWriteAction:     synthesizeComp.LifecycleActions.Readwrite,
 		// "dataPopulate":     synthesizeComp.LifecycleActions.DataPopulate,
 		// "dataAssemble":     synthesizeComp.LifecycleActions.DataAssemble,
 		// "reconfigure":      synthesizeComp.LifecycleActions.Reconfigure,

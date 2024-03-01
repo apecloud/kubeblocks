@@ -483,6 +483,42 @@ spec:
                   repository.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+              encryptionConfig:
+                description: Specifies the parameters for encrypting backup data.
+                  Encryption will be disabled if the field is not set.
+                properties:
+                  algorithm:
+                    description: "Specifies the encryption algorithm. Currently supported
+                      algorithms are: \n - AES-128-CFB - AES-192-CFB - AES-256-CFB"
+                    enum:
+                    - AES-128-CFB
+                    - AES-192-CFB
+                    - AES-256-CFB
+                    type: string
+                  passPhraseSecretKeyRef:
+                    description: Selects the key of a secret in the current namespace,
+                      the value of the secret is used as the encryption key.
+                    properties:
+                      key:
+                        description: The key of the secret to select from.  Must be
+                          a valid secret key.
+                        type: string
+                      name:
+                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          TODO: Add other useful fields. apiVersion, kind, uid?'
+                        type: string
+                      optional:
+                        description: Specify whether the Secret or its key must be
+                          defined
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                    x-kubernetes-map-type: atomic
+                required:
+                - algorithm
+                - passPhraseSecretKeyRef
+                type: object
               pathPrefix:
                 description: Specifies the directory inside the backup repository
                   to store the backup. This path is relative to the path of the backup

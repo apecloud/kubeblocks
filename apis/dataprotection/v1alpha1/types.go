@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 // Phase defines the BackupPolicy and ActionSet CR .status.phase
@@ -228,3 +230,23 @@ const (
 	VolumeClaimRestorePolicyParallel VolumeClaimRestorePolicy = "Parallel"
 	VolumeClaimRestorePolicySerial   VolumeClaimRestorePolicy = "Serial"
 )
+
+// EncryptionConfig defines the parameters for encrypting backup data.
+type EncryptionConfig struct {
+	// Specifies the encryption algorithm. Currently supported algorithms are:
+	//
+	// - AES-128-CFB
+	// - AES-192-CFB
+	// - AES-256-CFB
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=AES-256-CFB
+	// +kubebuilder:validation:Enum={AES-128-CFB,AES-192-CFB,AES-256-CFB}
+	Algorithm string `json:"algorithm"`
+
+	// Selects the key of a secret in the current namespace, the value of the secret
+	// is used as the encryption key.
+	//
+	// +kubebuilder:validation:Required
+	PassPhraseSecretKeyRef *corev1.SecretKeySelector `json:"passPhraseSecretKeyRef"`
+}

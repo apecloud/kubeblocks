@@ -54,7 +54,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information.
 func (mgr *Manager) GetReplicaRoleThroughCommands(ctx context.Context, cluster *dcs.Cluster) (string, error) {
 	roleProbeCmd, ok := mgr.actionCommands[constant.RoleProbeAction]
-	if !ok && len(roleProbeCmd) == 0 {
+	if !ok || len(roleProbeCmd) == 0 {
 		return "", errors.New("role probe commands is empty!")
 	}
 	envs, err := util.GetGlobalSharedEnvs()

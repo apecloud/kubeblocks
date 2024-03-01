@@ -121,7 +121,7 @@ func (mgr *Manager) InitComponentDefintionActions() error {
 // - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
 func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	memberJoinCmd, ok := mgr.actionCommands[constant.MemberJoinAction]
-	if !ok && len(memberJoinCmd) == 0 {
+	if !ok || len(memberJoinCmd) == 0 {
 		return errors.New("member join command is empty!")
 	}
 	envs, err := util.GetGlobalSharedEnvs()
@@ -141,6 +141,85 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 
 	if output != "" {
 		mgr.Logger.Info("member join", "output", output)
+	}
+	return err
+}
+
+// LeaveMemberFromCluster provides the following dedicated environment variables for the action:
+//
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+// - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
+// - KB_LEAVE_MEMBER_POD_NAME: The name of the leave member's Pod.
+func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+	memberLeaveCmd, ok := mgr.actionCommands[constant.MemberLeaveAction]
+	if !ok || len(memberLeaveCmd) == 0 {
+		return errors.New("member join command is empty!")
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+
+	if cluster.Leader == nil || cluster.Leader.Name == "" {
+		return errors.New("cluster has no leader")
+	}
+
+	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
+	fqdn := cluster.GetMemberAddr(*leaderMember)
+	envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+fqdn)
+	envs = append(envs, "KB_LEAVE_MEMBER_POD_NAME"+"="+memberName)
+	output, err := util.ExecCommand(ctx, memberLeaveCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("member leave", "output", output)
+	}
+	return err
+}
+
+// Lock provides the following dedicated environment variables for the action:
+//
+// - KB_POD_FQDN: The FQDN of the replica pod to check the role.
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	readonlyCmd, ok := mgr.actionCommands[constant.ReadonlyAction]
+	if !ok || len(readonlyCmd) == 0 {
+		return errors.New("member join command is empty!")
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+	output, err := util.ExecCommand(ctx, readonlyCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("member lock", "output", output)
+	}
+	return err
+}
+
+// Unlock provides the following dedicated environment variables for the action:
+//
+// - KB_POD_FQDN: The FQDN of the replica pod to check the role.
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+func (mgr *Manager) Unlock(ctx context.Context) error {
+	readWriteCmd, ok := mgr.actionCommands[constant.ReadWriteAction]
+	if !ok || len(readWriteCmd) == 0 {
+		return errors.New("member join command is empty!")
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+	output, err := util.ExecCommand(ctx, readWriteCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("member unlock", "output", output)
 	}
 	return err
 }

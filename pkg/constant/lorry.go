@@ -30,11 +30,13 @@ const (
 
 // action keys
 const (
-	RoleProbeAction   = "roleProbe"
-	MemberJoinAction  = "memberJoin"
-	MemberLeaveAction = "memberLeave"
-	ReadonlyAction    = "readonly"
-	ReadWriteAction   = "readwrite"
+	RoleProbeAction     = "roleProbe"
+	MemberJoinAction    = "memberJoin"
+	MemberLeaveAction   = "memberLeave"
+	ReadonlyAction      = "readonly"
+	ReadWriteAction     = "readwrite"
+	PostProvisionAction = "postProvision"
+	PreTerminateAction  = "preTerminate"
 )
 
 // action envs

@@ -46,14 +46,17 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	transCtx.ShardingComponentSpecs = make(map[string][]*appsv1alpha1.ClusterComponentSpec, 0)
 	transCtx.Labels = make(map[string]map[string]string, 0)
+	transCtx.Annotations = make(map[string]map[string]string, 0)
 	cluster := transCtx.Cluster
 	filteredClusterLabels := filterReservedLabels(cluster.Labels)
+	filteredClusterAnnotations := filterReservedAnnotations(cluster.Annotations)
 
 	for i := range cluster.Spec.ComponentSpecs {
 		clusterComSpec := cluster.Spec.ComponentSpecs[i]
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
-		// inherit cluster labels
+		// inherit cluster labels and annotations
 		transCtx.Labels[clusterComSpec.Name] = filteredClusterLabels
+		transCtx.Annotations[clusterComSpec.Name] = filteredClusterAnnotations
 	}
 	for i := range cluster.Spec.ShardingSpecs {
 		shardingSpec := cluster.Spec.ShardingSpecs[i]
@@ -66,12 +69,14 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 			genShardCompSpec := genShardingCompSpecList[j]
 			transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, genShardCompSpec)
 			transCtx.Labels[genShardCompSpec.Name] = controllerutil.MergeMetadataMaps(filteredClusterLabels, constant.GetShardingNameLabel(shardingSpec.Name))
+			transCtx.Annotations[genShardCompSpec.Name] = filteredClusterAnnotations
 		}
 	}
 
 	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)
 		transCtx.Labels[compSpec.Name] = filteredClusterLabels
+		transCtx.Annotations[compSpec.Name] = filteredClusterAnnotations
 	}
 
 	// validate componentDef and componentDefRef
@@ -121,18 +126,32 @@ func validateComponentDefNComponentDefRef(transCtx *clusterTransformContext) err
 	return nil
 }
 
-func filterReservedLabels(labels map[string]string) map[string]string {
-	reservedLabelKeys := constant.GetKBReservedLabelKeys()
-	reservedLabelSet := make(map[string]struct{}, len(reservedLabelKeys))
-	for _, k := range reservedLabelKeys {
-		reservedLabelSet[k] = struct{}{}
+// filterReservedEntries filters out reserved keys from a map based on a provided set of reserved keys
+func filterReservedEntries(entries map[string]string, reservedKeys []string) map[string]string {
+	reservedSet := make(map[string]struct{}, len(reservedKeys))
+	for _, key := range reservedKeys {
+		reservedSet[key] = struct{}{}
 	}
-	filteredLabels := make(map[string]string)
-	for k, v := range labels {
-		if _, exists := reservedLabelSet[k]; exists {
-			continue
+
+	filteredEntries := make(map[string]string)
+	for key, value := range entries {
+		if _, exists := reservedSet[key]; !exists {
+			filteredEntries[key] = value
 		}
-		filteredLabels[k] = v
 	}
-	return filteredLabels
+	return filteredEntries
+}
+
+func filterReservedLabels(labels map[string]string) map[string]string {
+	if labels == nil {
+		return nil
+	}
+	return filterReservedEntries(labels, constant.GetKBReservedLabelKeys())
+}
+
+func filterReservedAnnotations(annotations map[string]string) map[string]string {
+	if annotations == nil {
+		return nil
+	}
+	return filterReservedEntries(annotations, constant.GetKBReservedAnnotationKeys())
 }

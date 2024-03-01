@@ -508,6 +508,49 @@ var _ = Describe("Lorry HTTP Client", func() {
 			Expect(err).Should(BeNil())
 		})
 	})
+
+	Context("lock member", func() {
+		var lorryClient *HTTPClient
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+		})
+
+		It("success", func() {
+			mockDBManager.EXPECT().Lock(gomock.Any(), gomock.Any()).Return(nil)
+			Expect(lorryClient.Lock(context.TODO())).Should(Succeed())
+		})
+
+		It("not implemented", func() {
+			mockDBManager.EXPECT().Lock(gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			err := lorryClient.Lock(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(msg))
+		})
+	})
+
+	Context("unlock member", func() {
+		var lorryClient *HTTPClient
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+		})
+
+		It("success", func() {
+			mockDBManager.EXPECT().Unlock(gomock.Any()).Return(nil)
+			Expect(lorryClient.Unlock(context.TODO())).Should(Succeed())
+		})
+
+		It("not implemented", func() {
+			mockDBManager.EXPECT().Unlock(gomock.Any()).Return(fmt.Errorf(msg))
+			err := lorryClient.Unlock(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(msg))
+		})
+	})
+
 })
 
 func newHTTPServer(resp []byte) (*httptest.Server, int) {

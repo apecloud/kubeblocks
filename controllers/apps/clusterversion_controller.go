@@ -144,7 +144,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.ClusterVersion{}).
 		Complete(r)
 }

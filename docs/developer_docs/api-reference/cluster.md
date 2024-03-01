@@ -1280,6 +1280,20 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
+<code>hostNetwork</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
+HostNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the host-network capability and resources.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
@@ -2861,7 +2875,7 @@ This field cannot be updated.</p>
 </tr>
 <tr>
 <td>
-<code>timeoutSeconds:omitempty</code><br/>
+<code>timeoutSeconds</code><br/>
 <em>
 int32
 </em>
@@ -5291,7 +5305,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.</p>
@@ -6973,6 +6987,20 @@ This field is immutable.</p>
 <p>Defines the persistent volumes needed by the component.
 Users are responsible for providing these volumes when creating a component instance.
 This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostNetwork</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
+HostNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the host-network capability and resources.</p>
 </td>
 </tr>
 <tr>
@@ -9889,6 +9917,49 @@ ConsensusMember
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVars">PodVars</a>)
+</p>
+<div>
+<p>ContainerVars defines the vars can be referenced from a Container.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.NamedVar">
+NamedVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Container port to reference.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CredentialVar">CredentialVar
 </h3>
 <p>
@@ -10985,6 +11056,95 @@ will select from NodeAssignment.</li>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>containerPorts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkContainerPort">
+[]HostNetworkContainerPort
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The list of container ports that are required by the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dnsPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#dnspolicy-v1-core">
+Kubernetes core/v1.DNSPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Set DNS policy for the component.
+Defaults to &ldquo;ClusterFirst&rdquo;.
+Valid values are &lsquo;ClusterFirstWithHostNet&rsquo;, &lsquo;ClusterFirst&rsquo;, &lsquo;Default&rsquo; or &lsquo;None&rsquo;.
+DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
+To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to &lsquo;ClusterFirstWithHostNet&rsquo;.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkContainerPort">HostNetworkContainerPort
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Container specifies the target container within the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ports</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Ports are named container ports within the specified container.
+These container ports must be defined in the container for proper port allocation.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.IniConfig">IniConfig
 </h3>
 <p>
@@ -11529,7 +11689,7 @@ This field is only valid when BuiltIn is set to false.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 </div>
@@ -13029,6 +13189,86 @@ the rules are met.</p>
 </tr><tr><td><p>&#34;PreferredAvailable&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>PodVarSelector selects a var from a Pod.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The pod to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>PodVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PodVars">
+PodVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>PodVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.PodVars">PodVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>)
+</p>
+<div>
+<p>PodVars defines the vars can be referenced from a Pod.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">
+ContainerVars
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.PointInTimeRefSpec">PointInTimeRefSpec
 </h3>
@@ -17652,6 +17892,20 @@ Kubernetes core/v1.SecretKeySelector
 <td>
 <em>(Optional)</em>
 <p>Selects a key of a Secret.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">
+PodVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Pod.</p>
 </td>
 </tr>
 <tr>

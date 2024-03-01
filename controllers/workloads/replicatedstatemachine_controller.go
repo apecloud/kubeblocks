@@ -160,7 +160,7 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 		podHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
 
-		return ctrl.NewControllerManagedBy(mgr).
+		return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
 			Watches(&appsv1.StatefulSet{}, stsHandler).
 			Watches(&batchv1.Job{}, jobHandler).
@@ -174,7 +174,7 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
 		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 		podHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		return ctrl.NewControllerManagedBy(mgr).
+		return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
 			Watches(&batchv1.Job{}, jobHandler).
 			Watches(&corev1.Pod{}, podHandler).
@@ -184,7 +184,7 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 	stsOwnerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
 	rsmOwnerFinder := handler.NewOwnerFinder(&workloads.ReplicatedStateMachine{})
 	podHandler := handler.NewBuilder(ctx).AddFinder(stsOwnerFinder).AddFinder(rsmOwnerFinder).Build()
-	return ctrl.NewControllerManagedBy(mgr).
+	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&workloads.ReplicatedStateMachine{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).

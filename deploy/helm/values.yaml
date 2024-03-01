@@ -101,6 +101,11 @@ podDisruptionBudget:
   # Cannot be used if `minAvailable` is set.
   maxUnavailable:
 
+## Specify the namespaces that the operators will manage, multiple namespaces are separated by commas.
+##
+## @param managedNamespaces
+##
+managedNamespaces:
 
 ## Logger settings
 ##

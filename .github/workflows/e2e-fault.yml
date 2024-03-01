@@ -76,7 +76,7 @@ jobs:
           if [[ "${{ inputs.CLOUD_PROVIDER }}" == 'eks' && -z "$CLUSTER_REGION" ]]; then
               CLUSTER_REGION="${{ vars.REGION_AWS_EKS }}"
           elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'gke' && -z "$CLUSTER_REGION" ]]; then
-              CLUSTER_REGION="${{ vars.REGION_GCP_GEK }}"
+              CLUSTER_REGION="${{ vars.REGION_GCP_GKE }}"
           fi
           echo cluster-region=$CLUSTER_REGION >> $GITHUB_OUTPUT
 

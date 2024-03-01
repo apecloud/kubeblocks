@@ -65,6 +65,9 @@ spec:
             - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--apps=true"
             - "--workloads=true"
+            {{- with .Values.managedNamespaces }}
+            - "--managed-namespaces={{ . }}"
+            {{- end }}
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}

@@ -159,6 +159,9 @@ func setupFlags() {
 
 	flag.String(kubeContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
 
+	flag.String(constant.ManagedNamespacesFlag, "",
+		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
+
 	opts := zap.Options{
 		Development: false,
 	}
@@ -255,6 +258,11 @@ func main() {
 	if err := validateRequiredToParseConfigs(); err != nil {
 		setupLog.Error(err, "config value error")
 		os.Exit(1)
+	}
+
+	managedNamespaces := viper.GetString(strings.ReplaceAll(constant.ManagedNamespacesFlag, "-", "_"))
+	if len(managedNamespaces) > 0 {
+		setupLog.Info(fmt.Sprintf("managed namespaces: %s", managedNamespaces))
 	}
 
 	metricsAddr = viper.GetString(metricsAddrFlagKey.viperName())

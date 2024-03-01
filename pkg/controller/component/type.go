@@ -77,6 +77,7 @@ type SynthesizedComponent struct {
 	SystemAccounts      []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
 	RoleArbitrator      *v1alpha1.RoleArbitrator            `json:"roleArbitrator,omitempty"`
 	Volumes             []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
+	HostNetwork         *v1alpha1.HostNetwork               `json:"hostNetwork,omitempty"`
 	ComponentServices   []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.

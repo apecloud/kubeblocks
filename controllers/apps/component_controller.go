@@ -133,8 +133,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentLoadResourcesTransformer{},
 			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
-			// allocate port for hostNetwork component
-			&componentHostPortTransformer{},
+			// allocate ports for host-network component
+			&componentHostNetworkTransformer{},
 			// handle component services
 			&componentServiceTransformer{},
 			// handle component system accounts
@@ -181,7 +181,7 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if retryDurationMS != 0 {
 		requeueDuration = time.Millisecond * time.Duration(retryDurationMS)
 	}
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.Component{}).
 		Watches(&workloads.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&corev1.Service{}).

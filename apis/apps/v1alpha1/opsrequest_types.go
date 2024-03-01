@@ -359,10 +359,13 @@ type Expose struct {
 
 	// Controls the expose operation.
 	// If set to Enable, the corresponding service will be exposed. Conversely, if set to Disable, the service will be removed.
+	//
 	// +kubebuilder:validation:Required
 	Switch ExposeSwitch `json:"switch"`
 
 	// A list of services that are to be exposed or removed.
+	// If componentNamem is not specified, each `OpsService` in the list must specify ports and selectors.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minitems=0
 	Services []OpsService `json:"services"`

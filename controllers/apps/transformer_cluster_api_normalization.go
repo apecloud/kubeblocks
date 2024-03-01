@@ -165,13 +165,14 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4SimplifiedAPI(cluste
 
 func (t *ClusterAPINormalizationTransformer) buildCompLabelsInheritedFromCluster(transCtx *clusterTransformContext,
 	cluster *appsv1alpha1.Cluster) map[string]map[string]string {
+	clusterLabels := filterReservedLabels(cluster.Labels)
 	labels := make(map[string]map[string]string)
 	for _, compSpec := range transCtx.ComponentSpecs {
-		labels[compSpec.Name] = cluster.Labels
+		labels[compSpec.Name] = clusterLabels
 	}
 	for name, shardingCompSpecs := range transCtx.ShardingComponentSpecs {
 		for _, compSpec := range shardingCompSpecs {
-			labels[compSpec.Name] = controllerutil.MergeMetadataMaps(cluster.Labels, constant.GetShardingNameLabel(name))
+			labels[compSpec.Name] = controllerutil.MergeMetadataMaps(clusterLabels, constant.GetShardingNameLabel(name))
 		}
 	}
 	return labels
@@ -294,4 +295,20 @@ func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Specified(transCtx 
 		cluster.Spec.ShardingSpecs[i].Template.ServiceVersion = resolvedCompSpecs[idx].ServiceVersion
 		idx += int(sharding.Shards)
 	}
+}
+
+func filterReservedLabels(labels map[string]string) map[string]string {
+	reservedLabelKeys := constant.GetKBReservedLabelKeys()
+	reservedLabelSet := make(map[string]struct{}, len(reservedLabelKeys))
+	for _, k := range reservedLabelKeys {
+		reservedLabelSet[k] = struct{}{}
+	}
+	filteredLabels := make(map[string]string)
+	for k, v := range labels {
+		if _, exists := reservedLabelSet[k]; exists {
+			continue
+		}
+		filteredLabels[k] = v
+	}
+	return filteredLabels
 }

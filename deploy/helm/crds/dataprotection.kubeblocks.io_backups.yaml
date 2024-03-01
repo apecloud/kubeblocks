@@ -662,6 +662,7 @@ spec:
                 description: Records the encryption config for this backup.
                 properties:
                   algorithm:
+                    default: AES-256-CFB
                     description: "Specifies the encryption algorithm. Currently supported
                       algorithms are: \n - AES-128-CFB - AES-192-CFB - AES-256-CFB"
                     enum:

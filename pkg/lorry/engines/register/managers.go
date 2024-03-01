@@ -101,6 +101,14 @@ func GetManagerNewFunc(characterType, workloadType string) managerNewFunc {
 	return managerNewFuncs[key]
 }
 
+func SetCustomManager(manager engines.DBManager) {
+	customManager = manager
+}
+
+func GetCustomManager(cmd []string) engines.DBManager {
+	return customManager
+}
+
 func SetDBManager(manager engines.DBManager) {
 	dbManager = manager
 }

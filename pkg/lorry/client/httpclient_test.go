@@ -21,9 +21,11 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -35,8 +37,14 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/custom"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
+	opsregister "github.com/apecloud/kubeblocks/pkg/lorry/operations/register"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -339,11 +347,19 @@ var _ = Describe("Lorry HTTP Client", func() {
 	Context("join member", func() {
 		var lorryClient *HTTPClient
 		var cluster *dcs.Cluster
+		var podName = "pod-test"
 
 		BeforeEach(func() {
 			lorryClient, _ = NewHTTPClientWithPod(pod)
 			Expect(lorryClient).ShouldNot(BeNil())
-			cluster = &dcs.Cluster{}
+			cluster = &dcs.Cluster{
+				Members: []dcs.Member{{Name: podName}},
+				Leader:  &dcs.Leader{Name: podName},
+			}
+			os.Unsetenv(constant.KBEnvPodFQDN)
+			os.Unsetenv(constant.KBEnvServicePort)
+			os.Unsetenv(constant.KBEnvServiceUser)
+			os.Unsetenv(constant.KBEnvServicePassword)
 		})
 
 		It("success if join once", func() {
@@ -368,6 +384,40 @@ var _ = Describe("Lorry HTTP Client", func() {
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
 		})
+
+		It("execute command failed cased by envs is unset", func() {
+			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
+			actions := map[string][]string{}
+			actions[constant.MemberJoinAction] = []string{"ls"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.JoinMemberOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.JoinMember(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("envs is unset"))
+		})
+
+		It("execute command failed cased by executable file is not found", func() {
+			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
+			actions := map[string][]string{}
+			actions[constant.MemberJoinAction] = []string{"binary_not_exist"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			os.Setenv(constant.KBEnvPodFQDN, "test")
+			os.Setenv(constant.KBEnvServicePort, "test")
+			os.Setenv(constant.KBEnvServiceUser, "test")
+			os.Setenv(constant.KBEnvServicePassword, "test")
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.JoinMemberOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.JoinMember(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
+		})
 	})
 
 	Context("leave member", func() {
@@ -383,11 +433,17 @@ var _ = Describe("Lorry HTTP Client", func() {
 			cluster = &dcs.Cluster{
 				HaConfig: &dcs.HaConfig{DeleteMembers: make(map[string]dcs.MemberToDelete)},
 				Members:  []dcs.Member{{Name: podName}},
+				Leader:   &dcs.Leader{Name: podName},
 			}
+			os.Unsetenv(constant.KBEnvPodFQDN)
+			os.Unsetenv(constant.KBEnvServicePort)
+			os.Unsetenv(constant.KBEnvServiceUser)
+			os.Unsetenv(constant.KBEnvServicePassword)
+			viperx.SetDefault(constant.KBEnvPodName, podName)
 		})
 
 		It("success if leave once", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return("pod-test").Times(2)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
@@ -396,7 +452,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("success if leave twice", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return("pod-test").Times(4)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(4)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil).Times(2)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
@@ -409,13 +465,49 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return("pod-test").Times(2)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
 			err := lorryClient.LeaveMember(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
+		})
+
+		It("execute command failed cased by envs is unset", func() {
+			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
+			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
+			actions := map[string][]string{}
+			actions[constant.MemberLeaveAction] = []string{"ls"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.LeaveMemberOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.LeaveMember(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("envs is unset"))
+		})
+
+		It("execute command failed cased by executable file is not found", func() {
+			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
+			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
+			actions := map[string][]string{}
+			actions[constant.MemberLeaveAction] = []string{"binary_not_exist"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			os.Setenv(constant.KBEnvPodFQDN, "test")
+			os.Setenv(constant.KBEnvServicePort, "test")
+			os.Setenv(constant.KBEnvServiceUser, "test")
+			os.Setenv(constant.KBEnvServicePassword, "test")
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.LeaveMemberOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.LeaveMember(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
 		})
 	})
 
@@ -515,6 +607,11 @@ var _ = Describe("Lorry HTTP Client", func() {
 		BeforeEach(func() {
 			lorryClient, _ = NewHTTPClientWithPod(pod)
 			Expect(lorryClient).ShouldNot(BeNil())
+			os.Unsetenv(constant.KBEnvPodFQDN)
+			os.Unsetenv(constant.KBEnvServicePort)
+			os.Unsetenv(constant.KBEnvServiceUser)
+			os.Unsetenv(constant.KBEnvServicePassword)
+
 		})
 
 		It("success", func() {
@@ -528,6 +625,38 @@ var _ = Describe("Lorry HTTP Client", func() {
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
 		})
+
+		It("execute command failed cased by envs is unset", func() {
+			actions := map[string][]string{}
+			actions[constant.ReadonlyAction] = []string{"ls"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.LockOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.Lock(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("envs is unset"))
+		})
+
+		It("execute command failed cased by executable file is not found", func() {
+			actions := map[string][]string{}
+			actions[constant.ReadonlyAction] = []string{"binary_not_exist"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			os.Setenv(constant.KBEnvPodFQDN, "test")
+			os.Setenv(constant.KBEnvServicePort, "test")
+			os.Setenv(constant.KBEnvServiceUser, "test")
+			os.Setenv(constant.KBEnvServicePassword, "test")
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.LockOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.Lock(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
+		})
 	})
 
 	Context("unlock member", func() {
@@ -536,6 +665,10 @@ var _ = Describe("Lorry HTTP Client", func() {
 		BeforeEach(func() {
 			lorryClient, _ = NewHTTPClientWithPod(pod)
 			Expect(lorryClient).ShouldNot(BeNil())
+			os.Unsetenv(constant.KBEnvPodFQDN)
+			os.Unsetenv(constant.KBEnvServicePort)
+			os.Unsetenv(constant.KBEnvServiceUser)
+			os.Unsetenv(constant.KBEnvServicePassword)
 		})
 
 		It("success", func() {
@@ -549,6 +682,38 @@ var _ = Describe("Lorry HTTP Client", func() {
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
 		})
+
+		It("execute command failed cased by envs is unset", func() {
+			actions := map[string][]string{}
+			actions[constant.ReadWriteAction] = []string{"ls"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.UnlockOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.Unlock(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("envs is unset"))
+		})
+
+		It("execute command failed cased by executable file is not found", func() {
+			actions := map[string][]string{}
+			actions[constant.ReadWriteAction] = []string{"binary_not_exist"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			os.Setenv(constant.KBEnvPodFQDN, "test")
+			os.Setenv(constant.KBEnvServicePort, "test")
+			os.Setenv(constant.KBEnvServiceUser, "test")
+			os.Setenv(constant.KBEnvServicePassword, "test")
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.UnlockOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.Unlock(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
+		})
 	})
 
 	Context("post provision", func() {
@@ -557,12 +722,48 @@ var _ = Describe("Lorry HTTP Client", func() {
 		BeforeEach(func() {
 			lorryClient, _ = NewHTTPClientWithPod(pod)
 			Expect(lorryClient).ShouldNot(BeNil())
+			os.Unsetenv(constant.KBEnvPodFQDN)
+			os.Unsetenv(constant.KBEnvServicePort)
+			os.Unsetenv(constant.KBEnvServiceUser)
+			os.Unsetenv(constant.KBEnvServicePassword)
 		})
 
 		It("not implemented", func() {
 			err := lorryClient.PostProvision(context.TODO(), "", "", "", "", "")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("operation exec failed: no implemented"))
+		})
+
+		It("execute command failed cased by envs is unset", func() {
+			actions := map[string][]string{}
+			actions[constant.PostProvisionAction] = []string{"ls"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.PostProvisionOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.PostProvision(context.TODO(), "", "", "", "", "")
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("envs is unset"))
+		})
+
+		It("execute command failed cased by executable file is not found", func() {
+			actions := map[string][]string{}
+			actions[constant.PostProvisionAction] = []string{"binary_not_exist"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			os.Setenv(constant.KBEnvPodFQDN, "test")
+			os.Setenv(constant.KBEnvServicePort, "test")
+			os.Setenv(constant.KBEnvServiceUser, "test")
+			os.Setenv(constant.KBEnvServicePassword, "test")
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.PostProvisionOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.PostProvision(context.TODO(), "", "", "", "", "")
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
 		})
 	})
 
@@ -572,12 +773,48 @@ var _ = Describe("Lorry HTTP Client", func() {
 		BeforeEach(func() {
 			lorryClient, _ = NewHTTPClientWithPod(pod)
 			Expect(lorryClient).ShouldNot(BeNil())
+			os.Unsetenv(constant.KBEnvPodFQDN)
+			os.Unsetenv(constant.KBEnvServicePort)
+			os.Unsetenv(constant.KBEnvServiceUser)
+			os.Unsetenv(constant.KBEnvServicePassword)
 		})
 
 		It("not implemented", func() {
 			err := lorryClient.PreTerminate(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("operation exec failed: no implemented"))
+		})
+
+		It("execute command failed cased by envs is unset", func() {
+			actions := map[string][]string{}
+			actions[constant.PreTerminateAction] = []string{"ls"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.PreTerminateOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.PreTerminate(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("envs is unset"))
+		})
+
+		It("execute command failed cased by executable file is not found", func() {
+			actions := map[string][]string{}
+			actions[constant.PreTerminateAction] = []string{"binary_not_exist"}
+			jsonStr, _ := json.Marshal(actions)
+			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			os.Setenv(constant.KBEnvPodFQDN, "test")
+			os.Setenv(constant.KBEnvServicePort, "test")
+			os.Setenv(constant.KBEnvServiceUser, "test")
+			os.Setenv(constant.KBEnvServicePassword, "test")
+			ops := opsregister.Operations()
+			ops[strings.ToLower(string(util.PreTerminateOperation))].Init(context.TODO())
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetCustomManager(customManager)
+			err := lorryClient.PreTerminate(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
 		})
 	})
 

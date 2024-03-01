@@ -53,7 +53,8 @@ func GetGlobalSharedEnvs() ([]string, error) {
 	)
 	envSetGot := sets.KeySet(map[string]string{})
 	envs := make([]string, 0, envSetRequired.Len())
-	for _, env := range os.Environ() {
+	Es := os.Environ()
+	for _, env := range Es {
 		keys := strings.SplitN(env, "=", 2)
 		if len(keys) != 2 {
 			continue

@@ -236,6 +236,13 @@ func (configuration *ConfigurationSpec) GetConfigurationItem(name string) *Confi
 	return nil
 }
 
+func (configuration *ConfigurationSpec) GetConfigSpec(configSpecName string) *ComponentConfigSpec {
+	if configItem := configuration.GetConfigurationItem(configSpecName); configItem != nil {
+		return configItem.ConfigSpec
+	}
+	return nil
+}
+
 func (status *ConfigurationStatus) GetItemStatus(name string) *ConfigurationItemDetailStatus {
 	for i := range status.ConfigurationItemStatus {
 		itemStatus := &status.ConfigurationItemStatus[i]

@@ -191,7 +191,7 @@ func (r *StorageProviderReconciler) deleteExternalResources(
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *StorageProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&storagev1alpha1.StorageProvider{}).
 		Watches(&storagev1.CSIDriver{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {

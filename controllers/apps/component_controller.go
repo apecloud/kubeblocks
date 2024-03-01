@@ -181,7 +181,7 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if retryDurationMS != 0 {
 		requeueDuration = time.Millisecond * time.Duration(retryDurationMS)
 	}
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.Component{}).
 		Watches(&workloads.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&corev1.Service{}).

@@ -20,11 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -105,5 +110,18 @@ func (t *componentConfigurationTransformer) needWaiting(ctx *componentTransformC
 	}
 	// HACK for hostNetwork
 	// TODO: define the api to inject dynamic info of the cluster components
-	return component.CheckAndGetClusterComponents(ctx.Context, t.Client, ctx.Cluster)
+	components, err := component.CheckAndGetClusterComponents(ctx.Context, t.Client, ctx.Cluster)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range components {
+		comp := v.(*appsv1alpha1.Component)
+		if comp.Spec.CompDef != ctx.CompDef.Name {
+			continue
+		}
+		if _, ok := comp.Annotations[constant.HostPortAnnotationKey]; !ok {
+			return nil, intctrlutil.NewRequeueError(time.Second, "waiting for the host port allocation of all components to be completed.")
+		}
+	}
+	return components, nil
 }

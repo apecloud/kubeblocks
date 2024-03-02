@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -835,4 +837,33 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	// }
 	// return multicluster.InGlobalContext()
 	return nil
+}
+
+// GetHostNetworkRelatedRSMS gets the RSM list for the current cluster using hostWork.
+func GetHostNetworkRelatedRSMS(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
+	var rsmSlice []client.Object
+	comps, ok := cluster.Annotations[constant.HostNetworkAnnotationKey]
+	if !ok {
+		return rsmSlice, nil
+	}
+	rsmList := &workloads.ReplicatedStateMachineList{}
+	if err := cli.List(ctx, rsmList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
+		return nil, err
+	}
+	createdRSMCompMap := map[string]workloads.ReplicatedStateMachine{}
+	for i := range rsmList.Items {
+		if compName, ok := rsmList.Items[i].Labels[constant.KBAppComponentLabelKey]; ok {
+			createdRSMCompMap[compName] = rsmList.Items[i]
+		}
+	}
+	for _, compName := range strings.Split(comps, ",") {
+		if rsm, ok := createdRSMCompMap[compName]; !ok {
+			return nil, intctrlutil.NewRequeueError(time.Second, "waiting for all rsm creations to be completed")
+		} else {
+			rsmSlice = append(rsmSlice, &rsm)
+		}
+	}
+	return rsmSlice, nil
 }

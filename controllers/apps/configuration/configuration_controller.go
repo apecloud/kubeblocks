@@ -36,6 +36,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -153,9 +154,7 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 		return err
 	}
 
-	// HACK for hostNetwork
-	// TODO: define the api to inject dynamic info of the cluster components
-	dependencyObjs, err := component.GetHostNetworkRelatedComponents(synthesizedComp.PodSpec, taskCtx.reqCtx.Ctx, r.Client, taskCtx.fetcher.ClusterObj)
+	dependencyRSMS, err := rsm.GetHostNetworkRelatedRSMS(taskCtx.reqCtx.Ctx, r.Client, taskCtx.fetcher.ClusterObj)
 	if err != nil {
 		return err
 	}
@@ -164,7 +163,7 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 	patch := client.MergeFrom(configuration.DeepCopy())
 	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	for _, task := range tasks {
-		if err := task.Do(taskCtx.fetcher, synthesizedComp, dependencyObjs, revision); err != nil {
+		if err := task.Do(taskCtx.fetcher, synthesizedComp, dependencyRSMS, revision); err != nil {
 			errs = append(errs, err)
 			continue
 		}

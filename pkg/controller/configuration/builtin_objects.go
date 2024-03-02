@@ -88,7 +88,7 @@ func buildInComponentObjects(cache []client.Object, podSpec *corev1.PodSpec, com
 		podSpec:          podSpec,
 		component:        component,
 		cluster:          cluster,
-		dynamicCompInfos: buildDynamicCompInfos(cache, podSpec, component),
+		dynamicCompInfos: buildDynamicCompInfos(cache, cluster),
 	}
 }
 

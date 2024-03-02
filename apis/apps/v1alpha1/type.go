@@ -35,100 +35,102 @@ const (
 )
 
 type ComponentTemplateSpec struct {
-	// Specify the name of the configuration template.
+	// Specifies the name of the configuration template.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Specify the name of the referenced configuration template ConfigMap object.
+	// Specifies the name of the referenced configuration template ConfigMap object.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TemplateRef string `json:"templateRef"`
 
-	// Specify the namespace of the referenced configuration template ConfigMap object.
+	// Specifies the namespace of the referenced configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
-	//
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:default="default"
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	// The volume name of PodTemplate, to which the configuration file produced through the configuration
-	// template will be mounted. Must be a DNS_LABEL name.
+	// Refers to the volume name of PodTemplate. The configuration file produced through the configuration
+	// template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
-	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	VolumeName string `json:"volumeName"`
 
-	// Specify mode bits used to set permissions on created files by default.
+	// Refers to the mode bits used to set permissions on created files by default.
 	//
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
 	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
 	// Defaults to 0644.
 	//
 	// Directories within the path are not affected by this setting.
-	// This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other
-	// mode bits set.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup, and the result can be other mode bits set.
 	//
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
 
 type ConfigTemplateExtension struct {
-	// Specify the name of the referenced the configuration template ConfigMap object.
+	// Specifies the name of the referenced configuration template ConfigMap object.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TemplateRef string `json:"templateRef"`
 
-	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// Specifies the namespace of the referenced configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
+	//
 	// +kubebuilder:default="default"
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	// policy defines how to merge external imported templates into component templates.
+	// Defines the strategy for merging externally imported templates into component templates.
+	//
 	// +kubebuilder:default="none"
 	// +optional
 	Policy MergedPolicy `json:"policy,omitempty"`
 }
 
 type LegacyRenderedTemplateSpec struct {
+	// Extends the configuration template.
 	ConfigTemplateExtension `json:",inline"`
 }
 
 type ComponentConfigSpec struct {
 	ComponentTemplateSpec `json:",inline"`
 
-	// Specify a list of keys.
-	// If empty, ConfigConstraint applies to all keys in the configmap.
+	// Defines a list of keys.
+	// If left empty, ConfigConstraint applies to all keys in the configmap.
 	//
 	// +listType=set
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
-	// Defines the secondary rendered config spec
+	// An optional field that defines the secondary rendered config spec.
 	//
 	// +optional
 	LegacyRenderedConfigSpec *LegacyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
 
-	// Specify the name of the referenced the configuration constraints object.
+	// An optional field that defines the name of the referenced configuration constraints object.
 	//
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 
-	// Specify the list of containers that will be injected into EnvFrom.
+	// An optional field where the list of containers will be injected into EnvFrom.
 	//
 	// +listType=set
 	// +optional
@@ -762,6 +764,36 @@ type StatefulSetWorkload interface {
 	GetUpdateStrategy() UpdateStrategy
 }
 
+type HostNetwork struct {
+	// The list of container ports that are required by the component.
+	//
+	// +optional
+	ContainerPorts []HostNetworkContainerPort `json:"containerPorts,omitempty"`
+
+	// Set DNS policy for the component.
+	// Defaults to "ClusterFirst".
+	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
+	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
+	// To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.
+	//
+	// +optional
+	DNSPolicy *corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
+}
+
+type HostNetworkContainerPort struct {
+	// Container specifies the target container within the pod.
+	//
+	// +required
+	Container string `json:"container"`
+
+	// Ports are named container ports within the specified container.
+	// These container ports must be defined in the container for proper port allocation.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +required
+	Ports []string `json:"ports"`
+}
+
 // ClusterService defines the service of a cluster.
 type ClusterService struct {
 	Service `json:",inline"`
@@ -883,6 +915,7 @@ type EnvVar struct {
 	//
 	// +optional
 	Value string `json:"value,omitempty"`
+
 	// Source for the variable's value. Cannot be used if value is not empty.
 	// +optional
 	ValueFrom *VarSource `json:"valueFrom,omitempty"`
@@ -897,6 +930,10 @@ type VarSource struct {
 	// Selects a key of a Secret.
 	// +optional
 	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
+
+	// Selects a defined var of a Pod.
+	// +optional
+	PodVarRef *PodVarSelector `json:"podVarRef,omitempty"`
 
 	// Selects a defined var of a Service.
 	// +optional
@@ -927,6 +964,23 @@ type NamedVar struct {
 
 	// +optional
 	Option *VarOption `json:"option,omitempty"`
+}
+
+// PodVars defines the vars can be referenced from a Pod.
+type PodVars struct {
+	// +optional
+	Container *ContainerVars `json:"container,omitempty"`
+}
+
+// ContainerVars defines the vars can be referenced from a Container.
+type ContainerVars struct {
+	// The name of the container.
+	// +required
+	Name string `json:"name"`
+
+	// Container port to reference.
+	// +optional
+	Port *NamedVar `json:"port,omitempty"`
 }
 
 // ServiceVars defines the vars can be referenced from a Service.
@@ -960,6 +1014,14 @@ type ServiceRefVars struct {
 	Port *VarOption `json:"port,omitempty"`
 
 	CredentialVars `json:",inline"`
+}
+
+// PodVarSelector selects a var from a Pod.
+type PodVarSelector struct {
+	// The pod to select from.
+	ClusterObjectReference `json:",inline"`
+
+	PodVars `json:",inline"`
 }
 
 // ServiceVarSelector selects a var from a Service.

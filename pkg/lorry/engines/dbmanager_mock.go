@@ -187,20 +187,6 @@ func (mr *MockDBManagerMockRecorder) GetDBState(arg0, arg1 interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDBState", reflect.TypeOf((*MockDBManager)(nil).GetDBState), arg0, arg1)
 }
 
-// GetHealthiestMember mocks base method.
-func (m *MockDBManager) GetHealthiestMember(arg0 *dcs.Cluster, arg1 string) *dcs.Member {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetHealthiestMember", arg0, arg1)
-	ret0, _ := ret[0].(*dcs.Member)
-	return ret0
-}
-
-// GetHealthiestMember indicates an expected call of GetHealthiestMember.
-func (mr *MockDBManagerMockRecorder) GetHealthiestMember(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHealthiestMember", reflect.TypeOf((*MockDBManager)(nil).GetHealthiestMember), arg0, arg1)
-}
-
 // GetLag mocks base method.
 func (m *MockDBManager) GetLag(arg0 context.Context, arg1 *dcs.Cluster) (int64, error) {
 	m.ctrl.T.Helper()
@@ -633,17 +619,17 @@ func (mr *MockDBManagerMockRecorder) Query(arg0, arg1 interface{}) *gomock.Call 
 }
 
 // Recover mocks base method.
-func (m *MockDBManager) Recover(arg0 context.Context) error {
+func (m *MockDBManager) Recover(arg0 context.Context, arg1 *dcs.Cluster) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Recover", arg0)
+	ret := m.ctrl.Call(m, "Recover", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Recover indicates an expected call of Recover.
-func (mr *MockDBManagerMockRecorder) Recover(arg0 interface{}) *gomock.Call {
+func (mr *MockDBManagerMockRecorder) Recover(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Recover", reflect.TypeOf((*MockDBManager)(nil).Recover), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Recover", reflect.TypeOf((*MockDBManager)(nil).Recover), arg0, arg1)
 }
 
 // RevokeUserRole mocks base method.

@@ -23,12 +23,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +37,6 @@ import (
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -61,7 +58,7 @@ const (
 	configurationNotRelatedComponentMessage = "related component does not found any configSpecs, skip reconfigure"
 )
 
-var ConfigurationRequiredLabels = []string{
+var reconfigureRequiredLabels = []string{
 	constant.AppNameLabelKey,
 	constant.AppInstanceLabelKey,
 	constant.KBAppComponentLabelKey,
@@ -113,63 +110,44 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return updateConfigPhase(r.Client, reqCtx, config, appsv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 	}
 
-	// process configuration without ConfigConstraints
-	cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]
-	if !ok || cfgConstraintsName == "" {
-		reqCtx.Log.Info("configuration without ConfigConstraints.")
-		return r.sync(reqCtx, config, &appsv1alpha1.ConfigConstraint{})
+	resources, err := prepareRelatedResource(reqCtx, r.Client, config)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to fetch related resources")
+	}
+	if resources.configSpec == nil {
+		reqCtx.Log.Info(fmt.Sprintf("not found configSpec[%s] in the component[%s].",
+			config.Labels[constant.CMConfigurationSpecProviderLabelKey], resources.componentName))
+		reqCtx.Recorder.Event(config,
+			corev1.EventTypeWarning,
+			appsv1alpha1.ReasonReconfigureFailed,
+			configurationNotRelatedComponentMessage)
+		return updateConfigPhase(r.Client, reqCtx, config, appsv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
 	}
 
-	// process configuration with ConfigConstraints
-	key := types.NamespacedName{
-		Namespace: config.Namespace,
-		Name:      config.Labels[constant.CMConfigurationConstraintsNameLabelKey],
-	}
-	tpl := &appsv1alpha1.ConfigConstraint{}
-	if err := r.Client.Get(reqCtx.Ctx, key, tpl); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
-	}
-	return r.sync(reqCtx, config, tpl)
+	return r.sync(reqCtx, config, resources)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
 		WithEventFilter(predicate.NewPredicateFuncs(checkConfigurationObject)).
 		Complete(r)
 }
 
 func checkConfigurationObject(object client.Object) bool {
-	return checkConfigLabels(object, ConfigurationRequiredLabels)
+	return checkConfigLabels(object, reconfigureRequiredLabels)
 }
 
-func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, configConstraint *appsv1alpha1.ConfigConstraint) (ctrl.Result, error) {
-
-	var (
-		componentName  = configMap.Labels[constant.KBAppComponentLabelKey]
-		configSpecName = configMap.Labels[constant.CMConfigurationSpecProviderLabelKey]
-	)
-
-	componentLabels := map[string]string{
-		constant.AppInstanceLabelKey:    configMap.Labels[constant.AppInstanceLabelKey],
-		constant.KBAppComponentLabelKey: configMap.Labels[constant.KBAppComponentLabelKey],
-	}
-
-	var keySelector []string
-	if keysLabel, ok := configMap.Labels[constant.CMConfigurationCMKeysLabelKey]; ok && keysLabel != "" {
-		keySelector = strings.Split(keysLabel, ",")
-	}
-
-	configPatch, forceRestart, err := createConfigPatch(configMap, configConstraint.Spec.FormatterConfig, keySelector)
+func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, resources *reconfigureRelatedResource) (ctrl.Result, error) {
+	configPatch, forceRestart, err := createConfigPatch(configMap, resources.configConstraintObj.Spec.FormatterConfig, resources.configSpec.Keys)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
 
 	// No parameters updated
 	if configPatch != nil && !configPatch.IsModify {
-		reqCtx.Recorder.Eventf(configMap, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning,
-			"nothing changed, skip reconfigure")
+		reqCtx.Recorder.Event(configMap, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning, "nothing changed, skip reconfigure")
 		return r.updateConfigCMStatus(reqCtx, configMap, core.ReconfigureNoChangeType, nil)
 	}
 
@@ -186,13 +164,13 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 			Context:       reqCtx.Ctx,
 			Client:        r.Client,
 			Namespace:     configMap.Namespace,
-			ClusterName:   configMap.Labels[constant.AppInstanceLabelKey],
-			ComponentName: componentName,
+			ClusterName:   resources.clusterName,
+			ComponentName: resources.componentName,
 		},
 		configMap,
-		configConstraint,
-		configSpecName,
-		componentLabels)
+		resources.configSpec.Name,
+		reqCtx,
+		resources.componentMatchLabels())
 	if err := reconcileContext.GetRelatedObjects(); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
@@ -202,34 +180,18 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		reqCtx.Log.Info("not found component.")
 		return intctrlutil.Reconciled()
 	}
-	if reconcileContext.ConfigSpec == nil {
-		reqCtx.Log.Info(fmt.Sprintf("not found configSpec[%s] in the component[%s].", configSpecName, componentName))
-		reqCtx.Recorder.Eventf(configMap,
-			corev1.EventTypeWarning,
-			appsv1alpha1.ReasonReconfigureFailed,
-			configurationNotRelatedComponentMessage)
-		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
-	}
-	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 && len(reconcileContext.RSMList) == 0 {
-		reqCtx.Recorder.Eventf(configMap,
-			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
+
+	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.RSMList) == 0 {
+		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
 		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotUsingMessage)
 	}
 
-	synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, r.Client, reconcileContext.ClusterObj, reconcileContext.ClusterComObj)
-	if err != nil {
-		reqCtx.Recorder.Eventf(configMap,
-			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
-			"build synthesized component failed, skip reconfigure")
-		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotUsingMessage)
-	}
-
 	return r.performUpgrade(reconfigureParams{
-		ConfigSpecName:           configSpecName,
+		ConfigSpecName:           resources.configSpec.Name,
 		ConfigPatch:              configPatch,
 		ConfigMap:                configMap,
-		ConfigConstraint:         &configConstraint.Spec,
+		ConfigConstraint:         &resources.configConstraintObj.Spec,
 		Client:                   r.Client,
 		Ctx:                      reqCtx,
 		Cluster:                  reconcileContext.ClusterObj,
@@ -238,8 +200,8 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		DeploymentUnits:          reconcileContext.Deployments,
 		RSMList:                  reconcileContext.RSMList,
 		ClusterComponent:         reconcileContext.ClusterComObj,
-		SynthesizedComponent:     synthesizedComp,
-		Restart:                  forceRestart || !cfgcm.IsSupportReload(configConstraint.Spec.ReloadOptions),
+		SynthesizedComponent:     reconcileContext.BuiltinComponent,
+		Restart:                  forceRestart || !cfgcm.IsSupportReload(resources.configConstraintObj.Spec.ReloadOptions),
 		ReconfigureClientFactory: GetClientFactory(),
 	})
 }

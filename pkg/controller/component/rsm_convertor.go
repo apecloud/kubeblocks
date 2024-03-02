@@ -88,8 +88,17 @@ func (c *rsmMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
 type rsmPodManagementPolicyConvertor struct{}
 
 func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
-	// componentDefinition does not define PodManagementPolicy and StatefulSetUpdateStrategy.
-	// The Parallel strategy is used by default here. If necessary, the componentDefinition API can be expanded later
+	synthesizedComp, err := parseRSMConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	if synthesizedComp.PodManagementPolicy != nil {
+		return *synthesizedComp.PodManagementPolicy, nil
+	}
+	memberUpdateStrategy := getMemberUpdateStrategy(synthesizedComp)
+	if memberUpdateStrategy == nil || *memberUpdateStrategy == workloads.SerialUpdateStrategy {
+		return appsv1.OrderedReadyPodManagement, nil
+	}
 	return appsv1.ParallelPodManagement, nil
 }
 
@@ -199,17 +208,17 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 	}
 
 	rsmRoleProbe := &workloads.RoleProbe{
-		InitialDelaySeconds: synthesizeComp.LifecycleActions.RoleProbe.InitialDelaySeconds,
 		TimeoutSeconds:      synthesizeComp.LifecycleActions.RoleProbe.TimeoutSeconds,
 		PeriodSeconds:       synthesizeComp.LifecycleActions.RoleProbe.PeriodSeconds,
-		SuccessThreshold:    synthesizeComp.LifecycleActions.RoleProbe.SuccessThreshold,
-		FailureThreshold:    synthesizeComp.LifecycleActions.RoleProbe.FailureThreshold,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
 		RoleUpdateMechanism: workloads.DirectAPIServerEventUpdate,
 	}
 
 	if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
 		builtinHandler := string(*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler)
 		rsmRoleProbe.BuiltinHandler = &builtinHandler
+		return rsmRoleProbe, nil
 	}
 
 	// TODO(xingran): RSM Action does not support args[] yet

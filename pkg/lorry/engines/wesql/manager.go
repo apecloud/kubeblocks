@@ -137,7 +137,7 @@ func (mgr *Manager) IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) 
 	return false, 0
 }
 
-func (mgr *Manager) Recover(context.Context) error {
+func (mgr *Manager) Recover(context.Context, *dcs.Cluster) error {
 	return nil
 }
 

@@ -65,14 +65,14 @@ spec:
                       items:
                         properties:
                           actionSetName:
-                            description: actionSetName refers to the ActionSet object
-                              that defines the backup actions. For volume snapshot
-                              backup, the actionSet is not required, the controller
-                              will use the CSI volume snapshotter to create the snapshot.
+                            description: Refers to the ActionSet object that defines
+                              the backup actions. For volume snapshot backup, the
+                              actionSet is not required, the controller will use the
+                              CSI volume snapshotter to create the snapshot.
                             type: string
                           env:
-                            description: env specifies the environment variables for
-                              the backup workload.
+                            description: Specifies the environment variables for the
+                              backup workload.
                             items:
                               description: EnvVar represents an environment variable
                                 present in a Container.
@@ -254,16 +254,16 @@ spec:
                               type: object
                             type: array
                           name:
-                            description: the name of backup method.
+                            description: The name of backup method.
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           runtimeSettings:
-                            description: runtimeSettings specifies runtime settings
-                              for the backup workload container.
+                            description: Specifies runtime settings for the backup
+                              workload container.
                             properties:
                               resources:
-                                description: 'resources specifies the resource required
-                                  by container. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                                description: 'Specifies the resource required by container.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                                 properties:
                                   claims:
                                     description: "Claims lists the names of resources,
@@ -317,14 +317,14 @@ spec:
                             type: object
                           snapshotVolumes:
                             default: false
-                            description: snapshotVolumes specifies whether to take
-                              snapshots of persistent volumes. if true, the BackupScript
-                              is not required, the controller will use the CSI volume
-                              snapshotter to create the snapshot.
+                            description: Specifies whether to take snapshots of persistent
+                              volumes. If true, the ActionSetName is not required,
+                              the controller will use the CSI volume snapshotter to
+                              create the snapshot.
                             type: boolean
                           target:
-                            description: target specifies the target information to
-                              back up, it will override the global target policy.
+                            description: Specifies the target information to back
+                              up, it will override the target in backup policy.
                             properties:
                               account:
                                 description: "Refers to spec.componentDef.systemAccounts.accounts[*].name
@@ -336,35 +336,34 @@ spec:
                                   target secret."
                                 type: string
                               connectionCredential:
-                                description: connectionCredential specifies the connection
-                                  credential to connect to the target database cluster.
+                                description: Specifies the connection credential to
+                                  connect to the target database cluster.
                                 properties:
                                   hostKey:
-                                    description: hostKey specifies the map key of
-                                      the host in the connection credential secret.
+                                    description: Specifies the map key of the host
+                                      in the connection credential secret.
                                     type: string
                                   passwordKey:
                                     default: password
-                                    description: passwordKey specifies the map key
-                                      of the password in the connection credential
-                                      secret. This password will be saved in the backup
-                                      annotation for full backup. You can use the
-                                      environment variable DP_ENCRYPTION_KEY to specify
-                                      encryption key.
+                                    description: Specifies the map key of the password
+                                      in the connection credential secret. This password
+                                      will be saved in the backup annotation for full
+                                      backup. You can use the environment variable
+                                      DP_ENCRYPTION_KEY to specify encryption key.
                                     type: string
                                   portKey:
-                                    description: portKey specifies the map key of
-                                      the port in the connection credential secret.
+                                    description: Specifies the map key of the port
+                                      in the connection credential secret.
                                     type: string
                                   secretName:
-                                    description: secretName refers to the Secret object
-                                      that contains the connection credential.
+                                    description: Refers to the Secret object that
+                                      contains the connection credential.
                                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                     type: string
                                   usernameKey:
                                     default: username
-                                    description: usernameKey specifies the map key
-                                      of the user in the connection credential secret.
+                                    description: Specifies the map key of the user
+                                      in the connection credential secret.
                                     type: string
                                 required:
                                 - secretName
@@ -395,9 +394,8 @@ spec:
                                     type: string
                                 type: object
                               podSelector:
-                                description: podSelector is used to find the target
-                                  pod. The volumes of the target pod will be backed
-                                  up.
+                                description: Used to find the target pod. The volumes
+                                  of the target pod will be backed up.
                                 properties:
                                   matchExpressions:
                                     description: matchExpressions is a list of label
@@ -444,11 +442,12 @@ spec:
                                     type: object
                                   strategy:
                                     default: Any
-                                    description: "strategy specifies the strategy
-                                      to select the target pod when multiple pods
-                                      are selected. Valid values are: \n - Any: select
+                                    description: "Specifies the strategy to select
+                                      the target pod when multiple pods are selected.
+                                      Valid values are: Any: select any one pod that
+                                      match the labelsSelector. \n - `Any`: select
                                       any one pod that match the labelsSelector. -
-                                      All: select all pods that match the labelsSelector."
+                                      `All`: select all pods that match the labelsSelector."
                                     enum:
                                     - Any
                                     - All
@@ -456,8 +455,8 @@ spec:
                                 type: object
                                 x-kubernetes-map-type: atomic
                               resources:
-                                description: resources specifies the kubernetes resources
-                                  to back up.
+                                description: Specifies the kubernetes resources to
+                                  back up.
                                 properties:
                                   excluded:
                                     description: excluded is a slice of namespaced-scoped
@@ -467,20 +466,17 @@ spec:
                                       type: string
                                     type: array
                                   included:
-                                    default:
-                                    - '*'
                                     description: included is a slice of namespaced-scoped
                                       resource type names to include in the kubernetes
-                                      resources. The default value is "*", which means
-                                      all resource types will be included.
+                                      resources. The default value is empty.
                                     items:
                                       type: string
                                     type: array
                                   selector:
-                                    description: selector is a metav1.LabelSelector
-                                      to filter the target kubernetes resources that
-                                      need to be backed up. If not set, will do not
-                                      back up any kubernetes resources.
+                                    description: A metav1.LabelSelector to filter
+                                      the target kubernetes resources that need to
+                                      be backed up. If not set, will do not back up
+                                      any kubernetes resources.
                                     properties:
                                       matchExpressions:
                                         description: matchExpressions is a list of
@@ -545,8 +541,8 @@ spec:
                                   the BackupPolicy's target attribute."
                                 type: string
                               serviceAccountName:
-                                description: serviceAccountName specifies the service
-                                  account to run the backup workload.
+                                description: Specifies the service account to run
+                                  the backup workload.
                                 type: string
                               strategy:
                                 description: "Specifies the PodSelectionStrategy to
@@ -562,12 +558,12 @@ spec:
                             - role
                             type: object
                           targetVolumes:
-                            description: targetVolumes specifies which volumes from
-                              the target should be mounted in the backup workload.
+                            description: Specifies which volumes from the target should
+                              be mounted in the backup workload.
                             properties:
                               volumeMounts:
-                                description: volumeMounts specifies the mount for
-                                  the volumes specified in `Volumes` section.
+                                description: Specifies the mount for the volumes specified
+                                  in `volumes` section.
                                 items:
                                   description: VolumeMount describes a mounting of
                                     a Volume within a container.
@@ -611,9 +607,9 @@ spec:
                                   type: object
                                 type: array
                               volumes:
-                                description: Volumes indicates the list of volumes
-                                  of targeted application that should be mounted on
-                                  the backup job.
+                                description: Specifies the list of volumes of targeted
+                                  application that should be mounted on the backup
+                                  workload.
                                 items:
                                   type: string
                                 type: array

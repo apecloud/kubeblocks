@@ -202,7 +202,7 @@ func VolumeSnapshotEnabled(ctx context.Context, cli client.Client, pod *corev1.P
 		if err := cli.Get(ctx, types.NamespacedName{Name: pvcNames[i], Namespace: pod.Namespace}, pvc); err != nil {
 			return false, nil
 		}
-		enabled, err := intctrlutil.IsVolumeSnapshotEnabled(ctx, cli, pvc.Spec.VolumeName)
+		enabled, err := IsVolumeSnapshotEnabled(ctx, cli, pvc.Spec.VolumeName)
 		if err != nil {
 			return false, err
 		}
@@ -290,4 +290,19 @@ func GetKubeVersion() (string, error) {
 		return "", fmt.Errorf("kubernetes version is not a valid semver, version info %v", verInfo)
 	}
 	return semver.MajorMinor(ver.GitVersion), nil
+}
+
+func SupportsCronJobV1() bool {
+	kubeVersion, err := GetKubeVersion()
+	if err != nil {
+		return true
+	}
+	return semver.Compare(kubeVersion, "v1.21") >= 0
+}
+func GetPodFirstContainerPort(pod *corev1.Pod) int32 {
+	ports := pod.Spec.Containers[0].Ports
+	if len(ports) == 0 {
+		return 0
+	}
+	return ports[0].ContainerPort
 }

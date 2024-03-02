@@ -60,7 +60,7 @@ func (j *JobAction) Type() dpv1alpha1.ActionType {
 	return dpv1alpha1.ActionTypeJob
 }
 
-func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
+func (j *JobAction) Execute(actCtx ActionContext) (*dpv1alpha1.ActionStatus, error) {
 	sb := newStatusBuilder(j)
 	handleErr := func(err error) (*dpv1alpha1.ActionStatus, error) {
 		return sb.withErr(err).build(), err
@@ -75,14 +75,14 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 		Name:      j.ObjectMeta.Name,
 	}
 	original := batchv1.Job{}
-	exists, err := ctrlutil.CheckResourceExists(ctx.Ctx, ctx.Client, key, &original)
+	exists, err := ctrlutil.CheckResourceExists(actCtx.Ctx, actCtx.Client, key, &original)
 	if err != nil {
 		return handleErr(err)
 	}
 
 	// job exists, check job status and set action status accordingly
 	if exists {
-		objRef, _ := ref.GetReference(ctx.Scheme, &original)
+		objRef, _ := ref.GetReference(actCtx.Scheme, &original)
 		sb = sb.startTimestamp(&original.CreationTimestamp).objectRef(objRef)
 		_, finishedType, msg := utils.IsJobFinished(&original)
 		switch finishedType {
@@ -114,13 +114,13 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 
 	controllerutil.AddFinalizer(job, types.DataProtectionFinalizerName)
 	if job.Namespace == j.Owner.GetNamespace() {
-		if err = utils.SetControllerReference(j.Owner, job, ctx.Scheme); err != nil {
+		if err = utils.SetControllerReference(j.Owner, job, actCtx.Scheme); err != nil {
 			return handleErr(err)
 		}
 	}
 	msg := fmt.Sprintf("creating job %s/%s", job.Namespace, job.Name)
-	ctx.Recorder.Event(j.Owner, corev1.EventTypeNormal, "CreatingJob", msg)
-	return handleErr(client.IgnoreAlreadyExists(ctx.Client.Create(ctx.Ctx, job)))
+	actCtx.Recorder.Event(j.Owner, corev1.EventTypeNormal, "CreatingJob", msg)
+	return handleErr(client.IgnoreAlreadyExists(actCtx.Client.Create(actCtx.Ctx, job)))
 }
 
 func (j *JobAction) validate() error {

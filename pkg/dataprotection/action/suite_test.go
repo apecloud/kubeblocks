@@ -42,7 +42,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -61,8 +60,8 @@ var (
 	logger    logr.Logger
 	recorder  record.EventRecorder
 
-	buildActionCtx = func() action.Context {
-		return action.Context{
+	buildActionCtx = func() action.ActionContext {
+		return action.ActionContext{
 			Ctx:              testCtx.Ctx,
 			Client:           testCtx.Cli,
 			Recorder:         recorder,
@@ -128,9 +127,8 @@ var _ = BeforeSuite(func() {
 
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:                scheme.Scheme,
-		MetricsBindAddress:    "0",
-		ClientDisableCacheFor: ctrlutil.GetUncachedObjects(),
+		Scheme:             scheme.Scheme,
+		MetricsBindAddress: "0",
 	})
 	Expect(err).ToNot(HaveOccurred())
 

@@ -22,40 +22,46 @@ import (
 
 // BackupScheduleSpec defines the desired state of BackupSchedule.
 type BackupScheduleSpec struct {
-	// Which backupPolicy is applied to perform this backup.
+	// Specifies the backupPolicy to be applied for the `schedules`.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupPolicyName string `json:"backupPolicyName"`
 
-	// startingDeadlineMinutes defines the deadline in minutes for starting the
-	// backup workload if it misses scheduled time for any reason.
+	// Defines the deadline in minutes for starting the backup workload if it
+	// misses its scheduled time for any reason.
+	//
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1440
 	StartingDeadlineMinutes *int64 `json:"startingDeadlineMinutes,omitempty"`
 
-	// schedules defines the list of backup schedules.
+	// Defines the list of backup schedules.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	Schedules []SchedulePolicy `json:"schedules"`
 }
 
 type SchedulePolicy struct {
-	// enabled specifies whether the backup schedule is enabled or not.
+	// Specifies whether the backup schedule is enabled or not.
+	//
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// backupMethod specifies the backup method name that is defined in backupPolicy.
+	// Specifies the backup method name that is defined in backupPolicy.
+	//
 	// +kubebuilder:validation:Required
 	BackupMethod string `json:"backupMethod"`
 
-	// the cron expression for schedule, the timezone is in UTC.
+	// Specifies the cron expression for the schedule. The timezone is in UTC.
 	// see https://en.wikipedia.org/wiki/Cron.
+	//
 	// +kubebuilder:validation:Required
 	CronExpression string `json:"cronExpression"`
 
-	// retentionPeriod determines a duration up to which the backup should be kept.
-	// controller will remove all backups that are older than the RetentionPeriod.
+	// Determines the duration for which the backup should be kept.
+	// KubeBlocks will remove all backups that are older than the RetentionPeriod.
 	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
 	// Sample duration format:
 	//
@@ -74,21 +80,25 @@ type SchedulePolicy struct {
 
 // BackupScheduleStatus defines the observed state of BackupSchedule.
 type BackupScheduleStatus struct {
-	// phase describes the phase of the BackupSchedule.
+	// Describes the phase of the BackupSchedule.
+	//
 	// +optional
 	Phase BackupSchedulePhase `json:"phase,omitempty"`
 
-	// observedGeneration is the most recent generation observed for this
-	// BackupSchedule. It refers to the BackupSchedule's generation, which is
-	// updated on mutation by the API Server.
+	// Represents the most recent generation observed for this BackupSchedule.
+	// It refers to the BackupSchedule's generation, which is updated on mutation
+	// by the API Server.
+	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// failureReason is an error that caused the backup to fail.
+	// Represents an error that caused the backup to fail.
+	//
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
-	// schedules describes the status of each schedule.
+	// Describes the status of each schedule.
+	//
 	// +optional
 	Schedules map[string]ScheduleStatus `json:"schedules,omitempty"`
 }
@@ -97,33 +107,37 @@ type BackupScheduleStatus struct {
 type BackupSchedulePhase string
 
 const (
-	// BackupSchedulePhaseAvailable means the backup schedule is available.
+	// BackupSchedulePhaseAvailable indicates the backup schedule is available.
 	BackupSchedulePhaseAvailable BackupSchedulePhase = "Available"
 
-	// BackupSchedulePhaseFailed means the backup schedule is failed.
+	// BackupSchedulePhaseFailed indicates the backup schedule has failed.
 	BackupSchedulePhaseFailed BackupSchedulePhase = "Failed"
 )
 
-// ScheduleStatus defines the status of each schedule.
+// ScheduleStatus represents the status of each schedule.
 type ScheduleStatus struct {
-	// phase describes the phase of the schedule.
+	// Describes the phase of the schedule.
+	//
 	// +optional
 	Phase SchedulePhase `json:"phase,omitempty"`
 
-	// failureReason is an error that caused the backup to fail.
+	// Represents an error that caused the backup to fail.
+	//
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
-	// lastScheduleTime records the last time the backup was scheduled.
+	// Records the last time the backup was scheduled.
+	//
 	// +optional
 	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
 
-	// lastSuccessfulTime records the last time the backup was successfully completed.
+	// Records the last time the backup was successfully completed.
+	//
 	// +optional
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 }
 
-// SchedulePhase defines the phase of schedule
+// SchedulePhase represents the phase of a schedule.
 type SchedulePhase string
 
 const (

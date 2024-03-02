@@ -178,6 +178,49 @@ var _ = Describe("ComponentDefinition Controller", func() {
 		})
 	})
 
+	Context("host network", func() {
+		It("ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddHostNetworkContainerPort(testapps.DefaultMySQLContainerName, []string{"mysql"}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
+		})
+
+		It("duplicate containers", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddHostNetworkContainerPort(testapps.DefaultMySQLContainerName, []string{"mysql"}).
+				AddHostNetworkContainerPort(testapps.DefaultMySQLContainerName, []string{"mysql"}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("undefined container", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddHostNetworkContainerPort("non-exist-container", []string{"mysql"}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("undefined container port", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddHostNetworkContainerPort(testapps.DefaultMySQLContainerName, []string{"non-exist-port"}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+	})
+
 	Context("services", func() {
 		It("ok", func() {
 			By("create a ComponentDefinition obj")
@@ -263,7 +306,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
+				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)

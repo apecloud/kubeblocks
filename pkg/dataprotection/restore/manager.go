@@ -206,11 +206,10 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 
 		// TODO: compatibility handling for version 0.6/0.5, will be removed in 0.8.
 		volumeSnapshotName := backupSet.Backup.Name
-		vsCli := &intctrlutil.VolumeSnapshotCompatClient{
-			Client: cli,
-			Ctx:    reqCtx.Ctx,
-		}
-		if exist, err := vsCli.CheckResourceExists(types.NamespacedName{Namespace: backupSet.Backup.Namespace, Name: volumeSnapshotName}, &vsv1.VolumeSnapshot{}); err != nil {
+		vsCli := utils.NewCompatClient(cli)
+		if exist, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, vsCli,
+			types.NamespacedName{Namespace: backupSet.Backup.Namespace, Name: volumeSnapshotName},
+			&vsv1.VolumeSnapshot{}); err != nil {
 			return err
 		} else if !exist {
 			volumeSnapshotName = utils.GetBackupVolumeSnapshotName(backupSet.Backup.Name, claim.VolumeSource)

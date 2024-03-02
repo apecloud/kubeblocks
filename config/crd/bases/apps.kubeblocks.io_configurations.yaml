@@ -33,60 +33,69 @@ spec:
           metadata:
             type: object
           spec:
-            description: ConfigurationSpec defines the desired state of Configuration
+            description: ConfigurationSpec defines the desired state of a Configuration
+              resource.
             properties:
               clusterRef:
-                description: clusterRef references Cluster name.
+                description: Specifies the name of the cluster that this configuration
+                  is associated with.
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
               componentName:
-                description: componentName is cluster component name.
+                description: Represents the name of the cluster component that this
+                  configuration pertains to.
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
               configItemDetails:
-                description: customConfigurationItems describes user-defined config
-                  template.
+                description: An array of ConfigurationItemDetail objects that describe
+                  user-defined configuration templates.
                 items:
+                  description: ConfigurationItemDetail represents a specific configuration
+                    item within a configuration template.
                   properties:
                     configFileParams:
                       additionalProperties:
                         properties:
                           content:
-                            description: fileContent indicates the configuration file
-                              content.
+                            description: "Holds the configuration keys and values.
+                              This field is a workaround for issues found in kubebuilder
+                              and code-generator. Refer to https://github.com/kubernetes-sigs/kubebuilder/issues/528
+                              and https://github.com/kubernetes/code-generator/issues/50
+                              for more details. \n Represents the content of the configuration
+                              file."
                             type: string
                           parameters:
                             additionalProperties:
                               type: string
-                            description: updated parameters for a single configuration
-                              file.
+                            description: Represents the updated parameters for a single
+                              configuration file.
                             type: object
                         type: object
-                      description: configFileParams is used to set the parameters
-                        to be updated.
+                      description: Used to set the parameters to be updated. It is
+                        optional.
                       type: object
                     configSpec:
-                      description: configSpec is used to set the configuration template.
+                      description: Used to set the configuration template. It is optional.
                       properties:
                         asEnvFrom:
-                          description: Specify the list of containers that will be
-                            injected into EnvFrom.
+                          description: An optional field where the list of containers
+                            will be injected into EnvFrom.
                           items:
                             type: string
                           type: array
                           x-kubernetes-list-type: set
                         constraintRef:
-                          description: Specify the name of the referenced the configuration
-                            constraints object.
+                          description: An optional field that defines the name of
+                            the referenced configuration constraints object.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         defaultMode:
-                          description: "Specify mode bits used to set permissions
+                          description: "Refers to the mode bits used to set permissions
                             on created files by default. \n Must be an octal value
                             between 0000 and 0777 or a decimal value between 0 and
                             511. YAML accepts both octal and decimal values, JSON
@@ -98,35 +107,36 @@ spec:
                           format: int32
                           type: integer
                         keys:
-                          description: Specify a list of keys. If empty, ConfigConstraint
+                          description: Defines a list of keys. If left empty, ConfigConstraint
                             applies to all keys in the configmap.
                           items:
                             type: string
                           type: array
                           x-kubernetes-list-type: set
                         legacyRenderedConfigSpec:
-                          description: Defines the secondary rendered config spec
+                          description: An optional field that defines the secondary
+                            rendered config spec.
                           properties:
                             namespace:
                               default: default
-                              description: Specify the namespace of the referenced
-                                the configuration template ConfigMap object. An empty
+                              description: Specifies the namespace of the referenced
+                                configuration template ConfigMap object. An empty
                                 namespace is equivalent to the "default" namespace.
                               maxLength: 63
                               pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                               type: string
                             policy:
                               default: none
-                              description: policy defines how to merge external imported
-                                templates into component templates.
+                              description: Defines the strategy for merging externally
+                                imported templates into component templates.
                               enum:
                               - patch
                               - replace
                               - none
                               type: string
                             templateRef:
-                              description: Specify the name of the referenced the
-                                configuration template ConfigMap object.
+                              description: Specifies the name of the referenced configuration
+                                template ConfigMap object.
                               maxLength: 63
                               pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                               type: string
@@ -134,29 +144,30 @@ spec:
                           - templateRef
                           type: object
                         name:
-                          description: Specify the name of the configuration template.
+                          description: Specifies the name of the configuration template.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         namespace:
                           default: default
-                          description: Specify the namespace of the referenced configuration
+                          description: Specifies the namespace of the referenced configuration
                             template ConfigMap object. An empty namespace is equivalent
                             to the "default" namespace.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                           type: string
                         templateRef:
-                          description: Specify the name of the referenced configuration
+                          description: Specifies the name of the referenced configuration
                             template ConfigMap object.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         volumeName:
-                          description: The volume name of PodTemplate, to which the
+                          description: Refers to the volume name of PodTemplate. The
                             configuration file produced through the configuration
-                            template will be mounted. Must be a DNS_LABEL name. The
-                            volume name must be defined in podSpec.containers[*].volumeMounts.
+                            template will be mounted to the corresponding volume.
+                            Must be a DNS_LABEL name. The volume name must be defined
+                            in podSpec.containers[*].volumeMounts.
                           maxLength: 63
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
@@ -166,27 +177,27 @@ spec:
                       - volumeName
                       type: object
                     importTemplateRef:
-                      description: Specify the configuration template.
+                      description: Specifies the configuration template. It is optional.
                       properties:
                         namespace:
                           default: default
-                          description: Specify the namespace of the referenced the
-                            configuration template ConfigMap object. An empty namespace
-                            is equivalent to the "default" namespace.
+                          description: Specifies the namespace of the referenced configuration
+                            template ConfigMap object. An empty namespace is equivalent
+                            to the "default" namespace.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                           type: string
                         policy:
                           default: none
-                          description: policy defines how to merge external imported
-                            templates into component templates.
+                          description: Defines the strategy for merging externally
+                            imported templates into component templates.
                           enum:
                           - patch
                           - replace
                           - none
                           type: string
                         templateRef:
-                          description: Specify the name of the referenced the configuration
+                          description: Specifies the name of the referenced configuration
                             template ConfigMap object.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
@@ -195,17 +206,23 @@ spec:
                       - templateRef
                       type: object
                     name:
-                      description: Specify the name of configuration template.
+                      description: Defines the unique identifier of the configuration
+                        template. It must be a string of maximum 63 characters, and
+                        can only include lowercase alphanumeric characters, hyphens,
+                        and periods. The name must start and end with an alphanumeric
+                        character.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     payload:
-                      description: Payload holds the configuration-related rerender.
+                      description: Holds the configuration-related rerender. Preserves
+                        unknown fields and is optional.
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                     version:
-                      description: 'Deprecated: Please use payload instead. version
-                        is the version of configuration template.'
+                      description: 'Deprecated: No longer used. Please use ''Payload''
+                        instead. Previously represented the version of the configuration
+                        template.'
                       type: string
                   required:
                   - name
@@ -219,10 +236,9 @@ spec:
             - componentName
             type: object
           status:
-            description: ConfigurationStatus defines the observed state of Configuration
             properties:
               conditions:
-                description: conditions describes opsRequest detail status.
+                description: Provides detailed status information for opsRequest.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -294,24 +310,29 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               configurationStatus:
-                description: configurationStatus describes the status of the component
-                  reconfiguring.
+                description: Provides the status of each component undergoing reconfiguration.
                 items:
                   properties:
                     lastDoneRevision:
-                      description: lastDoneRevision is the last done revision of configurationItem.
+                      description: Represents the last completed revision of the configuration
+                        item. This field is optional.
                       type: string
                     message:
-                      description: message field describes the reasons of abnormal
-                        status.
+                      description: Provides a description of any abnormal status.
+                        This field is optional.
                       type: string
                     name:
-                      description: name is a config template name.
+                      description: Specifies the name of the configuration template.
+                        It is a required field and must be a string of maximum 63
+                        characters. The name should only contain lowercase alphanumeric
+                        characters, hyphens, or periods. It should start and end with
+                        an alphanumeric character.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     phase:
-                      description: phase is status of configurationItem.
+                      description: Indicates the current status of the configuration
+                        item. This field is optional.
                       enum:
                       - Creating
                       - Init
@@ -326,38 +347,40 @@ spec:
                       - Finished
                       type: string
                     reconcileDetail:
-                      description: reconcileDetail describes the details of the configuration
-                        change execution.
+                      description: Provides detailed information about the execution
+                        of the configuration change. This field is optional.
                       properties:
                         currentRevision:
-                          description: currentRevision is the current revision of
-                            configurationItem.
+                          description: Represents the current revision of the configuration
+                            item.
                           type: string
                         errMessage:
-                          description: errMessage is the error message when the configuration
-                            change execution fails.
+                          description: Represents the error message generated when
+                            the execution of configuration changes fails.
                           type: string
                         execResult:
-                          description: execResult is the result of the latest execution.
+                          description: Represents the outcome of the most recent execution.
                           type: string
                         expectedCount:
                           default: -1
-                          description: expectedCount is the number of pods that need
-                            to be executed for configuration changes.
+                          description: Represents the total number of pods that require
+                            execution of configuration changes.
                           format: int32
                           type: integer
                         policy:
-                          description: policy is the policy of the latest execution.
+                          description: Represents the policy applied during the most
+                            recent execution.
                           type: string
                         succeedCount:
                           default: -1
-                          description: succeedCount is the number of pods for which
-                            configuration changes were successfully executed.
+                          description: Represents the number of pods where configuration
+                            changes were successfully applied.
                           format: int32
                           type: integer
                       type: object
                     updateRevision:
-                      description: updateRevision is the update revision of configurationItem.
+                      description: Represents the updated revision of the configuration
+                        item. This field is optional.
                       type: string
                   required:
                   - name
@@ -367,12 +390,12 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               message:
-                description: message field describes the reasons of abnormal status.
+                description: Provides a description of any abnormal status.
                 type: string
               observedGeneration:
-                description: observedGeneration is the latest generation observed
-                  for this ClusterDefinition. It refers to the ConfigConstraint's
-                  generation, which is updated by the API Server.
+                description: Represents the latest generation observed for this ClusterDefinition.
+                  It corresponds to the ConfigConstraint's generation, which is updated
+                  by the API Server.
                 format: int64
                 type: integer
             required:

@@ -48,33 +48,33 @@ spec:
             description: ConfigConstraintSpec defines the desired state of ConfigConstraint
             properties:
               cfgSchemaTopLevelName:
-                description: cfgSchemaTopLevelName is cue type name, which generates
-                  openapi schema.
+                description: The cue type name, which generates the openapi schema.
                 type: string
               configurationSchema:
-                description: configurationSchema imposes restrictions on database
-                  parameter's rule.
+                description: Imposes restrictions on database parameter's rule.
                 properties:
                   cue:
-                    description: cue that to let provider verify user configuration
-                      through cue language.
+                    description: Enables providers to verify user configurations using
+                      the CUE language.
                     type: string
                   schema:
-                    description: schema provides a way for providers to validate the
-                      changed parameters through json.
+                    description: Provides a mechanism that allows providers to validate
+                      the modified parameters using JSON.
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
               downwardAPIOptions:
-                description: downwardAPIOptions is used to watch pod fields.
+                description: Used to monitor pod fields.
                 items:
                   properties:
                     command:
-                      description: command used to execute for downwrad api.
+                      description: The command used to execute for the downward API.
+                        This field is optional.
                       items:
                         type: string
                       type: array
                     items:
-                      description: Items is a list of downward API volume file
+                      description: Represents a list of downward API volume files.
+                        This is a required field.
                       items:
                         description: DownwardAPIVolumeFile represents information
                           to create the file containing the pod field
@@ -141,11 +141,15 @@ spec:
                         type: object
                       type: array
                     mountPoint:
-                      description: mountPoint is the mount point of the scripts file.
+                      description: Specifies the mount point of the scripts file.
+                        This is a required field and must be a string of maximum length
+                        128.
                       maxLength: 128
                       type: string
                     name:
-                      description: Specify the name of the field.
+                      description: Specifies the name of the field. This is a required
+                        field and must be a string of maximum length 63. The name
+                        should match the regex pattern `^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
@@ -156,28 +160,29 @@ spec:
                   type: object
                 type: array
               dynamicParameters:
-                description: dynamicParameters, list of DynamicParameter, modifications
-                  of them trigger a config dynamic reload without process restart.
+                description: A list of DynamicParameter. Modifications of these parameters
+                  trigger a config dynamic reload without process restart.
                 items:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
               forceHotUpdate:
-                description: forceHotUpdate indicates whether to execute hot update
-                  parameters when the pod needs to be restarted. if set true, the
-                  controller does the hot update and then restarts the pod.
+                description: Indicates whether to execute hot update parameters when
+                  the pod needs to be restarted. If set to true, the controller performs
+                  the hot update and then restarts the pod.
                 type: boolean
               formatterConfig:
-                description: "formatterConfig describes the format of the configuration
-                  file, the controller will: \n 1. parses configuration file 2. analyzes
-                  the modified parameters 3. applies corresponding policies."
+                description: 'Describes the format of the configuration file. The
+                  controller will: 1. Parse the configuration file 2. Analyze the
+                  modified parameters 3. Apply corresponding policies.'
                 properties:
                   format:
                     description: "The configuration file format. Valid values are
                       `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`
-                      and `toml`. \n - ini: a configuration file that consists of
-                      a text-based content with a structure and syntax comprising
-                      key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
+                      and `toml`. Each format has its own characteristics and use
+                      cases. \n - ini: a configuration file that consists of a text-based
+                      content with a structure and syntax comprising key–value pairs
+                      for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
                       - xml: reference wiki: https://en.wikipedia.org/wiki/XML - yaml:
                       a configuration file support for complex data types and structures.
                       - json: reference wiki: https://en.wikipedia.org/wiki/JSON -
@@ -202,82 +207,87 @@ spec:
                     - props-plus
                     type: string
                   iniConfig:
-                    description: iniConfig represents the ini options.
+                    description: A pointer to an IniConfig struct that holds the ini
+                      options.
                     properties:
                       sectionName:
-                        description: sectionName describes ini section.
+                        description: A string that describes the name of the ini section.
                         type: string
                     type: object
                 required:
                 - format
                 type: object
               immutableParameters:
-                description: immutableParameters describes parameters that prohibit
-                  user from modification.
+                description: Describes parameters that users are prohibited from modifying.
                 items:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
               reloadOptions:
-                description: "reloadOptions indicates whether the process supports
-                  reload. \n if set, the controller will determine the behavior of
-                  the engine instance based on the configuration templates, restart
-                  or reload depending on whether any parameters in the StaticParameters
-                  have been modified."
+                description: Specifies whether the process supports reload. If set,
+                  the controller determines the behavior of the engine instance based
+                  on the configuration templates. It will either restart or reload
+                  depending on whether any parameters in the StaticParameters have
+                  been modified.
                 properties:
                   autoTrigger:
-                    description: autoTrigger performs the reload command.
+                    description: Used to automatically perform the reload command
+                      when certain conditions are met.
                     properties:
                       processName:
-                        description: processName is process name
+                        description: The name of the process.
                         type: string
                     type: object
                   shellTrigger:
-                    description: shellTrigger performs the reload command.
+                    description: Used to perform the reload command via a shell script.
                     properties:
                       command:
-                        description: command used to execute for reload.
+                        description: Specifies the list of strings used to execute
+                          for reload.
                         items:
                           type: string
                         type: array
                       sync:
-                        description: Specify synchronize updates parameters to the
-                          config manager.
+                        description: Specifies whether to synchronize updates parameters
+                          to the config manager.
                         type: boolean
                     required:
                     - command
                     type: object
                   tplScriptTrigger:
-                    description: goTplTrigger performs the reload command.
+                    description: Used to perform the reload command via a Go template
+                      script.
                     properties:
                       namespace:
                         default: default
-                        description: Specify the namespace of the referenced the tpl
-                          script ConfigMap object. An empty namespace is equivalent
+                        description: Specifies the namespace where the referenced
+                          tpl script ConfigMap object resides. If left empty, it defaults
                           to the "default" namespace.
                         maxLength: 63
                         pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                         type: string
                       scriptConfigMapRef:
-                        description: scriptConfigMapRef used to execute for reload.
+                        description: Specifies the reference to the ConfigMap that
+                          contains the script to be executed for reload.
                         type: string
                       sync:
-                        description: Specify synchronize updates parameters to the
-                          config manager.
+                        description: Specifies whether to synchronize updates parameters
+                          to the config manager.
                         type: boolean
                     required:
                     - scriptConfigMapRef
                     type: object
                   unixSignalTrigger:
-                    description: unixSignalTrigger used to reload by sending a signal.
+                    description: Used to trigger a reload by sending a specific Unix
+                      signal to the process.
                     properties:
                       processName:
-                        description: processName is process name, sends unix signal
-                          to proc.
+                        description: Represents the name of the process to which the
+                          Unix signal is sent.
                         type: string
                       signal:
-                        description: 'signal is valid for unix signal. e.g: SIGHUP
-                          url: ../../pkg/configuration/configmap/handler.go:allUnixSignals'
+                        description: 'Represents a valid Unix signal. Refer to the
+                          following URL for a list of all Unix signals: ../../pkg/configuration/configmap/handler.go:allUnixSignals'
                         enum:
                         - SIGHUP
                         - SIGINT
@@ -317,20 +327,21 @@ spec:
                     type: object
                 type: object
               scriptConfigs:
-                description: scriptConfigs, list of ScriptConfig, witch these scripts
-                  can be used by volume trigger,downward trigger, or tool image
+                description: A list of ScriptConfig. These scripts can be used by
+                  volume trigger, downward trigger, or tool image.
                 items:
                   properties:
                     namespace:
                       default: default
-                      description: Specify the namespace of the referenced the tpl
-                        script ConfigMap object. An empty namespace is equivalent
+                      description: Specifies the namespace where the referenced tpl
+                        script ConfigMap object resides. If left empty, it defaults
                         to the "default" namespace.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     scriptConfigMapRef:
-                      description: scriptConfigMapRef used to execute for reload.
+                      description: Specifies the reference to the ConfigMap that contains
+                        the script to be executed for reload.
                       type: string
                   required:
                   - scriptConfigMapRef
@@ -340,8 +351,8 @@ spec:
                 - scriptConfigMapRef
                 x-kubernetes-list-type: map
               selector:
-                description: selector is used to match the label on the pod, for example,
-                  a pod of the primary is match on the patroni cluster.
+                description: Used to match the label on the pod. For example, a pod
+                  of the primary matches on the patroni cluster.
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -386,34 +397,36 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               staticParameters:
-                description: staticParameters, list of StaticParameter, modifications
-                  of them trigger a process restart.
+                description: A list of StaticParameter. Modifications of these parameters
+                  trigger a process restart.
                 items:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
               toolsImageSpec:
-                description: toolConfig used to config init container.
+                description: Used to configure the init container.
                 properties:
                   mountPoint:
-                    description: mountPoint is the mount point of the scripts file.
+                    description: Represents the location where the scripts file will
+                      be mounted.
                     maxLength: 128
                     type: string
                   toolConfigs:
-                    description: toolConfig used to config init container.
+                    description: Used to configure the initialization container.
                     items:
                       properties:
                         command:
-                          description: exec used to execute for init containers.
+                          description: Used to execute commands for init containers.
                           items:
                             type: string
                           type: array
                         image:
-                          description: tools Container image name.
+                          description: Represents the name of the container image
+                            for the tools.
                           type: string
                         name:
-                          description: Specify the name of initContainer. Must be
-                            a DNS_LABEL name.
+                          description: Specifies the name of the initContainer. This
+                            must be a DNS_LABEL name.
                           maxLength: 63
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
@@ -428,20 +441,20 @@ spec:
             - formatterConfig
             type: object
           status:
-            description: ConfigConstraintStatus defines the observed state of ConfigConstraint.
             properties:
               message:
-                description: message field describes the reasons of abnormal status.
+                description: Provides a description of any abnormal statuses that
+                  may be present.
                 type: string
               observedGeneration:
-                description: observedGeneration is the latest generation observed
-                  for this ClusterDefinition. It refers to the ConfigConstraint's
-                  generation, which is updated by the API Server.
+                description: Refers to the most recent generation observed for this
+                  ConfigConstraint. This value is updated by the API Server.
                 format: int64
                 type: integer
               phase:
-                description: phase is status of configuration template, when set to
-                  CCAvailablePhase, it can be referenced by ClusterDefinition or ClusterVersion.
+                description: Specifies the status of the configuration template. When
+                  set to CCAvailablePhase, the ConfigConstraint can be referenced
+                  by ClusterDefinition or ClusterVersion.
                 enum:
                 - Available
                 - Unavailable

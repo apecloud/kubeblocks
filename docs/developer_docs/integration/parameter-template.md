@@ -171,7 +171,8 @@ To meet various requirements, developers often need to configure multiple parame
 
 In KubeBlocks, developers can use multiple `ClusterVersion` to achieve their goals.
 
-$$Cluster = ClusterDefinition.yaml \Join ClusterVersion.yaml \Join Cluster.yaml
+$$
+Cluster = ClusterDefinition.yaml \Join ClusterVersion.yaml \Join Cluster.yaml
 $$
 
 The JoinKey is the Component Name.

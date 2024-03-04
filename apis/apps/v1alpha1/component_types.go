@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -107,6 +108,10 @@ type ComponentSpec struct {
 	//
 	// +optional
 	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
+
+	// Overrides values in default Template.
+	// +optional
+	Instances []workloads.InstanceTemplate `json:"instances,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the cluster.

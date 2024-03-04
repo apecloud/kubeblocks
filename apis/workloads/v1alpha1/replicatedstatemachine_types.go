@@ -32,6 +32,62 @@ const (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type InstanceTemplate struct {
+	// Number of replicas of this template.
+	// Default is 1.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Defines the name of the instance.
+	// Only applied when Replicas is 1.
+	// +optional
+	Name *string `json:"name,omitempty"`
+
+	// Defines annotations to override.
+	// Add new or override existing annotations.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Defines labels to override.
+	// Add new or override existing labels.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Defines NodeName to override.
+	// +optional
+	NodeName *string `json:"nodeName,omitempty"`
+
+	// Defines NodeSelector to override.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Defines Tolerations to override.
+	// Add new or override existing tolerations.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Defines Resources to override.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Defines Volumes to override.
+	// Add new or override existing volumes.
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// Defines VolumeMounts to override.
+	// Add new or override existing volume mounts.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// Defines VolumeClaimTemplates to override.
+	// Add new or override existing volume claim templates.
+	// +optional
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+}
+
 // ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine
 type ReplicatedStateMachineSpec struct {
 	// Specifies the desired number of replicas of the given Template.
@@ -73,6 +129,10 @@ type ReplicatedStateMachineSpec struct {
 	AlternativeServices []corev1.Service `json:"alternativeServices,omitempty"`
 
 	Template corev1.PodTemplateSpec `json:"template"`
+
+	// Overrides values in default Template.
+	// +optional
+	Instances []InstanceTemplate `json:"instances,omitempty"`
 
 	// Represents a list of claims that pods are allowed to reference.
 	// The ReplicatedStateMachine controller is responsible for mapping network identities to
@@ -410,6 +470,10 @@ type MemberStatus struct {
 
 	// Defines the role of the replica in the cluster.
 	ReplicaRole `json:"role"`
+
+	// Whether the corresponding Pod is in ready condition.
+	// +optional
+	Ready bool `json:"ready,omitempty"`
 
 	// Indicates whether it is required for the replica set manager (rsm) to have at least one primary pod ready.
 	//

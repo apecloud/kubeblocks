@@ -496,6 +496,10 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
+
+	// Overrides values in default Template.
+	// +optional
+	Instances []workloads.InstanceTemplate `json:"instances,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

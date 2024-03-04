@@ -171,7 +171,11 @@ func InitDBManager(configDir string) error {
 
 	dbManager = mgr
 
-	customManager, err = custom.NewManager(properties)
+	newCustomFunc := GetManagerNewFunc(string(models.Custom), "")
+	if newCustomFunc == nil {
+		return errors.New("no custom db manager")
+	}
+	customManager, err = newCustomFunc(properties)
 	if err != nil {
 		return err
 	}

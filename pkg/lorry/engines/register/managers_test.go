@@ -30,6 +30,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 const (
@@ -186,6 +187,9 @@ func TestInitDBManager(t *testing.T) {
 		return &engines.MockManager{}, nil
 	}
 	RegisterEngine(fakeCharacterType, "", fakeNewFunc, func() engines.ClusterCommands {
+		return nil
+	})
+	RegisterEngine(models.Custom, "", fakeNewFunc, func() engines.ClusterCommands {
 		return nil
 	})
 	t.Run("new func successfully", func(t *testing.T) {

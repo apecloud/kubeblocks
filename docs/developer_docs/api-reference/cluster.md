@@ -9971,7 +9971,8 @@ If set to Enable, the corresponding service will be exposed. Conversely, if set 
 </em>
 </td>
 <td>
-<p>A list of services that are to be exposed or removed.</p>
+<p>A list of services that are to be exposed or removed.
+If componentNamem is not specified, each <code>OpsService</code> in the list must specify ports and selectors.</p>
 </td>
 </tr>
 </tbody>

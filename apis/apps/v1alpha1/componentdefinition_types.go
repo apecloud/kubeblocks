@@ -809,6 +809,7 @@ type ComponentSwitchover struct {
 	// Used to define the selectors for the scriptSpecs that need to be referenced.
 	// When this field is defined, the scripts specified in the scripts field can be referenced in the Action.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.9.0"
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }

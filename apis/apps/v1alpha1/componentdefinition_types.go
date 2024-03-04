@@ -191,7 +191,7 @@ type ComponentDefinitionSpec struct {
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Defines static annotations that will be patched to all k8s resources created for the component.
-	// If a annotation key conflicts with any other system annotations or user-specified annotations, it will be silently ignored.
+	// If an annotation key conflicts with any other system annotations or user-specified annotations, it will be silently ignored.
 	// This field is immutable.
 	//
 	// +optional
@@ -816,7 +816,6 @@ type ComponentSwitchover struct {
 	// Used to define the selectors for the scriptSpecs that need to be referenced.
 	// When this field is defined, the scripts specified in the scripts field can be referenced in the Action.
 	//
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.9.0"
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }

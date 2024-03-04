@@ -1366,7 +1366,7 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>Defines static annotations that will be patched to all k8s resources created for the component.
-If a annotation key conflicts with any other system annotations or user-specified annotations, it will be silently ignored.
+If an annotation key conflicts with any other system annotations or user-specified annotations, it will be silently ignored.
 This field is immutable.</p>
 </td>
 </tr>
@@ -6744,7 +6744,7 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>Defines static annotations that will be patched to all k8s resources created for the component.
-If a annotation key conflicts with any other system annotations or user-specified annotations, it will be silently ignored.
+If an annotation key conflicts with any other system annotations or user-specified annotations, it will be silently ignored.
 This field is immutable.</p>
 </td>
 </tr>

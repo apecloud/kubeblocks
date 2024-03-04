@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // ComponentSpec defines the desired state of Component

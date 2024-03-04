@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 This tutorial shows how to create and connect to a Redis cluster.
 
-KuebBlocks for Redis supports Standalone clusters and Replication Cluster. From v0.8.2, KubeBlocks supports the sharding mode for a Redis cluster.
+KuebBlocks for Redis supports Standalone clusters and Replication Cluster. From v0.8.2, KubeBlocks supports Redis sharding.
 
 For your better high-availability experience, KubeBlocks creates a Redis Replication Cluster by default.
 

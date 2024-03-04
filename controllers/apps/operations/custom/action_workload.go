@@ -175,13 +175,14 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 	if len(podSpec.Tolerations) == 0 {
 		podSpec.Tolerations = w.Comp.Tolerations
 	}
-	if w.OpsRequest.Spec.CustomSpec.ServiceAccountName != nil {
+	switch {
+	case w.OpsRequest.Spec.CustomSpec.ServiceAccountName != nil:
 		// prioritize using the input sa.
 		podSpec.ServiceAccountName = *w.OpsRequest.Spec.CustomSpec.ServiceAccountName
-	} else if w.Comp.ServiceAccountName != "" {
+	case w.Comp.ServiceAccountName != "":
 		// using the component sa.
 		podSpec.ServiceAccountName = w.Comp.ServiceAccountName
-	} else {
+	default:
 		saKey := client.ObjectKey{Namespace: w.Cluster.Namespace,
 			Name: constant.GenerateDefaultServiceAccountName(w.Cluster.Name)}
 		if exists, _ := intctrlutil.CheckResourceExists(actionCtx.ReqCtx.Ctx, actionCtx.Client, saKey, &corev1.ServiceAccount{}); exists {

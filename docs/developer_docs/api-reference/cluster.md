@@ -1236,6 +1236,20 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
+<code>hostNetwork</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
+HostNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the host-network capability and resources.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
@@ -2773,6 +2787,105 @@ This field cannot be updated.</p>
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ActionTask">ActionTask
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ProgressStatusDetail">ProgressStatusDetail</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>objectKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the task workload.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the namespace where the task workload is deployed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ActionTaskStatus">
+ActionTaskStatus
+</a>
+</em>
+</td>
+<td>
+<p>Indicates the current status of the task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetPodName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the target pod for the task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retries</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of retry attempts for this task.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ActionTaskStatus">ActionTaskStatus
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ActionTask">ActionTask</a>)
+</p>
+<div>
+<p>ActionTaskStatus defines the status of the task.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Processing&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Succeed&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Affinity">Affinity
 </h3>
@@ -5098,7 +5211,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.</p>
@@ -6638,6 +6751,20 @@ This field is immutable.</p>
 <p>Defines the persistent volumes needed by the component.
 Users are responsible for providing these volumes when creating a component instance.
 This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostNetwork</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">
+HostNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the host-network capability and resources.</p>
 </td>
 </tr>
 <tr>
@@ -9315,6 +9442,49 @@ ConsensusMember
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVars">PodVars</a>)
+</p>
+<div>
+<p>ContainerVars defines the vars can be referenced from a Container.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.NamedVar">
+NamedVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Container port to reference.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CredentialVar">CredentialVar
 </h3>
 <p>
@@ -9578,6 +9748,16 @@ string
 </td>
 <td>
 <p>Is a reference to an OpsDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceAccountName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
 </td>
 </tr>
 <tr>
@@ -10005,7 +10185,8 @@ If set to Enable, the corresponding service will be exposed. Conversely, if set 
 </em>
 </td>
 <td>
-<p>A list of services that are to be exposed or removed.</p>
+<p>A list of services that are to be exposed or removed.
+If componentNamem is not specified, each <code>OpsService</code> in the list must specify ports and selectors.</p>
 </td>
 </tr>
 </tbody>
@@ -10460,6 +10641,95 @@ will select from NodeAssignment.</li>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>containerPorts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkContainerPort">
+[]HostNetworkContainerPort
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The list of container ports that are required by the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dnsPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#dnspolicy-v1-core">
+Kubernetes core/v1.DNSPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Set DNS policy for the component.
+Defaults to &ldquo;ClusterFirst&rdquo;.
+Valid values are &lsquo;ClusterFirstWithHostNet&rsquo;, &lsquo;ClusterFirst&rsquo;, &lsquo;Default&rsquo; or &lsquo;None&rsquo;.
+DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
+To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to &lsquo;ClusterFirstWithHostNet&rsquo;.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkContainerPort">HostNetworkContainerPort
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Container specifies the target container within the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ports</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Ports are named container ports within the specified container.
+These container ports must be defined in the container for proper port allocation.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.IniConfig">IniConfig
 </h3>
 <p>
@@ -10558,7 +10828,7 @@ It is required when the issuer is set to UserProvided.</p>
 </td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.JsonPatchOperation">JsonPatchOperation
+<h3 id="apps.kubeblocks.io/v1alpha1.JSONPatchOperation">JSONPatchOperation
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsResourceModifierAction">OpsResourceModifierAction</a>)
@@ -11100,7 +11370,7 @@ This field is only valid when BuiltIn is set to false.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 </div>
@@ -12251,8 +12521,8 @@ TypedObjectRef
 <td>
 <code>jsonPatches</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.JsonPatchOperation">
-[]JsonPatchOperation
+<a href="#apps.kubeblocks.io/v1alpha1.JSONPatchOperation">
+[]JSONPatchOperation
 </a>
 </em>
 </td>
@@ -12445,7 +12715,7 @@ More info: <a href="https://kubernetes.io/docs/concepts/services-networking/serv
 <tbody>
 <tr>
 <td>
-<code>envVarRef</code><br/>
+<code>envRef</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.EnvVarRef">
 EnvVarRef
@@ -12453,8 +12723,21 @@ EnvVarRef
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies a reference to a specific environment variable within a container.
 Used to specify the source of the variable, which can be either &ldquo;env&rdquo; or &ldquo;envFrom&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fieldPath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the JSONPath of the target pod. This is used to specify the exact location of the data within the JSON structure of the pod.</p>
 </td>
 </tr>
 </tbody>
@@ -13063,6 +13346,86 @@ valid values:
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>PodVarSelector selects a var from a Pod.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The pod to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>PodVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PodVars">
+PodVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>PodVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.PodVars">PodVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>)
+</p>
+<div>
+<p>PodVars defines the vars can be referenced from a Pod.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">
+ContainerVars
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.PointInTimeRefSpec">PointInTimeRefSpec
 </h3>
 <p>
@@ -13374,7 +13737,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Represents the unique key of the object.
-at least one exists for objectKey and actionName.</p>
+either objectKey or actionName.</p>
 </td>
 </tr>
 <tr>
@@ -13387,7 +13750,21 @@ string
 <td>
 <em>(Optional)</em>
 <p>Refer to the action name of the OpsDefinition.spec.actions[*].name.
-at least one exists for objectKey and actionName.</p>
+either objectKey or actionName.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>actionTasks</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ActionTask">
+[]ActionTask
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the tasks associated with an action. such as Jobs/Pods that executes action.</p>
 </td>
 </tr>
 <tr>
@@ -17241,7 +17618,7 @@ string
 </tr>
 <tr>
 <td>
-<code>varsRefs</code><br/>
+<code>vars</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsEnvVar">
 []OpsEnvVar
@@ -17843,6 +18220,20 @@ Kubernetes core/v1.SecretKeySelector
 <td>
 <em>(Optional)</em>
 <p>Selects a key of a Secret.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">
+PodVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Pod.</p>
 </td>
 </tr>
 <tr>

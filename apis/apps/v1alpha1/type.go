@@ -505,7 +505,7 @@ const (
 	SucceedProgressStatus    ProgressStatus = "Succeed"
 )
 
-// ActionTaskStatus
+// ActionTaskStatus defines the status of the task.
 // +enum
 // +kubebuilder:validation:Enum={Processing,Failed,Succeed}
 type ActionTaskStatus string

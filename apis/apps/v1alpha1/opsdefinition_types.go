@@ -306,14 +306,14 @@ type OpsResourceModifierAction struct {
 	//  Defines the set of patches that are used to perform updates on the resource object.
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:Required
-	JsonPatches []JsonPatchOperation `json:"jsonPatches"`
+	JSONPatches []JSONPatchOperation `json:"jsonPatches"`
 
 	// Provides a method to check if the action has been completed.
 	// +kubebuilder:validation:Required
 	CompletionProbe CompletionProbe `json:"completionProbe"`
 }
 
-type JsonPatchOperation struct {
+type JSONPatchOperation struct {
 	// Represents the type of JSON patch operation. It supports the following values: 'add', 'remove', 'replace'.
 	// +enum
 	// +kubebuilder:validation:Enum={add,remove,replace}

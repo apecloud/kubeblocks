@@ -160,5 +160,4 @@ func (w *WorkflowContext) getAction(action appsv1alpha1.OpsAction,
 	default:
 		return nil
 	}
-	return nil
 }

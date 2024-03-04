@@ -97,8 +97,8 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		ClusterName:   configuration.Spec.ClusterRef,
 		ComponentName: configuration.Spec.ComponentName,
 	}, fetcherTask).Cluster().
-		ClusterDef().
-		ClusterVer().
+		// ClusterDef().
+		// ClusterVer().
 		ClusterComponent().
 		Complete()
 	if err != nil {

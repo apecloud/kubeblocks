@@ -246,18 +246,18 @@ func UpdateCustomLabelsAndAnnotationsToPods(ctx context.Context,
 
 		// pod already in dag, update labels and annotations
 		if idx >= 0 {
-			updatePodLabelsAndAnnotations(pods[idx], synthesizedComp.Labels, synthesizedComp.Annotations)
+			updateObjLabelsAndAnnotations(pods[idx], synthesizedComp.Labels, synthesizedComp.Annotations)
 			continue
 		}
 
 		pod := &podList.Items[i]
-		updatePodLabelsAndAnnotations(pod, synthesizedComp.Labels, synthesizedComp.Annotations)
+		updateObjLabelsAndAnnotations(pod, synthesizedComp.Labels, synthesizedComp.Annotations)
 		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 	}
 	return nil
 }
 
-func updatePodLabelsAndAnnotations(obj client.Object, customLabels, customAnnotations map[string]string) {
+func updateObjLabelsAndAnnotations(obj client.Object, customLabels, customAnnotations map[string]string) {
 	if customLabels != nil {
 		labels := obj.GetLabels()
 		if labels == nil {

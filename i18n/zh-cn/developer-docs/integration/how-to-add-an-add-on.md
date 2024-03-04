@@ -115,7 +115,9 @@ sidebar_label: 添加数据库引擎
     
     如果我们将拓扑、版本和资源解耦（就像数据库中的 table normalize 一样），我们不仅可以让每一个对象描述的信息都更清晰和聚焦, 而且还可以通过这些对象的组合来生成更丰富的集群。因此，我们可以将 Cluster 表示为
 
-    $$Cluster = ClusterDefinition.yaml \Join ClusterVersion.yaml \Join ...$$
+    $$
+    Cluster = ClusterDefinition.yaml \Join ClusterVersion.yaml \Join ...
+    $$
 
     这个 `name` 就是那个join key。
     
@@ -333,7 +335,7 @@ spec:
 
 然后通过 `chartsImage` 来配置你的 Helm chart 远端仓库地址。
 
-## 步骤 4. 发布到 Kubeblocks 社区（可选）
+## 步骤 4. （可选）发布到 Kubeblocks 社区
 
 你可以将 Helm chart 贡献给 [KubeBlocks add-ons](https://github.com/apecloud/kubeblocks-addons)，将 `addon.yaml` 贡献给 [KubeBlocks](https://github.com/apecloud/kubeblocks)。
 

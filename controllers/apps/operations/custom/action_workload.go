@@ -168,7 +168,9 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 	}
 	// inject extras script.
 	w.injectOpsUtils(&podSpec)
-
+	for i := range podSpec.InitContainers {
+		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&podSpec.InitContainers[i])
+	}
 	if podSpec.RestartPolicy == "" {
 		podSpec.RestartPolicy = corev1.RestartPolicyNever
 	}

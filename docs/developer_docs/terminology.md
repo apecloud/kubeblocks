@@ -12,19 +12,19 @@ sidebar_label: Developer guides
 An addon is an efficient and open extension mechanism. With the KubeBlocks addon, developers can quickly add a new database engine to KubeBlocks and obtain specific foundational management functionalities of that database engine, including but not limited to lifecycle management, data backup and recovery, metrics and log collection, etc.
 ##### ActionSet
 
-An "ActionSet" declares a set of commands to perform backup and restore operations using specific tools, such as commands to backup MySQL using xtrabackup, as well as commands to restore data from the backup.
+An ActionSet declares a set of commands to perform backup and restore operations using specific tools, such as commands to backup MySQL using xtrabackup, as well as commands to restore data from the backup.
 
 ##### BackupPolicy
 
-A "BackupPolicy" represents a backup strategy for a Cluster, including details such as the backup repository (BackupRepo), backup targets, and backup methods. Multiple backup methods can be defined within a backup policy, with each method referring to a corresponding ActionSet. When creating a backup, the backup policy and backup method can be specified for the backup process.
+A BackupPolicy represents a backup strategy for a Cluster, including details such as the backup repository (BackupRepo), backup targets, and backup methods. Multiple backup methods can be defined within a backup policy, with each method referring to a corresponding ActionSet. When creating a backup, the backup policy and backup method can be specified for the backup process.
 
 ##### BackupRepo
 
-"BackupRepo" is the storage repository for backup data. Its principle involves using a CSI driver to upload backup data to various storage systems, such as object storage systems like S3, GCS, as well as storage servers like FTP, NFS, and others.
+BackupRepo is the storage repository for backup data. Its principle involves using a CSI driver to upload backup data to various storage systems, such as object storage systems like S3, GCS, as well as storage servers like FTP, NFS, and others.
 
 ##### BackupSchedule
 
-"BackupSchedule" declares the configuration for automatic backups in a Cluster, including backup frequency, retention period, backup policy, and backup method. The BackupSchedule Controller creates a CronJob to automatically backup the Cluster based on the configuration specified in the Custom Resource (CR).
+BackupSchedule declares the configuration for automatic backups in a Cluster, including backup frequency, retention period, backup policy, and backup method. The BackupSchedule Controller creates a CronJob to automatically backup the Cluster based on the configuration specified in the Custom Resource (CR).
 
 ##### Cluster 
 
@@ -64,7 +64,7 @@ Ops is short for "Operations," representing database maintenance operations. It 
 
 ##### OpsRequest
 
-An "OpsRequest" represents a single operation request.
+An OpsRequest represents a single operation request.
 
 ##### RBAC (Role-Based Access Control)
 
@@ -76,4 +76,4 @@ ReplicatedStateMachines is a workload that manages native Kubernetes objects suc
 
 ##### ServiceDescriptor
 
-The "ServiceDescriptor" is a Custom Resource (CR) object used to describe API objects that reference storage services. It allows users to abstract a service provided either by Kubernetes or non-Kubernetes environments, making it available for referencing by other Cluster objects within KubeBlocks. The "ServiceDescriptor" can be used to address issues such as service dependencies, component dependencies, and component sharing within KubeBlocks.
+The ServiceDescriptor is a Custom Resource (CR) object used to describe API objects that reference storage services. It allows users to abstract a service provided either by Kubernetes or non-Kubernetes environments, making it available for referencing by other Cluster objects within KubeBlocks. The "ServiceDescriptor" can be used to address issues such as service dependencies, component dependencies, and component sharing within KubeBlocks.

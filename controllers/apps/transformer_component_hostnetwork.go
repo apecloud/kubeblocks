@@ -91,6 +91,10 @@ func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *com
 				if err != nil {
 					return nil, err
 				}
+				_, ok := ports[c.Name]
+				if !ok {
+					ports[c.Name] = map[string]int32{}
+				}
 				ports[c.Name][p.Name] = port
 			} else {
 				if err := pm.UsePort(portKey, p.ContainerPort); err != nil {

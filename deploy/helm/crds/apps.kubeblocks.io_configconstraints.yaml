@@ -162,6 +162,21 @@ spec:
                   - name
                   type: object
                 type: array
+              dynamicActionCanBeMerged:
+                description: "Indicates the dynamic reload action and restart action
+                  can be merged to a restart action. \n When a batch of parameters
+                  updates incur both restart & dynamic reload, it works as: - set
+                  to true, the two actions merged to only one restart action - set
+                  to false, the two actions cannot be merged, the actions executed
+                  in order [dynamic reload, restart]"
+                type: boolean
+              dynamicParameterSelectedPolicy:
+                description: Specifies the policy for selecting the parameters of
+                  dynamic reload actions.
+                enum:
+                - all
+                - dynamic
+                type: string
               dynamicParameters:
                 description: A list of DynamicParameter. Modifications of dynamic
                   parameters trigger a reload action without process restart.
@@ -169,14 +184,6 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
-              forceHotUpdate:
-                description: "Indicates the dynamic reload action and restart action
-                  can be merged to a restart action. \n When a batch of parameters
-                  updates incur both restart & dynamic reload, it works as: - set
-                  to true, the two actions merged to only one restart action - set
-                  to false, the two actions cannot be merged, the actions executed
-                  in order [dynamic reload, restart] TODO (refactored to DynamicActionCanBeMerged)"
-                type: boolean
               formatterConfig:
                 description: 'Describes the format of the config file. The controller
                   works as follows: 1. Parse the config file 2. Get the modified parameters

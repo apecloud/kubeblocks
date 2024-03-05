@@ -2388,9 +2388,14 @@ func (in *ConfigConstraintSpec) DeepCopyInto(out *ConfigConstraintSpec) {
 		*out = new(ReloadOptions)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.ForceHotUpdate != nil {
-		in, out := &in.ForceHotUpdate, &out.ForceHotUpdate
+	if in.DynamicActionCanBeMerged != nil {
+		in, out := &in.DynamicActionCanBeMerged, &out.DynamicActionCanBeMerged
 		*out = new(bool)
+		**out = **in
+	}
+	if in.DynamicParameterSelectedPolicy != nil {
+		in, out := &in.DynamicParameterSelectedPolicy, &out.DynamicParameterSelectedPolicy
+		*out = new(DynamicParameterSelectedPolicy)
 		**out = **in
 	}
 	if in.ToolsImageSpec != nil {

@@ -50,7 +50,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 				policyExecutors: []reconfigurePolicy{&testPolicy{}},
 			}
 
-			Expect(upgradePolicyMap[appsv1alpha1.HotUpdateAndRestartPolicy]).ShouldNot(BeNil())
+			Expect(upgradePolicyMap[appsv1alpha1.DynamicReloadAndRestartPolicy]).ShouldNot(BeNil())
 
 			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
 				withMockStatefulSet(2, nil),

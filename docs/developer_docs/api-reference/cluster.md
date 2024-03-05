@@ -1680,7 +1680,7 @@ The actions are called only when the modified parameter is defined in dynamicPar
 </tr>
 <tr>
 <td>
-<code>forceHotUpdate</code><br/>
+<code>dynamicActionCanBeMerged</code><br/>
 <em>
 bool
 </em>
@@ -1691,6 +1691,20 @@ bool
 <p>When a batch of parameters updates incur both restart &amp; dynamic reload, it works as:
 - set to true, the two actions merged to only one restart action
 - set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicParameterSelectedPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">
+DynamicParameterSelectedPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for selecting the parameters of dynamic reload actions.</p>
 </td>
 </tr>
 <tr>
@@ -8204,7 +8218,7 @@ The actions are called only when the modified parameter is defined in dynamicPar
 </tr>
 <tr>
 <td>
-<code>forceHotUpdate</code><br/>
+<code>dynamicActionCanBeMerged</code><br/>
 <em>
 bool
 </em>
@@ -8215,6 +8229,20 @@ bool
 <p>When a batch of parameters updates incur both restart &amp; dynamic reload, it works as:
 - set to true, the two actions merged to only one restart action
 - set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicParameterSelectedPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">
+DynamicParameterSelectedPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for selecting the parameters of dynamic reload actions.</p>
 </td>
 </tr>
 <tr>
@@ -9731,6 +9759,27 @@ string
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">DynamicParameterSelectedPolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+<p>DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;all&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;dynamic&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.EnvMappingVar">EnvMappingVar
 </h3>
@@ -17120,17 +17169,17 @@ string
 </thead>
 <tbody><tr><td><p>&#34;autoReload&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;reloadAndRestart&#34;</p></td>
+</tr><tr><td><p>&#34;dynamicReloadBeginRestart&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;none&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;simple&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;operatorSyncUpdate&#34;</p></td>
-<td></td>
 </tr><tr><td><p>&#34;parallel&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;rolling&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;operatorSyncUpdate&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

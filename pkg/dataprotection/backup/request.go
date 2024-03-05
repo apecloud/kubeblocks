@@ -463,7 +463,7 @@ function update_backup_stauts() {
   local namespace="$3"
   local backup_name="$4"
   status="{\"status\":${backup_info}}"
-  kubectl -n "$namespace" patch backup "$backup_name" --subresource=status --type=merge --patch "${status}"
+  kubectl -n "$namespace" patch backups.dataprotection.kubeblocks.io "$backup_name" --subresource=status --type=merge --patch "${status}"
 }
 update_backup_stauts ${%s} ${%s} %s %s
 `, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)

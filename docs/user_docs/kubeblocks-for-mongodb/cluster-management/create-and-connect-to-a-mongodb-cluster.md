@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Create and connect to a MongoDB cluster
 
-This tutorial shows how to create and connect to a MongoDB cluster. From v0.8.2, KubeBlocks supports MongoDB sharding.
+This tutorial shows how to create and connect to a MongoDB cluster.
 
 ## Create a MongoDB cluster
 

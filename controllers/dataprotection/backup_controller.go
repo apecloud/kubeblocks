@@ -310,6 +310,18 @@ func (r *BackupReconciler) prepareBackupRequest(
 		}
 	}
 
+	// check encryption config
+	if backupPolicy.Spec.EncryptionConfig != nil {
+		secretKeyRef := backupPolicy.Spec.EncryptionConfig.PassPhraseSecretKeyRef
+		if secretKeyRef == nil {
+			return nil, fmt.Errorf("encryptionConfig.passPhraseSecretKeyRef if empty")
+		}
+		err := checkSecretKeyRef(reqCtx, r.Client, request.Namespace, secretKeyRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check encryption key reference: %w", err)
+		}
+	}
+
 	request.BackupPolicy = backupPolicy
 	if !snapshotVolumes {
 		// if use volume snapshot, ignore backup repo
@@ -354,6 +366,9 @@ func (r *BackupReconciler) patchBackupStatus(
 	}
 	if request.BackupPolicy.Spec.UseKopia {
 		request.Status.KopiaRepoPath = dpbackup.BuildKopiaRepoPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
+	}
+	if request.BackupPolicy.Spec.EncryptionConfig != nil {
+		request.Status.EncryptionConfig = request.BackupPolicy.Spec.EncryptionConfig
 	}
 	// init action status
 	actions, err := request.BuildActions()

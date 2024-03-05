@@ -32,10 +32,19 @@ type ConfigConstraintSpec struct {
 	// +optional
 	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
 
-	// forceHotUpdate indicates whether to execute hot update parameters when the pod needs to be restarted.
-	// if set true, the controller does the hot update and then restarts the pod.
+	// Indicates the dynamic reload action and restart action can be merged to a restart action.
+	//
+	// When a batch of parameters updates incur both restart & dynamic reload, it works as:
+	// - set to true, the two actions merged to only one restart action
+	// - set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]
+	//
 	// +optional
-	ForceHotUpdate *bool `json:"forceHotUpdate,omitempty"`
+	DynamicActionCanBeMerged *bool `json:"dynamicActionCanBeMerged,omitempty"`
+
+	// Specifies the policy for selecting the parameters of dynamic reload actions.
+	//
+	// +optional
+	DynamicParameterSelectedPolicy *DynamicParameterSelectedPolicy `json:"dynamicParameterSelectedPolicy,omitempty"`
 
 	// toolConfig used to config init container.
 	// +optional
@@ -320,9 +329,16 @@ func init() {
 	SchemeBuilder.Register(&ConfigConstraint{}, &ConfigConstraintList{})
 }
 
-func (in *ConfigConstraintSpec) NeedForceUpdateHot() bool {
-	if in.ForceHotUpdate != nil {
-		return *in.ForceHotUpdate
+func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
+	if in.DynamicActionCanBeMerged != nil {
+		return !*in.DynamicActionCanBeMerged
 	}
 	return false
+}
+
+func (in *ConfigConstraintSpec) DynamicParametersPolicy() DynamicParameterSelectedPolicy {
+	if in.DynamicParameterSelectedPolicy != nil {
+		return *in.DynamicParameterSelectedPolicy
+	}
+	return SelectedDynamicParameters
 }

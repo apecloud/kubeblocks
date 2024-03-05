@@ -35,11 +35,11 @@ type syncPolicy struct {
 }
 
 func init() {
-	RegisterPolicy(appsv1alpha1.OperatorSyncUpdate, &syncPolicy{})
+	RegisterPolicy(appsv1alpha1.SyncDynamicReloadPolicy, &syncPolicy{})
 }
 
 func (o *syncPolicy) GetPolicyName() string {
-	return string(appsv1alpha1.OperatorSyncUpdate)
+	return string(appsv1alpha1.SyncDynamicReloadPolicy)
 }
 
 func (o *syncPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
@@ -129,12 +129,13 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 
 func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) map[string]string {
 	r := make(map[string]string)
-	forceUpdate := cc.NeedForceUpdateHot()
+	dynamicAction := cc.NeedDynamicReloadAction()
+	selectedPolicy := cc.DynamicParametersPolicy()
 	parameters := core.GenerateVisualizedParamsList(configPatch, cc.FormatterConfig, nil)
 	for _, key := range parameters {
 		if key.UpdateType == core.UpdatedType {
 			for _, p := range key.Parameters {
-				if forceUpdate && !core.IsDynamicParameter(p.Key, cc) {
+				if dynamicAction && selectedPolicy == appsv1alpha1.SelectedDynamicParameters && !core.IsDynamicParameter(p.Key, cc) {
 					continue
 				}
 				if p.Value != nil {

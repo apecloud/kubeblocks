@@ -133,7 +133,7 @@ var (
 var upgradePolicyMap = map[appsv1alpha1.UpgradePolicy]reconfigurePolicy{}
 
 func init() {
-	RegisterPolicy(appsv1alpha1.AutoReload, &AutoReloadPolicy{})
+	RegisterPolicy(appsv1alpha1.AsyncDynamicReloadPolicy, &AutoReloadPolicy{})
 }
 
 // GetClientFactory support ut mock
@@ -200,7 +200,7 @@ func (receiver AutoReloadPolicy) Upgrade(params reconfigureParams) (ReturnedStat
 }
 
 func (receiver AutoReloadPolicy) GetPolicyName() string {
-	return string(appsv1alpha1.AutoReload)
+	return string(appsv1alpha1.AsyncDynamicReloadPolicy)
 }
 
 func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
@@ -220,19 +220,19 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.
 		switch {
 		case !dynamicUpdate: // static parameters update
 		case configmanager.IsAutoReload(cc.ReloadOptions): // if core support hot update, don't need to do anything
-			policy = appsv1alpha1.AutoReload
+			policy = appsv1alpha1.AsyncDynamicReloadPolicy
 		case enableSyncTrigger(cc.ReloadOptions): // sync config-manager exec hot update
-			policy = appsv1alpha1.OperatorSyncUpdate
+			policy = appsv1alpha1.SyncDynamicReloadPolicy
 		default: // config-manager auto trigger to hot update
-			policy = appsv1alpha1.AutoReload
+			policy = appsv1alpha1.AsyncDynamicReloadPolicy
 		}
 	}
 
 	// if not specify policy, or cannot decision policy, use default policy.
 	if policy == appsv1alpha1.NonePolicy {
 		policy = appsv1alpha1.NormalPolicy
-		if cc.NeedForceUpdateHot() && enableSyncTrigger(cc.ReloadOptions) {
-			policy = appsv1alpha1.HotUpdateAndRestartPolicy
+		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.ReloadOptions) {
+			policy = appsv1alpha1.DynamicReloadAndRestartPolicy
 		}
 	}
 

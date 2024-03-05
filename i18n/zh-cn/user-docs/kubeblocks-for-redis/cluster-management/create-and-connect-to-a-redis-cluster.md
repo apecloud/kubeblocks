@@ -13,7 +13,9 @@ import TabItem from '@theme/TabItem';
 
 本文档展示如何创建并连接到一个 Redis 集群。
 
-KubeBlocks 支持 Redis 单机版和 Redis 主备版集群。为了提供更好的高可用性体验，KubeBlocks 默认创建的是 Redis 主备版集群。
+KubeBlocks 支持 Redis 单机版和 Redis 主备版集群。从 v0.8.2 开始，KubeBlocks 支持 Redis 分片（Sharding）。
+
+为了提供更好的高可用性体验，KubeBlocks 默认创建的是 Redis 主备版集群。
 
 ## 创建 Redis 集群
 

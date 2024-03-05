@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 创建并连接到 MongoDB 集群
 
-本文档展示如何创建并连接到一个 MongoDB 集群。
+本文档展示如何创建并连接到一个 MongoDB 集群。从 v0.8.2 开始，KubeBlocks 支持 MongoDB 分片（Sharding）。
 
 ## 创建 MongoDB 集群
 

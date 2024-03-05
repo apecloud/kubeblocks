@@ -46,7 +46,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 }
 
 func (mgr *Manager) GetReplicaRoleFromDB(ctx context.Context) (string, error) {
-	slaveRunning, err := mgr.isSlaveRunning(ctx)
+	slaveRunning, err := mgr.isSlaveRunning()
 	if err != nil {
 		return "", err
 	}
@@ -54,7 +54,7 @@ func (mgr *Manager) GetReplicaRoleFromDB(ctx context.Context) (string, error) {
 		return models.SECONDARY, nil
 	}
 
-	hasSlave, err := mgr.hasSlaveHosts(ctx)
+	hasSlave, err := mgr.hasSlaveHosts()
 	if err != nil {
 		return "", err
 	}
@@ -75,7 +75,7 @@ func (mgr *Manager) GetReplicaRoleFromDB(ctx context.Context) (string, error) {
 	return models.PRIMARY, nil
 }
 
-func (mgr *Manager) isSlaveRunning(ctx context.Context) (bool, error) {
+func (mgr *Manager) isSlaveRunning() (bool, error) {
 	var rowMap = mgr.slaveStatus
 
 	if len(rowMap) == 0 {
@@ -89,7 +89,7 @@ func (mgr *Manager) isSlaveRunning(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (mgr *Manager) hasSlaveHosts(ctx context.Context) (bool, error) {
+func (mgr *Manager) hasSlaveHosts() (bool, error) {
 	sql := "show slave hosts"
 	var rowMap RowMap
 

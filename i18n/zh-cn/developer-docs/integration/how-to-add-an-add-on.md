@@ -112,7 +112,7 @@ sidebar_label: 添加数据库引擎
   - `name` [必填]
 
     即组件名称。这个名称没有特定标准，选择一个易区分有表达力的名字就可以。
-    
+
     如果我们将拓扑、版本和资源解耦（就像数据库中的 table normalize 一样），我们不仅可以让每一个对象描述的信息都更清晰和聚焦, 而且还可以通过这些对象的组合来生成更丰富的集群。因此，我们可以将 Cluster 表示为
 
     $$
@@ -120,13 +120,13 @@ sidebar_label: 添加数据库引擎
     $$
 
     这个 `name` 就是那个join key。
-    
+
     记住这个 `name`，后面要考的。
 
   - `characterType` [选填]
 
     `characterType` 是一个字符串类型，用来识别这是一个什么引擎，例如 `mysql`、`postgresql`、`redis` 等。它主要用于数据库连接，在操作数据库时，它能快速识别引擎类型，找到匹配的操作命令。
-    
+
     它可以是一个任意的字符串，或者你也可以给你的引擎起一个独特的名称。前期我们没有数据库引擎相关的操作，因此也可以空缺。
 
   - `workloadType` [必填]
@@ -137,7 +137,7 @@ sidebar_label: 添加数据库引擎
     - Consensus，有状态服务，且有自选举能力，有角色。
 
     之后我们会更深入地介绍 Workload（包括设计、实现、如何使用等）。
-    
+
     因为这里使用的是 MySQL 单机版，因此使用 `Stateful` 就足够了。
 
   - `service` [选填]
@@ -151,9 +151,9 @@ sidebar_label: 添加数据库引擎
     ```
 
     它定义如何为该组件创建一个 Service，暴露哪些端口。
-    
+
     还记得 `connectionCredential` 中介绍的，集群对外暴露的 port 和 endpoint 吗？ 
-    
+
     通过 `$(SVC_PORT_mysql)$` 来选择端口，`mysql` 就是这里的 `service.ports[0].name` mysql。
 
     :::note
@@ -193,7 +193,7 @@ sidebar_label: 添加数据库引擎
     ```
 
     这里定义了只包含一个 container 的 Pod，即 `mysql-container`，以及所需的环境变量、端口等常规信息。
-    
+
     我们从名为 `$(CONN_CREDENTIAL_SECRET_NAME)` 的 secret 中获取用户名和密码作为 pod environment variable。
 
     这是一个 placeholder, 用来指代前文中提到的 Connection credential Secret。
@@ -201,7 +201,7 @@ sidebar_label: 添加数据库引擎
 - `clusterVersion.yaml`
 
    所有版本相关的信息都配置在 `clusterVersion.yaml` 中。
-   
+
    现在可以为每一个 Component 需要的每一个 container 补充 image 信息。
 
    ```yaml

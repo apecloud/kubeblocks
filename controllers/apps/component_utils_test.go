@@ -125,25 +125,6 @@ var _ = Describe("Component Utils", func() {
 		})
 	})
 
-	Context("Custom Label test", func() {
-		Context("parseCustomLabelPattern func", func() {
-			It("should parse pattern well", func() {
-				pattern := "v1/Pod"
-				gvk, err := parseCustomLabelPattern(pattern)
-				Expect(err).Should(BeNil())
-				Expect(gvk.Group).Should(BeEmpty())
-				Expect(gvk.Version).Should(Equal("v1"))
-				Expect(gvk.Kind).Should(Equal("Pod"))
-				pattern = "apps/v1/StatefulSet"
-				gvk, err = parseCustomLabelPattern(pattern)
-				Expect(err).Should(BeNil())
-				Expect(gvk.Group).Should(Equal("apps"))
-				Expect(gvk.Version).Should(Equal("v1"))
-				Expect(gvk.Kind).Should(Equal("StatefulSet"))
-			})
-		})
-	})
-
 	Context("test mergeServiceAnnotations", func() {
 		It("test sync pod spec default values set by k8s", func() {
 			var (

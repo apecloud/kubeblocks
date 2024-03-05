@@ -20,9 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
 	"reflect"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -81,10 +79,6 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	createCompSet := protoCompSet.Difference(runningCompSet)
 	updateCompSet := protoCompSet.Intersection(runningCompSet)
 	deleteCompSet := runningCompSet.Difference(protoCompSet)
-	if len(deleteCompSet) > 0 {
-		return fmt.Errorf("cluster components cannot be removed at runtime: %s",
-			strings.Join(deleteCompSet.UnsortedList(), ","))
-	}
 
 	// component objects to be created
 	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, createCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
@@ -93,6 +87,11 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 
 	// component objects to be updated
 	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
+		return err
+	}
+
+	// component objects to be deleted
+	if err := t.handleCompsDelete(transCtx, dag, deleteCompSet); err != nil {
 		return err
 	}
 
@@ -139,6 +138,19 @@ func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 		if newCompObj := copyAndMergeComponent(runningComp, comp); newCompObj != nil {
 			graphCli.Update(dag, runningComp, newCompObj)
 		}
+	}
+	return nil
+}
+
+func (t *clusterComponentTransformer) handleCompsDelete(transCtx *clusterTransformContext, dag *graph.DAG, deleteCompSet sets.Set[string]) error {
+	cluster := transCtx.Cluster
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for compName := range deleteCompSet {
+		runningComp, err := getRunningCompObject(transCtx, cluster, compName)
+		if err != nil {
+			return err
+		}
+		graphCli.Delete(dag, runningComp)
 	}
 	return nil
 }

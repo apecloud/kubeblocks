@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -29,7 +28,6 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -80,26 +78,6 @@ func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster
 	objectList client.ObjectList, matchLabels client.ListOption) error {
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
-}
-
-// parseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
-func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
-	patterns := strings.Split(pattern, "/")
-	switch len(patterns) {
-	case 2:
-		return schema.GroupVersionKind{
-			Group:   "",
-			Version: patterns[0],
-			Kind:    patterns[1],
-		}, nil
-	case 3:
-		return schema.GroupVersionKind{
-			Group:   patterns[0],
-			Version: patterns[1],
-			Kind:    patterns[2],
-		}, nil
-	}
-	return schema.GroupVersionKind{}, fmt.Errorf("invalid pattern %s", pattern)
 }
 
 // DelayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.

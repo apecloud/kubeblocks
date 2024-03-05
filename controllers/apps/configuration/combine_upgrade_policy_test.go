@@ -64,7 +64,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 						VolumeName: "test_volume",
 					}}}))
 
-			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo("reloadAndRestart"))
+			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(appsv1alpha1.DynamicReloadAndRestartPolicy))
 			status, err := testPolicyExecs.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESNone))
@@ -88,7 +88,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 						VolumeName: "test_volume",
 					}}}))
 
-			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo("reloadAndRestart"))
+			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(appsv1alpha1.DynamicReloadAndRestartPolicy))
 			status, err := testPolicyExecs.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))

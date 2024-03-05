@@ -3,7 +3,7 @@ title: Terminology
 description: Terms you should know of KubeBlocks
 keywords: [terminology]
 sidebar_position: 2
-sidebar_label: Developer guides
+sidebar_label: Terminology
 ---
 # Terminology
 

@@ -1753,6 +1753,13 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.Annotations != nil {
+		in, out := &in.Annotations, &out.Annotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.ReplicasLimit != nil {
 		in, out := &in.ReplicasLimit, &out.ReplicasLimit
 		*out = new(ReplicasLimit)

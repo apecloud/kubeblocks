@@ -49,14 +49,12 @@ func VarReferenceRegExp() *regexp.Regexp {
 }
 
 // ResolveTemplateNEnvVars resolves all built-in and user-defined vars for config template and Env usage.
-func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	annotations map[string]string, definedVars []appsv1alpha1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
-	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, annotations, definedVars, false)
+func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1alpha1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
+	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars, false)
 }
 
-func ResolveEnvVars4LegacyCluster(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	annotations map[string]string, definedVars []appsv1alpha1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
-	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, annotations, definedVars, true)
+func ResolveEnvVars4LegacyCluster(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1alpha1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
+	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars, true)
 }
 
 func InjectEnvVars(synthesizedComp *SynthesizedComponent, envVars []corev1.EnvVar, envFromSources []corev1.EnvFromSource) {
@@ -95,13 +93,13 @@ func InjectEnvVars4Containers(synthesizedComp *SynthesizedComponent, envVars []c
 }
 
 func resolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	annotations map[string]string, definedVars []appsv1alpha1.EnvVar, legacy bool) (map[string]any, []corev1.EnvVar, error) {
+	definedVars []appsv1alpha1.EnvVar, legacy bool) (map[string]any, []corev1.EnvVar, error) {
 	templateVars, envVars, err := resolveNewTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	implicitEnvVars, err := buildLegacyImplicitEnvVars(synthesizedComp, annotations, legacy)
+	implicitEnvVars, err := buildLegacyImplicitEnvVars(synthesizedComp, legacy)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -133,11 +131,11 @@ func resolveNewTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesi
 	return templateVars, append(envVars, credentialVars...), nil
 }
 
-func buildLegacyImplicitEnvVars(synthesizedComp *SynthesizedComponent, annotations map[string]string, legacy bool) ([]corev1.EnvVar, error) {
+func buildLegacyImplicitEnvVars(synthesizedComp *SynthesizedComponent, legacy bool) ([]corev1.EnvVar, error) {
 	envVars := make([]corev1.EnvVar, 0)
 	envVars = append(envVars, buildDefaultEnvVars(synthesizedComp, legacy)...)
 	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
-	userDefinedVars, err := buildEnv4UserDefined(annotations)
+	userDefinedVars, err := buildEnv4UserDefined(synthesizedComp.Annotations)
 	if err != nil {
 		return nil, err
 	}

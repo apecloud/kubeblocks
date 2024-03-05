@@ -1358,6 +1358,20 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines static annotations that will be patched to all k8s resources created for the component.
+If an annotation key conflicts with any other system annotations or user-specified annotations, it will be silently ignored.
+This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicasLimit</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ReplicasLimit">
@@ -6722,6 +6736,20 @@ This field is immutable.</p>
 </tr>
 <tr>
 <td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines static annotations that will be patched to all k8s resources created for the component.
+If an annotation key conflicts with any other system annotations or user-specified annotations, it will be silently ignored.
+This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicasLimit</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ReplicasLimit">
@@ -6970,7 +6998,7 @@ RoleProbe
 <em>(Optional)</em>
 <p>RoleProbe defines the mechanism to probe the role of replicas periodically. The specified action will be
 executed by Lorry at the configured interval. If the execution is successful, the output will be used as
-the replica&rsquo;s assigned role, and the role must be one of the names defined in the componentdefinition roles.
+the replica&rsquo;s assigned role, and the role must be one of the names defined in the ComponentDefinition roles.
 The output will be compared with the last successful result.  If there is a change, a role change event will
 be created to notify the controller and trigger updating the replica&rsquo;s role.
 Defining a RoleProbe is required if roles are configured for the component. Otherwise, the replicas&rsquo; pods will

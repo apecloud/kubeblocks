@@ -70,6 +70,7 @@ type SynthesizedComponent struct {
 	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
 	Roles               []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
 	Labels              map[string]string                   `json:"labels,omitempty"`
+	Annotations         map[string]string                   `json:"annotations,omitempty"`
 	UpdateStrategy      *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
 	PodManagementPolicy *appsv1.PodManagementPolicyType     `json:"podManagementPolicy,omitempty"`
 	PolicyRules         []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
@@ -79,6 +80,7 @@ type SynthesizedComponent struct {
 	Volumes             []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
 	HostNetwork         *v1alpha1.HostNetwork               `json:"hostNetwork,omitempty"`
 	ComponentServices   []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
+	MinReadySeconds     int32                               `json:"minReadySeconds,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.
 	Probes           *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`           // The Probes will be replaced with LifecycleActions.RoleProbe in the future.
@@ -93,5 +95,4 @@ type SynthesizedComponent struct {
 	CharacterType         string                          `json:"characterType,omitempty"`
 	WorkloadType          v1alpha1.WorkloadType           `json:"workloadType,omitempty"`
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
-	MinReadySeconds       int32                           `json:"minReadySeconds,omitempty"`
 }

@@ -58,6 +58,14 @@ spec:
               with attributes that strongly work with stateful workloads and day-2
               operation behaviors.
             properties:
+              annotations:
+                additionalProperties:
+                  type: string
+                description: Defines static annotations that will be patched to all
+                  k8s resources created for the component. If an annotation key conflicts
+                  with any other system annotations or user-specified annotations,
+                  it will be silently ignored. This field is immutable.
+                type: object
               configs:
                 description: "The configs field is provided by the provider, and finally,
                   these configTemplateRefs will be rendered into the user's own configuration
@@ -3188,7 +3196,7 @@ spec:
                       of replicas periodically. The specified action will be executed
                       by Lorry at the configured interval. If the execution is successful,
                       the output will be used as the replica's assigned role, and
-                      the role must be one of the names defined in the componentdefinition
+                      the role must be one of the names defined in the ComponentDefinition
                       roles. The output will be compared with the last successful
                       result.  If there is a change, a role change event will be created
                       to notify the controller and trigger updating the replica's

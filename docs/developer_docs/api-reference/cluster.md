@@ -1652,7 +1652,7 @@ It will either restart or reload depending on whether any parameters in the Stat
 </tr>
 <tr>
 <td>
-<code>forceHotUpdate</code><br/>
+<code>dynamicActionCanBeMerged</code><br/>
 <em>
 bool
 </em>
@@ -1674,6 +1674,20 @@ bool
 <em>(Optional)</em>
 <p>forceHotUpdate indicates whether to execute hot update parameters when the pod needs to be restarted.
 if set true, the controller does the hot update and then restarts the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicParameterSelectedPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">
+DynamicParameterSelectedPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for selecting the parameters of dynamic reload actions.</p>
 </td>
 </tr>
 <tr>
@@ -8153,7 +8167,7 @@ It will either restart or reload depending on whether any parameters in the Stat
 </tr>
 <tr>
 <td>
-<code>forceHotUpdate</code><br/>
+<code>dynamicActionCanBeMerged</code><br/>
 <em>
 bool
 </em>
@@ -8175,6 +8189,20 @@ bool
 <em>(Optional)</em>
 <p>forceHotUpdate indicates whether to execute hot update parameters when the pod needs to be restarted.
 if set true, the controller does the hot update and then restarts the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicParameterSelectedPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">
+DynamicParameterSelectedPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for selecting the parameters of dynamic reload actions.</p>
 </td>
 </tr>
 <tr>
@@ -9641,6 +9669,27 @@ string
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">DynamicParameterSelectedPolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+<p>DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;all&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;dynamic&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.EnvMappingVar">EnvMappingVar
 </h3>
@@ -16854,17 +16903,17 @@ string
 </thead>
 <tbody><tr><td><p>&#34;autoReload&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;reloadAndRestart&#34;</p></td>
+</tr><tr><td><p>&#34;dynamicReloadBeginRestart&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;none&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;simple&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;operatorSyncUpdate&#34;</p></td>
-<td></td>
 </tr><tr><td><p>&#34;parallel&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;rolling&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;operatorSyncUpdate&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

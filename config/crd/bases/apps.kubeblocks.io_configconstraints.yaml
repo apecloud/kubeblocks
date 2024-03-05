@@ -155,6 +155,21 @@ spec:
                   - name
                   type: object
                 type: array
+              dynamicActionCanBeMerged:
+                description: "Indicates the dynamic reload action and restart action
+                  can be merged to a restart action. \n When a batch of parameters
+                  updates incur both restart & dynamic reload, it works as: - set
+                  to true, the two actions merged to only one restart action - set
+                  to false, the two actions cannot be merged, the actions executed
+                  in order [dynamic reload, restart]"
+                type: boolean
+              dynamicParameterSelectedPolicy:
+                description: Specifies the policy for selecting the parameters of
+                  dynamic reload actions.
+                enum:
+                - all
+                - dynamic
+                type: string
               dynamicParameters:
                 description: dynamicParameters, list of DynamicParameter, modifications
                   of them trigger a config dynamic reload without process restart.
@@ -162,11 +177,6 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
-              forceHotUpdate:
-                description: forceHotUpdate indicates whether to execute hot update
-                  parameters when the pod needs to be restarted. if set true, the
-                  controller does the hot update and then restarts the pod.
-                type: boolean
               formatterConfig:
                 description: "formatterConfig describes the format of the configuration
                   file, the controller will: \n 1. parses configuration file 2. analyzes

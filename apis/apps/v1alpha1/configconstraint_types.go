@@ -36,10 +36,14 @@ type ConfigConstraintSpec struct {
 	// When a batch of parameters updates incur both restart & dynamic reload, it works as:
 	// - set to true, the two actions merged to only one restart action
 	// - set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]
-	// TODO (refactored to DynamicActionCanBeMerged)
 	//
 	// +optional
-	ForceHotUpdate *bool `json:"forceHotUpdate,omitempty"`
+	DynamicActionCanBeMerged *bool `json:"dynamicActionCanBeMerged,omitempty"`
+
+	// Specifies the policy for selecting the parameters of dynamic reload actions.
+	//
+	// +optional
+	DynamicParameterSelectedPolicy *DynamicParameterSelectedPolicy `json:"dynamicParameterSelectedPolicy,omitempty"`
 
 	// Tools used by the dynamic reload actions.
 	// Usually it is referenced by the 'init container' for 'cp' it to a binary volume.
@@ -388,9 +392,16 @@ func init() {
 	SchemeBuilder.Register(&ConfigConstraint{}, &ConfigConstraintList{})
 }
 
-func (in *ConfigConstraintSpec) NeedForceUpdateHot() bool {
-	if in.ForceHotUpdate != nil {
-		return *in.ForceHotUpdate
+func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
+	if in.DynamicActionCanBeMerged != nil {
+		return !*in.DynamicActionCanBeMerged
 	}
 	return false
+}
+
+func (in *ConfigConstraintSpec) DynamicParametersPolicy() DynamicParameterSelectedPolicy {
+	if in.DynamicParameterSelectedPolicy != nil {
+		return *in.DynamicParameterSelectedPolicy
+	}
+	return SelectedDynamicParameters
 }

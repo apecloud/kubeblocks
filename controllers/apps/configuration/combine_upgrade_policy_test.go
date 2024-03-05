@@ -50,7 +50,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 				policyExecutors: []reconfigurePolicy{&testPolicy{}},
 			}
 
-			Expect(upgradePolicyMap[appsv1alpha1.HotUpdateAndRestartPolicy]).ShouldNot(BeNil())
+			Expect(upgradePolicyMap[appsv1alpha1.DynamicReloadAndRestartPolicy]).ShouldNot(BeNil())
 
 			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
 				withMockStatefulSet(2, nil),
@@ -64,7 +64,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 						VolumeName: "test_volume",
 					}}}))
 
-			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo("reloadAndRestart"))
+			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(appsv1alpha1.DynamicReloadAndRestartPolicy))
 			status, err := testPolicyExecs.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESNone))
@@ -88,7 +88,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 						VolumeName: "test_volume",
 					}}}))
 
-			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo("reloadAndRestart"))
+			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(appsv1alpha1.DynamicReloadAndRestartPolicy))
 			status, err := testPolicyExecs.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))

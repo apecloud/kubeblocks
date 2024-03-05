@@ -256,6 +256,17 @@ const (
 	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
 )
 
+// DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions
+//
+// +enum
+// +kubebuilder:validation:Enum={all,dynamic}
+type DynamicParameterSelectedPolicy string
+
+const (
+	SelectedAllParameters     DynamicParameterSelectedPolicy = "all"
+	SelectedDynamicParameters DynamicParameterSelectedPolicy = "dynamic"
+)
+
 // OpsPhase defines opsRequest phase.
 // +enum
 // +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
@@ -643,17 +654,17 @@ const (
 
 // UpgradePolicy defines the policy of reconfiguring.
 // +enum
-// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate}
+// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate,dynamicReloadBeginRestart}
 type UpgradePolicy string
 
 const (
-	NonePolicy                UpgradePolicy = "none"
-	NormalPolicy              UpgradePolicy = "simple"
-	RestartPolicy             UpgradePolicy = "parallel"
-	RollingPolicy             UpgradePolicy = "rolling"
-	AutoReload                UpgradePolicy = "autoReload"
-	HotUpdateAndRestartPolicy UpgradePolicy = "reloadAndRestart"
-	OperatorSyncUpdate        UpgradePolicy = "operatorSyncUpdate"
+	NonePolicy                    UpgradePolicy = "none"
+	NormalPolicy                  UpgradePolicy = "simple"
+	RestartPolicy                 UpgradePolicy = "parallel"
+	RollingPolicy                 UpgradePolicy = "rolling"
+	AsyncDynamicReloadPolicy      UpgradePolicy = "autoReload"
+	SyncDynamicReloadPolicy       UpgradePolicy = "operatorSyncUpdate"
+	DynamicReloadAndRestartPolicy UpgradePolicy = "dynamicReloadBeginRestart"
 )
 
 // CfgReloadType defines reload method.

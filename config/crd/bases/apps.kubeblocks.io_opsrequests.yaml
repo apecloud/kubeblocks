@@ -479,6 +479,7 @@ spec:
                           - rolling
                           - autoReload
                           - operatorSyncUpdate
+                          - dynamicReloadBeginRestart
                           type: string
                       required:
                       - keys
@@ -571,6 +572,7 @@ spec:
                             - rolling
                             - autoReload
                             - operatorSyncUpdate
+                            - dynamicReloadBeginRestart
                             type: string
                         required:
                         - keys
@@ -1564,6 +1566,7 @@ spec:
                           - rolling
                           - autoReload
                           - operatorSyncUpdate
+                          - dynamicReloadBeginRestart
                           type: string
                         updatedParameters:
                           description: Contains the updated parameters.
@@ -1717,6 +1720,7 @@ spec:
                             - rolling
                             - autoReload
                             - operatorSyncUpdate
+                            - dynamicReloadBeginRestart
                             type: string
                           updatedParameters:
                             description: Contains the updated parameters.

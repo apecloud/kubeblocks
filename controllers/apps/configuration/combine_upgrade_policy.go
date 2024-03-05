@@ -26,13 +26,13 @@ type combineUpgradePolicy struct {
 }
 
 func init() {
-	RegisterPolicy(appsv1alpha1.HotUpdateAndRestartPolicy, &combineUpgradePolicy{
+	RegisterPolicy(appsv1alpha1.DynamicReloadAndRestartPolicy, &combineUpgradePolicy{
 		policyExecutors: []reconfigurePolicy{&syncPolicy{}, &simplePolicy{}},
 	})
 }
 
 func (h *combineUpgradePolicy) GetPolicyName() string {
-	return string(appsv1alpha1.HotUpdateAndRestartPolicy)
+	return string(appsv1alpha1.DynamicReloadAndRestartPolicy)
 }
 
 func (h *combineUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {

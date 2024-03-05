@@ -242,7 +242,7 @@ func TestGetMemberRoleWithHost(t *testing.T) {
 	roles := []string{constant.Follower, constant.Candidate, constant.Leader, constant.Learner, ""}
 
 	t.Run("query paxos role failed", func(t *testing.T) {
-		mock.ExpectQuery("select role from consensus_cluster_status;").
+		mock.ExpectQuery("select role from consensus_member_status;").
 			WillReturnError(fmt.Errorf("some error"))
 
 		role, err := manager.GetMemberRoleWithHost(ctx, "")
@@ -251,7 +251,7 @@ func TestGetMemberRoleWithHost(t *testing.T) {
 	})
 
 	t.Run("parse query failed", func(t *testing.T) {
-		mock.ExpectQuery("select role from consensus_cluster_status;").
+		mock.ExpectQuery("select role from consensus_member_status;").
 			WillReturnRows(pgxmock.NewRows([]string{"role"}))
 
 		role, err := manager.GetMemberRoleWithHost(ctx, "")
@@ -261,7 +261,7 @@ func TestGetMemberRoleWithHost(t *testing.T) {
 
 	t.Run("get member role with host success", func(t *testing.T) {
 		for _, r := range roles {
-			mock.ExpectQuery("select role from consensus_cluster_status;").
+			mock.ExpectQuery("select role from consensus_member_status;").
 				WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow(r))
 
 			role, err := manager.GetMemberRoleWithHost(ctx, "")
@@ -281,7 +281,7 @@ func TestIsLeaderWithHost(t *testing.T) {
 	defer mock.Close()
 
 	t.Run("get member role with host failed", func(t *testing.T) {
-		mock.ExpectQuery("select role from consensus_cluster_status;").
+		mock.ExpectQuery("select role from consensus_member_status;").
 			WillReturnError(fmt.Errorf("some error"))
 
 		isLeader, err := manager.IsLeaderWithHost(ctx, "")
@@ -290,7 +290,7 @@ func TestIsLeaderWithHost(t *testing.T) {
 	})
 
 	t.Run("check is leader success", func(t *testing.T) {
-		mock.ExpectQuery("select role from consensus_cluster_status;").
+		mock.ExpectQuery("select role from consensus_member_status;").
 			WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("Leader"))
 
 		isLeader, err := manager.IsLeaderWithHost(ctx, "")
@@ -318,7 +318,7 @@ func TestIsLeader(t *testing.T) {
 
 	t.Run("is leader has not been set", func(t *testing.T) {
 		manager.UnsetIsLeader()
-		mock.ExpectQuery("select role from consensus_cluster_status;").
+		mock.ExpectQuery("select role from consensus_member_status;").
 			WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("Leader"))
 
 		isLeader, err := manager.IsLeader(ctx, nil)

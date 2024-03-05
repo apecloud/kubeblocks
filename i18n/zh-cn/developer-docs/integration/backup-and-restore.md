@@ -121,6 +121,7 @@ spec:
     datafile:                         # 数据文件备份，依赖备份工具
       backupToolName: oracle-mysql-xtrabackup
 ```
+
 如果启用了定时任务，KubeBlocks 会在后台创建一个 CronJob。
 
 在一个新的集群创建后，KubeBlocks 会通过 `clusterdefinition.kubeblocks.io/name` 标签来查找对应的 template 名，并创建相应的 BackupPolicy。
@@ -151,7 +152,7 @@ spec:
 
 `BackTool.yml` 用来描述备份工具的具体执行逻辑，主要服务于文件备份（datafile）。它包括：
 
-1. 备份工具 image；
+1. 备份工具镜像；
 2. backup 的脚本；
 3. restore 的脚本。
 

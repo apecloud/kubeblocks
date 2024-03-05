@@ -208,7 +208,7 @@ func (w *WorkloadAction) injectOpsUtils(podSpec *corev1.PodSpec) {
 	}
 	// TODO: If necessary, you can package a tool for operating OpsRequest.status.extras.
 	scripts := `cp /usr/bin/kubectl /scripts/kubectl;
-echo '/scripts/kubectl -n "${KB_OPS_NAMESPACE}" patch opsrequest "${KB_OPS_NAME}" --subresource=status --type=merge --patch "{\"status\":{\"extras\":$1}}"' >/scripts/patch-extras-status.sh
+echo '/scripts/kubectl -n "${KB_OPS_NAMESPACE}" patch opsrequests.apps.kubeblocks.io "${KB_OPS_NAME}" --subresource=status --type=merge --patch "{\"status\":{\"extras\":$1}}"' >/scripts/patch-extras-status.sh
 `
 	initContainer := corev1.Container{
 		Name:            opsUtilVolumeName,

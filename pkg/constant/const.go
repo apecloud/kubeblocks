@@ -46,6 +46,8 @@ const (
 
 	// customized encryption key for encrypting the password of connection credential.
 	CfgKeyDPEncryptionKey = "DP_ENCRYPTION_KEY"
+
+	CfgKBReconcileWorkers = "KB_RECONCILE_WORKERS"
 )
 
 const (

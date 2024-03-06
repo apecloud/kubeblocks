@@ -6,6 +6,9 @@ sidebar_position: 1
 sidebar_label: Create
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Create a Kafka cluster
 
 This document shows how to create a Kafka cluster.

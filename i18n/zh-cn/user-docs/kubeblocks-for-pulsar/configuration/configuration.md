@@ -27,9 +27,9 @@ sidebar_position: 1
 
 * 查看集群的当前配置文件。
 
-   ```bash
-   kbcli cluster describe-config pulsar  
-   ```
+```bash
+kbcli cluster describe-config pulsar  
+```
 
 * 查看当前配置文件的详细信息。
 

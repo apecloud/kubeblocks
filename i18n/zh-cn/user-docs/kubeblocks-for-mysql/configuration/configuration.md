@@ -13,15 +13,15 @@ KubeBlocks 提供了一套统一的默认配置生成策略，适用于在 KubeB
 
 ## 查看参数信息
 
-* 查看集群的配置文件。
+查看集群的配置文件。
 
-   ```bash
-   kbcli cluster describe-config mysql-cluster  
-   ```
+```bash
+kbcli cluster describe-config mysql-cluster  
+```
 
-   从元信息中可以看到，集群 `mysql-cluster` 有一个名为 `my.cnf` 的配置文件。
+从元信息中可以看到，集群 `mysql-cluster` 有一个名为 `my.cnf` 的配置文件。
 
-   你也可以查看此配置文件和参数的详细信息。
+你也可以查看此配置文件和参数的详细信息。
 
 * 查看当前配置文件的详细信息。
 

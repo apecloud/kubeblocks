@@ -99,6 +99,8 @@ const (
 	checkRoleEventReason         = "checkRole"
 
 	actionSvcPortBase = int32(36500)
+
+	reasonBuildPods = "BuildPods"
 )
 
 type rsmTransformContext struct {

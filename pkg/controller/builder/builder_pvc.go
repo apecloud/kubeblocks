@@ -50,3 +50,8 @@ func (builder *PVCBuilder) SetDataSource(dataSource corev1.TypedLocalObjectRefer
 	builder.get().Spec.DataSource = &dataSource
 	return builder
 }
+
+func (builder *PVCBuilder) SetSpec(spec corev1.PersistentVolumeClaimSpec) *PVCBuilder {
+	builder.get().Spec = spec
+	return builder
+}

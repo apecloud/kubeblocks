@@ -32,7 +32,7 @@ type InstanceTemplate struct {
 	// Number of replicas of this template.
 	// Default is 1.
 	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
@@ -65,6 +65,7 @@ type InstanceTemplate struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// Defines Resources to override.
+	// Will override the first container's resources of the pod.
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
@@ -74,7 +75,7 @@ type InstanceTemplate struct {
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// Defines VolumeMounts to override.
-	// Add new or override existing volume mounts.
+	// Add new or override existing volume mounts of the first container in the pod.
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 

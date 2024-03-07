@@ -22,6 +22,7 @@ package rsm
 import (
 	"context"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"regexp"
 	"sort"
 	"strconv"
@@ -825,4 +826,31 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	// }
 	// return multicluster.InGlobalContext()
 	return nil
+}
+
+func mergeMap(src, dst *map[string]string) {
+	if *src == nil {
+		return
+	}
+	if *dst == nil {
+		*dst = make(map[string]string)
+	}
+	for k, v := range *src {
+		(*dst)[k] = v
+	}
+}
+
+func mergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
+	if len(*src) == 0 {
+		return
+	}
+	for i := range *src {
+		item := (*src)[i]
+		index := slices.IndexFunc(*dst, f(item))
+		if index >= 0 {
+			(*dst)[index] = item
+		} else {
+			*dst = append(*dst, item)
+		}
+	}
 }

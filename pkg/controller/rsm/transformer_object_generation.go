@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -45,6 +46,12 @@ import (
 
 type ObjectGenerationTransformer struct{}
 
+type podTemplateSpecExt struct {
+	Replicas int32
+	corev1.PodTemplateSpec
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim
+}
+
 var _ graph.Transformer = &ObjectGenerationTransformer{}
 
 func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
@@ -57,13 +64,43 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
+	// sum of spec.templates[*].replicas should not greater than spec.replicas
+	replicasInTemplates := int32(0)
+	for _, instance := range rsm.Spec.Instances {
+		replicas := int32(1)
+		if instance.Replicas != nil {
+			replicas = *instance.Replicas
+		}
+		replicasInTemplates += replicas
+	}
+	if replicasInTemplates > *rsm.Spec.Replicas {
+		msgFmt := "total replicas in instances(%d) should not greater than replicas in spec(%d)"
+		transCtx.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, msgFmt, replicasInTemplates, *rsm.Spec.Replicas)
+		return model.NewRequeueError(time.Second*10, fmt.Sprintf(msgFmt, replicasInTemplates, *rsm.Spec.Replicas))
+	}
+	// instance.replicas should be nil or 1 if instance.name set
+	// TODO(free6om): do validation
+
+	// read cache snapshot
+	ml := getLabels(rsm)
+	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
+	if err != nil {
+		return err
+	}
+
 	// generate objects by current spec
 	svc := buildSvc(*rsm)
 	altSvs := buildAlternativeSvs(*rsm)
 	headLessSvc := buildHeadlessSvc(*rsm)
 	envConfig := buildEnvConfigMap(*rsm)
-	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
-	objects := []client.Object{sts, headLessSvc, envConfig}
+	workloadList, err := buildWorkloads(*rsm, headLessSvc.Name, *envConfig, oldSnapshot)
+	if err != nil {
+		transCtx.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, err.Error())
+		return model.NewRequeueError(time.Second*10, err.Error())
+	}
+	var objects []client.Object
+	objects = append(objects, workloadList...)
+	objects = append(objects, headLessSvc, envConfig)
 	if svc != nil {
 		objects = append(objects, svc)
 	}
@@ -75,13 +112,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		if err := setOwnership(rsm, object, model.GetScheme(), getFinalizer(object)); err != nil {
 			return err
 		}
-	}
-
-	// read cache snapshot
-	ml := getLabels(rsm)
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
-	if err != nil {
-		return err
 	}
 
 	// compute create/update/delete set
@@ -126,8 +156,10 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 	}
 	handleDependencies := func() {
-		// objects[0] is the sts object
-		cli.DependOn(dag, objects[0], objects[1:]...)
+		index := len(workloadList)
+		for i := range workloadList {
+			cli.DependOn(dag, workloadList[i], objects[index:]...)
+		}
 	}
 
 	// objects to be created
@@ -228,6 +260,11 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return oldCm
 	}
 
+	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
+		// TODO(free6om):finish me
+		panic("finish me")
+	}
+
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
 	case *apps.StatefulSet:
@@ -236,6 +273,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
 	case *corev1.ConfigMap:
 		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
+	case *corev1.Pod:
+		return copyAndMergePod(targetObj.(*corev1.Pod), o)
 	default:
 		return newObj
 	}
@@ -319,8 +358,217 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	return hdlBuilder.GetObject()
 }
 
+func buildWorkloads(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap, oldSnapshot model.ObjectSnapshot) ([]client.Object, error) {
+	// return true if there is a StatefulSet object in old cache
+	isManagingSts := func() bool {
+		for _, object := range oldSnapshot {
+			if _, ok := object.(*apps.StatefulSet); ok {
+				return true
+			}
+		}
+		return false
+	}
+
+	if isManagingSts() {
+		return []client.Object{buildSts(rsm, headlessSvcName, envConfig)}, nil
+	}
+
+	return buildPods(rsm, envConfig)
+}
+
+func buildPods(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) ([]client.Object, error) {
+	// 1. prepare all templates
+	var podTemplates []*podTemplateSpecExt
+	var replicasInTemplates int32
+	defaultTemplate := buildPodTemplate(rsm, envConfig)
+	buildPodTemplateExt := func(replicas int32) *podTemplateSpecExt {
+		claims := make([]corev1.PersistentVolumeClaim, len(rsm.Spec.VolumeClaimTemplates))
+		copy(claims, rsm.Spec.VolumeClaimTemplates)
+		return &podTemplateSpecExt{
+			Replicas:             replicas,
+			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
+			VolumeClaimTemplates: claims,
+		}
+	}
+	for _, instance := range rsm.Spec.Instances {
+		replicas := int32(1)
+		if instance.Replicas != nil {
+			replicas = *instance.Replicas
+		}
+		template := buildPodTemplateExt(replicas)
+		applyInstanceTemplate(instance, template)
+		podTemplates = append(podTemplates, template)
+		replicasInTemplates += template.Replicas
+	}
+	if replicasInTemplates < *rsm.Spec.Replicas {
+		template := buildPodTemplateExt(*rsm.Spec.Replicas - replicasInTemplates)
+		podTemplates = append(podTemplates, template)
+	}
+	// set the default name generator and namespace
+	for _, template := range podTemplates {
+		if template.GenerateName == "" {
+			template.GenerateName = rsm.Name
+		}
+		template.Namespace = rsm.Namespace
+	}
+
+	// 2. build all pods from podTemplates
+	// group the pod templates by template.Name if set or by template.GenerateName
+	podTemplateGroups := make(map[string][]*podTemplateSpecExt)
+	for _, template := range podTemplates {
+		name := template.Name
+		if template.Name == "" {
+			name = template.GenerateName
+		}
+		templates := podTemplateGroups[name]
+		templates = append(templates, template)
+		podTemplateGroups[name] = templates
+	}
+	// build pods by groups
+	var pods []client.Object
+	var pvcs []client.Object
+	for _, templateList := range podTemplateGroups {
+		var (
+			podList []*corev1.Pod
+			pvcList []*corev1.PersistentVolumeClaim
+			ordinal int
+		)
+		for _, template := range templateList {
+			podList, pvcList, ordinal = buildPodByTemplate(template, ordinal)
+			for _, pod := range podList {
+				pods = append(pods, pod)
+			}
+			for _, pvc := range pvcList {
+				pvcs = append(pvcs, pvc)
+			}
+		}
+	}
+	// validate duplicate pod names
+	podNameCount := make(map[string]int)
+	for _, pod := range pods {
+		count, exist := podNameCount[pod.GetName()]
+		if exist {
+			count++
+		} else {
+			count = 1
+		}
+		podNameCount[pod.GetName()] = count
+	}
+	dupNames := ""
+	for name, count := range podNameCount {
+		if count > 1 {
+			dupNames = fmt.Sprintf("%s%s,", dupNames, name)
+		}
+	}
+	if len(dupNames) > 0 {
+		return nil, fmt.Errorf("duplicate pod names: %s", dupNames)
+	}
+	return append(pods, pvcs...), nil
+}
+
+func buildPodByTemplate(template *podTemplateSpecExt, ordinal int) ([]*corev1.Pod, []*corev1.PersistentVolumeClaim, int) {
+	var (
+		podList []*corev1.Pod
+		pvcList []*corev1.PersistentVolumeClaim
+	)
+	generatePodName := func(name, generateName string, ordinal int) (string, int) {
+		if len(name) > 0 {
+			return name, ordinal
+		}
+		n := fmt.Sprintf("%s-%d", generateName, ordinal)
+		ordinal++
+		return n, ordinal
+	}
+	for i := 0; i < int(template.Replicas); i++ {
+		// 1. generate pod name
+		namespace := template.Namespace
+		var name string
+		name, ordinal = generatePodName(template.Name, template.GenerateName, ordinal)
+
+		// 2. build a pod from template
+		pod := builder.NewPodBuilder(namespace, name).
+			AddAnnotationsInMap(template.Annotations).
+			AddLabelsInMap(template.Labels).
+			SetPodSpec(*template.Spec.DeepCopy()).
+			GetObject()
+		podList = append(podList, pod)
+
+		// 3. build pvcs from template
+		pvcMap := make(map[string]*corev1.PersistentVolumeClaim)
+		pvcNameMap := make(map[string]string)
+		for _, claimTemplate := range template.VolumeClaimTemplates {
+			pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, pod.GetName())
+			pvc := builder.NewPVCBuilder(namespace, pvcName).SetSpec(*claimTemplate.Spec.DeepCopy()).GetObject()
+			pvcMap[pvcName] = pvc
+			pvcNameMap[pvcName] = claimTemplate.Name
+		}
+
+		// 4. update pod volumes
+		var volumeList []corev1.Volume
+		for pvcName, pvc := range pvcMap {
+			pvcList = append(pvcList, pvc)
+			volume := builder.NewVolumeBuilder(pvcNameMap[pvcName]).
+				SetVolumeSource(corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
+				}).GetObject()
+			volumeList = append(volumeList, *volume)
+		}
+		mergeList(&volumeList, &pod.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
+			return func(v corev1.Volume) bool {
+				return v.Name == item.Name
+			}
+		})
+
+		// in case illegal template.replicas set
+		if len(template.Name) > 0 {
+			break
+		}
+	}
+	return podList, pvcList, ordinal
+}
+
+func applyInstanceTemplate(instance workloads.InstanceTemplate, template *podTemplateSpecExt) {
+	replicas := int32(1)
+	if instance.Replicas != nil {
+		replicas = *instance.Replicas
+	}
+	template.Replicas = replicas
+	if instance.Name != nil {
+		template.Name = *instance.Name
+	}
+	if instance.NodeName != nil {
+		template.Spec.NodeName = *instance.NodeName
+	}
+	mergeMap(&instance.Annotations, &template.Annotations)
+	mergeMap(&instance.Labels, &template.Labels)
+	mergeMap(&instance.NodeSelector, &template.Spec.NodeSelector)
+	if instance.Resources != nil {
+		if len(template.Spec.Containers) > 0 {
+			template.Spec.Containers[0].Resources = *instance.Resources
+		}
+	}
+	mergeList(&instance.Volumes, &template.Spec.Volumes,
+		func(item corev1.Volume) func(corev1.Volume) bool {
+			return func(v corev1.Volume) bool {
+				return v.Name == item.Name
+			}
+		})
+	mergeList(&instance.VolumeMounts, &template.Spec.Containers[0].VolumeMounts,
+		func(item corev1.VolumeMount) func(corev1.VolumeMount) bool {
+			return func(vm corev1.VolumeMount) bool {
+				return vm.Name == item.Name
+			}
+		})
+	mergeList(&instance.VolumeClaimTemplates, &template.VolumeClaimTemplates,
+		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
+			return func(claim corev1.PersistentVolumeClaim) bool {
+				return claim.Name == item.Name
+			}
+		})
+}
+
 func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
-	template := buildStsPodTemplate(rsm, envConfig)
+	template := buildPodTemplate(rsm, envConfig)
 	annotations := ParseAnnotationsOfScope(RootScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
@@ -348,7 +596,7 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 		SetData(envData).GetObject()
 }
 
-func buildStsPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
+func buildPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
 	template := rsm.Spec.Template
 	// inject env ConfigMap into workload pods only
 	for i := range template.Spec.Containers {

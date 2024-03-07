@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -53,27 +54,33 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 	case model.IsObjectStatusUpdating(rsmOrig):
 		// read the underlying sts
 		sts := &apps.StatefulSet{}
-		if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts); err != nil {
+		err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts)
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
-		// keep rsm's ObservedGeneration to avoid override by sts's ObservedGeneration
-		generation := rsm.Status.ObservedGeneration
-		rsm.Status.StatefulSetStatus = sts.Status
-		rsm.Status.ObservedGeneration = generation
-		if currentGenerationLabel, ok := sts.Labels[rsmGenerationLabelKey]; ok {
-			currentGeneration, err := strconv.ParseInt(currentGenerationLabel, 10, 64)
+		// is managing sts if the underlying sts exists
+		if err == nil {
+			// keep rsm's ObservedGeneration to avoid override by sts's ObservedGeneration
+			generation := rsm.Status.ObservedGeneration
+			rsm.Status.StatefulSetStatus = sts.Status
+			rsm.Status.ObservedGeneration = generation
+			if currentGenerationLabel, ok := sts.Labels[rsmGenerationLabelKey]; ok {
+				currentGeneration, err := strconv.ParseInt(currentGenerationLabel, 10, 64)
+				if err != nil {
+					return err
+				}
+				rsm.Status.CurrentGeneration = currentGeneration
+			}
+			// read all pods belong to the sts, hence belong to the rsm
+			pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 			if err != nil {
 				return err
 			}
-			rsm.Status.CurrentGeneration = currentGeneration
+			// update role fields
+			setMembersStatus(rsm, pods)
+		} else {
+			// TODO(free6om): handle managing pods
 		}
-		// read all pods belong to the sts, hence belong to the rsm
-		pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
-		if err != nil {
-			return err
-		}
-		// update role fields
-		setMembersStatus(rsm, pods)
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)

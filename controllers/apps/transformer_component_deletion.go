@@ -33,10 +33,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // componentDeletionTransformer handles component deletion
-type componentDeletionTransformer struct{}
+type componentDeletionTransformer struct {
+	client.Client
+}
 
 var _ graph.Transformer = &componentDeletionTransformer{}
 
@@ -46,6 +49,11 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      transCtx.Context,
+		Log:      transCtx.Logger,
+		Recorder: transCtx.EventRecorder,
+	}
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
 	clusterName, err := component.GetClusterName(comp)
@@ -62,10 +70,19 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	// TODO: step1: check the preTerminate action
+	// step1: update the component status to deleting
+	if comp.Status.Phase != appsv1alpha1.DeletingClusterCompPhase {
+		comp.Status.Phase = appsv1alpha1.DeletingClusterCompPhase
+		graphCli.Status(dag, comp, transCtx.Component)
+		return newRequeueError(time.Second*1, "updating component status to deleting")
+	}
 
-	// step2: delete the sub-resources
-	comp.Status.Phase = appsv1alpha1.DeletingClusterCompPhase
+	// step2: do the pre-terminate action if needed
+	if err := component.ReconcileCompPreTerminate(reqCtx, t.Client, clusterName, comp, dag); err != nil {
+		return err
+	}
+
+	// step3: delete the sub-resources
 	if len(snapshot) > 0 {
 		// delete the sub-resources owned by the component before deleting the component
 		for _, object := range snapshot {

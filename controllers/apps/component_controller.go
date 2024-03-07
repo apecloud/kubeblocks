@@ -125,8 +125,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	plan, errBuild := planBuilder.
 		AddTransformer(
-			// handle component deletion first
-			&componentDeletionTransformer{},
+			// handle component deletion and pre-terminate
+			&componentDeletionTransformer{Client: r.Client},
 			// handle finalizers and referenced definition labels
 			&componentMetaTransformer{},
 			// validate referenced componentDefinition objects, and build synthesized component

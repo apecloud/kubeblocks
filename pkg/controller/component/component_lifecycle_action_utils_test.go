@@ -20,14 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"strconv"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -36,6 +32,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
+
+var tlog = ctrl.Log.WithName("component_testing")
 
 var _ = Describe("Component PostProvision Test", func() {
 	Context("has the BuildComponent function", func() {
@@ -69,37 +67,6 @@ var _ = Describe("Component PostProvision Test", func() {
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
-
-		mockPodsForTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
-			clusterDefName := cluster.Spec.ClusterDefRef
-			componentName := cluster.Spec.ComponentSpecs[0].Name
-			clusterName := cluster.Name
-			stsName := cluster.Name + "-" + componentName
-			pods := make([]corev1.Pod, 0)
-			for i := 0; i < number; i++ {
-				pod := &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      stsName + "-" + strconv.Itoa(i),
-						Namespace: testCtx.DefaultNamespace,
-						Labels: map[string]string{
-							constant.AppManagedByLabelKey:         constant.AppName,
-							constant.AppNameLabelKey:              clusterDefName,
-							constant.AppInstanceLabelKey:          clusterName,
-							constant.KBAppComponentLabelKey:       componentName,
-							appsv1.ControllerRevisionHashLabelKey: "mock-version",
-						},
-					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{{
-							Name:  "mock-container",
-							Image: "mock-container",
-						}},
-					},
-				}
-				pods = append(pods, *pod)
-			}
-			return pods
-		}
 
 		It("should work as expected with various inputs", func() {
 			By("test component definition without post provision")
@@ -143,38 +110,52 @@ var _ = Describe("Component PostProvision Test", func() {
 				},
 			}
 			synthesizeComp.LifecycleActions.PostProvision = &postProvision
-			need, err := needDoPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
-			Expect(err).Should(Succeed())
-			Expect(need).Should(BeFalse())
-			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
-			Expect(err).Should(Succeed())
 
-			By("mock component status ready, should do postProvision action")
-			comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
-			need, err = needDoPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
+			By("check built-in envs of cluster component available in postProvision job")
+			renderJob, err := renderActionCmdJob(testCtx.Ctx, testCtx.Cli, cluster, synthesizeComp, PostProvisionAction)
 			Expect(err).Should(Succeed())
-			Expect(need).Should(BeTrue())
-			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
-			Expect(err).ShouldNot(Succeed())
-
-			By("build component with postProvision with PodList, do postProvision action and requeue waiting job")
-			pods := mockPodsForTest(cluster, 1)
-			for _, pod := range pods {
-				Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-				// mock the status to pass the isReady(pod) check in consensus_set
-				pod.Status.Conditions = []corev1.PodCondition{{
-					Type:   corev1.PodReady,
-					Status: corev1.ConditionTrue,
-				}}
-				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+			Expect(renderJob).ShouldNot(BeNil())
+			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 9).Should(BeTrue())
+			compListExist := false
+			compPodNameListExist := false
+			compPodIPListExist := false
+			compPodHostNameListExist := false
+			compPodHostIPListExist := false
+			clusterPodNameListExist := false
+			clusterPodIPListExist := false
+			clusterPodHostNameListExist := false
+			clusterPodHostIPListExist := false
+			for _, env := range renderJob.Spec.Template.Spec.Containers[0].Env {
+				switch env.Name {
+				case kbLifecycleActionClusterCompList:
+					compListExist = true
+				case kbLifecycleActionClusterCompPodHostIPList:
+					compPodHostIPListExist = true
+				case kbLifecycleActionClusterCompPodHostNameList:
+					compPodHostNameListExist = true
+				case kbLifecycleActionClusterCompPodIPList:
+					compPodIPListExist = true
+				case kbLifecycleActionClusterCompPodNameList:
+					compPodNameListExist = true
+				case kbLifecycleActionClusterPodHostIPList:
+					clusterPodHostIPListExist = true
+				case kbLifecycleActionClusterPodHostNameList:
+					clusterPodHostNameListExist = true
+				case kbLifecycleActionClusterPodIPList:
+					clusterPodIPListExist = true
+				case kbLifecycleActionClusterPodNameList:
+					clusterPodNameListExist = true
+				}
 			}
-			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
-			Expect(err).Should(Succeed())
-
-			jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, PostProvisionAction)
-			err = CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
+			Expect(compListExist).Should(BeTrue())
+			Expect(compPodNameListExist).Should(BeTrue())
+			Expect(compPodIPListExist).Should(BeTrue())
+			Expect(compPodHostNameListExist).Should(BeTrue())
+			Expect(compPodHostIPListExist).Should(BeTrue())
+			Expect(clusterPodNameListExist).Should(BeTrue())
+			Expect(clusterPodIPListExist).Should(BeTrue())
+			Expect(clusterPodHostNameListExist).Should(BeTrue())
+			Expect(clusterPodHostIPListExist).Should(BeTrue())
 		})
 	})
 })

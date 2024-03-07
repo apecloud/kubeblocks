@@ -96,10 +96,7 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 		return err
 	}
 	// do clean up
-	if err = r.cleanupClusterAnnotations(comp.Name); err != nil {
-		return err
-	}
-	return r.cleanupRestores(comp)
+	return r.cleanupClusterAnnotations(comp.Name)
 }
 
 func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
@@ -369,22 +366,6 @@ func (r *RestoreManager) cleanupClusterAnnotations(compName string) error {
 			cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = string(restoreInfoBytes)
 		}
 		return r.Client.Patch(r.Ctx, cluster, patch)
-	}
-	return nil
-}
-
-func (r *RestoreManager) cleanupRestores(comp *component.SynthesizedComponent) error {
-	if r.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
-		return nil
-	}
-	restoreList := &dpv1alpha1.RestoreList{}
-	if err := r.Client.List(r.Ctx, restoreList, client.MatchingLabels(constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name))); err != nil {
-		return err
-	}
-	for i := range restoreList.Items {
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, r.Ctx, &restoreList.Items[i]); err != nil {
-			return err
-		}
 	}
 	return nil
 }

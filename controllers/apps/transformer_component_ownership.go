@@ -41,19 +41,18 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
 
+	// find all objects that are not components and set ownership to the component
 	objects := graphCli.FindAll(dag, &appsv1alpha1.Component{}, &model.HaveDifferentTypeWithOption{})
-	// controllerutil.AddFinalizer(comp, constant.DBComponentFinalizerName)
-	controllerutil.AddFinalizer(comp, constant.DBClusterFinalizerName)
-
 	for _, object := range objects {
-		// TODO: skip to set ownership for ClusterRoleBinding/PersistentVolume which is a cluster-scoped object.
+		// skip to set ownership for ClusterRoleBinding and PersistentVolume which is a cluster-scoped object.
 		if _, ok := object.(*rbacv1.ClusterRoleBinding); ok {
 			continue
 		}
 		if _, ok := object.(*corev1.PersistentVolume); ok {
 			continue
 		}
-		// if err := intctrlutil.SetOwnership(comp, object, rscheme, constant.DBComponentFinalizerName); err != nil {
+		// add component and cluster finalizers at the same time
+		controllerutil.AddFinalizer(object, constant.DBComponentFinalizerName)
 		if err := intctrlutil.SetOwnership(comp, object, rscheme, constant.DBClusterFinalizerName); err != nil {
 			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 				continue

@@ -20,9 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"time"
+
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // componentDeletionTransformer handles component deletion
@@ -38,40 +48,54 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
+	clusterName, err := component.GetClusterName(comp)
+	if err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+	compShortName, err := component.ShortName(clusterName, comp.Name)
+	if err != nil {
+		return err
+	}
+	ml := constant.GetComponentWellKnownLabels(clusterName, compShortName)
+	snapshot, err := model.ReadCacheSnapshot(transCtx, comp, ml, kindsForCompDelete()...)
+	if err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
 
-	// clusterName, err := getClusterName(comp)
-	// if err != nil {
-	//	return newRequeueError(requeueDuration, err.Error())
-	// }
-	//
-	// compName, err := component.ShortName(clusterName, comp.Name)
-	// ml := constant.GetComponentWellKnownLabels(clusterName, compName)
-	// snapshot, err := model.ReadCacheSnapshot(transCtx, comp, ml, kindsForCompDelete()...)
-	// if err != nil {
-	//	return newRequeueError(requeueDuration, err.Error())
-	// }
-	// for _, object := range snapshot {
-	//	graphCli.Delete(dag, object)
-	// }
+	// TODO: step1: check the preTerminate action
 
+	// step2: delete the sub-resources
 	comp.Status.Phase = appsv1alpha1.DeletingClusterCompPhase
-	graphCli.Delete(dag, comp)
+	if len(snapshot) > 0 {
+		// delete the sub-resources owned by the component before deleting the component
+		for _, object := range snapshot {
+			if !rsm.IsOwnedByRsm(object) {
+				graphCli.Delete(dag, object)
+			}
+		}
+		graphCli.Status(dag, comp, transCtx.Component)
+		return newRequeueError(time.Second*1, "not all component sub-resources deleted")
+	} else {
+		graphCli.Delete(dag, comp)
+	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
 }
 
-// func compOwnedKinds() []client.ObjectList {
-//	return []client.ObjectList{
-//		&workloads.ReplicatedStateMachineList{},
-//		&corev1.ServiceList{},
-//		&corev1.ConfigMapList{},
-//		&corev1.SecretList{},
-//	}
-// }
-//
-// func kindsForCompDelete() []client.ObjectList {
-//	kinds := compOwnedKinds()
-//	kinds = append(kinds, &batchv1.JobList{})
-//	return kinds
-// }
+func compOwnedKinds() []client.ObjectList {
+	return []client.ObjectList{
+		&workloads.ReplicatedStateMachineList{},
+		&corev1.ServiceList{},
+		&corev1.ConfigMapList{},
+		&corev1.SecretList{},
+	}
+}
+
+func kindsForCompDelete() []client.ObjectList {
+	kinds := compOwnedKinds()
+	kinds = append(kinds, &batchv1.JobList{})
+	// TODO(xingran): check it is necessary to add a component terminatePolicy to control the deletion of PVC
+	kinds = append(kinds, &corev1.PersistentVolumeClaimList{})
+	return kinds
+}

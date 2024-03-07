@@ -42,7 +42,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -88,7 +87,7 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	case "":
 		return r.newAction(reqCtx, restore)
 	case dpv1alpha1.RestorePhaseRunning:
-		return r.inProgressAction(reqCtx, restore)
+		return r.handleRunningPhase(reqCtx, restore)
 	case dpv1alpha1.RestorePhaseCompleted:
 		if err = r.deleteExternalResources(reqCtx, restore); err != nil {
 			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
@@ -170,14 +169,10 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 	return intctrlutil.Reconciled()
 }
 
-func (r *RestoreReconciler) inProgressAction(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) (ctrl.Result, error) {
+func (r *RestoreReconciler) handleRunningPhase(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) (ctrl.Result, error) {
 	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme)
 	// validate if the restore.spec is valid and build restore manager.
 	err := r.validateAndBuildMGR(reqCtx, restoreMgr)
-	// skip processing for ErrorTypeWaitForExternalHandler when Restore is Running
-	if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) {
-		return intctrlutil.Reconciled()
-	}
 	if err == nil {
 		saName := restore.Spec.ServiceAccountName
 		if saName == "" {
@@ -209,6 +204,7 @@ func (r *RestoreReconciler) inProgressAction(reqCtx intctrlutil.RequestCtx, rest
 }
 
 func (r *RestoreReconciler) HandleRestoreActions(reqCtx intctrlutil.RequestCtx, restoreMgr *dprestore.RestoreManager) error {
+	reqCtx.Log.V(1).Info("start to prepare data", "restore", reqCtx.Req.NamespacedName)
 	// 1. handle the prepareData stage.
 	isCompleted, err := r.prepareData(reqCtx, restoreMgr)
 	if err != nil {
@@ -218,6 +214,7 @@ func (r *RestoreReconciler) HandleRestoreActions(reqCtx intctrlutil.RequestCtx, 
 	if !isCompleted {
 		return nil
 	}
+	reqCtx.Log.V(1).Info("start to restore data after ready", "restore", reqCtx.Req.NamespacedName)
 	// 2. handle the postReady stage.
 	isCompleted, err = r.postReady(reqCtx, restoreMgr)
 	if err != nil {

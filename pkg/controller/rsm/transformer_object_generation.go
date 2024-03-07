@@ -64,22 +64,10 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	// sum of spec.templates[*].replicas should not greater than spec.replicas
-	replicasInTemplates := int32(0)
-	for _, instance := range rsm.Spec.Instances {
-		replicas := int32(1)
-		if instance.Replicas != nil {
-			replicas = *instance.Replicas
-		}
-		replicasInTemplates += replicas
+	if err := validateSpec(rsm); err != nil {
+		transCtx.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, err.Error())
+		return model.NewRequeueError(time.Second*10, err.Error())
 	}
-	if replicasInTemplates > *rsm.Spec.Replicas {
-		msgFmt := "total replicas in instances(%d) should not greater than replicas in spec(%d)"
-		transCtx.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, msgFmt, replicasInTemplates, *rsm.Spec.Replicas)
-		return model.NewRequeueError(time.Second*10, fmt.Sprintf(msgFmt, replicasInTemplates, *rsm.Spec.Replicas))
-	}
-	// instance.replicas should be nil or 1 if instance.name set
-	// TODO(free6om): do validation
 
 	// read cache snapshot
 	ml := getLabels(rsm)
@@ -88,12 +76,22 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		return err
 	}
 
+	// return true if there is a StatefulSet object in old cache
+	isManagingSts := func() bool {
+		for _, object := range oldSnapshot {
+			if _, ok := object.(*apps.StatefulSet); ok {
+				return true
+			}
+		}
+		return false
+	}()
+
 	// generate objects by current spec
 	svc := buildSvc(*rsm)
 	altSvs := buildAlternativeSvs(*rsm)
 	headLessSvc := buildHeadlessSvc(*rsm)
 	envConfig := buildEnvConfigMap(*rsm)
-	workloadList, err := buildWorkloads(*rsm, headLessSvc.Name, *envConfig, oldSnapshot)
+	workloadList, err := buildWorkloads(*rsm, headLessSvc.Name, *envConfig, isManagingSts)
 	if err != nil {
 		transCtx.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, err.Error())
 		return model.NewRequeueError(time.Second*10, err.Error())
@@ -137,10 +135,43 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 			cli.Create(dag, newSnapshot[name])
 		}
 	}
+	isPodOrPVC := func(obj client.Object) bool {
+		if _, ok := obj.(*corev1.Pod); ok {
+			return true
+		}
+		if _, ok := obj.(*corev1.PersistentVolumeClaim); ok {
+			return true
+		}
+		return false
+	}
 	updateObjects := func() {
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := copyAndMerge(oldObj, newSnapshot[name])
+			if newObj == nil {
+				continue
+			}
+
+			// filter pod and pvc if not owned by rsm
+			if isManagingSts && isPodOrPVC(newObj) {
+				continue
+			}
+
+			// handle pod update:
+			// we use Delete+Create to do the update job, and will transit to in-place update in the near future.
+			//
+			// why only do the Delete here? the trick is:
+			// Delete is an idempotent operation of K8s, so we can call it many times during pod deletion.
+			// and after the pod is deleted, it will be in the createSet in next reconciliation.
+			if _, ok := newObj.(*corev1.Pod); ok {
+				cli.Delete(dag, newObj)
+				continue
+			}
+			// TODO(free6om): support pod in-place update
+			// 1. fields support in-place update by the K8s (different K8s version may support different fields).
+			// 2. KubeBlocks will provide its in-place update feature, adapt it.
+			// 3. the customized K8s may support in-place update feature, adapt it.
+
 			cli.Update(dag, oldObj, newObj)
 		}
 	}
@@ -152,6 +183,12 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 					continue
 				}
 			}
+
+			// filter pod and pvc if not owned by rsm
+			if isManagingSts && isPodOrPVC(oldSnapshot[name]) {
+				continue
+			}
+
 			cli.Delete(dag, oldSnapshot[name])
 		}
 	}
@@ -170,6 +207,35 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	deleteOrphanObjects()
 	// handle object dependencies
 	handleDependencies()
+
+	return nil
+}
+
+func validateSpec(rsm *workloads.ReplicatedStateMachine) error {
+	replicasInTemplates := int32(0)
+	var names string
+	for _, instance := range rsm.Spec.Instances {
+		replicas := int32(1)
+		if instance.Replicas != nil {
+			replicas = *instance.Replicas
+		}
+		replicasInTemplates += replicas
+
+		if instance.Name != nil {
+			if instance.Replicas != nil && *instance.Replicas > 1 {
+				names = fmt.Sprintf("%s%s,", names, *instance.Name)
+			}
+		}
+	}
+	// sum of spec.templates[*].replicas should not greater than spec.replicas
+	if replicasInTemplates > *rsm.Spec.Replicas {
+		return fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *rsm.Spec.Replicas)
+	}
+
+	// instance.replicas should be nil or 1 if instance.name set
+	if len(names) > 0 {
+		return fmt.Errorf("replicas should be empty or no more than 1 if name set, instance names: %s", names)
+	}
 
 	return nil
 }
@@ -261,8 +327,21 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
-		// TODO(free6om):finish me
-		panic("finish me")
+		// in-place update is not supported currently, means the pod update is done through delete+create.
+		// so no need to merge the fields.
+		return oldPod
+	}
+
+	copyAndMergePVC := func(oldPVC, newPVC *corev1.PersistentVolumeClaim) client.Object {
+		// resources.request.storage and accessModes support in-place update.
+		// resources.request.storage only supports volume expansion.
+		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&
+			oldPVC.Spec.Resources.Requests.Storage().Cmp(*newPVC.Spec.Resources.Requests.Storage()) <= 0 {
+			return nil
+		}
+		oldPVC.Spec.AccessModes = newPVC.Spec.AccessModes
+		*oldPVC.Spec.Resources.Requests.Storage() = *newPVC.Spec.Resources.Requests.Storage()
+		return oldPVC
 	}
 
 	targetObj := oldObj.DeepCopyObject()
@@ -275,6 +354,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
 	case *corev1.Pod:
 		return copyAndMergePod(targetObj.(*corev1.Pod), o)
+	case *corev1.PersistentVolumeClaim:
+		return copyAndMergePVC(targetObj.(*corev1.PersistentVolumeClaim), o)
 	default:
 		return newObj
 	}
@@ -358,18 +439,8 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	return hdlBuilder.GetObject()
 }
 
-func buildWorkloads(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap, oldSnapshot model.ObjectSnapshot) ([]client.Object, error) {
-	// return true if there is a StatefulSet object in old cache
-	isManagingSts := func() bool {
-		for _, object := range oldSnapshot {
-			if _, ok := object.(*apps.StatefulSet); ok {
-				return true
-			}
-		}
-		return false
-	}
-
-	if isManagingSts() {
+func buildWorkloads(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap, isManagingSts bool) ([]client.Object, error) {
+	if isManagingSts {
 		return []client.Object{buildSts(rsm, headlessSvcName, envConfig)}, nil
 	}
 

@@ -158,13 +158,16 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
 		stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		podHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
+		// pod owned by legacy StatefulSet
+		stsPodHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
+
 
 		return ctrl.NewControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
 			Watches(&appsv1.StatefulSet{}, stsHandler).
 			Watches(&batchv1.Job{}, jobHandler).
-			Watches(&corev1.Pod{}, podHandler).
+			Watches(&corev1.Pod{}, stsPodHandler).
+			Owns(&corev1.Pod{}).
 			Complete(r)
 	}
 
@@ -176,5 +179,6 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
 		Watches(&corev1.Pod{}, podHandler).
+		Owns(&corev1.Pod{}).
 		Complete(r)
 }

@@ -92,23 +92,23 @@ var _ = Describe("utils test", func() {
 			membersStatus := []workloads.MemberStatus{
 				{
 					PodName:     "pod-0",
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 				{
 					PodName:     "pod-1",
-					ReplicaRole: workloads.ReplicaRole{Name: "learner"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "learner"},
 				},
 				{
 					PodName:     "pod-2",
-					ReplicaRole: workloads.ReplicaRole{Name: "learner"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "learner"},
 				},
 				{
 					PodName:     "pod-3",
-					ReplicaRole: workloads.ReplicaRole{Name: "leader"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader"},
 				},
 				{
 					PodName:     "pod-4",
-					ReplicaRole: workloads.ReplicaRole{Name: "logger"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "logger"},
 				},
 			}
 			expectedOrder := []string{"pod-3", "pod-0", "pod-4", "pod-2", "pod-1"}
@@ -136,27 +136,27 @@ var _ = Describe("utils test", func() {
 			oldMembersStatus := []workloads.MemberStatus{
 				{
 					PodName:     "pod-0",
-					ReplicaRole: workloads.ReplicaRole{Name: "leader"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader"},
 				},
 				{
 					PodName:     "pod-1",
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 				{
 					PodName:     "pod-2",
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 			}
 			replicas := int32(3)
 			rsm.Spec.Replicas = &replicas
 			rsm.Status.MembersStatus = oldMembersStatus
-			setMembersStatus(rsm, pods)
+			setMembersStatus(rsm, &pods)
 
 			Expect(rsm.Status.MembersStatus).Should(HaveLen(2))
 			Expect(rsm.Status.MembersStatus[0].PodName).Should(Equal("pod-1"))
-			Expect(rsm.Status.MembersStatus[0].Name).Should(Equal("leader"))
+			Expect(rsm.Status.MembersStatus[0].ReplicaRole.Name).Should(Equal("leader"))
 			Expect(rsm.Status.MembersStatus[1].PodName).Should(Equal("pod-0"))
-			Expect(rsm.Status.MembersStatus[1].Name).Should(Equal("follower"))
+			Expect(rsm.Status.MembersStatus[1].ReplicaRole.Name).Should(Equal("follower"))
 		})
 	})
 
@@ -229,7 +229,7 @@ var _ = Describe("utils test", func() {
 				ObjectMeta: pod.ObjectMeta,
 				Spec:       pod.Spec,
 			}
-			Expect(findSvcPort(*rsm)).Should(BeEquivalentTo(containerPort))
+			Expect(findSvcPort(rsm)).Should(BeEquivalentTo(containerPort))
 
 			By("set port number")
 			rsm.Spec.Service.Spec.Ports = []corev1.ServicePort{
@@ -240,7 +240,7 @@ var _ = Describe("utils test", func() {
 					TargetPort: intstr.FromInt(int(containerPort)),
 				},
 			}
-			Expect(findSvcPort(*rsm)).Should(BeEquivalentTo(containerPort))
+			Expect(findSvcPort(rsm)).Should(BeEquivalentTo(containerPort))
 
 			By("set no matched port")
 			rsm.Spec.Service.Spec.Ports = []corev1.ServicePort{
@@ -251,7 +251,7 @@ var _ = Describe("utils test", func() {
 					TargetPort: intstr.FromInt(int(containerPort - 1)),
 				},
 			}
-			Expect(findSvcPort(*rsm)).Should(BeZero())
+			Expect(findSvcPort(rsm)).Should(BeZero())
 		})
 	})
 
@@ -273,21 +273,21 @@ var _ = Describe("utils test", func() {
 			membersStatus := []workloads.MemberStatus{
 				{
 					PodName:     "pod-0",
-					ReplicaRole: workloads.ReplicaRole{Name: "leader", IsLeader: true},
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader", IsLeader: true},
 				},
 				{
 					PodName:     "pod-1",
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 				{
 					PodName:     "pod-2",
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 			}
 			Expect(getLeaderPodName(membersStatus)).Should(Equal(membersStatus[0].PodName))
 
 			By("set no leader")
-			membersStatus[0].IsLeader = false
+			membersStatus[0].ReplicaRole.IsLeader = false
 			Expect(getLeaderPodName(membersStatus)).Should(BeZero())
 		})
 	})

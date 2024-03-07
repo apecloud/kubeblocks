@@ -681,7 +681,9 @@ func (in *ClusterComponentStatus) DeepCopyInto(out *ClusterComponentStatus) {
 	if in.MembersStatus != nil {
 		in, out := &in.MembersStatus, &out.MembersStatus
 		*out = make([]workloadsv1alpha1.MemberStatus, len(*in))
-		copy(*out, *in)
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 

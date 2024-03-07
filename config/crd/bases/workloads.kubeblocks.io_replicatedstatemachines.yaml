@@ -12027,6 +12027,13 @@ spec:
                 description: currentRevision, if not empty, indicates the version
                   of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).
                 type: string
+              currentRevisions:
+                additionalProperties:
+                  type: string
+                description: currentRevisions, if not empty, indicates the old version
+                  of the RSM used to generate Pods. key is the pod name, value is
+                  the revision.
+                type: object
               initReplicas:
                 description: Defines the initial number of pods (members) when the
                   cluster is first initialized. This value is set to spec.Replicas
@@ -12078,7 +12085,6 @@ spec:
                       type: object
                   required:
                   - podName
-                  - role
                   type: object
                 type: array
               observedGeneration:
@@ -12107,6 +12113,13 @@ spec:
                 description: updateRevision, if not empty, indicates the version of
                   the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)
                 type: string
+              updateRevisions:
+                additionalProperties:
+                  type: string
+                description: updateRevisions, if not empty, indicates the new version
+                  of the RSM used to generate Pods. key is the pod name, value is
+                  the revision.
+                type: object
               updatedReplicas:
                 description: updatedReplicas is the number of Pods created by the
                   StatefulSet controller from the StatefulSet version indicated by

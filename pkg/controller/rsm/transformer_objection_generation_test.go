@@ -126,15 +126,15 @@ var _ = Describe("object generation transformer test.", func() {
 			rsm.Status.MembersStatus = []workloads.MemberStatus{
 				{
 					PodName:     getPodName(rsm.Name, 1),
-					ReplicaRole: workloads.ReplicaRole{Name: "leader", IsLeader: true},
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader", IsLeader: true},
 				},
 				{
 					PodName:     getPodName(rsm.Name, 0),
-					ReplicaRole: workloads.ReplicaRole{Name: "follower", CanVote: true},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower", CanVote: true},
 				},
 				{
 					PodName:     getPodName(rsm.Name, 2),
-					ReplicaRole: workloads.ReplicaRole{Name: "follower", CanVote: true},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower", CanVote: true},
 				},
 			}
 			requiredKeys := []string{
@@ -191,7 +191,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
@@ -215,7 +215,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
@@ -239,7 +239,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
@@ -263,7 +263,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))

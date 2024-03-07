@@ -212,6 +212,18 @@ type ReplicatedStateMachineStatus struct {
 	//
 	// +optional
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
+
+	// currentRevisions, if not empty, indicates the old version of the RSM used to generate Pods.
+	// key is the pod name, value is the revision.
+	//
+	// +optional
+	CurrentRevisions map[string]string `json:"currentRevisions,omitempty"`
+
+	// updateRevisions, if not empty, indicates the new version of the RSM used to generate Pods.
+	// key is the pod name, value is the revision.
+	//
+	// +optional
+	UpdateRevisions map[string]string `json:"updateRevisions,omitempty"`
 }
 
 // +genclient
@@ -466,7 +478,9 @@ type MemberStatus struct {
 	PodName string `json:"podName"`
 
 	// Defines the role of the replica in the cluster.
-	ReplicaRole `json:"role"`
+	//
+	// +optional
+	ReplicaRole *ReplicaRole `json:"role,omitempty"`
 
 	// Whether the corresponding Pod is in ready condition.
 	// +optional

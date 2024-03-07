@@ -7205,7 +7205,6 @@ spec:
                             type: object
                         required:
                         - podName
-                        - role
                         type: object
                       type: array
                     message:

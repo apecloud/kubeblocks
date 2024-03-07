@@ -49,15 +49,15 @@ var _ = Describe("update strategy transformer test.", func() {
 		membersStatus := []workloads.MemberStatus{
 			{
 				PodName:     getPodName(rsm.Name, 1),
-				ReplicaRole: workloads.ReplicaRole{Name: "leader", IsLeader: true},
+				ReplicaRole: &workloads.ReplicaRole{Name: "leader", IsLeader: true},
 			},
 			{
 				PodName:     getPodName(rsm.Name, 0),
-				ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+				ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 			},
 			{
 				PodName:     getPodName(rsm.Name, 2),
-				ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+				ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 			},
 		}
 		rsm.Status.MembersStatus = membersStatus

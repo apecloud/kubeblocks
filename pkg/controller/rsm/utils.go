@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"golang.org/x/exp/slices"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"regexp"
 	"sort"
 	"strconv"
@@ -80,7 +81,7 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 
 func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {
 	getRoleFunc := func(i int) string {
-		return membersStatus[i].Name
+		return membersStatus[i].ReplicaRole.Name
 	}
 	getOrdinalFunc := func(i int) int {
 		ordinal, _ := getPodOrdinal(membersStatus[i].PodName)
@@ -170,11 +171,16 @@ func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.R
 	return roleMap
 }
 
-func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
+func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods *[]corev1.Pod) {
+	// no roles defined
+	if rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
+		setMembersStatusWithoutRole(rsm, pods)
+		return
+	}
 	// compose new status
 	newMembersStatus := make([]workloads.MemberStatus, 0)
 	roleMap := composeRoleMap(*rsm)
-	for _, pod := range pods {
+	for _, pod := range *pods {
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
@@ -189,7 +195,8 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 		}
 		memberStatus := workloads.MemberStatus{
 			PodName:             pod.Name,
-			ReplicaRole:         role,
+			ReplicaRole:         &role,
+			Ready:               true,
 			ReadyWithoutPrimary: readyWithoutPrimary,
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)
@@ -199,6 +206,21 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 	rolePriorityMap := ComposeRolePriorityMap(rsm.Spec.Roles)
 	sortMembersStatus(newMembersStatus, rolePriorityMap)
 	rsm.Status.MembersStatus = newMembersStatus
+}
+
+func setMembersStatusWithoutRole(rsm *workloads.ReplicatedStateMachine, pods *[]corev1.Pod) {
+	var membersStatus []workloads.MemberStatus
+	for _, pod := range *pods {
+		memberStatus := workloads.MemberStatus{
+			PodName: pod.Name,
+			Ready:   podutils.IsPodReady(&pod),
+		}
+		membersStatus = append(membersStatus, memberStatus)
+	}
+	slices.SortStableFunc(membersStatus, func(a, b workloads.MemberStatus) bool {
+		return a.PodName < b.PodName
+	})
+	rsm.Status.MembersStatus = membersStatus
 }
 
 // getRoleName gets role name of pod 'pod'
@@ -250,7 +272,7 @@ func getHeadlessSvcName(rsm workloads.ReplicatedStateMachine) string {
 	return strings.Join([]string{rsm.Name, "headless"}, "-")
 }
 
-func findSvcPort(rsm workloads.ReplicatedStateMachine) int {
+func findSvcPort(rsm *workloads.ReplicatedStateMachine) int {
 	if rsm.Spec.Service == nil || len(rsm.Spec.Service.Spec.Ports) == 0 {
 		return 0
 	}
@@ -303,7 +325,7 @@ func getActionName(parent string, generation, ordinal int, actionType string) st
 
 func getLeaderPodName(membersStatus []workloads.MemberStatus) string {
 	for _, memberStatus := range membersStatus {
-		if memberStatus.IsLeader {
+		if memberStatus.ReplicaRole.IsLeader {
 			return memberStatus.PodName
 		}
 	}
@@ -383,7 +405,7 @@ func buildActionEnv(rsm *workloads.ReplicatedStateMachine, leader, target string
 	svcName := getHeadlessSvcName(*rsm)
 	leaderHost := fmt.Sprintf("%s.%s", leader, svcName)
 	targetHost := fmt.Sprintf("%s.%s", target, svcName)
-	svcPort := findSvcPort(*rsm)
+	svcPort := findSvcPort(rsm)
 	return []corev1.EnvVar{
 		{
 			Name:  leaderHostVarName,
@@ -710,7 +732,7 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 		if status.ReadyWithoutPrimary {
 			return true
 		}
-		if status.IsLeader {
+		if status.ReplicaRole.IsLeader {
 			hasLeader = true
 			break
 		}

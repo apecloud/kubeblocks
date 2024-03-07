@@ -91,7 +91,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	altSvs := buildAlternativeSvs(*rsm)
 	headLessSvc := buildHeadlessSvc(*rsm)
 	envConfig := buildEnvConfigMap(*rsm)
-	workloadList, err := buildWorkloads(*rsm, headLessSvc.Name, *envConfig, isManagingSts)
+	workloadList, err := buildWorkloads(rsm, headLessSvc.Name, *envConfig, isManagingSts)
 	if err != nil {
 		transCtx.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, err.Error())
 		return model.NewRequeueError(time.Second*10, err.Error())
@@ -444,7 +444,7 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	return hdlBuilder.GetObject()
 }
 
-func buildWorkloads(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap, isManagingSts bool) ([]client.Object, error) {
+func buildWorkloads(rsm *workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap, isManagingSts bool) ([]client.Object, error) {
 	if isManagingSts {
 		return []client.Object{buildSts(rsm, headlessSvcName, envConfig)}, nil
 	}
@@ -452,7 +452,7 @@ func buildWorkloads(rsm workloads.ReplicatedStateMachine, headlessSvcName string
 	return buildPods(rsm, envConfig)
 }
 
-func buildPods(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) ([]client.Object, error) {
+func buildPods(rsm *workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) ([]client.Object, error) {
 	// 1. prepare all templates
 	var podTemplates []*podTemplateSpecExt
 	var replicasInTemplates int32
@@ -511,7 +511,7 @@ func buildPods(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap)
 			err     error
 		)
 		for _, template := range templateList {
-			podList, pvcList, ordinal, err = buildPodByTemplate(template, ordinal, &rsm)
+			podList, pvcList, ordinal, err = buildPodByTemplate(template, ordinal, rsm)
 			if err != nil {
 				return nil, err
 			}
@@ -525,6 +525,7 @@ func buildPods(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap)
 	}
 	// validate duplicate pod names
 	podNameCount := make(map[string]int)
+	updatedRevisions := make(map[string]string, len(pods))
 	for _, pod := range pods {
 		count, exist := podNameCount[pod.GetName()]
 		if exist {
@@ -533,6 +534,7 @@ func buildPods(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap)
 			count = 1
 		}
 		podNameCount[pod.GetName()] = count
+		updatedRevisions[pod.GetName()] = pod.GetLabels()[apps.ControllerRevisionHashLabelKey]
 	}
 	dupNames := ""
 	for name, count := range podNameCount {
@@ -543,6 +545,10 @@ func buildPods(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap)
 	if len(dupNames) > 0 {
 		return nil, fmt.Errorf("duplicate pod names: %s", dupNames)
 	}
+
+	rsm.Status.UpdateRevisions = updatedRevisions
+	rsm.Status.UpdateRevision = pods[len(pods)-1].GetLabels()[apps.ControllerRevisionHashLabelKey]
+
 	return append(pods, pvcs...), nil
 }
 
@@ -631,7 +637,7 @@ func buildPodTemplateRevision(template *podTemplateSpecExt, parent *workloads.Re
 	if err != nil {
 		return "", err
 	}
-	return cr.Name, nil
+	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
 func applyInstanceTemplate(instance workloads.InstanceTemplate, template *podTemplateSpecExt) {
@@ -674,10 +680,10 @@ func applyInstanceTemplate(instance workloads.InstanceTemplate, template *podTem
 		})
 }
 
-func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
+func buildSts(rsm *workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
 	template := buildPodTemplate(rsm, envConfig)
 	annotations := ParseAnnotationsOfScope(RootScope, rsm.Annotations)
-	labels := getLabels(&rsm)
+	labels := getLabels(rsm)
 	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(labels).
 		AddLabels(rsmGenerationLabelKey, strconv.FormatInt(rsm.Generation, 10)).
@@ -703,7 +709,7 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 		SetData(envData).GetObject()
 }
 
-func buildPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
+func buildPodTemplate(rsm *workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
 	template := rsm.Spec.Template
 	// inject env ConfigMap into workload pods only
 	for i := range template.Spec.Containers {
@@ -722,7 +728,7 @@ func buildPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.Con
 	return &template
 }
 
-func injectRoleProbeContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
+func injectRoleProbeContainer(rsm *workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
 	roleProbe := rsm.Spec.RoleProbe
 	if roleProbe == nil {
 		return
@@ -791,7 +797,7 @@ func buildActionSvcPorts(template *corev1.PodTemplateSpec, actions []workloads.A
 	return actionSvcPorts
 }
 
-func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
+func injectRoleProbeBaseContainer(rsm *workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role probe base container
 	roleProbe := rsm.Spec.RoleProbe
 	if roleProbe == nil {
@@ -1001,7 +1007,7 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 	template.Spec.Containers = append(template.Spec.Containers, *container)
 }
 
-func injectCustomRoleProbeContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+func injectCustomRoleProbeContainer(rsm *workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
 	if rsm.Spec.RoleProbe == nil {
 		return
 	}
@@ -1080,9 +1086,9 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 				continue
 			}
 			switch {
-			case memberStatus.IsLeader:
+			case memberStatus.ReplicaRole.IsLeader:
 				envData[prefix+"LEADER"] = memberStatus.PodName
-			case memberStatus.CanVote:
+			case memberStatus.ReplicaRole.CanVote:
 				if len(followers) > 0 {
 					followers += ","
 				}

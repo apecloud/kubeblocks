@@ -40,114 +40,6 @@ type reconfiguringResult struct {
 	err                  error
 }
 
-// type updateReconfigureStatus func(params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) error
-
-// Deprecated: use NewPipeline instead
-// updateConfigConfigmapResource merges parameters of the config into the configmap, and verifies final configuration file.
-// func updateConfigConfigmapResource(config appsv1alpha1.ConfigurationItem,
-//	configSpec appsv1alpha1.ComponentConfigSpec,
-//	cmKey client.ObjectKey,
-//	ctx context.Context,
-//	cli client.Client,
-//	opsCrName string,
-//	updater updateReconfigureStatus) reconfiguringResult {
-//	var (
-//		cm = &corev1.ConfigMap{}
-//		cc = &appsv1alpha1.ConfigConstraint{}
-//
-//		err    error
-//		newCfg map[string]string
-//	)
-//
-//	if err := cli.Get(ctx, cmKey, cm); err != nil {
-//		return makeReconfiguringResult(err)
-//	}
-//	if err := cli.Get(ctx, client.ObjectKey{
-//		Namespace: configSpec.Namespace,
-//		Name:      configSpec.ConfigConstraintRef,
-//	}, cc); err != nil {
-//		return makeReconfiguringResult(err)
-//	}
-//
-//	updatedFiles := make(map[string]string, len(config.Keys))
-//	updatedParams := make([]core.ParamPairs, 0, len(config.Keys))
-//	for _, key := range config.Keys {
-//		if key.FileContent != "" {
-//			updatedFiles[key.Key] = key.FileContent
-//		}
-//		if len(key.Parameters) > 0 {
-//			updatedParams = append(updatedParams, core.ParamPairs{
-//				Key:           key.Key,
-//				UpdatedParams: fromKeyValuePair(key.Parameters),
-//			})
-//		}
-//	}
-//
-//	if newCfg, err = mergeUpdatedParams(cm.Data, updatedFiles, updatedParams, cc, configSpec); err != nil {
-//		return makeReconfiguringResult(err, withFailed(true))
-//	}
-//	configPatch, restart, err := core.CreateConfigPatch(cm.Data, newCfg, cc.Spec.FormatterConfig.Format, configSpec.Keys, len(updatedFiles) != 0)
-//	if err != nil {
-//		return makeReconfiguringResult(err)
-//	}
-//	if !restart && !configPatch.IsModify {
-//		return makeReconfiguringResult(nil, withReturned(newCfg, configPatch))
-//	}
-//	if updater != nil {
-//		if err := updater(updatedParams, cm.Data, cc.Spec.FormatterConfig); err != nil {
-//			return makeReconfiguringResult(err)
-//		}
-//	}
-//
-//	return makeReconfiguringResult(
-//		syncConfigmap(cm, newCfg, cli, ctx, opsCrName, configSpec, &cc.Spec, config.Policy),
-//		withReturned(newCfg, configPatch),
-//		withNoFormatFilesUpdated(restart))
-// }
-
-// func mergeUpdatedParams(base map[string]string,
-//	updatedFiles map[string]string,
-//	updatedParams []core.ParamPairs,
-//	cc *appsv1alpha1.ConfigConstraint,
-//	tpl appsv1alpha1.ComponentConfigSpec) (map[string]string, error) {
-//	updatedConfig := base
-//
-//	// merge updated files into configmap
-//	if len(updatedFiles) != 0 {
-//		return core.MergeUpdatedConfig(base, updatedFiles), nil
-//	}
-//	if cc == nil {
-//		return updatedConfig, nil
-//	}
-//	return intctrlutil.MergeAndValidateConfigs(cc.Spec, updatedConfig, tpl.Keys, updatedParams)
-// }
-
-// func syncConfigmap(
-//	cmObj *corev1.ConfigMap,
-//	newCfg map[string]string,
-//	cli client.Client,
-//	ctx context.Context,
-//	opsCrName string,
-//	configSpec appsv1alpha1.ComponentConfigSpec,
-//	cc *appsv1alpha1.ConfigConstraintSpec,
-//	policy *appsv1alpha1.UpgradePolicy) error {
-//
-//	patch := client.MergeFrom(cmObj.DeepCopy())
-//	cmObj.Data = newCfg
-//	if cmObj.Annotations == nil {
-//		cmObj.Annotations = make(map[string]string)
-//	}
-//	if policy != nil {
-//		cmObj.Annotations[constant.UpgradePolicyAnnotationKey] = string(*policy)
-//	}
-//	cmObj.Annotations[constant.LastAppliedOpsCRAnnotationKey] = opsCrName
-//	core.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
-//	if err := configuration.SyncEnvConfigmap(configSpec, cmObj, cc, cli, ctx); err != nil {
-//		return err
-//	}
-//	return cli.Patch(ctx, cmObj, patch)
-// }
-
 func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) {
 	var maxLabelCount = 16
 	updateLabel := func(param map[string]interface{}) {
@@ -158,8 +50,11 @@ func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.P
 			if maxLabelCount <= 0 {
 				return
 			}
+			paramName := core.GetValidFieldName(key)
+			if core.IsValidLabelKeyOrValue(paramName) {
+				obj.Labels[paramName] = core.FromValueToString(val)
+			}
 			maxLabelCount--
-			obj.Labels[core.GetValidFieldName(key)] = core.FromValueToString(val)
 		}
 	}
 	updateAnnotation := func(keyFile string, param map[string]interface{}) {

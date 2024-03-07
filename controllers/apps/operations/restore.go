@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -193,6 +194,16 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 	cluster.Name = opsRequest.Spec.ClusterRef
 	// Reset cluster services
-	cluster.Spec.Services = nil
+	var services []appsv1alpha1.ClusterService
+	for i := range cluster.Spec.Services {
+		svc := cluster.Spec.Services[i]
+		if svc.Service.Spec.Type != corev1.ServiceTypeLoadBalancer {
+			if svc.Service.Spec.Selector != nil {
+				delete(svc.Service.Spec.Selector, constant.AppInstanceLabelKey)
+			}
+			services = append(services, svc)
+		}
+	}
+	cluster.Spec.Services = services
 	return cluster, nil
 }

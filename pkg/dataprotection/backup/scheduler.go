@@ -412,9 +412,9 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for ops %s finished.", ops.Name)
 }
 
-func (r *Scheduler) reconcileReconfigure(backupSchedule *dpv1alpha1.BackupSchedule) error {
+func (s *Scheduler) reconcileReconfigure(backupSchedule *dpv1alpha1.BackupSchedule) error {
 	opsList := appsv1alpha1.OpsRequestList{}
-	if err := r.Client.List(r.Ctx, &opsList,
+	if err := s.Client.List(s.Ctx, &opsList,
 		client.InNamespace(backupSchedule.Namespace),
 		client.MatchingLabels{dptypes.BackupScheduleLabelKey: backupSchedule.Name}); err != nil {
 		return err

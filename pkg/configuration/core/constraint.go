@@ -24,7 +24,7 @@ import appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 const (
 	ReconfigureCreatedPhase    = "created"
 	ReconfigureNoChangeType    = "noChange"
-	ReconfigureAutoReloadPhase = string(appsv1alpha1.AutoReload)
+	ReconfigureAutoReloadPhase = string(appsv1alpha1.AsyncDynamicReloadPolicy)
 	ReconfigureSimplePhase     = string(appsv1alpha1.NormalPolicy)
 	ReconfigureParallelPhase   = string(appsv1alpha1.RestartPolicy)
 	ReconfigureRollingPhase    = string(appsv1alpha1.RollingPolicy)

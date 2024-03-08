@@ -163,6 +163,11 @@ type BackupStatus struct {
 	// +optional
 	BackupMethod *BackupMethod `json:"backupMethod,omitempty"`
 
+	// Records the encryption config for this backup.
+	//
+	// +optional
+	EncryptionConfig *EncryptionConfig `json:"encryptionConfig,omitempty"`
+
 	// Records the actions status for this backup.
 	//
 	// +optional

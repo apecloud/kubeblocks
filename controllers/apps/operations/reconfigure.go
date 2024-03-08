@@ -100,8 +100,8 @@ func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, c
 	})
 
 	err := fetcher.Cluster().
-		ClusterDef().
-		ClusterVer().
+		// ClusterDef().
+		// ClusterVer().
 		Configuration().
 		ConfigMap(configSpec.Name).
 		Complete()

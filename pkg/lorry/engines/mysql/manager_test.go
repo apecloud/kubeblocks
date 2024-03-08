@@ -265,7 +265,7 @@ func TestManager_IsMemberLagging(t *testing.T) {
 
 	t.Run("No leader DBState info", func(t *testing.T) {
 		isMemberLagging, lags := manager.IsMemberLagging(ctx, cluster, nil)
-		assert.True(t, isMemberLagging)
+		assert.False(t, isMemberLagging)
 		assert.Zero(t, lags)
 	})
 

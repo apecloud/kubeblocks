@@ -475,6 +475,21 @@ for clusters with a low update frequency.</p>
 <p>NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition, otherwise the backup will not be processed.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>encryptionConfig</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.EncryptionConfig">
+EncryptionConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the parameters for encrypting backup data.
+Encryption will be disabled if the field is not set.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -1824,6 +1839,21 @@ for clusters with a low update frequency.</p>
 <p>NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition, otherwise the backup will not be processed.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>encryptionConfig</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.EncryptionConfig">
+EncryptionConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the parameters for encrypting backup data.
+Encryption will be disabled if the field is not set.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPolicyStatus">BackupPolicyStatus
@@ -2643,6 +2673,20 @@ Refer to BackupMethod for more details.</p>
 </tr>
 <tr>
 <td>
+<code>encryptionConfig</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.EncryptionConfig">
+EncryptionConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the encryption config for this backup.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>actions</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.ActionStatus">
@@ -2950,6 +2994,54 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the map key of the port in the connection credential secret.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.EncryptionConfig">EncryptionConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicySpec">BackupPolicySpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatus">BackupStatus</a>)
+</p>
+<div>
+<p>EncryptionConfig defines the parameters for encrypting backup data.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>algorithm</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the encryption algorithm. Currently supported algorithms are:</p>
+<ul>
+<li>AES-128-CFB</li>
+<li>AES-192-CFB</li>
+<li>AES-256-CFB</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>passPhraseSecretKeyRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretkeyselector-v1-core">
+Kubernetes core/v1.SecretKeySelector
+</a>
+</em>
+</td>
+<td>
+<p>Selects the key of a secret in the current namespace, the value of the secret
+is used as the encryption key.</p>
 </td>
 </tr>
 </tbody>

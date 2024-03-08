@@ -114,24 +114,66 @@ spec:
               customSpec:
                 description: Specifies a custom operation as defined by OpsDefinition.
                 properties:
-                  componentName:
-                    description: Refers to the name of the cluster component.
-                    type: string
+                  components:
+                    description: Defines which components need to perform the actions
+                      defined by this OpsDefinition. At least one component is required.
+                      The components are identified by their name and can be merged
+                      or retained.
+                    items:
+                      properties:
+                        name:
+                          description: Specifies the unique identifier of the cluster
+                            component
+                          type: string
+                        parameters:
+                          description: Represents the parameters for this operation
+                            as declared in the opsDefinition.spec.parametersSchema.
+                          items:
+                            properties:
+                              name:
+                                description: Specifies the identifier of the parameter
+                                  as defined in the OpsDefinition.
+                                type: string
+                              value:
+                                description: Holds the data associated with the parameter.
+                                  If the parameter type is an array, the format should
+                                  be "v1,v2,v3".
+                                type: string
+                            required:
+                            - name
+                            - value
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                      required:
+                      - name
+                      type: object
+                    minItems: 1
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                   opsDefinitionRef:
                     description: Is a reference to an OpsDefinition.
                     type: string
-                  params:
-                    description: Represents the input for this operation as declared
-                      in the opsDefinition.spec.parametersSchema. It will create corresponding
-                      jobs for each array element. If the param type is an array,
-                      the format must be "v1,v2,v3".
-                    items:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    type: array
+                  parallelism:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: Defines the execution concurrency. By default, all
+                      incoming Components will be executed simultaneously. The value
+                      can be an absolute number (e.g., 5) or a percentage of desired
+                      components (e.g., 10%). The absolute number is calculated from
+                      the percentage by rounding up. For instance, if the percentage
+                      value is 10% and the components length is 1, the calculated
+                      number will be rounded up to 1.
+                    x-kubernetes-int-or-string: true
+                  serviceAccountName:
+                    type: string
                 required:
-                - componentName
+                - components
                 - opsDefinitionRef
                 type: object
               expose:
@@ -437,6 +479,7 @@ spec:
                           - rolling
                           - autoReload
                           - operatorSyncUpdate
+                          - dynamicReloadBeginRestart
                           type: string
                       required:
                       - keys
@@ -529,6 +572,7 @@ spec:
                             - rolling
                             - autoReload
                             - operatorSyncUpdate
+                            - dynamicReloadBeginRestart
                             type: string
                         required:
                         - keys
@@ -1038,11 +1082,66 @@ spec:
                       - Failed
                       - Abnormal
                       type: string
+                    preCheck:
+                      description: Specifies the outcome of the preConditions check
+                        for the opsRequest. This result is crucial for determining
+                        the next steps in the operation.
+                      properties:
+                        message:
+                          description: Provides additional details about the preCheck
+                            operation in a human-readable format.
+                          type: string
+                        pass:
+                          description: Indicates whether the preCheck operation was
+                            successful or not.
+                          type: boolean
+                      required:
+                      - pass
+                      type: object
                     progressDetails:
                       description: Describes the progress details of the component
                         for this operation.
                       items:
                         properties:
+                          actionName:
+                            description: Refer to the action name of the OpsDefinition.spec.actions[*].name.
+                              either objectKey or actionName.
+                            type: string
+                          actionTasks:
+                            description: Records the tasks associated with an action.
+                              such as Jobs/Pods that executes action.
+                            items:
+                              properties:
+                                namespace:
+                                  description: Defines the namespace where the task
+                                    workload is deployed.
+                                  type: string
+                                objectKey:
+                                  description: Specifies the name of the task workload.
+                                  type: string
+                                retries:
+                                  description: The number of retry attempts for this
+                                    task.
+                                  format: int32
+                                  type: integer
+                                status:
+                                  description: Indicates the current status of the
+                                    task.
+                                  enum:
+                                  - Processing
+                                  - Failed
+                                  - Succeed
+                                  type: string
+                                targetPodName:
+                                  description: The name of the target pod for the
+                                    task.
+                                  type: string
+                              required:
+                              - namespace
+                              - objectKey
+                              - status
+                              type: object
+                            type: array
                           endTime:
                             description: Represents the completion time of object
                               processing.
@@ -1059,6 +1158,7 @@ spec:
                             type: string
                           objectKey:
                             description: Represents the unique key of the object.
+                              either objectKey or actionName.
                             type: string
                           startTime:
                             description: Represents the start time of object processing.
@@ -1073,9 +1173,11 @@ spec:
                             - Succeed
                             type: string
                         required:
-                        - objectKey
                         - status
                         type: object
+                        x-kubernetes-validations:
+                        - message: either objectKey and actionName.
+                          rule: has(self.objectKey) || has(self.actionName)
                       type: array
                     reason:
                       description: Describes the reason for the component phase.
@@ -1165,6 +1267,14 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              extras:
+                description: A collection of additional key-value pairs that provide
+                  supplementary information for the opsRequest.
+                items:
+                  additionalProperties:
+                    type: string
+                  type: object
+                type: array
               lastConfiguration:
                 description: Records the last configuration before this operation
                   took effect.
@@ -1456,6 +1566,7 @@ spec:
                           - rolling
                           - autoReload
                           - operatorSyncUpdate
+                          - dynamicReloadBeginRestart
                           type: string
                         updatedParameters:
                           description: Contains the updated parameters.
@@ -1609,6 +1720,7 @@ spec:
                             - rolling
                             - autoReload
                             - operatorSyncUpdate
+                            - dynamicReloadBeginRestart
                             type: string
                           updatedParameters:
                             description: Contains the updated parameters.

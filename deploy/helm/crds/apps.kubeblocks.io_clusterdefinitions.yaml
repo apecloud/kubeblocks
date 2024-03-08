@@ -10114,6 +10114,7 @@ spec:
                 - Unavailable
                 type: string
               serviceRefs:
+                description: The service references declared by this ClusterDefinition.
                 type: string
               topologies:
                 description: Topologies this ClusterDefinition supported.

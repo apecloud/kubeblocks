@@ -5363,6 +5363,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
+<p>The service references declared by this ClusterDefinition.</p>
 </td>
 </tr>
 </tbody>
@@ -6169,6 +6170,7 @@ bool
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Default indicates whether this topology is the default configuration.</p>
 </td>
 </tr>

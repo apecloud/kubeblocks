@@ -82,15 +82,15 @@ type ClusterTopology struct {
 	// Name is the unique identifier for the cluster topology.
 	// Cannot be updated.
 	//
+	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
-	// +required
 	Name string `json:"name"`
 
 	// Components specifies the components in the topology.
 	//
+	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
-	// +required
 	Components []ClusterTopologyComponent `json:"components"`
 
 	// Orders defines the orders of components within the topology.
@@ -100,7 +100,7 @@ type ClusterTopology struct {
 
 	// Default indicates whether this topology is the default configuration.
 	//
-	// + optional
+	// +optional
 	Default bool `json:"default,omitempty"`
 }
 
@@ -313,6 +313,8 @@ type ClusterDefinitionStatus struct {
 	// +optional
 	Topologies string `json:"topologies,omitempty"`
 
+	// The service references declared by this ClusterDefinition.
+	//
 	// +optional
 	ServiceRefs string `json:"serviceRefs,omitempty"`
 }

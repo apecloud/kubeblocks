@@ -136,7 +136,7 @@ type ComponentVersion struct {
 	Status ComponentVersionStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ComponentVersionList contains a list of ComponentVersion
 type ComponentVersionList struct {

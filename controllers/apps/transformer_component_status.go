@@ -48,12 +48,6 @@ import (
 const (
 	// componentPhaseTransition the event reason indicates that the component transits to a new phase.
 	componentPhaseTransition = "ComponentPhaseTransition"
-
-	// podContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
-	podContainerFailedTimeout = 10 * time.Second
-
-	// podScheduledFailedTimeout timeout for scheduling failure.
-	podScheduledFailedTimeout = 30 * time.Second
 )
 
 // componentStatusTransformer computes the current status: read the underlying rsm status and update the component status
@@ -569,7 +563,7 @@ func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMe
 		requeueAfter   time.Duration
 	)
 	for _, pod := range pods {
-		isFailed, isTimedOut, messageStr := isPodFailedAndTimedOut(pod)
+		isFailed, isTimedOut, messageStr := intctrlutil.IsPodFailedAndTimedOut(pod)
 		if !isFailed {
 			continue
 		}
@@ -581,63 +575,9 @@ func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMe
 		}
 	}
 	if hasFailedPod && !hasTimedOutPod {
-		requeueAfter = podContainerFailedTimeout
+		requeueAfter = intctrlutil.PodContainerFailedTimeout
 	}
 	return hasTimedOutPod, messages, requeueAfter
-}
-
-// isPodFailedAndTimedOut checks if the pod is failed and timed out.
-func isPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
-	if isFailed, isTimedOut, message := isPodScheduledFailedAndTimedOut(pod); isFailed {
-		return isFailed, isTimedOut, message
-	}
-	initContainerFailed, message := isAnyContainerFailed(pod.Status.InitContainerStatuses)
-	if initContainerFailed {
-		return initContainerFailed, isContainerFailedAndTimedOut(pod, corev1.PodInitialized), message
-	}
-	containerFailed, message := isAnyContainerFailed(pod.Status.ContainerStatuses)
-	if containerFailed {
-		return containerFailed, isContainerFailedAndTimedOut(pod, corev1.ContainersReady), message
-	}
-	return false, false, ""
-}
-
-// isPodScheduledFailedAndTimedOut checks whether the unscheduled pod has timed out.
-func isPodScheduledFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
-	for _, cond := range pod.Status.Conditions {
-		if cond.Type != corev1.PodScheduled {
-			continue
-		}
-		if cond.Status == corev1.ConditionTrue {
-			return false, false, ""
-		}
-		return true, time.Now().After(cond.LastTransitionTime.Add(podScheduledFailedTimeout)), cond.Message
-	}
-	return false, false, ""
-}
-
-// isAnyContainerFailed checks whether any container in the list is failed.
-func isAnyContainerFailed(containersStatus []corev1.ContainerStatus) (bool, string) {
-	for _, v := range containersStatus {
-		waitingState := v.State.Waiting
-		if waitingState != nil && waitingState.Message != "" {
-			return true, waitingState.Message
-		}
-		terminatedState := v.State.Terminated
-		if terminatedState != nil && terminatedState.Message != "" {
-			return true, terminatedState.Message
-		}
-	}
-	return false, ""
-}
-
-// isContainerFailedAndTimedOut checks whether the failed container has timed out.
-func isContainerFailedAndTimedOut(pod *corev1.Pod, podConditionType corev1.PodConditionType) bool {
-	containerReadyCondition := intctrlutil.GetPodCondition(&pod.Status, podConditionType)
-	if containerReadyCondition == nil || containerReadyCondition.LastTransitionTime.IsZero() {
-		return false
-	}
-	return time.Now().After(containerReadyCondition.LastTransitionTime.Add(podContainerFailedTimeout))
 }
 
 // newComponentStatusHandler creates a new componentStatusHandler

@@ -104,6 +104,8 @@ const (
 	DPBackupBasePath = "DP_BACKUP_BASE_PATH"
 	// DPBackupName backup CR name
 	DPBackupName = "DP_BACKUP_NAME"
+	// DPParentBackupName backup CR name
+	DPParentBackupName = "DP_PARENT_BACKUP_NAME"
 	// DPTTL backup time to live, reference the backup.spec.retentionPeriod
 	DPTTL = "DP_TTL"
 	// DPCheckInterval check interval for sync backup progress
@@ -129,6 +131,9 @@ const (
 	DPDatasafedEncryptionAlgorithm = "DATASAFED_ENCRYPTION_ALGORITHM"
 	// DPDatasafedEncryptionPassPhrase specifies the encryption key
 	DPDatasafedEncryptionPassPhrase = "DATASAFED_ENCRYPTION_PASS_PHRASE"
+
+	DPArchiveInterval      = "DP_ARCHIVE_INTERVAL"
+	DPContinuousTTLSeconds = "DP_TTL_SECONDS"
 )
 
 const (

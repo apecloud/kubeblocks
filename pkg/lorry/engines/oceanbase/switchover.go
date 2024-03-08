@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+	_ "github.com/godror/godror"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -293,29 +294,35 @@ func (mgr *Manager) standbyTenant(ctx context.Context, db *sql.DB) error {
 
 func (mgr *Manager) getConnWithMode(member *dcs.Member, compatibilityMode string) (*sql.DB, error) {
 	var user, dsn string
+	var tenantDB *sql.DB
+	var err error
 	switch compatibilityMode {
 	case MYSQL:
 		user = "root"
 		// "root@alice@tcp(10.1.0.47:2881)/oceanbase?multiStatements=true"
 		dsn = fmt.Sprintf("%s@%s@tcp(%s:%s)/oceanbase?multiStatements=true", user, mgr.ReplicaTenant, member.PodIP, member.DBPort)
+		_, err := mysql.ParseDSN(dsn)
+		if err != nil {
+			return nil, errors.Wrapf(err, "illegal Data Source Name (DNS): %s", dsn)
+		}
+
+		tenantDB, err = sql.Open("mysql", dsn)
+		if err != nil {
+			return nil, errors.Wrap(err, "get DB connection failed")
+		}
 	case ORACLE:
 		user = "SYS"
 		dsn = fmt.Sprintf("%s@%s@tcp(%s:%s)/SYS?multiStatements=true", user, mgr.ReplicaTenant, member.PodIP, member.DBPort)
+		tenantDB, err = sql.Open("godror", dsn)
+		if err != nil {
+			return nil, errors.Wrap(err, "get DB connection failed")
+		}
 	default:
 		err := errors.Errorf("the compatibility mode is invalid: %s", compatibilityMode)
 		return nil, err
 	}
 
-	_, err := mysql.ParseDSN(dsn)
-	if err != nil {
-		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS): %s", dsn)
-	}
-
-	tenantdb, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, errors.Wrap(err, "get DB connection failed")
-	}
-	return tenantdb, nil
+	return tenantDB, nil
 }
 
 func getCompnentName(memberName string) (string, error) {

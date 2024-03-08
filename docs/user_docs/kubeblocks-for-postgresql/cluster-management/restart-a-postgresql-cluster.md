@@ -21,7 +21,7 @@ Restarting a PostgreSQL cluster triggers a concurrent restart and the leader may
 
 1. Restart a cluster.
 
-  You can use `kbcli` or create an OpsRequest to restart a cluster.
+   You can use `kbcli` or create an OpsRequest to restart a cluster.
   
    **Option 1.** (**Recommended**) Use kbcli
 

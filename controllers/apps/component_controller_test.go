@@ -2013,6 +2013,43 @@ var _ = Describe("Component Controller", func() {
 		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+1, 0, 1)
 	}
 
+	testCompInheritLabelsAndAnnotations := func(compName, compDefName string) {
+		By("Mock a cluster obj with custom labels and annotations.")
+		customLabelKey := "custom-inherit-label-key"
+		customLabelValue := "custom-inherit-label-value"
+		customLabelKeyBeFiltered := constant.RoleLabelKey
+		customLabelValueBeFiltered := "cluster-role-should-be-filtered"
+		customLabels := map[string]string{
+			customLabelKey:           customLabelValue,
+			customLabelKeyBeFiltered: customLabelValueBeFiltered,
+		}
+
+		customAnnotationKey := "custom-inherit-annotation-key"
+		customAnnotationValue := "custom-inherit-annotation-value"
+		customAnnotationKeyBeFiltered := constant.KubeBlocksGenerationKey
+		customAnnotationValueBeFiltered := "cluster-annotation-should-be-filtered"
+		customAnnotations := map[string]string{
+			customAnnotationKey:                                      customAnnotationValue,
+			customAnnotationKeyBeFiltered:                            customAnnotationValueBeFiltered,
+			constant.IgnoreResourceConstraint:                        "true",
+			constant.FeatureReconciliationInCompactModeAnnotationKey: "true",
+		}
+		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+			f.AddLabelsInMap(customLabels)
+			f.AddAnnotationsInMap(customAnnotations)
+		})
+
+		By("check component inherit clusters labels and annotations")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			g.Expect(comp.Labels).Should(HaveKeyWithValue(customLabelKey, customLabelValue))
+			g.Expect(comp.Labels).ShouldNot(HaveKeyWithValue(customLabelKeyBeFiltered, customLabelValueBeFiltered))
+			g.Expect(comp.Annotations).Should(HaveKeyWithValue(customAnnotationKey, customAnnotationValue))
+			g.Expect(comp.Annotations).ShouldNot(HaveKeyWithValue(customAnnotationKeyBeFiltered, customAnnotationValueBeFiltered))
+			g.Expect(comp.Annotations).Should(HaveKeyWithValue(constant.IgnoreResourceConstraint, "true"))
+			g.Expect(comp.Annotations).Should(HaveKeyWithValue(constant.FeatureReconciliationInCompactModeAnnotationKey, "true"))
+		})).Should(Succeed())
+	}
+
 	Context("component resources provisioning", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
@@ -2025,6 +2062,10 @@ var _ = Describe("Component Controller", func() {
 
 		It("component finalizers and labels", func() {
 			testCompFinalizerNLabel(defaultCompName, compDefName)
+		})
+
+		It("with inherit cluster labels and annotations", func() {
+			testCompInheritLabelsAndAnnotations(defaultCompName, compDefName)
 		})
 
 		It("with component services", func() {

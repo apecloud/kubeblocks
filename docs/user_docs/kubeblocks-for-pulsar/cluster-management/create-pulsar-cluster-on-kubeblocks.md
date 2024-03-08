@@ -14,7 +14,7 @@ KubeBlocks supports Pulsar's daily operations, including basic lifecycle operati
 
 ## Environment Recommendation
 
-Refer to the Pulsar official document for the configuration, such as memory, cpu, and storage, of each component.
+Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) for the configuration, such as memory, cpu, and storage, of each component.
 
 |      Components        |                                 Replicas                                  |
 | :--------------------  | :------------------------------------------------------------------------ |
@@ -88,7 +88,7 @@ Refer to the Pulsar official document for the configuration, such as memory, cpu
      ```
 
    - **Option 2**: Create pulsar cluster with proxy.
-     Configuration:
+   Configuration:
      - proxy: 3 replicas
      - broker: 3 replicas
      - bookies: 4 replicas

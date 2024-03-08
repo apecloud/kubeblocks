@@ -257,8 +257,9 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 		return err
 	}
 	kopiaRepoPath := backup.Status.KopiaRepoPath
+	encryptionConfig := backup.Status.EncryptionConfig
 	if backupRepo != nil {
-		utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, kopiaRepoPath)
+		utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, encryptionConfig, kopiaRepoPath)
 	} else {
 		utils.InjectDatasafedWithPVC(&podSpec, legacyPVCName, RepoVolumeMountPath, kopiaRepoPath)
 	}

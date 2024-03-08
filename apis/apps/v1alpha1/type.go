@@ -256,6 +256,17 @@ const (
 	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
 )
 
+// DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions
+//
+// +enum
+// +kubebuilder:validation:Enum={all,dynamic}
+type DynamicParameterSelectedPolicy string
+
+const (
+	SelectedAllParameters     DynamicParameterSelectedPolicy = "all"
+	SelectedDynamicParameters DynamicParameterSelectedPolicy = "dynamic"
+)
+
 // OpsPhase defines opsRequest phase.
 // +enum
 // +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
@@ -271,14 +282,35 @@ const (
 	OpsFailedPhase     OpsPhase = "Failed"
 )
 
-// PodSelectionStrategy pod selection strategy.
+// PodSelectionPolicy pod selection strategy.
 // +enum
-// +kubebuilder:validation:Enum={Available,PreferredAvailable}
-type PodSelectionStrategy string
+// +kubebuilder:validation:Enum={All,Any}
+type PodSelectionPolicy string
 
 const (
-	Available          PodSelectionStrategy = "Available"
-	PreferredAvailable PodSelectionStrategy = "PreferredAvailable"
+	All PodSelectionPolicy = "All"
+	Any PodSelectionPolicy = "Any"
+)
+
+// PodAvailabilityPolicy pod availability strategy.
+// +enum
+// +kubebuilder:validation:Enum={Available,PreferredAvailable,None}
+type PodAvailabilityPolicy string
+
+const (
+	AvailablePolicy        PodAvailabilityPolicy = "Available"
+	UnAvailablePolicy      PodAvailabilityPolicy = "UnAvailable"
+	NoneAvailabilityPolicy PodAvailabilityPolicy = "None"
+)
+
+// OpsWorkloadType policy after action failure.
+// +enum
+// +kubebuilder:validation:Enum={Job,Pod}
+type OpsWorkloadType string
+
+const (
+	PodWorkload OpsWorkloadType = "Pod"
+	JobWorkload OpsWorkloadType = "Job"
 )
 
 // OpsType defines operation types.
@@ -484,6 +516,17 @@ const (
 	SucceedProgressStatus    ProgressStatus = "Succeed"
 )
 
+// ActionTaskStatus defines the status of the task.
+// +enum
+// +kubebuilder:validation:Enum={Processing,Failed,Succeed}
+type ActionTaskStatus string
+
+const (
+	ProcessingActionTaskStatus ActionTaskStatus = "Processing"
+	FailedActionTaskStatus     ActionTaskStatus = "Failed"
+	SucceedActionTaskStatus    ActionTaskStatus = "Succeed"
+)
+
 type OpsRequestBehaviour struct {
 	FromClusterPhases []ClusterPhase
 	ToClusterPhase    ClusterPhase
@@ -611,17 +654,17 @@ const (
 
 // UpgradePolicy defines the policy of reconfiguring.
 // +enum
-// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate}
+// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate,dynamicReloadBeginRestart}
 type UpgradePolicy string
 
 const (
-	NonePolicy                UpgradePolicy = "none"
-	NormalPolicy              UpgradePolicy = "simple"
-	RestartPolicy             UpgradePolicy = "parallel"
-	RollingPolicy             UpgradePolicy = "rolling"
-	AutoReload                UpgradePolicy = "autoReload"
-	HotUpdateAndRestartPolicy UpgradePolicy = "reloadAndRestart"
-	OperatorSyncUpdate        UpgradePolicy = "operatorSyncUpdate"
+	NonePolicy                    UpgradePolicy = "none"
+	NormalPolicy                  UpgradePolicy = "simple"
+	RestartPolicy                 UpgradePolicy = "parallel"
+	RollingPolicy                 UpgradePolicy = "rolling"
+	AsyncDynamicReloadPolicy      UpgradePolicy = "autoReload"
+	SyncDynamicReloadPolicy       UpgradePolicy = "operatorSyncUpdate"
+	DynamicReloadAndRestartPolicy UpgradePolicy = "dynamicReloadBeginRestart"
 )
 
 // CfgReloadType defines reload method.

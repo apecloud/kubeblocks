@@ -66,10 +66,10 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	var envVars []corev1.EnvVar
 	if legacy {
 		templateVars, envVars, err = component.ResolveEnvVars4LegacyCluster(transCtx.Context, reader,
-			synthesizedComp, transCtx.Cluster.Annotations, transCtx.CompDef.Spec.Vars)
+			synthesizedComp, transCtx.CompDef.Spec.Vars)
 	} else {
 		templateVars, envVars, err = component.ResolveTemplateNEnvVars(transCtx.Context, reader,
-			synthesizedComp, transCtx.Cluster.Annotations, transCtx.CompDef.Spec.Vars)
+			synthesizedComp, transCtx.CompDef.Spec.Vars)
 	}
 	if err != nil {
 		return err

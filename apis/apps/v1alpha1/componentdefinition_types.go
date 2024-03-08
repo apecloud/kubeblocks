@@ -191,6 +191,13 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
+	// Defines static annotations that will be patched to all k8s resources created for the component.
+	// If an annotation key conflicts with any other system annotations or user-specified annotations, it will be silently ignored.
+	// This field is immutable.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Defines the limit of valid replicas supported.
 	// This field is immutable.
 	//
@@ -630,7 +637,7 @@ type ComponentLifecycleActions struct {
 
 	// RoleProbe defines the mechanism to probe the role of replicas periodically. The specified action will be
 	// executed by Lorry at the configured interval. If the execution is successful, the output will be used as
-	// the replica's assigned role, and the role must be one of the names defined in the componentdefinition roles.
+	// the replica's assigned role, and the role must be one of the names defined in the ComponentDefinition roles.
 	// The output will be compared with the last successful result.  If there is a change, a role change event will
 	// be created to notify the controller and trigger updating the replica's role.
 	// Defining a RoleProbe is required if roles are configured for the component. Otherwise, the replicas' pods will
@@ -810,6 +817,7 @@ type ComponentSwitchover struct {
 	// Used to define the selectors for the scriptSpecs that need to be referenced.
 	// When this field is defined, the scripts specified in the scripts field can be referenced in the Action.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.9.0"
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }

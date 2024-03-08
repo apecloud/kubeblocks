@@ -124,6 +124,7 @@ const (
 	AddonNameLabelKey                        = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                   = "ops.kubeblocks.io/ops-type"
 	OpsRequestNameLabelKey                   = "ops.kubeblocks.io/ops-name"
+	OpsRequestNamespaceLabelKey              = "ops.kubeblocks.io/ops-namespace"
 	ServiceDescriptorNameLabelKey            = "servicedescriptor.kubeblocks.io/name"
 	RestoreForHScaleLabelKey                 = "apps.kubeblocks.io/restore-for-hscale"
 	ResourceConstraintProviderLabelKey       = "resourceconstraint.kubeblocks.io/provider"

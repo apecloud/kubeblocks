@@ -130,6 +130,19 @@ var _ = Describe("Restore OpsRequest", func() {
 							},
 						},
 					},
+				},
+				{
+					ComponentSelector: consensusComp,
+					Service: appsv1alpha1.Service{
+						Name:        "svc-2",
+						ServiceName: "svc-2",
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{Name: "port", Port: 3306, NodePort: nodePort},
+							},
+						},
+					},
 				}}
 			Expect(testapps.ChangeObj(&testCtx, backup, func(backup *dpv1alpha1.Backup) {
 				backup.Labels = map[string]string{
@@ -157,9 +170,9 @@ var _ = Describe("Restore OpsRequest", func() {
 			restoreHandler := RestoreOpsHandler{}
 			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
 
-			By("the nodePort should be reset")
+			By("the loadBalancer should be reset")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1alpha1.Cluster) {
-				Expect(restoreCluster.Spec.Services).Should(HaveLen(0))
+				Expect(restoreCluster.Spec.Services).Should(HaveLen(1))
 			})).Should(Succeed())
 		})
 

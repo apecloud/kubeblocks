@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -60,7 +59,8 @@ func GetClusterUID(comp *appsv1alpha1.Component) (string, error) {
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
-func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec, labels map[string]string) (*appsv1alpha1.Component, error) {
+func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec,
+	labels, annotations map[string]string) (*appsv1alpha1.Component, error) {
 	compName := FullName(cluster.Name, compSpec.Name)
 	affinities := BuildAffinity(cluster, compSpec)
 	tolerations, err := BuildTolerations(cluster, compSpec)
@@ -92,17 +92,11 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetNodes(compSpec.Nodes).
 		SetInstances(compSpec.Instances).
 		SetTransformPolicy(compSpec.RsmTransformPolicy)
-	// sync cluster ignore resource constraint annotation to component
-	value, ok := cluster.GetAnnotations()[constant.IgnoreResourceConstraint]
-	if ok {
-		compBuilder.AddAnnotations(constant.IgnoreResourceConstraint, value)
-	}
-	if common.IsCompactMode(cluster.GetAnnotations()) {
-		compBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
-			cluster.GetAnnotations()[constant.FeatureReconciliationInCompactModeAnnotationKey])
-	}
 	if labels != nil {
 		compBuilder.AddLabelsInMap(labels)
+	}
+	if annotations != nil {
+		compBuilder.AddAnnotationsInMap(annotations)
 	}
 	return compBuilder.GetObject(), nil
 }

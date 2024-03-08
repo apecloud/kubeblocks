@@ -57,6 +57,7 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 		return err
 	}
 	transCtx.Labels = t.buildCompLabelsInheritedFromCluster(transCtx, cluster)
+	transCtx.Annotations = t.buildCompAnnotationsInheritedFromCluster(transCtx, cluster)
 
 	// resolve all component definitions referenced
 	if err = t.resolveCompDefinitions(transCtx); err != nil {
@@ -178,6 +179,16 @@ func (t *ClusterAPINormalizationTransformer) buildCompLabelsInheritedFromCluster
 	return labels
 }
 
+func (t *ClusterAPINormalizationTransformer) buildCompAnnotationsInheritedFromCluster(transCtx *clusterTransformContext,
+	cluster *appsv1alpha1.Cluster) map[string]map[string]string {
+	clusterAnnotations := filterReservedAnnotations(cluster.Annotations)
+	annotations := make(map[string]map[string]string)
+	for _, compSpec := range transCtx.ComponentSpecs {
+		annotations[compSpec.Name] = clusterAnnotations
+	}
+	return annotations
+}
+
 func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext) error {
 	if transCtx.ComponentDefs == nil {
 		transCtx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)
@@ -297,18 +308,32 @@ func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Specified(transCtx 
 	}
 }
 
-func filterReservedLabels(labels map[string]string) map[string]string {
-	reservedLabelKeys := constant.GetKBReservedLabelKeys()
-	reservedLabelSet := make(map[string]struct{}, len(reservedLabelKeys))
-	for _, k := range reservedLabelKeys {
-		reservedLabelSet[k] = struct{}{}
+// filterReservedEntries filters out reserved keys from a map based on a provided set of reserved keys
+func filterReservedEntries(entries map[string]string, reservedKeys []string) map[string]string {
+	reservedSet := make(map[string]struct{}, len(reservedKeys))
+	for _, key := range reservedKeys {
+		reservedSet[key] = struct{}{}
 	}
-	filteredLabels := make(map[string]string)
-	for k, v := range labels {
-		if _, exists := reservedLabelSet[k]; exists {
-			continue
+
+	filteredEntries := make(map[string]string)
+	for key, value := range entries {
+		if _, exists := reservedSet[key]; !exists {
+			filteredEntries[key] = value
 		}
-		filteredLabels[k] = v
 	}
-	return filteredLabels
+	return filteredEntries
+}
+
+func filterReservedLabels(labels map[string]string) map[string]string {
+	if labels == nil {
+		return nil
+	}
+	return filterReservedEntries(labels, constant.GetKBReservedLabelKeys())
+}
+
+func filterReservedAnnotations(annotations map[string]string) map[string]string {
+	if annotations == nil {
+		return nil
+	}
+	return filterReservedEntries(annotations, constant.GetKBReservedAnnotationKeys())
 }

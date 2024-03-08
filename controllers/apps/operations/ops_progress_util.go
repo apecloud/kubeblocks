@@ -60,7 +60,12 @@ func setComponentStatusProgressDetail(
 	if progressDetails == nil {
 		return
 	}
-	existingProgressDetail := findStatusProgressDetail(*progressDetails, newProgressDetail.ObjectKey)
+	var existingProgressDetail *appsv1alpha1.ProgressStatusDetail
+	if newProgressDetail.ObjectKey != "" {
+		existingProgressDetail = findStatusProgressDetail(*progressDetails, newProgressDetail.ObjectKey)
+	} else {
+		existingProgressDetail = findActionProgress(*progressDetails, newProgressDetail.ActionName)
+	}
 	if existingProgressDetail == nil {
 		updateProgressDetailTime(&newProgressDetail)
 		*progressDetails = append(*progressDetails, newProgressDetail)
@@ -78,6 +83,7 @@ func setComponentStatusProgressDetail(
 	}
 	existingProgressDetail.Status = newProgressDetail.Status
 	existingProgressDetail.Message = newProgressDetail.Message
+	existingProgressDetail.ActionTasks = newProgressDetail.ActionTasks
 	updateProgressDetailTime(existingProgressDetail)
 	sendProgressDetailEvent(recorder, opsRequest, newProgressDetail)
 }
@@ -87,6 +93,15 @@ func findStatusProgressDetail(progressDetails []appsv1alpha1.ProgressStatusDetai
 	objectKey string) *appsv1alpha1.ProgressStatusDetail {
 	for i := range progressDetails {
 		if progressDetails[i].ObjectKey == objectKey {
+			return &progressDetails[i]
+		}
+	}
+	return nil
+}
+
+func findActionProgress(progressDetails []appsv1alpha1.ProgressStatusDetail, actionName string) *appsv1alpha1.ProgressStatusDetail {
+	for i := range progressDetails {
+		if actionName == progressDetails[i].ActionName {
 			return &progressDetails[i]
 		}
 	}

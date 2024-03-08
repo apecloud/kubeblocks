@@ -376,6 +376,29 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 	return saName, nil
 }
 
+func checkSecretKeyRef(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	namespace string, ref *corev1.SecretKeySelector) error {
+	if ref == nil {
+		return fmt.Errorf("ref is nil")
+	}
+	secret := &corev1.Secret{}
+	err := cli.Get(reqCtx.Ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      ref.Name,
+	}, secret)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("secret (%s/%s) is not found", ref.Name, namespace)
+		}
+		return err
+	}
+	if _, has := secret.Data[ref.Key]; !has {
+		return fmt.Errorf("secret (%s/%s) doesn't contain key %s",
+			ref.Name, namespace, ref.Key)
+	}
+	return nil
+}
+
 // ============================================================================
 // refObjectMapper
 // ============================================================================

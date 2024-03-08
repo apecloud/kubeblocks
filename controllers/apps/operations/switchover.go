@@ -51,6 +51,7 @@ func init() {
 	switchoverBehaviour := OpsBehaviour{
 		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
+		QueueByCluster:    true,
 		OpsHandler:        switchoverOpsHandler{},
 	}
 

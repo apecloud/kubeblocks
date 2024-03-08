@@ -279,11 +279,11 @@ func (s *Scheduler) generateBackupName() string {
 	return backupNamePrefix + "-$(date -u +'%Y%m%d%H%M%S')"
 }
 
-func (r *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
-	backupName := GenerateCRNameByBackupSchedule(r.BackupSchedule, schedulePolicy.BackupMethod)
+func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
+	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
 	backup := &dpv1alpha1.Backup{}
-	exists, err := intctrlutil.CheckResourceExists(r.Ctx, r.Client, client.ObjectKey{Name: backupName,
-		Namespace: r.BackupSchedule.Namespace}, backup)
+	exists, err := intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
+		Namespace: s.BackupSchedule.Namespace}, backup)
 	if err != nil {
 		return err
 	}
@@ -292,7 +292,7 @@ func (r *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 		backup.Labels = map[string]string{}
 	}
 	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
-	backup.Labels[dptypes.BackupScheduleLabelKey] = r.BackupSchedule.Name
+	backup.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name
 	backup.Labels[dptypes.BackupTypeLabelKey] = string(dpv1alpha1.BackupTypeContinuous)
 	backup.Labels[dptypes.AutoBackupLabelKey] = "true"
 	if !exists {
@@ -300,11 +300,11 @@ func (r *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 			return nil
 		}
 		backup.Name = backupName
-		backup.Namespace = r.BackupSchedule.Namespace
+		backup.Namespace = s.BackupSchedule.Namespace
 		backup.Spec.BackupMethod = schedulePolicy.BackupMethod
-		backup.Spec.BackupPolicyName = r.BackupSchedule.Spec.BackupPolicyName
+		backup.Spec.BackupPolicyName = s.BackupSchedule.Spec.BackupPolicyName
 		backup.Spec.RetentionPeriod = schedulePolicy.RetentionPeriod
-		return intctrlutil.IgnoreIsAlreadyExists(r.Client.Create(r.Ctx, backup))
+		return intctrlutil.IgnoreIsAlreadyExists(s.Client.Create(s.Ctx, backup))
 	}
 
 	// notice to reconcile backup CR
@@ -314,14 +314,14 @@ func (r *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 		// if schedule is enabled and backup already is Completed/Failed, update phase to running
 		backup.Status.Phase = dpv1alpha1.BackupPhaseRunning
 		backup.Status.FailureReason = ""
-		return r.Client.Status().Patch(r.Ctx, backup, patch)
+		return s.Client.Status().Patch(s.Ctx, backup, patch)
 	}
 	if backup.Annotations == nil {
 		backup.Annotations = map[string]string{}
 	}
 	backup.Spec.RetentionPeriod = schedulePolicy.RetentionPeriod
-	backup.Annotations[constant.ReconcileAnnotationKey] = r.BackupSchedule.ResourceVersion
-	return r.Client.Patch(r.Ctx, backup, patch)
+	backup.Annotations[constant.ReconcileAnnotationKey] = s.BackupSchedule.ResourceVersion
+	return s.Client.Patch(s.Ctx, backup, patch)
 }
 
 type backupReconfigureRef struct {
@@ -333,8 +333,8 @@ type backupReconfigureRef struct {
 
 type parameterPairs map[string][]appsv1alpha1.ParameterPair
 
-func (r *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
-	reCfgRef := r.BackupSchedule.Annotations[dptypes.ReconfigureRefAnnotationKey]
+func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
+	reCfgRef := s.BackupSchedule.Annotations[dptypes.ReconfigureRefAnnotationKey]
 	if reCfgRef == "" {
 		return nil
 	}
@@ -344,7 +344,7 @@ func (r *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	}
 
 	enable := boolptr.IsSetToTrue(schedulePolicy.Enabled)
-	if r.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] == "" && !enable {
+	if s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] == "" && !enable {
 		// disable in the first policy created, no need reconfigure because default configs had been set.
 		return nil
 	}
@@ -362,18 +362,18 @@ func (r *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	}
 	updateParameterPairsBytes, _ := json.Marshal(parameters)
 	updateParameterPairs := string(updateParameterPairsBytes)
-	if updateParameterPairs == r.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] {
+	if updateParameterPairs == s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] {
 		// reconcile the config job if finished
-		return r.reconcileReconfigure(r.BackupSchedule)
+		return s.reconcileReconfigure(s.BackupSchedule)
 	}
 
-	targetPodSelector := r.BackupPolicy.Spec.Target.PodSelector
+	targetPodSelector := s.BackupPolicy.Spec.Target.PodSelector
 	ops := appsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: r.BackupSchedule.Name + "-",
-			Namespace:    r.BackupSchedule.Namespace,
+			GenerateName: s.BackupSchedule.Name + "-",
+			Namespace:    s.BackupSchedule.Namespace,
 			Labels: map[string]string{
-				dptypes.BackupScheduleLabelKey: r.BackupSchedule.Name,
+				dptypes.BackupScheduleLabelKey: s.BackupSchedule.Name,
 			},
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
@@ -397,16 +397,16 @@ func (r *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 			},
 		},
 	}
-	if err := r.Client.Create(r.Ctx, &ops); err != nil {
+	if err := s.Client.Create(s.Ctx, &ops); err != nil {
 		return err
 	}
-	r.Recorder.Eventf(r.BackupSchedule, corev1.EventTypeNormal, "Reconfiguring", "update config %s", updateParameterPairs)
-	patch := client.MergeFrom(r.BackupSchedule.DeepCopy())
-	if r.BackupSchedule.Annotations == nil {
-		r.BackupSchedule.Annotations = map[string]string{}
+	s.Recorder.Eventf(s.BackupSchedule, corev1.EventTypeNormal, "Reconfiguring", "update config %s", updateParameterPairs)
+	patch := client.MergeFrom(s.BackupSchedule.DeepCopy())
+	if s.BackupSchedule.Annotations == nil {
+		s.BackupSchedule.Annotations = map[string]string{}
 	}
-	r.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] = updateParameterPairs
-	if err := r.Client.Patch(r.Ctx, r.BackupSchedule, patch); err != nil {
+	s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] = updateParameterPairs
+	if err := s.Client.Patch(s.Ctx, s.BackupSchedule, patch); err != nil {
 		return err
 	}
 	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for ops %s finished.", ops.Name)

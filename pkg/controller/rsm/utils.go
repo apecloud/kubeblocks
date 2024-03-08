@@ -22,21 +22,22 @@ package rsm
 import (
 	"context"
 	"fmt"
-	"golang.org/x/exp/slices"
-	"k8s.io/kubectl/pkg/util/podutils"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -876,5 +877,27 @@ func mergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 		} else {
 			*dst = append(*dst, item)
 		}
+	}
+}
+
+func CurrentReplicaProvider(ctx context.Context, cli client.Reader, rsm *workloads.ReplicatedStateMachine) (ReplicaProvider, error) {
+	getDefaultProvider := func() ReplicaProvider {
+		provider := defaultReplicaProvider
+		if viper.IsSet(FeatureGateRSMReplicaProvider) {
+			provider = ReplicaProvider(viper.GetString(FeatureGateRSMReplicaProvider))
+			if provider != StatefulSetProvider && provider != PodProvider {
+				provider = defaultReplicaProvider
+			}
+		}
+		return provider
+	}
+	sts := &appsv1.StatefulSet{}
+	switch err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); {
+	case err == nil:
+		return StatefulSetProvider, nil
+	case !apierrors.IsNotFound(err):
+		return "", err
+	default:
+		return getDefaultProvider(), nil
 	}
 }

@@ -56,14 +56,17 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 		// use rsm's generation instead of sts's
 		rsm.Status.ObservedGeneration = rsm.Generation
 	case model.IsObjectStatusUpdating(rsmOrig):
-		// read the underlying sts
-		sts := &apps.StatefulSet{}
-		err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts)
-		if err != nil && !apierrors.IsNotFound(err) {
+		provider, err := CurrentReplicaProvider(transCtx.Context, transCtx.Client, rsm)
+		if err != nil {
 			return err
 		}
-		// is managing sts if the underlying sts exists
-		if err == nil {
+		if provider == StatefulSetProvider {
+			// read the underlying sts
+			sts := &apps.StatefulSet{}
+			err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
 			// keep rsm's ObservedGeneration to avoid override by sts's ObservedGeneration
 			generation := rsm.Status.ObservedGeneration
 			rsm.Status.StatefulSetStatus = sts.Status

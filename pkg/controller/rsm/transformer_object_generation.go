@@ -69,22 +69,14 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		return model.NewRequeueError(time.Second*10, err.Error())
 	}
 
-	// read cache snapshot
-	ml := getLabels(rsm)
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
+	// return true if there is a StatefulSet object in old cache
+	isManagingSts, err := func() (bool, error) {
+		provider, err := CurrentReplicaProvider(transCtx.Context, transCtx.Client, rsm)
+		return provider == StatefulSetProvider, err
+	}()
 	if err != nil {
 		return err
 	}
-
-	// return true if there is a StatefulSet object in old cache
-	isManagingSts := func() bool {
-		for _, object := range oldSnapshot {
-			if _, ok := object.(*apps.StatefulSet); ok {
-				return true
-			}
-		}
-		return false
-	}()
 
 	// generate objects by current spec
 	svc := buildSvc(*rsm)
@@ -120,6 +112,13 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 			return err
 		}
 		newSnapshot[*name] = object
+	}
+
+	// read cache snapshot
+	ml := getLabels(rsm)
+	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
+	if err != nil {
+		return err
 	}
 
 	// now compute the diff between old and target snapshot and generate the plan

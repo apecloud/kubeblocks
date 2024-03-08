@@ -552,12 +552,12 @@ func emitActionEvent(transCtx *rsmTransformContext, eventType, reason, message s
 
 func getFinalizer(obj client.Object) string {
 	if _, ok := obj.(*workloads.ReplicatedStateMachine); ok {
-		return rsmFinalizerName
+		return RSMFinalizerName
 	}
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		return constant.DBClusterFinalizerName
 	}
-	return rsmFinalizerName
+	return RSMFinalizerName
 }
 
 func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
@@ -578,8 +578,8 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 		return labels
 	}
 	return map[string]string{
-		workloadsManagedByLabelKey: kindReplicatedStateMachine,
-		workloadsInstanceLabelKey:  rsm.Name,
+		WorkloadsManagedByLabelKey: kindReplicatedStateMachine,
+		WorkloadsInstanceLabelKey:  rsm.Name,
 	}
 }
 

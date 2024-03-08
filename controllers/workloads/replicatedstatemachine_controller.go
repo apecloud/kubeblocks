@@ -21,6 +21,8 @@ package workloads
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -70,6 +72,23 @@ type ReplicatedStateMachineReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	obj := &workloads.ReplicatedStateMachine{}
+	if err := r.Client.Get(ctx, req.NamespacedName, obj); err != nil {
+		return ctrl.Result{}, err
+	}
+	provider, err := rsm.CurrentReplicaProvider(ctx, r.Client, obj)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if provider == rsm.PodProvider {
+		err := kubebuilderx.NewController(ctx, r.Client, req).
+			Prepare(rsm2.NewTreeReader()).
+			Do(rsm2.NewFixMetaReconciler()).
+			Do(rsm2.NewObjectDeletionReconciler()).
+			Commit(r.Client)
+		return ctrl.Result{}, err
+	}
+
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,

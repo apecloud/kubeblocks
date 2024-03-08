@@ -56,8 +56,8 @@ const (
 	// Planned supported replica providers include OpenKruise Advanced StatefulSet and KB Replica.
 	FeatureGateRSMReplicaProvider = "RSM_REPLICA_PROVIDER"
 
-	workloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
-	workloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
+	WorkloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
+	WorkloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
 
 	kindReplicatedStateMachine = "ReplicatedStateMachine"
 
@@ -67,7 +67,7 @@ const (
 
 	defaultPodName = "Unknown"
 
-	rsmFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
+	RSMFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
 
 	defaultReplicaProvider = StatefulSetProvider
 

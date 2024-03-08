@@ -83,6 +83,9 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if err = r.handleSchedule(reqCtx, backupSchedule); err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
+			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+		}
 		return r.patchStatusFailed(reqCtx, backupSchedule, "HandleBackupScheduleFailed", err)
 	}
 

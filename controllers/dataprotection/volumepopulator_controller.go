@@ -42,7 +42,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -86,7 +85,7 @@ func (r *VolumePopulatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return intctrlutil.RequeueWithError(patchErr, reqCtx.Log, "")
 			}
 			return intctrlutil.Reconciled()
-		} else if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) && r.ContainPopulatingCondition(pvc) {
+		} else if r.ContainPopulatingCondition(pvc) {
 			// ignore the error if external controller handles it.
 			return intctrlutil.Reconciled()
 		}

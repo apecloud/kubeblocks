@@ -36,6 +36,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
+const (
+	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
+	PodContainerFailedTimeout = 10 * time.Second
+
+	// PodScheduledFailedTimeout timeout for scheduling failure.
+	PodScheduledFailedTimeout = 30 * time.Second
+)
+
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
 var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
@@ -551,4 +559,58 @@ func ResolveContainerDefaultFields(container corev1.Container, pcontainer *corev
 	if pcontainer.StartupProbe != nil && container.StartupProbe != nil {
 		resolveContainerProbe(*container.StartupProbe, pcontainer.StartupProbe)
 	}
+}
+
+// IsPodFailedAndTimedOut checks if the pod is failed and timed out.
+func IsPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
+	if isFailed, isTimedOut, message := isPodScheduledFailedAndTimedOut(pod); isFailed {
+		return isFailed, isTimedOut, message
+	}
+	initContainerFailed, message := isAnyContainerFailed(pod.Status.InitContainerStatuses)
+	if initContainerFailed {
+		return initContainerFailed, isContainerFailedAndTimedOut(pod, corev1.PodInitialized), message
+	}
+	containerFailed, message := isAnyContainerFailed(pod.Status.ContainerStatuses)
+	if containerFailed {
+		return containerFailed, isContainerFailedAndTimedOut(pod, corev1.ContainersReady), message
+	}
+	return false, false, ""
+}
+
+// IsPodScheduledFailedAndTimedOut checks whether the unscheduled pod has timed out.
+func isPodScheduledFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type != corev1.PodScheduled {
+			continue
+		}
+		if cond.Status == corev1.ConditionTrue {
+			return false, false, ""
+		}
+		return true, time.Now().After(cond.LastTransitionTime.Add(PodScheduledFailedTimeout)), cond.Message
+	}
+	return false, false, ""
+}
+
+// IsAnyContainerFailed checks whether any container in the list is failed.
+func isAnyContainerFailed(containersStatus []corev1.ContainerStatus) (bool, string) {
+	for _, v := range containersStatus {
+		waitingState := v.State.Waiting
+		if waitingState != nil && waitingState.Message != "" {
+			return true, waitingState.Message
+		}
+		terminatedState := v.State.Terminated
+		if terminatedState != nil && terminatedState.ExitCode != 0 {
+			return true, terminatedState.Message
+		}
+	}
+	return false, ""
+}
+
+// IsContainerFailedAndTimedOut checks whether the failed container has timed out.
+func isContainerFailedAndTimedOut(pod *corev1.Pod, podConditionType corev1.PodConditionType) bool {
+	containerReadyCondition := GetPodCondition(&pod.Status, podConditionType)
+	if containerReadyCondition == nil || containerReadyCondition.LastTransitionTime.IsZero() {
+		return false
+	}
+	return time.Now().After(containerReadyCondition.LastTransitionTime.Add(PodContainerFailedTimeout))
 }

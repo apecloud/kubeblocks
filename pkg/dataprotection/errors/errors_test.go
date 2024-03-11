@@ -61,7 +61,7 @@ func TestNewErrors(t *testing.T) {
 	if !intctrlutil.IsTargetError(pvTemplateNotFound, ErrorTypeBackupPVTemplateNotFound) {
 		t.Error("should be error of BackupPVTemplateNotFound")
 	}
-	pvcIsEmpty := NewBackupPVCNameIsEmpty("datafile", "policy-test1")
+	pvcIsEmpty := NewBackupPVCNameIsEmpty("datafile")
 	if !intctrlutil.IsTargetError(pvcIsEmpty, ErrorTypeBackupPVCNameIsEmpty) {
 		t.Error("should be error of BackupPVCNameIsEmpty")
 	}
@@ -155,8 +155,7 @@ func TestNewBackupNotSupported(t *testing.T) {
 
 func TestNewBackupPVCNameIsEmpty(t *testing.T) {
 	type args struct {
-		backupRepo       string
-		backupPolicyName string
+		backupRepo string
 	}
 	tests := []struct {
 		name string
@@ -167,7 +166,7 @@ func TestNewBackupPVCNameIsEmpty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewBackupPVCNameIsEmpty(tt.args.backupRepo, tt.args.backupPolicyName); !reflect.DeepEqual(got, tt.want) {
+			if got := NewBackupPVCNameIsEmpty(tt.args.backupRepo); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewBackupPVCNameIsEmpty() = %v, want %v", got, tt.want)
 			}
 		})

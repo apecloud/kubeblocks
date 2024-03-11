@@ -143,6 +143,9 @@ type BackupRepoReconciler struct {
 // watch or update Backups
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;update;patch
 
+// watch or update Restores
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores,verbs=get;list;watch;update;patch
+
 // create or delete StorageClasses
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch;create;delete
 
@@ -273,6 +276,12 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if err = r.prepareForAssociatedBackups(reconCtx); err != nil {
 			return checkedRequeueWithError(err, reqCtx.Log,
 				"check associated backups failed")
+		}
+
+		// check associated restores, to create PVC in their namespaces
+		if err = r.prepareForAssociatedRestores(reconCtx); err != nil {
+			return checkedRequeueWithError(err, reqCtx.Log,
+				"check associated restores failed")
 		}
 	}
 
@@ -998,29 +1007,84 @@ func (r *BackupRepoReconciler) prepareForAssociatedBackups(reconCtx *reconcileCo
 	// return any error to reconcile the repo
 	var retErr error
 	for _, backup := range backups {
-		switch {
-		case reconCtx.repo.AccessByMount():
-			if _, err := r.createRepoPVC(reconCtx, reconCtx.repo.Status.BackupPVCName, backup.Namespace, nil); err != nil {
-				reconCtx.Log.Error(err, "failed to check or create PVC", "namespace", backup.Namespace)
-				retErr = err
-				continue
-			}
-		case reconCtx.repo.AccessByTool():
-			if _, err := r.createToolConfigSecret(reconCtx, reconCtx.repo.Status.ToolConfigSecretName, backup.Namespace, nil); err != nil {
-				reconCtx.Log.Error(err, "failed to check or create tool config secret", "namespace", backup.Namespace)
-				retErr = err
-				continue
-			}
-		default:
-			retErr = fmt.Errorf("unknown access method: %s", reconCtx.repo.Spec.AccessMethod)
+		err := r.prepareBackupRepoInNamespace(reconCtx, backup.Namespace)
+		if retErr == nil {
+			retErr = err
 		}
-
-		if backup.Labels[dataProtectionWaitRepoPreparationKey] != "" {
+		if err == nil && backup.Labels[dataProtectionWaitRepoPreparationKey] != "" {
 			patch := client.MergeFrom(backup.DeepCopy())
 			delete(backup.Labels, dataProtectionWaitRepoPreparationKey)
 			if err = r.Client.Patch(reconCtx.Ctx, backup, patch); err != nil {
 				reconCtx.Log.Error(err, "failed to patch backup",
 					"backup", client.ObjectKeyFromObject(backup))
+				retErr = err
+				continue
+			}
+		}
+	}
+	return retErr
+}
+
+func (r *BackupRepoReconciler) prepareBackupRepoInNamespace(reconCtx *reconcileContext, namespace string) error {
+	switch {
+	case reconCtx.repo.AccessByMount():
+		if _, err := r.createRepoPVC(reconCtx, reconCtx.repo.Status.BackupPVCName, namespace, nil); err != nil {
+			reconCtx.Log.Error(err, "failed to check or create PVC", "namespace", namespace)
+			return err
+		}
+	case reconCtx.repo.AccessByTool():
+		if _, err := r.createToolConfigSecret(reconCtx, reconCtx.repo.Status.ToolConfigSecretName, namespace, nil); err != nil {
+			reconCtx.Log.Error(err, "failed to check or create tool config secret", "namespace", namespace)
+			return err
+		}
+	default:
+		return fmt.Errorf("unknown access method: %s", reconCtx.repo.Spec.AccessMethod)
+	}
+	return nil
+}
+
+func (r *BackupRepoReconciler) listAssociatedRestores(
+	ctx context.Context, repo *dpv1alpha1.BackupRepo, extraSelector map[string]string) ([]*dpv1alpha1.Restore, error) {
+	// list restores associated with the repo
+	restoreList := &dpv1alpha1.RestoreList{}
+	selectors := client.MatchingLabels{
+		dataProtectionBackupRepoKey: repo.Name,
+	}
+	for k, v := range extraSelector {
+		selectors[k] = v
+	}
+	err := r.Client.List(ctx, restoreList, selectors)
+	var filtered []*dpv1alpha1.Restore
+	for idx := range restoreList.Items {
+		restore := &restoreList.Items[idx]
+		if restore.Status.Phase == dpv1alpha1.RestorePhaseFailed {
+			continue
+		}
+		filtered = append(filtered, restore)
+	}
+	return filtered, err
+}
+
+func (r *BackupRepoReconciler) prepareForAssociatedRestores(reconCtx *reconcileContext) error {
+	restores, err := r.listAssociatedRestores(reconCtx.Ctx, reconCtx.repo, map[string]string{
+		dataProtectionWaitRepoPreparationKey: trueVal,
+	})
+	if err != nil {
+		return err
+	}
+	// return any error to reconcile the repo
+	var retErr error
+	for _, restore := range restores {
+		err := r.prepareBackupRepoInNamespace(reconCtx, restore.Namespace)
+		if retErr == nil {
+			retErr = err
+		}
+		if err == nil && restore.Labels[dataProtectionWaitRepoPreparationKey] != "" {
+			patch := client.MergeFrom(restore.DeepCopy())
+			delete(restore.Labels, dataProtectionWaitRepoPreparationKey)
+			if err = r.Client.Patch(reconCtx.Ctx, restore, patch); err != nil {
+				reconCtx.Log.Error(err, "failed to patch restore",
+					"restore", client.ObjectKeyFromObject(restore))
 				retErr = err
 				continue
 			}
@@ -1333,6 +1397,27 @@ func (r *BackupRepoReconciler) mapBackupToRepo(ctx context.Context, obj client.O
 	return nil
 }
 
+func (r *BackupRepoReconciler) mapRestoreToRepo(ctx context.Context, obj client.Object) []ctrl.Request {
+	restore := obj.(*dpv1alpha1.Restore)
+	repoName, ok := restore.Labels[dataProtectionBackupRepoKey]
+	if !ok {
+		return nil
+	}
+	// ignore failed restores
+	if restore.Status.Phase == dpv1alpha1.RestorePhaseFailed {
+		return nil
+	}
+	// we should reconcile the BackupRepo when:
+	//   1. the Restore needs to use the BackupRepo, but it's not ready for the namespace.
+	shouldReconcileRepo := restore.Labels[dataProtectionWaitRepoPreparationKey] == trueVal
+	if shouldReconcileRepo {
+		return []ctrl.Request{{
+			NamespacedName: client.ObjectKey{Name: repoName},
+		}}
+	}
+	return nil
+}
+
 func (r *BackupRepoReconciler) mapProviderToRepos(ctx context.Context, obj client.Object) []ctrl.Request {
 	return r.providerRefMapper.mapToRequests(obj)
 }
@@ -1368,6 +1453,7 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&dpv1alpha1.BackupRepo{}).
 		Watches(&storagev1alpha1.StorageProvider{}, handler.EnqueueRequestsFromMapFunc(r.mapProviderToRepos)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.mapBackupToRepo)).
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.mapRestoreToRepo)).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.mapSecretToRepos)).
 		Owns(&storagev1.StorageClass{}).
 		Owns(&corev1.PersistentVolumeClaim{}).

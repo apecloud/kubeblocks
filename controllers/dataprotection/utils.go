@@ -96,7 +96,7 @@ func HandleBackupRepo(request *dpbackup.Request) error {
 	case repo.AccessByMount():
 		pvcName := repo.Status.BackupPVCName
 		if pvcName == "" {
-			return dperrors.NewBackupPVCNameIsEmpty(repo.Name, request.Spec.BackupPolicyName)
+			return dperrors.NewBackupPVCNameIsEmpty(repo.Name)
 		}
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: pvcName}

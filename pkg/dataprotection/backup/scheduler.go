@@ -22,17 +22,22 @@ package backup
 import (
 	"fmt"
 	"reflect"
+	"sort"
 
+	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
@@ -93,8 +98,10 @@ func (s *Scheduler) handleSchedulePolicy(index int) error {
 				return err
 			}
 			if actionSet.Spec.BackupType == dpv1alpha1.BackupTypeContinuous {
-				// ignore continuous backup
-				return nil
+				if err = s.reconfigure(schedulePolicy); err != nil {
+					return err
+				}
+				return s.reconcileForContinuous(schedulePolicy)
 			}
 		}
 	}
@@ -270,4 +277,158 @@ func (s *Scheduler) generateBackupName() string {
 		backupNamePrefix = s.BackupSchedule.Name
 	}
 	return backupNamePrefix + "-$(date -u +'%Y%m%d%H%M%S')"
+}
+
+func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
+	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
+	backup := &dpv1alpha1.Backup{}
+	exists, err := intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
+		Namespace: s.BackupSchedule.Namespace}, backup)
+	if err != nil {
+		return err
+	}
+	patch := client.MergeFrom(backup.DeepCopy())
+	if backup.Labels == nil {
+		backup.Labels = map[string]string{}
+	}
+	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
+	backup.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name
+	backup.Labels[dptypes.BackupTypeLabelKey] = string(dpv1alpha1.BackupTypeContinuous)
+	backup.Labels[dptypes.AutoBackupLabelKey] = "true"
+	if !exists {
+		if boolptr.IsSetToFalse(schedulePolicy.Enabled) {
+			return nil
+		}
+		backup.Name = backupName
+		backup.Namespace = s.BackupSchedule.Namespace
+		backup.Spec.BackupMethod = schedulePolicy.BackupMethod
+		backup.Spec.BackupPolicyName = s.BackupSchedule.Spec.BackupPolicyName
+		backup.Spec.RetentionPeriod = schedulePolicy.RetentionPeriod
+		return intctrlutil.IgnoreIsAlreadyExists(s.Client.Create(s.Ctx, backup))
+	}
+
+	// notice to reconcile backup CR
+	if boolptr.IsSetToTrue(schedulePolicy.Enabled) && slices.Contains([]dpv1alpha1.BackupPhase{
+		dpv1alpha1.BackupPhaseCompleted, dpv1alpha1.BackupPhaseFailed},
+		backup.Status.Phase) {
+		// if schedule is enabled and backup already is Completed/Failed, update phase to running
+		backup.Status.Phase = dpv1alpha1.BackupPhaseRunning
+		backup.Status.FailureReason = ""
+		return s.Client.Status().Patch(s.Ctx, backup, patch)
+	}
+	if backup.Annotations == nil {
+		backup.Annotations = map[string]string{}
+	}
+	backup.Spec.RetentionPeriod = schedulePolicy.RetentionPeriod
+	backup.Annotations[constant.ReconcileAnnotationKey] = s.BackupSchedule.ResourceVersion
+	return s.Client.Patch(s.Ctx, backup, patch)
+}
+
+type backupReconfigureRef struct {
+	Name    string         `json:"name"`
+	Key     string         `json:"key"`
+	Enable  parameterPairs `json:"enable,omitempty"`
+	Disable parameterPairs `json:"disable,omitempty"`
+}
+
+type parameterPairs map[string][]appsv1alpha1.ParameterPair
+
+func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
+	reCfgRef := s.BackupSchedule.Annotations[dptypes.ReconfigureRefAnnotationKey]
+	if reCfgRef == "" {
+		return nil
+	}
+	configRef := backupReconfigureRef{}
+	if err := json.Unmarshal([]byte(reCfgRef), &configRef); err != nil {
+		return err
+	}
+
+	enable := boolptr.IsSetToTrue(schedulePolicy.Enabled)
+	if s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] == "" && !enable {
+		// disable in the first policy created, no need reconfigure because default configs had been set.
+		return nil
+	}
+	configParameters := configRef.Disable
+	if enable {
+		configParameters = configRef.Enable
+	}
+	if configParameters == nil {
+		return nil
+	}
+	parameters := configParameters[schedulePolicy.BackupMethod]
+	if len(parameters) == 0 {
+		// skip reconfigure if not found parameters.
+		return nil
+	}
+	updateParameterPairsBytes, _ := json.Marshal(parameters)
+	updateParameterPairs := string(updateParameterPairsBytes)
+	if updateParameterPairs == s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] {
+		// reconcile the config job if finished
+		return s.reconcileReconfigure(s.BackupSchedule)
+	}
+
+	targetPodSelector := s.BackupPolicy.Spec.Target.PodSelector
+	ops := appsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: s.BackupSchedule.Name + "-",
+			Namespace:    s.BackupSchedule.Namespace,
+			Labels: map[string]string{
+				dptypes.BackupScheduleLabelKey: s.BackupSchedule.Name,
+			},
+		},
+		Spec: appsv1alpha1.OpsRequestSpec{
+			Type:       appsv1alpha1.ReconfiguringType,
+			ClusterRef: targetPodSelector.MatchLabels[constant.AppInstanceLabelKey],
+			Reconfigure: &appsv1alpha1.Reconfigure{
+				ComponentOps: appsv1alpha1.ComponentOps{
+					ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
+				},
+				Configurations: []appsv1alpha1.ConfigurationItem{
+					{
+						Name: configRef.Name,
+						Keys: []appsv1alpha1.ParameterConfig{
+							{
+								Key:        configRef.Key,
+								Parameters: parameters,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	if err := s.Client.Create(s.Ctx, &ops); err != nil {
+		return err
+	}
+	s.Recorder.Eventf(s.BackupSchedule, corev1.EventTypeNormal, "Reconfiguring", "update config %s", updateParameterPairs)
+	patch := client.MergeFrom(s.BackupSchedule.DeepCopy())
+	if s.BackupSchedule.Annotations == nil {
+		s.BackupSchedule.Annotations = map[string]string{}
+	}
+	s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] = updateParameterPairs
+	if err := s.Client.Patch(s.Ctx, s.BackupSchedule, patch); err != nil {
+		return err
+	}
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for ops %s finished.", ops.Name)
+}
+
+func (s *Scheduler) reconcileReconfigure(backupSchedule *dpv1alpha1.BackupSchedule) error {
+	opsList := appsv1alpha1.OpsRequestList{}
+	if err := s.Client.List(s.Ctx, &opsList,
+		client.InNamespace(backupSchedule.Namespace),
+		client.MatchingLabels{dptypes.BackupScheduleLabelKey: backupSchedule.Name}); err != nil {
+		return err
+	}
+	if len(opsList.Items) > 0 {
+		sort.Slice(opsList.Items, func(i, j int) bool {
+			return opsList.Items[j].CreationTimestamp.Before(&opsList.Items[i].CreationTimestamp)
+		})
+		latestOps := opsList.Items[0]
+		if latestOps.Status.Phase == appsv1alpha1.OpsFailedPhase {
+			return intctrlutil.NewErrorf(dperrors.ErrorTypeReconfigureFailed, "ops failed %s", latestOps.Name)
+		} else if latestOps.Status.Phase != appsv1alpha1.OpsSucceedPhase {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "waiting for ops %s finished.", latestOps.Name)
+		}
+	}
+	return nil
 }

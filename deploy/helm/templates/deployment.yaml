@@ -72,6 +72,10 @@ spec:
             - name: CM_AFFINITY
               value: {{ toJson . | quote }}
             {{- end }}
+            {{- if .Values.reconcileWorkers }}
+            - name: KUBEBLOCKS_RECONCILE_WORKERS
+              values: {{ .Values.reconcileWorkers }}
+            {{- end }}
             {{- with .Values.nodeSelector }}
             - name: CM_NODE_SELECTOR
               value: {{ toJson . | quote }}

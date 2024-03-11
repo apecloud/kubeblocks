@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -179,6 +180,9 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// TODO: add filter predicate for core API objects
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Cluster{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
+		}).
 		Owns(&appsv1alpha1.Component{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).

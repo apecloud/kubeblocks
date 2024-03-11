@@ -67,6 +67,7 @@ var _ = Describe("BackupRepo controller", func() {
 		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RestoreSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
 
@@ -74,6 +75,7 @@ var _ = Describe("BackupRepo controller", func() {
 		inNS2 := client.InNamespace(namespace2)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS2, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS2, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RestoreSignature, true, inNS2, ml)
 		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS2, ml)
 		testapps.ClearResources(&testCtx, generics.JobSignature, inNS2, ml)
 
@@ -247,6 +249,39 @@ parameters:
 				}
 			}).Should(Succeed())
 			return backup
+		}
+
+		createRestoreSpec := func(mutateFunc func(backup *dpv1alpha1.Restore)) *dpv1alpha1.Restore {
+			obj := &dpv1alpha1.Restore{}
+			obj.GenerateName = "restore-"
+			obj.Namespace = testCtx.DefaultNamespace
+			obj.Labels = map[string]string{
+				dataProtectionBackupRepoKey:          repoKey.Name,
+				dataProtectionWaitRepoPreparationKey: trueVal,
+			}
+			if mutateFunc != nil {
+				mutateFunc(obj)
+			}
+			restore := testapps.CreateK8sResource(&testCtx, obj).(*dpv1alpha1.Restore)
+			// updating the status of the Restore to COMPLETED, backup repo controller only
+			// handles for non-failed restores.
+			Eventually(func(g Gomega) {
+				obj := &dpv1alpha1.Restore{}
+				err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(restore), obj)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				if obj.Status.Phase == dpv1alpha1.RestorePhaseFailed {
+					// the controller will set the status to failed because
+					// essential objects (e.g. backup policy) are missed.
+					// we set the status to completed after that, to avoid conflict.
+					obj.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+					err = testCtx.Cli.Status().Update(testCtx.Ctx, obj)
+					g.Expect(err).ShouldNot(HaveOccurred())
+				} else {
+					// check again
+					g.Expect(false).Should(BeTrue())
+				}
+			}).Should(Succeed())
+			return restore
 		}
 
 		getBackupRepo := func(g Gomega, key types.NamespacedName) *dpv1alpha1.BackupRepo {
@@ -1244,6 +1279,34 @@ new-item=new-value
 			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.IsDefault).Should(BeFalse())
 			})).Should(Succeed())
+		})
+
+		It("should prepare for cross namespace Restores", func() {
+			By("making sure the repo is ready")
+			var pvcName string
+			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady), "%+v", repo)
+				g.Expect(repo.Status.BackupPVCName).ShouldNot(BeEmpty())
+				pvcName = repo.Status.BackupPVCName
+			})).Should(Succeed())
+			By("creating a Backup object for referencing by Restore")
+			backup := createBackupSpec(func(backup *dpv1alpha1.Backup) {
+				backup.Namespace = testCtx.DefaultNamespace
+			})
+			By("creating a Restore object in the namespace")
+			createRestoreSpec(func(restore *dpv1alpha1.Restore) {
+				restore.Namespace = namespace2
+				restore.Spec.Backup = dpv1alpha1.BackupRef{
+					Name:      backup.Name,
+					Namespace: backup.Namespace,
+				}
+			})
+			By("checking the PVC has been created in the namespace")
+			pvcKey := types.NamespacedName{
+				Name:      pvcName,
+				Namespace: namespace2,
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
 		})
 	})
 })

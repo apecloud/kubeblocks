@@ -46,6 +46,8 @@ const (
 
 	// customized encryption key for encrypting the password of connection credential.
 	CfgKeyDPEncryptionKey = "DP_ENCRYPTION_KEY"
+
+	CfgKBReconcileWorkers = "KUBEBLOCKS_RECONCILE_WORKERS"
 )
 
 const (

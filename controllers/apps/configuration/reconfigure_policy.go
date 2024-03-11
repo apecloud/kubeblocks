@@ -186,7 +186,7 @@ func (param *reconfigureParams) getTargetReplicas() int {
 }
 
 func (param *reconfigureParams) podMinReadySeconds() int32 {
-	minReadySeconds := param.ComponentUnits[0].Spec.MinReadySeconds
+	minReadySeconds := param.SynthesizedComponent.MinReadySeconds
 	return util.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 

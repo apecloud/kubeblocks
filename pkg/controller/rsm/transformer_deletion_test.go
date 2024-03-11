@@ -85,21 +85,21 @@ var _ = Describe("object deletion transformer test.", func() {
 					Controller: &controller,
 				},
 			}
-			headLessSvc := buildHeadlessSvc(*rsm)
+			headLessSvc := BuildHeadlessSvc(*rsm)
 			headLessSvc.SetOwnerReferences([]metav1.OwnerReference{
 				{
 					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
 					Controller: &controller,
 				},
 			})
-			envConfig := buildEnvConfigMap(*rsm)
+			envConfig := BuildEnvConfigMap(*rsm)
 			envConfig.SetOwnerReferences([]metav1.OwnerReference{
 				{
 					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
 					Controller: &controller,
 				},
 			})
-			envConfigShouldNotBeDeleted := buildEnvConfigMap(*rsm)
+			envConfigShouldNotBeDeleted := BuildEnvConfigMap(*rsm)
 			envConfigShouldNotBeDeleted.SetOwnerReferences([]metav1.OwnerReference{
 				{
 					Kind:       reflect.TypeOf(v1alpha1.Cluster{}).Name(),

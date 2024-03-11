@@ -75,14 +75,6 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 		return nil
 	}
 
-	provider, err := CurrentReplicaProvider(transCtx.Context, transCtx.Client, rsm)
-	if err != nil {
-		return err
-	}
-	if provider != StatefulSetProvider {
-		return nil
-	}
-
 	// cluster initialization done, handle dynamic membership reconfiguration
 
 	// rsm is ready

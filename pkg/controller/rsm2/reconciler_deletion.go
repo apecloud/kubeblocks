@@ -31,6 +31,9 @@ func (r *objectDeletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 	if !model.IsObjectDeleting(tree.Root) {
 		return kubebuilderx.ResultUnsatisfied
 	}
+	if model.IsReconciliationPaused(tree.Root) {
+		return kubebuilderx.ResultUnsatisfied
+	}
 	return kubebuilderx.ResultSatisfied
 }
 

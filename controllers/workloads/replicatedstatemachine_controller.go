@@ -72,16 +72,18 @@ type ReplicatedStateMachineReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("ReplicatedStateMachine", req.NamespacedName)
+
 	obj := &workloads.ReplicatedStateMachine{}
 	if err := r.Client.Get(ctx, req.NamespacedName, obj); err != nil {
 		return ctrl.Result{}, err
 	}
-	provider, err := rsm.CurrentReplicaProvider(ctx, r.Client, obj)
+	provider, err := rsm2.CurrentReplicaProvider(ctx, r.Client, obj)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if provider == rsm.PodProvider {
-		err := kubebuilderx.NewController(ctx, r.Client, req).
+	if provider == rsm2.PodProvider {
+		err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 			Prepare(rsm2.NewTreeReader()).
 			Do(rsm2.NewFixMetaReconciler()).
 			Do(rsm2.NewObjectDeletionReconciler()).
@@ -92,7 +94,7 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("ReplicatedStateMachine", req.NamespacedName),
+		Log:      logger,
 		Recorder: r.Recorder,
 	}
 

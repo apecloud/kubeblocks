@@ -24,6 +24,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 type fixMetaReconciler struct{}
@@ -33,7 +34,7 @@ func (r *fixMetaReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebui
 		return kubebuilderx.ResultUnsatisfied
 	}
 
-	finalizer := getFinalizer(tree.Root)
+	finalizer := rsm1.GetFinalizer(tree.Root)
 	if controllerutil.ContainsFinalizer(tree.Root, finalizer) {
 		return kubebuilderx.ResultUnsatisfied
 	}
@@ -45,7 +46,7 @@ func (r *fixMetaReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuild
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
-	finalizer := getFinalizer(tree.Root)
+	finalizer := rsm1.GetFinalizer(tree.Root)
 	controllerutil.AddFinalizer(tree.Root, finalizer)
 	return tree, nil
 }

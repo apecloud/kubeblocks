@@ -141,7 +141,7 @@ func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	finalizer := getFinalizer(vertex.Obj)
+	finalizer := GetFinalizer(vertex.Obj)
 	if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 		err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {

@@ -160,10 +160,10 @@ var _ = Describe("utils test", func() {
 		})
 	})
 
-	Context("getRoleName function", func() {
+	Context("GetRoleName function", func() {
 		It("should work well", func() {
 			pod := builder.NewPodBuilder(namespace, name).AddLabels(roleLabelKey, "LEADER").GetObject()
-			role := getRoleName(*pod)
+			role := GetRoleName(*pod)
 			Expect(role).Should(Equal("leader"))
 		})
 	})

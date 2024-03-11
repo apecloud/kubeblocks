@@ -2,6 +2,8 @@ package kubebuilderx
 
 import (
 	"context"
+	"github.com/go-logr/logr"
+	"k8s.io/client-go/tools/record"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,7 +26,6 @@ import (
 // 2. expose EventRecorder
 // 3. expose Logger
 
-
 type Controller interface {
 	Prepare(reader TreeReader) Controller
 	Do(...Reconciler) Controller
@@ -32,9 +33,11 @@ type Controller interface {
 }
 
 type controller struct {
-	ctx    context.Context
-	reader client.Reader
-	req    ctrl.Request
+	ctx      context.Context
+	reader   client.Reader
+	req      ctrl.Request
+	recorder record.EventRecorder
+	logger   logr.Logger
 
 	err error
 
@@ -43,7 +46,7 @@ type controller struct {
 }
 
 func (c *controller) Prepare(reader TreeReader) Controller {
-	c.oldTree, c.err = reader.Read(c.ctx, c.reader, c.req)
+	c.oldTree, c.err = reader.Read(c.ctx, c.reader, c.req, c.recorder, c.logger)
 	if c.err != nil {
 		return c
 	}
@@ -82,11 +85,13 @@ func (c *controller) Commit(writer client.Client) error {
 	return nil
 }
 
-func NewController(ctx context.Context, reader client.Reader, req ctrl.Request) Controller {
+func NewController(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) Controller {
 	return &controller{
-		ctx:    ctx,
-		reader: reader,
-		req:    req,
+		ctx:      ctx,
+		reader:   reader,
+		req:      req,
+		recorder: recorder,
+		logger:   logger,
 	}
 }
 

@@ -2,6 +2,8 @@ package rsm2
 
 import (
 	"context"
+	"github.com/go-logr/logr"
+	"k8s.io/client-go/tools/record"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,12 +17,19 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-type treeReader struct {}
+type treeReader struct{}
 
-func (r *treeReader) Read(ctx context.Context, reader client.Reader, req ctrl.Request) (*kubebuilderx.ObjectTree, error) {
+func (r *treeReader) Read(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
 	keys := getMatchLabelKeys()
 	kinds := ownedKinds()
-	return kubebuilderx.ReadObjectTree[*workloads.ReplicatedStateMachine](ctx, reader, req, keys, kinds...)
+	tree, err := kubebuilderx.ReadObjectTree[*workloads.ReplicatedStateMachine](ctx, reader, req, keys, kinds...)
+	if err != nil {
+		return nil, err
+	}
+	tree.EventRecorder = recorder
+	tree.Logger = logger
+
+	return tree, err
 }
 
 func getMatchLabelKeys() []string {

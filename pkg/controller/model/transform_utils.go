@@ -165,6 +165,31 @@ func IsObjectStatusUpdating(object client.Object) bool {
 	return !IsObjectDeleting(object) && !IsObjectUpdating(object)
 }
 
+func IsReconciliationPaused(object client.Object) bool {
+	value := reflect.ValueOf(object)
+	if value.Kind() == reflect.Ptr {
+		value = value.Elem()
+	}
+	if value.Kind() != reflect.Struct {
+		return false
+	}
+	spec := value.FieldByName("Spec")
+	if !spec.IsValid() {
+		return false
+	}
+	paused := value.FieldByName("Paused")
+	if !paused.IsValid() {
+		return false
+	}
+	if paused.Kind() == reflect.Ptr {
+		paused = paused.Elem()
+	}
+	if !paused.Type().AssignableTo(reflect.TypeOf(true)) {
+		return false
+	}
+	return paused.Interface().(bool)
+}
+
 // ReadCacheSnapshot reads all objects owned by our cluster
 func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (ObjectSnapshot, error) {
 	// list what kinds of object cluster owns

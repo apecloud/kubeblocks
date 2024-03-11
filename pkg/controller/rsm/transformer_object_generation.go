@@ -25,7 +25,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -46,12 +45,6 @@ import (
 
 type ObjectGenerationTransformer struct{}
 
-type podTemplateSpecExt struct {
-	Replicas int32
-	corev1.PodTemplateSpec
-	VolumeClaimTemplates []corev1.PersistentVolumeClaim
-}
-
 var _ graph.Transformer = &ObjectGenerationTransformer{}
 
 func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
@@ -64,32 +57,15 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	if err := validateSpec(rsm); err != nil {
-		transCtx.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, err.Error())
-		return model.NewRequeueError(time.Second*10, err.Error())
-	}
-
-	// return true if there is a StatefulSet object in old cache
-	isManagingSts, err := func() (bool, error) {
-		provider, err := CurrentReplicaProvider(transCtx.Context, transCtx.Client, rsm)
-		return provider == StatefulSetProvider, err
-	}()
-	if err != nil {
-		return err
-	}
-
 	// generate objects by current spec
-	svc := buildSvc(*rsm)
-	altSvs := buildAlternativeSvs(*rsm)
-	headLessSvc := buildHeadlessSvc(*rsm)
-	envConfig := buildEnvConfigMap(*rsm)
-	workloadList, err := buildWorkloads(rsm, headLessSvc.Name, *envConfig, isManagingSts)
-	if err != nil {
-		transCtx.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, err.Error())
-		return model.NewRequeueError(time.Second*10, err.Error())
-	}
+	svc := BuildSvc(*rsm)
+	altSvs := BuildAlternativeSvs(*rsm)
+	headLessSvc := BuildHeadlessSvc(*rsm)
+	envConfig := BuildEnvConfigMap(*rsm)
+	sts := buildSts(rsm, headLessSvc.Name)
+
 	var objects []client.Object
-	objects = append(objects, workloadList...)
+	objects = append(objects, sts)
 	objects = append(objects, headLessSvc, envConfig)
 	if svc != nil {
 		objects = append(objects, svc)
@@ -99,7 +75,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	for _, object := range objects {
-		if err := setOwnership(rsm, object, model.GetScheme(), getFinalizer(object)); err != nil {
+		if err := SetOwnership(rsm, object, model.GetScheme(), GetFinalizer(object)); err != nil {
 			return err
 		}
 	}
@@ -134,43 +110,10 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 			cli.Create(dag, newSnapshot[name])
 		}
 	}
-	isPodOrPVC := func(obj client.Object) bool {
-		if _, ok := obj.(*corev1.Pod); ok {
-			return true
-		}
-		if _, ok := obj.(*corev1.PersistentVolumeClaim); ok {
-			return true
-		}
-		return false
-	}
 	updateObjects := func() {
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := copyAndMerge(oldObj, newSnapshot[name])
-			if newObj == nil {
-				continue
-			}
-
-			// filter pod and pvc if not owned by rsm
-			if isManagingSts && isPodOrPVC(newObj) {
-				continue
-			}
-
-			// handle pod update:
-			// we use Delete+Create to do the update job, and will transit to in-place update in the near future.
-			//
-			// why only do the Delete here? the trick is:
-			// Delete is an idempotent operation of K8s, so we can call it many times during pod deletion.
-			// and after the pod is deleted, it will be in the createSet in next reconciliation.
-			if _, ok := newObj.(*corev1.Pod); ok {
-				cli.Delete(dag, newObj)
-				continue
-			}
-			// TODO(free6om): support pod in-place update
-			// 1. fields support in-place update by the K8s (different K8s version may support different fields).
-			// 2. KubeBlocks will provide its in-place update feature, adapt it.
-			// 3. the customized K8s may support in-place update feature, adapt it.
-
 			cli.Update(dag, oldObj, newObj)
 		}
 	}
@@ -182,20 +125,12 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 					continue
 				}
 			}
-
-			// filter pod and pvc if not owned by rsm
-			if isManagingSts && isPodOrPVC(oldSnapshot[name]) {
-				continue
-			}
-
 			cli.Delete(dag, oldSnapshot[name])
 		}
 	}
 	handleDependencies := func() {
-		index := len(workloadList)
-		for i := range workloadList {
-			cli.DependOn(dag, workloadList[i], objects[index:]...)
-		}
+		// objects[0] is the sts object
+		cli.DependOn(dag, objects[0], objects[1:]...)
 	}
 
 	// objects to be created
@@ -206,35 +141,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	deleteOrphanObjects()
 	// handle object dependencies
 	handleDependencies()
-
-	return nil
-}
-
-func validateSpec(rsm *workloads.ReplicatedStateMachine) error {
-	replicasInTemplates := int32(0)
-	var names string
-	for _, instance := range rsm.Spec.Instances {
-		replicas := int32(1)
-		if instance.Replicas != nil {
-			replicas = *instance.Replicas
-		}
-		replicasInTemplates += replicas
-
-		if instance.Name != nil {
-			if instance.Replicas != nil && *instance.Replicas > 1 {
-				names = fmt.Sprintf("%s%s,", names, *instance.Name)
-			}
-		}
-	}
-	// sum of spec.templates[*].replicas should not greater than spec.replicas
-	if replicasInTemplates > *rsm.Spec.Replicas {
-		return fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *rsm.Spec.Replicas)
-	}
-
-	// instance.replicas should be nil or 1 if instance.name set
-	if len(names) > 0 {
-		return fmt.Errorf("replicas should be empty or no more than 1 if name set, instance names: %s", names)
-	}
 
 	return nil
 }
@@ -325,29 +231,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return oldCm
 	}
 
-	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
-		// check pod update by revision
-		if newPod.Labels[apps.ControllerRevisionHashLabelKey] == oldPod.Labels[apps.ControllerRevisionHashLabelKey] {
-			return nil
-		}
-
-		// in-place update is not supported currently, means the pod update is done through delete+create.
-		// so no need to merge the fields.
-		return oldPod
-	}
-
-	copyAndMergePVC := func(oldPVC, newPVC *corev1.PersistentVolumeClaim) client.Object {
-		// resources.request.storage and accessModes support in-place update.
-		// resources.request.storage only supports volume expansion.
-		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&
-			oldPVC.Spec.Resources.Requests.Storage().Cmp(*newPVC.Spec.Resources.Requests.Storage()) <= 0 {
-			return nil
-		}
-		oldPVC.Spec.AccessModes = newPVC.Spec.AccessModes
-		*oldPVC.Spec.Resources.Requests.Storage() = *newPVC.Spec.Resources.Requests.Storage()
-		return oldPVC
-	}
-
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
 	case *apps.StatefulSet:
@@ -356,16 +239,12 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
 	case *corev1.ConfigMap:
 		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
-	case *corev1.Pod:
-		return copyAndMergePod(targetObj.(*corev1.Pod), o)
-	case *corev1.PersistentVolumeClaim:
-		return copyAndMergePVC(targetObj.(*corev1.PersistentVolumeClaim), o)
 	default:
 		return newObj
 	}
 }
 
-func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
+func BuildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
@@ -382,7 +261,7 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 		GetObject()
 }
 
-func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service {
+func BuildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
@@ -413,7 +292,7 @@ func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service
 	return services
 }
 
-func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
+func BuildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	selectors := getSvcSelector(&rsm, true)
@@ -443,244 +322,9 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	return hdlBuilder.GetObject()
 }
 
-func buildWorkloads(rsm *workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap, isManagingSts bool) ([]client.Object, error) {
-	if isManagingSts {
-		return []client.Object{buildSts(rsm, headlessSvcName, envConfig)}, nil
-	}
-
-	return buildPods(rsm, envConfig)
-}
-
-func buildPods(rsm *workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) ([]client.Object, error) {
-	// 1. prepare all templates
-	var podTemplates []*podTemplateSpecExt
-	var replicasInTemplates int32
-	defaultTemplate := buildPodTemplate(rsm, envConfig)
-	buildPodTemplateExt := func(replicas int32) *podTemplateSpecExt {
-		claims := make([]corev1.PersistentVolumeClaim, len(rsm.Spec.VolumeClaimTemplates))
-		copy(claims, rsm.Spec.VolumeClaimTemplates)
-		return &podTemplateSpecExt{
-			Replicas:             replicas,
-			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
-			VolumeClaimTemplates: claims,
-		}
-	}
-	for _, instance := range rsm.Spec.Instances {
-		replicas := int32(1)
-		if instance.Replicas != nil {
-			replicas = *instance.Replicas
-		}
-		template := buildPodTemplateExt(replicas)
-		applyInstanceTemplate(instance, template)
-		podTemplates = append(podTemplates, template)
-		replicasInTemplates += template.Replicas
-	}
-	if replicasInTemplates < *rsm.Spec.Replicas {
-		template := buildPodTemplateExt(*rsm.Spec.Replicas - replicasInTemplates)
-		podTemplates = append(podTemplates, template)
-	}
-	// set the default name generator and namespace
-	for _, template := range podTemplates {
-		if template.GenerateName == "" {
-			template.GenerateName = rsm.Name
-		}
-		template.Namespace = rsm.Namespace
-	}
-
-	// 2. build all pods from podTemplates
-	// group the pod templates by template.Name if set or by template.GenerateName
-	podTemplateGroups := make(map[string][]*podTemplateSpecExt)
-	for _, template := range podTemplates {
-		name := template.Name
-		if template.Name == "" {
-			name = template.GenerateName
-		}
-		templates := podTemplateGroups[name]
-		templates = append(templates, template)
-		podTemplateGroups[name] = templates
-	}
-	// build pods by groups
-	var pods []client.Object
-	var pvcs []client.Object
-	for _, templateList := range podTemplateGroups {
-		var (
-			podList []*corev1.Pod
-			pvcList []*corev1.PersistentVolumeClaim
-			ordinal int
-			err     error
-		)
-		for _, template := range templateList {
-			podList, pvcList, ordinal, err = buildPodByTemplate(template, ordinal, rsm)
-			if err != nil {
-				return nil, err
-			}
-			for _, pod := range podList {
-				pods = append(pods, pod)
-			}
-			for _, pvc := range pvcList {
-				pvcs = append(pvcs, pvc)
-			}
-		}
-	}
-	// validate duplicate pod names
-	podNameCount := make(map[string]int)
-	updatedRevisions := make(map[string]string, len(pods))
-	for _, pod := range pods {
-		count, exist := podNameCount[pod.GetName()]
-		if exist {
-			count++
-		} else {
-			count = 1
-		}
-		podNameCount[pod.GetName()] = count
-		updatedRevisions[pod.GetName()] = pod.GetLabels()[apps.ControllerRevisionHashLabelKey]
-	}
-	dupNames := ""
-	for name, count := range podNameCount {
-		if count > 1 {
-			dupNames = fmt.Sprintf("%s%s,", dupNames, name)
-		}
-	}
-	if len(dupNames) > 0 {
-		return nil, fmt.Errorf("duplicate pod names: %s", dupNames)
-	}
-
-	rsm.Status.UpdateRevisions = updatedRevisions
-	rsm.Status.UpdateRevision = pods[len(pods)-1].GetLabels()[apps.ControllerRevisionHashLabelKey]
-
-	return append(pods, pvcs...), nil
-}
-
-func buildPodByTemplate(template *podTemplateSpecExt, ordinal int, parent *workloads.ReplicatedStateMachine) ([]*corev1.Pod, []*corev1.PersistentVolumeClaim, int, error) {
-	var (
-		podList []*corev1.Pod
-		pvcList []*corev1.PersistentVolumeClaim
-	)
-	generatePodName := func(name, generateName string, ordinal int) (string, int) {
-		if len(name) > 0 {
-			return name, ordinal
-		}
-		n := fmt.Sprintf("%s-%d", generateName, ordinal)
-		ordinal++
-		return n, ordinal
-	}
-	revision, err := buildPodTemplateRevision(template, parent)
-	if err != nil {
-		return nil, nil, ordinal, err
-	}
-	for i := 0; i < int(template.Replicas); i++ {
-		// 1. generate pod name
-		namespace := template.Namespace
-		var name string
-		name, ordinal = generatePodName(template.Name, template.GenerateName, ordinal)
-
-		// 2. build a pod from template
-		pod := builder.NewPodBuilder(namespace, name).
-			AddAnnotationsInMap(template.Annotations).
-			AddLabelsInMap(template.Labels).
-			AddControllerRevisionHashLabel(revision).
-			SetPodSpec(*template.Spec.DeepCopy()).
-			GetObject()
-		// Set these immutable fields only on initial Pod creation, not updates.
-		pod.Spec.Hostname = pod.Name
-		pod.Spec.Subdomain = parent.Spec.ServiceName
-		podList = append(podList, pod)
-
-		// 3. build pvcs from template
-		pvcMap := make(map[string]*corev1.PersistentVolumeClaim)
-		pvcNameMap := make(map[string]string)
-		for _, claimTemplate := range template.VolumeClaimTemplates {
-			pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, pod.GetName())
-			pvc := builder.NewPVCBuilder(namespace, pvcName).
-				AddLabelsInMap(template.Labels).
-				SetSpec(*claimTemplate.Spec.DeepCopy()).
-				GetObject()
-			pvcMap[pvcName] = pvc
-			pvcNameMap[pvcName] = claimTemplate.Name
-		}
-
-		// 4. update pod volumes
-		var volumeList []corev1.Volume
-		for pvcName, pvc := range pvcMap {
-			pvcList = append(pvcList, pvc)
-			volume := builder.NewVolumeBuilder(pvcNameMap[pvcName]).
-				SetVolumeSource(corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
-				}).GetObject()
-			volumeList = append(volumeList, *volume)
-		}
-		mergeList(&volumeList, &pod.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
-			return func(v corev1.Volume) bool {
-				return v.Name == item.Name
-			}
-		})
-
-		// in case illegal template.replicas set
-		if len(template.Name) > 0 {
-			break
-		}
-	}
-	return podList, pvcList, ordinal, nil
-}
-
-func buildPodTemplateRevision(template *podTemplateSpecExt, parent *workloads.ReplicatedStateMachine) (string, error) {
-	// try to generate the same revision as if generated by sts controller
-	rsm := builder.NewReplicatedStateMachineBuilder(parent.Namespace, parent.Name).
-		SetUID(parent.UID).
-		AddAnnotationsInMap(parent.Annotations).
-		AddMatchLabelsInMap(parent.Labels).
-		SetTemplate(template.PodTemplateSpec).
-		GetObject()
-
-	cr, err := NewRevision(rsm)
-	if err != nil {
-		return "", err
-	}
-	return cr.Labels[ControllerRevisionHashLabel], nil
-}
-
-func applyInstanceTemplate(instance workloads.InstanceTemplate, template *podTemplateSpecExt) {
-	replicas := int32(1)
-	if instance.Replicas != nil {
-		replicas = *instance.Replicas
-	}
-	template.Replicas = replicas
-	if instance.Name != nil {
-		template.Name = *instance.Name
-	}
-	if instance.NodeName != nil {
-		template.Spec.NodeName = *instance.NodeName
-	}
-	mergeMap(&instance.Annotations, &template.Annotations)
-	mergeMap(&instance.Labels, &template.Labels)
-	mergeMap(&instance.NodeSelector, &template.Spec.NodeSelector)
-	if instance.Resources != nil {
-		if len(template.Spec.Containers) > 0 {
-			template.Spec.Containers[0].Resources = *instance.Resources
-		}
-	}
-	mergeList(&instance.Volumes, &template.Spec.Volumes,
-		func(item corev1.Volume) func(corev1.Volume) bool {
-			return func(v corev1.Volume) bool {
-				return v.Name == item.Name
-			}
-		})
-	mergeList(&instance.VolumeMounts, &template.Spec.Containers[0].VolumeMounts,
-		func(item corev1.VolumeMount) func(corev1.VolumeMount) bool {
-			return func(vm corev1.VolumeMount) bool {
-				return vm.Name == item.Name
-			}
-		})
-	mergeList(&instance.VolumeClaimTemplates, &template.VolumeClaimTemplates,
-		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
-			return func(claim corev1.PersistentVolumeClaim) bool {
-				return claim.Name == item.Name
-			}
-		})
-}
-
-func buildSts(rsm *workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
-	template := buildPodTemplate(rsm, envConfig)
+func buildSts(rsm *workloads.ReplicatedStateMachine, headlessSvcName string) *apps.StatefulSet {
+	envConfigName := GetEnvConfigMapName(rsm.Name)
+	template := BuildPodTemplate(rsm, envConfigName)
 	annotations := ParseAnnotationsOfScope(RootScope, rsm.Annotations)
 	labels := getLabels(rsm)
 	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
@@ -698,17 +342,17 @@ func buildSts(rsm *workloads.ReplicatedStateMachine, headlessSvcName string, env
 		GetObject()
 }
 
-func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
+func BuildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
 	annotations := ParseAnnotationsOfScope(ConfigMapScope, rsm.Annotations)
 	labels := getLabels(&rsm)
-	return builder.NewConfigMapBuilder(rsm.Namespace, getEnvConfigMapName(rsm.Name)).
+	return builder.NewConfigMapBuilder(rsm.Namespace, GetEnvConfigMapName(rsm.Name)).
 		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
 		SetData(envData).GetObject()
 }
 
-func buildPodTemplate(rsm *workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
+func BuildPodTemplate(rsm *workloads.ReplicatedStateMachine, envConfigName string) *corev1.PodTemplateSpec {
 	template := rsm.Spec.Template
 	// inject env ConfigMap into workload pods only
 	for i := range template.Spec.Containers {
@@ -716,7 +360,7 @@ func buildPodTemplate(rsm *workloads.ReplicatedStateMachine, envConfig corev1.Co
 			corev1.EnvFromSource{
 				ConfigMapRef: &corev1.ConfigMapEnvSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: envConfig.Name,
+						Name: envConfigName,
 					},
 					Optional: func() *bool { optional := false; return &optional }(),
 				}})

@@ -42,17 +42,9 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 		return nil
 	}
 
-	provider, err := CurrentReplicaProvider(transCtx.Context, transCtx.Client, rsm)
-	if err != nil {
-		return err
-	}
-	if provider != StatefulSetProvider {
-		return nil
-	}
-
 	// read the underlying sts
 	stsObj := &apps.StatefulSet{}
-	if err = transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), stsObj); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), stsObj); err != nil {
 		return err
 	}
 	// read all pods belong to the sts, hence belong to the rsm

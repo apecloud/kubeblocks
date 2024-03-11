@@ -32,7 +32,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,7 +70,7 @@ var podNameRegex = regexp.MustCompile(`(.*)-([0-9]+)$`)
 // reverse it if reverse==true
 func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 	getRoleFunc := func(i int) string {
-		return getRoleName(pods[i])
+		return GetRoleName(pods[i])
 	}
 	getOrdinalFunc := func(i int) int {
 		_, ordinal := intctrlutil.GetParentNameAndOrdinal(&pods[i])
@@ -186,7 +185,7 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods *[]corev1.Pod)
 			continue
 		}
 		readyWithoutPrimary := false
-		roleName := getRoleName(pod)
+		roleName := GetRoleName(pod)
 		role, ok := roleMap[roleName]
 		if !ok {
 			continue
@@ -224,8 +223,8 @@ func setMembersStatusWithoutRole(rsm *workloads.ReplicatedStateMachine, pods *[]
 	rsm.Status.MembersStatus = membersStatus
 }
 
-// getRoleName gets role name of pod 'pod'
-func getRoleName(pod corev1.Pod) string {
+// GetRoleName gets role name of pod 'pod'
+func GetRoleName(pod corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
 
@@ -343,7 +342,7 @@ func getPodOrdinal(podName string) (int, error) {
 
 // ordinal is the ordinal of pod which this action applies to
 func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
-	if err := setOwnership(rsm, action, model.GetScheme(), getFinalizer(action)); err != nil {
+	if err := SetOwnership(rsm, action, model.GetScheme(), GetFinalizer(action)); err != nil {
 		return err
 	}
 	cli.Create(dag, action)
@@ -550,14 +549,14 @@ func emitActionEvent(transCtx *rsmTransformContext, eventType, reason, message s
 	transCtx.EventRecorder.Event(transCtx.rsm, eventType, strings.ToUpper(reason), message)
 }
 
-func getFinalizer(obj client.Object) string {
+func GetFinalizer(obj client.Object) string {
 	if _, ok := obj.(*workloads.ReplicatedStateMachine); ok {
-		return RSMFinalizerName
+		return rsmFinalizerName
 	}
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		return constant.DBClusterFinalizerName
 	}
-	return RSMFinalizerName
+	return rsmFinalizerName
 }
 
 func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
@@ -615,7 +614,7 @@ func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[st
 	return selectors
 }
 
-func setOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
+func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
 	// if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 	//	return CopyOwnership(owner, obj, scheme, finalizer)
 	// }
@@ -812,7 +811,7 @@ func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet 
 	return sts
 }
 
-func getEnvConfigMapName(rsmName string) string {
+func GetEnvConfigMapName(rsmName string) string {
 	return fmt.Sprintf("%s-rsm-env", rsmName)
 }
 
@@ -851,53 +850,4 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	// }
 	// return multicluster.InGlobalContext()
 	return nil
-}
-
-func mergeMap(src, dst *map[string]string) {
-	if *src == nil {
-		return
-	}
-	if *dst == nil {
-		*dst = make(map[string]string)
-	}
-	for k, v := range *src {
-		(*dst)[k] = v
-	}
-}
-
-func mergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
-	if len(*src) == 0 {
-		return
-	}
-	for i := range *src {
-		item := (*src)[i]
-		index := slices.IndexFunc(*dst, f(item))
-		if index >= 0 {
-			(*dst)[index] = item
-		} else {
-			*dst = append(*dst, item)
-		}
-	}
-}
-
-func CurrentReplicaProvider(ctx context.Context, cli client.Reader, rsm *workloads.ReplicatedStateMachine) (ReplicaProvider, error) {
-	getDefaultProvider := func() ReplicaProvider {
-		provider := defaultReplicaProvider
-		if viper.IsSet(FeatureGateRSMReplicaProvider) {
-			provider = ReplicaProvider(viper.GetString(FeatureGateRSMReplicaProvider))
-			if provider != StatefulSetProvider && provider != PodProvider {
-				provider = defaultReplicaProvider
-			}
-		}
-		return provider
-	}
-	sts := &appsv1.StatefulSet{}
-	switch err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); {
-	case err == nil:
-		return StatefulSetProvider, nil
-	case !apierrors.IsNotFound(err):
-		return "", err
-	default:
-		return getDefaultProvider(), nil
-	}
 }

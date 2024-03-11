@@ -976,7 +976,8 @@ var _ = Describe("vars", func() {
 		It("multiple components", func() {
 			var (
 				compName1             = synthesizedComp.Name
-				compName2             = "other-comp"
+				compName2             = "comp-other"
+				compName3             = "comp-other-not-exist"
 				svcName1              = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName1, "service")
 				svcName2              = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName2, "service")
 				credentialSecretName1 = constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName1, "credential")
@@ -984,14 +985,16 @@ var _ = Describe("vars", func() {
 				compVarName           = func(compName, envName string) string {
 					return fmt.Sprintf("%s_%s", envName, strings.ToUpper(strings.ReplaceAll(compName, "-", "_")))
 				}
-				svcVarName1           = compVarName(compName1, "service-host")
-				svcVarName2           = compVarName(compName2, "service-host")
-				credentialVarName1    = compVarName(compName1, "credential-username")
-				credentialVarName2    = compVarName(compName2, "credential-username")
-				combinedSvcVarValue   = fmt.Sprintf("%s:%s,%s:%s", compName1, svcName1, compName2, svcName2)
-				newVarSuffix          = "suffix"
-				newCombinedSvcVarName = fmt.Sprintf("%s_%s", "service-host", newVarSuffix)
-				reader                = &mockReader{
+				svcVarName1                  = compVarName(compName1, "service-host")
+				svcVarName2                  = compVarName(compName2, "service-host")
+				svcVarName3                  = compVarName(compName3, "service-host")
+				credentialVarName1           = compVarName(compName1, "credential-username")
+				credentialVarName2           = compVarName(compName2, "credential-username")
+				combinedSvcVarValue          = fmt.Sprintf("%s:%s,%s:%s", compName1, svcName1, compName2, svcName2)
+				combinedSvcVarValueWithComp3 = fmt.Sprintf("%s:%s,%s:%s,%s:", compName1, svcName1, compName2, svcName2, compName3)
+				newVarSuffix                 = "suffix"
+				newCombinedSvcVarName        = fmt.Sprintf("%s_%s", "service-host", newVarSuffix)
+				reader                       = &mockReader{
 					cli: testCtx.Cli,
 					objs: []client.Object{
 						&corev1.Service{
@@ -1044,8 +1047,8 @@ var _ = Describe("vars", func() {
 			synthesizedComp.Comp2CompDefs = map[string]string{
 				compName1:       synthesizedComp.CompDefName,
 				compName2:       synthesizedComp.CompDefName,
-				"other-comp-01": "abc" + synthesizedComp.CompDefName,
-				"other-comp-02": "abc" + synthesizedComp.CompDefName,
+				"comp-other-01": "abc" + synthesizedComp.CompDefName,
+				"comp-other-02": "abc" + synthesizedComp.CompDefName,
 			}
 
 			By("w/o option - ref self")
@@ -1157,9 +1160,6 @@ var _ = Describe("vars", func() {
 				},
 			})
 
-			// TODO
-			// By("individual - partial nil object")
-
 			By("combined - reuse")
 			vars = []appsv1alpha1.EnvVar{
 				{
@@ -1225,9 +1225,6 @@ var _ = Describe("vars", func() {
 			checkEnvVarNotExist(envVars, svcVarName1)
 			checkEnvVarNotExist(envVars, svcVarName2)
 
-			// TODO
-			// By("combined - partial nil object")
-
 			By("combined - value from error")
 			vars = []appsv1alpha1.EnvVar{
 				{
@@ -1251,6 +1248,75 @@ var _ = Describe("vars", func() {
 			}
 			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
+
+			By("individual - partial nil object")
+			synthesizedComp.Comp2CompDefs = map[string]string{
+				compName1: synthesizedComp.CompDefName,
+				compName2: synthesizedComp.CompDefName,
+				compName3: synthesizedComp.CompDefName,
+			}
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: required(),
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
+								},
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
+			Expect(templateVars).Should(HaveKeyWithValue(svcVarName1, svcName1))
+			Expect(templateVars).Should(HaveKeyWithValue(svcVarName2, svcName2))
+			Expect(templateVars).Should(HaveKeyWithValue(svcVarName3, ""))
+			checkEnvVarWithValue(envVars, "service-host", "")
+			checkEnvVarWithValue(envVars, svcVarName1, svcName1)
+			checkEnvVarWithValue(envVars, svcVarName2, svcName2)
+			checkEnvVarWithValue(envVars, svcVarName3, "")
+
+			By("combined - partial nil object")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: required(),
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
+								},
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValueWithComp3))
+			Expect(templateVars).ShouldNot(HaveKey(svcVarName1))
+			Expect(templateVars).ShouldNot(HaveKey(svcVarName2))
+			Expect(templateVars).ShouldNot(HaveKey(svcVarName3))
+			checkEnvVarWithValue(envVars, "service-host", combinedSvcVarValueWithComp3)
+			checkEnvVarNotExist(envVars, svcVarName1)
+			checkEnvVarNotExist(envVars, svcVarName2)
+			checkEnvVarNotExist(envVars, svcVarName3)
 		})
 
 		It("vars reference and escaping", func() {

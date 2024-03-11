@@ -27,6 +27,10 @@ image:
 ##
 replicaCount: 1
 
+## MaxConcurrentReconciles for cluster and component controllers.
+##
+reconcileWorkers: ""
+
 ## @param nameOverride
 ##
 nameOverride: ""

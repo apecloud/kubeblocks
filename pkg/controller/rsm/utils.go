@@ -233,8 +233,6 @@ func ownedKinds() []client.ObjectList {
 		&appsv1.StatefulSetList{},
 		&corev1.ServiceList{},
 		&corev1.ConfigMapList{},
-		&corev1.PodList{},
-		&corev1.PersistentVolumeClaimList{},
 	}
 }
 

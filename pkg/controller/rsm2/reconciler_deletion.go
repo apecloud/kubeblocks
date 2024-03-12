@@ -24,10 +24,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// objectDeletionReconciler handles object and its secondary resources' deletion
-type objectDeletionReconciler struct{}
+// deletionReconciler handles object and its secondary resources' deletion
+type deletionReconciler struct{}
 
-func (r *objectDeletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if !model.IsObjectDeleting(tree.Root) {
 		return kubebuilderx.ResultUnsatisfied
 	}
@@ -37,13 +37,13 @@ func (r *objectDeletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 	return kubebuilderx.ResultSatisfied
 }
 
-func (r *objectDeletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	tree.Children = nil
 	return tree, nil
 }
 
-func NewObjectDeletionReconciler() kubebuilderx.Reconciler {
-	return &objectDeletionReconciler{}
+func NewDeletionReconciler() kubebuilderx.Reconciler {
+	return &deletionReconciler{}
 }
 
-var _ kubebuilderx.Reconciler = &objectDeletionReconciler{}
+var _ kubebuilderx.Reconciler = &deletionReconciler{}

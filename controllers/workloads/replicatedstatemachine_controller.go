@@ -86,7 +86,9 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 		err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 			Prepare(rsm2.NewTreeReader()).
 			Do(rsm2.NewFixMetaReconciler()).
-			Do(rsm2.NewObjectDeletionReconciler()).
+			Do(rsm2.NewDeletionReconciler()).
+			Do(rsm2.NewUpdateReconciler()).
+			Do(rsm2.NewStatusReconciler()).
 			Commit(r.Client)
 		return ctrl.Result{}, err
 	}

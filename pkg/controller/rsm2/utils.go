@@ -3,6 +3,9 @@ package rsm2
 import (
 	"context"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sort"
 
 	"golang.org/x/exp/slices"
@@ -86,4 +89,47 @@ func SortReplicas(replicas []replica, rolePriorityMap map[string]int, reverse bo
 		}
 		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
 	})
+}
+
+// isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
+func isRunningAndReady(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodRunning && podutils.IsPodReady(pod)
+}
+
+func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
+	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
+}
+
+// isCreated returns true if pod has been created and is maintained by the API server
+func isCreated(pod *v1.Pod) bool {
+	return pod.Status.Phase != ""
+}
+
+// isPending returns true if pod has a Phase of PodPending
+func isPending(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodPending
+}
+
+// isFailed returns true if pod has a Phase of PodFailed
+func isFailed(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed
+}
+
+// isTerminating returns true if pod's DeletionTimestamp has been set
+func isTerminating(pod *v1.Pod) bool {
+	return pod.DeletionTimestamp != nil
+}
+
+// isHealthy returns true if pod is running and ready and has not been terminated
+func isHealthy(pod *v1.Pod) bool {
+	return isRunningAndReady(pod) && !isTerminating(pod)
+}
+
+// getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
+// string is returned.
+func getPodRevision(pod *v1.Pod) string {
+	if pod.Labels == nil {
+		return ""
+	}
+	return pod.Labels[appsv1.ControllerRevisionHashLabelKey]
 }

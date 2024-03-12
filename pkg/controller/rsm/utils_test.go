@@ -120,7 +120,7 @@ var _ = Describe("utils test", func() {
 		})
 	})
 
-	Context("setMembersStatus function", func() {
+	Context("SetMembersStatus function", func() {
 		It("should work well", func() {
 			pods := []corev1.Pod{
 				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
@@ -150,7 +150,7 @@ var _ = Describe("utils test", func() {
 			replicas := int32(3)
 			rsm.Spec.Replicas = &replicas
 			rsm.Status.MembersStatus = oldMembersStatus
-			setMembersStatus(rsm, &pods)
+			SetMembersStatus(rsm, &pods)
 
 			Expect(rsm.Status.MembersStatus).Should(HaveLen(2))
 			Expect(rsm.Status.MembersStatus[0].PodName).Should(Equal("pod-1"))

@@ -3,6 +3,7 @@ package kubebuilderx
 import (
 	"context"
 	"errors"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
 	"reflect"
@@ -17,7 +18,7 @@ type ObjectTree struct {
 	logr.Logger
 
 	Root     client.Object
-	Children []client.Object
+	Children model.ObjectSnapshot
 }
 
 type TreeReader interface {
@@ -50,13 +51,13 @@ func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 		return nil, ErrDeepCopyFailed
 	}
 	out.Root = root
-	var children []client.Object
-	for _, child := range t.Children {
+	var children model.ObjectSnapshot
+	for key, child := range t.Children {
 		childCopied, ok := child.DeepCopyObject().(client.Object)
 		if !ok {
 			return nil, ErrDeepCopyFailed
 		}
-		children = append(children, childCopied)
+		children[key] = childCopied
 	}
 	out.Children = children
 	return out, nil
@@ -78,4 +79,34 @@ func (t *ObjectTree) List(obj client.Object) []client.Object {
 		}
 	}
 	return objects
+}
+
+func (t *ObjectTree) Add(objects ...client.Object) error {
+	return t.replace(objects...)
+}
+
+func (t *ObjectTree) Delete(objects ...client.Object) error {
+	for _, object := range objects {
+		name, err := model.GetGVKName(object)
+		if err != nil {
+			return err
+		}
+		delete(t.Children, *name)
+	}
+	return nil
+}
+
+func (t *ObjectTree) Update(objects ...client.Object) error {
+	return t.replace(objects...)
+}
+
+func (t *ObjectTree) replace(objects ...client.Object) error {
+	for _, object := range objects {
+		name, err := model.GetGVKName(object)
+		if err != nil {
+			return err
+		}
+		t.Children[*name] = object
+	}
+	return nil
 }

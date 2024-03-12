@@ -2,6 +2,7 @@ package kubebuilderx
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"reflect"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -15,7 +16,7 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 		return nil, err
 	}
 
-	var children []client.Object
+	var children model.ObjectSnapshot
 	ml := getMatchLabels(root, labelKeys)
 	inNS := client.InNamespace(req.Namespace)
 	for _, list := range kinds {
@@ -28,7 +29,11 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			children = append(children, object)
+			name, err := model.GetGVKName(object)
+			if err != nil {
+				return nil, err
+			}
+			children[*name] = object
 		}
 	}
 

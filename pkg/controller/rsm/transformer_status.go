@@ -75,7 +75,7 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 			return err
 		}
 		// update role fields
-		setMembersStatus(rsm, &pods)
+		SetMembersStatus(rsm, &pods)
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)

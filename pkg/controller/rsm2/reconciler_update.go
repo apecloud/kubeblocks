@@ -21,14 +21,13 @@ package rsm2
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"math"
 	"reflect"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -36,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type updateReconciler struct{}
@@ -52,6 +52,10 @@ type replica struct {
 }
 
 var _ kubebuilderx.Reconciler = &updateReconciler{}
+
+func NewUpdateReconciler() kubebuilderx.Reconciler {
+	return &updateReconciler{}
+}
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if model.IsObjectDeleting(tree.Root) {
@@ -127,15 +131,21 @@ func handleNoneWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 	updateSet := newNameSet.Intersection(oldNameSet)
 	deleteSet := oldNameSet.Difference(newNameSet)
 	for name := range createSet {
-		tree.Add(newNameSet[name])
+		if err := tree.Add(newSnapshot[name]); err != nil {
+			return err
+		}
 	}
 	for name := range updateSet {
 		oldObj := oldSnapshot[name]
 		newObj := copyAndMerge(oldObj, newSnapshot[name])
-		tree.Update(newObj)
+		if err := tree.Update(newObj); err != nil {
+			return err
+		}
 	}
 	for name := range deleteSet {
-		tree.Delete(oldSnapshot[name])
+		if err := tree.Delete(oldSnapshot[name]); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -170,38 +180,135 @@ func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 	updateSet := newNameSet.Intersection(oldNameSet)
 	deleteSet := oldNameSet.Difference(newNameSet)
 
-	partition := len(replicaList)
-	unavailable := partition
-	// 3. handle RollingUpdate
-	if rsm.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType {
-		// 3.1 build partition set by RollingUpdate.partition if set
-		partition, unavailable = parsePartitionNMaxUnavailable(rsm.Spec.UpdateStrategy.RollingUpdate, len(replicaList))
-		// 3.2 consider max unavailable
-		currentUnavailable := len(createSet)
-		for _, object := range oldReplicaList {
-			pod, _ := object.(*corev1.Pod)
-			if !controllerutil.IsAvailable(pod, rsm.Spec.MinReadySeconds) {
-				currentUnavailable++
+	// 3. handle scaling
+	if rsm.Spec.PodManagementPolicy == apps.ParallelPodManagement {
+		for name := range createSet {
+			i := newReplicaMap[name]
+			if err = tree.Add(replicaList[i].pod); err != nil {
+				return err
+			}
+			for _, pvc := range replicaList[i].pvcs {
+				if err = tree.Add(pvc); err != nil {
+					return err
+				}
 			}
 		}
-		unavailable = unavailable - currentUnavailable
+		for name := range deleteSet {
+			i := oldReplicaMap[name]
+			if err = tree.Delete(replicaList[i].pod); err != nil {
+				return err
+			}
+			for _, pvc := range replicaList[i].pvcs {
+				if err = tree.Delete(pvc); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		for i, r := range replicaList {
+			if _, ok := createSet[r.pod.GetName()]; !ok {
+				continue
+			}
+			if i == 0 || controllerutil.IsAvailable(replicaList[i-1].pod, rsm.Spec.MinReadySeconds) {
+				if err = tree.Add(r.pod); err != nil {
+					return err
+				}
+				for _, pvc := range r.pvcs {
+					if err = tree.Add(pvc); err != nil {
+						return err
+					}
+				}
+			}
+			break
+		}
+		for i := len(oldReplicaList) - 1; i >= 0; i-- {
+			pod, _ := oldReplicaList[i].(*corev1.Pod)
+			if _, ok := deleteSet[pod.Name]; !ok {
+				continue
+			}
+			if controllerutil.IsAvailable(pod, rsm.Spec.MinReadySeconds) {
+				if err = tree.Delete(pod); err != nil {
+					return err
+				}
+				// TODO(free6om): handle pvc management policy
+				// Retain by default.
+			}
+			break
+		}
 	}
+	// TODO(free6om): handle BestEffortParallel: always keep the majority available.
 
-	// 4. build update set by PodManagementPolicy
-	switch rsm.Spec.PodManagementPolicy {
-	case "",apps.OrderedReadyPodManagement:
-
+	// 4. handle update
+	// do nothing if UpdateStrategyType is 'OnDelete'
+	if rsm.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
+		return nil
 	}
+	// handle 'RollingUpdate'
+	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(rsm.Spec.UpdateStrategy.RollingUpdate, len(replicaList))
+	if err != nil {
+		return err
+	}
+	currentUnavailable := 0
+	for _, object := range oldReplicaList {
+		pod, _ := object.(*corev1.Pod)
+		if !isHealthy(pod) {
+			currentUnavailable++
+		}
+	}
+	unavailable := maxUnavailable - currentUnavailable
 
-	// 5. do update
+	// TODO(free6om): calculate updateCount from PodManagementPolicy
+	updateCount := 1
+	deletedPods := 0
+	updatedPods := 0
+	for _, object := range oldReplicaList {
+		pod, _ := object.(*corev1.Pod)
+		if _, ok := updateSet[pod.Name]; !ok {
+			continue
+		}
+		newPod := replicaList[newReplicaMap[pod.Name]].pod
+		if pod.Labels[apps.ControllerRevisionHashLabelKey] != newPod.Labels[apps.ControllerRevisionHashLabelKey] && !isTerminating(pod) {
+			if err = tree.Delete(pod); err != nil {
+				return err
+			}
+			// TODO(free6om): handle pvc management policy
+			// Retain by default.
+			deletedPods++
+		}
+		updatedPods++
+
+		if deletedPods > updateCount || deletedPods > unavailable {
+			break
+		}
+		if updatedPods >= partition {
+			break
+		}
+	}
+	return nil
 }
 
-func parsePartitionNMaxUnavailable(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, replicas int) (int, int) {
+func parsePartitionNMaxUnavailable(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, replicas int) (int, int, error) {
 	partition := 0
 	maxUnavailable := 1
-	if rsm.Spec.UpdateStrategy.RollingUpdate != nil {
-		tree.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, "")
+	if rollingUpdate == nil {
+		return partition, maxUnavailable, nil
 	}
+	if rollingUpdate.Partition != nil {
+		partition = int(*rollingUpdate.Partition)
+	}
+	if rollingUpdate.MaxUnavailable != nil {
+		maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(rollingUpdate.MaxUnavailable, intstr.FromInt32(1)), replicas, false)
+		if err != nil {
+			return 0, 0, err
+		}
+		// maxUnavailable might be zero for small percentage with round down.
+		// So we have to enforce it not to be less than 1.
+		if maxUnavailableNum < 1 {
+			maxUnavailableNum = 1
+		}
+		maxUnavailable = maxUnavailableNum
+	}
+	return partition, maxUnavailable, nil
 }
 
 func validateSpec(rsm *workloads.ReplicatedStateMachine) error {

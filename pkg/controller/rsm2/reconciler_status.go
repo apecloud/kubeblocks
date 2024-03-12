@@ -20,134 +20,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubectl/pkg/util/podutils"
-	"strconv"
-
 	apps "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-// ObjectStatusTransformer computes the current status:
-// 1. read the underlying sts's status and copy them to the primary object's status
-// 2. read pod role label and update the primary object's status role fields
-type ObjectStatusTransformer struct{}
+// statusReconciler computes the current status
+type statusReconciler struct{}
 
-var _ graph.Transformer = &ObjectStatusTransformer{}
+var _ kubebuilderx.Reconciler = &statusReconciler{}
 
-func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*rsmTransformContext)
-	rsm := transCtx.rsm
-	rsmOrig := transCtx.rsmOrig
+func NewStatusReconciler() kubebuilderx.Reconciler {
+	return &statusReconciler{}
+}
 
-	// fast return
-	if model.IsObjectDeleting(rsmOrig) {
-		return nil
+func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+	if model.IsObjectDeleting(tree.Root) {
+		return kubebuilderx.ResultUnsatisfied
 	}
+	return kubebuilderx.ResultSatisfied
+}
 
-	switch {
-	case model.IsObjectUpdating(rsmOrig):
-		// use rsm's generation instead of sts's
+func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+	rsm, _ := tree.Root.(*workloads.ReplicatedStateMachine)
+	if model.IsObjectUpdating(rsm) {
 		rsm.Status.ObservedGeneration = rsm.Generation
-	case model.IsObjectStatusUpdating(rsmOrig):
-		provider, err := CurrentReplicaProvider(transCtx.Context, transCtx.Client, rsm)
-		if err != nil {
-			return err
-		}
-		if provider == StatefulSetProvider {
-			// read the underlying sts
-			sts := &apps.StatefulSet{}
-			err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-			// keep rsm's ObservedGeneration to avoid override by sts's ObservedGeneration
-			generation := rsm.Status.ObservedGeneration
-			rsm.Status.StatefulSetStatus = sts.Status
-			rsm.Status.ObservedGeneration = generation
-			if currentGenerationLabel, ok := sts.Labels[rsmGenerationLabelKey]; ok {
-				currentGeneration, err := strconv.ParseInt(currentGenerationLabel, 10, 64)
-				if err != nil {
-					return err
-				}
-				rsm.Status.CurrentGeneration = currentGeneration
-			}
-			// read all pods belong to the sts, hence belong to the rsm
-			pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
-			if err != nil {
-				return err
-			}
-			// update role fields
-			setMembersStatus(rsm, &pods)
-		} else {
-			// 1. get all pods
-			selector, err := metav1.LabelSelectorAsSelector(rsm.Spec.Selector)
-			if err != nil {
-				return err
-			}
-			ml := client.MatchingLabelsSelector{Selector: selector}
-			podList := &corev1.PodList{}
-			if err = transCtx.Client.List(transCtx.Context, podList, ml); err != nil {
-				return err
-			}
-			// 2. calculate status summary
-			// the key is how to know pod is updated.
-			// proposal 1:
-			// build a pod.name to revision map, store it in status.currentRevisions and status.updatedRevisions.
-			// keep the status.currentRevision and status.updatedRevision as the last template's revision.
-			//
-			// proposal 2:
-			// build a pod.name to revision map, store it in a cm. set currentRevision and updatedRevision as the name of the cm.
-			//
-			// proposal 3:
-			// patch updated revision to the outdated pod as a label
-			//
-			// proposal 1 is used currently.
-			rsm.Status.Replicas = int32(len(podList.Items))
-			currentReplicas, updatedReplicas := int32(0), int32(0)
-			readyReplicas, availableReplicas := int32(0), int32(0)
-			for _, pod := range podList.Items {
-				switch revision, ok := rsm.Status.UpdateRevisions[pod.Name]; {
-				case !ok:
-					currentReplicas++
-				case revision != pod.Labels[apps.ControllerRevisionHashLabelKey]:
-					currentReplicas++
-				default:
-					updatedReplicas++
-				}
-				switch {
-				case controllerutil.IsAvailable(&pod, rsm.Spec.MinReadySeconds):
-					availableReplicas++
-					readyReplicas++
-				case podutils.IsPodReady(&pod):
-					readyReplicas++
-				}
-			}
-			rsm.Status.ReadyReplicas = readyReplicas
-			rsm.Status.AvailableReplicas = availableReplicas
-			rsm.Status.CurrentReplicas = currentReplicas
-			rsm.Status.UpdatedReplicas = updatedReplicas
-			rsm.Status.CurrentGeneration = rsm.Generation
-			// all pods have been updated
-			if currentReplicas == 0 {
-				rsm.Status.CurrentReplicas = rsm.Status.UpdatedReplicas
-				rsm.Status.CurrentRevisions = rsm.Status.UpdateRevisions
-				rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
-			}
-
-			// 3. set members status
-			setMembersStatus(rsm, &podList.Items)
-		}
+		return tree, nil
 	}
 
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-	graphCli.Status(dag, rsmOrig, rsm)
+	// 1. get all pods
+	pods := tree.List(&corev1.Pod{})
+	var podList []corev1.Pod
+	for _, object := range pods {
+		pod, _ := object.(*corev1.Pod)
+		podList = append(podList, *pod)
+	}
+	// 2. calculate status summary
+	// the key is how to know pod is updated.
+	// proposal 1:
+	// build a pod.name to revision map, store it in status.currentRevisions and status.updatedRevisions.
+	// keep the status.currentRevision and status.updatedRevision as the last template's revision.
+	//
+	// proposal 2:
+	// build a pod.name to revision map, store it in a cm. set currentRevision and updatedRevision as the name of the cm.
+	//
+	// proposal 3:
+	// patch updated revision to the outdated pod as a label
+	//
+	// proposal 1 is used currently.
+	replicas := int32(0)
+	currentReplicas, updatedReplicas := int32(0), int32(0)
+	readyReplicas, availableReplicas := int32(0), int32(0)
+	for i := range podList {
+		pod := &podList[i]
+		if isCreated(pod) {
+			replicas++
+		}
+		if isRunningAndReady(pod) {
+			readyReplicas++
+			if isRunningAndAvailable(pod, rsm.Spec.MinReadySeconds) {
+				availableReplicas++
+			}
+		}
+		if isCreated(pod) && !isTerminating(pod) {
+			switch revision, ok := rsm.Status.UpdateRevisions[pod.Name]; {
+			case !ok, revision != pod.Labels[apps.ControllerRevisionHashLabelKey]:
+				currentReplicas++
+			default:
+				updatedReplicas++
+			}
+		}
+	}
+	rsm.Status.Replicas = replicas
+	rsm.Status.ReadyReplicas = readyReplicas
+	rsm.Status.AvailableReplicas = availableReplicas
+	rsm.Status.CurrentReplicas = currentReplicas
+	rsm.Status.UpdatedReplicas = updatedReplicas
+	rsm.Status.CurrentGeneration = rsm.Generation
+	// all pods have been updated
+	if currentReplicas == 0 {
+		rsm.Status.CurrentReplicas = rsm.Status.UpdatedReplicas
+		rsm.Status.CurrentRevisions = rsm.Status.UpdateRevisions
+		rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
+	}
 
-	return nil
+	// 3. set members status
+	rsm1.SetMembersStatus(rsm, &podList)
+
+	return tree, nil
 }

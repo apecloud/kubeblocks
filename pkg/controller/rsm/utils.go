@@ -171,7 +171,7 @@ func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.R
 	return roleMap
 }
 
-func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods *[]corev1.Pod) {
+func SetMembersStatus(rsm *workloads.ReplicatedStateMachine, pods *[]corev1.Pod) {
 	// no roles defined
 	if rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
 		setMembersStatusWithoutRole(rsm, pods)

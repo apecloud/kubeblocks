@@ -31,7 +31,7 @@ import (
 var _ = Describe("revision util test", func() {
 	Context("NewRevision function", func() {
 		It("should work well", func() {
-			stsJson := `
+			stsJSON := `
 {
     "apiVersion": "workloads.kubeblocks.io/v1alpha1",
     "kind": "ReplicatedStateMachine",
@@ -962,7 +962,7 @@ var _ = Describe("revision util test", func() {
 }
 `
 			rsm := &workloads.ReplicatedStateMachine{}
-			err := json.Unmarshal([]byte(stsJson), rsm)
+			err := json.Unmarshal([]byte(stsJSON), rsm)
 			Expect(err).Should(Succeed())
 			cr, err := NewRevision(rsm)
 			Expect(err).Should(Succeed())

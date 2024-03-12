@@ -194,7 +194,7 @@ func NewPlanBuilder(ctx context.Context, cli client.Client, currentTree, desired
 			recorder: currentTree.EventRecorder,
 			logger:   currentTree.Logger,
 		},
-		cli: cli,
+		cli:         cli,
 		currentTree: currentTree,
 		desiredTree: desiredTree,
 	}

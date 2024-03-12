@@ -22,13 +22,14 @@ package kubebuilderx
 import (
 	"context"
 	"errors"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/go-logr/logr"
-	"k8s.io/client-go/tools/record"
 	"reflect"
 
+	"github.com/go-logr/logr"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type ObjectTree struct {
@@ -70,7 +71,7 @@ func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 		return nil, ErrDeepCopyFailed
 	}
 	out.Root = root
-	var children model.ObjectSnapshot
+	children := make(model.ObjectSnapshot, len(t.Children))
 	for key, child := range t.Children {
 		childCopied, ok := child.DeepCopyObject().(client.Object)
 		if !ok {

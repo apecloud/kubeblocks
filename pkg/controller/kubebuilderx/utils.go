@@ -21,11 +21,12 @@ package kubebuilderx
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"reflect"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 // ReadObjectTree reads all objects owned by the root object which is type of 'T' with key in 'req'.
@@ -35,7 +36,7 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 		return nil, err
 	}
 
-	var children model.ObjectSnapshot
+	children := make(model.ObjectSnapshot)
 	ml := getMatchLabels(root, labelKeys)
 	inNS := client.InNamespace(req.Namespace)
 	for _, list := range kinds {

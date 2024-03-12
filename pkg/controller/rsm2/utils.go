@@ -21,17 +21,17 @@ package rsm2
 
 import (
 	"context"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubectl/pkg/util/podutils"
 	"sort"
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -121,16 +121,6 @@ func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
 // isCreated returns true if pod has been created and is maintained by the API server
 func isCreated(pod *v1.Pod) bool {
 	return pod.Status.Phase != ""
-}
-
-// isPending returns true if pod has a Phase of PodPending
-func isPending(pod *v1.Pod) bool {
-	return pod.Status.Phase == v1.PodPending
-}
-
-// isFailed returns true if pod has a Phase of PodFailed
-func isFailed(pod *v1.Pod) bool {
-	return pod.Status.Phase == v1.PodFailed
 }
 
 // isTerminating returns true if pod's DeletionTimestamp has been set

@@ -22,7 +22,6 @@ package replica
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -37,7 +36,6 @@ type Leave struct {
 	operations.Base
 	dcsStore dcs.DCS
 	logger   logr.Logger
-	Timeout  time.Duration
 }
 
 var leave operations.Operation = &Leave{}

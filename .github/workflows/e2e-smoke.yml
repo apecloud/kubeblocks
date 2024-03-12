@@ -24,7 +24,7 @@ on:
           - gke
           - eks
       CLUSTER_VERSION:
-        description: 'k8s cluster version (e.g. 1.26)'
+        description: 'k8s cluster version'
         required: false
         default: '1.27'
         type: choice

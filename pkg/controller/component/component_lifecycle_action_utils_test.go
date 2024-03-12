@@ -35,7 +35,7 @@ import (
 
 var tlog = ctrl.Log.WithName("component_testing")
 
-var _ = Describe("Component PostProvision Test", func() {
+var _ = Describe("Component LifeCycle Action Utils Test", func() {
 	Context("has the BuildComponent function", func() {
 		const (
 			clusterDefName     = "test-clusterdef"
@@ -96,23 +96,21 @@ var _ = Describe("Component PostProvision Test", func() {
 			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
 			Expect(err).Should(Succeed())
 
-			By("build component with postProvision without PodList, do not need to do PostProvision action")
+			By("build component with preTerminate without PodList, check the built-in envs of cluster component available in action job")
 			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
-			defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
-			postProvision := appsv1alpha1.LifecycleActionHandler{
+			preTerminate := appsv1alpha1.LifecycleActionHandler{
 				CustomHandler: &appsv1alpha1.Action{
 					Image: constant.KBToolsImage,
 					Exec: &appsv1alpha1.ExecAction{
 						Command: []string{"echo", "mock"},
 						Args:    []string{},
 					},
-					PreCondition: &defaultPreCondition,
 				},
 			}
-			synthesizeComp.LifecycleActions.PostProvision = &postProvision
+			synthesizeComp.LifecycleActions.PreTerminate = &preTerminate
 
-			By("check built-in envs of cluster component available in postProvision job")
-			renderJob, err := renderActionCmdJob(testCtx.Ctx, testCtx.Cli, cluster, synthesizeComp, PostProvisionAction)
+			By("check built-in envs of cluster component available in action job")
+			renderJob, err := renderActionCmdJob(testCtx.Ctx, testCtx.Cli, cluster, synthesizeComp, PreTerminateAction)
 			Expect(err).Should(Succeed())
 			Expect(renderJob).ShouldNot(BeNil())
 			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 9).Should(BeTrue())

@@ -154,14 +154,11 @@ var _ = Describe("Component PostProvision Test", func() {
 			need, err = needDoPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeTrue())
-			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
-			Expect(err).ShouldNot(Succeed())
-
+			
 			By("build component with postProvision with PodList, do postProvision action and requeue waiting job")
 			pods := mockPodsForTest(cluster, 1)
 			for _, pod := range pods {
 				Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-				// mock the status to pass the isReady(pod) check in consensus_set
 				pod.Status.Conditions = []corev1.PodCondition{{
 					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,

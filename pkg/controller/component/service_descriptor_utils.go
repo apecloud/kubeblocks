@@ -49,7 +49,7 @@ func GenServiceReferencesLegacy(reqCtx intctrlutil.RequestCtx,
 	if compDef, err = BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec); err != nil {
 		return nil, err
 	}
-	if comp, err = BuildComponent(cluster, clusterCompSpec, nil); err != nil {
+	if comp, err = BuildComponent(cluster, clusterCompSpec, nil, nil); err != nil {
 		return nil, err
 	}
 	return GenServiceReferences(reqCtx, cli, cluster.Namespace, cluster.Name, compDef, comp)

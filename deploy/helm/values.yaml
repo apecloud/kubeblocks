@@ -27,6 +27,10 @@ image:
 ##
 replicaCount: 1
 
+## MaxConcurrentReconciles for cluster and component controllers.
+##
+reconcileWorkers: ""
+
 ## @param nameOverride
 ##
 nameOverride: ""
@@ -101,6 +105,11 @@ podDisruptionBudget:
   # Cannot be used if `minAvailable` is set.
   maxUnavailable:
 
+## Specify the namespaces that the operators will manage, multiple namespaces are separated by commas.
+##
+## @param managedNamespaces
+##
+managedNamespaces:
 
 ## Logger settings
 ##
@@ -332,7 +341,7 @@ dataProtection:
     imagePullSecrets: []
     datasafed:
       repository: apecloud/datasafed
-      tag: "0.1.0"
+      tag: "0.2.0"
 
 ## BackupRepo settings
 ##
@@ -1430,7 +1439,7 @@ prometheus:
           action: replace
           target_label: pod
         - source_labels: [__meta_kubernetes_pod_phase]
-          regex: Pending|Succeeded|Failed|Completed
+          regex: Succeeded|Failed|Completed
           action: drop
 
       - job_name: 'kubeblocks-agamotto'

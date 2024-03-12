@@ -92,8 +92,9 @@ func (r *ActionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ActionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&dpv1alpha1.ActionSet{}).Complete(r)
+	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+		For(&dpv1alpha1.ActionSet{}).
+		Complete(r)
 }
 
 func (r *ActionSetReconciler) deleteExternalResources(

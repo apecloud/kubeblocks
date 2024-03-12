@@ -28,6 +28,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/apiutil"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -370,6 +371,45 @@ var _ = Describe("Component Definition Convertor", func() {
 			})
 		})
 
+		Context("vars", func() {
+			It("host network ports", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				// default ports are 3306 and 13306
+				clusterCompDef.PodSpec.Containers[0].Ports[0].ContainerPort = 36
+
+				convertor := &compDefVarsConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				vars, ok := res.([]appsv1alpha1.EnvVar)
+				Expect(ok).Should(BeTrue())
+				Expect(vars).Should(HaveLen(1))
+
+				container := clusterCompDef.PodSpec.Containers[0]
+				expectedVar := appsv1alpha1.EnvVar{
+					Name: apiutil.HostNetworkDynamicPortVarName(container.Name, container.Ports[0].Name),
+					ValueFrom: &appsv1alpha1.VarSource{
+						PodVarRef: &appsv1alpha1.PodVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Optional: func() *bool { optional := false; return &optional }(),
+							},
+							PodVars: appsv1alpha1.PodVars{
+								Container: &appsv1alpha1.ContainerVars{
+									Name: container.Name,
+									Port: &appsv1alpha1.NamedVar{
+										Name:   container.Ports[0].Name,
+										Option: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+				}
+				Expect(vars[0]).Should(BeEquivalentTo(expectedVar))
+			})
+		})
+
 		Context("volumes", func() {
 			It("w/o volume types", func() {
 				clusterCompDefCopy := clusterCompDef.DeepCopy()
@@ -413,6 +453,108 @@ var _ = Describe("Component Definition Convertor", func() {
 					})
 				}
 				Expect(res).Should(BeEquivalentTo(expectedVolumes))
+			})
+		})
+
+		Context("host network", func() {
+			It("w/o pod spec", func() {
+				clusterCompDef.PodSpec = nil
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).Should(BeNil())
+			})
+
+			It("host network disabled", func() {
+				clusterCompDef.PodSpec.HostNetwork = false
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).Should(BeNil())
+			})
+
+			It("empty container ports", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				for i := range clusterCompDef.PodSpec.Containers {
+					clusterCompDef.PodSpec.Containers[i].Ports = nil
+				}
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
+				Expect(ok).Should(BeTrue())
+				Expect(hostNetwork.ContainerPorts).Should(HaveLen(0))
+				Expect(hostNetwork.DNSPolicy).Should(BeNil())
+			})
+
+			It("no dynamic ports", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				// default ports are 3306 and 13306
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
+				Expect(ok).Should(BeTrue())
+				Expect(hostNetwork.ContainerPorts).Should(HaveLen(0))
+				Expect(hostNetwork.DNSPolicy).Should(BeNil())
+			})
+
+			It("part dynamic ports", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				// default ports are 3306 and 13306
+				container := clusterCompDef.PodSpec.Containers[0]
+				clusterCompDef.PodSpec.Containers[0].Ports[0].ContainerPort = 36
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
+				Expect(ok).Should(BeTrue())
+				Expect(hostNetwork.ContainerPorts).Should(HaveLen(1))
+				Expect(hostNetwork.ContainerPorts[0].Container).Should(Equal(container.Name))
+				Expect(hostNetwork.ContainerPorts[0].Ports).Should(HaveLen(1))
+				Expect(hostNetwork.ContainerPorts[0].Ports[0]).Should(Equal(container.Ports[0].Name))
+				Expect(hostNetwork.DNSPolicy).Should(BeNil())
+			})
+
+			It("w/ dns policy ClusterFirst", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				clusterCompDef.PodSpec.DNSPolicy = corev1.DNSClusterFirst
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
+				Expect(ok).Should(BeTrue())
+				Expect(hostNetwork.DNSPolicy).ShouldNot(BeNil())
+				Expect(*hostNetwork.DNSPolicy).Should(Equal(corev1.DNSClusterFirst))
+			})
+
+			It("w/ dns policy non-ClusterFirst", func() {
+				clusterCompDef.PodSpec.HostNetwork = true
+				clusterCompDef.PodSpec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
+
+				convertor := &compDefHostNetworkConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				Expect(res).ShouldNot(BeNil())
+
+				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
+				Expect(ok).Should(BeTrue())
+				Expect(hostNetwork.DNSPolicy).ShouldNot(BeNil())
+				Expect(*hostNetwork.DNSPolicy).Should(Equal(corev1.DNSClusterFirstWithHostNet))
 			})
 		})
 
@@ -848,7 +990,7 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
-				Expect(actions.RoleProbe.BuiltinHandler).Should(BeNil())
+				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.WeSQLBuiltinActionHandler))
 				Expect(actions.RoleProbe.CustomHandler).ShouldNot(BeNil())
 				Expect(actions.RoleProbe.CustomHandler.Image).Should(BeEquivalentTo("mock-rsm-role-probe-image"))
 				Expect(actions.RoleProbe.CustomHandler.Exec.Command).Should(BeEquivalentTo(mockCommand))

@@ -118,15 +118,15 @@ Kubeblocks 提供了主流引擎的 Grafana 仪表盘和 Prometheus 告警规则
     kbcli cluster create mysql <clustername> 
     ```
 
-    :::note
+:::note
 
-    你可以将 `--monitoring-interval` 设置为 `0` 以关闭监控功能（不建议关闭）。
+你可以将 `--monitoring-interval` 设置为 `0` 以关闭监控功能（不建议关闭）。
 
-    ```bash
-    kbcli cluster create mysql mycluster --monitoring-interval=0
-    ```
+```bash
+kbcli cluster create mysql mycluster --monitoring-interval=0
+```
 
-    :::
+:::
 
 - 对于已禁用监控功能的集群，可以使用 `update` 子命令启用监控功能。
 

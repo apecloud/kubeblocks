@@ -135,7 +135,22 @@ type ComponentConfigSpec struct {
 	// +listType=set
 	// +optional
 	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
+
+	// An optional field defines which resources change trigger re-render config.
+	// +listType=set
+	// +optional
+	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`
 }
+
+// RerenderResourceType defines the resource requirements for a component.
+// +enum
+// +kubebuilder:validation:Enum={resources,replcias,tls}
+type RerenderResourceType string
+
+const (
+	ComponentResourceType RerenderResourceType = "resources"
+	ComponentReplicasType RerenderResourceType = "replicas"
+)
 
 // MergedPolicy defines how to merge external imported templates into component templates.
 // +enum
@@ -256,6 +271,17 @@ const (
 	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
 )
 
+// DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions
+//
+// +enum
+// +kubebuilder:validation:Enum={all,dynamic}
+type DynamicParameterSelectedPolicy string
+
+const (
+	SelectedAllParameters     DynamicParameterSelectedPolicy = "all"
+	SelectedDynamicParameters DynamicParameterSelectedPolicy = "dynamic"
+)
+
 // OpsPhase defines opsRequest phase.
 // +enum
 // +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
@@ -271,14 +297,35 @@ const (
 	OpsFailedPhase     OpsPhase = "Failed"
 )
 
-// PodSelectionStrategy pod selection strategy.
+// PodSelectionPolicy pod selection strategy.
 // +enum
-// +kubebuilder:validation:Enum={Available,PreferredAvailable}
-type PodSelectionStrategy string
+// +kubebuilder:validation:Enum={All,Any}
+type PodSelectionPolicy string
 
 const (
-	Available          PodSelectionStrategy = "Available"
-	PreferredAvailable PodSelectionStrategy = "PreferredAvailable"
+	All PodSelectionPolicy = "All"
+	Any PodSelectionPolicy = "Any"
+)
+
+// PodAvailabilityPolicy pod availability strategy.
+// +enum
+// +kubebuilder:validation:Enum={Available,PreferredAvailable,None}
+type PodAvailabilityPolicy string
+
+const (
+	AvailablePolicy        PodAvailabilityPolicy = "Available"
+	UnAvailablePolicy      PodAvailabilityPolicy = "UnAvailable"
+	NoneAvailabilityPolicy PodAvailabilityPolicy = "None"
+)
+
+// OpsWorkloadType policy after action failure.
+// +enum
+// +kubebuilder:validation:Enum={Job,Pod}
+type OpsWorkloadType string
+
+const (
+	PodWorkload OpsWorkloadType = "Pod"
+	JobWorkload OpsWorkloadType = "Job"
 )
 
 // OpsType defines operation types.
@@ -484,6 +531,17 @@ const (
 	SucceedProgressStatus    ProgressStatus = "Succeed"
 )
 
+// ActionTaskStatus defines the status of the task.
+// +enum
+// +kubebuilder:validation:Enum={Processing,Failed,Succeed}
+type ActionTaskStatus string
+
+const (
+	ProcessingActionTaskStatus ActionTaskStatus = "Processing"
+	FailedActionTaskStatus     ActionTaskStatus = "Failed"
+	SucceedActionTaskStatus    ActionTaskStatus = "Succeed"
+)
+
 type OpsRequestBehaviour struct {
 	FromClusterPhases []ClusterPhase
 	ToClusterPhase    ClusterPhase
@@ -611,17 +669,17 @@ const (
 
 // UpgradePolicy defines the policy of reconfiguring.
 // +enum
-// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate}
+// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate,dynamicReloadBeginRestart}
 type UpgradePolicy string
 
 const (
-	NonePolicy                UpgradePolicy = "none"
-	NormalPolicy              UpgradePolicy = "simple"
-	RestartPolicy             UpgradePolicy = "parallel"
-	RollingPolicy             UpgradePolicy = "rolling"
-	AutoReload                UpgradePolicy = "autoReload"
-	HotUpdateAndRestartPolicy UpgradePolicy = "reloadAndRestart"
-	OperatorSyncUpdate        UpgradePolicy = "operatorSyncUpdate"
+	NonePolicy                    UpgradePolicy = "none"
+	NormalPolicy                  UpgradePolicy = "simple"
+	RestartPolicy                 UpgradePolicy = "parallel"
+	RollingPolicy                 UpgradePolicy = "rolling"
+	AsyncDynamicReloadPolicy      UpgradePolicy = "autoReload"
+	SyncDynamicReloadPolicy       UpgradePolicy = "operatorSyncUpdate"
+	DynamicReloadAndRestartPolicy UpgradePolicy = "dynamicReloadBeginRestart"
 )
 
 // CfgReloadType defines reload method.
@@ -764,6 +822,36 @@ type StatefulSetWorkload interface {
 	GetUpdateStrategy() UpdateStrategy
 }
 
+type HostNetwork struct {
+	// The list of container ports that are required by the component.
+	//
+	// +optional
+	ContainerPorts []HostNetworkContainerPort `json:"containerPorts,omitempty"`
+
+	// Set DNS policy for the component.
+	// Defaults to "ClusterFirst".
+	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
+	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
+	// To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.
+	//
+	// +optional
+	DNSPolicy *corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
+}
+
+type HostNetworkContainerPort struct {
+	// Container specifies the target container within the pod.
+	//
+	// +required
+	Container string `json:"container"`
+
+	// Ports are named container ports within the specified container.
+	// These container ports must be defined in the container for proper port allocation.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +required
+	Ports []string `json:"ports"`
+}
+
 // ClusterService defines the service of a cluster.
 type ClusterService struct {
 	Service `json:",inline"`
@@ -885,6 +973,7 @@ type EnvVar struct {
 	//
 	// +optional
 	Value string `json:"value,omitempty"`
+
 	// Source for the variable's value. Cannot be used if value is not empty.
 	// +optional
 	ValueFrom *VarSource `json:"valueFrom,omitempty"`
@@ -899,6 +988,10 @@ type VarSource struct {
 	// Selects a key of a Secret.
 	// +optional
 	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
+
+	// Selects a defined var of a Pod.
+	// +optional
+	PodVarRef *PodVarSelector `json:"podVarRef,omitempty"`
 
 	// Selects a defined var of a Service.
 	// +optional
@@ -929,6 +1022,23 @@ type NamedVar struct {
 
 	// +optional
 	Option *VarOption `json:"option,omitempty"`
+}
+
+// PodVars defines the vars can be referenced from a Pod.
+type PodVars struct {
+	// +optional
+	Container *ContainerVars `json:"container,omitempty"`
+}
+
+// ContainerVars defines the vars can be referenced from a Container.
+type ContainerVars struct {
+	// The name of the container.
+	// +required
+	Name string `json:"name"`
+
+	// Container port to reference.
+	// +optional
+	Port *NamedVar `json:"port,omitempty"`
 }
 
 // ServiceVars defines the vars can be referenced from a Service.
@@ -962,6 +1072,14 @@ type ServiceRefVars struct {
 	Port *VarOption `json:"port,omitempty"`
 
 	CredentialVars `json:",inline"`
+}
+
+// PodVarSelector selects a var from a Pod.
+type PodVarSelector struct {
+	// The pod to select from.
+	ClusterObjectReference `json:",inline"`
+
+	PodVars `json:",inline"`
 }
 
 // ServiceVarSelector selects a var from a Service.

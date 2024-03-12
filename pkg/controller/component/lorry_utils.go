@@ -78,7 +78,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 		}
 	}
 
-	container := buildBasicContainer(synthesizeComp, int(lorryHTTPPort))
+	container := buildBasicContainer(int(lorryHTTPPort))
 	// inject role probe container
 	var compRoleProbe *appsv1alpha1.RoleProbe
 	if synthesizeComp.LifecycleActions != nil {
@@ -94,7 +94,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	// inject volume protection probe container
 	if volumeProtectionEnabled(synthesizeComp) {
 		c := container.DeepCopy()
-		buildVolumeProtectionProbeContainer(synthesizeComp.CharacterType, c, int(lorryHTTPPort))
+		buildVolumeProtectionProbeContainer(c, int(lorryHTTPPort))
 		lorryContainers = append(lorryContainers, *c)
 	}
 
@@ -119,7 +119,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 	if len(actionCommands) == 0 {
 		return
 	}
-	initContainer := buildLorryInitContainer(synthesizeComp)
+	initContainer := buildLorryInitContainer()
 	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
 	execContainer := getExecContainer(synthesizeComp.PodSpec.Containers, containerName)
 	if execImage == "" {
@@ -160,7 +160,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 	}
 }
 
-func buildBasicContainer(synthesizeComp *SynthesizedComponent, lorryHTTPPort int) *corev1.Container {
+func buildBasicContainer(lorryHTTPPort int) *corev1.Container {
 	return builder.NewContainerBuilder("string").
 		SetImage("infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/google_containers/pause:3.6").
 		SetImagePullPolicy(corev1.PullIfNotPresent).
@@ -198,7 +198,7 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 	buildLorryEnvs(container, synthesizeComp, clusterCompSpec)
 }
 
-func buildLorryInitContainer(component *SynthesizedComponent) *corev1.Container {
+func buildLorryInitContainer() *corev1.Container {
 	container := &corev1.Container{}
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.Name = constant.LorryInitContainerName
@@ -283,7 +283,7 @@ func volumeProtectionEnabled(component *SynthesizedComponent) bool {
 	return component.VolumeProtection != nil
 }
 
-func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container, probeSvcHTTPPort int) {
+func buildVolumeProtectionProbeContainer(c *corev1.Container, probeSvcHTTPPort int) {
 	c.Name = constant.VolumeProtectionProbeContainerName
 	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
@@ -366,7 +366,8 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	}
 
 	if synthesizeComp.LifecycleActions.RoleProbe != nil {
-		if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
+		if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil &&
+			*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != appsv1alpha1.UnknownBuiltinActionHandler {
 			return *synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
 		} else {
 			return appsv1alpha1.CustomActionHandler

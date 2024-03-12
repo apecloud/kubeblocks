@@ -335,7 +335,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		dbState = new(DBState)
 		err = json.Unmarshal([]byte(stateStr), &dbState)
 		if err != nil {
-			store.logger.Error(err, fmt.Sprintf("get leader dbstate failed, annotations: %v", annotations))
+			store.logger.Info("get leader dbstate failed", "annotations", annotations, "error", err.Error())
 		}
 	}
 

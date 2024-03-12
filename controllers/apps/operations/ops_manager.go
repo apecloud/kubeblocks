@@ -133,6 +133,12 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return 0, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
 	opsRes.ToClusterPhase = opsBehaviour.ToClusterPhase
+	if opsRequest.Spec.Type == appsv1alpha1.CustomType {
+		err = initOpsDefAndValidate(reqCtx, cli, opsRes)
+		if err != nil {
+			return requeueAfter, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+		}
+	}
 	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(reqCtx, cli, opsRes); err != nil &&
 		!isOpsRequestFailedPhase(opsRequestPhase) {
 		// if the opsRequest phase is not failed, skipped

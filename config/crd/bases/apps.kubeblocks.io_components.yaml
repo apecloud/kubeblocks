@@ -186,6 +186,19 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    reRenderResourceTypes:
+                      description: An optional field defines which resources change
+                        trigger re-render config.
+                      items:
+                        description: RerenderResourceType defines the resource requirements
+                          for a component.
+                        enum:
+                        - resources
+                        - replcias
+                        - tls
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
                     templateRef:
                       description: Specifies the name of the referenced configuration
                         template ConfigMap object.

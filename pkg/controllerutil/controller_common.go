@@ -593,7 +593,3 @@ func (pm *PortManager) ReleaseByPrefix(prefix string) error {
 	}
 	return nil
 }
-
-func (pm *PortManager) NeedAllocate(port int32) bool {
-	return port <= 100
-}

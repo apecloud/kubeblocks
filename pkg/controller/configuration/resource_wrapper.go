@@ -45,8 +45,10 @@ type ResourceFetcher[T any] struct {
 	obj *T
 	*ResourceCtx
 
-	ClusterObj    *appsv1alpha1.Cluster
+	ClusterObj *appsv1alpha1.Cluster
+	// Deprecated: this API will be removed from version 0.9.0
 	ClusterDefObj *appsv1alpha1.ClusterDefinition
+	// Deprecated: use ComponentDefinition instead
 	ClusterVerObj *appsv1alpha1.ClusterVersion
 
 	ConfigMapObj        *corev1.ConfigMap
@@ -82,6 +84,8 @@ func (r *ResourceFetcher[T]) Cluster() *T {
 	})
 }
 
+// ClusterDef get clusterDefinition cr
+// Deprecated: use ComponentDefinition instead
 func (r *ResourceFetcher[T]) ClusterDef() *T {
 	clusterDefKey := client.ObjectKey{
 		Namespace: "",
@@ -93,6 +97,8 @@ func (r *ResourceFetcher[T]) ClusterDef() *T {
 	})
 }
 
+// ClusterVer get clusterVersion cr
+// Deprecated: this API will be removed from version 0.9.0
 func (r *ResourceFetcher[T]) ClusterVer() *T {
 	clusterVerKey := client.ObjectKey{
 		Namespace: "",

@@ -34,7 +34,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	discoverycli "k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -84,7 +84,7 @@ const (
 )
 
 var (
-	scheme   = runtime.NewScheme()
+	scheme   = k8sruntime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
 
@@ -128,6 +128,7 @@ func init() {
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
 	viper.SetDefault(rsm2.FeatureGateRSMReplicaProvider, rsm2.StatefulSetProvider)
 	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
+	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 }
 
 type flagName string
@@ -159,6 +160,9 @@ func setupFlags() {
 		"Enable the workloads controller manager.")
 
 	flag.String(kubeContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
+
+	flag.String(constant.ManagedNamespacesFlag, "",
+		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
 
 	opts := zap.Options{
 		Development: false,
@@ -256,6 +260,11 @@ func main() {
 	if err := validateRequiredToParseConfigs(); err != nil {
 		setupLog.Error(err, "config value error")
 		os.Exit(1)
+	}
+
+	managedNamespaces := viper.GetString(strings.ReplaceAll(constant.ManagedNamespacesFlag, "-", "_"))
+	if len(managedNamespaces) > 0 {
+		setupLog.Info(fmt.Sprintf("managed namespaces: %s", managedNamespaces))
 	}
 
 	metricsAddr = viper.GetString(metricsAddrFlagKey.viperName())

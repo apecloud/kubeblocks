@@ -26,6 +26,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/apiutil"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -47,6 +48,7 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"runtime":                &compDefRuntimeConvertor{},
 		"vars":                   &compDefVarsConvertor{},
 		"volumes":                &compDefVolumesConvertor{},
+		"hostnetwork":            &compDefHostNetworkConvertor{},
 		"services":               &compDefServicesConvertor{},
 		"configs":                &compDefConfigsConvertor{},
 		"logconfigs":             &compDefLogConfigsConvertor{},
@@ -127,7 +129,40 @@ func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 type compDefVarsConvertor struct{}
 
 func (c *compDefVarsConvertor) convert(args ...any) (any, error) {
-	return nil, nil
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return c.convertHostNetworkVars(clusterCompDef), nil
+}
+
+func (c *compDefVarsConvertor) convertHostNetworkVars(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) []appsv1alpha1.EnvVar {
+	hostNetwork, err := convertHostNetwork(clusterCompDef)
+	if err != nil || hostNetwork == nil || len(hostNetwork.ContainerPorts) == 0 {
+		return nil
+	}
+	vars := make([]appsv1alpha1.EnvVar, 0)
+	for _, cc := range hostNetwork.ContainerPorts {
+		for _, port := range cc.Ports {
+			vars = append(vars, appsv1alpha1.EnvVar{
+				Name: apiutil.HostNetworkDynamicPortVarName(cc.Container, port),
+				ValueFrom: &appsv1alpha1.VarSource{
+					PodVarRef: &appsv1alpha1.PodVarSelector{
+						ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+							Optional: func() *bool { optional := false; return &optional }(),
+						},
+						PodVars: appsv1alpha1.PodVars{
+							Container: &appsv1alpha1.ContainerVars{
+								Name: cc.Container,
+								Port: &appsv1alpha1.NamedVar{
+									Name:   port,
+									Option: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+				},
+			})
+		}
+	}
+	return vars
 }
 
 // compDefVolumesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Volumes.
@@ -163,6 +198,45 @@ func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
 		}
 	}
 	return volumes, nil
+}
+
+// compDefHostNetworkConvertor converts the given object into ComponentDefinition.Spec.HostNetwork.
+type compDefHostNetworkConvertor struct{}
+
+func (c *compDefHostNetworkConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return convertHostNetwork(clusterCompDef)
+}
+
+func convertHostNetwork(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (*appsv1alpha1.HostNetwork, error) {
+	if clusterCompDef.PodSpec == nil || !clusterCompDef.PodSpec.HostNetwork {
+		return nil, nil
+	}
+
+	hostNetwork := &appsv1alpha1.HostNetwork{
+		ContainerPorts: []appsv1alpha1.HostNetworkContainerPort{},
+	}
+	for _, container := range clusterCompDef.PodSpec.Containers {
+		cp := appsv1alpha1.HostNetworkContainerPort{
+			Container: container.Name,
+			Ports:     []string{},
+		}
+		for _, port := range container.Ports {
+			if apiutil.IsHostNetworkDynamicPort(port.ContainerPort) {
+				cp.Ports = append(cp.Ports, port.Name)
+			}
+		}
+		if len(cp.Ports) > 0 {
+			hostNetwork.ContainerPorts = append(hostNetwork.ContainerPorts, cp)
+		}
+	}
+	if len(clusterCompDef.PodSpec.DNSPolicy) > 0 {
+		hostNetwork.DNSPolicy = func() *corev1.DNSPolicy {
+			policy := clusterCompDef.PodSpec.DNSPolicy
+			return &policy
+		}()
+	}
+	return hostNetwork, nil
 }
 
 // compDefServicesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Services.
@@ -224,6 +298,16 @@ func (c *compDefServicesConvertor) removeDuplicatePorts(svc *corev1.Service) *co
 }
 
 func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) string {
+	// if rsmSpec is not nil, pick the one with AccessMode == ReadWrite as the primary.
+	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.Roles != nil {
+		for _, role := range clusterCompDef.RSMSpec.Roles {
+			if role.AccessMode == workloads.ReadWriteMode {
+				return role.Name
+			}
+		}
+	}
+
+	// convert the leader name w.r.t workload type.
 	switch clusterCompDef.WorkloadType {
 	case appsv1alpha1.Consensus:
 		if clusterCompDef.ConsensusSpec == nil {
@@ -535,12 +619,13 @@ func (c *compDefLifecycleActionsConvertor) convertBuiltinActionHandler(clusterCo
 }
 
 func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.RoleProbe {
+	builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
 	// if RSMSpec has role probe CustomHandler, use it first.
 	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil && len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
 		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbe only support one image and command now.
 		return &appsv1alpha1.RoleProbe{
 			LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
-				BuiltinHandler: nil,
+				BuiltinHandler: &builtinHandler,
 				CustomHandler: &appsv1alpha1.Action{
 					Image: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Image,
 					Exec: &appsv1alpha1.ExecAction{
@@ -562,7 +647,6 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 		PeriodSeconds:  clusterCompDefRoleProbe.PeriodSeconds,
 	}
 
-	builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
 	roleProbe.BuiltinHandler = &builtinHandler
 	if clusterCompDefRoleProbe.Commands == nil || len(clusterCompDefRoleProbe.Commands.Queries) == 0 {
 		roleProbe.CustomHandler = nil

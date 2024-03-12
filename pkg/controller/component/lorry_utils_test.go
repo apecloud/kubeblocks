@@ -98,7 +98,7 @@ var _ = Describe("Lorry Utils", func() {
 				Containers: []corev1.Container{},
 			}
 
-			container = buildBasicContainer(component, lorryHTTPPort)
+			container = buildBasicContainer(lorryHTTPPort)
 		})
 
 		It("build role probe containers", func() {

@@ -251,3 +251,41 @@ func foundPortByConfigManagerPortName(container corev1.Container) *corev1.Contai
 	}
 	return nil
 }
+
+// UpdateConfigPayload updates the configuration payload
+func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *component.SynthesizedComponent) (bool, error) {
+	updated := false
+	for i := range config.ConfigItemDetails {
+		configSpec := &config.ConfigItemDetails[i]
+		// check v-scale operation
+		if enableResourceTrigger(configSpec.ConfigSpec) {
+			resourcePayload := intctrlutil.ResourcesPayloadForComponent(component.Resources)
+			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload)
+			if err != nil {
+				return false, err
+			}
+			updated = updated || ret
+		}
+		// check h-scale operation
+		if enableReplicasTrigger(configSpec.ConfigSpec) {
+			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas)
+			if err != nil {
+				return false, err
+			}
+			updated = updated || ret
+		}
+	}
+	return updated, nil
+}
+
+func validRerenderResources(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
+	return configSpec != nil && len(configSpec.ReRenderResourceTypes) != 0
+}
+
+func enableReplicasTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
+	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentReplicasType)
+}
+
+func enableResourceTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
+	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentResourceType)
+}

@@ -108,7 +108,7 @@ func BuildSynthesizedComponentWrapper4Test(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	comp, err := BuildComponent(cluster, clusterCompSpec, nil)
+	comp, err := BuildComponent(cluster, clusterCompSpec, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -153,6 +153,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		CompDefName:        compDef.Name,
 		ClusterGeneration:  clusterGeneration(cluster, comp),
 		PodSpec:            &compDef.Spec.Runtime,
+		HostNetwork:        compDefObj.Spec.HostNetwork,
 		LogConfigs:         compDefObj.Spec.LogConfigs,
 		ConfigTemplates:    compDefObj.Spec.Configs,
 		ScriptTemplates:    compDefObj.Spec.Scripts,
@@ -164,6 +165,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		SystemAccounts:     compDefObj.Spec.SystemAccounts,
 		RoleArbitrator:     compDefObj.Spec.RoleArbitrator,
 		Replicas:           comp.Spec.Replicas,
+		Resources:          comp.Spec.Resources,
 		TLSConfig:          comp.Spec.TLSConfig,
 		ServiceAccountName: comp.Spec.ServiceAccountName,
 	}
@@ -190,8 +192,8 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
-	// build labels
-	buildLabels(compDef, comp, synthesizeComp)
+	// build labels and annotations
+	buildLabelsAndAnnotations(compDef, comp, synthesizeComp)
 
 	// build volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
@@ -257,30 +259,41 @@ func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1al
 	return mapping
 }
 
-// buildLabels builds labels for synthesizedComponent.
-func buildLabels(compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) {
-	replaceKBEnvPlaceholderTokens := func(clusterName, uid, componentName, strToReplace string) string {
+// buildLabelsAndAnnotations builds labels and annotations for synthesizedComponent.
+func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) {
+	replaceEnvPlaceholderTokens := func(clusterName, uid, componentName string, kvMap map[string]string) map[string]string {
+		replacedMap := make(map[string]string, len(kvMap))
 		builtInEnvMap := GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
-		return ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
+		for k, v := range kvMap {
+			replacedMap[ReplaceNamedVars(builtInEnvMap, k, -1, true)] = ReplaceNamedVars(builtInEnvMap, v, -1, true)
+		}
+		return replacedMap
 	}
 
-	labels := make(map[string]string)
-	if compDef.Labels == nil && comp.Labels == nil {
-		return
+	mergeMaps := func(baseMap, overrideMap map[string]string) map[string]string {
+		for k, v := range overrideMap {
+			baseMap[k] = v
+		}
+		return baseMap
 	}
 
-	for k, v := range compDef.Spec.Labels {
-		resolveKey := replaceKBEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, k)
-		resolveValue := replaceKBEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, v)
-		labels[resolveKey] = resolveValue
+	if compDef.Spec.Labels != nil || comp.Labels != nil {
+		baseLabels := make(map[string]string)
+		if compDef.Spec.Labels != nil {
+			baseLabels = replaceEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, compDef.Spec.Labels)
+		}
+		// override labels from component
+		synthesizeComp.Labels = mergeMaps(baseLabels, comp.Labels)
 	}
 
-	// override labels from component
-	for k, v := range comp.Labels {
-		labels[k] = v
+	if compDef.Spec.Annotations != nil || comp.Annotations != nil {
+		baseAnnotations := make(map[string]string)
+		if compDef.Spec.Annotations != nil {
+			baseAnnotations = replaceEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, compDef.Spec.Annotations)
+		}
+		// override annotations from component
+		synthesizeComp.Annotations = mergeMaps(baseAnnotations, comp.Annotations)
 	}
-
-	synthesizeComp.Labels = labels
 }
 
 // buildAffinitiesAndTolerations builds affinities and tolerations for component.

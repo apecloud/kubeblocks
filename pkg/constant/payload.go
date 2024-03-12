@@ -22,5 +22,6 @@ package constant
 const (
 	TLSPayload               = "tls"
 	ComponentResourcePayload = "component-resource"
+	ReplicasPayload          = "replicas"
 	BinaryVersionPayload     = "binary-version"
 )

@@ -115,7 +115,9 @@ There are two YAML files under `templates`, `clusterDefinition.yaml` and `cluste
 
     Remember the equation in the previous article?
 
-    $$Cluster = ClusterDefinition.yaml \Join ClusterVersion.yaml \Join ...$$
+    $$
+    Cluster = ClusterDefinition.yaml \Join ClusterVersion.yaml \Join ...
+    $$
 
     `name` here is the join key.
 

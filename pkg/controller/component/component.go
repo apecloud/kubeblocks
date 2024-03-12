@@ -60,7 +60,8 @@ func GetClusterUID(comp *appsv1alpha1.Component) (string, error) {
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
-func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec, customLabels map[string]string) (*appsv1alpha1.Component, error) {
+func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
+	customLabels, customAnnotations map[string]string) (*appsv1alpha1.Component, error) {
 	compName := FullName(cluster.Name, clusterCompSpec.Name)
 	affinities := BuildAffinity(cluster, clusterCompSpec)
 	tolerations, err := BuildTolerations(cluster, clusterCompSpec)
@@ -99,6 +100,9 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 	}
 	if customLabels != nil {
 		compBuilder.AddLabelsInMap(customLabels)
+	}
+	if customAnnotations != nil {
+		compBuilder.AddAnnotationsInMap(customAnnotations)
 	}
 	return compBuilder.GetObject(), nil
 }

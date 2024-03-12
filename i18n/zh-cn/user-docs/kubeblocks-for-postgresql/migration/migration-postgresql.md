@@ -179,7 +179,7 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
    在业务切换到目标数据库之后，默认新写入的 Sequence 不会以源库的 Sequence 的最大值作为初始值继续去递增。需要手动设置。
 
     ```bash
-    # PostgreSQL Function 示例:
+    # PostgreSQL Function 示例
 
     CREATE FUNCTION build_setvals() returns void
     AS $$
@@ -198,16 +198,16 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
     $$ 
     LANGUAGE plpgsql;
 
-    # Execute:
+    # 执行
     psql -hxx -p xx -U xx -d xx -c "set client_min_messages = notice; select build_setvals();" | grep setval
 
-    # Output like:
+    # 输出类似于
     NOTICE:  select setval('public.seq_test_1'::regclass, 2);
     NOTICE:  select setval('public.seq_test_2'::regclass, 1001);
     NOTICE:  select setval('public.seq_test_3'::regclass, 203);
     NOTICE:  select setval('public.seq_test_4'::regclass, 476);
 
-    # Execute the above script in the sink
+    # 在目标端执行上述脚本
     ```
 
 * Slot 的生命周期

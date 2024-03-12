@@ -84,6 +84,9 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if err = r.handleSchedule(reqCtx, backupSchedule); err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
+			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+		}
 		return r.patchStatusFailed(reqCtx, backupSchedule, "HandleBackupScheduleFailed", err)
 	}
 
@@ -92,7 +95,7 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&dpv1alpha1.BackupSchedule{})
 
 	// Compatible with kubernetes versions prior to K8s 1.21, only supports batch v1beta1.

@@ -77,7 +77,7 @@ spec:
             {{- end }}
             {{- if .Values.reconcileWorkers }}
             - name: KUBEBLOCKS_RECONCILE_WORKERS
-              values: {{ .Values.reconcileWorkers }}
+              value: {{ .Values.reconcileWorkers | quote }}
             {{- end }}
             {{- with .Values.nodeSelector }}
             - name: CM_NODE_SELECTOR

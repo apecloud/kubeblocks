@@ -74,11 +74,7 @@ type ReplicatedStateMachineReconciler struct {
 func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("ReplicatedStateMachine", req.NamespacedName)
 
-	obj := &workloads.ReplicatedStateMachine{}
-	if err := r.Client.Get(ctx, req.NamespacedName, obj); err != nil {
-		return ctrl.Result{}, err
-	}
-	provider, err := rsm2.CurrentReplicaProvider(ctx, r.Client, obj)
+	provider, err := rsm2.CurrentReplicaProvider(ctx, r.Client, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

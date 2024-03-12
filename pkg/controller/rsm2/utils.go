@@ -13,7 +13,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -44,7 +43,7 @@ func mergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 	}
 }
 
-func CurrentReplicaProvider(ctx context.Context, cli client.Reader, rsm *workloads.ReplicatedStateMachine) (ReplicaProvider, error) {
+func CurrentReplicaProvider(ctx context.Context, cli client.Reader, objectKey client.ObjectKey) (ReplicaProvider, error) {
 	getDefaultProvider := func() ReplicaProvider {
 		provider := defaultReplicaProvider
 		if viper.IsSet(FeatureGateRSMReplicaProvider) {
@@ -56,7 +55,7 @@ func CurrentReplicaProvider(ctx context.Context, cli client.Reader, rsm *workloa
 		return provider
 	}
 	sts := &appsv1.StatefulSet{}
-	switch err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); {
+	switch err := cli.Get(ctx, objectKey, sts); {
 	case err == nil:
 		return StatefulSetProvider, nil
 	case !apierrors.IsNotFound(err):

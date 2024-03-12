@@ -17,53 +17,73 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm
+package kubebuilderx
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-type PlanBuilder struct {
-	req          ctrl.Request
-	cli          client.Client
-	transCtx     *rsmTransformContext
-	transformers graph.TransformerChain
+type transformContext struct {
+	ctx      context.Context
+	cli      client.Reader
+	recorder record.EventRecorder
+	logger   logr.Logger
 }
 
-var _ graph.PlanBuilder = &PlanBuilder{}
+type PlanBuilder struct {
+	transCtx     *transformContext
+	cli          client.Client
+	currentTree  *ObjectTree
+	desiredTree  *ObjectTree
+	transformers graph.TransformerChain
+}
 
 type Plan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
-	transCtx *rsmTransformContext
+	transCtx *transformContext
 }
 
+var _ graph.TransformContext = &transformContext{}
+var _ graph.PlanBuilder = &PlanBuilder{}
 var _ graph.Plan = &Plan{}
 
 func init() {
 	model.AddScheme(workloads.AddToScheme)
 }
 
+func (t *transformContext) GetContext() context.Context {
+	return t.ctx
+}
+
+func (t *transformContext) GetClient() client.Reader {
+	return t.cli
+}
+
+func (t *transformContext) GetRecorder() record.EventRecorder {
+	return t.recorder
+}
+
+func (t *transformContext) GetLogger() logr.Logger {
+	return t.logger
+}
+
 // PlanBuilder implementation
 
 func (b *PlanBuilder) Init() error {
-	rsm := &workloads.ReplicatedStateMachine{}
-	if err := b.cli.Get(b.transCtx.Context, b.req.NamespacedName, rsm); err != nil {
-		return err
-	}
-	b.AddTransformer(&initTransformer{ReplicatedStateMachine: rsm})
 	return nil
 }
 
@@ -83,7 +103,7 @@ func (b *PlanBuilder) Build() (graph.Plan, error) {
 	dag := graph.NewDAG()
 	err = b.transformers.ApplyTo(b.transCtx, dag)
 	// log for debug
-	b.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
+	b.transCtx.logger.Info(fmt.Sprintf("DAG: %s", dag))
 
 	// we got the execution plan
 	plan := &Plan{
@@ -110,7 +130,7 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 	if vertex.Action == nil {
 		return errors.New("vertex action can't be nil")
 	}
-	ctx := b.transCtx.Context
+	ctx := b.transCtx.ctx
 	switch *vertex.Action {
 	case model.CREATE:
 		return b.createObject(ctx, vertex)
@@ -125,7 +145,7 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 }
 
 func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := b.cli.Create(ctx, vertex.Obj, ClientOption(vertex))
+	err := b.cli.Create(ctx, vertex.Obj, rsm1.ClientOption(vertex))
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -133,7 +153,7 @@ func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := b.cli.Update(ctx, vertex.Obj, ClientOption(vertex))
+	err := b.cli.Update(ctx, vertex.Obj, rsm1.ClientOption(vertex))
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -141,16 +161,16 @@ func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	finalizer := GetFinalizer(vertex.Obj)
+	finalizer := rsm1.GetFinalizer(vertex.Obj)
 	if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
-		err := b.cli.Update(ctx, vertex.Obj, ClientOption(vertex))
+		err := b.cli.Update(ctx, vertex.Obj, rsm1.ClientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {
-			b.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
+			b.transCtx.logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
 			return err
 		}
 	}
 	if !model.IsObjectDeleting(vertex.Obj) {
-		err := b.cli.Delete(ctx, vertex.Obj, ClientOption(vertex))
+		err := b.cli.Delete(ctx, vertex.Obj, rsm1.ClientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -159,22 +179,23 @@ func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 func (b *PlanBuilder) statusObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	if err := b.cli.Status().Update(ctx, vertex.Obj, ClientOption(vertex)); err != nil {
+	if err := b.cli.Status().Update(ctx, vertex.Obj, rsm1.ClientOption(vertex)); err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewRSMPlanBuilder returns a RSMPlanBuilder powered PlanBuilder
-func NewRSMPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
+// NewPlanBuilder returns a PlanBuilder
+func NewPlanBuilder(ctx context.Context, cli client.Client, currentTree, desiredTree *ObjectTree) graph.PlanBuilder {
 	return &PlanBuilder{
-		req: req,
-		cli: cli,
-		transCtx: &rsmTransformContext{
-			Context:       ctx.Ctx,
-			Client:        model.NewGraphClient(cli),
-			EventRecorder: ctx.Recorder,
-			Logger:        ctx.Log,
+		transCtx: &transformContext{
+			ctx:      ctx,
+			cli:      model.NewGraphClient(cli),
+			recorder: currentTree.EventRecorder,
+			logger:   currentTree.Logger,
 		},
+		cli: cli,
+		currentTree: currentTree,
+		desiredTree: desiredTree,
 	}
 }

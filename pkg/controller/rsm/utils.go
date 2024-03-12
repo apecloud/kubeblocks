@@ -840,7 +840,7 @@ func IsOwnedByRsm(obj client.Object) bool {
 //	return model.WithClientOption(multicluster.InLocalContextOneshot())
 // }
 
-func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
+func ClientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	// if v.ClientOpt != nil {
 	//	opt, ok := v.ClientOpt.(*multicluster.ClientOption)
 	//	if ok {

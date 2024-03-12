@@ -81,8 +81,16 @@ func (c *controller) Commit(writer client.Client) error {
 	if c.err != nil {
 		return c.err
 	}
-	// TODO(free6om): finish me
-	return nil
+	builder := NewPlanBuilder(c.ctx, writer, c.oldTree, c.tree)
+	if err := builder.Init(); err != nil {
+		return err
+	}
+	builder.AddTransformer(newObjectTree2DAGTransformer(c.oldTree, c.tree))
+	plan, err := builder.Build()
+	if err != nil {
+		return err
+	}
+	return plan.Execute()
 }
 
 func NewController(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) Controller {

@@ -75,8 +75,8 @@ func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1alpha1
 		withClusterSimplifiedAPI(cluster) {
 		return nil
 	}
-	return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d, legacy comps: %d, new comps: %d, simplified API: %v",
-		cluster.Spec.ClusterDefRef, cluster.Spec.Topology, clusterCompCnt(cluster), clusterLegacyCompCnt(cluster), clusterNewCompCnt(cluster), withClusterSimplifiedAPI(cluster))
+	return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d, legacy comps: %d, simplified API: %v",
+		cluster.Spec.ClusterDefRef, cluster.Spec.Topology, clusterCompCnt(cluster), clusterLegacyCompCnt(cluster), withClusterSimplifiedAPI(cluster))
 }
 
 func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
@@ -143,11 +143,11 @@ func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCt
 }
 
 func withClusterTopology(cluster *appsv1alpha1.Cluster) bool {
-	return len(cluster.Spec.ClusterDefRef) > 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
+	return len(cluster.Spec.ClusterDefRef) > 0 && clusterLegacyCompCnt(cluster) == 0
 }
 
 func withClusterUserDefined(cluster *appsv1alpha1.Cluster) bool {
-	return len(cluster.Spec.ClusterDefRef) == 0 && len(cluster.Spec.Topology) == 0 && clusterCompCnt(cluster) == clusterNewCompCnt(cluster)
+	return len(cluster.Spec.ClusterDefRef) == 0 && len(cluster.Spec.Topology) == 0 && clusterLegacyCompCnt(cluster) == 0
 }
 
 func withClusterLegacyDefinition(cluster *appsv1alpha1.Cluster) bool {
@@ -160,13 +160,6 @@ func withClusterSimplifiedAPI(cluster *appsv1alpha1.Cluster) bool {
 
 func clusterCompCnt(cluster *appsv1alpha1.Cluster) int {
 	return clusterCompCntWithFunc(cluster, func(spec appsv1alpha1.ClusterComponentSpec) bool { return true })
-}
-
-func clusterNewCompCnt(cluster *appsv1alpha1.Cluster) int {
-	isNewComp := func(spec appsv1alpha1.ClusterComponentSpec) bool {
-		return len(spec.ComponentDefRef) == 0 // spec.componentDef is optional and can be inferred by operator.
-	}
-	return clusterCompCntWithFunc(cluster, isNewComp)
 }
 
 func clusterLegacyCompCnt(cluster *appsv1alpha1.Cluster) int {

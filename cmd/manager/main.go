@@ -24,7 +24,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -113,7 +112,7 @@ func init() {
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
 	viper.SetDefault(rsm.FeatureGateRSMToPod, true)
-	viper.SetDefault(constant.CfgKBReconcileWorkers, runtime.NumCPU())
+	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 }
 
 type flagName string

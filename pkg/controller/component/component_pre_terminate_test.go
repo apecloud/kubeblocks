@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"strconv"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -31,9 +29,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("Component PreTerminate Test", func() {
@@ -69,39 +64,8 @@ var _ = Describe("Component PreTerminate Test", func() {
 				GetObject()
 		})
 
-		mockPodsForTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
-			clusterDefName := cluster.Spec.ClusterDefRef
-			componentName := cluster.Spec.ComponentSpecs[0].Name
-			clusterName := cluster.Name
-			stsName := cluster.Name + "-" + componentName
-			pods := make([]corev1.Pod, 0)
-			for i := 0; i < number; i++ {
-				pod := &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      stsName + "-" + strconv.Itoa(i),
-						Namespace: testCtx.DefaultNamespace,
-						Labels: map[string]string{
-							constant.AppManagedByLabelKey:         constant.AppName,
-							constant.AppNameLabelKey:              clusterDefName,
-							constant.AppInstanceLabelKey:          clusterName,
-							constant.KBAppComponentLabelKey:       componentName,
-							appsv1.ControllerRevisionHashLabelKey: "mock-version",
-						},
-					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{{
-							Name:  "mock-container",
-							Image: "mock-container",
-						}},
-					},
-				}
-				pods = append(pods, *pod)
-			}
-			return pods
-		}
-
 		It("should work as expected with various inputs", func() {
-			By("test component definition without post provision")
+			By("test component definition without pre terminate")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: tlog,
@@ -123,14 +87,17 @@ var _ = Describe("Component PreTerminate Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
 
+			By("test component without preTerminate action and no need to do PreTerminate action")
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
-			err = ReconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
+			need, err := needDoPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
+			Expect(err).Should(Succeed())
+			Expect(need).Should(BeFalse())
+			err = reconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
 			Expect(err).Should(Succeed())
 
-			By("build component with PreTerminate without PodList, do not need to do PreTerminate action")
+			By("build component with preTerminate action and should do PreTerminate action")
 			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
-			defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
 			PreTerminate := appsv1alpha1.LifecycleActionHandler{
 				CustomHandler: &appsv1alpha1.Action{
 					Image: constant.KBToolsImage,
@@ -138,38 +105,16 @@ var _ = Describe("Component PreTerminate Test", func() {
 						Command: []string{"echo", "mock"},
 						Args:    []string{},
 					},
-					PreCondition: &defaultPreCondition,
 				},
 			}
 			synthesizeComp.LifecycleActions.PreTerminate = &PreTerminate
-			need, err := needDoPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
-			Expect(err).Should(Succeed())
-			Expect(need).Should(BeFalse())
-			err = ReconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
-			Expect(err).Should(Succeed())
-
-			By("mock component status ready, should do PreTerminate action")
-			comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
 			need, err = needDoPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeTrue())
-			err = ReconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
-			Expect(err).ShouldNot(Succeed())
-
-			By("build component with PreTerminate with PodList, do PreTerminate action and requeue waiting job")
-			pods := mockPodsForTest(cluster, 1)
-			for _, pod := range pods {
-				Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-				// mock the status to pass the isReady(pod) check in consensus_set
-				pod.Status.Conditions = []corev1.PodCondition{{
-					Type:   corev1.PodReady,
-					Status: corev1.ConditionTrue,
-				}}
-				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
-			}
-			err = ReconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
+			err = reconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
 			Expect(err).Should(Succeed())
 
+			By("requeue to waiting for job")
 			jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, PreTerminateAction)
 			err = CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
 			Expect(err).ShouldNot(Succeed())

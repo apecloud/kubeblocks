@@ -271,11 +271,12 @@ func genClusterNComponentEnvs(ctx context.Context, cli client.Client, cluster *a
 	}
 
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		shardingCompNames, err := intctrlutil.ListShardingCompNames(ctx, cli, cluster, &shardingSpec)
+		undeletedShardingCompNames, deletingShardingCompNames, err := intctrlutil.ListShardingCompNames(ctx, cli, cluster, &shardingSpec)
 		if err != nil {
 			return nil, err
 		}
-		compList = append(compList, shardingCompNames...)
+		compList = append(compList, undeletedShardingCompNames...)
+		compList = append(compList, deletingShardingCompNames...)
 	}
 
 	envs := make([]corev1.EnvVar, 0)
@@ -285,6 +286,7 @@ func genClusterNComponentEnvs(ctx context.Context, cli client.Client, cluster *a
 	}
 	envs = append(envs, compEnvs...)
 
+	// TODO(xingran): need to differentiate undeleted comps and deleting comps?
 	clusterEnvs, err := genClusterEnvs(ctx, cli, cluster, compList)
 	if err != nil {
 		return nil, err
@@ -490,7 +492,6 @@ func getActionCmdJobLabels(clusterName, componentName string, actionType LifeCyc
 		constant.AppInstanceLabelKey:    clusterName,
 		constant.KBAppComponentLabelKey: componentName,
 		constant.AppManagedByLabelKey:   constant.AppName,
-		kbPostProvisionJobLabelKey:      kbPostProvisionJobLabelValue,
 	}
 	switch actionType {
 	case PostProvisionAction:

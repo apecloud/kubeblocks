@@ -42,19 +42,24 @@ const (
 	kbCompPreTerminateDoneKey = "kubeblocks.io/pre-terminate-done"
 )
 
-// ReconcileCompPreTerminate reconciles the component-level PreTerminate command.
+// ReconcileCompPreTerminate reconciles the component-level preTerminate command.
 func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	clusterName string,
 	comp *appsv1alpha1.Component,
 	dag *graph.DAG) error {
-
 	ctx := reqCtx.Ctx
 	cluster := &appsv1alpha1.Cluster{}
 	err := cli.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
 	if err != nil {
 		return errors.New(fmt.Sprintf("failed to get cluster %s: %v", clusterName, err))
 	}
+
+	// TODO(xingran): check if preTerminate action is needed for the component when cluster id deleting
+	//if !cluster.DeletionTimestamp.IsZero() {
+	//	reqCtx.Log.Info("cluster is deleting, skip reconciling component preTerminate", "cluster", cluster.Name)
+	//	return nil
+	//}
 
 	compKey := types.NamespacedName{
 		Namespace: comp.Namespace,
@@ -70,6 +75,15 @@ func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
+	return reconcileCompPreTerminate(ctx, cli, cluster, comp, synthesizedComp, dag)
+}
+
+func reconcileCompPreTerminate(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	comp *appsv1alpha1.Component,
+	synthesizedComp *SynthesizedComponent,
+	dag *graph.DAG) error {
 	needPreTerminate, err := needDoPreTerminate(ctx, cli, cluster, comp, synthesizedComp)
 	if err != nil {
 		return err
@@ -88,9 +102,6 @@ func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 
 	err = CheckJobSucceed(ctx, cli, cluster, job.Name)
 	if err != nil {
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
-			return nil
-		}
 		return err
 	}
 

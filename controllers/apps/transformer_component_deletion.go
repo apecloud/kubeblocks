@@ -60,15 +60,6 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
-	compShortName, err := component.ShortName(clusterName, comp.Name)
-	if err != nil {
-		return err
-	}
-	ml := constant.GetComponentWellKnownLabels(clusterName, compShortName)
-	snapshot, err := model.ReadCacheSnapshot(transCtx, comp, ml, kindsForCompDelete()...)
-	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
 
 	// step1: update the component status to deleting
 	if comp.Status.Phase != appsv1alpha1.DeletingClusterCompPhase {
@@ -79,10 +70,22 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 
 	// step2: do the pre-terminate action if needed
 	if err := component.ReconcileCompPreTerminate(reqCtx, t.Client, clusterName, comp, dag); err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
+			return newRequeueError(time.Second*3, "wait for pre terminate to be done")
+		}
 		return err
 	}
 
 	// step3: delete the sub-resources
+	compShortName, err := component.ShortName(clusterName, comp.Name)
+	if err != nil {
+		return err
+	}
+	ml := constant.GetComponentWellKnownLabels(clusterName, compShortName)
+	snapshot, err := model.ReadCacheSnapshot(transCtx, comp, ml, kindsForCompDelete()...)
+	if err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
 	if len(snapshot) > 0 {
 		// delete the sub-resources owned by the component before deleting the component
 		for _, object := range snapshot {

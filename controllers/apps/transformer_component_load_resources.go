@@ -156,11 +156,11 @@ func isGeneratedComponent(ctx context.Context, cli client.Reader, cluster *appsv
 	}
 
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		shardCompNames, err := ictrlutil.ListShardingCompNames(ctx, cli, cluster, &shardingSpec)
+		undeletedShardCompNames, _, err := ictrlutil.ListShardingCompNames(ctx, cli, cluster, &shardingSpec)
 		if err != nil {
 			return false, err
 		}
-		if slices.Contains(shardCompNames, compName) {
+		if slices.Contains(undeletedShardCompNames, compName) {
 			return validateCompDef(shardingSpec.Template.ComponentDef)
 		}
 	}

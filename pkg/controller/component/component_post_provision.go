@@ -77,7 +77,6 @@ func ReconcileCompPostProvision(ctx context.Context,
 		return err
 	}
 
-	// clean up the postProvision job
 	if err := cleanActionJob(ctx, cli, cluster, *compOrig, *synthesizeComp, PostProvisionAction, job.Name); err != nil {
 		return err
 	}
@@ -113,17 +112,5 @@ func needDoPostProvision(ctx context.Context, cli client.Client,
 		return false, nil
 	}
 
-	if comp.Annotations == nil {
-		return true, nil
-	}
-
-	// determine whether the component has undergone postProvision by examining the annotation
-	jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, PostProvisionAction)
-	jobExist := checkActionJobExist(ctx, cli, cluster, jobName)
-	finishAnnotationExist := checkActionDoneAnnotationExist(*cluster, *comp, *synthesizeComp, PostProvisionAction)
-	if finishAnnotationExist && !jobExist {
-		// if the annotation has been set and the job does not exist, it means that the postProvision has finished, so skip it
-		return false, nil
-	}
-	return true, nil
+	return needDoActionByCheckingJobNAnnotation(ctx, cli, cluster, comp, synthesizeComp, PostProvisionAction)
 }

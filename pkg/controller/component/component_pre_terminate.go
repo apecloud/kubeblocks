@@ -111,7 +111,6 @@ func reconcileCompPreTerminate(ctx context.Context,
 		return err
 	}
 
-	// clean up the PreTerminate job
 	if err := cleanActionJob(ctx, cli, cluster, *compOrig, *synthesizedComp, PreTerminateAction, job.Name); err != nil {
 		return err
 	}
@@ -121,23 +120,11 @@ func reconcileCompPreTerminate(ctx context.Context,
 
 func needDoPreTerminate(ctx context.Context, cli client.Client,
 	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) (bool, error) {
-	// if the component does not have a custom PreTerminate, skip it
+	// if the component does not have a custom PreTerminate action, skip it
 	actionExist, _ := checkLifeCycleAction(synthesizeComp, PreTerminateAction)
 	if !actionExist {
 		return false, nil
 	}
 
-	if comp.Annotations == nil {
-		return true, nil
-	}
-
-	// determine whether the component has undergone PreTerminate by examining the annotation
-	jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, PreTerminateAction)
-	jobExist := checkActionJobExist(ctx, cli, cluster, jobName)
-	finishAnnotationExist := checkActionDoneAnnotationExist(*cluster, *comp, *synthesizeComp, PreTerminateAction)
-	if finishAnnotationExist && !jobExist {
-		// if the annotation has been set and the job does not exist, it means that the PreTerminate has finished, so skip it
-		return false, nil
-	}
-	return true, nil
+	return needDoActionByCheckingJobNAnnotation(ctx, cli, cluster, comp, synthesizeComp, PreTerminateAction)
 }

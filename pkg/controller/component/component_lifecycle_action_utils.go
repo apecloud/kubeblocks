@@ -103,13 +103,6 @@ func createActionJobIfNotExist(ctx context.Context,
 	return renderJob, nil
 }
 
-func checkActionJobExist(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, jobName string) bool {
-	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
-	existJob := &batchv1.Job{}
-	exist, _ := intctrlutil.CheckResourceExists(ctx, cli, key, existJob)
-	return exist
-}
-
 // renderActionCmdJob renders and creates the action command job.
 func renderActionCmdJob(ctx context.Context,
 	cli client.Client,
@@ -379,6 +372,30 @@ func genClusterEnvs(ctx context.Context, cli client.Client, cluster *appsv1alpha
 		}}...)
 
 	return clusterEnvs, nil
+}
+
+// needDoActionByCheckingJobNAnnotation checks if the action needs to be executed by checking the job and annotation.
+func needDoActionByCheckingJobNAnnotation(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster,
+	comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent, actionType LifeCycleActionType) (bool, error) {
+	if comp.Annotations == nil {
+		return true, nil
+	}
+	// determine whether the component has undergone action by checking the annotation and job
+	jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, actionType)
+	jobExist := checkActionJobExist(ctx, cli, cluster, jobName)
+	finishAnnotationExist := checkActionDoneAnnotationExist(*cluster, *comp, *synthesizeComp, actionType)
+	if finishAnnotationExist && !jobExist {
+		// if the annotation has been set and the job does not exist, it means that the action has finished, so skip it
+		return false, nil
+	}
+	return true, nil
+}
+
+func checkActionJobExist(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, jobName string) bool {
+	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
+	existJob := &batchv1.Job{}
+	exist, _ := intctrlutil.CheckResourceExists(ctx, cli, key, existJob)
+	return exist
 }
 
 // setActionDoneAnnotation sets the action done annotation for the component.

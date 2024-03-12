@@ -27,9 +27,15 @@ image:
 ##
 replicaCount: 1
 
-## MaxConcurrentReconciles for cluster and component controllers.
+## MaxConcurrentReconciles for component, rsm and opsRequest controllers.
 ##
 reconcileWorkers: ""
+
+client:
+  # default is 20
+  qps: ""
+  # default is 30
+  burst: ""
 
 ## @param nameOverride
 ##
@@ -318,7 +324,8 @@ dataProtection:
   # if 'get/list' role of the backup CR are compromised.
   encryptionKey: ""
   gcFrequencySeconds: 3600
-
+  ## MaxConcurrentReconciles for backup controller.
+  reconcileWorkers: ""
   worker:
     serviceAccount:
       # The name of the service account for worker pods.

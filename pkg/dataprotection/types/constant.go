@@ -33,6 +33,8 @@ const (
 	CfgKeyWorkerServiceAccountAnnotations = "WORKER_SERVICE_ACCOUNT_ANNOTATIONS"
 	// CfgKeyWorkerClusterRoleName is the key of cluster role name for binding the service account of the worker
 	CfgKeyWorkerClusterRoleName = "WORKER_CLUSTER_ROLE_NAME"
+	// CfgDataProtectionReconcileWorkers the max reconcile workers for MaxConcurrentReconciles
+	CfgDataProtectionReconcileWorkers = "DATAPROTECTION_RECONCILE_WORKERS"
 )
 
 // config default values

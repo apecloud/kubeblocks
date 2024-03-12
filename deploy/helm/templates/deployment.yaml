@@ -79,6 +79,14 @@ spec:
             - name: KUBEBLOCKS_RECONCILE_WORKERS
               value: {{ .Values.reconcileWorkers | quote }}
             {{- end }}
+            {{- if .Values.client.qps }}
+            - name: CLIENT_QPS
+              value: {{ .Values.client.qps | quote }}
+            {{- end }}
+            {{- if .Values.client.burst }}
+            - name: CLIENT_BURST
+              value: {{ .Values.client.burst | quote }}
+            {{- end }}
             {{- with .Values.nodeSelector }}
             - name: CM_NODE_SELECTOR
               value: {{ toJson . | quote }}

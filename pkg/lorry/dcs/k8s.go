@@ -204,7 +204,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		Leader:          leader,
 		Switchover:      switchover,
 		HaConfig:        haConfig,
-		resource:        clusterResource,
+		Resource:        clusterResource,
 	}
 
 	store.cluster = cluster
@@ -263,7 +263,7 @@ func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 
 func (store *KubernetesStore) IsLeaseExist() (bool, error) {
 	leaderConfigMap, err := store.GetLeaderConfigMap()
-	appCluster, ok := store.cluster.resource.(*appsv1alpha1.Cluster)
+	appCluster, ok := store.cluster.Resource.(*appsv1alpha1.Cluster)
 	if leaderConfigMap != nil && ok && leaderConfigMap.CreationTimestamp.Before(&appCluster.CreationTimestamp) {
 		store.logger.Info("A previous leader configmap resource exists, delete it", "name", leaderConfigMap.Name)
 		_ = store.DeleteLeader()
@@ -654,7 +654,7 @@ func getLorryPort(pod *corev1.Pod) string {
 }
 
 func getOwnerRef(cluster *Cluster) metav1.OwnerReference {
-	clusterObj := cluster.resource.(*appsv1alpha1.Cluster)
+	clusterObj := cluster.Resource.(*appsv1alpha1.Cluster)
 	gvk, _ := apiutil.GVKForObject(clusterObj, scheme.Scheme)
 	ownerRef := metav1.OwnerReference{
 		APIVersion: gvk.GroupVersion().String(),

@@ -36,6 +36,8 @@ import (
 
 type CheckStatus struct {
 	operations.Base
+	LeaderFailedCount          int
+	FailureThreshold           int
 	dcsStore                   dcs.DCS
 	dbManager                  engines.DBManager
 	checkFailedCount           int
@@ -43,10 +45,14 @@ type CheckStatus struct {
 	logger                     logr.Logger
 }
 
+type FailoverManager interface {
+	Failover(ctx context.Context, cluster *dcs.Cluster, candidate string) error
+}
+
 var checkstatus operations.Operation = &CheckStatus{}
 
 func init() {
-	err := operations.Register("checkstatus", checkstatus)
+	err := operations.Register(string(util.CheckStatusOperation), checkstatus)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -71,6 +77,7 @@ func (s *CheckStatus) Init(ctx context.Context) error {
 		s.failedEventReportFrequency = 3600
 	}
 
+	s.FailureThreshold = 3
 	s.logger = ctrl.Log.WithName("checkstatus")
 	return nil
 }
@@ -84,25 +91,66 @@ func (s *CheckStatus) Do(ctx context.Context, req *operations.OpsRequest) (*oper
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.CheckStatusOperation
-	var message string
 
 	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
 	cluster := k8sStore.GetClusterFromCache()
-	isHealthy := s.dbManager.IsCurrentMemberHealthy(ctx, cluster)
-	if !isHealthy {
-		message = "status check failed"
-		s.logger.Info(message)
-		resp.Data["event"] = util.OperationFailed
-		resp.Data["message"] = message
-		var err error
-		if s.checkFailedCount%s.failedEventReportFrequency == 0 {
-			s.logger.Info("status checks failed continuously", "times", s.checkFailedCount)
-			err = util.SentEventForProbe(ctx, resp.Data)
-		}
-		s.checkFailedCount++
-		return resp, err
+	err := s.dbManager.CurrentMemberHealthyCheck(ctx, cluster)
+	if err != nil {
+		return s.handlerError(ctx, err)
 	}
+
+	isLeader, err := s.dbManager.IsLeader(ctx, cluster)
+	if err != nil {
+		return s.handlerError(ctx, err)
+	}
+
+	if isLeader {
+		s.LeaderFailedCount = 0
+		s.checkFailedCount = 0
+		resp.Data["event"] = util.OperationSuccess
+		return resp, nil
+	}
+	err = s.dbManager.LeaderHealthyCheck(ctx, cluster)
+	if err != nil {
+		s.LeaderFailedCount++
+		if s.LeaderFailedCount > s.FailureThreshold {
+			err = s.failover(ctx, cluster)
+			if err != nil {
+				return s.handlerError(ctx, err)
+			}
+		}
+		return s.handlerError(ctx, err)
+	}
+	s.LeaderFailedCount = 0
 	s.checkFailedCount = 0
 	resp.Data["event"] = util.OperationSuccess
 	return resp, nil
+}
+
+func (s *CheckStatus) failover(ctx context.Context, cluster *dcs.Cluster) error {
+	failoverManger, ok := s.dbManager.(FailoverManager)
+	if !ok {
+		return errors.New("failover manager not found")
+	}
+	err := failoverManger.Failover(ctx, cluster, s.dbManager.GetCurrentMemberName())
+	if err != nil {
+		return errors.Wrap(err, "failover failed")
+	}
+	return nil
+}
+
+func (s *CheckStatus) handlerError(ctx context.Context, err error) (*operations.OpsResponse, error) {
+	resp := &operations.OpsResponse{
+		Data: map[string]any{},
+	}
+	message := err.Error()
+	s.logger.Info("healthy checks failed", "error", message)
+	resp.Data["event"] = util.OperationFailed
+	resp.Data["message"] = message
+	if s.checkFailedCount%s.failedEventReportFrequency == 0 {
+		s.logger.Info("healthy checks failed continuously", "times", s.checkFailedCount)
+		_ = util.SentEventForProbe(ctx, resp.Data)
+	}
+	s.checkFailedCount++
+	return resp, err
 }

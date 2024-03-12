@@ -63,8 +63,8 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 	var role string
 	var isReady bool
 	for rows.Next() {
-		if err = rows.Scan(&role); err != nil {
-			mgr.Logger.Error(err, "Role query error")
+		if err = rows.Scan(&role, &mgr.CompatibilityMode); err != nil {
+			mgr.Logger.Info("Role query failed", "error", err.Error())
 			return role, err
 		}
 		isReady = true

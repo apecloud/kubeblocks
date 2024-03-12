@@ -36,7 +36,7 @@ type Cluster struct {
 	Members         []Member
 	Switchover      *Switchover
 	Extra           map[string]string
-	resource        any
+	Resource        any
 }
 
 func (c *Cluster) HasMember(memberName string) bool {

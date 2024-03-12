@@ -40,7 +40,9 @@ const (
 
 type Manager struct {
 	mysql.Manager
-	ReplicaTenant string
+	ReplicaTenant     string
+	CompatibilityMode string
+	Members           []dcs.Member
 }
 
 var _ engines.DBManager = &Manager{}
@@ -82,4 +84,100 @@ func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, e
 	}
 
 	return false, nil
+}
+func (mgr *Manager) MemberHealthyCheck(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) error {
+	switch mgr.CompatibilityMode {
+	case MYSQL:
+		return mgr.HealthyCheckForMySQLMode(ctx, cluster, member)
+	case ORACLE:
+		return mgr.HealthyCheckForOracleMode(ctx, cluster, member)
+	default:
+		return nil
+	}
+}
+
+func (mgr *Manager) CurrentMemberHealthyCheck(ctx context.Context, cluster *dcs.Cluster) error {
+	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
+	return mgr.MemberHealthyCheck(ctx, cluster, member)
+}
+
+func (mgr *Manager) LeaderHealthyCheck(ctx context.Context, cluster *dcs.Cluster) error {
+	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
+	return mgr.MemberHealthyCheck(ctx, cluster, member)
+}
+
+func (mgr *Manager) HealthyCheckForMySQLMode(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) error {
+	isLeader, err := mgr.IsLeader(ctx, cluster)
+	if err != nil {
+		return err
+	}
+	addr := cluster.GetMemberAddrWithPort(*member)
+	db, err := mgr.GetMySQLDBConnWithAddr(addr)
+	if err != nil {
+		return err
+	}
+	if isLeader {
+		err = mgr.WriteCheck(ctx, db)
+		if err != nil {
+			return err
+		}
+	}
+	err = mgr.ReadCheck(ctx, db)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (mgr *Manager) HealthyCheckForOracleMode(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) error {
+	isLeader, err := mgr.IsLeader(ctx, cluster)
+	if err != nil {
+		return err
+	}
+	if isLeader {
+		return nil
+	}
+	return nil
+}
+
+func (mgr *Manager) GetMembers(ctx context.Context, cluster *dcs.Cluster) []dcs.Member {
+	clusterCR, ok := cluster.Resource.(*appsv1alpha1.Cluster)
+	if !ok {
+		return nil
+	}
+	updateMembers := false
+	for _, component := range clusterCR.Spec.Components {
+		hasMember := false
+		for _, member := range mgr.Members {
+			if strings.Contains(member.Name, component.Name) {
+				hasMember = true
+				break
+			}
+		}
+		if !hasMember {
+			updateMembers = true
+			break
+		}
+	}
+	if !updateMembers {
+		return mgr.Members
+	}
+
+	mgr.Members = []dcs.Member{}
+	for _, component := range clusterCR.Spec.Components {
+		if strings.Contains(mgr.ClusterCompName, component.Name) {
+			mgr.Members = append(mgr.Members, cluster.Members...)
+			continue
+		}
+		k8sStore, _ := dcs.NewKubernetesStore()
+		k8sStore.SetCompName(component.Name)
+		cluster, err := k8sStore.GetCluster()
+		if err != nil {
+			return nil
+		}
+		mgr.Members = append(mgr.Members, cluster.Members...)
+	}
+
+	return mgr.Members
 }

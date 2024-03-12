@@ -224,6 +224,16 @@ func (c *compDefServicesConvertor) removeDuplicatePorts(svc *corev1.Service) *co
 }
 
 func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) string {
+	// if rsmSpec is not nil, pick the one with AccessMode == ReadWrite as the primary.
+	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.Roles != nil {
+		for _, role := range clusterCompDef.RSMSpec.Roles {
+			if role.AccessMode == workloads.ReadWriteMode {
+				return role.Name
+			}
+		}
+	}
+
+	// convert the leader name w.r.t workload type.
 	switch clusterCompDef.WorkloadType {
 	case appsv1alpha1.Consensus:
 		if clusterCompDef.ConsensusSpec == nil {

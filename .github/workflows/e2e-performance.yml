@@ -35,9 +35,11 @@ on:
       K8S_VERSION:
         description: 'eks version'
         required: false
-        default: '1.26'
+        default: '1.27'
         type: choice
         options:
+          - 1.29
+          - 1.28
           - 1.27
           - 1.26
           - 1.25

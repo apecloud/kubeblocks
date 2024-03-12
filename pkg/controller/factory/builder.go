@@ -276,6 +276,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	// if exists, replace the random password
 	if restorePassword != "" {
 		randomPassword = restorePassword
+		strongRandomPasswd = restorePassword
 	}
 	m := map[string]string{
 		"$(RANDOM_PASSWD)":        randomPassword,

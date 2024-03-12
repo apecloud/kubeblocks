@@ -976,25 +976,29 @@ var _ = Describe("vars", func() {
 		It("multiple components", func() {
 			var (
 				compName1             = synthesizedComp.Name
-				compName2             = "comp-other"
-				compName3             = "comp-other-not-exist"
+				compName2             = synthesizedComp.Name + "-other"
+				compName3             = synthesizedComp.Name + "-other-not-exist"
 				svcName1              = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName1, "service")
 				svcName2              = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName2, "service")
 				credentialSecretName1 = constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName1, "credential")
 				credentialSecretName2 = constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName2, "credential")
-				compVarName           = func(compName, envName string) string {
+
+				compVarName = func(compName, envName string) string {
 					return fmt.Sprintf("%s_%s", envName, strings.ToUpper(strings.ReplaceAll(compName, "-", "_")))
 				}
-				svcVarName1                  = compVarName(compName1, "service-host")
-				svcVarName2                  = compVarName(compName2, "service-host")
-				svcVarName3                  = compVarName(compName3, "service-host")
-				credentialVarName1           = compVarName(compName1, "credential-username")
-				credentialVarName2           = compVarName(compName2, "credential-username")
+				compSvcVarName1        = compVarName(compName1, "service-host")
+				compSvcVarName2        = compVarName(compName2, "service-host")
+				compSvcVarName3        = compVarName(compName3, "service-host")
+				compCredentialVarName1 = compVarName(compName1, "credential-username")
+				compCredentialVarName2 = compVarName(compName2, "credential-username")
+
 				combinedSvcVarValue          = fmt.Sprintf("%s:%s,%s:%s", compName1, svcName1, compName2, svcName2)
 				combinedSvcVarValueWithComp3 = fmt.Sprintf("%s:%s,%s:%s,%s:", compName1, svcName1, compName2, svcName2, compName3)
-				newVarSuffix                 = "suffix"
-				newCombinedSvcVarName        = fmt.Sprintf("%s_%s", "service-host", newVarSuffix)
-				reader                       = &mockReader{
+
+				newVarSuffix          = "suffix"
+				newCombinedSvcVarName = fmt.Sprintf("%s_%s", "service-host", newVarSuffix)
+
+				reader = &mockReader{
 					cli: testCtx.Cli,
 					objs: []client.Object{
 						&corev1.Service{
@@ -1094,6 +1098,7 @@ var _ = Describe("vars", func() {
 			}
 			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("more than one referent component found"))
 
 			By("individual")
 			vars = []appsv1alpha1.EnvVar{
@@ -1136,14 +1141,17 @@ var _ = Describe("vars", func() {
 			}
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
+			// the defined var will have empty values.
 			Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
-			Expect(templateVars).Should(HaveKeyWithValue(svcVarName1, svcName1))
-			Expect(templateVars).Should(HaveKeyWithValue(svcVarName2, svcName2))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName1, svcName1))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName2, svcName2))
+			// the defined var will have empty values.
 			checkEnvVarWithValue(envVars, "service-host", "")
-			checkEnvVarWithValue(envVars, svcVarName1, svcName1)
-			checkEnvVarWithValue(envVars, svcVarName2, svcName2)
+			checkEnvVarWithValue(envVars, compSvcVarName1, svcName1)
+			checkEnvVarWithValue(envVars, compSvcVarName2, svcName2)
+			// the defined var will have empty values.
 			checkEnvVarWithValueFrom(envVars, "credential-username", nil)
-			checkEnvVarWithValueFrom(envVars, credentialVarName1, &corev1.EnvVarSource{
+			checkEnvVarWithValueFrom(envVars, compCredentialVarName1, &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: credentialSecretName1,
@@ -1151,7 +1159,7 @@ var _ = Describe("vars", func() {
 					Key: constant.AccountNameForSecret,
 				},
 			})
-			checkEnvVarWithValueFrom(envVars, credentialVarName2, &corev1.EnvVarSource{
+			checkEnvVarWithValueFrom(envVars, compCredentialVarName2, &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: credentialSecretName2,
@@ -1184,11 +1192,13 @@ var _ = Describe("vars", func() {
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValue))
-			Expect(templateVars).ShouldNot(HaveKey(svcVarName1))
-			Expect(templateVars).ShouldNot(HaveKey(svcVarName2))
+			// check that per-component vars not been created.
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName1))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName2))
 			checkEnvVarWithValue(envVars, "service-host", combinedSvcVarValue)
-			checkEnvVarNotExist(envVars, svcVarName1)
-			checkEnvVarNotExist(envVars, svcVarName2)
+			// check that per-component vars not been created.
+			checkEnvVarNotExist(envVars, compSvcVarName1)
+			checkEnvVarNotExist(envVars, compSvcVarName2)
 
 			By("combined - new")
 			vars = []appsv1alpha1.EnvVar{
@@ -1216,14 +1226,16 @@ var _ = Describe("vars", func() {
 			}
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
+			// the defined var will have empty values.
 			Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
 			Expect(templateVars).Should(HaveKeyWithValue(newCombinedSvcVarName, combinedSvcVarValue))
-			Expect(templateVars).ShouldNot(HaveKey(svcVarName1))
-			Expect(templateVars).ShouldNot(HaveKey(svcVarName2))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName1))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName2))
+			// the defined var will have empty values.
 			checkEnvVarWithValue(envVars, "service-host", "")
 			checkEnvVarWithValue(envVars, newCombinedSvcVarName, combinedSvcVarValue)
-			checkEnvVarNotExist(envVars, svcVarName1)
-			checkEnvVarNotExist(envVars, svcVarName2)
+			checkEnvVarNotExist(envVars, compSvcVarName1)
+			checkEnvVarNotExist(envVars, compSvcVarName2)
 
 			By("combined - value from error")
 			vars = []appsv1alpha1.EnvVar{
@@ -1248,12 +1260,13 @@ var _ = Describe("vars", func() {
 			}
 			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("combined strategy doesn't support vars with valueFrom values"))
 
-			By("individual - partial nil object")
+			By("individual - partial objects")
 			synthesizedComp.Comp2CompDefs = map[string]string{
 				compName1: synthesizedComp.CompDefName,
 				compName2: synthesizedComp.CompDefName,
-				compName3: synthesizedComp.CompDefName,
+				compName3: synthesizedComp.CompDefName, // there is no service object for comp3.
 			}
 			vars = []appsv1alpha1.EnvVar{
 				{
@@ -1278,15 +1291,17 @@ var _ = Describe("vars", func() {
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
-			Expect(templateVars).Should(HaveKeyWithValue(svcVarName1, svcName1))
-			Expect(templateVars).Should(HaveKeyWithValue(svcVarName2, svcName2))
-			Expect(templateVars).Should(HaveKeyWithValue(svcVarName3, ""))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName1, svcName1))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName2, svcName2))
+			// the new var for comp3 will still be created, but its values will be empty.
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName3, ""))
 			checkEnvVarWithValue(envVars, "service-host", "")
-			checkEnvVarWithValue(envVars, svcVarName1, svcName1)
-			checkEnvVarWithValue(envVars, svcVarName2, svcName2)
-			checkEnvVarWithValue(envVars, svcVarName3, "")
+			checkEnvVarWithValue(envVars, compSvcVarName1, svcName1)
+			checkEnvVarWithValue(envVars, compSvcVarName2, svcName2)
+			// the new var for comp3 will still be created, but its values will be empty.
+			checkEnvVarWithValue(envVars, compSvcVarName3, "")
 
-			By("combined - partial nil object")
+			By("combined - partial objects")
 			vars = []appsv1alpha1.EnvVar{
 				{
 					Name: "service-host",
@@ -1309,14 +1324,16 @@ var _ = Describe("vars", func() {
 			}
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
+			// the combined value will have comp3 in it, but its value will be empty: "comp1:val1,comp2:val2,comp3:"
 			Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValueWithComp3))
-			Expect(templateVars).ShouldNot(HaveKey(svcVarName1))
-			Expect(templateVars).ShouldNot(HaveKey(svcVarName2))
-			Expect(templateVars).ShouldNot(HaveKey(svcVarName3))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName1))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName2))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName3))
+			// the combined value will have comp3 in it, but its value will be empty: "comp1:val1,comp2:val2,comp3:"
 			checkEnvVarWithValue(envVars, "service-host", combinedSvcVarValueWithComp3)
-			checkEnvVarNotExist(envVars, svcVarName1)
-			checkEnvVarNotExist(envVars, svcVarName2)
-			checkEnvVarNotExist(envVars, svcVarName3)
+			checkEnvVarNotExist(envVars, compSvcVarName1)
+			checkEnvVarNotExist(envVars, compSvcVarName2)
+			checkEnvVarNotExist(envVars, compSvcVarName3)
 		})
 
 		It("vars reference and escaping", func() {

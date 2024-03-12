@@ -41,6 +41,18 @@ type InstanceTemplate struct {
 	// +optional
 	Name *string `json:"name,omitempty"`
 
+	// GenerateName is an optional prefix, used by the server, to generate a unique
+	// name ONLY IF the Name field has not been provided.
+	// If this field is used, the name returned to the client will be different
+	// than the name passed. This value will also be combined with a unique suffix.
+	// The provided value has the same validation rules as the Name field,
+	// and may be truncated by the length of the suffix required to make the value
+	// unique on the server.
+	//
+	// Applied only if Name is not specified.
+	// +optional
+	GenerateName *string `json:"generateName,omitempty"`
+
 	// Defines annotations to override.
 	// Add new or override existing annotations.
 	// +optional
@@ -50,6 +62,11 @@ type InstanceTemplate struct {
 	// Add new or override existing labels.
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// Defines image to override.
+	// Will override the first container's image of the pod.
+	// +optional
+	Image *string `json:"image,omitempty"`
 
 	// Defines NodeName to override.
 	// +optional

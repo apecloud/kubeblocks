@@ -616,14 +616,20 @@ func applyInstanceTemplate(instance workloads.InstanceTemplate, template *podTem
 	if instance.Name != nil {
 		template.Name = *instance.Name
 	}
+	if instance.GenerateName != nil {
+		template.GenerateName = *instance.GenerateName
+	}
 	if instance.NodeName != nil {
 		template.Spec.NodeName = *instance.NodeName
 	}
 	mergeMap(&instance.Annotations, &template.Annotations)
 	mergeMap(&instance.Labels, &template.Labels)
 	mergeMap(&instance.NodeSelector, &template.Spec.NodeSelector)
-	if instance.Resources != nil {
-		if len(template.Spec.Containers) > 0 {
+	if len(template.Spec.Containers) > 0 {
+		if instance.Image != nil {
+			template.Spec.Containers[0].Image = *instance.Image
+		}
+		if instance.Resources != nil {
 			template.Spec.Containers[0].Resources = *instance.Resources
 		}
 	}

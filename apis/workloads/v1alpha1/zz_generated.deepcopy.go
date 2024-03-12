@@ -105,6 +105,11 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.GenerateName != nil {
+		in, out := &in.GenerateName, &out.GenerateName
+		*out = new(string)
+		**out = **in
+	}
 	if in.Annotations != nil {
 		in, out := &in.Annotations, &out.Annotations
 		*out = make(map[string]string, len(*in))
@@ -118,6 +123,11 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 		for key, val := range *in {
 			(*out)[key] = val
 		}
+	}
+	if in.Image != nil {
+		in, out := &in.Image, &out.Image
+		*out = new(string)
+		**out = **in
 	}
 	if in.NodeName != nil {
 		in, out := &in.NodeName, &out.NodeName

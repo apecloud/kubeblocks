@@ -828,6 +828,21 @@ spec:
                       description: Defines annotations to override. Add new or override
                         existing annotations.
                       type: object
+                    generateName:
+                      description: "GenerateName is an optional prefix, used by the
+                        server, to generate a unique name ONLY IF the Name field has
+                        not been provided. If this field is used, the name returned
+                        to the client will be different than the name passed. This
+                        value will also be combined with a unique suffix. The provided
+                        value has the same validation rules as the Name field, and
+                        may be truncated by the length of the suffix required to make
+                        the value unique on the server. \n Applied only if Name is
+                        not specified."
+                      type: string
+                    image:
+                      description: Defines image to override. Will override the first
+                        container's image of the pod.
+                      type: string
                     labels:
                       additionalProperties:
                         type: string

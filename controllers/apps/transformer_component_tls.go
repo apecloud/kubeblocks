@@ -39,7 +39,9 @@ import (
 )
 
 // componentTLSTransformer handles component configuration render
-type componentTLSTransformer struct{}
+type componentTLSTransformer struct {
+	client.Client
+}
 
 var _ graph.Transformer = &componentTLSTransformer{}
 
@@ -57,7 +59,7 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return err
 	}
 
-	if err := checkAndTriggerReRender(transCtx.Context, transCtx.Client, *synthesizedComp, dag); err != nil {
+	if err := checkAndTriggerReRender(transCtx.Context, *synthesizedComp, t.Client); err != nil {
 		return err
 	}
 
@@ -65,7 +67,7 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 }
 
 // a hack way to notify the configuration controller to re-render config
-func checkAndTriggerReRender(ctx context.Context, cli client.Reader, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
+func checkAndTriggerReRender(ctx context.Context, synthesizedComp component.SynthesizedComponent, cli client.Client) error {
 	cm := &corev1.ConfigMap{}
 	if len(synthesizedComp.ConfigTemplates) == 0 {
 		return nil
@@ -121,8 +123,9 @@ func checkAndTriggerReRender(ctx context.Context, cli client.Reader, synthesized
 		// thread2: patch configuration(id: 1001)
 		// thread1: submit configuration
 		// result: thread2's update will be lost
-		graphCli, _ := cli.(model.GraphClient)
-		graphCli.Update(dag, conf, confCopy)
+		// graphCli, _ := cli.(model.GraphClient)
+		// graphCli.Update(dag, conf, confCopy)
+		return cli.Patch(ctx, confCopy, client.MergeFrom(conf.DeepCopy()))
 	}
 
 	return nil

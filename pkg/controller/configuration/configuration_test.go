@@ -104,6 +104,10 @@ func newAllFieldsComponent(clusterDef *appsv1alpha1.ClusterDefinition,
 	Expect(err).Should(Succeed())
 	Expect(synthesizeComp).ShouldNot(BeNil())
 	addTestVolumeMount(synthesizeComp.PodSpec, mysqlCompName)
+	if len(synthesizeComp.ConfigTemplates) > 0 {
+		configSpec := &synthesizeComp.ConfigTemplates[0]
+		configSpec.ReRenderResourceTypes = []appsv1alpha1.RerenderResourceType{appsv1alpha1.ComponentResourceType, appsv1alpha1.ComponentReplicasType}
+	}
 	return synthesizeComp
 }
 

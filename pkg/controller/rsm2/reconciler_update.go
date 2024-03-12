@@ -267,7 +267,7 @@ func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 			continue
 		}
 		newPod := replicaList[newReplicaMap[pod.Name]].pod
-		if pod.Labels[apps.ControllerRevisionHashLabelKey] != newPod.Labels[apps.ControllerRevisionHashLabelKey] && !isTerminating(pod) {
+		if getPodRevision(pod) != getPodRevision(newPod) && !isTerminating(pod) {
 			if err = tree.Delete(pod); err != nil {
 				return err
 			}
@@ -416,7 +416,7 @@ func buildReplicas(rsm *workloads.ReplicatedStateMachine) ([]replica, error) {
 			count = 1
 		}
 		podNameCount[r.pod.GetName()] = count
-		updatedRevisions[r.pod.GetName()] = r.pod.GetLabels()[apps.ControllerRevisionHashLabelKey]
+		updatedRevisions[r.pod.GetName()] = getPodRevision(r.pod)
 	}
 	dupNames := ""
 	for name, count := range podNameCount {
@@ -429,7 +429,7 @@ func buildReplicas(rsm *workloads.ReplicatedStateMachine) ([]replica, error) {
 	}
 
 	rsm.Status.UpdateRevisions = updatedRevisions
-	rsm.Status.UpdateRevision = replicaList[len(replicaList)-1].pod.GetLabels()[apps.ControllerRevisionHashLabelKey]
+	rsm.Status.UpdateRevision = getPodRevision(replicaList[len(replicaList)-1].pod)
 
 	return replicaList, nil
 }
@@ -483,7 +483,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
 		// check pod update by revision
-		if newPod.Labels[apps.ControllerRevisionHashLabelKey] == oldPod.Labels[apps.ControllerRevisionHashLabelKey] {
+		if getPodRevision(newPod) == getPodRevision(oldPod) {
 			return nil
 		}
 

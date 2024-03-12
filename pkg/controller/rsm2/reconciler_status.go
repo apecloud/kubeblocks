@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
-	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -88,7 +87,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		}
 		if isCreated(pod) && !isTerminating(pod) {
 			switch revision, ok := rsm.Status.UpdateRevisions[pod.Name]; {
-			case !ok, revision != pod.Labels[apps.ControllerRevisionHashLabelKey]:
+			case !ok, revision != getPodRevision(pod):
 				currentReplicas++
 			default:
 				updatedReplicas++

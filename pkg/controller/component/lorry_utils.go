@@ -366,7 +366,8 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	}
 
 	if synthesizeComp.LifecycleActions.RoleProbe != nil {
-		if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
+		if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil &&
+			*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != appsv1alpha1.UnknownBuiltinActionHandler {
 			return *synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
 		} else {
 			return appsv1alpha1.CustomActionHandler

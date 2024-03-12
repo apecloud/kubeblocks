@@ -37,6 +37,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -232,6 +233,23 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 			Ctx:      ctx,
 			Log:      log.FromContext(ctx).WithValues("policy_test", testName),
 			Recorder: record.NewFakeRecorder(100),
+		},
+		SynthesizedComponent: &component.SynthesizedComponent{
+			MinReadySeconds: 5,
+			Roles: []appsv1alpha1.ReplicaRole{
+				{
+					Name:        "leader",
+					Serviceable: true,
+					Writable:    true,
+					Votable:     true,
+				},
+				{
+					Name:        "follower",
+					Serviceable: true,
+					Writable:    false,
+					Votable:     true,
+				},
+			},
 		},
 		Cluster: &appsv1alpha1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{

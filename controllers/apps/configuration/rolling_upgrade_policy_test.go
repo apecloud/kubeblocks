@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -232,16 +233,16 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 	})
 
 	// TODO(component)
-	PContext("rolling reconfigure policy test for not supported component", func() {
-		It("Should failed", func() {
-			// not supported type
-			_ = mockParam
-			k8sMockClient.MockListMethod(testutil.WithSucceed(testutil.WithTimes(0)))
-
-			status, err := rollingPolicy.Upgrade(createReconfigureParam(appsv1alpha1.Stateless, defaultReplica))
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("not supported component workload type"))
-			Expect(status.Status).Should(BeEquivalentTo(ESNotSupport))
-		})
-	})
+	// PContext("rolling reconfigure policy test for not supported component", func() {
+	// 	It("Should failed", func() {
+	// 		// not supported type
+	// 		_ = mockParam
+	// 		k8sMockClient.MockListMethod(testutil.WithSucceed(testutil.WithTimes(0)))
+	//
+	// 		status, err := rollingPolicy.Upgrade(createReconfigureParam(appsv1alpha1.Stateless, defaultReplica))
+	// 		Expect(err).ShouldNot(Succeed())
+	// 		Expect(err.Error()).Should(ContainSubstring("not supported component workload type"))
+	// 		Expect(status.Status).Should(BeEquivalentTo(ESNotSupport))
+	// 	})
+	// })
 })

@@ -31,7 +31,13 @@ import (
 
 // ReadObjectTree reads all objects owned by the root object which is type of 'T' with key in 'req'.
 func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, req ctrl.Request, labelKeys []string, kinds ...client.ObjectList) (*ObjectTree, error) {
-	root := *new(T)
+	var obj T
+	t := reflect.TypeOf(obj)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	rootObj := reflect.New(t).Interface()
+	root, _ := rootObj.(T)
 	if err := reader.Get(ctx, req.NamespacedName, root); err != nil {
 		return nil, err
 	}

@@ -177,7 +177,7 @@ func IsReconciliationPaused(object client.Object) bool {
 	if !spec.IsValid() {
 		return false
 	}
-	paused := value.FieldByName("Paused")
+	paused := spec.FieldByName("Paused")
 	if !paused.IsValid() {
 		return false
 	}

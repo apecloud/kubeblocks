@@ -112,15 +112,15 @@ func handleNoneWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 		newSnapshot[*name] = object
 	}
 	oldSnapshot := make(map[model.GVKNObjKey]client.Object)
-	for _, child := range tree.Children {
-		_, isSvc := child.(*corev1.Service)
-		_, isCm := child.(*corev1.Service)
-		if isSvc || isCm {
-			name, err := model.GetGVKName(child)
+	svcList := tree.List(&corev1.Service{})
+	cmList := tree.List(&corev1.ConfigMap{})
+	for _, objectList := range [][]client.Object{svcList, cmList} {
+		for _, object := range objectList {
+			name, err := model.GetGVKName(object)
 			if err != nil {
 				return err
 			}
-			oldSnapshot[*name] = child
+			oldSnapshot[*name] = object
 		}
 	}
 	// now compute the diff between old and target snapshot and generate the plan
@@ -347,8 +347,10 @@ func buildReplicas(rsm *workloads.ReplicatedStateMachine) ([]replica, error) {
 	envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
 	defaultTemplate := rsm1.BuildPodTemplate(rsm, envConfigName)
 	buildPodTemplateExt := func(replicas int32) *podTemplateSpecExt {
-		claims := make([]corev1.PersistentVolumeClaim, len(rsm.Spec.VolumeClaimTemplates))
-		copy(claims, rsm.Spec.VolumeClaimTemplates)
+		var claims []corev1.PersistentVolumeClaim
+		for _, template := range rsm.Spec.VolumeClaimTemplates {
+			claims = append(claims, *template.DeepCopy())
+		}
 		return &podTemplateSpecExt{
 			Replicas:             replicas,
 			PodTemplateSpec:      *defaultTemplate.DeepCopy(),

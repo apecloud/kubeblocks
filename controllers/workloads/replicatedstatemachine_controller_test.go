@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package workloads
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +35,16 @@ import (
 )
 
 var _ = Describe("ReplicatedStateMachine Controller", func() {
-	Context("reconciliation", func() {
+	Context("reconciliation with ReplicaProvider=StatefulSet", func() {
+		var replicaProvider string
+		BeforeEach(func() {
+			replicaProvider = viper.GetString(rsm2.FeatureGateRSMReplicaProvider)
+			viper.Set(rsm2.FeatureGateRSMReplicaProvider, string(rsm2.StatefulSetProvider))
+		})
+		AfterEach(func() {
+			viper.Set(rsm2.FeatureGateRSMReplicaProvider, replicaProvider)
+		})
+
 		It("should reconcile well", func() {
 			name := "test-stateful-replica-set"
 			port := int32(12345)

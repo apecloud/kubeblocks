@@ -33,7 +33,7 @@ const (
 	// Planned supported replica providers include OpenKruise Advanced StatefulSet and KB Replica.
 	FeatureGateRSMReplicaProvider = "RSM_REPLICA_PROVIDER"
 
-	defaultReplicaProvider = StatefulSetProvider
+	defaultReplicaProvider = PodProvider
 
 	reasonBuildPods = "BuildPods"
 )

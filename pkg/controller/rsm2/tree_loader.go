@@ -36,9 +36,9 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-type treeReader struct{}
+type treeLoader struct{}
 
-func (r *treeReader) Read(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
+func (r *treeLoader) Read(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
 	keys := getMatchLabelKeys()
 	kinds := ownedKinds()
 	tree, err := kubebuilderx.ReadObjectTree[*workloads.ReplicatedStateMachine](ctx, reader, req, keys, kinds...)
@@ -77,8 +77,8 @@ func ownedKinds() []client.ObjectList {
 	}
 }
 
-func NewTreeReader() kubebuilderx.TreeReader {
-	return &treeReader{}
+func NewTreeReader() kubebuilderx.TreeLoader {
+	return &treeLoader{}
 }
 
-var _ kubebuilderx.TreeReader = &treeReader{}
+var _ kubebuilderx.TreeLoader = &treeLoader{}

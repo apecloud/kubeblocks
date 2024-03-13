@@ -41,7 +41,7 @@ type ObjectTree struct {
 	children model.ObjectSnapshot
 }
 
-type TreeReader interface {
+type TreeLoader interface {
 	Read(context.Context, client.Reader, ctrl.Request, record.EventRecorder, logr.Logger) (*ObjectTree, error)
 }
 

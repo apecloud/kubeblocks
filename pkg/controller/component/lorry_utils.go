@@ -447,6 +447,10 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 		actions[constant.RoleProbeAction] = &synthesizeComp.LifecycleActions.RoleProbe.LifecycleActionHandler
 	}
 
+	if synthesizeComp.LifecycleActions.HealthyCheck != nil {
+		actions[constant.HealthyCheckAction] = &synthesizeComp.LifecycleActions.HealthyCheck.LifecycleActionHandler
+	}
+
 	var toolImage string
 	var containerName string
 	actionCommands := map[string][]string{}

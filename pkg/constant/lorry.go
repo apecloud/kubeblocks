@@ -31,6 +31,7 @@ const (
 // action keys
 const (
 	RoleProbeAction     = "roleProbe"
+	HealthyCheckAction  = "healthyCheck"
 	MemberJoinAction    = "memberJoin"
 	MemberLeaveAction   = "memberLeave"
 	ReadonlyAction      = "readonly"

@@ -21,12 +21,14 @@ package replica
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
@@ -64,12 +66,6 @@ func (s *CheckStatus) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-
 	s.failedEventReportFrequency = viper.GetInt("KB_FAILED_EVENT_REPORT_FREQUENCY")
 	if s.failedEventReportFrequency < 300 {
 		s.failedEventReportFrequency = 300
@@ -79,6 +75,25 @@ func (s *CheckStatus) Init(ctx context.Context) error {
 
 	s.FailureThreshold = 3
 	s.logger = ctrl.Log.WithName("checkstatus")
+	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	if actionJSON != "" {
+		actionCommands := map[string][]string{}
+		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
+		if err != nil {
+			s.logger.Info("get action commands failed", "error", err.Error())
+			return err
+		}
+		healthyCheckCmd, ok := actionCommands[constant.HealthyCheckAction]
+		if ok && len(healthyCheckCmd) > 0 {
+			s.Command = healthyCheckCmd
+		}
+	}
+	dbManager, err := register.GetDBManager(s.Command)
+	if err != nil {
+		return errors.Wrap(err, "get manager failed")
+	}
+	s.dbManager = dbManager
+
 	return nil
 }
 

@@ -36,6 +36,7 @@ type Operation interface {
 
 type Base struct {
 	Timeout time.Duration
+	Command []string
 }
 
 func (b *Base) Init(ctx context.Context) error {

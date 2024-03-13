@@ -397,6 +397,14 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		}
 	}
 
+	if synthesizeComp.LifecycleActions.HealthyCheck != nil {
+		if synthesizeComp.LifecycleActions.HealthyCheck.BuiltinHandler != nil {
+			return *synthesizeComp.LifecycleActions.HealthyCheck.BuiltinHandler
+		} else {
+			return appsv1alpha1.CustomActionHandler
+		}
+	}
+
 	actions := []*appsv1alpha1.LifecycleActionHandler{
 		synthesizeComp.LifecycleActions.PostProvision,
 		synthesizeComp.LifecycleActions.PreTerminate,

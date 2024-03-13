@@ -185,6 +185,29 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 	return err
 }
 
+// CurrentMemberHealthCheck provides the following dedicated environment variables for the action:
+//
+// - KB_POD_FQDN: The FQDN of the replica pod to check the role.
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+func (mgr *Manager) CurrentMemberHealthCheck(ctx context.Context, cluster *dcs.Cluster) error {
+	healthyCheckCmd, ok := mgr.actionCommands[constant.HealthyCheckAction]
+	if !ok || len(healthyCheckCmd) == 0 {
+		return errors.New("member healthyCheck command is empty!")
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+	output, err := util.ExecCommand(ctx, healthyCheckCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("member healthy check", "output", output)
+	}
+	return err
+}
+
 // Lock provides the following dedicated environment variables for the action:
 //
 // - KB_POD_FQDN: The FQDN of the replica pod to check the role.

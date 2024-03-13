@@ -106,9 +106,11 @@ func (mgr *Manager) GetReplicaRoleThroughASMAction(ctx context.Context, cluster 
 	return parseCSV(finalOutput)
 }
 
-// callAction performs an HTTP request to local HTTP endpoint specified by actionSvcPort
+// callAction sends an HTTP POST request to the specified URL and returns the response body.
+// It takes a context.Context and the URL as input parameters.
+// The function returns the response body as a byte slice and an error if any.
 func (mgr *Manager) callAction(ctx context.Context, url string) ([]byte, error) {
-	// compose http request
+	// construct http request
 	request, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
 		return nil, err

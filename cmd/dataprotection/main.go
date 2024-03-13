@@ -24,6 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -33,7 +34,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	discoverycli "k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -71,7 +72,7 @@ const (
 )
 
 var (
-	scheme   = runtime.NewScheme()
+	scheme   = k8sruntime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
 
@@ -99,6 +100,7 @@ func init() {
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(dptypes.CfgKeyGCFrequencySeconds, dptypes.DefaultGCFrequencySeconds)
+	viper.SetDefault(dptypes.CfgDataProtectionReconcileWorkers, runtime.NumCPU())
 }
 
 func main() {
@@ -165,7 +167,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,

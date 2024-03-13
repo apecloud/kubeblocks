@@ -26,6 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -118,4 +120,17 @@ func SetOwnerReference(owner, object metav1.Object) error {
 
 func SetControllerReference(owner, object metav1.Object) error {
 	return controllerutil.SetControllerReference(owner, object, innerScheme)
+}
+
+func GeKubeRestConfig() *rest.Config {
+	cfg := ctrl.GetConfigOrDie()
+	clientQPS := viper.GetInt(constant.CfgClientQPS)
+	if clientQPS != 0 {
+		cfg.QPS = float32(clientQPS)
+	}
+	clientBurst := viper.GetInt(constant.CfgClientBurst)
+	if clientBurst != 0 {
+		cfg.Burst = clientBurst
+	}
+	return cfg
 }

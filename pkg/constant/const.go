@@ -51,6 +51,8 @@ const (
 	CfgKeyDPEncryptionKey = "DP_ENCRYPTION_KEY"
 
 	CfgKBReconcileWorkers = "KUBEBLOCKS_RECONCILE_WORKERS"
+	CfgClientQPS          = "CLIENT_QPS"
+	CfgClientBurst        = "CLIENT_BURST"
 )
 
 const (

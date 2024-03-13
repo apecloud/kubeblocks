@@ -31,6 +31,13 @@ replicaCount: 1
 ##
 reconcileWorkers: ""
 
+## k8s client configuration.
+client:
+  # default is 20
+  qps: ""
+  # default is 30
+  burst: ""
+
 ## @param nameOverride
 ##
 nameOverride: ""
@@ -311,7 +318,8 @@ dataProtection:
   # if 'get/list' role of the backup CR are compromised.
   encryptionKey: ""
   gcFrequencySeconds: 3600
-
+  ## MaxConcurrentReconciles for backup controller.
+  reconcileWorkers: ""
   image:
     # if the value of dataProtection.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
     registry: ""

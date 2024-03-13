@@ -50,6 +50,11 @@ const (
 	ReconfigureRefAnnotationKey = "dataprotection.kubeblocks.io/reconfigure-ref"
 )
 
+const (
+	// CfgDataProtectionReconcileWorkers the max reconcile workers for MaxConcurrentReconciles
+	CfgDataProtectionReconcileWorkers = "DATAPROTECTION_RECONCILE_WORKERS"
+)
+
 // label keys
 const (
 	// ClusterUIDLabelKey specifies the cluster UID label key.

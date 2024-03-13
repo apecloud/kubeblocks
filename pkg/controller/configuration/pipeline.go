@@ -24,7 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -110,14 +109,10 @@ func (p *pipeline) RenderScriptTemplate() *pipeline {
 func (p *pipeline) UpdateConfiguration() *pipeline {
 	buildConfiguration := func() (err error) {
 		expectedConfiguration := p.createConfiguration()
-		comp, err := p.getComponent()
-		if err != nil {
-			return err
-		}
-		if intctrlutil.SetControllerReference(comp, expectedConfiguration) != nil {
+		if intctrlutil.SetControllerReference(p.ctx.Component, expectedConfiguration) != nil {
 			return
 		}
-		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.Component)
+		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.SynthesizedComponent)
 
 		existingConfiguration := appsv1alpha1.Configuration{}
 		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectedConfiguration), &existingConfiguration)
@@ -131,15 +126,6 @@ func (p *pipeline) UpdateConfiguration() *pipeline {
 		}
 	}
 	return p.Wrap(buildConfiguration)
-}
-
-func (p *pipeline) getComponent() (*appsv1alpha1.Component, error) {
-	comp := &appsv1alpha1.Component{}
-	err := p.Client.Get(p.ctx.Context, types.NamespacedName{Name: p.ctx.SynthesizedComponent.FullCompName, Namespace: p.ctx.Cluster.Namespace}, comp)
-	if err != nil {
-		return nil, core.MakeError("get component %s failed: %v", p.ctx.SynthesizedComponent.FullCompName, err)
-	}
-	return comp, nil
 }
 
 func (p *pipeline) CreateConfigTemplate() *pipeline {

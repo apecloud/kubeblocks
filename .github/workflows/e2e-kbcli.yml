@@ -27,10 +27,11 @@ on:
           - gke
           - eks
           - aks
+          - aks-cn
       CLUSTER_VERSION:
-        description: 'k8s cluster version (e.g. 1.26)'
+        description: 'k8s cluster version'
         required: false
-        default: '1.26'
+        default: '1.27'
         type: choice
         options:
           - 1.29
@@ -89,6 +90,8 @@ jobs:
               CLUSTER_REGION="${{ vars.REGION_GCP_GKE }}"
           elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'aks' && -z "$CLUSTER_REGION" ]]; then
               CLUSTER_REGION="${{ vars.REGION_AZURE_AKS }}"
+          elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'aks-cn' && -z "$CLUSTER_REGION" ]]; then
+              CLUSTER_REGION="${{ vars.REGION_AZURE_CN_AKS }}"
           fi
           echo cluster-region=$CLUSTER_REGION >> $GITHUB_OUTPUT
 

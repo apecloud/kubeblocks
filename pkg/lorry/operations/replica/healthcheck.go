@@ -64,7 +64,7 @@ func (s *CheckStatus) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
-	dbManager, err := register.GetDBManager()
+	dbManager, err := register.GetDBManager(nil)
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}

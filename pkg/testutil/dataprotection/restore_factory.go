@@ -42,6 +42,11 @@ func NewRestoreFactory(namespace, name string) *MockRestoreFactory {
 	return f
 }
 
+func (f *MockRestoreFactory) SetNamespace(namespace string) *MockRestoreFactory {
+	f.Get().Namespace = namespace
+	return f
+}
+
 func (f *MockRestoreFactory) SetBackup(name, namespace string) *MockRestoreFactory {
 	f.Get().Spec.Backup = dpv1alpha1.BackupRef{
 		Name:      name,

@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -162,6 +163,9 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 
 		return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
+			WithOptions(controller.Options{
+				MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
+			}).
 			Watches(&appsv1.StatefulSet{}, stsHandler).
 			Watches(&batchv1.Job{}, jobHandler).
 			Watches(&corev1.Pod{}, podHandler).
@@ -176,6 +180,9 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		podHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 		return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
+			WithOptions(controller.Options{
+				MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
+			}).
 			Watches(&batchv1.Job{}, jobHandler).
 			Watches(&corev1.Pod{}, podHandler).
 			Complete(r)
@@ -186,6 +193,9 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 	podHandler := handler.NewBuilder(ctx).AddFinder(stsOwnerFinder).AddFinder(rsmOwnerFinder).Build()
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&workloads.ReplicatedStateMachine{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
+		}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
 		Watches(&corev1.Pod{}, podHandler).

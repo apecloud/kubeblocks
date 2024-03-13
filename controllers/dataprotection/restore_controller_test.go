@@ -44,6 +44,8 @@ import (
 )
 
 var _ = Describe("Restore Controller test", func() {
+	const namespace2 = "test2"
+
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -51,24 +53,30 @@ var _ = Describe("Restore Controller test", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete rest mocked objects
-		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
-		// namespaced
-		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
+		cleanNamespaced := func(namespace string) {
+			// delete rest mocked objects
+			inNS := client.InNamespace(namespace)
 
-		// wait all backup to be deleted, otherwise the controller maybe create
-		// job to delete the backup between the ClearResources function delete
-		// the job and get the job list, resulting the ClearResources panic.
-		Eventually(testapps.List(&testCtx, generics.BackupSignature, inNS)).Should(HaveLen(0))
+			// namespaced
+			testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+			testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
+			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RestoreSignature, true, inNS)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
-		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
+			// wait all backup to be deleted, otherwise the controller maybe create
+			// job to delete the backup between the ClearResources function delete
+			// the job and get the job list, resulting the ClearResources panic.
+			Eventually(testapps.List(&testCtx, generics.BackupSignature, inNS)).Should(HaveLen(0))
+
+			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
+			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RestoreSignature, true, inNS)
+			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
+			testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
+		}
+
+		cleanNamespaced(testCtx.DefaultNamespace)
+		cleanNamespaced(namespace2)
 
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
@@ -78,8 +86,23 @@ var _ = Describe("Restore Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 	}
 
+	ensureNamespace := func(name string) {
+		Eventually(func(g Gomega) {
+			obj := &corev1.Namespace{}
+			obj.Name = name
+			err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(obj), &corev1.Namespace{})
+			if err == nil {
+				return
+			}
+			g.Expect(client.IgnoreNotFound(err)).Should(Succeed())
+			err = testCtx.Cli.Create(testCtx.Ctx, obj)
+			g.Expect(err).Should(Succeed())
+		}).Should(Succeed())
+	}
+
 	BeforeEach(func() {
 		cleanEnv()
+		ensureNamespace(namespace2)
 	})
 
 	AfterEach(func() {
@@ -88,6 +111,7 @@ var _ = Describe("Restore Controller test", func() {
 
 	When("restore controller test", func() {
 		var (
+			repo        *dpv1alpha1.BackupRepo
 			repoPVCName string
 			actionSet   *dpv1alpha1.ActionSet
 			nodeName    = "minikube"
@@ -101,7 +125,7 @@ var _ = Describe("Restore Controller test", func() {
 			_ = testdp.NewFakeStorageProvider(&testCtx, nil)
 
 			By("creating a backupRepo")
-			_, repoPVCName = testdp.NewFakeBackupRepo(&testCtx, nil)
+			repo, repoPVCName = testdp.NewFakeBackupRepo(&testCtx, nil)
 		})
 
 		initResourcesAndWaitRestore := func(
@@ -111,7 +135,7 @@ var _ = Describe("Restore Controller test", func() {
 			expectRestorePhase dpv1alpha1.RestorePhase,
 			change func(f *testdp.MockRestoreFactory)) *dpv1alpha1.Restore {
 			By("create a completed backup")
-			backup := mockBackupForRestore(actionSet.Name, repoPVCName, mockBackupCompleted, useVolumeSnapshot)
+			backup := mockBackupForRestore(actionSet.Name, repo.Name, repoPVCName, mockBackupCompleted, useVolumeSnapshot)
 
 			By("create restore ")
 			schedulingSpec := dpv1alpha1.SchedulingSpec{
@@ -351,10 +375,20 @@ var _ = Describe("Restore Controller test", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(restore), restore, false)).Should(Succeed())
 			})
 		})
+
+		Context("test cross namespace", func() {
+			It("should wait for preparation of backup repo", func() {
+				By("creating a restore in a different namespace from backup")
+				initResourcesAndWaitRestore(true, false, true, dpv1alpha1.RestorePhaseRunning,
+					func(f *testdp.MockRestoreFactory) {
+						f.SetNamespace(namespace2)
+					})
+			})
+		})
 	})
 })
 
-func mockBackupForRestore(actionSetName, backupPVCName string, mockBackupCompleted, useVolumeSnapshotBackup bool) *dpv1alpha1.Backup {
+func mockBackupForRestore(actionSetName, repoName, backupPVCName string, mockBackupCompleted, useVolumeSnapshotBackup bool) *dpv1alpha1.Backup {
 	backup := testdp.NewFakeBackup(&testCtx, nil)
 	// wait for backup is failed by backup controller.
 	// it will be failed if the backupPolicy is not created.
@@ -370,6 +404,7 @@ func mockBackupForRestore(actionSetName, backupPVCName string, mockBackupComplet
 		}
 		Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 			backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+			backup.Status.BackupRepoName = repoName
 			backup.Status.PersistentVolumeClaimName = backupPVCName
 			testdp.MockBackupStatusMethod(backup, backupMethodName, testdp.DataVolumeName, actionSetName)
 		})).Should(Succeed())

@@ -78,7 +78,7 @@ func (s *CheckRunning) Init(ctx context.Context) error {
 }
 
 func (s *CheckRunning) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager()
+	manager, err := register.GetDBManager(nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "get manager failed")
 	}

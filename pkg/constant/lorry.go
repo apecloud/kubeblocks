@@ -27,3 +27,17 @@ const (
 	ETCDCharacterType       = "etcd"
 	PolarDBXCharacterType   = "polardbx"
 )
+
+// action keys
+const (
+	RoleProbeAction     = "roleProbe"
+	MemberJoinAction    = "memberJoin"
+	MemberLeaveAction   = "memberLeave"
+	ReadonlyAction      = "readonly"
+	ReadWriteAction     = "readwrite"
+	PostProvisionAction = "postProvision"
+	PreTerminateAction  = "preTerminate"
+)
+
+// action envs
+const ()

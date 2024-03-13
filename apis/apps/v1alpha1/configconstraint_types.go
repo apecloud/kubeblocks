@@ -391,17 +391,3 @@ type ConfigConstraintList struct {
 func init() {
 	SchemeBuilder.Register(&ConfigConstraint{}, &ConfigConstraintList{})
 }
-
-func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
-	if in.DynamicActionCanBeMerged != nil {
-		return !*in.DynamicActionCanBeMerged
-	}
-	return false
-}
-
-func (in *ConfigConstraintSpec) DynamicParametersPolicy() DynamicParameterSelectedPolicy {
-	if in.DynamicParameterSelectedPolicy != nil {
-		return *in.DynamicParameterSelectedPolicy
-	}
-	return SelectedDynamicParameters
-}

@@ -85,7 +85,7 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 			Do(rsm2.NewDeletionReconciler()).
 			Do(rsm2.NewUpdateReconciler()).
 			Do(rsm2.NewStatusReconciler()).
-			Commit(r.Client)
+			Commit()
 		return ctrl.Result{}, err
 	}
 

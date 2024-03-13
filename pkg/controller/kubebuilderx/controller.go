@@ -48,12 +48,12 @@ import (
 type Controller interface {
 	Prepare(reader TreeReader) Controller
 	Do(...Reconciler) Controller
-	Commit(writer client.Client) error
+	Commit() error
 }
 
 type controller struct {
 	ctx      context.Context
-	reader   client.Reader
+	cli      client.Client
 	req      ctrl.Request
 	recorder record.EventRecorder
 	logger   logr.Logger
@@ -65,7 +65,7 @@ type controller struct {
 }
 
 func (c *controller) Prepare(reader TreeReader) Controller {
-	c.oldTree, c.err = reader.Read(c.ctx, c.reader, c.req, c.recorder, c.logger)
+	c.oldTree, c.err = reader.Read(c.ctx, c.cli, c.req, c.recorder, c.logger)
 	if c.err != nil {
 		return c
 	}
@@ -96,14 +96,14 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 	return c
 }
 
-func (c *controller) Commit(writer client.Client) error {
+func (c *controller) Commit() error {
 	if c.err != nil {
 		return c.err
 	}
 	if c.oldTree.GetRoot() == nil {
 		return nil
 	}
-	builder := NewPlanBuilder(c.ctx, writer, c.oldTree, c.tree)
+	builder := NewPlanBuilder(c.ctx, c.cli, c.oldTree, c.tree)
 	if err := builder.Init(); err != nil {
 		return err
 	}
@@ -115,10 +115,10 @@ func (c *controller) Commit(writer client.Client) error {
 	return plan.Execute()
 }
 
-func NewController(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) Controller {
+func NewController(ctx context.Context, cli client.Client, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) Controller {
 	return &controller{
 		ctx:      ctx,
-		reader:   reader,
+		cli:      cli,
 		req:      req,
 		recorder: recorder,
 		logger:   logger,

@@ -38,7 +38,7 @@ func NewStatusReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
+	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
 	return kubebuilderx.ResultSatisfied
@@ -46,11 +46,6 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
-	if model.IsObjectUpdating(rsm) {
-		rsm.Status.ObservedGeneration = rsm.Generation
-		return tree, nil
-	}
-
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
 	var podList []corev1.Pod

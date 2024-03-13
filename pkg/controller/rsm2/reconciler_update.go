@@ -78,7 +78,19 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	}
 
 	// handle workload objects(i.e. pod and pvc)
-	return tree, handleWorkloadObjectUpdate(tree)
+	if err := handleWorkloadObjectUpdate(tree); err != nil {
+		return nil, err
+	}
+
+	// update observed generation
+	updateObservedGeneration(tree)
+
+	return tree, nil
+}
+
+func updateObservedGeneration(tree *kubebuilderx.ObjectTree) {
+	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
+	rsm.Status.ObservedGeneration = rsm.Generation
 }
 
 func handleNoneWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {

@@ -10028,15 +10028,6 @@ spec:
                             maxLength: 16
                             pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
-                          serviceVersion:
-                            description: ServiceVersion specifies the service version
-                              associated with the referenced component definition.
-                              This field helps in determining the appropriate version
-                              of the component definition, considering multiple available
-                              versions. If not explicitly specified, the latest available
-                              version will be used.
-                            maxLength: 32
-                            type: string
                         required:
                         - compDef
                         - name

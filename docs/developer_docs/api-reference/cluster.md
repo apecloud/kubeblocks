@@ -6217,20 +6217,6 @@ string
 Cannot be updated.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>serviceVersion</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServiceVersion specifies the service version associated with the referenced component definition.
-This field helps in determining the appropriate version of the component definition, considering multiple available versions.
-If not explicitly specified, the latest available version will be used.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopologyOrders">ClusterTopologyOrders

@@ -202,9 +202,8 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				Default: true,
 				Components: []appsv1alpha1.ClusterTopologyComponent{
 					{
-						Name:           "server",
-						CompDef:        compDefinitionName,
-						ServiceVersion: "",
+						Name:    "server",
+						CompDef: compDefinitionName,
 					},
 				},
 				Orders: &appsv1alpha1.ClusterTopologyOrders{},
@@ -214,19 +213,16 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				Default: false,
 				Components: []appsv1alpha1.ClusterTopologyComponent{
 					{
-						Name:           "proxy",
-						CompDef:        compDefinitionName,
-						ServiceVersion: "",
+						Name:    "proxy",
+						CompDef: compDefinitionName,
 					},
 					{
-						Name:           "server",
-						CompDef:        compDefinitionName,
-						ServiceVersion: "",
+						Name:    "server",
+						CompDef: compDefinitionName,
 					},
 					{
-						Name:           "storage",
-						CompDef:        compDefinitionName,
-						ServiceVersion: "",
+						Name:    "storage",
+						CompDef: compDefinitionName,
 					},
 				},
 				Orders: &appsv1alpha1.ClusterTopologyOrders{

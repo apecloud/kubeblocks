@@ -88,18 +88,14 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 	cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	newCompSpec := func(comp appsv1alpha1.ClusterTopologyComponent) *appsv1alpha1.ClusterComponentSpec {
 		return &appsv1alpha1.ClusterComponentSpec{
-			Name:           comp.Name,
-			ComponentDef:   comp.CompDef,
-			ServiceVersion: comp.ServiceVersion,
+			Name:         comp.Name,
+			ComponentDef: comp.CompDef,
 		}
 	}
 
 	mergeCompSpec := func(comp appsv1alpha1.ClusterTopologyComponent, compSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.ClusterComponentSpec {
 		if len(compSpec.ComponentDef) == 0 {
 			compSpec.ComponentDef = comp.CompDef
-		}
-		if len(compSpec.ServiceVersion) == 0 {
-			compSpec.ServiceVersion = comp.ServiceVersion
 		}
 		return compSpec
 	}

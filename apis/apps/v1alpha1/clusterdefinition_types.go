@@ -121,14 +121,6 @@ type ClusterTopologyComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=64
 	CompDef string `json:"compDef"`
-
-	// ServiceVersion specifies the service version associated with the referenced component definition.
-	// This field helps in determining the appropriate version of the component definition, considering multiple available versions.
-	// If not explicitly specified, the latest available version will be used.
-	//
-	// +kubebuilder:validation:MaxLength=32
-	// +optional
-	ServiceVersion string `json:"serviceVersion,omitempty"`
 }
 
 // ClusterTopologyOrders defines the orders for components within a topology.

@@ -23,6 +23,7 @@ import (
 	"context"
 	"reflect"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -31,6 +32,9 @@ import (
 
 // ReadObjectTree reads all objects owned by the root object which is type of 'T' with key in 'req'.
 func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, req ctrl.Request, labelKeys []string, kinds ...client.ObjectList) (*ObjectTree, error) {
+	tree := NewObjectTree()
+
+	// read root object
 	var obj T
 	t := reflect.TypeOf(obj)
 	if t.Kind() == reflect.Ptr {
@@ -39,12 +43,14 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 	rootObj := reflect.New(t).Interface()
 	root, _ := rootObj.(T)
 	if err := reader.Get(ctx, req.NamespacedName, root); err != nil {
+		if apierrors.IsNotFound(err) {
+			return tree, nil
+		}
 		return nil, err
 	}
-
-	tree := NewObjectTree()
 	tree.SetRoot(root)
 
+	// read child objects
 	ml := getMatchLabels(root, labelKeys)
 	inNS := client.InNamespace(req.Namespace)
 	for _, list := range kinds {

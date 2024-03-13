@@ -57,7 +57,7 @@ func NewUpdateReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if model.IsObjectDeleting(tree.GetRoot()) {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
 	if model.IsReconciliationPaused(tree.GetRoot()) {
@@ -161,16 +161,18 @@ func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 	// 2. sort replicas by pod name and role priority
 	priorities := rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
 	SortReplicas(replicaList, priorities, false)
-
 	newReplicaMap := make(map[string]int, len(replicaList))
 	for i := range replicaList {
 		newReplicaMap[replicaList[i].pod.Name] = i
 	}
+
 	oldReplicaList := tree.List(&corev1.Pod{})
+	SortObjects(oldReplicaList, priorities, false)
 	oldReplicaMap := make(map[string]int, len(oldReplicaList))
 	for i := range oldReplicaList {
 		oldReplicaMap[oldReplicaList[i].GetName()] = i
 	}
+
 	// now compute the diff between current and desired pods and generate the plan
 	oldNameSet := sets.KeySet(oldReplicaMap)
 	newNameSet := sets.KeySet(newReplicaMap)
@@ -195,14 +197,10 @@ func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 		}
 		for name := range deleteSet {
 			i := oldReplicaMap[name]
-			if err = tree.Delete(replicaList[i].pod); err != nil {
+			if err = tree.Delete(oldReplicaList[i]); err != nil {
 				return err
 			}
-			for _, pvc := range replicaList[i].pvcs {
-				if err = tree.Delete(pvc); err != nil {
-					return err
-				}
-			}
+			// TODO(free6om): handle pvc management policy
 		}
 	} else {
 		for i, r := range replicaList {

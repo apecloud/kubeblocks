@@ -22,6 +22,7 @@ package rsm2
 import (
 	"context"
 	"sort"
+	"strings"
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -88,24 +90,40 @@ func CurrentReplicaProvider(ctx context.Context, cli client.Reader, objectKey cl
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
 // reverse it if reverse==true
 func SortReplicas(replicas []replica, rolePriorityMap map[string]int, reverse bool) {
-	getRoleFunc := func(i int) string {
-		return rsm1.GetRoleName(*replicas[i].pod)
+	getRolePriorityFunc := func(i int) int {
+		role := rsm1.GetRoleName(*replicas[i].pod)
+		return rolePriorityMap[role]
 	}
 	getNameFunc := func(i int) string {
 		return replicas[i].pod.Name
 	}
-	sort.SliceStable(replicas, func(i, j int) bool {
+	baseSort(replicas, getNameFunc, getRolePriorityFunc, reverse)
+}
+
+func SortObjects(objects []client.Object, rolePriorityMap map[string]int, reverse bool) {
+	getRolePriorityFunc := func(i int) int {
+		role := strings.ToLower(objects[i].GetLabels()[constant.RoleLabelKey])
+		return rolePriorityMap[role]
+	}
+	getNameFunc := func(i int) string {
+		return objects[i].GetName()
+	}
+	baseSort(objects, getNameFunc, getRolePriorityFunc, reverse)
+}
+
+func baseSort(x any, getNameFunc func(i int) string, getRolePriorityFunc func(i int) int, reverse bool) {
+	sort.SliceStable(x, func(i, j int) bool {
 		if reverse {
 			i, j = j, i
 		}
-		roleI := getRoleFunc(i)
-		roleJ := getRoleFunc(j)
-		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
+		rolePriI := getRolePriorityFunc(i)
+		rolePriJ := getRolePriorityFunc(j)
+		if rolePriI == rolePriJ {
 			ordinal1 := getNameFunc(i)
 			ordinal2 := getNameFunc(j)
 			return ordinal1 < ordinal2
 		}
-		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
+		return rolePriI < rolePriJ
 	})
 }
 

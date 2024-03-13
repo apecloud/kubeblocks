@@ -35,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type updateReconciler struct{}
@@ -58,13 +57,13 @@ func NewUpdateReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if model.IsObjectDeleting(tree.Root) {
+	if model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
-	if model.IsReconciliationPaused(tree.Root) {
+	if model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
-	rsm, _ := tree.Root.(*workloads.ReplicatedStateMachine)
+	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 	if err := validateSpec(rsm); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
@@ -82,7 +81,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 }
 
 func handleNoneWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
-	rsm, _ := tree.Root.(*workloads.ReplicatedStateMachine)
+	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 
 	// generate objects by current spec
 	svc := rsm1.BuildSvc(*rsm)
@@ -152,7 +151,7 @@ func handleNoneWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 
 func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 	// 1. build desired replicas
-	rsm, _ := tree.Root.(*workloads.ReplicatedStateMachine)
+	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 	replicaList, err := buildReplicas(rsm)
 	if err != nil {
 		tree.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, err.Error())
@@ -181,6 +180,7 @@ func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 	deleteSet := oldNameSet.Difference(newNameSet)
 
 	// 3. handle scaling
+	// TODO(free6om): refine the following block
 	if rsm.Spec.PodManagementPolicy == apps.ParallelPodManagement {
 		for name := range createSet {
 			i := newReplicaMap[name]
@@ -209,7 +209,7 @@ func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 			if _, ok := createSet[r.pod.GetName()]; !ok {
 				continue
 			}
-			if i == 0 || controllerutil.IsAvailable(replicaList[i-1].pod, rsm.Spec.MinReadySeconds) {
+			if i == 0 || isRunningAndAvailable(replicaList[i-1].pod, rsm.Spec.MinReadySeconds) {
 				if err = tree.Add(r.pod); err != nil {
 					return err
 				}
@@ -226,7 +226,7 @@ func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 			if _, ok := deleteSet[pod.Name]; !ok {
 				continue
 			}
-			if controllerutil.IsAvailable(pod, rsm.Spec.MinReadySeconds) {
+			if isRunningAndAvailable(pod, rsm.Spec.MinReadySeconds) {
 				if err = tree.Delete(pod); err != nil {
 					return err
 				}
@@ -432,6 +432,18 @@ func buildReplicas(rsm *workloads.ReplicatedStateMachine) ([]replica, error) {
 
 	rsm.Status.UpdateRevisions = updatedRevisions
 	rsm.Status.UpdateRevision = getPodRevision(replicaList[len(replicaList)-1].pod)
+
+	// set ownership
+	for _, r := range replicaList {
+		if err := rsm1.SetOwnership(rsm, r.pod, model.GetScheme(), rsm1.GetFinalizer(r.pod)); err != nil {
+			return nil, err
+		}
+		for _, pvc := range r.pvcs {
+			if err := rsm1.SetOwnership(rsm, pvc, model.GetScheme(), rsm1.GetFinalizer(pvc)); err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	return replicaList, nil
 }

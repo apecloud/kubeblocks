@@ -136,6 +136,8 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 		return b.createObject(ctx, vertex)
 	case model.UPDATE:
 		return b.updateObject(ctx, vertex)
+	case model.PATCH:
+		return b.patchObject(ctx, vertex)
 	case model.DELETE:
 		return b.deleteObject(ctx, vertex)
 	case model.STATUS:
@@ -154,6 +156,15 @@ func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVert
 
 func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	err := b.cli.Update(ctx, vertex.Obj, rsm1.ClientOption(vertex))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	patch := client.MergeFrom(vertex.OriObj)
+	err := b.cli.Patch(ctx, vertex.Obj, patch, rsm1.ClientOption(vertex))
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}

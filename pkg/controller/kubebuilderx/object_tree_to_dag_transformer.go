@@ -20,11 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubebuilderx
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"reflect"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type objectTree2DAGTransformer struct {
@@ -36,11 +39,24 @@ func (t *objectTree2DAGTransformer) Transform(ctx graph.TransformContext, dag *g
 	// init context
 	transCtx, _ := ctx.(*transformContext)
 	cli, _ := transCtx.cli.(model.GraphClient)
-	// init dag
-	cli.Root(dag, t.current.Root, t.desired.Root, model.ActionStatusPtr())
+	// handle root object
+	if t.desired.GetRoot() == nil {
+		cli.Root(dag, t.current.GetRoot(), t.current.GetRoot(), model.ActionDeletePtr())
+	} else {
+		// if annotations, labels or finalizers updated, do both meta patch and status update.
+		if !reflect.DeepEqual(t.current.GetRoot().GetAnnotations(), t.desired.GetRoot().GetAnnotations()) ||
+			!reflect.DeepEqual(t.current.GetRoot().GetLabels(), t.desired.GetRoot().GetLabels()) ||
+			!reflect.DeepEqual(t.current.GetRoot().GetFinalizers(), t.desired.GetRoot().GetFinalizers()) {
+			currentRoot, _ := t.current.GetRoot().DeepCopyObject().(client.Object)
+			desiredRoot, _ := t.desired.GetRoot().DeepCopyObject().(client.Object)
+			cli.Do(dag, currentRoot, desiredRoot, model.ActionPatchPtr(), nil)
+		}
+		cli.Root(dag, t.current.GetRoot(), t.desired.GetRoot(), model.ActionStatusPtr())
+	}
 
-	oldSnapshot := t.current.Children
-	newSnapshot := t.desired.Children
+	// handle secondary objects
+	oldSnapshot := t.current.GetSecondaryObjects()
+	newSnapshot := t.desired.GetSecondaryObjects()
 
 	// now compute the diff between old and target snapshot and generate the plan
 	oldNameSet := sets.KeySet(oldSnapshot)
@@ -74,7 +90,7 @@ func (t *objectTree2DAGTransformer) Transform(ctx graph.TransformContext, dag *g
 		pvcList := cli.FindAll(dag, &corev1.PersistentVolumeClaim{})
 		allObjects := cli.FindAll(dag, nil, &model.HaveDifferentTypeWithOption{})
 		dependencyMap := make(model.ObjectSnapshot, len(svcList)+len(cmList)+len(secretList)+len(pvcList))
-		buildDependencyMap := func(objects []client.Object) error {
+		for _, objects := range [][]client.Object{svcList, cmList, secretList, pvcList} {
 			for _, object := range objects {
 				name, err := model.GetGVKName(object)
 				if err != nil {
@@ -82,19 +98,6 @@ func (t *objectTree2DAGTransformer) Transform(ctx graph.TransformContext, dag *g
 				}
 				dependencyMap[*name] = object
 			}
-			return nil
-		}
-		if err := buildDependencyMap(svcList); err != nil {
-			return err
-		}
-		if err := buildDependencyMap(cmList); err != nil {
-			return err
-		}
-		if err := buildDependencyMap(secretList); err != nil {
-			return err
-		}
-		if err := buildDependencyMap(pvcList); err != nil {
-			return err
 		}
 		for _, workload := range allObjects {
 			name, err := model.GetGVKName(workload)

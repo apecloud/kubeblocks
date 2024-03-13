@@ -38,14 +38,14 @@ func NewStatusReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if model.IsObjectDeleting(tree.Root) {
+	if model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
 	return kubebuilderx.ResultSatisfied
 }
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	rsm, _ := tree.Root.(*workloads.ReplicatedStateMachine)
+	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 	if model.IsObjectUpdating(rsm) {
 		rsm.Status.ObservedGeneration = rsm.Generation
 		return tree, nil

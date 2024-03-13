@@ -28,17 +28,17 @@ import (
 type deletionReconciler struct{}
 
 func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if !model.IsObjectDeleting(tree.Root) {
+	if !model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
-	if model.IsReconciliationPaused(tree.Root) {
+	if model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
 	return kubebuilderx.ResultSatisfied
 }
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	tree.Children = nil
+	tree.DeleteAll()
 	return tree, nil
 }
 

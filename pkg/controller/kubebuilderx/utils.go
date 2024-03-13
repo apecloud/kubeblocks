@@ -42,7 +42,9 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 		return nil, err
 	}
 
-	children := make(model.ObjectSnapshot)
+	tree := NewObjectTree()
+	tree.SetRoot(root)
+
 	ml := getMatchLabels(root, labelKeys)
 	inNS := client.InNamespace(req.Namespace)
 	for _, list := range kinds {
@@ -55,17 +57,13 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			name, err := model.GetGVKName(object)
-			if err != nil {
+			if !model.IsOwnerOf(root, object) {
+				continue
+			}
+			if err := tree.Add(object); err != nil {
 				return nil, err
 			}
-			children[*name] = object
 		}
-	}
-
-	tree := &ObjectTree{
-		Root:     root,
-		Children: children,
 	}
 
 	return tree, nil

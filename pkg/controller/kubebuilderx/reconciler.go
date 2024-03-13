@@ -37,8 +37,8 @@ type ObjectTree struct {
 	record.EventRecorder
 	logr.Logger
 
-	Root     client.Object
-	Children model.ObjectSnapshot
+	root     client.Object
+	children model.ObjectSnapshot
 }
 
 type TreeReader interface {
@@ -66,21 +66,29 @@ func CheckResultWithError(err error) *CheckResult {
 
 func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 	out := new(ObjectTree)
-	root, ok := t.Root.DeepCopyObject().(client.Object)
+	root, ok := t.root.DeepCopyObject().(client.Object)
 	if !ok {
 		return nil, ErrDeepCopyFailed
 	}
-	out.Root = root
-	children := make(model.ObjectSnapshot, len(t.Children))
-	for key, child := range t.Children {
+	out.root = root
+	children := make(model.ObjectSnapshot, len(t.children))
+	for key, child := range t.children {
 		childCopied, ok := child.DeepCopyObject().(client.Object)
 		if !ok {
 			return nil, ErrDeepCopyFailed
 		}
 		children[key] = childCopied
 	}
-	out.Children = children
+	out.children = children
 	return out, nil
+}
+
+func (t *ObjectTree) GetRoot() client.Object {
+	return t.root
+}
+
+func (t *ObjectTree) SetRoot(root client.Object) {
+	t.root = root
 }
 
 func (t *ObjectTree) List(obj client.Object) []client.Object {
@@ -92,7 +100,7 @@ func (t *ObjectTree) List(obj client.Object) []client.Object {
 	}
 	objType := reflect.TypeOf(obj)
 	objects := make([]client.Object, 0)
-	for _, child := range t.Children {
+	for _, child := range t.children {
 		vertexType := reflect.TypeOf(child)
 		if assignableTo(vertexType, objType) {
 			objects = append(objects, child)
@@ -101,19 +109,12 @@ func (t *ObjectTree) List(obj client.Object) []client.Object {
 	return objects
 }
 
-func (t *ObjectTree) Add(objects ...client.Object) error {
-	return t.replace(objects...)
+func (t *ObjectTree) GetSecondaryObjects() model.ObjectSnapshot {
+	return t.children
 }
 
-func (t *ObjectTree) Delete(objects ...client.Object) error {
-	for _, object := range objects {
-		name, err := model.GetGVKName(object)
-		if err != nil {
-			return err
-		}
-		delete(t.Children, *name)
-	}
-	return nil
+func (t *ObjectTree) Add(objects ...client.Object) error {
+	return t.replace(objects...)
 }
 
 func (t *ObjectTree) Update(objects ...client.Object) error {
@@ -126,7 +127,29 @@ func (t *ObjectTree) replace(objects ...client.Object) error {
 		if err != nil {
 			return err
 		}
-		t.Children[*name] = object
+		t.children[*name] = object
 	}
 	return nil
+}
+
+func (t *ObjectTree) Delete(objects ...client.Object) error {
+	for _, object := range objects {
+		name, err := model.GetGVKName(object)
+		if err != nil {
+			return err
+		}
+		delete(t.children, *name)
+	}
+	return nil
+}
+
+func (t *ObjectTree) DeleteAll() {
+	t.root = nil
+	t.children = nil
+}
+
+func NewObjectTree() *ObjectTree {
+	return &ObjectTree{
+		children: make(model.ObjectSnapshot),
+	}
 }

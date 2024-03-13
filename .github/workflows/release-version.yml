@@ -97,6 +97,17 @@ jobs:
       APECD_REF: "v0.1.38"
     secrets: inherit
 
+  release-addons-version-ent:
+    needs: release-branch
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.38
+    with:
+      GITHUB_REPO: "apecloud/apecloud-addons"
+      VERSION: "${{ inputs.release_version }}"
+      BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
+      WORKFLOW_ID: "release-version.yml"
+      APECD_REF: "v0.1.38"
+    secrets: inherit
+
   release-version:
     needs: [ release-addons-version ]
     runs-on: ubuntu-latest

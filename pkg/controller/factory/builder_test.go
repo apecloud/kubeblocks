@@ -151,7 +151,8 @@ var _ = Describe("builder", func() {
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
 		// to resolve and inject env vars
-		_, envVars, err := component.ResolveTemplateNEnvVars(reqCtx.Ctx, testCtx.Cli, synthesizeComp, cluster.Annotations, nil)
+		synthesizeComp.Annotations = cluster.Annotations
+		_, envVars, err := component.ResolveTemplateNEnvVars(reqCtx.Ctx, testCtx.Cli, synthesizeComp, nil)
 		Expect(err).Should(Succeed())
 		component.InjectEnvVars(synthesizeComp, envVars, nil)
 		return synthesizeComp

@@ -35,7 +35,6 @@ KubeBlocks 通过 ***Go Template*** 来渲染参数模版，除了常见函数�
 
 KubeBlocks 具有强大的渲染能力，能让你快速定制一个 ***自适应参数模板***（Adaptive ConfigTemplate），根据上下文（例如内存、CPU 大小）来渲染合适的配置文件。
 
-
 ### 添加参数模板
 
 ```yaml
@@ -70,12 +69,14 @@ KubeBlocks 具有强大的渲染能力，能让你快速定制一个 ***自适�
 
 上面展示了一个通过 ConfigMap 定义的 MySQL 自适应参数模板。模板中配置了几个常见的 MySQL 参数，包括 `port`，`innodb_buffer_pool_size` 等。
 它根据容器启动时配置的 memory，
+
 - 计算得到 `innodb_buffer_size` 大小（Line 11 ~ Line 15）。
 - 在 memory 小于 8Gi 时，禁用 `performance_schema` 来减少对性能的影响（Line 19 ~ Line 21）。
 
 `callBufferSizeByResource` 是 KubeBlocks 预定义的一个 bufferPool 计算规则，主要为 MySQL 服务。
 
 此外，你也可以通过查询 memory 和 cpu 来定制你的计算公式：
+
 - `getContainerMemory` 获取 Pod 上某个 container 的 memory 大小。
 - `getContainerCPU` 获取 Pod 中某个 container 的 CPU 大小。
 
@@ -93,6 +94,7 @@ KubeBlocks 具有强大的渲染能力，能让你快速定制一个 ***自适�
 #### 修改 ClusterDefinition
 
 可以通过 `ClusterDefinition` 中的 `configSpecs` 来指定参数模板，引用在[添加参数模板](#添加参数模板)中定义的 ConfigMap。
+
 ```yaml
   componentDefs:
     - name: mysql-compdef
@@ -113,7 +115,7 @@ KubeBlocks 具有强大的渲染能力，能让你快速定制一个 ***自适�
             ...
 ```
 
-如上所示，需要通过添加 `configSpecs` 字段（Line 3 ~ 7）修改 `ClusterDefinition.yaml` 文件，分别指定：
+如上所示，需要通过添加 `configSpecs` 字段修改 `ClusterDefinition.yaml` 文件，分别指定：
 
 - templateRef: 模板所在的 ConfigMap 对象名称。
 - volumeName: 挂载到 Pod 的卷名。
@@ -172,7 +174,8 @@ K8s 会将 ConfigMap 的变更定时同步到 Pod 上，但是大部分引擎并
 
 还记得我们对 cluster 的定义吗，它可以表示为：
 
-$$Cluster = ClusterDefinition.yaml \Join ClusterVersion.yaml \Join Cluster.yaml
+$$
+Cluster = ClusterDefinition.yaml \Join ClusterVersion.yaml \Join Cluster.yaml
 $$
 
 其中 JoinKey 就是 Component Name。

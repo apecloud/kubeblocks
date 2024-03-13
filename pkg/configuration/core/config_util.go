@@ -38,15 +38,22 @@ type ParamPairs struct {
 }
 
 const pattern = `^[a-z0-9A-Z]([a-zA-Z0-9\.\-\_]*[a-zA-Z0-9])?$`
+const validLabelLength = 63
 
 var regxPattern = regexp.MustCompile(pattern)
 
 func FromValueToString(val interface{}) string {
 	str := strings.Trim(cast.ToString(val), ` '"`)
-	if regxPattern.MatchString(str) {
+	if IsValidLabelKeyOrValue(str) {
 		return str
 	}
 	return ""
+}
+
+// IsValidLabelKeyOrValue checks if the input string is a valid label key or value
+// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
+func IsValidLabelKeyOrValue(label string) bool {
+	return len(label) <= validLabelLength && regxPattern.MatchString(label)
 }
 
 // MergeUpdatedConfig replaces the file content of the changed key.

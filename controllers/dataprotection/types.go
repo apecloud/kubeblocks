@@ -20,12 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
-	"runtime"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -33,8 +30,6 @@ const (
 )
 
 const (
-	// settings keys
-	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"
 
 	// label keys
 	dataProtectionBackupRepoKey          = "dataprotection.kubeblocks.io/backup-repo-name"
@@ -100,7 +95,3 @@ const (
 )
 
 var reconcileInterval = time.Second
-
-func init() {
-	viper.SetDefault(maxConcurDataProtectionReconKey, runtime.NumCPU()*2)
-}

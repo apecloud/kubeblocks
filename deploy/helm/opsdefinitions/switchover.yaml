@@ -3,17 +3,24 @@ kind: OpsDefinition
 metadata:
   name: switchover
 spec:
-  varsRef:
-    podSelectionStrategy: Available
-    vars:
-    - name: TARGET_POD_IP
-      valueFrom:
-        envVarRef:
-          envName: KB_POD_IP
-    - name: LORRY_HTTP_PORT
-      valueFrom:
-        envVarRef:
-          envName: LORRY_HTTP_PORT
+  preConditions:
+    - rule:
+        expression: '{{ or (eq .component.status.phase "Running") (eq .component.status.phase "Abnormal") }}'
+        message: "Component is not in Running/Abnormal status."
+  targetPodTemplates:
+    - name: availablePod
+      podSelector:
+        availability: Available
+        selectionPolicy: Any
+      vars:
+        - name: TARGET_POD_IP
+          valueFrom:
+            envRef:
+              envName: KB_POD_IP
+        - name: LORRY_HTTP_PORT
+          valueFrom:
+            envRef:
+              envName: LORRY_HTTP_PORT
   parametersSchema:
     openAPIV3Schema:
       properties:
@@ -26,11 +33,18 @@ spec:
             otherwise promote a randomly selected pod to primary.
           type: string
       type: object
-  jobSpec:
-    backoffLimit: 0
-    template:
-      spec:
-        containers:
+  actions:
+    - name: switchover
+      failurePolicy: Fail
+      parameters:
+        - primary
+        - candidate
+      workload:
+        targetPodTemplate: availablePod
+        type: Job
+        backoffLimit: 0
+        podSpec:
+          containers:
           - name: switchover
             image: docker.io/apecloud/kubeblocks-tools:latest
             imagePullPolicy: IfNotPresent
@@ -45,7 +59,7 @@ spec:
                 echo "curl ${url}, parameters: ${params}"
                 res=`curl -s -X POST -H 'Content-Type: application/json' "${url}" -d "${params}"`
                 echo "curl result: ${res}"
-                
+
                 # check if switchover successfully.
                 echo "INFO: start to check if switchover successfully, timeout is 60s"
                 executedUnix=$(date +%s)
@@ -78,7 +92,3 @@ spec:
                     exit 1
                   fi
                 done
-  preConditions:
-    - rule:
-        expression: '{{ eq .component.status.phase "Running" }}'
-        message: "Component is not in Running status."

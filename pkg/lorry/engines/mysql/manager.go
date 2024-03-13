@@ -206,8 +206,10 @@ func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Clu
 func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
 	var leaderDBState *dcs.DBState
 	if cluster.Leader == nil || cluster.Leader.DBState == nil {
+		// In the event of leader initialization failure, there is no available database state information,
+		// just returning false allows other replicas to acquire the lease.
 		mgr.Logger.Info("No leader DBState info")
-		return true, 0
+		return false, 0
 	}
 	leaderDBState = cluster.Leader.DBState
 

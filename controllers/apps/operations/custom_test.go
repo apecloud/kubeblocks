@@ -75,17 +75,22 @@ var _ = Describe("CustomOps", func() {
 
 	AfterEach(cleanEnv)
 
-	createCustomOps := func(comp string, params []map[string]string) *appsv1alpha1.OpsRequest {
+	createCustomOps := func(comp string, params []appsv1alpha1.Parameter) *appsv1alpha1.OpsRequest {
 		opsName := "custom-ops-" + testCtx.GetRandomStr()
 		ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 			cluster.Name, appsv1alpha1.CustomType)
 		ops.Spec.CustomSpec = &appsv1alpha1.CustomOpsSpec{
-			ComponentName:    comp,
 			OpsDefinitionRef: opsDef.Name,
-			Params:           params,
+			CustomOpsComponents: []appsv1alpha1.CustomOpsComponent{
+				{
+					ComponentName: comp,
+					Parameters:    params,
+				},
+			},
 		}
 		Expect(testCtx.CreateObj(testCtx.Ctx, ops)).Should(Succeed())
 		ops.Status.Phase = appsv1alpha1.OpsPendingPhase
+		opsResource.OpsRequest = ops
 		return ops
 	}
 
@@ -120,16 +125,11 @@ var _ = Describe("CustomOps", func() {
 			}
 
 			reqCtx = intctrlutil.RequestCtx{
-				Ctx: testCtx.Ctx,
-				Log: logf.FromContext(testCtx.Ctx).WithValues("customOps", testCtx.DefaultNamespace),
+				Ctx:      testCtx.Ctx,
+				Recorder: opsResource.Recorder,
+				Log:      logf.FromContext(testCtx.Ctx).WithValues("customOps", testCtx.DefaultNamespace),
 			}
 		})
-
-		patchComponentPhase := func(compPhase appsv1alpha1.ClusterComponentPhase) {
-			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
-				compObj.Status.Phase = compPhase
-			})).Should(Succeed())
-		}
 
 		patchJobPhase := func(job *batchv1.Job, conditionType batchv1.JobConditionType) {
 			Expect(testapps.ChangeObjStatus(&testCtx, job, func() {
@@ -140,69 +140,72 @@ var _ = Describe("CustomOps", func() {
 		}
 
 		It("validate json parameter schemas", func() {
-			params := []map[string]string{
-				{"test": "test"},
+			params := []appsv1alpha1.Parameter{
+				{Name: "test", Value: "test"},
 			}
 			By("validate json schema, 'sql' parameter is required")
 			ops := createCustomOps(consensusComp, params)
 			opsResource.OpsRequest = ops
-			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsResource)
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
 			Expect(ops.Status.Conditions).ShouldNot(BeEmpty())
 			Expect(ops.Status.Conditions[0].Message).Should(ContainSubstring("sql in body is required"))
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
+
 		})
 
-		testCustomOps := func(paramsCount int) *batchv1.JobList {
-			params := []map[string]string{}
-			for i := 0; i < paramsCount; i++ {
-				params = append(params, map[string]string{
-					"sql": "select 1"})
+		It("Test custom ops when validate failed ", func() {
+			By("create custom Ops")
+			params := []appsv1alpha1.Parameter{
+				{Name: "sql", Value: "select 1"},
 			}
 			ops := createCustomOps(consensusComp, params)
 
 			By("validate pass for json schema")
-			opsResource.OpsRequest = ops
-			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsResource)
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsResource)
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By("validate the expression of preChecks, expect the ops phase to fail if component phase is not Running")
 			opsResource.OpsRequest = ops
-			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsResource)
-			Expect(ops.Status.Conditions[2].Message).Should(ContainSubstring("Component is not in Running status"))
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(ops.Status.Components[consensusComp].PreCheckResult.Pass).Should(BeFalse())
+			Expect(ops.Status.Components[consensusComp].PreCheckResult.Message).Should(ContainSubstring("Component is not in Running status"))
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
+		})
 
-			By("patch cluster to Running and do ops action, expect the job to be created")
-			patchComponentPhase(appsv1alpha1.RunningClusterCompPhase)
-			ops.Status.Phase = appsv1alpha1.OpsCreatingPhase
-			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsResource)
+		It("Test custom ops when workload job completed ", func() {
+			By("create custom Ops")
+			params := []appsv1alpha1.Parameter{
+				{Name: "sql", Value: "select 1"},
+			}
+			ops := createCustomOps(consensusComp, params)
 
+			By("mock component is Running")
+			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
+				compObj.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+			})).Should(Succeed())
+
+			By("job should be created successfully")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
+			Expect(err).ShouldNot(HaveOccurred())
 			jobList := &batchv1.JobList{}
 			Expect(k8sClient.List(ctx, jobList, client.MatchingLabels{constant.OpsRequestNameLabelKey: ops.Name},
 				client.InNamespace(ops.Namespace))).Should(Succeed())
-			Expect(jobList.Items).Should(HaveLen(paramsCount))
-			return jobList
-		}
-
-		It("Test custom ops when params len is 1", func() {
-			jobList := testCustomOps(1)
+			Expect(len(jobList.Items)).Should(Equal(1))
 
 			By("mock job is completed, expect for ops phase is Succeed")
 			job := &jobList.Items[0]
 			patchJobPhase(job, batchv1.JobComplete)
-			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
+			By("reconcile once and make the action succeed")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsResource.OpsRequest.Status.Components[consensusComp].ProgressDetails[0].Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
+
+			By("reconcile again and make the opsRequest succeed")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsResource.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
-		})
-
-		It("Test custom ops when params len is 2", func() {
-			jobList := testCustomOps(2)
-
-			By("mock one job is completed and another job is Failed, expect for ops phase is Failed")
-			job1 := &jobList.Items[0]
-			patchJobPhase(job1, batchv1.JobComplete)
-			job2 := &jobList.Items[1]
-			patchJobPhase(job2, batchv1.JobFailed)
-			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
-			Expect(opsResource.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
 		})
 
 	})

@@ -58,6 +58,14 @@ spec:
               with attributes that strongly work with stateful workloads and day-2
               operation behaviors.
             properties:
+              annotations:
+                additionalProperties:
+                  type: string
+                description: Defines static annotations that will be patched to all
+                  k8s resources created for the component. If an annotation key conflicts
+                  with any other system annotations or user-specified annotations,
+                  it will be silently ignored. This field is immutable.
+                type: object
               configs:
                 description: "The configs field is provided by the provider, and finally,
                   these configTemplateRefs will be rendered into the user's own configuration
@@ -139,6 +147,19 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    reRenderResourceTypes:
+                      description: An optional field defines which resources change
+                        trigger re-render config.
+                      items:
+                        description: RerenderResourceType defines the resource requirements
+                          for a component.
+                        enum:
+                        - resources
+                        - replcias
+                        - tls
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
                     templateRef:
                       description: Specifies the name of the referenced configuration
                         template ConfigMap object.
@@ -166,6 +187,40 @@ spec:
                 description: Provides a brief description of the component.
                 maxLength: 256
                 type: string
+              hostNetwork:
+                description: Defines the host-network capability and resources.
+                properties:
+                  containerPorts:
+                    description: The list of container ports that are required by
+                      the component.
+                    items:
+                      properties:
+                        container:
+                          description: Container specifies the target container within
+                            the pod.
+                          type: string
+                        ports:
+                          description: Ports are named container ports within the
+                            specified container. These container ports must be defined
+                            in the container for proper port allocation.
+                          items:
+                            type: string
+                          minItems: 1
+                          type: array
+                      required:
+                      - container
+                      - ports
+                      type: object
+                    type: array
+                  dnsPolicy:
+                    description: Set DNS policy for the component. Defaults to "ClusterFirst".
+                      Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst',
+                      'Default' or 'None'. DNS parameters given in DNSConfig will
+                      be merged with the policy selected with DNSPolicy. To have DNS
+                      options set along with hostNetwork, you have to specify DNS
+                      policy explicitly to 'ClusterFirstWithHostNet'.
+                    type: string
+                type: object
               labels:
                 additionalProperties:
                   type: string
@@ -3172,7 +3227,7 @@ spec:
                       of replicas periodically. The specified action will be executed
                       by Lorry at the configured interval. If the execution is successful,
                       the output will be used as the replica's assigned role, and
-                      the role must be one of the names defined in the componentdefinition
+                      the role must be one of the names defined in the ComponentDefinition
                       roles. The output will be compared with the last successful
                       result.  If there is a change, a role change event will be created
                       to notify the controller and trigger updating the replica's
@@ -12196,6 +12251,43 @@ spec:
                               - Required
                               - Optional
                               type: string
+                          type: object
+                        podVarRef:
+                          description: Selects a defined var of a Pod.
+                          properties:
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
+                              type: string
+                            container:
+                              description: ContainerVars defines the vars can be referenced
+                                from a Container.
+                              properties:
+                                name:
+                                  description: The name of the container.
+                                  type: string
+                                port:
+                                  description: Container port to reference.
+                                  properties:
+                                    name:
+                                      type: string
+                                    option:
+                                      description: VarOption defines whether a variable
+                                        is required or optional.
+                                      enum:
+                                      - Required
+                                      - Optional
+                                      type: string
+                                  type: object
+                              required:
+                              - name
+                              type: object
+                            name:
+                              description: Name of the referent object.
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
                           type: object
                         secretKeyRef:
                           description: Selects a key of a Secret.

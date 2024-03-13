@@ -107,6 +107,9 @@ func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		delayUpdateKubeBlocksToolsImage(obj.Containers, &pobj.Containers[i])
 	}
+	for i := range pobj.InitContainers {
+		delayUpdateKubeBlocksToolsImage(obj.InitContainers, &pobj.InitContainers[i])
+	}
 	updateLorryContainer(obj.Containers, pobj.Containers)
 }
 
@@ -220,48 +223,62 @@ func UpdateComponentInfoToPods(
 	return nil
 }
 
-// UpdateCustomLabelToPods updates custom label to pods
-func UpdateCustomLabelToPods(ctx context.Context,
+// UpdateCustomLabelsAndAnnotationsToPods updates custom labels and annotations to pods.
+func UpdateCustomLabelsAndAnnotationsToPods(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *intctrlcomp.SynthesizedComponent,
+	synthesizedComp *intctrlcomp.SynthesizedComponent,
 	dag *graph.DAG) error {
-	if cluster == nil || component == nil {
+	if cluster == nil || synthesizedComp == nil {
 		return nil
 	}
 	// list all pods in dag
 	graphCli := model.NewGraphClient(cli)
 	pods := graphCli.FindAll(dag, &corev1.Pod{})
 
-	for labelKey, labelValue := range component.Labels {
-		podList := &corev1.PodList{}
-		matchLabels := constant.GetComponentWellKnownLabels(cluster.Name, component.Name)
-		if err := getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels)); err != nil {
-			return err
+	// list all pods in cache
+	podList := &corev1.PodList{}
+	matchLabels := constant.GetComponentWellKnownLabels(cluster.Name, synthesizedComp.Name)
+	if err := getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels)); err != nil {
+		return err
+	}
+	for i := range podList.Items {
+		idx := slices.IndexFunc(pods, func(obj client.Object) bool {
+			return obj.GetName() == podList.Items[i].Name
+		})
+
+		// pod already in dag, update labels and annotations
+		if idx >= 0 {
+			updateObjLabelsAndAnnotations(pods[idx], synthesizedComp.Labels, synthesizedComp.Annotations)
+			continue
 		}
 
-		for i := range podList.Items {
-			idx := slices.IndexFunc(pods, func(obj client.Object) bool {
-				return obj.GetName() == podList.Items[i].Name
-			})
-			// pod already in dag, merge labels
-			if idx >= 0 {
-				updateObjLabel(labelKey, labelValue, pods[idx])
-				continue
-			}
-			pod := &podList.Items[i]
-			updateObjLabel(labelKey, labelValue, pod)
-			graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
-		}
+		pod := &podList.Items[i]
+		updateObjLabelsAndAnnotations(pod, synthesizedComp.Labels, synthesizedComp.Annotations)
+		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 	}
 	return nil
 }
 
-func updateObjLabel(labelKey, labelValue string, obj client.Object) {
-	labels := obj.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string, 0)
+func updateObjLabelsAndAnnotations(obj client.Object, customLabels, customAnnotations map[string]string) {
+	if customLabels != nil {
+		labels := obj.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string, 0)
+		}
+		for k, v := range customLabels {
+			labels[k] = v
+		}
+		obj.SetLabels(labels)
 	}
-	labels[labelKey] = labelValue
-	obj.SetLabels(labels)
+	if customAnnotations != nil {
+		annotations := obj.GetAnnotations()
+		if annotations == nil {
+			annotations = make(map[string]string, 0)
+		}
+		for k, v := range customAnnotations {
+			annotations[k] = v
+		}
+		obj.SetAnnotations(annotations)
+	}
 }

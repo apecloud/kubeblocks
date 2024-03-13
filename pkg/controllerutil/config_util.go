@@ -131,7 +131,7 @@ func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDeta
 	if configMap == nil {
 		return true
 	}
-	if item.Version == "" && len(item.Payload.Data) == 0 && item.ImportTemplateRef == nil {
+	if item.Version == "" && item.Payload.Data == nil && item.ImportTemplateRef == nil {
 		return false
 	}
 	if version := configMap.Annotations[constant.CMConfigurationTemplateVersion]; version != item.Version {
@@ -198,4 +198,15 @@ func buildPayloadAsUnstructuredObject(payload interface{}) (interface{}, error) 
 		return nil, err
 	}
 	return unstructuredObj, nil
+}
+
+func ResourcesPayloadForComponent(resources corev1.ResourceRequirements) any {
+	if len(resources.Requests) == 0 && len(resources.Limits) == 0 {
+		return nil
+	}
+
+	return map[string]any{
+		"limits":   resources.Limits,
+		"requests": resources.Requests,
+	}
 }

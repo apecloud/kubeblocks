@@ -66,6 +66,12 @@ type BackupPolicySpec struct {
 	// +optional
 	// +kubebuilder:default=false
 	UseKopia bool `json:"useKopia"`
+
+	// Specifies the parameters for encrypting backup data.
+	// Encryption will be disabled if the field is not set.
+	//
+	// +optional
+	EncryptionConfig *EncryptionConfig `json:"encryptionConfig,omitempty"`
 }
 
 type BackupTarget struct {

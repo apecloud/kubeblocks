@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -174,22 +175,41 @@ func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (act
 	}
 
 	backupDataAct := r.ActionSet.Spec.Backup.BackupData
-	podSpec, err := r.BuildJobActionPodSpec(targetPod, BackupDataContainerName, &backupDataAct.JobActionSpec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build job action pod spec: %w", err)
-	}
-
-	if backupDataAct.SyncProgress != nil {
-		r.InjectSyncProgressContainer(podSpec, backupDataAct.SyncProgress, r.buildSyncProgressCommand())
-	}
-
-	if r.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeFull {
+	switch r.ActionSet.Spec.BackupType {
+	case dpv1alpha1.BackupTypeFull:
+		podSpec, err := r.BuildJobActionPodSpec(targetPod, BackupDataContainerName, &backupDataAct.JobActionSpec)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build job action pod spec: %w", err)
+		}
+		if backupDataAct.SyncProgress != nil {
+			r.InjectSyncProgressContainer(podSpec, backupDataAct.SyncProgress, r.buildSyncProgressCommand())
+		}
 		return &action.JobAction{
 			Name:         name,
 			ObjectMeta:   *buildBackupJobObjMeta(r.Backup, name),
 			Owner:        r.Backup,
 			PodSpec:      podSpec,
 			BackOffLimit: r.BackupPolicy.Spec.BackoffLimit,
+		}, nil
+	case dpv1alpha1.BackupTypeContinuous:
+		podSpec, err := r.BuildJobActionPodSpec(r.TargetPods[0], BackupDataContainerName, &backupDataAct.JobActionSpec)
+		if err != nil {
+			return nil, err
+		}
+		if backupDataAct.SyncProgress != nil {
+			r.InjectSyncProgressContainer(podSpec, backupDataAct.SyncProgress, r.buildContinuousSyncProgressCommand())
+		}
+		return &action.StatefulSetAction{
+			Name: r.Name,
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: r.Namespace,
+				Name:      r.Name,
+				Labels:    BuildBackupWorkloadLabels(r.Backup),
+			},
+			Replicas:  pointer.Int32(int32(1)),
+			Backup:    r.Backup,
+			PodSpec:   podSpec,
+			ActionSet: r.ActionSet,
 		}, nil
 	}
 	return nil, fmt.Errorf("unsupported backup type %s", r.ActionSet.Spec.BackupType)
@@ -311,6 +331,10 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 				Value: r.Backup.Name,
 			},
 			{
+				Name:  dptypes.DPParentBackupName,
+				Value: r.Backup.Spec.ParentBackupName,
+			},
+			{
 				Name:  dptypes.DPTargetPodName,
 				Value: targetPod.Name,
 			},
@@ -429,7 +453,8 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		}
 	}
 
-	utils.InjectDatasafed(podSpec, r.BackupRepo, RepoVolumeMountPath, r.Status.KopiaRepoPath)
+	utils.InjectDatasafed(podSpec, r.BackupRepo, RepoVolumeMountPath,
+		r.Status.EncryptionConfig, r.Status.KopiaRepoPath)
 	return podSpec, nil
 }
 
@@ -463,9 +488,50 @@ function update_backup_stauts() {
   local namespace="$3"
   local backup_name="$4"
   status="{\"status\":${backup_info}}"
-  kubectl -n "$namespace" patch backup "$backup_name" --subresource=status --type=merge --patch "${status}"
+  kubectl -n "$namespace" patch backups.dataprotection.kubeblocks.io "$backup_name" --subresource=status --type=merge --patch "${status}"
 }
 update_backup_stauts ${%s} ${%s} %s %s
+`, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)
+}
+
+func (r *Request) buildContinuousSyncProgressCommand() string {
+	// sync progress script will wait for the backup info file to be created,
+	// if the file is created, it will update the backup status and exit.
+	// If an exit file named with the backup info file with .exit suffix exists,
+	// it indicates that the container for backing up data exited abnormally,
+	// this script will exit.
+	return fmt.Sprintf(`
+set -o errexit
+set -o nounset
+
+retryTimes=0
+oldBackupInfo=
+backupInfoFile=${%s}
+trap "echo 'Terminating...' && exit" TERM
+while true; do
+  sleep ${%s};
+  if [ ! -f ${backupInfoFile} ]; then
+    continue
+  fi
+  backupInfo=$(cat ${backupInfoFile})
+  if [ "${oldBackupInfo}" == "${backupInfo}" ]; then
+    continue
+  fi
+  echo "start to patch backupInfo: ${backupInfo}"
+  status="{\"status\":${backupInfo}}"
+  kubectl -n %s patch backups.dataprotection.kubeblocks.io %s --subresource=status --type=merge --patch "${status}"
+  if [ $? -ne 0 ]; then
+    retryTimes=$(($retryTimes+1))
+  else
+    echo "update backup status successfully"
+    retryTimes=0
+    oldBackupInfo=${backupInfo}
+  fi
+  if [ $retryTimes -ge 3 ]; then
+    echo "ERROR: update backup status failed, 3 attempts have been made!"
+    exit 1
+  fi
+done
 `, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)
 }
 

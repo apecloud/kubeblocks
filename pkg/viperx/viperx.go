@@ -47,6 +47,10 @@ func GetInt(key string) int {
 	return rCall(key, viper.GetInt)
 }
 
+func GetFloat64(key string) float64 {
+	return rCall(key, viper.GetFloat64)
+}
+
 func GetInt32(key string) int32 {
 	return rCall(key, viper.GetInt32)
 }

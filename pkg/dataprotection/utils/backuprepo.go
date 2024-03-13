@@ -38,12 +38,33 @@ const (
 	datasafedConfigMountPath = "/etc/datasafed"
 )
 
-func InjectDatasafed(podSpec *corev1.PodSpec, repo *dpv1alpha1.BackupRepo, repoVolumeMountPath string, kopiaRepoPath string) {
+func InjectDatasafed(podSpec *corev1.PodSpec, repo *dpv1alpha1.BackupRepo, repoVolumeMountPath string,
+	encryptionConfig *dpv1alpha1.EncryptionConfig, kopiaRepoPath string) {
 	if repo.AccessByMount() {
 		InjectDatasafedWithPVC(podSpec, repo.Status.BackupPVCName, repoVolumeMountPath, kopiaRepoPath)
 	} else if repo.AccessByTool() {
 		InjectDatasafedWithConfig(podSpec, repo.Status.ToolConfigSecretName, kopiaRepoPath)
 	}
+	injectEncryptionEnvs(podSpec, encryptionConfig)
+}
+
+func injectEncryptionEnvs(podSpec *corev1.PodSpec, encryptionConfig *dpv1alpha1.EncryptionConfig) {
+	if encryptionConfig == nil {
+		return
+	}
+	envs := []corev1.EnvVar{
+		{
+			Name:  dptypes.DPDatasafedEncryptionAlgorithm,
+			Value: encryptionConfig.Algorithm,
+		},
+		{
+			Name: dptypes.DPDatasafedEncryptionPassPhrase,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: encryptionConfig.PassPhraseSecretKeyRef,
+			},
+		},
+	}
+	injectElements(podSpec, nil, nil, envs)
 }
 
 func InjectDatasafedWithPVC(podSpec *corev1.PodSpec, pvcName string, mountPath string, kopiaRepoPath string) {

@@ -24,6 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -33,7 +34,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	discoverycli "k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -73,7 +74,7 @@ const (
 )
 
 var (
-	scheme   = runtime.NewScheme()
+	scheme   = k8sruntime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
 
@@ -105,6 +106,7 @@ func init() {
 	viper.SetDefault(dptypes.CfgKeyExecWorkerServiceAccountName, "kubeblocks-dataprotection-exec-worker")
 	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, "{}")
 	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kubeblocks-dataprotection-worker-role")
+	viper.SetDefault(dptypes.CfgDataProtectionReconcileWorkers, runtime.NumCPU())
 }
 
 func main() {
@@ -124,6 +126,9 @@ func main() {
 	flag.String(leaderElectIDFlagKey.String(), "abd03fda",
 		"The leader election ID prefix for controller manager. "+
 			"This ID must be unique to controller manager.")
+
+	flag.String(constant.ManagedNamespacesFlag, "",
+		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
 
 	opts := zap.Options{
 		Development: true,
@@ -171,7 +176,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	managedNamespaces := viper.GetString(strings.ReplaceAll(constant.ManagedNamespacesFlag, "-", "_"))
+	if len(managedNamespaces) > 0 {
+		setupLog.Info(fmt.Sprintf("managed namespaces: %s", managedNamespaces))
+	}
+	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,

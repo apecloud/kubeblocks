@@ -111,7 +111,7 @@ func (mgr *Manager) CurrentMemberHealthyCheck(ctx context.Context, cluster *dcs.
 func (mgr *Manager) LeaderHealthyCheck(ctx context.Context, cluster *dcs.Cluster) error {
 	members := mgr.GetMembers(ctx, cluster)
 	for _, member := range members {
-		if strings.EqualFold(member.Role, PRIMARY) {
+		if isLeader, _ := mgr.IsLeaderMember(ctx, cluster, &member); isLeader {
 			return mgr.MemberHealthyCheck(ctx, cluster, &member)
 		}
 	}

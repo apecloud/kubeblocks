@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -118,7 +119,9 @@ func (mgr *Manager) InitComponentDefintionActions() error {
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
 // - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
+// - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
+// - KB_NEW_MEMBER_POD_IP: The name of the new member's Pod.
 func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	memberJoinCmd, ok := mgr.actionCommands[constant.MemberJoinAction]
 	if !ok || len(memberJoinCmd) == 0 {
@@ -129,13 +132,14 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 		return err
 	}
 
-	if cluster.Leader == nil || cluster.Leader.Name == "" {
-		return errors.New("cluster has no leader")
+	if cluster.Leader != nil && cluster.Leader.Name != "" {
+		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
+		fqdn := cluster.GetMemberAddr(*leaderMember)
+		envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+fqdn)
 	}
 
-	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-	fqdn := cluster.GetMemberAddr(*leaderMember)
-	envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+fqdn)
+	addrs := cluster.GetMemberAddrs()
+	envs = append(envs, "KB_MEMBER_ADDRESSES"+"="+strings.Join(addrs, ","))
 	envs = append(envs, "KB_NEW_MEMBER_POD_NAME"+"="+mgr.CurrentMemberName)
 	output, err := util.ExecCommand(ctx, memberJoinCmd, envs)
 
@@ -151,7 +155,9 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
 // - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
+// - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_LEAVE_MEMBER_POD_NAME: The name of the leave member's Pod.
+// - KB_LEAVE_MEMBER_POD_IP: The IP of the leave member's Pod.
 func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	memberLeaveCmd, ok := mgr.actionCommands[constant.MemberLeaveAction]
 	if !ok || len(memberLeaveCmd) == 0 {
@@ -162,13 +168,14 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 		return err
 	}
 
-	if cluster.Leader == nil || cluster.Leader.Name == "" {
-		return errors.New("cluster has no leader")
+	if cluster.Leader != nil && cluster.Leader.Name != "" {
+		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
+		fqdn := cluster.GetMemberAddr(*leaderMember)
+		envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+fqdn)
 	}
 
-	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-	fqdn := cluster.GetMemberAddr(*leaderMember)
-	envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+fqdn)
+	addrs := cluster.GetMemberAddrs()
+	envs = append(envs, "KB_MEMBER_ADDRESSES"+"="+strings.Join(addrs, ","))
 	envs = append(envs, "KB_LEAVE_MEMBER_POD_NAME"+"="+memberName)
 	output, err := util.ExecCommand(ctx, memberLeaveCmd, envs)
 

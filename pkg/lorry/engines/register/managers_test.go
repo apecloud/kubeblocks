@@ -30,6 +30,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 const (
@@ -134,7 +135,7 @@ func TestInitDBManager(t *testing.T) {
 
 		assert.NotNil(t, err)
 		// assert.ErrorContains(t, err, "KB_SERVICE_CHARACTER_TYPE not set")
-		_, err = GetDBManager()
+		_, err = GetDBManager(nil)
 		assert.NotNil(t, err)
 		// assert.ErrorContains(t, err, "no db manager")
 	})
@@ -145,7 +146,7 @@ func TestInitDBManager(t *testing.T) {
 
 		assert.NotNil(t, err)
 		assert.ErrorContains(t, err, "fatal error config file")
-		_, err = GetDBManager()
+		_, err = GetDBManager(nil)
 		assert.NotNil(t, err)
 		assert.ErrorContains(t, err, "no db manager")
 	})
@@ -163,7 +164,7 @@ func TestInitDBManager(t *testing.T) {
 
 		assert.NotNil(t, err)
 		assert.ErrorContains(t, err, "no db manager for characterType fake-db and workloadType ")
-		_, err = GetDBManager()
+		_, err = GetDBManager(nil)
 		assert.NotNil(t, err)
 		assert.ErrorContains(t, err, "no db manager")
 	})
@@ -177,7 +178,7 @@ func TestInitDBManager(t *testing.T) {
 
 		assert.NotNil(t, err)
 		assert.ErrorContains(t, err, "some error")
-		_, err = GetDBManager()
+		_, err = GetDBManager(nil)
 		assert.NotNil(t, err)
 		assert.ErrorContains(t, err, "no db manager")
 	})
@@ -188,11 +189,14 @@ func TestInitDBManager(t *testing.T) {
 	RegisterEngine(fakeCharacterType, "", fakeNewFunc, func() engines.ClusterCommands {
 		return nil
 	})
+	RegisterEngine(models.Custom, "", fakeNewFunc, func() engines.ClusterCommands {
+		return nil
+	})
 	t.Run("new func successfully", func(t *testing.T) {
 		err = InitDBManager(configDir)
 
 		assert.Nil(t, err)
-		_, err = GetDBManager()
+		_, err = GetDBManager(nil)
 		assert.Nil(t, err)
 	})
 
@@ -200,7 +204,7 @@ func TestInitDBManager(t *testing.T) {
 	t.Run("db manager exists", func(t *testing.T) {
 		err = InitDBManager(configDir)
 		assert.Nil(t, err)
-		_, err = GetDBManager()
+		_, err = GetDBManager(nil)
 		assert.Nil(t, err)
 	})
 

@@ -41,4 +41,8 @@ type Client interface {
 	LeaveMember(ctx context.Context) error
 
 	Switchover(ctx context.Context, primary, candidate string, force bool) error
+	Lock(ctx context.Context) error
+	Unlock(ctx context.Context) error
+	PostProvision(ctx context.Context, componentNames, podNames, podIPs, podHostNames, podHostIPs string) error
+	PreTerminate(ctx context.Context) error
 }

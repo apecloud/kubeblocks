@@ -52,7 +52,7 @@ func NewHa(disableDNSChecker bool) *Ha {
 	logger := ctrl.Log.WithName("HA")
 
 	dcs := dcs3.GetStore()
-	manager, err := register.GetDBManager()
+	manager, err := register.GetDBManager(nil)
 	if err != nil {
 		logger.Error(err, "No DB Manager")
 		return nil

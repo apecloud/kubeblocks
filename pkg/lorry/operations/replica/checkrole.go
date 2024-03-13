@@ -96,9 +96,10 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		actionCommands := map[string][]string{}
 		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
 		if err != nil {
-			s.logger.Info("get action commands failed", "error", err)
+			s.logger.Info("get action commands failed", "error", err.Error())
+			return err
 		}
-		roleProbeCmd, ok := actionCommands["roleProbe"]
+		roleProbeCmd, ok := actionCommands[constant.RoleProbeAction]
 		if ok && len(roleProbeCmd) > 0 {
 			s.Command = roleProbeCmd
 		}
@@ -120,25 +121,21 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 	var role string
 	var err error
 
-	if len(s.Command) == 0 {
-		manager, err1 := register.GetDBManager()
-		if err1 != nil {
-			return nil, errors.Wrap(err1, "get manager failed")
-		}
-
-		if !manager.IsDBStartupReady() {
-			resp.Data["message"] = "db not ready"
-			return resp, nil
-		}
-
-		cluster := s.dcsStore.GetClusterFromCache()
-
-		ctx1, cancel := context.WithTimeout(ctx, s.ProbeTimeout)
-		defer cancel()
-		role, err = manager.GetReplicaRole(ctx1, cluster)
-	} else {
-		role, err = util.ExecCommand(s.Command)
+	manager, err1 := register.GetDBManager(s.Command)
+	if err1 != nil {
+		return nil, errors.Wrap(err1, "get manager failed")
 	}
+
+	if !manager.IsDBStartupReady() {
+		resp.Data["message"] = "db not ready"
+		return resp, nil
+	}
+
+	cluster := s.dcsStore.GetClusterFromCache()
+
+	ctx1, cancel := context.WithTimeout(ctx, s.ProbeTimeout)
+	defer cancel()
+	role, err = manager.GetReplicaRole(ctx1, cluster)
 
 	if err != nil {
 		s.logger.Info("executing checkRole error", "error", err.Error())

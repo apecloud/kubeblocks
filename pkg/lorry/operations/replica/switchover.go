@@ -71,7 +71,7 @@ func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 		return errors.Wrap(err, "get cluster failed")
 	}
 
-	manager, err := register.GetDBManager()
+	manager, err := register.GetDBManager(nil)
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}
@@ -119,7 +119,7 @@ func (s *Switchover) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	primary := req.GetString("primary")
 	candidate := req.GetString("candidate")
 	force := req.GetBool("force")
-	manager, err := register.GetDBManager()
+	manager, err := register.GetDBManager(nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "get manager failed")
 	}

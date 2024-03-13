@@ -21,6 +21,7 @@ package oceanbase
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -74,7 +75,11 @@ func (mgr *Manager) InitializeCluster(context.Context, *dcs.Cluster) error {
 }
 
 func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	role, err := mgr.GetReplicaRole(ctx, cluster)
+	return mgr.IsLeaderMember(ctx, cluster, nil)
+}
+
+func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
+	role, err := mgr.GetReplicaRoleForMember(ctx, cluster, member)
 
 	if err != nil {
 		return false, err
@@ -86,6 +91,7 @@ func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, e
 
 	return false, nil
 }
+
 func (mgr *Manager) MemberHealthyCheck(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) error {
 	switch mgr.CompatibilityMode {
 	case MYSQL:
@@ -93,7 +99,7 @@ func (mgr *Manager) MemberHealthyCheck(ctx context.Context, cluster *dcs.Cluster
 	case ORACLE:
 		return mgr.HealthyCheckForOracleMode(ctx, cluster, member)
 	default:
-		return nil
+		return errors.New("compatibility mode not supported")
 	}
 }
 
@@ -103,12 +109,18 @@ func (mgr *Manager) CurrentMemberHealthyCheck(ctx context.Context, cluster *dcs.
 }
 
 func (mgr *Manager) LeaderHealthyCheck(ctx context.Context, cluster *dcs.Cluster) error {
-	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
-	return mgr.MemberHealthyCheck(ctx, cluster, member)
+	members := mgr.GetMembers(ctx, cluster)
+	for _, member := range members {
+		if strings.EqualFold(member.Role, PRIMARY) {
+			return mgr.MemberHealthyCheck(ctx, cluster, &member)
+		}
+	}
+
+	return errors.New("no leader found")
 }
 
 func (mgr *Manager) HealthyCheckForMySQLMode(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) error {
-	isLeader, err := mgr.IsLeader(ctx, cluster)
+	isLeader, err := mgr.IsLeaderMember(ctx, cluster, member)
 	if err != nil {
 		return err
 	}
@@ -132,6 +144,7 @@ func (mgr *Manager) HealthyCheckForMySQLMode(ctx context.Context, cluster *dcs.C
 }
 
 func (mgr *Manager) HealthyCheckForOracleMode(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) error {
+	// there is no golang driver for oceanbase oracle mode, so we just check the root connection for healthy.
 	isLeader, err := mgr.IsLeader(ctx, cluster)
 	if err != nil {
 		return err

@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"math"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -181,7 +182,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Cluster{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
+			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),
 		}).
 		Owns(&appsv1alpha1.Component{}).
 		Owns(&corev1.Service{}).

@@ -22,7 +22,6 @@ package dataprotection
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -46,6 +45,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // LogCollectionReconciler reconciles a job of the backup and restore to collect the failed message.
@@ -128,7 +128,7 @@ func (r *LogCollectionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return false
 			},
 		})).WithOptions(controller.Options{
-		MaxConcurrentReconciles: runtime.NumCPU(),
+		MaxConcurrentReconciles: viper.GetInt(dptypes.CfgDataProtectionReconcileWorkers),
 	}).Complete(r)
 }
 

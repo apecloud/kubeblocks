@@ -131,7 +131,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
+			MaxConcurrentReconciles: viper.GetInt(dptypes.CfgDataProtectionReconcileWorkers),
 		}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).

@@ -52,6 +52,8 @@ const (
 	ConnectionPasswordAnnotationKey = "dataprotection.kubeblocks.io/connection-password"
 	// GeminiAcknowledgedAnnotationKey indicates whether Gemini has acknowledged the backup.
 	GeminiAcknowledgedAnnotationKey = "dataprotection.kubeblocks.io/gemini-acknowledged"
+	// CfgDataProtectionReconcileWorkers the max reconcile workers for MaxConcurrentReconciles
+	CfgDataProtectionReconcileWorkers = "DATAPROTECTION_RECONCILE_WORKERS"
 )
 
 // label keys

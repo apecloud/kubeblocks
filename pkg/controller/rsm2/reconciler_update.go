@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -445,11 +446,11 @@ func buildReplicas(rsm *workloads.ReplicatedStateMachine) ([]replica, error) {
 
 	// set ownership
 	for _, r := range replicaList {
-		if err := rsm1.SetOwnership(rsm, r.pod, model.GetScheme(), rsm1.GetFinalizer(r.pod)); err != nil {
+		if err := controllerutil.SetControllerReference(rsm, r.pod, model.GetScheme()); err != nil {
 			return nil, err
 		}
 		for _, pvc := range r.pvcs {
-			if err := rsm1.SetOwnership(rsm, pvc, model.GetScheme(), rsm1.GetFinalizer(pvc)); err != nil {
+			if err := controllerutil.SetControllerReference(rsm, pvc, model.GetScheme()); err != nil {
 				return nil, err
 			}
 		}

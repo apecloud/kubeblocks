@@ -100,6 +100,9 @@ func (c *controller) Commit(writer client.Client) error {
 	if c.err != nil {
 		return c.err
 	}
+	if c.oldTree.GetRoot() == nil {
+		return nil
+	}
 	builder := NewPlanBuilder(c.ctx, writer, c.oldTree, c.tree)
 	if err := builder.Init(); err != nil {
 		return err

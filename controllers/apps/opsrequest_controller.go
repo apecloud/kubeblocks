@@ -89,7 +89,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.OpsRequest{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: int(math.Ceil(float64(viper.GetInt(constant.CfgKBReconcileWorkers) / 2))),
+			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
 		}).
 		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseFirstOpsRequest)).
 		Watches(&workloadsv1alpha1.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.parseFirstOpsRequestForRSM)).

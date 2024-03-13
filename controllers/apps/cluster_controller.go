@@ -172,7 +172,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.Cluster{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: int(math.Ceil(float64(viper.GetInt(constant.CfgKBReconcileWorkers) / 4))),
+			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),
 		}).
 		Owns(&appsv1alpha1.Component{}).
 		Owns(&corev1.Service{}). // cluster services

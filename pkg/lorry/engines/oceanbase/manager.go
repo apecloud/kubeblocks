@@ -25,6 +25,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/mysql"
@@ -147,7 +148,7 @@ func (mgr *Manager) GetMembers(ctx context.Context, cluster *dcs.Cluster) []dcs.
 		return nil
 	}
 	updateMembers := false
-	for _, component := range clusterCR.Spec.Components {
+	for _, component := range clusterCR.Spec.ComponentSpecs {
 		hasMember := false
 		for _, member := range mgr.Members {
 			if strings.Contains(member.Name, component.Name) {
@@ -165,18 +166,18 @@ func (mgr *Manager) GetMembers(ctx context.Context, cluster *dcs.Cluster) []dcs.
 	}
 
 	mgr.Members = []dcs.Member{}
-	for _, component := range clusterCR.Spec.Components {
+	for _, component := range clusterCR.Spec.ComponentSpecs {
 		if strings.Contains(mgr.ClusterCompName, component.Name) {
 			mgr.Members = append(mgr.Members, cluster.Members...)
 			continue
 		}
 		k8sStore, _ := dcs.NewKubernetesStore()
 		k8sStore.SetCompName(component.Name)
-		cluster, err := k8sStore.GetCluster()
+		c, err := k8sStore.GetCluster()
 		if err != nil {
 			return nil
 		}
-		mgr.Members = append(mgr.Members, cluster.Members...)
+		mgr.Members = append(mgr.Members, c.Members...)
 	}
 
 	return mgr.Members

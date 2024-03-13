@@ -79,7 +79,8 @@ const (
 	extensionsFlagKey flagName = "extensions"
 	workloadsFlagKey  flagName = "workloads"
 
-	kubeContextsFlagKey flagName = "kube-contexts"
+	multiClusterKubeConfigFlagKey flagName = "multi-cluster-kubeconfig"
+	multiClusterContextsFlagKey   flagName = "multi-cluster-contexts"
 )
 
 var (
@@ -158,7 +159,8 @@ func setupFlags() {
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager.")
 
-	flag.String(kubeContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
+	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
+	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
@@ -239,7 +241,8 @@ func main() {
 		probeAddr              string
 		enableLeaderElection   bool
 		enableLeaderElectionID string
-		kubeContexts           string
+		multiClusterKubeConfig string
+		multiClusterContexts   string
 		err                    error
 	)
 
@@ -270,7 +273,8 @@ func main() {
 	probeAddr = viper.GetString(probeAddrFlagKey.viperName())
 	enableLeaderElection = viper.GetBool(leaderElectFlagKey.viperName())
 	enableLeaderElectionID = viper.GetString(leaderElectIDFlagKey.viperName())
-	kubeContexts = viper.GetString(kubeContextsFlagKey.viperName())
+	multiClusterKubeConfig = viper.GetString(multiClusterKubeConfigFlagKey.viperName())
+	multiClusterContexts = viper.GetString(multiClusterContextsFlagKey.viperName())
 
 	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
 		Scheme:                 scheme,
@@ -305,8 +309,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// multi-cluster manager for all worker k8s
-	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetClient(), kubeContexts)
+	// multi-cluster manager for all data-plane k8s
+	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetClient(), multiClusterKubeConfig, multiClusterContexts)
 	if err != nil {
 		setupLog.Error(err, "unable to setup multi-cluster manager")
 		os.Exit(1)

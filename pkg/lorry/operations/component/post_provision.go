@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package replica
+package component
 
 import (
 	"context"
@@ -30,35 +30,33 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
-type Join struct {
+type PostProvision struct {
 	operations.Base
-	dcsStore dcs.DCS
-	logger   logr.Logger
-	Timeout  time.Duration
-	Command  []string
+	logger  logr.Logger
+	Timeout time.Duration
+	Command []string
 }
 
-var join operations.Operation = &Join{}
+type PostProvisionManager interface {
+	PostProvision(ctx context.Context, componentNames, podNames, podIPs, podHostNames, podHostIPs string) error
+}
+
+var postProvision operations.Operation = &PostProvision{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.JoinMemberOperation)), join)
+	err := operations.Register(strings.ToLower(string(util.PostProvisionOperation)), postProvision)
 	if err != nil {
 		panic(err.Error())
 	}
 }
 
-func (s *Join) Init(ctx context.Context) error {
-	s.dcsStore = dcs.GetStore()
-	if s.dcsStore == nil {
-		return errors.New("dcs store init failed")
-	}
-
+func (s *PostProvision) Init(_ context.Context) error {
 	actionJSON := viper.GetString(constant.KBEnvActionCommands)
 	if actionJSON != "" {
 		actionCommands := map[string][]string{}
@@ -67,32 +65,33 @@ func (s *Join) Init(ctx context.Context) error {
 			s.logger.Info("get action commands failed", "error", err.Error())
 			return err
 		}
-		memberJoinCmd, ok := actionCommands[constant.MemberJoinAction]
-		if ok && len(memberJoinCmd) > 0 {
-			s.Command = memberJoinCmd
+		postProvisionCmd, ok := actionCommands[constant.PostProvisionAction]
+		if ok && len(postProvisionCmd) > 0 {
+			s.Command = postProvisionCmd
 		}
 	}
 	return nil
 }
 
-func (s *Join) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *PostProvision) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+	return nil
+}
+
+func (s *PostProvision) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+	componentNames := req.GetString("componentNames")
+	podNames := req.GetString("podNames")
+	podIPs := req.GetString("podIPs")
+	podHostNames := req.GetString("podHostNames")
+	podHostIPs := req.GetString("podHostIPs")
 	manager, err := register.GetDBManager(s.Command)
 	if err != nil {
 		return nil, errors.Wrap(err, "get manager failed")
 	}
 
-	cluster, err := s.dcsStore.GetCluster()
-	if err != nil {
-		s.logger.Error(err, "get cluster failed")
-		return nil, err
+	ppManager, ok := manager.(PostProvisionManager)
+	if !ok {
+		return nil, models.ErrNoImplemented
 	}
-
-	// join current member to db cluster
-	err = manager.JoinCurrentMemberToCluster(ctx, cluster)
-	if err != nil {
-		s.logger.Error(err, "join member to cluster failed")
-		return nil, err
-	}
-
-	return nil, nil
+	err = ppManager.PostProvision(ctx, componentNames, podNames, podIPs, podHostNames, podHostIPs)
+	return nil, err
 }

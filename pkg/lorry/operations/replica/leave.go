@@ -21,12 +21,15 @@ package replica
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
@@ -38,6 +41,7 @@ type Leave struct {
 	dcsStore dcs.DCS
 	logger   logr.Logger
 	Timeout  time.Duration
+	Command  []string
 }
 
 var leave operations.Operation = &Leave{}
@@ -54,12 +58,24 @@ func (s *Leave) Init(ctx context.Context) error {
 	if s.dcsStore == nil {
 		return errors.New("dcs store init failed")
 	}
-
+	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	if actionJSON != "" {
+		actionCommands := map[string][]string{}
+		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
+		if err != nil {
+			s.logger.Info("get action commands failed", "error", err.Error())
+			return err
+		}
+		memberLeaveCmd, ok := actionCommands[constant.MemberLeaveAction]
+		if ok && len(memberLeaveCmd) > 0 {
+			s.Command = memberLeaveCmd
+		}
+	}
 	return nil
 }
 
 func (s *Leave) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager()
+	manager, err := register.GetDBManager(s.Command)
 	if err != nil {
 		return nil, errors.Wrap(err, "get manager failed")
 	}

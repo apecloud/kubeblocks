@@ -51,6 +51,9 @@ const (
 	ErrorTypeLogfileScheduleDisabled intctrlutil.ErrorType = "LogfileScheduleDisabled"
 	// ErrorTypeWaitForExternalHandler wait for external handler to handle the Backup or Restore
 	ErrorTypeWaitForExternalHandler intctrlutil.ErrorType = "WaitForExternalHandler"
+	// ErrorTypeWaitForBackupRepoPreparation indicates that one should wait for the BackupRepoController to
+	// prepare resources in the namespace.
+	ErrorTypeWaitForBackupRepoPreparation = "WaitForBackupRepoPreparation"
 )
 
 // NewBackupNotSupported returns a new Error with ErrorTypeBackupNotSupported.
@@ -74,8 +77,8 @@ func NewToolConfigSecretNameIsEmpty(backupRepo string) *intctrlutil.Error {
 }
 
 // NewBackupPVCNameIsEmpty returns a new Error with ErrorTypeBackupPVCNameIsEmpty.
-func NewBackupPVCNameIsEmpty(backupRepo, backupPolicyName string) *intctrlutil.Error {
-	return intctrlutil.NewErrorf(ErrorTypeBackupPVCNameIsEmpty, `the persistentVolumeClaim name of %s is empty in BackupPolicy "%s"`, backupRepo, backupPolicyName)
+func NewBackupPVCNameIsEmpty(backupRepo string) *intctrlutil.Error {
+	return intctrlutil.NewErrorf(ErrorTypeBackupPVCNameIsEmpty, `the BackupPVCName is empty in BackupRepo "%s"`, backupRepo)
 }
 
 // NewBackupJobFailed returns a new Error with ErrorTypeBackupJobFailed.

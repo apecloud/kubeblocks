@@ -22,6 +22,7 @@ package restore
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -138,6 +139,118 @@ func (r *RestoreManager) BuildIncrementalBackupActionSets(reqCtx intctrlutil.Req
 	r.PrepareDataBackupSets = sortBackupSets(r.PrepareDataBackupSets, false)
 	r.PostReadyBackupSets = sortBackupSets(r.PostReadyBackupSets, false)
 	return nil
+}
+
+func (r *RestoreManager) BuildContinuousRestoreManager(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackupSet BackupActionSet) error {
+	restoreTime, _ := time.Parse(time.RFC3339, r.Restore.Spec.RestoreTime)
+	continuousBackup := continuousBackupSet.Backup
+	checkRestoreTime := func() error {
+		startTime := continuousBackup.GetStartTime()
+		stopTime := continuousBackup.GetEndTime()
+		if startTime.IsZero() || stopTime.IsZero() {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`startTimeStamp or completeTimeStamp of backup "%s" is empty`, continuousBackup.Name))
+		}
+		if restoreTime.Before(startTime.Time) || restoreTime.After(stopTime.Time) {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`restore time out of the range for backup "%s"`, continuousBackup.Name))
+		}
+		return nil
+	}
+	// check if the restore time is valid.
+	if err := checkRestoreTime(); err != nil {
+		return err
+	}
+	fullBackupSet, err := r.getFullBackupActionSetForContinuous(reqCtx, cli, continuousBackup, metav1.NewTime(restoreTime))
+	if err != nil || fullBackupSet == nil {
+		return err
+	}
+	// set base backup
+	continuousBackupSet.BaseBackup = fullBackupSet.Backup
+	r.SetBackupSets(*fullBackupSet, continuousBackupSet)
+	return nil
+}
+
+// getFullBackupActionSetForContinuous gets full backup and actionSet for continuous.
+func (r *RestoreManager) getFullBackupActionSetForContinuous(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackup *dpv1alpha1.Backup, restoreTime metav1.Time) (*BackupActionSet, error) {
+	notFoundLatestFullBackup := func() (*BackupActionSet, error) {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found latest full backup based on backupPolicy "%s" and specified restoreTime "%s"`,
+			continuousBackup.Spec.BackupPolicyName, restoreTime))
+	}
+	if continuousBackup.GetStartTime().IsZero() {
+		return notFoundLatestFullBackup()
+	}
+	// 1. list completed full backups
+	backupItems, err := r.listCompletedFullBackups(reqCtx, cli, continuousBackup)
+	if err != nil {
+		return nil, err
+	}
+
+	// sort by completed time in descending order
+	sort.Slice(backupItems, func(i, j int) bool {
+		i, j = j, i
+		return CompareWithBackupStopTime(backupItems[i], backupItems[j])
+	})
+
+	// 2. get the latest backup object
+	var latestFullBackup *dpv1alpha1.Backup
+	for _, item := range backupItems {
+		fullBackupStopTime := item.GetEndTime()
+		// latest full backup rules:
+		// 1. Full backup's stopTime must after Continuous backup's startTime.
+		//    Even if the seconds are the same, the data may not be continuous.
+		// 2. RestoreTime should after the Full backup's stopTime.
+		if fullBackupStopTime != nil &&
+			!restoreTime.Before(fullBackupStopTime) &&
+			!fullBackupStopTime.Before(continuousBackup.GetStartTime()) {
+			latestFullBackup = &item
+			break
+		}
+	}
+	if latestFullBackup == nil {
+		return notFoundLatestFullBackup()
+	}
+	// 3. get the action set
+	var actionSetName string
+	if latestFullBackup.Status.BackupMethod != nil {
+		actionSetName = latestFullBackup.Status.BackupMethod.ActionSetName
+	}
+	actionSet, err := utils.GetActionSetByName(reqCtx, cli, actionSetName)
+	if err != nil {
+		return nil, err
+	}
+	return &BackupActionSet{Backup: latestFullBackup, ActionSet: actionSet}, nil
+}
+
+func (r *RestoreManager) listCompletedFullBackups(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackup *dpv1alpha1.Backup) ([]dpv1alpha1.Backup, error) {
+	matchingLabels := map[string]string{
+		dptypes.BackupTypeLabelKey: string(dpv1alpha1.BackupTypeFull),
+	}
+	if clusterUID := continuousBackup.Labels[dptypes.ClusterUIDLabelKey]; clusterUID != "" {
+		matchingLabels[dptypes.ClusterUIDLabelKey] = clusterUID
+	}
+	if instance := continuousBackup.Labels[constant.AppInstanceLabelKey]; instance != "" {
+		matchingLabels[constant.AppInstanceLabelKey] = instance
+	}
+	if compName := continuousBackup.Labels[constant.KBAppComponentLabelKey]; compName != "" {
+		matchingLabels[constant.KBAppComponentLabelKey] = compName
+	}
+	if len(matchingLabels) == 1 {
+		// if only backupType label exists, need to match based on whether it is the same policy.
+		matchingLabels[dptypes.BackupPolicyLabelKey] = continuousBackup.Spec.BackupPolicyName
+	}
+	backups := dpv1alpha1.BackupList{}
+	if err := cli.List(reqCtx.Ctx, &backups,
+		client.InNamespace(continuousBackup.Namespace),
+		client.MatchingLabels(matchingLabels),
+	); err != nil {
+		return nil, err
+	}
+	backupItems := []dpv1alpha1.Backup{}
+	for _, b := range backups.Items {
+		if b.Status.Phase == dpv1alpha1.BackupPhaseCompleted {
+			backupItems = append(backupItems, b)
+		}
+	}
+	return backupItems, nil
 }
 
 func (r *RestoreManager) SetBackupSets(backupSets ...BackupActionSet) {

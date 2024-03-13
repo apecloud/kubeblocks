@@ -56,6 +56,7 @@ var managerNewFuncs = make(map[string]managerNewFunc)
 // Lorry runs with a single database engine instance at a time,
 // so only one dbManager is initialized and cached here during execution.
 var dbManager engines.DBManager
+var customManager engines.DBManager
 
 var fs = afero.NewOsFs()
 
@@ -100,11 +101,22 @@ func GetManagerNewFunc(characterType, workloadType string) managerNewFunc {
 	return managerNewFuncs[key]
 }
 
+func SetCustomManager(manager engines.DBManager) {
+	customManager = manager
+}
+
+func GetCustomManager(cmd []string) engines.DBManager {
+	return customManager
+}
+
 func SetDBManager(manager engines.DBManager) {
 	dbManager = manager
 }
 
-func GetDBManager() (engines.DBManager, error) {
+func GetDBManager(cmd []string) (engines.DBManager, error) {
+	if len(cmd) > 0 {
+		return customManager, nil
+	}
 	if dbManager != nil {
 		return dbManager, nil
 	}
@@ -158,6 +170,16 @@ func InitDBManager(configDir string) error {
 	}
 
 	dbManager = mgr
+
+	newCustomFunc := GetManagerNewFunc(string(models.Custom), "")
+	if newCustomFunc == nil {
+		return errors.New("no custom db manager")
+	}
+	customManager, err = newCustomFunc(properties)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

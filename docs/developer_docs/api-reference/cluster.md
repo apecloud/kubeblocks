@@ -1680,7 +1680,7 @@ The actions are called only when the modified parameter is defined in dynamicPar
 </tr>
 <tr>
 <td>
-<code>forceHotUpdate</code><br/>
+<code>dynamicActionCanBeMerged</code><br/>
 <em>
 bool
 </em>
@@ -1691,6 +1691,20 @@ bool
 <p>When a batch of parameters updates incur both restart &amp; dynamic reload, it works as:
 - set to true, the two actions merged to only one restart action
 - set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicParameterSelectedPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">
+DynamicParameterSelectedPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for selecting the parameters of dynamic reload actions.</p>
 </td>
 </tr>
 <tr>
@@ -6531,6 +6545,20 @@ string
 <p>An optional field where the list of containers will be injected into EnvFrom.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>reRenderResourceTypes</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RerenderResourceType">
+[]RerenderResourceType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>An optional field defines which resources change trigger re-render config.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef
@@ -7227,17 +7255,31 @@ LifecycleActionHandler
 <em>(Optional)</em>
 <p>Defines the method to add a new replica to the replication group.
 This action is typically invoked when a new replica needs to be added, such as during scale-out.
-It may involve updating configuration, notifying other members, and ensuring data consistency.</p>
+The function does not specify or constrain the role of the new member. The role assignment
+is handled by the scripts implemented in the action commands. This provides flexibility
+as the new member can be automatically scaled and assigned a role based on the cluster&rsquo;s needs.</p>
 <p>The following dedicated environment variables are available for the action:</p>
 <ul>
 <li>KB_SERVICE_PORT: The port on which the DB service listens.</li>
 <li>KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.</li>
 <li>KB_SERVICE_PASSWORD: The password of the user used to access the DB service .</li>
-<li>KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.</li>
+<li>KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod.</li>
+<li>KB_MEMBER_ADDRESSES: The addresses of all members.</li>
 <li>KB_NEW_MEMBER_POD_NAME: The name of the new member&rsquo;s Pod.</li>
+<li>KB_NEW_MEMBER_POD_IP: The name of the new member&rsquo;s Pod.</li>
 </ul>
 <p>Output of the action:
 - ERROR: Any error message if the action fails.</p>
+<p>For example, the following command can be used to add a new OBServer to the OceanBase Cluster in zone1:
+command:
+- bash
+- -c
+- |
+ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
+HOST=$(echo $ADDRESS | cut -d &lsquo;:&rsquo; -f 1)
+PORT=$(echo $ADDRESS | cut -d &lsquo;:&rsquo; -f 2)
+CLIENT=&ldquo;mysql -u $KB_SERVICE_USER -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e&rdquo;
+$CLIENT &ldquo;ALTER SYSTEM ADD SERVER &lsquo;$KB_NEW_MEMBER_POD_IP:$KB_SERVICE_PORT&rsquo; ZONE &lsquo;zone1&rsquo;&rdquo;</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>
@@ -7261,11 +7303,23 @@ but it is advisable to avoid performing data migration within this action.</p>
 <li>KB_SERVICE_PORT: The port on which the DB service listens.</li>
 <li>KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.</li>
 <li>KB_SERVICE_PASSWORD: The password of the user used to access the DB service.</li>
-<li>KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.</li>
+<li>KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod.</li>
+<li>KB_MEMBER_ADDRESSES: The addresses of all members.</li>
 <li>KB_LEAVE_MEMBER_POD_NAME: The name of the leave member&rsquo;s Pod.</li>
+<li>KB_LEAVE_MEMBER_POD_IP: The IP of the leave member&rsquo;s Pod.</li>
 </ul>
 <p>Output of the action:
 - ERROR: Any error message if the action fails.</p>
+<p>For example, the following command can be used to delete a OBServer from the OceanBase Cluster in zone1:
+command:
+- bash
+- -c
+- |
+ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
+HOST=$(echo $ADDRESS | cut -d &lsquo;:&rsquo; -f 1)
+PORT=$(echo $ADDRESS | cut -d &lsquo;:&rsquo; -f 2)
+CLIENT=&ldquo;mysql -u $KB_SERVICE_USER  -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e&rdquo;
+$CLIENT &ldquo;ALTER SYSTEM DELETE SERVER &lsquo;$KB_NEW_MEMBER_POD_IP:$KB_SERVICE_PORT&rsquo; ZONE &lsquo;zone1&rsquo;&rdquo;</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>
@@ -8359,7 +8413,7 @@ The actions are called only when the modified parameter is defined in dynamicPar
 </tr>
 <tr>
 <td>
-<code>forceHotUpdate</code><br/>
+<code>dynamicActionCanBeMerged</code><br/>
 <em>
 bool
 </em>
@@ -8370,6 +8424,20 @@ bool
 <p>When a batch of parameters updates incur both restart &amp; dynamic reload, it works as:
 - set to true, the two actions merged to only one restart action
 - set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicParameterSelectedPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">
+DynamicParameterSelectedPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for selecting the parameters of dynamic reload actions.</p>
 </td>
 </tr>
 <tr>
@@ -9945,6 +10013,27 @@ string
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">DynamicParameterSelectedPolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+<p>DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;all&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;dynamic&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.EnvMappingVar">EnvMappingVar
 </h3>
@@ -14635,6 +14724,27 @@ StatefulSetSpec
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RerenderResourceType">RerenderResourceType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
+</p>
+<div>
+<p>RerenderResourceType defines the resource requirements for a component.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;replicas&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;resources&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ResourceConstraintRule">ResourceConstraintRule
 </h3>
 <p>
@@ -18077,17 +18187,17 @@ string
 </thead>
 <tbody><tr><td><p>&#34;autoReload&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;reloadAndRestart&#34;</p></td>
+</tr><tr><td><p>&#34;dynamicReloadBeginRestart&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;none&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;simple&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;operatorSyncUpdate&#34;</p></td>
-<td></td>
 </tr><tr><td><p>&#34;parallel&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;rolling&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;operatorSyncUpdate&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

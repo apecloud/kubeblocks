@@ -136,7 +136,22 @@ type ComponentConfigSpec struct {
 	// +listType=set
 	// +optional
 	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
+
+	// An optional field defines which resources change trigger re-render config.
+	// +listType=set
+	// +optional
+	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`
 }
+
+// RerenderResourceType defines the resource requirements for a component.
+// +enum
+// +kubebuilder:validation:Enum={resources,replcias,tls}
+type RerenderResourceType string
+
+const (
+	ComponentResourceType RerenderResourceType = "resources"
+	ComponentReplicasType RerenderResourceType = "replicas"
+)
 
 // MergedPolicy defines how to merge external imported templates into component templates.
 // +enum
@@ -255,6 +270,17 @@ const (
 	CCAvailablePhase   ConfigConstraintPhase = "Available"
 	CCUnavailablePhase ConfigConstraintPhase = "Unavailable"
 	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
+)
+
+// DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions
+//
+// +enum
+// +kubebuilder:validation:Enum={all,dynamic}
+type DynamicParameterSelectedPolicy string
+
+const (
+	SelectedAllParameters     DynamicParameterSelectedPolicy = "all"
+	SelectedDynamicParameters DynamicParameterSelectedPolicy = "dynamic"
 )
 
 // OpsPhase defines opsRequest phase.
@@ -644,17 +670,17 @@ const (
 
 // UpgradePolicy defines the policy of reconfiguring.
 // +enum
-// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate}
+// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate,dynamicReloadBeginRestart}
 type UpgradePolicy string
 
 const (
-	NonePolicy                UpgradePolicy = "none"
-	NormalPolicy              UpgradePolicy = "simple"
-	RestartPolicy             UpgradePolicy = "parallel"
-	RollingPolicy             UpgradePolicy = "rolling"
-	AutoReload                UpgradePolicy = "autoReload"
-	HotUpdateAndRestartPolicy UpgradePolicy = "reloadAndRestart"
-	OperatorSyncUpdate        UpgradePolicy = "operatorSyncUpdate"
+	NonePolicy                    UpgradePolicy = "none"
+	NormalPolicy                  UpgradePolicy = "simple"
+	RestartPolicy                 UpgradePolicy = "parallel"
+	RollingPolicy                 UpgradePolicy = "rolling"
+	AsyncDynamicReloadPolicy      UpgradePolicy = "autoReload"
+	SyncDynamicReloadPolicy       UpgradePolicy = "operatorSyncUpdate"
+	DynamicReloadAndRestartPolicy UpgradePolicy = "dynamicReloadBeginRestart"
 )
 
 // CfgReloadType defines reload method.

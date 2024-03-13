@@ -51,7 +51,7 @@ func init() {
 }
 
 func (s *DescribeUser) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager()
+	dbManager, err := register.GetDBManager(nil)
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}

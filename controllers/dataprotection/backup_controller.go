@@ -28,6 +28,7 @@ import (
 
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,7 +52,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
-	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
@@ -119,6 +119,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return r.handleCompletedPhase(reqCtx, backup)
 	case dpv1alpha1.BackupPhaseDeleting:
 		return r.handleDeletingPhase(reqCtx, backup)
+	case dpv1alpha1.BackupPhaseFailed:
+		if backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous) {
+			return r.handleRunningPhase(reqCtx, backup)
+		}
+		return intctrlutil.Reconciled()
 	default:
 		return intctrlutil.Reconciled()
 	}
@@ -129,9 +134,11 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
+			MaxConcurrentReconciles: viper.GetInt(dptypes.CfgDataProtectionReconcileWorkers),
 		}).
+		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterBackupPods)).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupJob))
 
 	if dputils.SupportsVolumeSnapshotV1() {
@@ -140,6 +147,30 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		b.Owns(&vsv1beta1.VolumeSnapshot{}, builder.Predicates{})
 	}
 	return b.Complete(r)
+}
+
+func (r *BackupReconciler) filterBackupPods(ctx context.Context, obj client.Object) []reconcile.Request {
+	var requests []reconcile.Request
+	labels := obj.GetLabels()
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+		return requests
+	}
+	backupName, ok := labels[dptypes.BackupNameLabelKey]
+	if !ok {
+		return requests
+	}
+	for _, v := range obj.GetOwnerReferences() {
+		if v.Kind == constant.StatefulSetKind && v.Name == backupName {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: obj.GetNamespace(),
+					Name:      backupName,
+				},
+			})
+			break
+		}
+	}
+	return requests
 }
 
 func (r *BackupReconciler) parseBackupJob(_ context.Context, object client.Object) []reconcile.Request {
@@ -230,9 +261,6 @@ func (r *BackupReconciler) handleNewPhase(
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
-		if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) {
-			return RecorderEventAndRequeue(reqCtx, r.Recorder, backup, err)
-		}
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
 
@@ -294,20 +322,8 @@ func (r *BackupReconciler) prepareBackupRequest(
 		actionSet, err := dputils.GetActionSetByName(reqCtx, r.Client, backupMethod.ActionSetName)
 		if err != nil {
 			return nil, err
-		} else if actionSet.Spec.BackupType != dpv1alpha1.BackupTypeFull {
-			// TODO: refactor it if supports other backup type.
-			return nil, intctrlutil.NewErrorf(dperrors.ErrorTypeWaitForExternalHandler,
-				`wait for external handler to handle this backup type "%s"`, actionSet.Spec.BackupType)
 		}
 		request.ActionSet = actionSet
-	}
-
-	if !snapshotVolumes && backupPolicy.Spec.UseKopia {
-		acked := backup.Annotations[dptypes.GeminiAcknowledgedAnnotationKey]
-		if acked != trueVal {
-			return nil, intctrlutil.NewErrorf(dperrors.ErrorTypeWaitForExternalHandler,
-				`wait for external handler to handle this backup because policy.spec.useKopia is true`)
-		}
 	}
 
 	// check encryption config
@@ -399,11 +415,16 @@ func (r *BackupReconciler) handleRunningPhase(
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
-		// external controller is already processing it, only mark reconciled
-		if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) {
+		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
+	}
+
+	if request.ActionSet != nil && request.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeContinuous {
+		// check if the continuous backup is completed.
+		if completed, err := r.checkIsCompletedDuringRunning(reqCtx, request); err != nil {
+			return RecorderEventAndRequeue(reqCtx, r.Recorder, backup, err)
+		} else if completed {
 			return intctrlutil.Reconciled()
 		}
-		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
 
 	// there are actions not completed, continue to handle following actions
@@ -473,6 +494,55 @@ func (r *BackupReconciler) handleRunningPhase(
 	return intctrlutil.Reconciled()
 }
 
+// checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,
+// backup phase should be Completed.
+func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.RequestCtx,
+	request *dpbackup.Request) (bool, error) {
+	backupScheduleList := &dpv1alpha1.BackupScheduleList{}
+	if err := r.Client.List(reqCtx.Ctx, backupScheduleList, client.MatchingLabels{
+		dptypes.BackupPolicyLabelKey: request.Backup.Spec.BackupPolicyName,
+	}); err != nil {
+		return false, err
+	}
+	var (
+		enabled             *bool
+		targetClusterExists = true
+	)
+	// check if Continuous backupMethod is enabled
+	for _, v := range backupScheduleList.Items {
+		for _, method := range v.Spec.Schedules {
+			if method.BackupMethod == request.Spec.BackupMethod {
+				enabled = method.Enabled
+				break
+			}
+		}
+	}
+	// check if target cluster exits
+	clusterName := request.Labels[constant.AppInstanceLabelKey]
+	if clusterName != "" {
+		cluster := &appsv1alpha1.Cluster{}
+		var err error
+		targetClusterExists, err = intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
+			client.ObjectKey{Name: clusterName, Namespace: request.Namespace}, cluster)
+		if err != nil {
+			return false, err
+		}
+	}
+	if boolptr.IsSetToTrue(enabled) && targetClusterExists {
+		return false, nil
+	}
+	patch := client.MergeFrom(request.Backup.DeepCopy())
+	request.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+	request.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	_ = dpbackup.SetExpirationByCreationTime(request.Backup)
+	if !request.Status.StartTimestamp.IsZero() {
+		// round the duration to a multiple of seconds.
+		duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
+		request.Status.Duration = &metav1.Duration{Duration: duration}
+	}
+	return true, r.Client.Status().Patch(reqCtx.Ctx, request.Backup, patch)
+}
+
 // handleCompletedPhase handles the backup object in completed phase.
 // It will delete the reference workloads.
 func (r *BackupReconciler) handleCompletedPhase(
@@ -490,6 +560,9 @@ func (r *BackupReconciler) updateStatusIfFailed(
 	original *dpv1alpha1.Backup,
 	backup *dpv1alpha1.Backup,
 	err error) (ctrl.Result, error) {
+	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 	sendWarningEventForError(r.Recorder, backup, err)
 	backup.Status.Phase = dpv1alpha1.BackupPhaseFailed
 	backup.Status.FailureReason = err.Error()
@@ -522,11 +595,34 @@ func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,
 	return deleter.DeleteVolumeSnapshots(backup)
 }
 
+// deleteExternalStatefulSet deletes the external statefulSet.
+func (r *BackupReconciler) deleteExternalStatefulSet(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+	key := client.ObjectKey{
+		Namespace: backup.Namespace,
+		Name:      backup.Name,
+	}
+	sts := &appsv1.StatefulSet{}
+	if err := r.Client.Get(reqCtx.Ctx, key, sts); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	patch := client.MergeFrom(sts.DeepCopy())
+	controllerutil.RemoveFinalizer(sts, dptypes.DataProtectionFinalizerName)
+	if err := r.Client.Patch(reqCtx.Ctx, sts, patch); err != nil {
+		return err
+	}
+	reqCtx.Log.V(1).Info("delete statefulSet", "statefulSet", sts)
+	return intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, sts)
+}
+
 // deleteExternalResources deletes the external workloads that execute backup.
 // Currently, it only supports two types of workloads: job.
 func (r *BackupReconciler) deleteExternalResources(
 	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	return r.deleteExternalJobs(reqCtx, backup)
+	if err := r.deleteExternalJobs(reqCtx, backup); err != nil {
+		return err
+	}
+	return r.deleteExternalStatefulSet(reqCtx, backup)
 }
 
 // PatchBackupObjectMeta patches backup object metaObject include cluster snapshot.

@@ -99,7 +99,7 @@ func (p *Protection) Init(ctx context.Context) error {
 	}
 	p.SendEvent = true
 
-	dbManager, err := register.GetDBManager()
+	dbManager, err := register.GetDBManager(nil)
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}

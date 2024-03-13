@@ -22,9 +22,9 @@ package dataprotection
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"strings"
 
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -107,7 +107,7 @@ func (r *LogCollectionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				r:     r,
 			})).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: runtime.NumCPU(),
+			MaxConcurrentReconciles: viper.GetInt(dptypes.CfgDataProtectionReconcileWorkers),
 		}).
 		Complete(r)
 }

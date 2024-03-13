@@ -105,14 +105,17 @@ As discovered, components may refer to each other and the figure below shows the
 
 ![Nebula Inter-Component References](./../../img/nebula-inter-component-ref.png)
 
-Therefore, three common types of inter-component references are: \
+Therefore, three common types of inter-component references are:
 
 1. **Service Reference**
-   e.g., Nebula-Console needs to obtain the service name of Nebula-Graphd.
+
+   E.g., Nebula-Console needs to obtain the service name of Nebula-Graphd.
 2. **HostName Reference**
-   e.g., Nebula-Graphd needs to configure the DNS of all Pods of Nebula-metad. This reference typically points to a stateful component.
+
+   E.g., Nebula-Graphd needs to configure the DNS of all Pods of Nebula-metad. This reference typically points to a stateful component.
 3. **Field Reference**
-   e.g., Nebula-Console needs to obtain a service port name of Nebula-Graphd.
+
+   E.g., Nebula-Console needs to obtain a service port name of Nebula-Graphd.
 
 To ensure that the cluster starts normally, the above information needs to be injected into the Pod through environment variables (whether it is loaded through configmap or defined as pod env).
 

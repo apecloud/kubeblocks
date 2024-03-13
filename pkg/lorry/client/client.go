@@ -211,6 +211,38 @@ func (cli *lorryClient) LeaveMember(ctx context.Context) error {
 	return err
 }
 
+// Lock sends a set readonly request to Lorry.
+func (cli *lorryClient) Lock(ctx context.Context) error {
+	_, err := cli.Request(ctx, string(LockOperation), http.MethodPost, nil)
+	return err
+}
+
+// Unlock sends a set readwrite request to Lorry.
+func (cli *lorryClient) Unlock(ctx context.Context) error {
+	_, err := cli.Request(ctx, string(UnlockOperation), http.MethodPost, nil)
+	return err
+}
+
+// PostProvision sends a component post provision request to Lorry.
+func (cli *lorryClient) PostProvision(ctx context.Context, componentNames, podNames, podIPs, podHostNames, podHostIPs string) error {
+	parameters := map[string]any{
+		"componentNames": componentNames,
+		"podNames":       podNames,
+		"podIPs":         podIPs,
+		"podHostNames":   podHostNames,
+		"podHostIPs":     podHostIPs,
+	}
+	req := map[string]any{"parameters": parameters}
+	_, err := cli.Request(ctx, string(PostProvisionOperation), http.MethodPost, req)
+	return err
+}
+
+// PreTerminate sends a pre terminate request to Lorry.
+func (cli *lorryClient) PreTerminate(ctx context.Context) error {
+	_, err := cli.Request(ctx, string(PreTerminateOperation), http.MethodPost, nil)
+	return err
+}
+
 func (cli *lorryClient) Request(ctx context.Context, operation, method string, req map[string]any) (map[string]any, error) {
 	if cli.requester == nil {
 		return nil, errors.New("lorry client's requester must be set")

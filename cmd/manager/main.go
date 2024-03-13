@@ -34,7 +34,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	discoverycli "k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -83,7 +83,7 @@ const (
 )
 
 var (
-	scheme   = runtime.NewScheme()
+	scheme   = k8sruntime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
 
@@ -127,6 +127,7 @@ func init() {
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
 	viper.SetDefault(rsm.FeatureGateRSMToPod, true)
 	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
+	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 }
 
 type flagName string
@@ -271,7 +272,7 @@ func main() {
 	enableLeaderElectionID = viper.GetString(leaderElectIDFlagKey.viperName())
 	kubeContexts = viper.GetString(kubeContextsFlagKey.viperName())
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,

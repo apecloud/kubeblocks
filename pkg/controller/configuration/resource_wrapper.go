@@ -27,6 +27,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -45,7 +46,8 @@ type ResourceFetcher[T any] struct {
 	obj *T
 	*ResourceCtx
 
-	ClusterObj *appsv1alpha1.Cluster
+	ClusterObj   *appsv1alpha1.Cluster
+	ComponentObj *appsv1alpha1.Component
 	// Deprecated: this API will be removed from version 0.9.0
 	ClusterDefObj *appsv1alpha1.ClusterDefinition
 	// Deprecated: use ComponentDefinition instead
@@ -84,6 +86,17 @@ func (r *ResourceFetcher[T]) Cluster() *T {
 	})
 }
 
+func (r *ResourceFetcher[T]) Component() *T {
+	componentKey := client.ObjectKey{
+		Namespace: r.Namespace,
+		Name:      constant.GenerateClusterComponentName(r.ClusterName, r.ComponentName),
+	}
+	return r.Wrap(func() error {
+		r.ComponentObj = &appsv1alpha1.Component{}
+		return r.Client.Get(r.Context, componentKey, r.ComponentObj)
+	})
+}
+
 // ClusterDef get clusterDefinition cr
 // Deprecated: use ComponentDefinition instead
 func (r *ResourceFetcher[T]) ClusterDef() *T {
@@ -113,7 +126,7 @@ func (r *ResourceFetcher[T]) ClusterVer() *T {
 	})
 }
 
-func (r *ResourceFetcher[T]) ClusterComponent() *T {
+func (r *ResourceFetcher[T]) ComponentSpec() *T {
 	return r.Wrap(func() (err error) {
 		r.ClusterComObj, err = controllerutil.GetOriginalOrGeneratedComponentSpecByName(r.Context, r.Client, r.ClusterObj, r.ComponentName)
 		if err != nil {

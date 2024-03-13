@@ -64,7 +64,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest configurations
 		ml := client.HasLabels{testCtx.TestObjLabelKey}

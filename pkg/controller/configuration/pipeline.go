@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -38,9 +39,10 @@ import (
 type ReconcileCtx struct {
 	*ResourceCtx
 
-	Cluster   *appsv1alpha1.Cluster
-	Component *component.SynthesizedComponent
-	PodSpec   *corev1.PodSpec
+	Cluster              *appsv1alpha1.Cluster
+	Component            *appsv1alpha1.Component
+	SynthesizedComponent *component.SynthesizedComponent
+	PodSpec              *corev1.PodSpec
 
 	Cache []client.Object
 }
@@ -90,8 +92,8 @@ func (p *pipeline) Prepare() *pipeline {
 		ctx := p.ctx
 		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.Context, p.Client)
 		// Prepare built-in objects and built-in functions
-		templateBuilder.injectBuiltInObjectsAndFunctions(ctx.PodSpec, ctx.Component.ConfigTemplates, ctx.Component, ctx.Cache, ctx.Cluster)
-		p.renderWrapper = newTemplateRenderWrapper(templateBuilder, ctx.Cluster, p.Context, ctx.Client)
+		templateBuilder.injectBuiltInObjectsAndFunctions(ctx.PodSpec, ctx.SynthesizedComponent.ConfigTemplates, ctx.SynthesizedComponent, ctx.Cache, ctx.Cluster)
+		p.renderWrapper = newTemplateRenderWrapper(p.Context, ctx.Client, templateBuilder, ctx.Cluster, ctx.Component)
 		return
 	}
 
@@ -101,14 +103,18 @@ func (p *pipeline) Prepare() *pipeline {
 func (p *pipeline) RenderScriptTemplate() *pipeline {
 	return p.Wrap(func() error {
 		ctx := p.ctx
-		return p.renderWrapper.renderScriptTemplate(ctx.Cluster, ctx.Component, ctx.Cache)
+		return p.renderWrapper.renderScriptTemplate(ctx.Cluster, ctx.SynthesizedComponent, ctx.Cache)
 	})
 }
 
 func (p *pipeline) UpdateConfiguration() *pipeline {
 	buildConfiguration := func() (err error) {
 		expectedConfiguration := p.createConfiguration()
-		if intctrlutil.SetControllerReference(p.ctx.Cluster, expectedConfiguration) != nil {
+		comp, err := p.getComponent()
+		if err != nil {
+			return err
+		}
+		if intctrlutil.SetControllerReference(comp, expectedConfiguration) != nil {
 			return
 		}
 
@@ -126,10 +132,19 @@ func (p *pipeline) UpdateConfiguration() *pipeline {
 	return p.Wrap(buildConfiguration)
 }
 
+func (p *pipeline) getComponent() (*appsv1alpha1.Component, error) {
+	comp := &appsv1alpha1.Component{}
+	err := p.Client.Get(p.ctx.Context, types.NamespacedName{Name: p.ctx.SynthesizedComponent.FullCompName, Namespace: p.ctx.Cluster.Namespace}, comp)
+	if err != nil {
+		return nil, core.MakeError("get component %s failed: %v", p.ctx.SynthesizedComponent.FullCompName, err)
+	}
+	return comp, nil
+}
+
 func (p *pipeline) CreateConfigTemplate() *pipeline {
 	return p.Wrap(func() error {
 		ctx := p.ctx
-		return p.renderWrapper.renderConfigTemplate(ctx.Cluster, ctx.Component, ctx.Cache, p.ConfigurationObj)
+		return p.renderWrapper.renderConfigTemplate(ctx.Cluster, ctx.SynthesizedComponent, ctx.Cache, p.ConfigurationObj)
 	})
 }
 
@@ -183,13 +198,13 @@ func (p *pipeline) UpdatePodVolumes() *pipeline {
 
 func (p *pipeline) BuildConfigManagerSidecar() *pipeline {
 	return p.Wrap(func() error {
-		return buildConfigManagerWithComponent(p.ctx.PodSpec, p.ctx.Component.ConfigTemplates, p.Context, p.Client, p.ctx.Cluster, p.ctx.Component)
+		return buildConfigManagerWithComponent(p.ctx.PodSpec, p.ctx.SynthesizedComponent.ConfigTemplates, p.Context, p.Client, p.ctx.Cluster, p.ctx.SynthesizedComponent)
 	})
 }
 
 func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
 	updateMeta := func() error {
-		if err := injectTemplateEnvFrom(p.ctx.Cluster, p.ctx.Component, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {
+		if err := injectTemplateEnvFrom(p.ctx.Cluster, p.ctx.SynthesizedComponent, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {
 			return err
 		}
 		return createConfigObjects(p.Client, p.Context, p.renderWrapper.renderedObjs)
@@ -202,12 +217,12 @@ func (p *pipeline) createConfiguration() *appsv1alpha1.Configuration {
 	builder := builder.NewConfigurationBuilder(p.Namespace,
 		core.GenerateComponentConfigurationName(p.ClusterName, p.ComponentName),
 	)
-	for _, template := range p.ctx.Component.ConfigTemplates {
+	for _, template := range p.ctx.SynthesizedComponent.ConfigTemplates {
 		builder.AddConfigurationItem(template)
 	}
 	return builder.Component(p.ComponentName).
 		ClusterRef(p.ClusterName).
-		AddLabelsInMap(constant.GetClusterWellKnownLabels(p.ClusterName)).
+		AddLabelsInMap(constant.GetComponentWellKnownLabels(p.ClusterName, p.ComponentName)).
 		GetObject()
 }
 
@@ -257,8 +272,8 @@ func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.Context, p.Client)
 		// Prepare built-in objects and built-in functions
 		templateBuilder.injectBuiltInObjectsAndFunctions(p.ctx.PodSpec,
-			[]appsv1alpha1.ComponentConfigSpec{*p.configSpec}, p.ctx.Component, p.ctx.Cache, p.ctx.Cluster)
-		p.renderWrapper = newTemplateRenderWrapper(templateBuilder, p.ctx.Cluster, p.Context, p.Client)
+			[]appsv1alpha1.ComponentConfigSpec{*p.configSpec}, p.ctx.SynthesizedComponent, p.ctx.Cache, p.ctx.Cluster)
+		p.renderWrapper = newTemplateRenderWrapper(p.Context, p.Client, templateBuilder, p.ctx.Cluster, p.ctx.Component)
 		return
 	}
 	return p.Wrap(buildTemplate)
@@ -271,7 +286,7 @@ func (p *updatePipeline) ConfigSpec() *appsv1alpha1.ComponentConfigSpec {
 func (p *updatePipeline) InitConfigSpec() *updatePipeline {
 	return p.Wrap(func() (err error) {
 		if p.configSpec == nil {
-			p.configSpec = component.GetConfigSpecByName(p.ctx.Component, p.item.Name)
+			p.configSpec = component.GetConfigSpecByName(p.ctx.SynthesizedComponent, p.item.Name)
 			if p.configSpec == nil {
 				return core.MakeError("not found config spec: %s", p.item.Name)
 			}
@@ -286,7 +301,7 @@ func (p *updatePipeline) RerenderTemplate() *updatePipeline {
 			return
 		}
 		if intctrlutil.IsRerender(p.ConfigMapObj, p.item) {
-			p.newCM, err = p.renderWrapper.rerenderConfigTemplate(p.ctx.Cluster, p.ctx.Component, *p.configSpec, &p.item)
+			p.newCM, err = p.renderWrapper.rerenderConfigTemplate(p.ctx.Cluster, p.ctx.SynthesizedComponent, *p.configSpec, &p.item)
 		} else {
 			p.newCM = p.ConfigMapObj.DeepCopy()
 		}

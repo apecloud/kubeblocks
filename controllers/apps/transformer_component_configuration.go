@@ -89,6 +89,7 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 			ComponentName: synthesizeComp.Name,
 		},
 		cluster,
+		comp,
 		synthesizeComp,
 		synthesizeComp.PodSpec,
 		dependOnObjs); err != nil {

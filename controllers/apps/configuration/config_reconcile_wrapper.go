@@ -64,7 +64,8 @@ func newConfigReconcileContext(resourceCtx *configctrl.ResourceCtx,
 
 func (c *configReconcileContext) GetRelatedObjects() error {
 	return c.Cluster().
-		ClusterComponent().
+		Component().
+		ComponentSpec().
 		RSM().
 		SynthesizedComponent().
 		Complete()

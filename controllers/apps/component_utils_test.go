@@ -77,7 +77,7 @@ var _ = Describe("Component Utils", func() {
 		// create the new objects.
 		By("clean resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// clear rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)

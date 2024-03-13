@@ -141,6 +141,7 @@ const (
 	ComponentReplicasAnnotationKey              = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
 	BackupPolicyTemplateAnnotationKey           = "apps.kubeblocks.io/backup-policy-template"
 	LastAppliedClusterAnnotationKey             = "apps.kubeblocks.io/last-applied-cluster"
+	LastAppliedComponentAnnotationKey           = "apps.kubeblocks.io/last-applied-component"
 	PVLastClaimPolicyAnnotationKey              = "apps.kubeblocks.io/pv-last-claim-policy"
 	HaltRecoveryAllowInconsistentCVAnnotKey     = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
 	HaltRecoveryAllowInconsistentResAnnotKey    = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"

@@ -21,9 +21,6 @@ package component
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -45,15 +42,10 @@ const (
 // ReconcileCompPreTerminate reconciles the component-level preTerminate command.
 func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	clusterName string,
+	cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component,
 	dag *graph.DAG) error {
 	ctx := reqCtx.Ctx
-	cluster := &appsv1alpha1.Cluster{}
-	err := cli.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
-	if err != nil {
-		return errors.New(fmt.Sprintf("failed to get cluster %s: %v", clusterName, err))
-	}
 
 	// TODO(xingran): check if preTerminate action is needed for the component when cluster id deleting
 	//if !cluster.DeletionTimestamp.IsZero() {

@@ -94,7 +94,7 @@ func newAllFieldsClusterObj(
 	return clusterObj, clusterDefObj, clusterVersionObj, key
 }
 
-func newAllFieldsComponent(clusterDef *appsv1alpha1.ClusterDefinition,
+func newAllFieldsSynthesizedComponent(clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: testCtx.Ctx,
@@ -105,6 +105,11 @@ func newAllFieldsComponent(clusterDef *appsv1alpha1.ClusterDefinition,
 	Expect(synthesizeComp).ShouldNot(BeNil())
 	addTestVolumeMount(synthesizeComp.PodSpec, mysqlCompName)
 	return synthesizeComp
+}
+
+func newAllFieldsComponent(cluster *appsv1alpha1.Cluster) *appsv1alpha1.Component {
+	comp, _ := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+	return comp
 }
 
 func addTestVolumeMount(spec *corev1.PodSpec, containerName string) {

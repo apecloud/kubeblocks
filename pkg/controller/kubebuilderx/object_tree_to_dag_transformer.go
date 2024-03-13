@@ -43,6 +43,7 @@ func (t *objectTree2DAGTransformer) Transform(ctx graph.TransformContext, dag *g
 	if t.desired.GetRoot() == nil {
 		cli.Root(dag, t.current.GetRoot(), t.current.GetRoot(), model.ActionDeletePtr())
 	} else {
+		cli.Root(dag, t.current.GetRoot(), t.desired.GetRoot(), model.ActionStatusPtr())
 		// if annotations, labels or finalizers updated, do both meta patch and status update.
 		if !reflect.DeepEqual(t.current.GetRoot().GetAnnotations(), t.desired.GetRoot().GetAnnotations()) ||
 			!reflect.DeepEqual(t.current.GetRoot().GetLabels(), t.desired.GetRoot().GetLabels()) ||
@@ -51,7 +52,6 @@ func (t *objectTree2DAGTransformer) Transform(ctx graph.TransformContext, dag *g
 			desiredRoot, _ := t.desired.GetRoot().DeepCopyObject().(client.Object)
 			cli.Do(dag, currentRoot, desiredRoot, model.ActionPatchPtr(), nil)
 		}
-		cli.Root(dag, t.current.GetRoot(), t.desired.GetRoot(), model.ActionStatusPtr())
 	}
 
 	// handle secondary objects

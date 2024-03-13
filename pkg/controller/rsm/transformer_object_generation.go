@@ -353,7 +353,7 @@ func BuildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 }
 
 func BuildPodTemplate(rsm *workloads.ReplicatedStateMachine, envConfigName string) *corev1.PodTemplateSpec {
-	template := rsm.Spec.Template
+	template := rsm.Spec.Template.DeepCopy()
 	// inject env ConfigMap into workload pods only
 	for i := range template.Spec.Containers {
 		template.Spec.Containers[i].EnvFrom = append(template.Spec.Containers[i].EnvFrom,
@@ -366,9 +366,9 @@ func BuildPodTemplate(rsm *workloads.ReplicatedStateMachine, envConfigName strin
 				}})
 	}
 
-	injectRoleProbeContainer(rsm, &template)
+	injectRoleProbeContainer(rsm, template)
 
-	return &template
+	return template
 }
 
 func injectRoleProbeContainer(rsm *workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {

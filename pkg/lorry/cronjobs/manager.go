@@ -24,6 +24,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/spf13/viper"
 )
 
@@ -35,15 +36,15 @@ var logger = ctrl.Log.WithName("cronjobs")
 
 func NewManager() (*Manager, error) {
 	cronSettings := make(map[string]map[string]string)
-	jsonStr := viper.GetString("CRON_JOBS")
+	jsonStr := viper.GetString(constant.KBEnvCronJobs)
 	if jsonStr == "" {
-		logger.Info("CRON_JOBS is not set")
+		logger.Info("env is not set", "env", constant.KBEnvCronJobs)
 		return &Manager{}, nil
 	}
 
 	err := json.Unmarshal([]byte(jsonStr), &cronSettings)
 	if err != nil {
-		logger.Info("Failed to unmarshal CRON_JOBS", "error", err.Error())
+		logger.Info("Failed to unmarshal env", "name", constant.KBEnvCronJobs, "value", jsonStr, "error", err.Error())
 		return nil, err
 	}
 

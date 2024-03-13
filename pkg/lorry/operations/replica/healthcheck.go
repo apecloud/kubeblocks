@@ -52,7 +52,7 @@ type FailoverManager interface {
 var checkstatus operations.Operation = &CheckStatus{}
 
 func init() {
-	err := operations.Register(string(util.CheckStatusOperation), checkstatus)
+	err := operations.Register(string(util.HealthyCheckOperation), checkstatus)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -90,7 +90,7 @@ func (s *CheckStatus) Do(ctx context.Context, req *operations.OpsRequest) (*oper
 	resp := &operations.OpsResponse{
 		Data: map[string]any{},
 	}
-	resp.Data["operation"] = util.CheckStatusOperation
+	resp.Data["operation"] = util.HealthyCheckOperation
 
 	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
 	cluster := k8sStore.GetClusterFromCache()

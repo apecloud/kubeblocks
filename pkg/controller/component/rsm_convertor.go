@@ -113,7 +113,6 @@ func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	if getMemberUpdateStrategy(synthesizedComp) != nil {
 		// appsv1.OnDeleteStatefulSetStrategyType is the default value if member update strategy is set.
 		return appsv1.StatefulSetUpdateStrategy{
-			Type: appsv1.OnDeleteStatefulSetStrategyType,
 		}, nil
 	}
 	return nil, nil

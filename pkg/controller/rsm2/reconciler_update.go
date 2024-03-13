@@ -190,8 +190,20 @@ func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 				return err
 			}
 			for _, pvc := range replicaList[i].pvcs {
-				if err = tree.Add(pvc); err != nil {
+				switch oldPvc, err := tree.Get(pvc); {
+				case err != nil:
 					return err
+				case oldPvc == nil:
+					if err = tree.Add(pvc); err != nil {
+						return err
+					}
+				default:
+					pvcObj := copyAndMerge(oldPvc, pvc)
+					if pvcObj != nil {
+						if err = tree.Update(pvcObj); err != nil {
+							return err
+						}
+					}
 				}
 			}
 		}

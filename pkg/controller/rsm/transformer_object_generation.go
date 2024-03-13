@@ -338,7 +338,7 @@ func buildSts(rsm *workloads.ReplicatedStateMachine, headlessSvcName string) *ap
 		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
 		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
 		SetTemplate(*template).
-		SetUpdateStrategy(rsm.Spec.UpdateStrategy).
+		SetUpdateStrategy(apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType}).
 		GetObject()
 }
 

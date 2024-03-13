@@ -79,7 +79,7 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 		return ctrl.Result{}, err
 	}
 	if provider == rsm2.PodProvider {
-		err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+		err = kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 			Prepare(rsm2.NewTreeReader()).
 			Do(rsm2.NewFixMetaReconciler()).
 			Do(rsm2.NewDeletionReconciler()).

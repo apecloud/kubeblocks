@@ -66,11 +66,13 @@ func CheckResultWithError(err error) *CheckResult {
 
 func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 	out := new(ObjectTree)
-	root, ok := t.root.DeepCopyObject().(client.Object)
-	if !ok {
-		return nil, ErrDeepCopyFailed
+	if t.root != nil {
+		root, ok := t.root.DeepCopyObject().(client.Object)
+		if !ok {
+			return nil, ErrDeepCopyFailed
+		}
+		out.root = root
 	}
-	out.root = root
 	children := make(model.ObjectSnapshot, len(t.children))
 	for key, child := range t.children {
 		childCopied, ok := child.DeepCopyObject().(client.Object)
@@ -81,6 +83,14 @@ func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 	}
 	out.children = children
 	return out, nil
+}
+
+func (t *ObjectTree) Get(object client.Object) (client.Object, error) {
+	name, err := model.GetGVKName(object)
+	if err != nil {
+		return nil, err
+	}
+	return t.children[*name], nil
 }
 
 func (t *ObjectTree) GetRoot() client.Object {

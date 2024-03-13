@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -79,18 +80,20 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 		return false, nil
 	}
 
-	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels)
-	if err != nil {
-		return false, err
-	}
-
 	// check whether the underlying workload(sts) has sent the latest template to pods
 	sts := &appsv1.StatefulSet{}
 	if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
 		return false, err
 	}
 	if sts.Status.ObservedGeneration != sts.Generation {
 		return false, nil
+	}
+	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels)
+	if err != nil {
+		return false, err
 	}
 	for _, pod := range pods {
 		if intctrlutil.GetPodRevision(pod) != sts.Status.UpdateRevision {

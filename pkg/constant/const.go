@@ -46,6 +46,8 @@ const (
 
 	// customized encryption key for encrypting the password of connection credential.
 	CfgKeyDPEncryptionKey = "DP_ENCRYPTION_KEY"
+
+	CfgKBReconcileWorkers = "KUBEBLOCKS_RECONCILE_WORKERS"
 )
 
 const (
@@ -159,11 +161,11 @@ const (
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
 
 	// kubeblocks.io well-known finalizers
-	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
-	DBComponentFinalizerName           = "component.kubeblocks.io/finalizer"
-	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
-	ServiceDescriptorFinalizerName     = "servicedescriptor.kubeblocks.io/finalizer"
-	OpsRequestFinalizerName            = "opsrequest.kubeblocks.io/finalizer"
+	DBClusterFinalizerName         = "cluster.kubeblocks.io/finalizer"
+	DBComponentFinalizerName       = "component.kubeblocks.io/finalizer"
+	ConfigFinalizerName            = "config.kubeblocks.io/finalizer"
+	ServiceDescriptorFinalizerName = "servicedescriptor.kubeblocks.io/finalizer"
+	OpsRequestFinalizerName        = "opsrequest.kubeblocks.io/finalizer"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"

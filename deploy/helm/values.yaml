@@ -27,6 +27,10 @@ image:
 ##
 replicaCount: 1
 
+## MaxConcurrentReconciles for cluster and component controllers.
+##
+reconcileWorkers: ""
+
 ## @param nameOverride
 ##
 nameOverride: ""
@@ -1435,7 +1439,7 @@ prometheus:
           action: replace
           target_label: pod
         - source_labels: [__meta_kubernetes_pod_phase]
-          regex: Pending|Succeeded|Failed|Completed
+          regex: Succeeded|Failed|Completed
           action: drop
 
       - job_name: 'kubeblocks-agamotto'

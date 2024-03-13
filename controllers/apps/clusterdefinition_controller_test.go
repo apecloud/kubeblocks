@@ -190,7 +190,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				Name:      cmName,
 			}
 			Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cmObj *corev1.ConfigMap) {
-				g.Expect(controllerutil.ContainsFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName)).To(BeTrue())
+				g.Expect(controllerutil.ContainsFinalizer(cmObj, constant.ConfigFinalizerName)).To(BeTrue())
 			})).Should(Succeed())
 		})
 	})

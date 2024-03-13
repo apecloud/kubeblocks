@@ -197,12 +197,18 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	var services []appsv1alpha1.ClusterService
 	for i := range cluster.Spec.Services {
 		svc := cluster.Spec.Services[i]
-		if svc.Service.Spec.Type != corev1.ServiceTypeLoadBalancer {
-			if svc.Service.Spec.Selector != nil {
-				delete(svc.Service.Spec.Selector, constant.AppInstanceLabelKey)
-			}
-			services = append(services, svc)
+		if svc.Service.Spec.Type == corev1.ServiceTypeLoadBalancer {
+			continue
 		}
+		if svc.Service.Spec.Type == corev1.ServiceTypeNodePort {
+			for j := range svc.Spec.Ports {
+				svc.Spec.Ports[j].NodePort = 0
+			}
+		}
+		if svc.Service.Spec.Selector != nil {
+			delete(svc.Service.Spec.Selector, constant.AppInstanceLabelKey)
+		}
+		services = append(services, svc)
 	}
 	cluster.Spec.Services = services
 	return cluster, nil

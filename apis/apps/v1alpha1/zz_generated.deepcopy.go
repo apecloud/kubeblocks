@@ -27,7 +27,7 @@ package v1alpha1
 import (
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1680,6 +1680,11 @@ func (in *ComponentConfigSpec) DeepCopyInto(out *ComponentConfigSpec) {
 	if in.AsEnvFrom != nil {
 		in, out := &in.AsEnvFrom, &out.AsEnvFrom
 		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.ReRenderResourceTypes != nil {
+		in, out := &in.ReRenderResourceTypes, &out.ReRenderResourceTypes
+		*out = make([]RerenderResourceType, len(*in))
 		copy(*out, *in)
 	}
 }

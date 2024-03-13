@@ -6923,6 +6923,20 @@ string
 <p>An optional field where the list of containers will be injected into EnvFrom.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>reRenderResourceTypes</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RerenderResourceType">
+[]RerenderResourceType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>An optional field defines which resources change trigger re-render config.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef
@@ -15301,6 +15315,27 @@ StatefulSetSpec
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RerenderResourceType">RerenderResourceType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
+</p>
+<div>
+<p>RerenderResourceType defines the resource requirements for a component.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;replicas&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;resources&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ResourceConstraintRule">ResourceConstraintRule
 </h3>

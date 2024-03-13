@@ -51,7 +51,7 @@ func ResetToIgnoreFinalizers() {
 		"kubernetes.io/pvc-protection",
 		// REVIEW: adding following is a hack, if tests are running as
 		// controller-runtime manager setup.
-		constant.ConfigurationTemplateFinalizerName,
+		constant.ConfigFinalizerName,
 		constant.DBClusterFinalizerName,
 	}
 }

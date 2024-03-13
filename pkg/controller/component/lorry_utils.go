@@ -85,7 +85,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 		compRoleProbe = synthesizeComp.LifecycleActions.RoleProbe
 	}
 	if compRoleProbe != nil {
-		reqCtx.Log.V(3).Info("lorry", "settings", compRoleProbe)
+		reqCtx.Log.V(3).Info("lorry", "role probe settings", compRoleProbe)
 		roleChangedContainer := container.DeepCopy()
 		buildRoleProbeContainer(roleChangedContainer, compRoleProbe, int(lorryHTTPPort))
 		lorryContainers = append(lorryContainers, *roleChangedContainer)

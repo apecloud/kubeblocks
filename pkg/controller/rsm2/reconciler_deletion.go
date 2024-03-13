@@ -38,7 +38,14 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 }
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	tree.DeleteAll()
+	// delete secondary objects first
+	if len(tree.GetSecondaryObjects()) > 0 {
+		tree.DeleteSecondaryObjects()
+		return tree, nil
+	}
+
+	// delete root object
+	tree.DeleteRoot()
 	return tree, nil
 }
 

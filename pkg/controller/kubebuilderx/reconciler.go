@@ -101,6 +101,10 @@ func (t *ObjectTree) SetRoot(root client.Object) {
 	t.root = root
 }
 
+func (t *ObjectTree) DeleteRoot() {
+	t.root = nil
+}
+
 func (t *ObjectTree) List(obj client.Object) []client.Object {
 	assignableTo := func(src, dst reflect.Type) bool {
 		if dst == nil {
@@ -153,9 +157,8 @@ func (t *ObjectTree) Delete(objects ...client.Object) error {
 	return nil
 }
 
-func (t *ObjectTree) DeleteAll() {
-	t.root = nil
-	t.children = nil
+func (t *ObjectTree) DeleteSecondaryObjects() {
+	t.children = make(model.ObjectSnapshot)
 }
 
 func NewObjectTree() *ObjectTree {

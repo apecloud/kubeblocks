@@ -42,7 +42,7 @@ var _ = Describe("Configuration Controller", func() {
 
 	Context("When updating configuration", func() {
 		It("Should reconcile success", func() {
-			_, _, clusterObj, synthesizedComp := mockReconcileResource()
+			_, _, clusterObj, componentObj, synthesizedComp := mockReconcileResource()
 
 			cfgKey := client.ObjectKey{
 				Name:      core.GenerateComponentConfigurationName(clusterName, statefulCompName),
@@ -65,7 +65,7 @@ var _ = Describe("Configuration Controller", func() {
 				Namespace:     testCtx.DefaultNamespace,
 				ClusterName:   clusterName,
 				ComponentName: statefulCompName,
-			}, synthesizedComp, clusterObj)).Should(Succeed())
+			}, synthesizedComp, clusterObj, componentObj)).Should(Succeed())
 
 			Eventually(checkCfgStatus(appsv1alpha1.CFinishedPhase)).Should(BeTrue())
 
@@ -92,7 +92,7 @@ var _ = Describe("Configuration Controller", func() {
 		})
 
 		It("Invalid component test", func() {
-			_, _, clusterObj, synthesizedComp := mockReconcileResource()
+			_, _, clusterObj, componentObj, synthesizedComp := mockReconcileResource()
 
 			cfgKey := client.ObjectKey{
 				Name:      core.GenerateComponentConfigurationName(clusterName, "invalid-component"),
@@ -105,7 +105,7 @@ var _ = Describe("Configuration Controller", func() {
 				Namespace:     testCtx.DefaultNamespace,
 				ClusterName:   clusterName,
 				ComponentName: "invalid-component",
-			}, synthesizedComp, clusterObj)).Should(Succeed())
+			}, synthesizedComp, clusterObj, componentObj)).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				cfg := &appsv1alpha1.Configuration{}

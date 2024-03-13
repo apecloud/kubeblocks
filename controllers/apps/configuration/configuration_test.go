@@ -97,7 +97,7 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 	return configmap, constraint
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
+func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint, *appsv1alpha1.Cluster, *appsv1alpha1.Component, *component.SynthesizedComponent) {
 	configmap, constraint := mockConfigResource()
 
 	By("Create a clusterDefinition obj")
@@ -120,6 +120,9 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint,
 		clusterDefObj.Name, clusterVersionObj.Name).
 		AddComponent(statefulCompName, statefulCompDefName).Create(&testCtx).GetObject()
 
+	By("Create a component obj")
+	componentObj, _ := component.BuildComponent(clusterObj, &clusterObj.Spec.ComponentSpecs[0], nil, nil)
+
 	container := *builder.NewContainerBuilder("mock-container").
 		AddVolumeMounts(corev1.VolumeMount{
 			Name:      configVolumeName,
@@ -140,19 +143,23 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint,
 	}, testCtx.Cli, clusterObj, clusterObj.Spec.GetComponentByName(statefulCompName))
 	Expect(err).ShouldNot(HaveOccurred())
 
-	return configmap, constraint, clusterObj, synthesizedComp
+	return configmap, constraint, clusterObj, componentObj, synthesizedComp
 }
 
-func initConfiguration(resourceCtx *configctrl.ResourceCtx, synthesizedComponent *component.SynthesizedComponent, clusterObj *appsv1alpha1.Cluster) error {
+func initConfiguration(resourceCtx *configctrl.ResourceCtx,
+	synthesizedComponent *component.SynthesizedComponent,
+	clusterObj *appsv1alpha1.Cluster,
+	componentObj *appsv1alpha1.Component) error {
 	return configctrl.NewCreatePipeline(configctrl.ReconcileCtx{
-		ResourceCtx: resourceCtx,
-		Component:   synthesizedComponent,
-		Cluster:     clusterObj,
-		PodSpec:     synthesizedComponent.PodSpec,
+		ResourceCtx:          resourceCtx,
+		Component:            componentObj,
+		SynthesizedComponent: synthesizedComponent,
+		Cluster:              clusterObj,
+		PodSpec:              synthesizedComponent.PodSpec,
 	}).
 		Prepare().
 		UpdateConfiguration(). // reconcile Configuration
-		Configuration().       // sync Configuration
+		Configuration(). // sync Configuration
 		CreateConfigTemplate().
 		UpdateConfigRelatedObject().
 		UpdateConfigurationStatus().

@@ -31,6 +31,7 @@ replicaCount: 1
 ##
 reconcileWorkers: ""
 
+## k8s client configuration.
 client:
   # default is 20
   qps: ""

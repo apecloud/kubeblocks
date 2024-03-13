@@ -163,6 +163,9 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 
 		return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
+			WithOptions(controller.Options{
+				MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
+			}).
 			Watches(&appsv1.StatefulSet{}, stsHandler).
 			Watches(&batchv1.Job{}, jobHandler).
 			Watches(&corev1.Pod{}, podHandler).

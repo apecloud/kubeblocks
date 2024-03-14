@@ -77,7 +77,7 @@ func ownedKinds() []client.ObjectList {
 	}
 }
 
-func NewTreeReader() kubebuilderx.TreeLoader {
+func NewTreeLoader() kubebuilderx.TreeLoader {
 	return &treeLoader{}
 }
 

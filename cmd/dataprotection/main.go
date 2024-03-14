@@ -24,7 +24,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -101,7 +100,7 @@ func init() {
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(dptypes.CfgKeyGCFrequencySeconds, dptypes.DefaultGCFrequencySeconds)
-	viper.SetDefault(dptypes.CfgDataProtectionReconcileWorkers, runtime.NumCPU())
+	viper.SetDefault(dptypes.CfgDataProtectionReconcileWorkers, 8)
 }
 
 func main() {

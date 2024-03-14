@@ -93,7 +93,8 @@ func (r *ResourceFetcher[T]) Component() *T {
 	}
 	return r.Wrap(func() error {
 		r.ComponentObj = &appsv1alpha1.Component{}
-		return r.Client.Get(r.Context, componentKey, r.ComponentObj)
+		err := r.Client.Get(r.Context, componentKey, r.ComponentObj)
+		return client.IgnoreNotFound(err)
 	})
 }
 

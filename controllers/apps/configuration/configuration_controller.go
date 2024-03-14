@@ -112,7 +112,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.Reconciled()
 	}
 
-	if fetcherTask.ClusterComObj == nil {
+	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
 		return r.failWithInvalidComponent(config, reqCtx)
 	}
 

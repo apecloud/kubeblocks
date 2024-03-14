@@ -252,7 +252,7 @@ func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.Compon
 	if configuration != nil {
 		err = intctrlutil.SetControllerReference(configuration, cm)
 	} else {
-		err = intctrlutil.SetOwnerReference(wrapper.component, cm)
+		err = intctrlutil.SetControllerReference(wrapper.component, cm)
 	}
 	if err != nil {
 		return err

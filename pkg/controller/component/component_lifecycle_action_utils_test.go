@@ -20,9 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"strconv"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -68,6 +73,37 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 				GetObject()
 		})
 
+		mockPodsForTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
+			clusterDefName := cluster.Spec.ClusterDefRef
+			componentName := cluster.Spec.ComponentSpecs[0].Name
+			clusterName := cluster.Name
+			stsName := cluster.Name + "-" + componentName
+			pods := make([]corev1.Pod, 0)
+			for i := 0; i < number; i++ {
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      stsName + "-" + strconv.Itoa(i),
+						Namespace: testCtx.DefaultNamespace,
+						Labels: map[string]string{
+							constant.AppManagedByLabelKey:         constant.AppName,
+							constant.AppNameLabelKey:              clusterDefName,
+							constant.AppInstanceLabelKey:          clusterName,
+							constant.KBAppComponentLabelKey:       componentName,
+							appsv1.ControllerRevisionHashLabelKey: "mock-version",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name:  "mock-container",
+							Image: "mock-container",
+						}},
+					},
+				}
+				pods = append(pods, *pod)
+			}
+			return pods
+		}
+
 		It("should work as expected with various inputs", func() {
 			By("test component definition without post provision")
 			reqCtx := intctrlutil.RequestCtx{
@@ -110,6 +146,15 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 			synthesizeComp.LifecycleActions.PreTerminate = &preTerminate
 
 			By("check built-in envs of cluster component available in action job")
+			pods := mockPodsForTest(cluster, 1)
+			for _, pod := range pods {
+				Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+				pod.Status.Conditions = []corev1.PodCondition{{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				}}
+				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+			}
 			renderJob, err := renderActionCmdJob(testCtx.Ctx, testCtx.Cli, cluster, synthesizeComp, PreTerminateAction)
 			Expect(err).Should(Succeed())
 			Expect(renderJob).ShouldNot(BeNil())

@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -121,7 +124,13 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint,
 		AddComponent(statefulCompName, statefulCompDefName).Create(&testCtx).GetObject()
 
 	By("Create a component obj")
-	componentObj, _ := component.BuildComponent(clusterObj, &clusterObj.Spec.ComponentSpecs[0], nil, nil)
+	fullCompName := constant.GenerateClusterComponentName(clusterName, statefulCompName)
+	componentObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, statefulCompDefName).
+		AddLabels(constant.AppInstanceLabelKey, clusterName).
+		AddLabels(constant.KBAppClusterUIDLabelKey, string(clusterObj.UID)).
+		SetUID(types.UID(fmt.Sprintf("%s-%s", clusterObj.Name, "test-uid"))).
+		SetReplicas(1).
+		Create(&testCtx).GetObject()
 
 	container := *builder.NewContainerBuilder("mock-container").
 		AddVolumeMounts(corev1.VolumeMount{
@@ -159,7 +168,7 @@ func initConfiguration(resourceCtx *configctrl.ResourceCtx,
 	}).
 		Prepare().
 		UpdateConfiguration(). // reconcile Configuration
-		Configuration(). // sync Configuration
+		Configuration().       // sync Configuration
 		CreateConfigTemplate().
 		UpdateConfigRelatedObject().
 		UpdateConfigurationStatus().
@@ -182,6 +191,7 @@ func cleanEnv() {
 	// non-namespaced
 	testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	// namespaced
+	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StatefulSetSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigurationSignature, false, inNS, ml)

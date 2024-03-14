@@ -122,6 +122,7 @@ var _ = Describe("Prepare Test", func() {
 				GetObject()
 
 			comp, _ = component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			comp.SetUID("test-uid")
 		})
 
 		It("render configuration should success", func() {

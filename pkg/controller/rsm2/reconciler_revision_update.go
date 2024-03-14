@@ -22,12 +22,9 @@ package rsm2
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
-
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // revisionUpdateReconciler is responsible for updating the expected replica names and their corresponding revisions in the status when there are changes in the spec.
@@ -36,6 +33,10 @@ type revisionUpdateReconciler struct{}
 type replicaRevision struct {
 	name     string
 	revision string
+}
+
+func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
+	return &revisionUpdateReconciler{}
 }
 
 func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -93,59 +94,6 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	rsm.Status.ObservedGeneration = rsm.Generation
 
 	return tree, nil
-}
-
-func buildReplicaTemplateGroups(rsm *workloads.ReplicatedStateMachine) map[string][]*podTemplateSpecExt {
-	var podTemplates []*podTemplateSpecExt
-	var replicasInTemplates int32
-	envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
-	defaultTemplate := rsm1.BuildPodTemplate(rsm, envConfigName)
-	buildPodTemplateExt := func(replicas int32) *podTemplateSpecExt {
-		var claims []corev1.PersistentVolumeClaim
-		for _, template := range rsm.Spec.VolumeClaimTemplates {
-			claims = append(claims, *template.DeepCopy())
-		}
-		return &podTemplateSpecExt{
-			Replicas:             replicas,
-			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
-			VolumeClaimTemplates: claims,
-		}
-	}
-	for _, instance := range rsm.Spec.Instances {
-		replicas := int32(1)
-		if instance.Replicas != nil {
-			replicas = *instance.Replicas
-		}
-		template := buildPodTemplateExt(replicas)
-		applyInstanceTemplate(instance, template)
-		podTemplates = append(podTemplates, template)
-		replicasInTemplates += template.Replicas
-	}
-	if replicasInTemplates < *rsm.Spec.Replicas {
-		template := buildPodTemplateExt(*rsm.Spec.Replicas - replicasInTemplates)
-		podTemplates = append(podTemplates, template)
-	}
-	// set the default name generator and namespace
-	for _, template := range podTemplates {
-		if template.GenerateName == "" {
-			template.GenerateName = rsm.Name
-		}
-		template.Namespace = rsm.Namespace
-	}
-
-	// group the pod templates by template.Name if set or by template.GenerateName
-	replicaTemplateGroups := make(map[string][]*podTemplateSpecExt)
-	for _, template := range podTemplates {
-		name := template.Name
-		if template.Name == "" {
-			name = template.GenerateName
-		}
-		templates := replicaTemplateGroups[name]
-		templates = append(templates, template)
-		replicaTemplateGroups[name] = templates
-	}
-
-	return replicaTemplateGroups
 }
 
 func buildReplicaRevisions(template *podTemplateSpecExt, ordinal int, parent *workloads.ReplicatedStateMachine) ([]replicaRevision, int, error) {

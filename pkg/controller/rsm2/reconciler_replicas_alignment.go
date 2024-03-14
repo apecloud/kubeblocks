@@ -36,6 +36,10 @@ import (
 // TODO(free6om): support membership reconfiguration
 type replicasAlignmentReconciler struct{}
 
+func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
+	return &replicasAlignmentReconciler{}
+}
+
 func (r *replicasAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
@@ -53,7 +57,10 @@ func (r *replicasAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 	// 1. build desired name to template map
-	nameToTemplateMap := buildReplicaName2TemplateMap(rsm)
+	nameToTemplateMap, err := buildReplicaName2TemplateMap(rsm)
+	if err != nil {
+		return nil, err
+	}
 
 	// 2. find the create and delete set
 	newNameSet := sets.NewString()
@@ -104,7 +111,10 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if shouldReady && predecessor != nil && !isHealthy(predecessor) {
 			break
 		}
-		replica := buildReplicaByTemplate(name, nameToTemplateMap[name])
+		replica, err := buildReplicaByTemplate(name, nameToTemplateMap[name], rsm)
+		if err != nil {
+			return nil, err
+		}
 		if err := tree.Add(replica.pod); err != nil {
 			return nil, err
 		}
@@ -130,7 +140,7 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	// delete useless replicas
 	priorities := make(map[string]int)
-	SortObjects(oldReplicaList, priorities, true)
+	sortObjects(oldReplicaList, priorities, true)
 	for _, object := range oldReplicaList {
 		pod, _ := object.(*corev1.Pod)
 		if _, ok := deleteNameSet[pod.Name]; !ok {

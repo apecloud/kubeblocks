@@ -21,6 +21,7 @@ package rsm2
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"reflect"
 	"sort"
 	"strings"
@@ -42,21 +43,10 @@ type podTemplateSpecExt struct {
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 }
 
-// SortReplicas sorts replicas by their role priority and name
+// sortObjects sorts objects by their role priority and name
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
 // reverse it if reverse==true
-func SortReplicas(replicas []replica, rolePriorityMap map[string]int, reverse bool) {
-	getRolePriorityFunc := func(i int) int {
-		role := rsm1.GetRoleName(*replicas[i].pod)
-		return rolePriorityMap[role]
-	}
-	getNameFunc := func(i int) string {
-		return replicas[i].pod.Name
-	}
-	baseSort(replicas, getNameFunc, getRolePriorityFunc, reverse)
-}
-
-func SortObjects(objects []client.Object, rolePriorityMap map[string]int, reverse bool) {
+func sortObjects(objects []client.Object, rolePriorityMap map[string]int, reverse bool) {
 	getRolePriorityFunc := func(i int) int {
 		role := strings.ToLower(objects[i].GetLabels()[constant.RoleLabelKey])
 		return rolePriorityMap[role]
@@ -145,12 +135,108 @@ func validateDupReplicaNames[T any](replicas []T, getNameFunc func(item T) strin
 	return nil
 }
 
-func buildReplicaName2TemplateMap(rsm *workloads.ReplicatedStateMachine) map[string]*podTemplateSpecExt {
-	templateGroups := buildReplicaTemplateGroups(rsm)
+func buildReplicaName2TemplateMap(rsm *workloads.ReplicatedStateMachine) (map[string]*podTemplateSpecExt, error) {
+	replicaTemplateGroups := buildReplicaTemplateGroups(rsm)
+	nameTemplateMap := make(map[string]*podTemplateSpecExt)
+	var (
+		replicaNameList []string
+		replicaNames    []string
+		ordinal         int
+		err             error
+	)
+	for _, templateList := range replicaTemplateGroups {
+		ordinal = 0
+		for _, template := range templateList {
+			replicaNames, ordinal, err = buildReplicaNames(template, ordinal)
+			if err != nil {
+				return nil, err
+			}
+			for _, name := range replicaNames {
+				nameTemplateMap[name] = template
+			}
+			replicaNameList = append(replicaNameList, replicaNames...)
+		}
+	}
+	// validate duplicate pod names
+	getNameFunc := func(n string) string {
+		return n
+	}
+	if err = validateDupReplicaNames(replicaNameList, getNameFunc); err != nil {
+		return nil, err
+	}
+
+	return nameTemplateMap, nil
 }
 
-func buildReplicaByTemplate(name string, template *podTemplateSpecExt) replica {
-	panic("finish me")
+func buildReplicaNames(template *podTemplateSpecExt, ordinal int) ([]string, int, error) {
+	generatePodName := func(name, generateName string, ordinal int) (string, int) {
+		if len(name) > 0 {
+			return name, ordinal
+		}
+		n := fmt.Sprintf("%s-%d", generateName, ordinal)
+		ordinal++
+		return n, ordinal
+	}
+	var replicaNameList []string
+	var name string
+	for i := 0; i < int(template.Replicas); i++ {
+		name, ordinal = generatePodName(template.Name, template.GenerateName, ordinal)
+		replicaNameList = append(replicaNameList, name)
+	}
+	return replicaNameList, ordinal, nil
+}
+
+func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *workloads.ReplicatedStateMachine) (*replica, error) {
+	revision, err := buildPodTemplateRevision(template, parent)
+	if err != nil {
+		return nil, err
+	}
+	// 1. build a pod from template
+	pod := builder.NewPodBuilder(template.Namespace, name).
+		AddAnnotationsInMap(template.Annotations).
+		AddLabelsInMap(template.Labels).
+		AddControllerRevisionHashLabel(revision).
+		SetPodSpec(*template.Spec.DeepCopy()).
+		GetObject()
+	// Set these immutable fields only on initial Pod creation, not updates.
+	pod.Spec.Hostname = pod.Name
+	pod.Spec.Subdomain = parent.Spec.ServiceName
+
+	// 2. build pvcs from template
+	pvcMap := make(map[string]*corev1.PersistentVolumeClaim)
+	pvcNameMap := make(map[string]string)
+	for _, claimTemplate := range template.VolumeClaimTemplates {
+		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, pod.GetName())
+		pvc := builder.NewPVCBuilder(template.Namespace, pvcName).
+			AddLabelsInMap(template.Labels).
+			SetSpec(*claimTemplate.Spec.DeepCopy()).
+			GetObject()
+		pvcMap[pvcName] = pvc
+		pvcNameMap[pvcName] = claimTemplate.Name
+	}
+
+	// 3. update pod volumes
+	var pvcs []*corev1.PersistentVolumeClaim
+	var volumeList []corev1.Volume
+	for pvcName, pvc := range pvcMap {
+		pvcs = append(pvcs, pvc)
+		volume := builder.NewVolumeBuilder(pvcNameMap[pvcName]).
+			SetVolumeSource(corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
+			}).GetObject()
+		volumeList = append(volumeList, *volume)
+	}
+	mergeList(&volumeList, &pod.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
+		return func(v corev1.Volume) bool {
+			return v.Name == item.Name
+		}
+	})
+
+	replica := &replica{
+		pod:  pod,
+		pvcs: pvcs,
+	}
+	return replica, nil
 }
 
 // copyAndMerge merges two objects for updating:
@@ -267,4 +353,119 @@ func validateSpec(rsm *workloads.ReplicatedStateMachine) error {
 	}
 
 	return nil
+}
+
+func buildPodTemplateRevision(template *podTemplateSpecExt, parent *workloads.ReplicatedStateMachine) (string, error) {
+	// try to generate the same revision as if generated by sts controller
+	rsm := builder.NewReplicatedStateMachineBuilder(parent.Namespace, parent.Name).
+		SetUID(parent.UID).
+		AddAnnotationsInMap(parent.Annotations).
+		AddMatchLabelsInMap(parent.Labels).
+		SetTemplate(template.PodTemplateSpec).
+		GetObject()
+
+	cr, err := NewRevision(rsm)
+	if err != nil {
+		return "", err
+	}
+	return cr.Labels[ControllerRevisionHashLabel], nil
+}
+
+func buildReplicaTemplateGroups(rsm *workloads.ReplicatedStateMachine) map[string][]*podTemplateSpecExt {
+	var podTemplates []*podTemplateSpecExt
+	var replicasInTemplates int32
+	envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
+	defaultTemplate := rsm1.BuildPodTemplate(rsm, envConfigName)
+	buildPodTemplateExt := func(replicas int32) *podTemplateSpecExt {
+		var claims []corev1.PersistentVolumeClaim
+		for _, template := range rsm.Spec.VolumeClaimTemplates {
+			claims = append(claims, *template.DeepCopy())
+		}
+		return &podTemplateSpecExt{
+			Replicas:             replicas,
+			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
+			VolumeClaimTemplates: claims,
+		}
+	}
+	for _, instance := range rsm.Spec.Instances {
+		replicas := int32(1)
+		if instance.Replicas != nil {
+			replicas = *instance.Replicas
+		}
+		template := buildPodTemplateExt(replicas)
+		applyInstanceTemplate(instance, template)
+		podTemplates = append(podTemplates, template)
+		replicasInTemplates += template.Replicas
+	}
+	if replicasInTemplates < *rsm.Spec.Replicas {
+		template := buildPodTemplateExt(*rsm.Spec.Replicas - replicasInTemplates)
+		podTemplates = append(podTemplates, template)
+	}
+	// set the default name generator and namespace
+	for _, template := range podTemplates {
+		if template.GenerateName == "" {
+			template.GenerateName = rsm.Name
+		}
+		template.Namespace = rsm.Namespace
+	}
+
+	// group the pod templates by template.Name if set or by template.GenerateName
+	replicaTemplateGroups := make(map[string][]*podTemplateSpecExt)
+	for _, template := range podTemplates {
+		name := template.Name
+		if template.Name == "" {
+			name = template.GenerateName
+		}
+		templates := replicaTemplateGroups[name]
+		templates = append(templates, template)
+		replicaTemplateGroups[name] = templates
+	}
+
+	return replicaTemplateGroups
+}
+
+func applyInstanceTemplate(instance workloads.InstanceTemplate, template *podTemplateSpecExt) {
+	replicas := int32(1)
+	if instance.Replicas != nil {
+		replicas = *instance.Replicas
+	}
+	template.Replicas = replicas
+	if instance.Name != nil {
+		template.Name = *instance.Name
+	}
+	if instance.GenerateName != nil {
+		template.GenerateName = *instance.GenerateName
+	}
+	if instance.NodeName != nil {
+		template.Spec.NodeName = *instance.NodeName
+	}
+	mergeMap(&instance.Annotations, &template.Annotations)
+	mergeMap(&instance.Labels, &template.Labels)
+	mergeMap(&instance.NodeSelector, &template.Spec.NodeSelector)
+	if len(template.Spec.Containers) > 0 {
+		if instance.Image != nil {
+			template.Spec.Containers[0].Image = *instance.Image
+		}
+		if instance.Resources != nil {
+			template.Spec.Containers[0].Resources = *instance.Resources
+		}
+	}
+	mergeList(&instance.Volumes, &template.Spec.Volumes,
+		func(item corev1.Volume) func(corev1.Volume) bool {
+			return func(v corev1.Volume) bool {
+				return v.Name == item.Name
+			}
+		})
+	mergeList(&instance.VolumeMounts, &template.Spec.Containers[0].VolumeMounts,
+		func(item corev1.VolumeMount) func(corev1.VolumeMount) bool {
+			return func(vm corev1.VolumeMount) bool {
+				return vm.Name == item.Name
+			}
+		})
+	mergeList(&instance.VolumeClaimTemplates, &template.VolumeClaimTemplates,
+		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
+			return func(claim corev1.PersistentVolumeClaim) bool {
+				return claim.Name == item.Name
+			}
+		})
 }

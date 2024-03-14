@@ -33,6 +33,10 @@ import (
 // assistantObjectReconciler manages non-workload objects, such as Service, ConfigMap, etc.
 type assistantObjectReconciler struct {}
 
+func NewAssistantObjectReconciler() kubebuilderx.Reconciler {
+	return &assistantObjectReconciler{}
+}
+
 func (a *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied

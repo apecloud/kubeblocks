@@ -79,7 +79,7 @@ FoxLake Configration Environment Variables
     secretKeyRef:
       name: $(CONN_CREDENTIAL_SECRET_NAME)
       key: password  
-- name: rootPasswd
+- name: rootUserPassword
   valueFrom:
     secretKeyRef:
       name: $(CONN_CREDENTIAL_SECRET_NAME)

@@ -83,11 +83,11 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 			Prepare(rsm2.NewTreeLoader()).
 			Do(rsm2.NewFixMetaReconciler()).
 			Do(rsm2.NewDeletionReconciler()).
+			Do(rsm2.NewStatusReconciler()).
 			Do(rsm2.NewRevisionUpdateReconciler()).
 			Do(rsm2.NewAssistantObjectReconciler()).
 			Do(rsm2.NewReplicasAlignmentReconciler()).
 			Do(rsm2.NewUpdateReconciler()).
-			Do(rsm2.NewStatusReconciler()).
 			Commit()
 		return ctrl.Result{}, err
 	}

@@ -138,7 +138,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 }
 
 func parsePartitionNMaxUnavailable(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, replicas int) (int, int, error) {
-	partition := 0
+	partition := replicas
 	maxUnavailable := 1
 	if rollingUpdate == nil {
 		return partition, maxUnavailable, nil

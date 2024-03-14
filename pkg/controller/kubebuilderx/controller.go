@@ -21,6 +21,7 @@ package kubebuilderx
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
@@ -55,6 +56,10 @@ type controller struct {
 func (c *controller) Prepare(reader TreeLoader) Controller {
 	c.oldTree, c.err = reader.Read(c.ctx, c.cli, c.req, c.recorder, c.logger)
 	if c.err != nil {
+		return c
+	}
+	if c.oldTree == nil {
+		c.err = fmt.Errorf("nil tree loaded")
 		return c
 	}
 	c.tree, c.err = c.oldTree.DeepCopy()

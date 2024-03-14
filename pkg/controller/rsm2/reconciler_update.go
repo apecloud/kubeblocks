@@ -21,14 +21,10 @@ package rsm2
 
 import (
 	"fmt"
-	"reflect"
-	"time"
-
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -38,13 +34,9 @@ import (
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
+// updateReconciler handles the updates of replicas based on the UpdateStrategy.
+// Currently, two update strategies are supported: 'OnDelete' and 'RollingUpdate'.
 type updateReconciler struct{}
-
-type podTemplateSpecExt struct {
-	Replicas int32
-	corev1.PodTemplateSpec
-	VolumeClaimTemplates []corev1.PersistentVolumeClaim
-}
 
 type replica struct {
 	pod  *corev1.Pod
@@ -65,6 +57,13 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 		return kubebuilderx.ResultUnsatisfied
 	}
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
+	replicas := 1
+	if rsm.Spec.Replicas != nil {
+		replicas = int(*rsm.Spec.Replicas)
+	}
+	if len(tree.List(&corev1.Pod{})) != replicas {
+		return kubebuilderx.ResultUnsatisfied
+	}
 	if err := validateSpec(rsm); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
@@ -72,204 +71,41 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 }
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	// handle none workload objects
-	if err := handleNoneWorkloadObjectUpdate(tree); err != nil {
-		return nil, err
-	}
-
-	// handle workload objects(i.e. pod and pvc)
-	if err := handleWorkloadObjectUpdate(tree); err != nil {
-		return nil, err
-	}
-
-	// update observed generation
-	updateObservedGeneration(tree)
-
-	return tree, nil
-}
-
-func updateObservedGeneration(tree *kubebuilderx.ObjectTree) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
-	rsm.Status.ObservedGeneration = rsm.Generation
-}
+	// 1. build desired name to template map
+	nameToTemplateMap := buildReplicaName2TemplateMap(rsm)
 
-func handleNoneWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
-	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
-
-	// generate objects by current spec
-	svc := rsm1.BuildSvc(*rsm)
-	altSvs := rsm1.BuildAlternativeSvs(*rsm)
-	headLessSvc := rsm1.BuildHeadlessSvc(*rsm)
-	envConfig := rsm1.BuildEnvConfigMap(*rsm)
-	var objects []client.Object
-	if svc != nil {
-		objects = append(objects, svc)
+	// 2. validate the update set
+	newNameSet := sets.NewString()
+	for name := range nameToTemplateMap {
+		newNameSet.Insert(name)
 	}
-	for _, s := range altSvs {
-		objects = append(objects, s)
-	}
-	objects = append(objects, headLessSvc, envConfig)
-	for _, object := range objects {
-		if err := rsm1.SetOwnership(rsm, object, model.GetScheme(), rsm1.GetFinalizer(object)); err != nil {
-			return err
-		}
-	}
-	// compute create/update/delete set
-	newSnapshot := make(map[model.GVKNObjKey]client.Object)
-	for _, object := range objects {
-		name, err := model.GetGVKName(object)
-		if err != nil {
-			return err
-		}
-		newSnapshot[*name] = object
-	}
-	oldSnapshot := make(map[model.GVKNObjKey]client.Object)
-	svcList := tree.List(&corev1.Service{})
-	cmList := tree.List(&corev1.ConfigMap{})
-	for _, objectList := range [][]client.Object{svcList, cmList} {
-		for _, object := range objectList {
-			name, err := model.GetGVKName(object)
-			if err != nil {
-				return err
-			}
-			oldSnapshot[*name] = object
-		}
-	}
-	// now compute the diff between old and target snapshot and generate the plan
-	oldNameSet := sets.KeySet(oldSnapshot)
-	newNameSet := sets.KeySet(newSnapshot)
-
-	createSet := newNameSet.Difference(oldNameSet)
-	updateSet := newNameSet.Intersection(oldNameSet)
-	deleteSet := oldNameSet.Difference(newNameSet)
-	for name := range createSet {
-		if err := tree.Add(newSnapshot[name]); err != nil {
-			return err
-		}
-	}
-	for name := range updateSet {
-		oldObj := oldSnapshot[name]
-		newObj := copyAndMerge(oldObj, newSnapshot[name])
-		if err := tree.Update(newObj); err != nil {
-			return err
-		}
-	}
-	for name := range deleteSet {
-		if err := tree.Delete(oldSnapshot[name]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
-	// 1. build desired replicas
-	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
-	replicaList, err := buildReplicas(rsm)
-	if err != nil {
-		tree.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, reasonBuildPods, err.Error())
-		return model.NewRequeueError(time.Second*10, err.Error())
-	}
-
-	// 2. sort replicas by pod name and role priority
-	priorities := rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
-	SortReplicas(replicaList, priorities, false)
-	newReplicaMap := make(map[string]int, len(replicaList))
-	for i := range replicaList {
-		newReplicaMap[replicaList[i].pod.Name] = i
-	}
-
+	oldNameSet := sets.NewString()
+	oldReplicaMap := make(map[string]*corev1.Pod)
 	oldReplicaList := tree.List(&corev1.Pod{})
-	SortObjects(oldReplicaList, priorities, false)
-	oldReplicaMap := make(map[string]int, len(oldReplicaList))
-	for i := range oldReplicaList {
-		oldReplicaMap[oldReplicaList[i].GetName()] = i
+	for _, object := range oldReplicaList {
+		oldNameSet.Insert(object.GetName())
+		pod, _ := object.(*corev1.Pod)
+		oldReplicaMap[object.GetName()] = pod
+	}
+	updateNameSet := oldNameSet.Intersection(newNameSet)
+	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
+		tree.Logger.Info(fmt.Sprintf("RSM %s/%s replicas are not aligned", rsm.Namespace, rsm.Name))
+		return tree, nil
 	}
 
-	// now compute the diff between current and desired pods and generate the plan
-	oldNameSet := sets.KeySet(oldReplicaMap)
-	newNameSet := sets.KeySet(newReplicaMap)
-
-	createSet := newNameSet.Difference(oldNameSet)
-	updateSet := newNameSet.Intersection(oldNameSet)
-	deleteSet := oldNameSet.Difference(newNameSet)
-
-	// 3. handle scaling
-	// TODO(free6om): refine the following block
-	if rsm.Spec.PodManagementPolicy == apps.ParallelPodManagement {
-		for name := range createSet {
-			i := newReplicaMap[name]
-			if err = tree.Add(replicaList[i].pod); err != nil {
-				return err
-			}
-			for _, pvc := range replicaList[i].pvcs {
-				switch oldPvc, err := tree.Get(pvc); {
-				case err != nil:
-					return err
-				case oldPvc == nil:
-					if err = tree.Add(pvc); err != nil {
-						return err
-					}
-				default:
-					pvcObj := copyAndMerge(oldPvc, pvc)
-					if pvcObj != nil {
-						if err = tree.Update(pvcObj); err != nil {
-							return err
-						}
-					}
-				}
-			}
-		}
-		for name := range deleteSet {
-			i := oldReplicaMap[name]
-			if err = tree.Delete(oldReplicaList[i]); err != nil {
-				return err
-			}
-			// TODO(free6om): handle pvc management policy
-		}
-	} else {
-		for i, r := range replicaList {
-			if _, ok := createSet[r.pod.GetName()]; !ok {
-				continue
-			}
-			if i == 0 || isRunningAndAvailable(replicaList[i-1].pod, rsm.Spec.MinReadySeconds) {
-				if err = tree.Add(r.pod); err != nil {
-					return err
-				}
-				for _, pvc := range r.pvcs {
-					if err = tree.Add(pvc); err != nil {
-						return err
-					}
-				}
-			}
-			break
-		}
-		for i := len(oldReplicaList) - 1; i >= 0; i-- {
-			pod, _ := oldReplicaList[i].(*corev1.Pod)
-			if _, ok := deleteSet[pod.Name]; !ok {
-				continue
-			}
-			if isRunningAndAvailable(pod, rsm.Spec.MinReadySeconds) {
-				if err = tree.Delete(pod); err != nil {
-					return err
-				}
-				// TODO(free6om): handle pvc management policy
-				// Retain by default.
-			}
-			break
-		}
-	}
-	// TODO(free6om): handle BestEffortParallel: always keep the majority available.
-
-	// 4. handle update
+	// 3. do update
 	// do nothing if UpdateStrategyType is 'OnDelete'
 	if rsm.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
-		return nil
+		return tree, nil
 	}
+
 	// handle 'RollingUpdate'
-	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(rsm.Spec.UpdateStrategy.RollingUpdate, len(replicaList))
+	priorities := rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
+	SortObjects(oldReplicaList, priorities, false)
+	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(rsm.Spec.UpdateStrategy.RollingUpdate, len(oldReplicaList))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	currentUnavailable := 0
 	for _, object := range oldReplicaList {
@@ -280,34 +116,35 @@ func handleWorkloadObjectUpdate(tree *kubebuilderx.ObjectTree) error {
 	}
 	unavailable := maxUnavailable - currentUnavailable
 
-	// TODO(free6om): calculate updateCount from PodManagementPolicy
+	// TODO(free6om): compute updateCount from PodManagementPolicy(Serial/OrderedReady, Parallel, BestEffortParallel).
 	updateCount := 1
 	deletedPods := 0
 	updatedPods := 0
 	for _, object := range oldReplicaList {
-		pod, _ := object.(*corev1.Pod)
-		if _, ok := updateSet[pod.Name]; !ok {
-			continue
-		}
-		newPod := replicaList[newReplicaMap[pod.Name]].pod
-		if getPodRevision(pod) != getPodRevision(newPod) && !isTerminating(pod) {
-			if err = tree.Delete(pod); err != nil {
-				return err
-			}
-			// TODO(free6om): handle pvc management policy
-			// Retain by default.
-			deletedPods++
-		}
-		updatedPods++
-
 		if deletedPods > updateCount || deletedPods > unavailable {
 			break
 		}
 		if updatedPods >= partition {
 			break
 		}
+
+		pod, _ := object.(*corev1.Pod)
+		if !isHealthy(pod) {
+			tree.Logger.Info(fmt.Sprintf("RSM %s/%s blocks on scale-in as the pod %s is not healthy", rsm.Namespace, rsm.Name, pod.Name))
+			break
+		}
+		newPodRevision := rsm.Status.UpdateRevisions[pod.Name]
+		if getPodRevision(pod) != newPodRevision && !isTerminating(pod) {
+			if err = tree.Delete(pod); err != nil {
+				return nil, err
+			}
+			// TODO(free6om): handle pvc management policy
+			// Retain by default.
+			deletedPods++
+		}
+		updatedPods++
 	}
-	return nil
+	return tree, nil
 }
 
 func parsePartitionNMaxUnavailable(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, replicas int) (int, int, error) {
@@ -469,93 +306,6 @@ func buildReplicas(rsm *workloads.ReplicatedStateMachine) ([]replica, error) {
 	}
 
 	return replicaList, nil
-}
-
-// copyAndMerge merges two objects for updating:
-// 1. new an object targetObj by copying from oldObj
-// 2. merge all fields can be updated from newObj into targetObj
-func copyAndMerge(oldObj, newObj client.Object) client.Object {
-	if reflect.TypeOf(oldObj) != reflect.TypeOf(newObj) {
-		return nil
-	}
-
-	// mergeMetadataMap keeps the original elements.
-	mergeMetadataMap := func(originalMap map[string]string, targetMap map[string]string) map[string]string {
-		if targetMap == nil && originalMap == nil {
-			return nil
-		}
-		if targetMap == nil {
-			targetMap = map[string]string{}
-		}
-		for k, v := range originalMap {
-			// if the element not exist in targetMap, copy it from original.
-			if _, ok := (targetMap)[k]; !ok {
-				(targetMap)[k] = v
-			}
-		}
-		return targetMap
-	}
-
-	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
-		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
-		// if annotations exist and are replaced, the StatefulSet will be updated.
-		oldSts.Annotations = mergeMetadataMap(oldSts.Annotations, newSts.Annotations)
-		oldSts.Spec.Template = newSts.Spec.Template
-		oldSts.Spec.Replicas = newSts.Spec.Replicas
-		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
-		return oldSts
-	}
-
-	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
-		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
-		oldSvc.Spec = newSvc.Spec
-		return oldSvc
-	}
-
-	copyAndMergeCm := func(oldCm, newCm *corev1.ConfigMap) client.Object {
-		oldCm.Data = newCm.Data
-		oldCm.BinaryData = newCm.BinaryData
-		return oldCm
-	}
-
-	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
-		// check pod update by revision
-		if getPodRevision(newPod) == getPodRevision(oldPod) {
-			return nil
-		}
-
-		// in-place update is not supported currently, means the pod update is done through delete+create.
-		// so no need to merge the fields.
-		return oldPod
-	}
-
-	copyAndMergePVC := func(oldPVC, newPVC *corev1.PersistentVolumeClaim) client.Object {
-		// resources.request.storage and accessModes support in-place update.
-		// resources.request.storage only supports volume expansion.
-		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&
-			oldPVC.Spec.Resources.Requests.Storage().Cmp(*newPVC.Spec.Resources.Requests.Storage()) <= 0 {
-			return nil
-		}
-		oldPVC.Spec.AccessModes = newPVC.Spec.AccessModes
-		*oldPVC.Spec.Resources.Requests.Storage() = *newPVC.Spec.Resources.Requests.Storage()
-		return oldPVC
-	}
-
-	targetObj := oldObj.DeepCopyObject()
-	switch o := newObj.(type) {
-	case *apps.StatefulSet:
-		return copyAndMergeSts(targetObj.(*apps.StatefulSet), o)
-	case *corev1.Service:
-		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
-	case *corev1.ConfigMap:
-		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
-	case *corev1.Pod:
-		return copyAndMergePod(targetObj.(*corev1.Pod), o)
-	case *corev1.PersistentVolumeClaim:
-		return copyAndMergePVC(targetObj.(*corev1.PersistentVolumeClaim), o)
-	default:
-		return newObj
-	}
 }
 
 func buildPodByTemplate(template *podTemplateSpecExt, ordinal int, parent *workloads.ReplicatedStateMachine) ([]replica, int, error) {

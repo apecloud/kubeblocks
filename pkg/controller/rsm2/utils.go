@@ -21,19 +21,11 @@ package rsm2
 
 import (
 	"context"
-	"sort"
-	"strings"
-
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -84,78 +76,4 @@ func CurrentReplicaProvider(ctx context.Context, cli client.Reader, objectKey cl
 	default:
 		return getDefaultProvider(), nil
 	}
-}
-
-// SortReplicas sorts replicas by their role priority and name
-// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
-// reverse it if reverse==true
-func SortReplicas(replicas []replica, rolePriorityMap map[string]int, reverse bool) {
-	getRolePriorityFunc := func(i int) int {
-		role := rsm1.GetRoleName(*replicas[i].pod)
-		return rolePriorityMap[role]
-	}
-	getNameFunc := func(i int) string {
-		return replicas[i].pod.Name
-	}
-	baseSort(replicas, getNameFunc, getRolePriorityFunc, reverse)
-}
-
-func SortObjects(objects []client.Object, rolePriorityMap map[string]int, reverse bool) {
-	getRolePriorityFunc := func(i int) int {
-		role := strings.ToLower(objects[i].GetLabels()[constant.RoleLabelKey])
-		return rolePriorityMap[role]
-	}
-	getNameFunc := func(i int) string {
-		return objects[i].GetName()
-	}
-	baseSort(objects, getNameFunc, getRolePriorityFunc, reverse)
-}
-
-func baseSort(x any, getNameFunc func(i int) string, getRolePriorityFunc func(i int) int, reverse bool) {
-	sort.SliceStable(x, func(i, j int) bool {
-		if reverse {
-			i, j = j, i
-		}
-		rolePriI := getRolePriorityFunc(i)
-		rolePriJ := getRolePriorityFunc(j)
-		if rolePriI == rolePriJ {
-			ordinal1 := getNameFunc(i)
-			ordinal2 := getNameFunc(j)
-			return ordinal1 < ordinal2
-		}
-		return rolePriI < rolePriJ
-	})
-}
-
-// isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
-func isRunningAndReady(pod *v1.Pod) bool {
-	return pod.Status.Phase == v1.PodRunning && podutils.IsPodReady(pod)
-}
-
-func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
-	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
-}
-
-// isCreated returns true if pod has been created and is maintained by the API server
-func isCreated(pod *v1.Pod) bool {
-	return pod.Status.Phase != ""
-}
-
-// isTerminating returns true if pod's DeletionTimestamp has been set
-func isTerminating(pod *v1.Pod) bool {
-	return pod.DeletionTimestamp != nil
-}
-
-// isHealthy returns true if pod is running and ready and has not been terminated
-func isHealthy(pod *v1.Pod) bool {
-	return isRunningAndReady(pod) && !isTerminating(pod)
-}
-
-// getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
-// string is returned.
-func getPodRevision(pod *v1.Pod) string {
-	if pod.Labels == nil {
-		return ""
-	}
-	return pod.Labels[appsv1.ControllerRevisionHashLabelKey]
 }

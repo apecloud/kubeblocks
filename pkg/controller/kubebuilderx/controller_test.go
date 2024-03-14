@@ -64,7 +64,7 @@ var _ = Describe("controller test", func() {
 			Expect(err).Should(Equal(reconcileCondErr))
 
 			By("Reconcile with pre-condition unsatisfied")
-			tree.Add(builder.NewPodBuilder(namespace, name).GetObject())
+			Expect(tree.Add(builder.NewPodBuilder(namespace, name).GetObject())).Should(Succeed())
 			newTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
 			err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{unsatisfied: true}).Commit()
@@ -108,7 +108,9 @@ func (d *dummyReconciler) PreCondition(tree *ObjectTree) *CheckResult {
 
 func (d *dummyReconciler) Reconcile(tree *ObjectTree) (*ObjectTree, error) {
 	if tree != nil {
-		tree.Add(builder.NewConfigMapBuilder("hello", "world").GetObject())
+		if err := tree.Add(builder.NewConfigMapBuilder("hello", "world").GetObject()); err != nil {
+			return nil, err
+		}
 	}
 	return tree, d.err
 }

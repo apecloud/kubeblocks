@@ -31,7 +31,7 @@ import (
 )
 
 // assistantObjectReconciler manages non-workload objects, such as Service, ConfigMap, etc.
-type assistantObjectReconciler struct {}
+type assistantObjectReconciler struct{}
 
 func NewAssistantObjectReconciler() kubebuilderx.Reconciler {
 	return &assistantObjectReconciler{}

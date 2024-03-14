@@ -34,6 +34,4 @@ const (
 	FeatureGateRSMReplicaProvider = "RSM_REPLICA_PROVIDER"
 
 	defaultReplicaProvider = PodProvider
-
-	reasonBuildPods = "BuildPods"
 )

@@ -73,6 +73,9 @@ const (
 	OperationFailed            = "Failed"
 	DefaultProbeTimeoutSeconds = 2
 
+	DataDumpOperation OperationKind = "dataDump"
+	DataLoadOperation OperationKind = "dataLoad"
+
 	// this is a general script template, which can be used for all kinds of exec request to databases.
 	DataScriptRequestTpl string = `
 		response=$(curl -s -X POST -H 'Content-Type: application/json' http://%s:3501/v1.0/bindings/%s -d '%s')

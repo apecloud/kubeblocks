@@ -37,6 +37,8 @@ const (
 	ReadWriteAction     = "readwrite"
 	PostProvisionAction = "postProvision"
 	PreTerminateAction  = "preTerminate"
+	DataDumpAction      = "dataDump"
+	DataLoadAction      = "dataLoad"
 )
 
 // action envs

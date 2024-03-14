@@ -381,8 +381,8 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		synthesizeComp.LifecycleActions.MemberLeave,
 		synthesizeComp.LifecycleActions.Readonly,
 		synthesizeComp.LifecycleActions.Readwrite,
-		synthesizeComp.LifecycleActions.DataPopulate,
-		synthesizeComp.LifecycleActions.DataAssemble,
+		synthesizeComp.LifecycleActions.DataDump,
+		synthesizeComp.LifecycleActions.DataLoad,
 		synthesizeComp.LifecycleActions.Reconfigure,
 		synthesizeComp.LifecycleActions.AccountProvision,
 	}
@@ -414,9 +414,9 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 		constant.MemberLeaveAction:   synthesizeComp.LifecycleActions.MemberLeave,
 		constant.ReadonlyAction:      synthesizeComp.LifecycleActions.Readonly,
 		constant.ReadWriteAction:     synthesizeComp.LifecycleActions.Readwrite,
-		// "dataPopulate":     synthesizeComp.LifecycleActions.DataPopulate,
-		// "dataAssemble":     synthesizeComp.LifecycleActions.DataAssemble,
-		// "reconfigure":      synthesizeComp.LifecycleActions.Reconfigure,
+		constant.DataDumpAction:      synthesizeComp.LifecycleActions.DataDump,
+		constant.DataLoadAction:      synthesizeComp.LifecycleActions.DataLoad,
+		// "reconfigure":                synthesizeComp.LifecycleActions.Reconfigure,
 		// "accountProvision": synthesizeComp.LifecycleActions.AccountProvision,
 	}
 

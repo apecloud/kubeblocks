@@ -524,14 +524,12 @@ spec:
                             type: integer
                         type: object
                     type: object
-                  dataAssemble:
-                    description: "Defines the method to assemble data synchronized
-                      from external before starting the service for a new replica.
-                      This action is typically used when creating a new replica, such
-                      as: \n - scale-out - rebuild - clone \n The data will be streamed
-                      in via stdin. If any error occurs during the assembly process,
-                      the action must be able to guarantee idempotence to allow for
-                      retries from the beginning. This field cannot be updated."
+                  dataDump:
+                    description: "Defines the method to dump the data from a replica.
+                      This action is typically used when a new replica needs to be
+                      constructed, such as: \n - scale-out - rebuild - clone \n It
+                      should write the valid data to stdout without including any
+                      extraneous information. This field cannot be updated."
                     properties:
                       builtinHandler:
                         description: BuiltinHandler specifies the builtin action handler
@@ -819,12 +817,13 @@ spec:
                             type: integer
                         type: object
                     type: object
-                  dataPopulate:
-                    description: "Defines the method to populate the data to create
-                      new replicas. This action is typically used when a new replica
-                      needs to be constructed, such as: \n - scale-out - rebuild -
-                      clone \n It should write the valid data to stdout without including
-                      any extraneous information. This field cannot be updated."
+                  dataLoad:
+                    description: "Defines the method to load data into a replica.
+                      This action is typically used when creating a new replica, such
+                      as: \n - scale-out - rebuild - clone \n The data will be streamed
+                      in via stdin. If any error occurs during the process, the action
+                      must be able to guarantee idempotence to allow for retries from
+                      the beginning. This field cannot be updated."
                     properties:
                       builtinHandler:
                         description: BuiltinHandler specifies the builtin action handler

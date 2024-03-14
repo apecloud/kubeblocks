@@ -350,8 +350,8 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 		{lifecycleActions.MemberLeave},
 		{lifecycleActions.Readonly},
 		{lifecycleActions.Readwrite},
-		{lifecycleActions.DataPopulate},
-		{lifecycleActions.DataAssemble},
+		{lifecycleActions.DataDump},
+		{lifecycleActions.DataLoad},
 		{lifecycleActions.Reconfigure},
 		{lifecycleActions.AccountProvision},
 	}

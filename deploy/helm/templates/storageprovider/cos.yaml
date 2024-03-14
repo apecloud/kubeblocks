@@ -40,7 +40,12 @@ spec:
     env_auth = false
     access_key_id = {{ `{{ index .Parameters "accessKeyId" }}` }}
     secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
-    endpoint = {{ `{{ printf "cos.%s.myqcloud.com" .Parameters.region }}` }}
+    {{ `{{- $region := index .Parameters "region" }}` }}
+    {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
+    {{ `{{- if not $endpoint }}` }}
+      {{ `{{- $endpoint = (printf "cos.%s.myqcloud.com" $region) }}` }}
+    {{ `{{- end }}` }}
+    endpoint = {{ `{{ $endpoint }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
     chunk_size = 50Mi
 

@@ -13,9 +13,9 @@ on:
         default: ''
       TEST_TYPE:
         description: 'test type (e.g. apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|mysqlscale|weaviate|qdrant|smartengine|
-        greptimedb|nebula|risingwave|starrocks|etcd|foxlake|orioledb|oracle-mysql|official-pg|asmysql|openldap|
+        greptimedb|nebula|risingwave|starrocks|etcd|foxlake|orioledb|oracle-mysql|official-pg|asmysql|openldap|polardbx|
         opensearch|elasticsearch|vllm|tdengine|milvus|clickhouse|pika|ggml|zookeeper|mariadb|tidb|xinference|
-        oracle|opengauss|influxdb|flink|solr|doris|halo|mogdb|starrocks-ent|yashandb)'
+        oracle|opengauss|influxdb|flink|solr|doris|halo|mogdb|starrocks-ent|apecloud-postgresql|yashandb|redis-cluster|camellia-redis-proxy|pulsar-nodeport)'
         required: false
         default: ''
       CLUSTER_VERSION:

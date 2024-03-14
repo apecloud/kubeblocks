@@ -72,7 +72,7 @@ var _ = Describe("reconciler test", func() {
 
 			By("DeepCopy")
 			tree.SetRoot(root)
-			tree.Add(obj0, obj1)
+			Expect(tree.Add(obj0, obj1)).Should(Succeed())
 			treeCopied, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
 			Expect(treeCopied).Should(Equal(tree))

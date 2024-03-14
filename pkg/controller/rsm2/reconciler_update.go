@@ -37,11 +37,6 @@ import (
 // Currently, two update strategies are supported: 'OnDelete' and 'RollingUpdate'.
 type updateReconciler struct{}
 
-type replica struct {
-	pod  *corev1.Pod
-	pvcs []*corev1.PersistentVolumeClaim
-}
-
 var _ kubebuilderx.Reconciler = &updateReconciler{}
 
 func NewUpdateReconciler() kubebuilderx.Reconciler {

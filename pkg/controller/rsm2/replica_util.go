@@ -21,7 +21,6 @@ package rsm2
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"reflect"
 	"sort"
 	"strings"
@@ -31,9 +30,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
@@ -41,6 +43,11 @@ type podTemplateSpecExt struct {
 	Replicas int32
 	corev1.PodTemplateSpec
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
+}
+
+type replica struct {
+	pod  *corev1.Pod
+	pvcs []*corev1.PersistentVolumeClaim
 }
 
 // sortObjects sorts objects by their role priority and name
@@ -232,6 +239,14 @@ func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *w
 		}
 	})
 
+	if err = controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
+		return nil, err
+	}
+	for _, pvc := range pvcs {
+		if err = controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
+			return nil, err
+		}
+	}
 	replica := &replica{
 		pod:  pod,
 		pvcs: pvcs,

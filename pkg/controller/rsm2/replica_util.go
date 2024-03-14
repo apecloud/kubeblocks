@@ -146,7 +146,7 @@ func validateDupReplicaNames[T any](replicas []T, getNameFunc func(item T) strin
 }
 
 func buildReplicaName2TemplateMap(rsm *workloads.ReplicatedStateMachine) map[string]*podTemplateSpecExt {
-	panic("finish me")
+	templateGroups := buildReplicaTemplateGroups(rsm)
 }
 
 func buildReplicaByTemplate(name string, template *podTemplateSpecExt) replica {
@@ -238,4 +238,33 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	default:
 		return newObj
 	}
+}
+
+func validateSpec(rsm *workloads.ReplicatedStateMachine) error {
+	replicasInTemplates := int32(0)
+	var names string
+	for _, instance := range rsm.Spec.Instances {
+		replicas := int32(1)
+		if instance.Replicas != nil {
+			replicas = *instance.Replicas
+		}
+		replicasInTemplates += replicas
+
+		if instance.Name != nil {
+			if instance.Replicas != nil && *instance.Replicas > 1 {
+				names = fmt.Sprintf("%s%s,", names, *instance.Name)
+			}
+		}
+	}
+	// sum of spec.templates[*].replicas should not greater than spec.replicas
+	if replicasInTemplates > *rsm.Spec.Replicas {
+		return fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *rsm.Spec.Replicas)
+	}
+
+	// instance.replicas should be nil or 1 if instance.name set
+	if len(names) > 0 {
+		return fmt.Errorf("replicas should be empty or no more than 1 if name set, instance names: %s", names)
+	}
+
+	return nil
 }

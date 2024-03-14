@@ -53,12 +53,17 @@ func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 	//	return nil
 	//}
 
+	if comp == nil || len(comp.Spec.CompDef) == 0 {
+		reqCtx.Log.Info("comp is nil or compDef is empty, skip reconciling component preTerminate")
+		return nil
+	}
 	compKey := types.NamespacedName{
 		Namespace: comp.Namespace,
 		Name:      comp.Spec.CompDef,
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	if err := cli.Get(ctx, compKey, compDef); err != nil {
+		reqCtx.Log.Error(err, "reconcile pre terminate failed to get compDef", "comp", comp.Name, "compDef", compKey)
 		return err
 	}
 

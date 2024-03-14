@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -150,6 +151,8 @@ func compOwnedKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&workloads.ReplicatedStateMachineList{},
 		&corev1.ServiceList{},
+		&corev1.ServiceAccountList{},
+		&rbacv1.RoleBindingList{},
 		&batchv1.JobList{},
 	}
 }

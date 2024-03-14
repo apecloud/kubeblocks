@@ -164,8 +164,8 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 		&appsv1.StatefulSetList{}, // be compatible with 0.6 workloads.
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
-		&corev1.ServiceAccountList{},
-		&rbacv1.RoleBindingList{},
+		&corev1.ServiceAccountList{}, // be backward compatible
+		&rbacv1.RoleBindingList{},    // be backward compatible
 		&dpv1alpha1.BackupPolicyList{},
 		&dpv1alpha1.BackupScheduleList{},
 		&dpv1alpha1.RestoreList{},

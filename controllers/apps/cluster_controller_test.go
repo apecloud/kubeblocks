@@ -960,7 +960,7 @@ var _ = Describe("Cluster Controller", func() {
 				testDeleteClusterWithDoNotTerminate(createObj)
 			})
 
-			FIt("delete cluster with terminationPolicy=Halt", func() {
+			It("delete cluster with terminationPolicy=Halt", func() {
 				testDeleteClusterWithHalt(createObj)
 			})
 

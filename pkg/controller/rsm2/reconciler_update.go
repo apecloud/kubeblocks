@@ -51,13 +51,6 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 		return kubebuilderx.ResultUnsatisfied
 	}
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
-	replicas := 1
-	if rsm.Spec.Replicas != nil {
-		replicas = int(*rsm.Spec.Replicas)
-	}
-	if len(tree.List(&corev1.Pod{})) != replicas {
-		return kubebuilderx.ResultUnsatisfied
-	}
 	if err := validateSpec(rsm); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}

@@ -20,14 +20,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubebuilderx
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/go-logr/logr"
+	"github.com/golang/mock/gomock"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+
+var (
+	mockController *gomock.Controller
+	k8sMock        *mocks.MockClient
+	ctx            context.Context
+	logger         logr.Logger
+)
 
 func init() {
 }
@@ -39,10 +54,15 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	mockController, k8sMock = testutil.SetupK8sMock()
+	ctx = context.Background()
+	logger = logf.FromContext(ctx).WithValues("kubebuilderx-test", "foo")
+
 	go func() {
 		defer GinkgoRecover()
 	}()
 })
 
 var _ = AfterSuite(func() {
+	mockController.Finish()
 })

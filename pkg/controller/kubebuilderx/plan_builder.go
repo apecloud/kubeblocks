@@ -46,8 +46,6 @@ type transformContext struct {
 type PlanBuilder struct {
 	transCtx     *transformContext
 	cli          client.Client
-	currentTree  *ObjectTree
-	desiredTree  *ObjectTree
 	transformers graph.TransformerChain
 }
 
@@ -197,16 +195,14 @@ func (b *PlanBuilder) statusObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 // NewPlanBuilder returns a PlanBuilder
-func NewPlanBuilder(ctx context.Context, cli client.Client, currentTree, desiredTree *ObjectTree) graph.PlanBuilder {
+func NewPlanBuilder(ctx context.Context, cli client.Client, recorder record.EventRecorder, logger logr.Logger) graph.PlanBuilder {
 	return &PlanBuilder{
 		transCtx: &transformContext{
 			ctx:      ctx,
 			cli:      model.NewGraphClient(cli),
-			recorder: currentTree.EventRecorder,
-			logger:   currentTree.Logger,
+			recorder: recorder,
+			logger:   logger,
 		},
-		cli:         cli,
-		currentTree: currentTree,
-		desiredTree: desiredTree,
+		cli: cli,
 	}
 }

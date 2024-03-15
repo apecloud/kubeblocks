@@ -96,7 +96,7 @@ func (c *controller) Commit() error {
 	if c.oldTree.GetRoot() == nil {
 		return nil
 	}
-	builder := NewPlanBuilder(c.ctx, c.cli, c.oldTree, c.tree)
+	builder := NewPlanBuilder(c.ctx, c.cli, c.recorder, c.logger)
 	if err := builder.Init(); err != nil {
 		return err
 	}

@@ -20,15 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-var _ = Describe("fix meta reconciler test", func() {
+var _ = Describe("deletion reconciler test", func() {
 	const (
 		namespace = "foo"
 		name      = "bar"
@@ -40,17 +43,21 @@ var _ = Describe("fix meta reconciler test", func() {
 			rsm := builder.NewReplicatedStateMachineBuilder(namespace, name).GetObject()
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(rsm)
-			reconciler := NewFixMetaReconciler()
+			reconciler := NewDeletionReconciler()
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultUnsatisfied))
+			t := metav1.NewTime(time.Now())
+			rsm.SetDeletionTimestamp(&t)
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
-			By("Reconcile without finalizer")
+			By("Reconcile")
+			pod := builder.NewPodBuilder(namespace, name+"0").GetObject()
+			Expect(tree.Add(pod)).Should(Succeed())
 			newTree, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			Expect(newTree.GetRoot().GetFinalizers()).Should(HaveLen(1))
-			Expect(newTree.GetRoot().GetFinalizers()[0]).Should(Equal(rsm1.FinalizerName))
-
-			By("Reconcile with finalizer")
-			Expect(reconciler.PreCondition(newTree)).Should(Equal(kubebuilderx.ResultUnsatisfied))
+			Expect(newTree.GetRoot()).Should(Equal(rsm))
+			newTree, err = reconciler.Reconcile(newTree)
+			Expect(err).Should(BeNil())
+			Expect(newTree.GetRoot()).Should(BeNil())
 		})
 	})
 })

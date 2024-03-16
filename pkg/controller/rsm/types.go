@@ -54,7 +54,7 @@ const (
 
 	defaultPodName = "Unknown"
 
-	rsmFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
+	FinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
 
 	jobHandledLabel             = "rsm.workloads.kubeblocks.io/job-handled"
 	jobTypeLabel                = "rsm.workloads.kubeblocks.io/job-type"

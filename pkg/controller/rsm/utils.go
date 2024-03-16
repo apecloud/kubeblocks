@@ -549,12 +549,12 @@ func emitActionEvent(transCtx *rsmTransformContext, eventType, reason, message s
 
 func GetFinalizer(obj client.Object) string {
 	if _, ok := obj.(*workloads.ReplicatedStateMachine); ok {
-		return rsmFinalizerName
+		return FinalizerName
 	}
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		return constant.DBClusterFinalizerName
 	}
-	return rsmFinalizerName
+	return FinalizerName
 }
 
 func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {

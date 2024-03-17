@@ -149,10 +149,10 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	role, ok := roleMap[roleName]
 	switch ok {
 	case true:
-		pod.Labels[roleLabelKey] = role.Name
+		pod.Labels[RoleLabelKey] = role.Name
 		pod.Labels[rsmAccessModeLabelKey] = string(role.AccessMode)
 	case false:
-		delete(pod.Labels, roleLabelKey)
+		delete(pod.Labels, RoleLabelKey)
 		delete(pod.Labels, rsmAccessModeLabelKey)
 	}
 

@@ -169,8 +169,8 @@ func makePodUpdateReady(newRevision string, pods ...*corev1.Pod) {
 	}
 	for _, pod := range pods {
 		pod.Labels[apps.StatefulSetRevisionLabel] = newRevision
-		if pod.Labels[roleLabelKey] == "" {
-			pod.Labels[roleLabelKey] = "learner"
+		if pod.Labels[RoleLabelKey] == "" {
+			pod.Labels[RoleLabelKey] = "learner"
 		}
 		pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)
 	}

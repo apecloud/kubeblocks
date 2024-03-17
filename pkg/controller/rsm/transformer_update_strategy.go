@@ -164,7 +164,7 @@ func selectSwitchoverTarget(rsm *workloads.ReplicatedStateMachine, pods []corev1
 		if len(podUpdated) == 0 {
 			podUpdated = pod.Name
 		}
-		if _, ok := pod.Labels[roleLabelKey]; !ok {
+		if _, ok := pod.Labels[RoleLabelKey]; !ok {
 			continue
 		}
 		if len(podUpdatedWithLabel) == 0 {

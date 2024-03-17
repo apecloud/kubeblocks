@@ -157,15 +157,15 @@ var _ = Describe("update strategy transformer test.", func() {
 					return nil
 				}).Times(4)
 			pod0 := builder.NewPodBuilder(namespace, getPodName(rsm.Name, 0)).
-				AddLabels(roleLabelKey, "follower").
+				AddLabels(RoleLabelKey, "follower").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 			pod1 := builder.NewPodBuilder(namespace, getPodName(name, 1)).
-				AddLabels(roleLabelKey, "leader").
+				AddLabels(RoleLabelKey, "leader").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 			pod2 := builder.NewPodBuilder(namespace, getPodName(name, 2)).
-				AddLabels(roleLabelKey, "follower").
+				AddLabels(RoleLabelKey, "follower").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 			k8sMock.EXPECT().

@@ -48,7 +48,7 @@ const (
 
 	kindReplicatedStateMachine = "ReplicatedStateMachine"
 
-	roleLabelKey          = "kubeblocks.io/role"
+	RoleLabelKey          = "kubeblocks.io/role"
 	rsmAccessModeLabelKey = "rsm.workloads.kubeblocks.io/access-mode"
 	rsmGenerationLabelKey = "rsm.workloads.kubeblocks.io/controller-generation"
 

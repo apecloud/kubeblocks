@@ -42,12 +42,12 @@ var _ = Describe("update plan test.", func() {
 
 		resetPods := func() {
 			pod0 = builder.NewPodBuilder(namespace, getPodName(name, 0)).
-				AddLabels(roleLabelKey, "follower").
+				AddLabels(RoleLabelKey, "follower").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
 			pod1 = builder.NewPodBuilder(namespace, getPodName(name, 1)).
-				AddLabels(roleLabelKey, "logger").
+				AddLabels(RoleLabelKey, "logger").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
@@ -56,22 +56,22 @@ var _ = Describe("update plan test.", func() {
 				GetObject()
 
 			pod3 = builder.NewPodBuilder(namespace, getPodName(name, 3)).
-				AddLabels(roleLabelKey, "learner").
+				AddLabels(RoleLabelKey, "learner").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
 			pod4 = builder.NewPodBuilder(namespace, getPodName(name, 4)).
-				AddLabels(roleLabelKey, "candidate").
+				AddLabels(RoleLabelKey, "candidate").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
 			pod5 = builder.NewPodBuilder(namespace, getPodName(name, 5)).
-				AddLabels(roleLabelKey, "leader").
+				AddLabels(RoleLabelKey, "leader").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
 			pod6 = builder.NewPodBuilder(namespace, getPodName(name, 6)).
-				AddLabels(roleLabelKey, "learner").
+				AddLabels(RoleLabelKey, "learner").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 		}

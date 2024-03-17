@@ -110,13 +110,13 @@ var _ = Describe("object status transformer test.", func() {
 					return nil
 				}).Times(1)
 			pod0 := builder.NewPodBuilder(namespace, getPodName(rsm.Name, 0)).
-				AddLabels(roleLabelKey, "follower").
+				AddLabels(RoleLabelKey, "follower").
 				GetObject()
 			pod1 := builder.NewPodBuilder(namespace, getPodName(name, 1)).
-				AddLabels(roleLabelKey, "leader").
+				AddLabels(RoleLabelKey, "leader").
 				GetObject()
 			pod2 := builder.NewPodBuilder(namespace, getPodName(name, 2)).
-				AddLabels(roleLabelKey, "follower").
+				AddLabels(RoleLabelKey, "follower").
 				GetObject()
 			makePodUpdateReady(newRevision, pod0, pod1, pod2)
 			k8sMock.EXPECT().
@@ -144,7 +144,7 @@ var _ = Describe("object status transformer test.", func() {
 			for _, pod := range pods {
 				matched := false
 				for _, status := range rsmNew.Status.MembersStatus {
-					if status.PodName == pod.Name && status.ReplicaRole.Name == pod.Labels[roleLabelKey] {
+					if status.PodName == pod.Name && status.ReplicaRole.Name == pod.Labels[RoleLabelKey] {
 						matched = true
 					}
 				}

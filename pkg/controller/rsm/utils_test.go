@@ -69,13 +69,13 @@ var _ = Describe("utils test", func() {
 	Context("SortPods function", func() {
 		It("should work well", func() {
 			pods := []corev1.Pod{
-				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(roleLabelKey, "logger").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(RoleLabelKey, "follower").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(RoleLabelKey, "logger").GetObject(),
 				*builder.NewPodBuilder(namespace, "pod-2").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-3").AddLabels(roleLabelKey, "learner").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-4").AddLabels(roleLabelKey, "candidate").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-5").AddLabels(roleLabelKey, "leader").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-6").AddLabels(roleLabelKey, "learner").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-3").AddLabels(RoleLabelKey, "learner").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-4").AddLabels(RoleLabelKey, "candidate").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-5").AddLabels(RoleLabelKey, "leader").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-6").AddLabels(RoleLabelKey, "learner").GetObject(),
 			}
 			expectedOrder := []string{"pod-4", "pod-2", "pod-3", "pod-6", "pod-1", "pod-0", "pod-5"}
 
@@ -123,9 +123,9 @@ var _ = Describe("utils test", func() {
 	Context("SetMembersStatus function", func() {
 		It("should work well", func() {
 			pods := []corev1.Pod{
-				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(roleLabelKey, "leader").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-2").AddLabels(roleLabelKey, "follower").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(RoleLabelKey, "follower").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(RoleLabelKey, "leader").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-2").AddLabels(RoleLabelKey, "follower").GetObject(),
 			}
 			readyCondition := corev1.PodCondition{
 				Type:   corev1.PodReady,
@@ -162,7 +162,7 @@ var _ = Describe("utils test", func() {
 
 	Context("GetRoleName function", func() {
 		It("should work well", func() {
-			pod := builder.NewPodBuilder(namespace, name).AddLabels(roleLabelKey, "LEADER").GetObject()
+			pod := builder.NewPodBuilder(namespace, name).AddLabels(RoleLabelKey, "LEADER").GetObject()
 			role := GetRoleName(*pod)
 			Expect(role).Should(Equal("leader"))
 		})

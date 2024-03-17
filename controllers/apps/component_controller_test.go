@@ -263,8 +263,9 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory), phase *appsv1alpha1.ClusterPhase) {
-		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+	createClusterObjVx := func(clusterDefName, clusterVerName, compName, compDefName string, v2 bool,
+		processor func(*testapps.MockClusterFactory), phase *appsv1alpha1.ClusterPhase) {
+		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVerName).
 			WithRandomName()
 		if !v2 {
 			factory.AddComponent(compName, compDefName).SetReplicas(1)
@@ -308,17 +309,17 @@ var _ = Describe("Component Controller", func() {
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjVx(compName, compDefName, false, processor, nil)
+		createClusterObjVx(clusterDefObj.Name, clusterVersionObj.Name, compName, compDefName, false, processor, nil)
 	}
 
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor, nil)
+		createClusterObjVx("", "", compName, compDefName, true, processor, nil)
 	}
 
 	createClusterObjV2WithPhase := func(compName, compDefName string, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor, &phase)
+		createClusterObjVx("", "", compName, compDefName, true, processor, &phase)
 	}
 
 	mockCompRunning := func(compName string) {

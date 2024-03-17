@@ -36,7 +36,7 @@ func HandleSimplifiedClusterAPI(clusterDef *appsv1alpha1.ClusterDefinition, clus
 	if hasClusterCompDefined(cluster) {
 		return nil
 	}
-	if !hasSimplifiedClusterAPI(cluster) {
+	if !HasSimplifiedClusterAPI(cluster) {
 		return nil
 	}
 	if len(clusterDef.Spec.ComponentDefs) == 0 {
@@ -50,7 +50,7 @@ func hasClusterCompDefined(cluster *appsv1alpha1.Cluster) bool {
 	return cluster.Spec.ComponentSpecs != nil && len(cluster.Spec.ComponentSpecs) > 0
 }
 
-func hasSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster) bool {
+func HasSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster) bool {
 	return cluster.Spec.Replicas != nil ||
 		!cluster.Spec.Resources.CPU.IsZero() ||
 		!cluster.Spec.Resources.Memory.IsZero() ||

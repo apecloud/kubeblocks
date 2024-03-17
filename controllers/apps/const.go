@@ -25,6 +25,7 @@ const (
 	clusterVersionFinalizerName      = "clusterversion.kubeblocks.io/finalizer"
 	opsDefinitionFinalizerName       = "opsdefinition.kubeblocks.io/finalizer"
 	componentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
+	componentVersionFinalizerName    = "componentversion.kubeblocks.io/finalizer"
 
 	// annotations keys
 	// debugClusterAnnotationKey is used when one wants to debug the cluster.

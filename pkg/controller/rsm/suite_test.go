@@ -67,7 +67,7 @@ var (
 
 	selectors = map[string]string{
 		constant.AppInstanceLabelKey: name,
-		WorkloadsManagedByLabelKey:   kindReplicatedStateMachine,
+		WorkloadsManagedByLabelKey:   KindReplicatedStateMachine,
 	}
 
 	headlessSvcName = name + "-headless"

@@ -224,7 +224,7 @@ var _ = Describe("update strategy transformer test.", func() {
 			action = builder.NewJobBuilder(name, actionName).
 				AddLabelsInMap(map[string]string{
 					constant.AppInstanceLabelKey: rsm.Name,
-					constant.KBManagedByKey:      kindReplicatedStateMachine,
+					constant.KBManagedByKey:      KindReplicatedStateMachine,
 					jobScenarioLabel:             jobScenarioUpdate,
 					jobTypeLabel:                 jobTypeSwitchover,
 					jobHandledLabel:              jobHandledFalse,

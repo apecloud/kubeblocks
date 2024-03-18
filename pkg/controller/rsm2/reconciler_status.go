@@ -96,10 +96,14 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	rsm.Status.UpdatedReplicas = updatedReplicas
 	rsm.Status.CurrentGeneration = rsm.Generation
 	// all pods have been updated
-	if currentReplicas == 0 && updatedReplicas > 0 {
-		rsm.Status.CurrentReplicas = rsm.Status.UpdatedReplicas
+	totalReplicas := int32(1)
+	if rsm.Spec.Replicas != nil {
+		totalReplicas = *rsm.Spec.Replicas
+	}
+	if rsm.Status.Replicas == totalReplicas && rsm.Status.UpdatedReplicas == totalReplicas {
 		rsm.Status.CurrentRevisions = rsm.Status.UpdateRevisions
 		rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
+		rsm.Status.CurrentReplicas = totalReplicas
 	}
 
 	// 3. set members status

@@ -57,6 +57,10 @@ func (mgr *Manager) GetReplicaRoleThroughCommands(ctx context.Context, cluster *
 	if !ok || len(roleProbeCmd) == 0 {
 		return "", errors.New("role probe commands is empty!")
 	}
+	if roleProbeCmd[0] != "sh" && roleProbeCmd[0] != "bash" {
+		roleProbeCmd = append([]string{"sh", "-c"}, strings.Join(roleProbeCmd, " "))
+	}
+
 	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {
 		return "", err

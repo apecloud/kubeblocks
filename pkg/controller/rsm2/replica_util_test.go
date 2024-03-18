@@ -66,7 +66,7 @@ var _ = Describe("replica util test", func() {
 				AccessMode: workloads.ReadonlyMode,
 			},
 		}
-		pod = builder.NewPodBuilder(namespace, name+"0").
+		pod = builder.NewPodBuilder("", "").
 			AddContainer(corev1.Container{
 				Name:  "foo",
 				Image: "bar",
@@ -172,9 +172,18 @@ var _ = Describe("replica util test", func() {
 
 		It("build a rsm with one instance template override", func() {
 			nameOverride0 := "name-o-0"
-			annotationOverride := map[string]string{}
+			annotationOverride := map[string]string{
+				"foo": "bar",
+			}
+			labelOverride := map[string]string{
+				"foo": "bar",
+			}
+			imageOverride := "foo:latest"
 			instance := workloads.InstanceTemplate{
-				Name: &nameOverride0,
+				Name:        &nameOverride0,
+				Annotations: annotationOverride,
+				Labels:      labelOverride,
+				Image:       &imageOverride,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instance)
 			nameTemplate, err := buildReplicaName2TemplateMap(rsm)
@@ -185,7 +194,14 @@ var _ = Describe("replica util test", func() {
 			Expect(nameTemplate).Should(HaveKey(name0))
 			Expect(nameTemplate).Should(HaveKey(name1))
 			Expect(nameTemplate).Should(HaveKey(nameOverride0))
-			Expect(nameTemplate[name0].PodTemplateSpec).Should(Equal(template))
+			envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
+			expectedTemplate := rsm1.BuildPodTemplate(rsm, envConfigName)
+			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
+			Expect(nameTemplate[name1].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
+			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec).ShouldNot(Equal(expectedTemplate.Spec))
+			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Annotations).Should(Equal(annotationOverride))
+			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Labels).Should(Equal(labelOverride))
+			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec.Containers[0].Image).Should(Equal(imageOverride))
 		})
 	})
 })

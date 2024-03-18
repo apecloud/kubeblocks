@@ -28,6 +28,7 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -145,6 +146,7 @@ func (r *ComponentDefinitionReconciler) status(cli client.Client, rctx intctrlut
 func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	for _, validator := range []func(client.Client, intctrlutil.RequestCtx, *appsv1alpha1.ComponentDefinition) error{
+		r.validateServiceVersion,
 		r.validateRuntime,
 		r.validateVars,
 		r.validateVolumes,
@@ -165,6 +167,11 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		}
 	}
 	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateServiceVersion(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	return validateServiceVersion(cmpd.Spec.ServiceVersion)
 }
 
 func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx intctrlutil.RequestCtx,
@@ -375,6 +382,42 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 func (r *ComponentDefinitionReconciler) validateComponentDefRef(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
+}
+
+func getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1alpha1.ComponentDefinition, error) {
+	compKey := types.NamespacedName{
+		Name: name,
+	}
+	compDef := &appsv1alpha1.ComponentDefinition{}
+	if err := cli.Get(ctx, compKey, compDef); err != nil {
+		return nil, err
+	}
+	if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
+		return nil, fmt.Errorf("ComponentDefinition referenced is unavailable: %s", compDef.Name)
+	}
+	return compDef, nil
+}
+
+// listCompDefinitionsWithPrefix returns all component definitions whose names have prefix @namePrefix.
+func listCompDefinitionsWithPrefix(ctx context.Context, cli client.Reader, namePrefix string) ([]*appsv1alpha1.ComponentDefinition, error) {
+	compDefList := &appsv1alpha1.ComponentDefinitionList{}
+	if err := cli.List(ctx, compDefList); err != nil {
+		return nil, err
+	}
+	compDefsFullyMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
+	compDefsPrefixMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
+	for i, item := range compDefList.Items {
+		if item.Name == namePrefix {
+			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
+		}
+		if strings.HasPrefix(item.Name, namePrefix) {
+			compDefsPrefixMatched = append(compDefsPrefixMatched, &compDefList.Items[i])
+		}
+	}
+	if len(compDefsFullyMatched) > 0 {
+		return compDefsFullyMatched, nil
+	}
+	return compDefsPrefixMatched, nil
 }
 
 func checkUniqueItemWithValue(slice any, fieldName string, val any) bool {

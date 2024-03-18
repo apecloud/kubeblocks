@@ -130,7 +130,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	}
 
 	var templates []dpv1alpha1.RestoreVolumeClaim
-	pvcLabels := constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name)
+	pvcLabels := constant.GetKBWellKnownLabels(r.Cluster.Spec.ClusterDefRef, r.Cluster.Name, comp.Name)
 	for _, v := range comp.VolumeClaimTemplates {
 		if !r.existVolumeSource(targetVolumes, v.Name) {
 			continue
@@ -210,7 +210,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 				ExecAction: &dpv1alpha1.ExecAction{
 					Target: dpv1alpha1.ExecActionTarget{
 						PodSelector: metav1.LabelSelector{
-							MatchLabels: constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name),
+							MatchLabels: constant.GetKBWellKnownLabels(r.Cluster.Spec.ClusterDefRef, r.Cluster.Name, comp.Name),
 						},
 					},
 				},
@@ -252,7 +252,7 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 		name = fmt.Sprintf("%s-%d", name, r.startingIndex)
 	}
 	if len(r.restoreLabels) == 0 {
-		r.restoreLabels = constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name)
+		r.restoreLabels = constant.GetKBWellKnownLabels(r.Cluster.Spec.ClusterDefRef, r.Cluster.Name, comp.Name)
 	}
 	return metav1.ObjectMeta{
 		Name:      name,

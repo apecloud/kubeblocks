@@ -24,6 +24,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -39,6 +40,7 @@ func init() {
 	stopBehaviour := OpsBehaviour{
 		FromClusterPhases: []appsv1alpha1.ClusterPhase{appsv1alpha1.StoppedClusterPhase},
 		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
+		QueueByCluster:    true,
 		OpsHandler:        StartOpsHandler{},
 	}
 
@@ -54,7 +56,7 @@ func (start StartOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCt
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	cluster := opsRes.Cluster
-	componentReplicasMap, err := start.getComponentReplicasSnapshot(cluster.Annotations)
+	componentReplicasMap, err := getComponentReplicasSnapshot(cluster.Annotations)
 	if err != nil {
 		return err
 	}
@@ -77,7 +79,11 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 // the Reconcile function for start opsRequest.
 func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, componentName string) *int32 {
-		componentReplicasMap, _ := start.getComponentReplicasSnapshot(opsRequest.Annotations)
+		compStatus := opsRequest.Status.Components[componentName]
+		if compStatus.OverrideBy != nil {
+			return compStatus.OverrideBy.Replicas
+		}
+		componentReplicasMap, _ := getComponentReplicasSnapshot(opsRequest.Annotations)
 		replicas, ok := componentReplicasMap[componentName]
 		if !ok {
 			return nil
@@ -92,14 +98,14 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, getExpectReplicas)
 	}
-	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "start", handleComponentProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "start", syncOverrideByOpsForScaleReplicas, handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (start StartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
-	componentReplicasMap, err := start.getComponentReplicasSnapshot(opsRes.Cluster.Annotations)
+	componentReplicasMap, err := getComponentReplicasSnapshot(opsRes.Cluster.Annotations)
 	if err != nil {
 		return err
 	}
@@ -112,9 +118,8 @@ func (start StartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx
 			continue
 		}
 		if v.Replicas == 0 {
-			copyReplicas := v.Replicas
 			lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
-				Replicas: &copyReplicas,
+				Replicas: pointer.Int32(v.Replicas),
 			}
 		}
 	}
@@ -142,7 +147,7 @@ func (start StartOpsHandler) setOpsAnnotation(reqCtx intctrlutil.RequestCtx, cli
 }
 
 // getComponentReplicasSnapshot gets the replicas snapshot of components from annotations.
-func (start StartOpsHandler) getComponentReplicasSnapshot(annotations map[string]string) (map[string]int32, error) {
+func getComponentReplicasSnapshot(annotations map[string]string) (map[string]int32, error) {
 	componentReplicasMap := map[string]int32{}
 	snapshotForStart := annotations[constant.SnapShotForStartAnnotationKey]
 	if len(snapshotForStart) != 0 {

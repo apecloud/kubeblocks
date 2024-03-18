@@ -24,6 +24,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -39,6 +40,7 @@ func init() {
 	stopBehaviour := OpsBehaviour{
 		FromClusterPhases: append(appsv1alpha1.GetClusterUpRunningPhases(), appsv1alpha1.UpdatingClusterPhase),
 		ToClusterPhase:    appsv1alpha1.StoppingClusterPhase,
+		QueueByCluster:    true,
 		OpsHandler:        StopOpsHandler{},
 	}
 
@@ -81,8 +83,11 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // the Reconcile function for stop opsRequest.
 func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, componentName string) *int32 {
-		expectReplicas := int32(0)
-		return &expectReplicas
+		compStatus := opsRequest.Status.Components[componentName]
+		if compStatus.OverrideBy != nil {
+			return compStatus.OverrideBy.Replicas
+		}
+		return pointer.Int32(0)
 	}
 	handleComponentProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
@@ -95,7 +100,7 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 		return expectProgressCount, completedCount, nil
 	}
-	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", handleComponentProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", syncOverrideByOpsForScaleReplicas, handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

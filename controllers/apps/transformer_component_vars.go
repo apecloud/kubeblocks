@@ -84,10 +84,7 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 // generatedComponent4LegacyCluster checks whether the cluster to which this component belongs was created before 0.8.
 func generatedComponent4LegacyCluster(transCtx *componentTransformContext) (bool, error) {
-	generated, err := isGeneratedComponent(transCtx.Context, transCtx.Client, transCtx.Cluster, transCtx.ComponentOrig)
-	if err != nil {
-		return false, err
-	}
+	generated := isGeneratedComponent(transCtx.ComponentOrig)
 	if !generated {
 		return false, nil
 	}
@@ -98,7 +95,7 @@ func generatedComponent4LegacyCluster(transCtx *componentTransformContext) (bool
 		Namespace: synthesizedComp.Namespace,
 		Name:      constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
 	}
-	if err = transCtx.Client.Get(transCtx.Context, rsmKey, rsmObj); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, rsmKey, rsmObj); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 

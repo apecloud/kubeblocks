@@ -43,6 +43,11 @@ func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory
 	return f
 }
 
+func (factory *MockClusterFactory) SetTopology(topology string) *MockClusterFactory {
+	factory.Get().Spec.Topology = topology
+	return factory
+}
+
 func (factory *MockClusterFactory) SetTerminationPolicy(policyType appsv1alpha1.TerminationPolicyType) *MockClusterFactory {
 	factory.Get().Spec.TerminationPolicy = policyType
 	return factory
@@ -150,6 +155,12 @@ func (factory *MockClusterFactory) SetShards(shards int32) *MockClusterFactory {
 func (factory *MockClusterFactory) SetCompDef(compDef string) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
 		comp.ComponentDef = compDef
+	})
+}
+
+func (factory *MockClusterFactory) SetServiceVersion(serviceVersion string) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.ServiceVersion = serviceVersion
 	})
 }
 

@@ -42,7 +42,8 @@ type ErrorType string
 const (
 	// ErrorWaitCacheRefresh waits for synchronization of the corresponding object cache in client-go from ApiServer.
 	ErrorWaitCacheRefresh ErrorType = "WaitCacheRefresh"
-	ErrorIgnoreCancel               = "IgnoreCancel"
+	ErrorIgnoreCancel     ErrorType = "IgnoreCancel"
+
 	// ErrorTypeNotFound not found any resource.
 	ErrorTypeNotFound ErrorType = "NotFound"
 

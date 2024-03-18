@@ -74,19 +74,6 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	if component == nil {
 		return nil, nil
 	}
-	if customDataCloneSupported(component) {
-		return &customDataClone{
-			baseDataClone{
-				reqCtx:    reqCtx,
-				cli:       cli,
-				cluster:   cluster,
-				component: component,
-				stsObj:    stsObj,
-				stsProto:  stsProto,
-				key:       key,
-			},
-		}, nil
-	}
 	if component.HorizontalScalePolicy == nil {
 		return &dummyDataClone{
 			baseDataClone{
@@ -115,10 +102,6 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	}
 	// TODO: how about policy None and Snapshot?
 	return nil, nil
-}
-
-func customDataCloneSupported(comp *component.SynthesizedComponent) bool {
-	return comp.LifecycleActions != nil && comp.LifecycleActions.DataDump != nil && comp.LifecycleActions.DataLoad != nil
 }
 
 type baseDataClone struct {
@@ -295,42 +278,6 @@ func (d *dummyDataClone) CheckRestoreStatus(startingIndex int32) (dpv1alpha1.Res
 }
 
 func (d *dummyDataClone) restore(startingIndex int32) ([]client.Object, error) {
-	panic("runtime error: dummyDataClone.restore called")
-}
-
-type customDataClone struct {
-	baseDataClone
-}
-
-var _ dataClone = &customDataClone{}
-
-func (d *customDataClone) Succeed() (bool, error) {
-	// TODO: check actions finished successfully
-	return false, nil
-}
-
-func (d *customDataClone) CloneData(dataClone) ([]client.Object, error) {
-	return d.createPVCs(d.allVCTs())
-}
-
-func (d *customDataClone) ClearTmpResources() ([]client.Object, error) {
-	return nil, nil
-}
-
-func (d *customDataClone) CheckBackupStatus() (backupStatus, error) {
-	// TODO: trigger actions to synchronize data to new replicas.
-	return backupStatusFailed, nil
-}
-
-func (d *customDataClone) backup() ([]client.Object, error) {
-	panic("runtime error: dummyDataClone.backup called")
-}
-
-func (d *customDataClone) CheckRestoreStatus(startingIndex int32) (dpv1alpha1.RestorePhase, error) {
-	return dpv1alpha1.RestorePhaseCompleted, nil
-}
-
-func (d *customDataClone) restore(startingIndex int32) ([]client.Object, error) {
 	panic("runtime error: dummyDataClone.restore called")
 }
 

@@ -111,7 +111,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	deletedPods := 0
 	updatedPods := 0
 	for _, object := range oldReplicaList {
-		if deletedPods > updateCount || deletedPods > unavailable {
+		if deletedPods >= updateCount || deletedPods >= unavailable {
 			break
 		}
 		if updatedPods >= partition {

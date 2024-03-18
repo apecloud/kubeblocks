@@ -316,11 +316,11 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		// resources.request.storage and accessModes support in-place update.
 		// resources.request.storage only supports volume expansion.
 		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&
-			oldPVC.Spec.Resources.Requests.Storage().Cmp(*newPVC.Spec.Resources.Requests.Storage()) <= 0 {
+			oldPVC.Spec.Resources.Requests.Storage().Cmp(*newPVC.Spec.Resources.Requests.Storage()) >= 0 {
 			return nil
 		}
 		oldPVC.Spec.AccessModes = newPVC.Spec.AccessModes
-		*oldPVC.Spec.Resources.Requests.Storage() = *newPVC.Spec.Resources.Requests.Storage()
+		oldPVC.Spec.Resources.Requests[corev1.ResourceStorage] = *newPVC.Spec.Resources.Requests.Storage()
 		return oldPVC
 	}
 

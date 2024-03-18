@@ -97,8 +97,8 @@ steps:
 				return nil, err
 			}
 			progressDetail.ActionTasks = actionStatus.ActionTasks
-			progressDetail.Status = appsv1alpha1.ProcessingProgressStatus
-			progressDetail.Message = fmt.Sprintf(`Start to processing action "%s" of the component %s`, actions[i].Name, comp.Name)
+			progressDetail.SetStatusAndMessage(appsv1alpha1.ProcessingProgressStatus,
+				fmt.Sprintf(`Start to processing action "%s" of the component %s`, actions[i].Name, comp.Name))
 			setComponentStatusProgressDetail(w.reqCtx.Recorder, w.OpsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			break steps
 		case appsv1alpha1.ProcessingProgressStatus:

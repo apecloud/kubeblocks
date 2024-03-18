@@ -151,6 +151,15 @@ type OpsRequestSpec struct {
 	// +optional
 	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
 
+	// Specifies the instances that require re-creation.
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.rebuildFrom"
+	RebuildFrom []RebuildInstance `json:"rebuildFrom,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
 	// Specifies a custom operation as defined by OpsDefinition.
 	// +optional
 	CustomSpec *CustomOpsSpec `json:"customSpec,omitempty"`
@@ -161,6 +170,20 @@ type ComponentOps struct {
 	// Specifies the name of the cluster component.
 	// +kubebuilder:validation:Required
 	ComponentName string `json:"componentName"`
+}
+
+type RebuildInstance struct {
+	ComponentOps `json:",inline"`
+
+	// Defines the names of the instances that need to be rebuilt. These are essentially the names of the pods.
+	// +kubebuilder:validation:Required
+	InstanceNames []string `json:"instanceNames"`
+
+	// Indicates the name of the backup from which to recover. Currently, only a full physical backup is supported
+	// unless your component only has one replica. Such as 'xtrabackup' is full physical backup for mysql and 'mysqldump' is not.
+	// And if no specified backupName, the instance will be recreated with empty 'PersistentVolumes'.
+	// +optional
+	BackupName string `json:"backupName,omitempty"`
 }
 
 type Switchover struct {

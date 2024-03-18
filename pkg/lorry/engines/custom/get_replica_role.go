@@ -57,7 +57,10 @@ func (mgr *Manager) GetReplicaRoleThroughCommands(ctx context.Context, cluster *
 	if !ok || len(roleProbeCmd) == 0 {
 		return "", errors.New("role probe commands is empty!")
 	}
-	if roleProbeCmd[0] != "sh" && roleProbeCmd[0] != "bash" {
+
+	supportedShells := []string{"sh", "bash", "zsh", "csh", "ksh", "tcsh", "fish"}
+	// Check if the cmd is one kind of "sh"
+	if !contains(supportedShells, roleProbeCmd[0]) {
 		roleProbeCmd = append([]string{"sh", "-c"}, strings.Join(roleProbeCmd, " "))
 	}
 
@@ -137,4 +140,13 @@ func (mgr *Manager) callAction(ctx context.Context, url string) ([]byte, error) 
 	}
 
 	return b, err
+}
+
+func contains(supportedShells []string, shell string) bool {
+	for _, s := range supportedShells {
+		if s == shell {
+			return true
+		}
+	}
+	return false
 }

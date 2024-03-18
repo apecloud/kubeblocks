@@ -238,8 +238,8 @@ func removeOwnerRefOfType(obj client.Object, gvk schema.GroupVersionKind) {
 	obj.SetOwnerReferences(ownerRefs)
 }
 
-// IsOwnedByComp is used to judge if the obj is owned by Component.
-func IsOwnedByComp(obj client.Object) bool {
+// isOwnedByComp is used to judge if the obj is owned by Component.
+func isOwnedByComp(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
 		if ref.Kind == appsv1alpha1.ComponentKind && ref.Controller != nil && *ref.Controller {
 			return true

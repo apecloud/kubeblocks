@@ -224,6 +224,9 @@ func (c *componentPlanBuilder) reconcilePatchObject(ctx context.Context, vertex 
 }
 
 func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	// The additional removal of DBClusterFinalizerName in the component controller is to backward compatibility.
+	// In versions prior to 0.9.0, the component object's finalizers includes DBClusterFinalizerName.
+	// Therefore, it is necessary to remove DBClusterFinalizerName when the component is scaled-in independently.
 	finalizers := []string{constant.DBComponentFinalizerName, constant.DBClusterFinalizerName}
 	for _, finalizer := range finalizers {
 		if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {

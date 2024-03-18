@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -150,6 +151,7 @@ func (t *clusterComponentTransformer) handleCompsDelete(transCtx *clusterTransfo
 		if err != nil {
 			return err
 		}
+		transCtx.Logger.V(1).Info(fmt.Sprintf("deleting component %s", runningComp.Name))
 		graphCli.Delete(dag, runningComp)
 	}
 	return nil

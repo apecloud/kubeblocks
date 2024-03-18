@@ -2576,6 +2576,20 @@ Note that this restore operation will roll back cluster services.</p>
 </tr>
 <tr>
 <td>
+<code>rebuildFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">
+[]RebuildInstance
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the instances that require re-creation.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>customSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.CustomOpsSpec">
@@ -7856,7 +7870,7 @@ This field cannot be updated.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentOps">ComponentOps
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Expose">Expose</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Expose">Expose</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 <p>ComponentOps represents the common variables required for operations within the scope of a component.</p>
@@ -13062,6 +13076,20 @@ Note that this restore operation will roll back cluster services.</p>
 </tr>
 <tr>
 <td>
+<code>rebuildFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">
+[]RebuildInstance
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the instances that require re-creation.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>customSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.CustomOpsSpec">
@@ -13474,13 +13502,16 @@ More info: <a href="https://kubernetes.io/docs/concepts/services-networking/serv
 <td><p>DataScriptType the data script operation will execute the data script against the cluster.</p>
 </td>
 </tr><tr><td><p>&#34;Custom&#34;</p></td>
-<td></td>
+<td><p>RebuildInstance rebuilding an instance is very useful when a node is offline or an instance is unrecoverable.</p>
+</td>
 </tr><tr><td><p>&#34;DataScript&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Expose&#34;</p></td>
 <td><p>StartType the start operation will start the pods which is deleted in stop operation.</p>
 </td>
 </tr><tr><td><p>&#34;HorizontalScaling&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;RebuildInstance&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Reconfiguring&#34;</p></td>
 <td></td>
@@ -15002,6 +15033,63 @@ MemberUpdateStrategy
 <li><code>BestEffortParallel</code>: Updates Members in parallel to ensure minimum component write downtime.</li>
 <li><code>Parallel</code>: Forces parallel updates.</li>
 </ul>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ComponentOps</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
+ComponentOps
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentOps</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceNames</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Defines the names of the instances that need to be rebuilt. These are essentially the names of the pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backupName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the name of the backup from which to recover. Currently, only a full physical backup is supported
+unless your component only has one replica. Such as &lsquo;xtrabackup&rsquo; is full physical backup for mysql and &lsquo;mysqldump&rsquo; is not.
+And if no specified backupName, the instance will be recreated with empty &lsquo;PersistentVolumes&rsquo;.</p>
 </td>
 </tr>
 </tbody>

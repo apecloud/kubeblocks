@@ -418,6 +418,38 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.horizontalScaling
                   rule: self == oldSelf
+              rebuildFrom:
+                description: Specifies the instances that require re-creation.
+                items:
+                  properties:
+                    backupName:
+                      description: Indicates the name of the backup from which to
+                        recover. Currently, only a full physical backup is supported
+                        unless your component only has one replica. Such as 'xtrabackup'
+                        is full physical backup for mysql and 'mysqldump' is not.
+                        And if no specified backupName, the instance will be recreated
+                        with empty 'PersistentVolumes'.
+                      type: string
+                    componentName:
+                      description: Specifies the name of the cluster component.
+                      type: string
+                    instanceNames:
+                      description: Defines the names of the instances that need to
+                        be rebuilt. These are essentially the names of the pods.
+                      items:
+                        type: string
+                      type: array
+                  required:
+                  - componentName
+                  - instanceNames
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.rebuildFrom
+                  rule: self == oldSelf
               reconfigure:
                 description: 'Deprecated: replace by reconfigures. Defines the variables
                   that need to input when updating configuration.'
@@ -901,6 +933,7 @@ spec:
                 - DataScript
                 - Backup
                 - Restore
+                - RebuildInstance
                 - Custom
                 type: string
                 x-kubernetes-validations:

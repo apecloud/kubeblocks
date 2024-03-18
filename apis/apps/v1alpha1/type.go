@@ -330,7 +330,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript,Backup,Restore,Custom}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript,Backup,Restore,RebuildInstance,Custom}
 type OpsType string
 
 const (
@@ -347,7 +347,8 @@ const (
 	DataScriptType        OpsType = "DataScript" // DataScriptType the data script operation will execute the data script against the cluster.
 	BackupType            OpsType = "Backup"
 	RestoreType           OpsType = "Restore"
-	CustomType            OpsType = "Custom" // use opsDefinition
+	RebuildInstanceType   OpsType = "RebuildInstance" // RebuildInstance rebuilding an instance is very useful when a node is offline or an instance is unrecoverable.
+	CustomType            OpsType = "Custom"          // use opsDefinition
 )
 
 // ComponentResourceKey defines the resource key of component, such as pod/pvc.

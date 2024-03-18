@@ -22,7 +22,6 @@ package operations
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 	"text/template"
 	"time"
@@ -72,7 +71,6 @@ func (c CustomOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 func (c CustomOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	var (
 		oldOpsRequest        = opsRes.OpsRequest.DeepCopy()
-		patch                = client.MergeFrom(oldOpsRequest)
 		opsRequestPhase      = opsRes.OpsRequest.Status.Phase
 		customSpec           = opsRes.OpsRequest.Spec.CustomSpec
 		workflowContext      = NewWorkflowContext(reqCtx, cli, opsRes)
@@ -104,21 +102,17 @@ func (c CustomOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		completedActionCount += workflowStatus.CompletedCount
 	}
 	// sync progress
-	opsRes.OpsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedActionCount, len(customSpec.CustomOpsComponents)*len(opsRes.OpsDef.Spec.Actions))
-	if !reflect.DeepEqual(opsRes.OpsRequest.Status, oldOpsRequest.Status) {
-		if err := cli.Status().Patch(reqCtx.Ctx, opsRes.OpsRequest, patch); err != nil {
-			return opsRequestPhase, 0, err
-		}
+	if err := syncProgressToOpsRequest(reqCtx, cli, opsRes, oldOpsRequest, completedActionCount, compCount*len(opsRes.OpsDef.Spec.Actions)); err != nil {
+		return opsRequestPhase, 0, err
 	}
 	// check if the ops has been finished.
-	if compCompleteCount == compCount {
-		if compFailedCount == 0 {
-			opsRequestPhase = appsv1alpha1.OpsSucceedPhase
-		} else {
-			opsRequestPhase = appsv1alpha1.OpsFailedPhase
-		}
+	if compCompleteCount != compCount {
+		return opsRequestPhase, 0, nil
 	}
-	return opsRequestPhase, 0, nil
+	if compFailedCount == 0 {
+		return appsv1alpha1.OpsSucceedPhase, 0, nil
+	}
+	return appsv1alpha1.OpsFailedPhase, 0, nil
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

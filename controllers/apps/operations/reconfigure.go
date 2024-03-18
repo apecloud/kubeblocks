@@ -45,6 +45,7 @@ func init() {
 		FromClusterPhases: appsv1alpha1.GetReconfiguringRunningPhases(),
 		// TODO: add cluster reconcile Reconfiguring phase.
 		ToClusterPhase: appsv1alpha1.UpdatingClusterPhase,
+		QueueByCluster: true,
 		OpsHandler:     &reAction,
 	}
 	opsManager.RegisterOps(appsv1alpha1.ReconfiguringType, reconfigureBehaviour)

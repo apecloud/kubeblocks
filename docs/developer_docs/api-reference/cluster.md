@@ -2338,6 +2338,20 @@ Once set to true, this opsRequest will be canceled and modifying this property a
 </tr>
 <tr>
 <td>
+<code>force</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates if pre-checks should be bypassed, allowing the opsRequest to execute immediately. If set to true, pre-checks are skipped except for &lsquo;Start&rsquo; type.
+Particularly useful when concurrent execution of VerticalScaling and HorizontalScaling opsRequests is required,
+achievable through the use of the Force flag.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>type</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsType">
@@ -11649,7 +11663,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LastConfiguration">LastConfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LastConfiguration">LastConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.OverrideBy">OverrideBy</a>)
 </p>
 <div>
 </div>
@@ -12591,6 +12605,17 @@ bool
 <p>indicates whether the current opsRequest is in the queue</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>queueBySelf</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>indicates that the operation is queued for execution within its own-type scope.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsRequestBehaviour">OpsRequestBehaviour
@@ -12718,6 +12743,21 @@ WorkloadType
 </tr>
 <tr>
 <td>
+<code>overrideBy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OverrideBy">
+OverrideBy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes the configuration covered by the latest OpsRequest of the same kind.
+when reconciling, this information will be used as a benchmark rather than the &lsquo;spec&rsquo;, such as &lsquo;Spec.HorizontalScaling&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>reason</code><br/>
 <em>
 string
@@ -12780,6 +12820,20 @@ bool
 <em>(Optional)</em>
 <p>Defines the action to cancel the <code>Pending/Creating/Running</code> opsRequest, supported types: <code>VerticalScaling/HorizontalScaling</code>.
 Once set to true, this opsRequest will be canceled and modifying this property again will not take effect.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>force</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates if pre-checks should be bypassed, allowing the opsRequest to execute immediately. If set to true, pre-checks are skipped except for &lsquo;Start&rsquo; type.
+Particularly useful when concurrent execution of VerticalScaling and HorizontalScaling opsRequests is required,
+achievable through the use of the Force flag.</p>
 </td>
 </tr>
 <tr>
@@ -13583,6 +13637,50 @@ Kubernetes core/v1.PodSpec
 </tr><tr><td><p>&#34;Pod&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.OverrideBy">OverrideBy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">OpsRequestComponentStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>opsName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the opsRequest name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>LastComponentConfiguration</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">
+LastComponentConfiguration
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>LastComponentConfiguration</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Parameter">Parameter
 </h3>

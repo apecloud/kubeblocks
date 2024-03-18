@@ -132,6 +132,9 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	rule *appsv1alpha1.Rule,
 	compCustomOSpec appsv1alpha1.CustomOpsComponent) error {
 	opsSpec := opsRes.OpsRequest.Spec
+	if opsSpec.Force {
+		return nil
+	}
 	componentObjName := constant.GenerateClusterComponentName(opsSpec.ClusterRef, compCustomOSpec.ComponentName)
 	comp := &appsv1alpha1.Component{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: componentObjName, Namespace: opsRes.OpsRequest.Namespace}, comp); err != nil {
@@ -141,9 +144,9 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	// get the built-in objects and covert the json tag
 	getBuiltInObjs := func() (map[string]interface{}, error) {
 		b, err := json.Marshal(map[string]interface{}{
-			"cluster":   opsRes.Cluster,
-			"component": comp,
-			"params":    params,
+			"cluster":    opsRes.Cluster,
+			"component":  comp,
+			"parameters": params,
 		})
 		if err != nil {
 			return nil, err

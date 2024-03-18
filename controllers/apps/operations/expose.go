@@ -376,6 +376,14 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 					return clusterCompDef.ConsensusSpec.Leader.Name, nil
 				}
 				return constant.Leader, nil
+			case appsv1alpha1.Stateful:
+				if clusterCompDef.RSMSpec != nil {
+					for _, role := range clusterCompDef.RSMSpec.Roles {
+						if role.IsLeader {
+							return role.Name, nil
+						}
+					}
+				}
 			}
 		}
 		return "", nil

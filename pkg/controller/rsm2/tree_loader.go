@@ -32,7 +32,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -52,7 +52,7 @@ func (r *treeLoader) Read(ctx context.Context, reader client.Reader, req ctrl.Re
 }
 
 func getMatchLabelKeys() []string {
-	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) {
+	if viper.GetBool(rsm1.FeatureGateRSMCompatibilityMode) {
 		return []string{
 			constant.AppManagedByLabelKey,
 			constant.AppNameLabelKey,
@@ -62,8 +62,8 @@ func getMatchLabelKeys() []string {
 		}
 	}
 	return []string{
-		rsm.WorkloadsManagedByLabelKey,
-		rsm.WorkloadsInstanceLabelKey,
+		rsm1.WorkloadsManagedByLabelKey,
+		rsm1.WorkloadsInstanceLabelKey,
 	}
 }
 

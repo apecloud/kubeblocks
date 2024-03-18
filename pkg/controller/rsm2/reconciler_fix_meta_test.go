@@ -29,11 +29,6 @@ import (
 )
 
 var _ = Describe("fix meta reconciler test", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
-
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
 			By("PreCondition")

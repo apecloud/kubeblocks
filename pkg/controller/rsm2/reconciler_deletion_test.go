@@ -32,11 +32,6 @@ import (
 )
 
 var _ = Describe("deletion reconciler test", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
-
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
 			By("PreCondition")

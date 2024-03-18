@@ -40,11 +40,6 @@ import (
 )
 
 var _ = Describe("tree loader test", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
-
 	Context("Read", func() {
 		It("should work well", func() {
 			ctx := context.Background()

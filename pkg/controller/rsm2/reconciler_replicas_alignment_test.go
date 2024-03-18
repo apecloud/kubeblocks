@@ -25,8 +25,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -36,74 +34,6 @@ import (
 )
 
 var _ = Describe("replicas alignment reconciler test", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
-
-	var (
-		rsm        *workloads.ReplicatedStateMachine
-		reconciler kubebuilderx.Reconciler
-
-		roles = []workloads.ReplicaRole{
-			{
-				Name:       "leader",
-				IsLeader:   true,
-				CanVote:    true,
-				AccessMode: workloads.ReadWriteMode,
-			},
-			{
-				Name:       "follower",
-				IsLeader:   false,
-				CanVote:    true,
-				AccessMode: workloads.ReadonlyMode,
-			},
-			{
-				Name:       "logger",
-				IsLeader:   false,
-				CanVote:    true,
-				AccessMode: workloads.NoneMode,
-			},
-			{
-				Name:       "learner",
-				IsLeader:   false,
-				CanVote:    false,
-				AccessMode: workloads.ReadonlyMode,
-			},
-		}
-		pod = builder.NewPodBuilder("", "").
-			AddContainer(corev1.Container{
-				Name:  "foo",
-				Image: "bar",
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          "my-svc",
-						Protocol:      corev1.ProtocolTCP,
-						ContainerPort: 12345,
-					},
-				},
-			}).GetObject()
-		template = corev1.PodTemplateSpec{
-			ObjectMeta: pod.ObjectMeta,
-			Spec:       pod.Spec,
-		}
-
-		volumeClaimTemplates = []corev1.PersistentVolumeClaim{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "data",
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					Resources: corev1.ResourceRequirements{
-						Requests: map[corev1.ResourceName]resource.Quantity{
-							corev1.ResourceStorage: resource.MustParse("2G"),
-						},
-					},
-				},
-			},
-		}
-	)
-
 	BeforeEach(func() {
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 			SetService(&corev1.Service{}).
@@ -173,6 +103,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 
 			By("do reconcile with Parallel policy")
 			parallelTree, err := tree.DeepCopy()
+			Expect(err).Should(BeNil())
 			parallelRsm, ok := parallelTree.GetRoot().(*workloads.ReplicatedStateMachine)
 			Expect(ok).Should(BeTrue())
 			parallelRsm.Spec.PodManagementPolicy = appsv1.ParallelPodManagement

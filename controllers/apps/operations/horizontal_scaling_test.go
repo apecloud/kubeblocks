@@ -196,7 +196,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		})
 
 		It("force run horizontal scaling opsRequests ", func() {
-			By(fmt.Sprintf("create opsRequest for horizontal scaling"))
+			By("create opsRequest for horizontal scaling")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _ := commonHScaleConsensusCompTest(reqCtx, 5)
 			firstOps := opsRes.OpsRequest.DeepCopy()
@@ -204,7 +204,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 			})).ShouldNot(HaveOccurred())
 
-			By(fmt.Sprintf("create opsRequest for horizontal scaling with force flag"))
+			By("create opsRequest for horizontal scaling with force flag")
 			ops := createHorizontalScaling(clusterName, 4)
 			opsRes.OpsRequest = ops
 			opsRes.OpsRequest.Spec.Force = true

@@ -93,7 +93,7 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
-            {{- if .Values.reconcileWorkers }}
+            {{- if .Values.dataProtection.reconcileWorkers }}
             - name: DATAPROTECTION_RECONCILE_WORKERS
               value: {{ .Values.dataProtection.reconcileWorkers | quote }}
             {{- end }}

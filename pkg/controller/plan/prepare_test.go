@@ -101,7 +101,7 @@ var _ = Describe("Prepare Test", func() {
 				SetDefaultSpec().
 				AddConfigs(testapps.DefaultCompDefConfigs).
 				AddScripts(testapps.DefaultCompDefScripts).
-				AddContainerVolumeMounts("mysql", []corev1.VolumeMount{{Name: testapps.DefaultConfigSpecVolumeName, MountPath: "/mnt/config"}}).
+				AddVolumeMounts("mysql", []corev1.VolumeMount{{Name: testapps.DefaultConfigSpecVolumeName, MountPath: "/mnt/config"}}).
 				Create(&testCtx).
 				GetObject()
 		}

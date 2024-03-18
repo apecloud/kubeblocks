@@ -90,6 +90,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-apps-kubeblocks-io-v1alpha1-componentversion
+  failurePolicy: Fail
+  name: mcomponentversion.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - componentversions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-apps-kubeblocks-io-v1alpha1-servicedescriptor
   failurePolicy: Fail
   name: mservicedescriptor.kb.io
@@ -229,6 +249,26 @@ webhooks:
     - UPDATE
     resources:
     - componentdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kubeblocks-io-v1alpha1-componentversion
+  failurePolicy: Fail
+  name: vcomponentversion.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - componentversions
   sideEffects: None
 - admissionReviewVersions:
   - v1

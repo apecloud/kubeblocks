@@ -107,12 +107,14 @@ const (
 	KBManagedByKey                           = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey          = "apps.kubeblocks.io/vct-name"
+	KBAppServiceVersionLabelKey              = "apps.kubeblocks.io/service-version"
 	VolumeClaimTemplateNameLabelKeyForLegacy = "vct.kubeblocks.io/name" // Deprecated: only compatible with version 0.5, will be removed in 0.7
 	WorkloadTypeLabelKey                     = "apps.kubeblocks.io/workload-type"
 	ClassProviderLabelKey                    = "class.kubeblocks.io/provider"
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"
 	ClusterVerLabelKey                       = "clusterversion.kubeblocks.io/name"
 	ComponentDefinitionLabelKey              = "componentdefinition.kubeblocks.io/name"
+	ComponentVersionLabelKey                 = "componentversion.kubeblocks.io/name"
 	CMConfigurationSpecProviderLabelKey      = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationCMKeysLabelKey            = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
 	CMConfigurationTemplateNameLabelKey      = "config.kubeblocks.io/config-template-name"

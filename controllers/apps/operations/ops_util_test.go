@@ -93,7 +93,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("expect for opsRequest is running")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsPhase, _, err := reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentStatusProgress)
+			opsPhase, _, err := reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", syncOverrideByOpsForScaleReplicas, handleComponentStatusProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
@@ -101,7 +101,7 @@ var _ = Describe("OpsUtil functions", func() {
 			compStatus := opsRes.OpsRequest.Status.Components[consensusComp]
 			compStatus.LastFailedTime = metav1.Time{Time: compStatus.LastFailedTime.Add(-1 * componentFailedTimeout).Add(-1 * time.Second)}
 			opsRes.OpsRequest.Status.Components[consensusComp] = compStatus
-			opsPhase, _, err = reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentStatusProgress)
+			opsPhase, _, err = reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", syncOverrideByOpsForScaleReplicas, handleComponentStatusProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsFailedPhase))
 
@@ -137,7 +137,9 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("test enqueueOpsRequestToClusterAnnotation function with Reentry")
 			opsBehaviour := opsManager.OpsMap[ops2.Spec.Type]
-			opsSlice, _ = enqueueOpsRequestToClusterAnnotation(ctx, k8sClient, opsRes, opsBehaviour)
+			_, _ = enqueueOpsRequestToClusterAnnotation(ctx, k8sClient, opsRes, opsBehaviour)
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), cluster)).Should(Succeed())
+			opsSlice, _ = opsutil.GetOpsRequestSliceFromCluster(cluster)
 			Expect(len(opsSlice)).Should(Equal(2))
 
 			By("test DequeueOpsRequestInClusterAnnotation function when first opsRequest is Failed")

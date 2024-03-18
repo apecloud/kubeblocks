@@ -104,7 +104,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("Test OpsManager.Reconcile function when horizontal scaling OpsRequest is Running")
-			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRequestKind
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			return opsRes, podList
@@ -194,10 +194,57 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			mockConsensusCompToRunning(opsRes)
 			checkCancelledSucceed(reqCtx, opsRes)
 		})
+
+		It("force run horizontal scaling opsRequests ", func() {
+			By("create opsRequest for horizontal scaling")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRes, _ := commonHScaleConsensusCompTest(reqCtx, 5)
+			firstOps := opsRes.OpsRequest.DeepCopy()
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
+			})).ShouldNot(HaveOccurred())
+
+			By("create opsRequest for horizontal scaling with force flag")
+			ops := createHorizontalScaling(clusterName, 4)
+			opsRes.OpsRequest = ops
+			opsRes.OpsRequest.Spec.Force = true
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp)
+
+			By("expect for opsRequest phase is Creating after doing action")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			By("mock the next reconcile")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(testapps.ChangeObjStatus(&testCtx, ops, func() {
+				ops.Status.Phase = appsv1alpha1.OpsRunningPhase
+			})).Should(Succeed())
+
+			By("expect these opsRequest should not in the queue of the clusters")
+			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(len(opsRequestSlice)).Should(Equal(2))
+			for _, v := range opsRequestSlice {
+				Expect(v.InQueue).Should(BeFalse())
+			}
+
+			By("reconcile the firstOpsRequest again")
+			opsRes.OpsRequest = firstOps
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("expect the firstOpsRequest should be overwritten for the resources")
+			override := opsRes.OpsRequest.Status.Components[consensusComp].OverrideBy
+			Expect(override).ShouldNot(BeNil())
+			Expect(*override.Replicas).Should(Equal(ops.Spec.HorizontalScalingList[0].Replicas))
+		})
 	})
 })
 
-func createHorizontalScaling(clusterName string, replicas int) *appsv1alpha1.OpsRequest {
+func createHorizontalScaling(clusterName string, replicas int, force ...bool) *appsv1alpha1.OpsRequest {
 	horizontalOpsName := "horizontal-scaling-ops-" + testCtx.GetRandomStr()
 	ops := testapps.NewOpsRequestObj(horizontalOpsName, testCtx.DefaultNamespace,
 		clusterName, appsv1alpha1.HorizontalScalingType)

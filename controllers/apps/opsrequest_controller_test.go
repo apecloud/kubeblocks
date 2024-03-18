@@ -859,7 +859,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			mockCompRunning(replicas)
 
 			By("create first restart ops")
-			restartOps1 := createRestartOps(clusterObj.Name, 1)
+			restartOps1 := createRestartOps(clusterObj.Name, 0)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps1))).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.UpdatingClusterPhase))
 
@@ -875,7 +875,7 @@ var _ = Describe("OpsRequest Controller", func() {
 						Services: []appsv1alpha1.OpsService{
 							{
 								Name:        "svc1",
-								ServiceType: corev1.ServiceTypeNodePort,
+								ServiceType: corev1.ServiceTypeLoadBalancer,
 								Ports: []corev1.ServicePort{
 									{Name: "port1", Port: 3306, TargetPort: intstr.IntOrString{Type: intstr.String, StrVal: "mysql"}},
 								},
@@ -886,7 +886,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				return testapps.CreateOpsRequest(ctx, testCtx, ops)
 			}
 			By("create expose ops which needs to queue by self")
-			exposeOps1 := createExposeOps(clusterObj.Name, 0, appsv1alpha1.EnableExposeSwitch)
+			exposeOps1 := createExposeOps(clusterObj.Name, 1, appsv1alpha1.EnableExposeSwitch)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps1))).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
 			By("create secondary restart ops and expect it to Pending")
@@ -894,7 +894,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(appsv1alpha1.OpsPendingPhase))
 
 			By("create secondary expose ops and expect it to Pending")
-			exposeOps2 := createExposeOps(clusterObj.Name, 1, appsv1alpha1.DisableExposeSwitch)
+			exposeOps2 := createExposeOps(clusterObj.Name, 3, appsv1alpha1.DisableExposeSwitch)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(appsv1alpha1.OpsPendingPhase))
 
 			By("check opsRequest queue")
@@ -911,9 +911,14 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(opsSlice[3].InQueue).Should(BeTrue())
 			})).Should(Succeed())
 
-			By("mock component to running and expect restartOps1/exposeOps1 phase to Succeed")
+			By("mock component to running and expect restartOps1 phase to Succeed")
 			mockCompRunning(replicas)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps1))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+
+			By("mock loadBalance service is ready")
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: fmt.Sprintf("%s-%s-svc1", clusterObj.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}, func(svc *corev1.Service) {
+				svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: "test", IP: "192.168.1.110"}}
+			})()).Should(Succeed())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps1))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 
 			By("expect restartOps2 to Running and exposeOps2 to Succeed")

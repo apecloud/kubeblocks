@@ -76,8 +76,10 @@ func addComponentFinalizer(obj client.Object, comp *appsv1alpha1.Component) {
 }
 
 func shouldSkipAddingCompFinalizer(obj client.Object, comp *appsv1alpha1.Component) bool {
-	// For compatibility reasons, we have created some cluster-scoped RoleBinding and ServiceAccount objects
-	// with named pattern kb-{cluster.Name} in the component controller. And their lifecycle should not be tied to the component.
+	// Due to compatibility reasons, the component controller creates cluster-scoped RoleBinding and ServiceAccount objects in the following two scenarios:
+	// 1. When the user does not specify a ServiceAccount, KubeBlocks automatically creates a ServiceAccount and a RoleBinding with named pattern kb-{cluster.Name}.
+	// 2. When the user specifies a ServiceAccount that does not exist, KubeBlocks will automatically create a ServiceAccount and a RoleBinding with the same name.
+	// In both cases, the lifecycle of the RoleBinding and ServiceAccount should not be tied to the component.
 	skipTypes := []interface{}{
 		&rbacv1.RoleBinding{},
 		&corev1.ServiceAccount{},

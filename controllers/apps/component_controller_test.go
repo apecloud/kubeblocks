@@ -2137,7 +2137,7 @@ var _ = Describe("Component Controller", func() {
 			testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefName)
 		})
 
-		It("re-create component with custom RBAC which is already exist created by User", func() {
+		It("create component with custom RBAC which is already exist created by User", func() {
 			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
 		})
 	})

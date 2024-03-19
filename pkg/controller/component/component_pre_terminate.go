@@ -48,10 +48,10 @@ func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 	ctx := reqCtx.Ctx
 
 	// TODO(xingran): check if preTerminate action is needed for the component when cluster id deleting
-	//if !cluster.DeletionTimestamp.IsZero() {
+	// if !cluster.DeletionTimestamp.IsZero() {
 	//	reqCtx.Log.Info("cluster is deleting, skip reconciling component preTerminate", "cluster", cluster.Name)
 	//	return nil
-	//}
+	// }
 
 	if comp == nil || len(comp.Spec.CompDef) == 0 {
 		reqCtx.Log.Info("comp is nil or compDef is empty, skip reconciling component preTerminate")

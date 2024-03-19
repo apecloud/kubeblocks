@@ -48,11 +48,7 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 	// find all objects that are not component and set ownership to the component
 	objects := graphCli.FindAll(dag, &appsv1alpha1.Component{}, &model.HaveDifferentTypeWithOption{})
 	for _, object := range objects {
-		// skip to set ownership for ClusterRoleBinding and PersistentVolume which is a cluster-scoped object.
-		if _, ok := object.(*rbacv1.ClusterRoleBinding); ok {
-			continue
-		}
-		if _, ok := object.(*corev1.PersistentVolume); ok {
+		if skipSetCompOwnership(object) {
 			continue
 		}
 		// add component and cluster finalizers at the same time
@@ -66,6 +62,16 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 	}
 
 	return nil
+}
+
+// skipSetCompOwnership returns true if the object should not be set ownership to the component
+func skipSetCompOwnership(obj client.Object) bool {
+	switch obj.(type) {
+	case *rbacv1.ClusterRoleBinding, *corev1.PersistentVolume, *corev1.Pod:
+		return true
+	default:
+		return false
+	}
 }
 
 func addComponentFinalizer(obj client.Object, comp *appsv1alpha1.Component) {

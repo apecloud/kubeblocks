@@ -56,7 +56,6 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 	if err != nil {
 		return errors.Wrapf(err, "get primary %s failed", primary)
 	}
-
 	candidateMember, err := getMember(candidate)
 	if err != nil {
 		return errors.Wrapf(err, "get candidate %s failed", candidate)
@@ -79,6 +78,16 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 	compatibilityMode, err := mgr.validateAndGetCompatibilityMode(ctx, primaryDB, candidateDB)
 	if err != nil {
 		return err
+	}
+
+	opTimestamp, err := mgr.GetMemberOpTimestamp(ctx, cluster, primaryMember)
+	if err != nil {
+		return errors.Wrap(err, "get primary op timestamp failed")
+	}
+	mgr.OpTimestamp = opTimestamp
+	isLagging, _ := mgr.IsMemberLagging(ctx, cluster, candidateMember)
+	if isLagging {
+		return errors.New("candidate member is lagging")
 	}
 
 	err = mgr.standbyTenant(ctx, primaryDB)

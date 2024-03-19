@@ -46,6 +46,8 @@ type Manager struct {
 	ReplicaTenant     string
 	CompatibilityMode string
 	Members           []dcs.Member
+	OpTimestamp       int64
+	MaxLag            int64
 }
 
 var _ engines.DBManager = &Manager{}
@@ -157,6 +159,8 @@ func (mgr *Manager) HealthyCheckForMySQLMode(ctx context.Context, cluster *dcs.C
 		return err
 	}
 
+	mgr.OpTimestamp, _ = mgr.GetOpTimestamp(ctx, db)
+
 	return nil
 }
 
@@ -211,4 +215,40 @@ func (mgr *Manager) GetMembers(ctx context.Context, cluster *dcs.Cluster) []dcs.
 	}
 
 	return mgr.Members
+}
+
+func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
+	if mgr.CompatibilityMode == ORACLE {
+		return false, 0
+	}
+	if mgr.OpTimestamp == 0 {
+		mgr.Logger.Info("leader's op timestamp is 0")
+		return true, 0
+	}
+
+	opTimestamp, err := mgr.GetMemberOpTimestamp(ctx, cluster, member)
+	if err != nil {
+		mgr.Logger.Info("get op timestamp failed", "error", err.Error())
+		return true, 0
+	}
+	lag := mgr.OpTimestamp - opTimestamp
+	if lag > mgr.MaxLag {
+		mgr.Logger.Info("member is lagging", "opTimestamp", opTimestamp, "leaderOpTimestamp", mgr.OpTimestamp)
+		return true, lag
+	}
+	return false, lag
+}
+
+func (mgr *Manager) GetMemberOpTimestamp(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (int64, error) {
+	if mgr.CompatibilityMode == ORACLE {
+		// oracle mode does not support op timestamp yet!
+		return 0, nil
+	}
+	addr := cluster.GetMemberAddrWithPort(*member)
+	db, err := mgr.GetMySQLDBConnWithAddr(addr)
+	if err != nil {
+		mgr.Logger.Info("get db connection failed", "error", err.Error())
+		return 0, err
+	}
+	return mgr.GetOpTimestamp(ctx, db)
 }

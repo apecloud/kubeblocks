@@ -53,6 +53,11 @@ func (mgr *Manager) Failover(ctx context.Context, cluster *dcs.Cluster, candidat
 
 	candidateMember := candidateCluster.Members[0]
 
+	isLagging, _ := mgr.IsMemberLagging(ctx, cluster, &candidateMember)
+	if isLagging {
+		return errors.New("candidate member is lagging")
+	}
+
 	candidateAddr := fmt.Sprintf("%s:%s", candidateMember.PodIP, candidateMember.DBPort)
 	candidateDB, err := config.GetDBConnWithAddr(candidateAddr)
 	if err != nil {

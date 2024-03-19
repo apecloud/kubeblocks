@@ -21,9 +21,10 @@ package oceanbase
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -92,14 +93,30 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, me
 	return false, nil
 }
 
+func (mgr *Manager) GetCompatibilityMode(ctx context.Context) (string, error) {
+	if mgr.CompatibilityMode != "" {
+		return mgr.CompatibilityMode, nil
+	}
+	sql := fmt.Sprintf("SELECT COMPATIBILITY_MODE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
+	err := mgr.DB.QueryRowContext(ctx, sql).Scan(&mgr.CompatibilityMode)
+	if err != nil {
+		return "", errors.Wrap(err, "query compatibility mode failed")
+	}
+	return mgr.CompatibilityMode, nil
+}
+
 func (mgr *Manager) MemberHealthyCheck(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) error {
-	switch mgr.CompatibilityMode {
+	compatibilityMode, err := mgr.GetCompatibilityMode(ctx)
+	if err != nil {
+		return errors.Wrap(err, "compatibility mode unknown")
+	}
+	switch compatibilityMode {
 	case MYSQL:
 		return mgr.HealthyCheckForMySQLMode(ctx, cluster, member)
 	case ORACLE:
 		return mgr.HealthyCheckForOracleMode(ctx, cluster, member)
 	default:
-		return errors.New("compatibility mode not supported")
+		return errors.Errorf("compatibility mode not supported: [%s]", compatibilityMode)
 	}
 }
 

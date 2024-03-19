@@ -49,7 +49,7 @@ func (mgr *Manager) GetMySQLDBConn() (*sql.DB, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", config.URL)
 	}
-	mysqlConfig.User = fmt.Sprintf("%s@%s", "SYS", mgr.ReplicaTenant)
+	mysqlConfig.User = fmt.Sprintf("%s@%s", "root", mgr.ReplicaTenant)
 	mysqlConfig.Passwd = config.Password
 	db, err := mysqlengine.GetDBConnection(mysqlConfig.FormatDSN())
 	if err != nil {
@@ -64,7 +64,7 @@ func (mgr *Manager) GetMySQLDBConnWithAddr(addr string) (*sql.DB, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", config.URL)
 	}
-	mysqlConfig.User = fmt.Sprintf("%s:%s", "SYS", mgr.ReplicaTenant)
+	mysqlConfig.User = fmt.Sprintf("%s@%s", "root", mgr.ReplicaTenant)
 	mysqlConfig.Passwd = config.Password
 	mysqlConfig.Addr = addr
 	db, err := mysqlengine.GetDBConnection(mysqlConfig.FormatDSN())

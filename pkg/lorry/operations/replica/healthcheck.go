@@ -22,6 +22,7 @@ package replica
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -54,7 +55,7 @@ type FailoverManager interface {
 var checkstatus operations.Operation = &CheckStatus{}
 
 func init() {
-	err := operations.Register(string(util.HealthyCheckOperation), checkstatus)
+	err := operations.Register(strings.ToLower(string(util.HealthyCheckOperation)), checkstatus)
 	if err != nil {
 		panic(err.Error())
 	}

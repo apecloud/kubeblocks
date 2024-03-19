@@ -38,7 +38,7 @@ const (
 	ListOperation   OperationKind = "list"
 
 	CheckRunningOperation OperationKind = "checkRunning"
-	HealthyCheckOperation OperationKind = "healthCheck"
+	HealthyCheckOperation OperationKind = "healthyCheck"
 	CheckRoleOperation    OperationKind = "checkRole"
 	GetRoleOperation      OperationKind = "getRole"
 	GetLagOperation       OperationKind = "getLag"

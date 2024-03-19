@@ -917,49 +917,16 @@ TLSConfig
 </tr>
 <tr>
 <td>
-<code>rsmTransformPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
-RsmTransformPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy generate sts using rsm.</p>
-<ul>
-<li>ToSts: rsm transform to statefulSet</li>
-<li>ToPod: rsm transform to pods</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodes</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
-[]k8s.io/apimachinery/pkg/types.NodeName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the list of nodes that pods can schedule
-If the RsmTransformPolicy is specified as OneToMul,the list of nodes will be used. If the list of nodes is empty,
-no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
-across the nodes in the list.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>instances</code><br/>
 <em>
-[]string
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the list of instance to be deleted priorly</p>
+<p>Overrides values in default Template.</p>
 </td>
 </tr>
 </table>
@@ -4538,46 +4505,16 @@ UserResourceRefs
 </tr>
 <tr>
 <td>
-<code>rsmTransformPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
-RsmTransformPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy to generate sts using rsm.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodes</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
-[]k8s.io/apimachinery/pkg/types.NodeName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the list of nodes that pods can schedule.
-If the RsmTransformPolicy is specified as ToPod, the list of nodes will be used. If the list of nodes is empty,
-no specific node will be assigned. However, if the list of nodes is filled, all pods will be evenly scheduled
-across the nodes in the list.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>instances</code><br/>
 <em>
-[]string
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the list of instances to be deleted priorly.
-If the RsmTransformPolicy is specified as ToPod, the list of instances will be used.</p>
+<p>Overrides values in default Template.</p>
 </td>
 </tr>
 </tbody>
@@ -7917,49 +7854,16 @@ TLSConfig
 </tr>
 <tr>
 <td>
-<code>rsmTransformPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
-RsmTransformPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy generate sts using rsm.</p>
-<ul>
-<li>ToSts: rsm transform to statefulSet</li>
-<li>ToPod: rsm transform to pods</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodes</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
-[]k8s.io/apimachinery/pkg/types.NodeName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the list of nodes that pods can schedule
-If the RsmTransformPolicy is specified as OneToMul,the list of nodes will be used. If the list of nodes is empty,
-no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
-across the nodes in the list.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>instances</code><br/>
 <em>
-[]string
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the list of instance to be deleted priorly</p>
+<p>Overrides values in default Template.</p>
 </td>
 </tr>
 </tbody>
@@ -10734,43 +10638,6 @@ int32
 </td>
 <td>
 <p>Specifies the number of replicas for the workloads.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodes</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
-[]k8s.io/apimachinery/pkg/types.NodeName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the list of nodes where pods can be scheduled during a scale-up operation.
-If the RsmTransformPolicy is set to ToPod and the expected number of replicas is greater than the current number,
-the list of Nodes will be used. If the list of Nodes is empty, pods will not be assigned to any specific node.
-However, if the list of Nodes is populated, pods will be evenly distributed across the nodes in the list during scale-up.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>instances</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the names of instances that the rsm should prioritize for scale-down operations.
-If the RsmTransformPolicy is set to ToPod and the expected number of replicas is less than the current number,
-the list of Instances will be used.</p>
-<ul>
-<li><code>current replicas - expected replicas &gt; len(Instances)</code>: Scale down from the list of Instances priorly, the others
-will select from NodeAssignment.</li>
-<li><code>current replicas - expected replicas &lt; len(Instances)</code>: Scale down from the list of Instances.</li>
-<li><code>current replicas - expected replicas &lt; len(Instances)</code>: Scale down from a part of Instances.</li>
-</ul>
 </td>
 </tr>
 </tbody>
@@ -18908,6 +18775,20 @@ Kubernetes core/v1.PodTemplateSpec
 </tr>
 <tr>
 <td>
+<code>instances</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides values in default Template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeClaimTemplates</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
@@ -19046,36 +18927,6 @@ Credential
 <td>
 <em>(Optional)</em>
 <p>Credential used to connect to DB engine</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>rsmTransformPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
-RsmTransformPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy to generate sts using rsm. Passed from cluster.
-ToSts: rsm transform to statefulSet
-ToPod: rsm transform to pod</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeAssignment</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.NodeAssignment">
-[]NodeAssignment
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the expected assignment of nodes.</p>
 </td>
 </tr>
 </table>
@@ -19263,6 +19114,206 @@ Kubernetes core/v1.EnvVarSource
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Number of replicas of this template.
+Default is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the name of the instance.
+Only applied when Replicas is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>generateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>GenerateName is an optional prefix, used by the server, to generate a unique
+name ONLY IF the Name field has not been provided.
+If this field is used, the name returned to the client will be different
+than the name passed. This value will also be combined with a unique suffix.
+The provided value has the same validation rules as the Name field,
+and may be truncated by the length of the suffix required to make the value
+unique on the server.</p>
+<p>Applied only if Name is not specified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines annotations to override.
+Add new or override existing annotations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines labels to override.
+Add new or override existing labels.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines image to override.
+Will override the first container&rsquo;s image of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines NodeName to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSelector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines NodeSelector to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tolerations</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
+[]Kubernetes core/v1.Toleration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Tolerations to override.
+Add new or override existing tolerations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Resources to override.
+Will override the first container&rsquo;s resources of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Volumes to override.
+Add new or override existing volumes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMounts</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
+[]Kubernetes core/v1.VolumeMount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeMounts to override.
+Add new or override existing volume mounts of the first container in the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeClaimTemplates to override.
+Add new or override existing volume claim templates.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus
 </h3>
 <p>
@@ -19299,7 +19350,20 @@ ReplicaRole
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Defines the role of the replica in the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ready</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Whether the corresponding Pod is in ready condition.</p>
 </td>
 </tr>
 <tr>
@@ -19433,80 +19497,6 @@ Action
 <em>(Optional)</em>
 <p>Defines the action to inform the cluster that the new member can join voting now.
 If the Image is not configured, the Image from the previous non-nil action will be used.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1alpha1.NodeAssignment">NodeAssignment
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the identifier for the statefulSet requiring node allocation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeSpec</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.NodeSpec">
-NodeSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides comprehensive details of the node to be assigned to the statefulSet.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1alpha1.NodeSpec">NodeSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.NodeAssignment">NodeAssignment</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>nodeName</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
-k8s.io/apimachinery/pkg/types.NodeName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the name of the node. This is a unique identifier within the cluster and is used to identify the specific node for scheduling, reporting, and other tasks.</p>
 </td>
 </tr>
 </tbody>
@@ -19693,6 +19683,20 @@ Kubernetes core/v1.PodTemplateSpec
 </tr>
 <tr>
 <td>
+<code>instances</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides values in default Template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeClaimTemplates</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
@@ -19833,36 +19837,6 @@ Credential
 <p>Credential used to connect to DB engine</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>rsmTransformPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
-RsmTransformPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy to generate sts using rsm. Passed from cluster.
-ToSts: rsm transform to statefulSet
-ToPod: rsm transform to pod</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeAssignment</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.NodeAssignment">
-[]NodeAssignment
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the expected assignment of nodes.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineStatus">ReplicatedStateMachineStatus
@@ -19945,6 +19919,32 @@ int64
 <td>
 <em>(Optional)</em>
 <p>Provides the status of each member in the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>currentRevisions, if not empty, indicates the old version of the RSM used to generate Pods.
+key is the pod name, value is the revision.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>updateRevisions, if not empty, indicates the new version of the RSM used to generate Pods.
+key is the pod name, value is the revision.</p>
 </td>
 </tr>
 </tbody>
@@ -20095,28 +20095,6 @@ RoleUpdateMechanism
 <tbody><tr><td><p>&#34;DirectAPIServerEventUpdate&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;ReadinessProbeEventUpdate&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">RsmTransformPolicy
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
-</p>
-<div>
-<p>RsmTransformPolicy defines rsm transform type
-ToSts and ToPod is supported</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;ToPod&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;ToSts&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

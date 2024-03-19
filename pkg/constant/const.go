@@ -162,6 +162,7 @@ const (
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
+	AutoCreateResourceAnnotationKey             = "apps.kubeblocks.io/auto-create-resource" // AutoCreateResourceAnnotationKey specifies whether the resource is automatically created by KubeBlocks
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName         = "cluster.kubeblocks.io/finalizer"

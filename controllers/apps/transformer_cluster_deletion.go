@@ -204,9 +204,10 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster appsv1alpha1.Cluster) b
 		return false
 	}
 
-	// For compatibility reasons, we have created some cluster-scoped RoleBinding and ServiceAccount objects
-	// with named pattern kb-{cluster.Name} in the component controller (owned by the component).
-	// and their lifecycle should not be tied to the component, they should be deleted when the cluster is deleted.
+	// Due to compatibility reasons, the component controller creates cluster-scoped RoleBinding and ServiceAccount objects in the following two scenarios:
+	// 1. When the user does not specify a ServiceAccount, KubeBlocks automatically creates a ServiceAccount and a RoleBinding with named pattern kb-{cluster.Name}.
+	// 2. When the user specifies a ServiceAccount that does not exist, KubeBlocks will automatically create a ServiceAccount and a RoleBinding with the same name.
+	// In both cases, the lifecycle of the RoleBinding and ServiceAccount should not be tied to the component. They should be deleted when the cluster is deleted.
 	doNotSkipTypes := []interface{}{
 		&rbacv1.RoleBinding{},
 		&corev1.ServiceAccount{},
@@ -214,7 +215,11 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster appsv1alpha1.Cluster) b
 	for _, t := range doNotSkipTypes {
 		if objType, ok := obj.(interface{ GetName() string }); ok && reflect.TypeOf(obj) == reflect.TypeOf(t) {
 			if strings.EqualFold(objType.GetName(), constant.GenerateDefaultServiceAccountName(cluster.GetName())) {
-				// if the object is a cluster-scoped RoleBinding or ServiceAccount with named pattern kb-{cluster.Name}, it should not be skipped
+				return false
+			}
+			annotations := obj.GetAnnotations()
+			_, ok := annotations[constant.AutoCreateResourceAnnotationKey]
+			if ok {
 				return false
 			}
 		}

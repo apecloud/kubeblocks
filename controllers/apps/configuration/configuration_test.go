@@ -123,9 +123,17 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint,
 		clusterDefObj.Name, clusterVersionObj.Name).
 		AddComponent(statefulCompName, statefulCompDefName).Create(&testCtx).GetObject()
 
+	By("Create a component definition obj and mock to available")
+	componentDefObj := testapps.NewComponentDefinitionFactory(statefulCompDefName).
+		SetRuntime(nil).
+		Create(&testCtx).GetObject()
+	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(obj *appsv1alpha1.ComponentDefinition) {
+		obj.Status.Phase = appsv1alpha1.AvailablePhase
+	})()).Should(Succeed())
+
 	By("Create a component obj")
 	fullCompName := constant.GenerateClusterComponentName(clusterName, statefulCompName)
-	componentObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, statefulCompDefName).
+	componentObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, componentDefObj.Name).
 		AddLabels(constant.AppInstanceLabelKey, clusterName).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(clusterObj.UID)).
 		SetUID(types.UID(fmt.Sprintf("%s-%s", clusterObj.Name, "test-uid"))).
@@ -190,6 +198,7 @@ func cleanEnv() {
 	ml := client.HasLabels{testCtx.TestObjLabelKey}
 	// non-namespaced
 	testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+	testapps.ClearResources(&testCtx, generics.ComponentDefinitionSignature, ml)
 	// namespaced
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)

@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -89,7 +90,7 @@ func (r *ResourceFetcher[T]) Cluster() *T {
 	})
 }
 
-func (r *ResourceFetcher[T]) Component() *T {
+func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 	componentKey := client.ObjectKey{
 		Namespace: r.Namespace,
 		Name:      constant.GenerateClusterComponentName(r.ClusterName, r.ComponentName),
@@ -97,18 +98,19 @@ func (r *ResourceFetcher[T]) Component() *T {
 	return r.Wrap(func() error {
 		r.ComponentObj = &appsv1alpha1.Component{}
 		err := r.Client.Get(r.Context, componentKey, r.ComponentObj)
-		return client.IgnoreNotFound(err)
-	})
-}
+		if apierrors.IsNotFound(err) {
+			return nil
+		} else if err != nil {
+			return err
+		}
 
-func (r *ResourceFetcher[T]) ComponentDef() *T {
-	if r.ComponentObj == nil || len(r.ComponentObj.Spec.CompDef) == 0 {
-		return nil
-	}
-	compDefKey := types.NamespacedName{
-		Name: r.ComponentObj.Spec.CompDef,
-	}
-	return r.Wrap(func() error {
+		if len(r.ComponentObj.Spec.CompDef) == 0 {
+			return nil
+		}
+
+		compDefKey := types.NamespacedName{
+			Name: r.ComponentObj.Spec.CompDef,
+		}
 		r.ComponentDefObj = &appsv1alpha1.ComponentDefinition{}
 		if err := r.Client.Get(r.Context, compDefKey, r.ComponentDefObj); err != nil {
 			return err

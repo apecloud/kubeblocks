@@ -101,10 +101,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		ClusterName:   config.Spec.ClusterRef,
 		ComponentName: config.Spec.ComponentName,
 	}, fetcherTask).Cluster().
-		Component().
-		ComponentDef().
-		// ClusterDef().
-		// ClusterVer().
+		ComponentAndComponentDef().
 		ComponentSpec().
 		Complete()
 	if err != nil {
@@ -115,11 +112,9 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		reqCtx.Log.Info("cluster is deleting, skip reconcile")
 		return intctrlutil.Reconciled()
 	}
-
 	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
 		return r.failWithInvalidComponent(config, reqCtx)
 	}
-
 	if err := r.runTasks(TaskContext{config, reqCtx, fetcherTask}, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}

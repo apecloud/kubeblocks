@@ -143,6 +143,8 @@ func (mgr *Manager) callAction(ctx context.Context, url string) ([]byte, error) 
 }
 
 func contains(supportedShells []string, shell string) bool {
+	cmds := strings.Split(shell, "/")
+	shell = cmds[len(cmds)-1]
 	for _, s := range supportedShells {
 		if s == shell {
 			return true

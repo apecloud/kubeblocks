@@ -154,7 +154,7 @@ var _ = Describe("Component PostProvision Test", func() {
 			need, err = needDoPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeTrue())
-			
+
 			By("build component with postProvision with PodList, do postProvision action and requeue waiting job")
 			pods := mockPodsForTest(cluster, 1)
 			for _, pod := range pods {

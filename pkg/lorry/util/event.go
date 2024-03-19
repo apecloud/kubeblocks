@@ -129,6 +129,7 @@ func SendEvent(ctx context.Context, event *corev1.Event) error {
 	for i := 0; i < 30; i++ {
 		_, err = clientset.CoreV1().Events(namespace).Create(ctx1, event, metav1.CreateOptions{})
 		if err == nil {
+			logger.Info("send event success", "message", event.Message)
 			break
 		}
 		logger.Info("send event failed", "error", err.Error())

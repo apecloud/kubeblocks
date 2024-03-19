@@ -102,6 +102,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		ComponentName: config.Spec.ComponentName,
 	}, fetcherTask).Cluster().
 		Component().
+		ComponentDef().
 		// ClusterDef().
 		// ClusterVer().
 		ComponentSpec().
@@ -158,7 +159,13 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 		configuration = taskCtx.configuration
 	)
 
-	synthesizedComp, err = component.BuildSynthesizedComponentWrapper(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ClusterComObj)
+	if len(taskCtx.fetcher.ComponentObj.Spec.CompDef) == 0 {
+		// build synthesized component for generated component
+		synthesizedComp, err = component.BuildSynthesizedComponentWrapper(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ClusterComObj)
+	} else {
+		// build synthesized component for native component
+		synthesizedComp, err = component.BuildSynthesizedComponent(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ComponentDefObj, taskCtx.fetcher.ComponentObj)
+	}
 	if err != nil {
 		return err
 	}

@@ -21,8 +21,10 @@ package configuration
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -46,8 +48,11 @@ type ResourceFetcher[T any] struct {
 	obj *T
 	*ResourceCtx
 
-	ClusterObj   *appsv1alpha1.Cluster
-	ComponentObj *appsv1alpha1.Component
+	ClusterObj      *appsv1alpha1.Cluster
+	ComponentObj    *appsv1alpha1.Component
+	ComponentDefObj *appsv1alpha1.ComponentDefinition
+	ClusterComObj   *appsv1alpha1.ClusterComponentSpec
+
 	// Deprecated: this API will be removed from version 0.9.0
 	ClusterDefObj *appsv1alpha1.ClusterDefinition
 	// Deprecated: use ComponentDefinition instead
@@ -56,8 +61,6 @@ type ResourceFetcher[T any] struct {
 	ConfigMapObj        *corev1.ConfigMap
 	ConfigurationObj    *appsv1alpha1.Configuration
 	ConfigConstraintObj *appsv1alpha1.ConfigConstraint
-
-	ClusterComObj *appsv1alpha1.ClusterComponentSpec
 }
 
 func (r *ResourceFetcher[T]) Init(ctx *ResourceCtx, object *T) *T {
@@ -95,6 +98,25 @@ func (r *ResourceFetcher[T]) Component() *T {
 		r.ComponentObj = &appsv1alpha1.Component{}
 		err := r.Client.Get(r.Context, componentKey, r.ComponentObj)
 		return client.IgnoreNotFound(err)
+	})
+}
+
+func (r *ResourceFetcher[T]) ComponentDef() *T {
+	if r.ComponentObj == nil || len(r.ComponentObj.Spec.CompDef) == 0 {
+		return nil
+	}
+	compDefKey := types.NamespacedName{
+		Name: r.ComponentObj.Spec.CompDef,
+	}
+	return r.Wrap(func() error {
+		r.ComponentDefObj = &appsv1alpha1.ComponentDefinition{}
+		if err := r.Client.Get(r.Context, compDefKey, r.ComponentDefObj); err != nil {
+			return err
+		}
+		if r.ComponentDefObj.Status.Phase != appsv1alpha1.AvailablePhase {
+			return fmt.Errorf("ComponentDefinition referenced is unavailable: %s", r.ComponentDefObj.Name)
+		}
+		return nil
 	})
 }
 

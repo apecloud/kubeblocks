@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
@@ -64,11 +65,11 @@ func (mgr *Manager) GetReplicaRoleThroughCommands(ctx context.Context, cluster *
 		roleProbeCmd = append([]string{"sh", "-c"}, strings.Join(roleProbeCmd, " "))
 	}
 
-	envs, err := util.GetGlobalSharedEnvs()
-	if err != nil {
-		return "", err
-	}
-	return util.ExecCommand(ctx, roleProbeCmd, envs)
+	// envs, err := util.GetGlobalSharedEnvs()
+	// if err != nil {
+	// 	return "", err
+	// }
+	return util.ExecCommand(ctx, roleProbeCmd, os.Environ())
 }
 
 func (mgr *Manager) GetReplicaRoleThroughASMAction(ctx context.Context, cluster *dcs.Cluster) (string, error) {

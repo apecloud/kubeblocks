@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
@@ -40,7 +41,7 @@ import (
 var perNodeRegx = regexp.MustCompile("^[^,]*$")
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
-	if mgr.actionSvcPorts != nil {
+	if mgr.actionSvcPorts != nil && len(*mgr.actionSvcPorts) > 0 {
 		return mgr.GetReplicaRoleThroughASMAction(ctx, cluster)
 	}
 	return mgr.GetReplicaRoleThroughCommands(ctx, cluster)
@@ -57,11 +58,18 @@ func (mgr *Manager) GetReplicaRoleThroughCommands(ctx context.Context, cluster *
 	if !ok || len(roleProbeCmd) == 0 {
 		return "", errors.New("role probe commands is empty!")
 	}
-	envs, err := util.GetGlobalSharedEnvs()
-	if err != nil {
-		return "", err
+
+	supportedShells := []string{"sh", "bash", "zsh", "csh", "ksh", "tcsh", "fish"}
+	// Check if the cmd is one kind of "sh"
+	if !contains(supportedShells, roleProbeCmd[0]) {
+		roleProbeCmd = append([]string{"sh", "-c"}, strings.Join(roleProbeCmd, " "))
 	}
-	return util.ExecCommand(ctx, roleProbeCmd, envs)
+
+	// envs, err := util.GetGlobalSharedEnvs()
+	// if err != nil {
+	// 	return "", err
+	// }
+	return util.ExecCommand(ctx, roleProbeCmd, os.Environ())
 }
 
 func (mgr *Manager) GetReplicaRoleThroughASMAction(ctx context.Context, cluster *dcs.Cluster) (string, error) {
@@ -133,4 +141,15 @@ func (mgr *Manager) callAction(ctx context.Context, url string) ([]byte, error) 
 	}
 
 	return b, err
+}
+
+func contains(supportedShells []string, shell string) bool {
+	cmds := strings.Split(shell, "/")
+	shell = cmds[len(cmds)-1]
+	for _, s := range supportedShells {
+		if s == shell {
+			return true
+		}
+	}
+	return false
 }

@@ -47,8 +47,16 @@ type ClusterSpec struct {
 	//
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
+
+	// Topology specifies the topology to use for the cluster. If not specified, the default topology will be used.
+	// Cannot be updated.
+	//
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	Topology string `json:"topology,omitempty"`
 
 	// Specifies the cluster termination policy.
 	//
@@ -99,50 +107,57 @@ type ClusterSpec struct {
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
+	// Cluster backup configuration.
+	//
+	// +optional
+	Backup *ClusterBackup `json:"backup,omitempty"`
+
 	// !!!!! The following fields may be deprecated in subsequent versions, please DO NOT rely on them for new requirements.
 
 	// Describes how pods are distributed across node.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Tenancy TenancyType `json:"tenancy,omitempty"`
 
 	// Describes the availability policy, including zone, node, and none.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	AvailabilityPolicy AvailabilityPolicyType `json:"availabilityPolicy,omitempty"`
 
 	// Specifies the replicas of the first componentSpec, if the replicas of the first componentSpec is specified,
 	// this value will be ignored.
 	//
+	//+kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Specifies the resources of the first componentSpec, if the resources of the first componentSpec is specified,
 	// this value will be ignored.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Resources ClusterResources `json:"resources,omitempty"`
 
 	// Specifies the storage of the first componentSpec, if the storage of the first componentSpec is specified,
 	// this value will be ignored.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Storage ClusterStorage `json:"storage,omitempty"`
 
 	// The configuration of monitor.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Monitor ClusterMonitor `json:"monitor,omitempty"`
 
 	// The configuration of network.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Network *ClusterNetwork `json:"network,omitempty"`
-
-	// Cluster backup configuration.
-	//
-	// +optional
-	Backup *ClusterBackup `json:"backup,omitempty"`
 }
 
 type ClusterBackup struct {
@@ -362,7 +377,6 @@ type ShardingSpec struct {
 }
 
 // ClusterComponentSpec defines the specifications for a cluster component.
-// +kubebuilder:validation:XValidation:rule="has(self.componentDefRef) || has(self.componentDef)",message="either componentDefRef or componentDef should be provided"
 // TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
 // TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
@@ -381,17 +395,26 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0, consider using the ComponentDef instead"
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
 	// References the name of the ComponentDefinition.
 	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
 	//
-	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:MaxLength=64
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
+
+	// ServiceVersion specifies the version of the service provisioned by the component.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+	// If not explicitly specified, the version defined in the referenced topology will be used.
+	// If no version is specified in the topology, the latest available version will be used.
+	//
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ServiceVersion string `json:"serviceVersion,omitempty"`
 
 	// References the class defined in ComponentClassDefinition.
 	//
@@ -463,11 +486,13 @@ type ClusterComponentSpec struct {
 
 	// Services expose endpoints that can be accessed by clients.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0, consider using the $.Spec.ClusterService instead"
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
 	// Defines the strategy for switchover and failover when workloadType is Replication.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
 
@@ -489,6 +514,7 @@ type ClusterComponentSpec struct {
 	// Defines the update strategy for the component.
 	// Not supported.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 

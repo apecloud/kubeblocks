@@ -41,6 +41,7 @@ func init() {
 		// TODO: we should add "force" flag for these opsRequest.
 		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
+		QueueByCluster:    true,
 		OpsHandler:        hsHandler,
 		CancelFunc:        hsHandler.Cancel,
 	}
@@ -81,7 +82,7 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, hs.getExpectReplicas)
 	}
-	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", syncOverrideByOpsForScaleReplicas, handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
@@ -114,6 +115,10 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 }
 
 func (hs horizontalScalingOpsHandler) getExpectReplicas(opsRequest *appsv1alpha1.OpsRequest, componentName string) *int32 {
+	compStatus := opsRequest.Status.Components[componentName]
+	if compStatus.OverrideBy != nil {
+		return compStatus.OverrideBy.Replicas
+	}
 	for _, v := range opsRequest.Spec.HorizontalScalingList {
 		if v.ComponentName == componentName {
 			return &v.Replicas
@@ -138,6 +143,11 @@ func getCompPodNamesBeforeScaleDownReplicas(reqCtx intctrlutil.RequestCtx,
 
 // Cancel this function defines the cancel horizontalScaling action.
 func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	for _, v := range opsRes.OpsRequest.Status.Components {
+		if v.OverrideBy != nil && v.OverrideBy.OpsName != "" {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorIgnoreCancel, `can not cancel the opsRequest due to another opsRequest "%s" is running`, v.OverrideBy.OpsName)
+		}
+	}
 	return cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) error {
 		if lastConfig.Replicas == nil {
 			return nil

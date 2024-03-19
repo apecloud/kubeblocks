@@ -333,8 +333,15 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+              force:
+                description: Indicates if pre-checks should be bypassed, allowing
+                  the opsRequest to execute immediately. If set to true, pre-checks
+                  are skipped except for 'Start' type. Particularly useful when concurrent
+                  execution of VerticalScaling and HorizontalScaling opsRequests is
+                  required, achievable through the use of the Force flag.
+                type: boolean
                 x-kubernetes-validations:
-                - message: forbidden to update spec.expose
+                - message: forbidden to update spec.force
                   rule: self == oldSelf
               horizontalScaling:
                 description: Defines what component need to horizontal scale the specified
@@ -1021,6 +1028,155 @@ spec:
                         about this operation.
                       maxLength: 32768
                       type: string
+                    overrideBy:
+                      description: Describes the configuration covered by the latest
+                        OpsRequest of the same kind. when reconciling, this information
+                        will be used as a benchmark rather than the 'spec', such as
+                        'Spec.HorizontalScaling'.
+                      properties:
+                        claims:
+                          description: "Claims lists the names of resources, defined
+                            in spec.resourceClaims, that are used by this container.
+                            \n This is an alpha field and requires enabling the DynamicResourceAllocation
+                            feature gate. \n This field is immutable. It can only
+                            be set for containers."
+                          items:
+                            description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                            properties:
+                              name:
+                                description: Name must match the name of one entry
+                                  in pod.spec.resourceClaims of the Pod where this
+                                  field is used. It makes that resource available
+                                  inside a container.
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                        classDefRef:
+                          description: References a class defined in ComponentClassDefinition.
+                          properties:
+                            class:
+                              description: Defines the name of the class that is defined
+                                in the ComponentClassDefinition.
+                              type: string
+                            name:
+                              description: Specifies the name of the ComponentClassDefinition.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - class
+                          type: object
+                        limits:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: 'Limits describes the maximum amount of compute
+                            resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          type: object
+                        opsName:
+                          description: Indicates the opsRequest name.
+                          type: string
+                        replicas:
+                          description: Represents the last replicas of the component.
+                          format: int32
+                          type: integer
+                        requests:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: 'Requests describes the minimum amount of compute
+                            resources required. If Requests is omitted for a container,
+                            it defaults to Limits if that is explicitly specified,
+                            otherwise to an implementation-defined value. Requests
+                            cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          type: object
+                        services:
+                          description: Records the last services of the component.
+                          items:
+                            properties:
+                              annotations:
+                                additionalProperties:
+                                  type: string
+                                description: 'If ServiceType is LoadBalancer, cloud
+                                  provider related parameters can be put here. More
+                                  info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
+                                type: object
+                              name:
+                                description: The name of the service.
+                                maxLength: 15
+                                type: string
+                              serviceType:
+                                default: ClusterIP
+                                description: "Determines how the Service is exposed.
+                                  Valid options are ClusterIP, NodePort, and LoadBalancer.
+                                  \n - `ClusterIP` allocates a cluster-internal IP
+                                  address for load-balancing to endpoints. Endpoints
+                                  are determined by the selector or if that is not
+                                  specified, they are determined by manual construction
+                                  of an Endpoints object or EndpointSlice objects.
+                                  If clusterIP is \"None\", no virtual IP is allocated
+                                  and the endpoints are published as a set of endpoints
+                                  rather than a virtual IP. - `NodePort` builds on
+                                  ClusterIP and allocates a port on every node which
+                                  routes to the same endpoints as the clusterIP. -
+                                  `LoadBalancer` builds on NodePort and creates an
+                                  external load-balancer (if supported in the current
+                                  cloud) which routes to the same endpoints as the
+                                  clusterIP. \n More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
+                                enum:
+                                - ClusterIP
+                                - NodePort
+                                - LoadBalancer
+                                type: string
+                                x-kubernetes-preserve-unknown-fields: true
+                            required:
+                            - name
+                            type: object
+                          type: array
+                        targetResources:
+                          additionalProperties:
+                            items:
+                              type: string
+                            type: array
+                          description: Records the information about the target resources
+                            affected by the component. The resource key is in the
+                            list of [pods].
+                          type: object
+                        volumeClaimTemplates:
+                          description: Records the last volumeClaimTemplates of the
+                            component.
+                          items:
+                            properties:
+                              name:
+                                description: A reference to the volumeClaimTemplate
+                                  name from the cluster components.
+                                type: string
+                              storage:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the requested storage size
+                                  for the volume.
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - name
+                            - storage
+                            type: object
+                          type: array
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     phase:
                       description: Describes the component phase, referencing Cluster.status.component.phase.
                       enum:

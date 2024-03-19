@@ -554,6 +554,8 @@ type OpsRecorder struct {
 	Type OpsType `json:"type"`
 	// indicates whether the current opsRequest is in the queue
 	InQueue bool `json:"inQueue,omitempty"`
+	// indicates that the operation is queued for execution within its own-type scope.
+	QueueBySelf bool `json:"queueBySelf,omitempty"`
 }
 
 // ProvisionPolicyType defines the policy for creating accounts.

@@ -38,6 +38,13 @@ type OpsRequestSpec struct {
 	// +optional
 	Cancel bool `json:"cancel,omitempty"`
 
+	// Indicates if pre-checks should be bypassed, allowing the opsRequest to execute immediately. If set to true, pre-checks are skipped except for 'Start' type.
+	// Particularly useful when concurrent execution of VerticalScaling and HorizontalScaling opsRequests is required,
+	// achievable through the use of the Force flag.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.force"
+	// +optional
+	Force bool `json:"force,omitempty"`
+
 	// Defines the operation type.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.type"
@@ -118,7 +125,6 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.expose"
 	ExposeList []Expose `json:"expose,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Cluster RestoreFrom backup or point in time.
@@ -766,6 +772,11 @@ type OpsRequestComponentStatus struct {
 	// +optional
 	WorkloadType WorkloadType `json:"workloadType,omitempty"`
 
+	// Describes the configuration covered by the latest OpsRequest of the same kind.
+	// when reconciling, this information will be used as a benchmark rather than the 'spec', such as 'Spec.HorizontalScaling'.
+	// +optional
+	OverrideBy *OverrideBy `json:"overrideBy,omitempty"`
+
 	// Describes the reason for the component phase.
 	// +kubebuilder:validation:MaxLength=1024
 	// +optional
@@ -775,6 +786,14 @@ type OpsRequestComponentStatus struct {
 	// +kubebuilder:validation:MaxLength=32768
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+}
+
+type OverrideBy struct {
+	// Indicates the opsRequest name.
+	// +optional
+	OpsName string `json:"opsName"`
+
+	LastComponentConfiguration `json:",inline"`
 }
 
 type PreCheckResult struct {

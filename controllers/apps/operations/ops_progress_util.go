@@ -492,18 +492,12 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 		expectReplicas = opsRequest.Status.LastConfiguration.Components[clusterComponent.Name].Replicas
 	}
 	var (
-		isScaleOut          bool
 		expectProgressCount int32
 		completedCount      int32
 		dValue              = *expectReplicas - *lastComponentReplicas
 	)
 	if dValue > 0 {
 		expectProgressCount = dValue
-		isScaleOut = true
-	} else {
-		expectProgressCount = dValue * -1
-	}
-	if isScaleOut {
 		completedCount, err = handleScaleOutProgress(reqCtx, cli, opsRes, pgRes, podList, compStatus)
 		// if the workload type is Stateless, remove the progressDetails of the expired pods.
 		// because ReplicaSet may attempt to create a pod multiple times till it succeeds when scale out the replicas.
@@ -511,9 +505,10 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 			compStatus.ProgressDetails = removeStatelessExpiredPods(podList, compStatus.ProgressDetails)
 		}
 	} else {
+		expectProgressCount = dValue * -1
 		completedCount, err = handleScaleDownProgress(reqCtx, cli, opsRes, pgRes, podList, compStatus)
 	}
-	return getFinalExpectCount(compStatus, expectProgressCount), completedCount, err
+	return getFinalExpectCount(completedCount, expectProgressCount), completedCount, err
 }
 
 // handleScaleOutProgress handles the progressDetails of scaled out replicas.
@@ -638,10 +633,9 @@ func handleScaleDownProgress(
 }
 
 // getFinalExpectCount gets the number of pods which has been processed by controller.
-func getFinalExpectCount(compStatus *appsv1alpha1.OpsRequestComponentStatus, expectProgressCount int32) int32 {
-	progressDetailsLen := int32(len(compStatus.ProgressDetails))
-	if progressDetailsLen > expectProgressCount {
-		expectProgressCount = progressDetailsLen
+func getFinalExpectCount(completedCount, expectProgressCount int32) int32 {
+	if completedCount > expectProgressCount {
+		return completedCount
 	}
 	return expectProgressCount
 }

@@ -1,0 +1,3 @@
+- rule:
+    expression: '{{ or (eq .component.status.phase "Running") (eq .component.status.phase "Abnormal") }}'
+    message: "Component is not in Running/Abnormal status."

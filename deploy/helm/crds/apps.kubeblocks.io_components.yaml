@@ -107,6 +107,7 @@ spec:
                 type: object
               compDef:
                 description: Specifies the name of the referenced ComponentDefinition.
+                maxLength: 64
                 type: string
               configs:
                 description: Defines the configuration for the component.
@@ -2640,6 +2641,12 @@ spec:
                   - name
                   type: object
                 type: array
+              serviceVersion:
+                description: ServiceVersion specifies the version of the service provisioned
+                  by the component. The version should follow the syntax and semantics
+                  of the "Semantic Versioning" specification (http://semver.org/).
+                maxLength: 32
+                type: string
               tlsConfig:
                 description: Specifies the TLS configuration for the component.
                 properties:

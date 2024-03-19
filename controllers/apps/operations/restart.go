@@ -45,6 +45,7 @@ func init() {
 		// TODO: we should add "force" flag for these opsRequest.
 		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
+		QueueByCluster:    true,
 		OpsHandler:        restartOpsHandler{},
 	}
 
@@ -79,7 +80,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", handleComponentStatusProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", nil, handleComponentStatusProgress)
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.

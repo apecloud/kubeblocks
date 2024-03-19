@@ -77,7 +77,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 
 func (mgr *Manager) InitASMActions() error {
 	actionSvcList := viper.GetString("KB_RSM_ACTION_SVC_LIST")
-	if actionSvcList == "" {
+	if actionSvcList == "" || actionSvcList == "null" {
 		return nil
 	}
 	err := json.Unmarshal([]byte(actionSvcList), mgr.actionSvcPorts)

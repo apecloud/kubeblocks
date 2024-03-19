@@ -225,12 +225,10 @@ spec:
                       - class
                       type: object
                     componentDef:
-                      description: "References the name of the ComponentDefinition.
+                      description: References the name of the ComponentDefinition.
                         If both componentDefRef and componentDef are provided, the
-                        componentDef will take precedence over componentDefRef. \n
-                        TODO +kubebuilder:validation:XValidation:rule=\"self == oldSelf\",message=\"componentDef
-                        is immutable\""
-                      maxLength: 22
+                        componentDef will take precedence over componentDefRef.
+                      maxLength: 64
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     componentDefRef:
@@ -2866,6 +2864,16 @@ spec:
                         - name
                         type: object
                       type: array
+                    serviceVersion:
+                      description: ServiceVersion specifies the version of the service
+                        provisioned by the component. The version should follow the
+                        syntax and semantics of the "Semantic Versioning" specification
+                        (http://semver.org/). If not explicitly specified, the version
+                        defined in the referenced topology will be used. If no version
+                        is specified in the topology, the latest available version
+                        will be used.
+                      maxLength: 32
+                      type: string
                     services:
                       description: Services expose endpoints that can be accessed
                         by clients.
@@ -3294,9 +3302,6 @@ spec:
                   required:
                   - replicas
                   type: object
-                  x-kubernetes-validations:
-                  - message: either componentDefRef or componentDef should be provided
-                    rule: has(self.componentDefRef) || has(self.componentDef)
                 maxItems: 128
                 minItems: 1
                 type: array
@@ -3857,12 +3862,10 @@ spec:
                           - class
                           type: object
                         componentDef:
-                          description: "References the name of the ComponentDefinition.
+                          description: References the name of the ComponentDefinition.
                             If both componentDefRef and componentDef are provided,
                             the componentDef will take precedence over componentDefRef.
-                            \n TODO +kubebuilder:validation:XValidation:rule=\"self
-                            == oldSelf\",message=\"componentDef is immutable\""
-                          maxLength: 22
+                          maxLength: 64
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         componentDefRef:
@@ -6641,6 +6644,16 @@ spec:
                             - name
                             type: object
                           type: array
+                        serviceVersion:
+                          description: ServiceVersion specifies the version of the
+                            service provisioned by the component. The version should
+                            follow the syntax and semantics of the "Semantic Versioning"
+                            specification (http://semver.org/). If not explicitly
+                            specified, the version defined in the referenced topology
+                            will be used. If no version is specified in the topology,
+                            the latest available version will be used.
+                          maxLength: 32
+                          type: string
                         services:
                           description: Services expose endpoints that can be accessed
                             by clients.
@@ -7086,10 +7099,6 @@ spec:
                       required:
                       - replicas
                       type: object
-                      x-kubernetes-validations:
-                      - message: either componentDefRef or componentDef should be
-                          provided
-                        rule: has(self.componentDefRef) || has(self.componentDef)
                   required:
                   - name
                   - template
@@ -7175,6 +7184,11 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-preserve-unknown-fields: true
+              topology:
+                description: Topology specifies the topology to use for the cluster.
+                  If not specified, the default topology will be used. Cannot be updated.
+                maxLength: 32
+                type: string
             required:
             - terminationPolicy
             type: object

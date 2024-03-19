@@ -28,14 +28,19 @@ type ComponentBuilder struct {
 	BaseBuilder[appsv1alpha1.Component, *appsv1alpha1.Component, ComponentBuilder]
 }
 
-func NewComponentBuilder(namespace, name, componentDefinition string) *ComponentBuilder {
+func NewComponentBuilder(namespace, name, compDef string) *ComponentBuilder {
 	builder := &ComponentBuilder{}
 	builder.init(namespace, name,
 		&appsv1alpha1.Component{
 			Spec: appsv1alpha1.ComponentSpec{
-				CompDef: componentDefinition,
+				CompDef: compDef,
 			},
 		}, builder)
+	return builder
+}
+
+func (builder *ComponentBuilder) SetServiceVersion(serviceVersion string) *ComponentBuilder {
+	builder.get().Spec.ServiceVersion = serviceVersion
 	return builder
 }
 

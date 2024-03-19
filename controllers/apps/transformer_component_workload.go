@@ -326,11 +326,11 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	}
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
-	DelayUpdatePodSpecSystemFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
+	DelayUpdateRsmSystemFields(oldRsm.Spec, &rsmObjCopy.Spec)
 
 	isSpecUpdated := !reflect.DeepEqual(&oldRsm.Spec, &rsmObjCopy.Spec)
 	if isSpecUpdated {
-		UpdatePodSpecSystemFields(&rsmProto.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
+		UpdateRsmSystemFields(rsmProto.Spec, &rsmObjCopy.Spec)
 	}
 
 	isLabelsUpdated := !reflect.DeepEqual(oldRsm.Labels, rsmObjCopy.Labels)

@@ -80,6 +80,15 @@ func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
+func DelayUpdateRsmSystemFields(obj v1alpha1.ReplicatedStateMachineSpec, pobj *v1alpha1.ReplicatedStateMachineSpec) {
+	DelayUpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
+
+	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
+		pobj.RoleProbe.FailureThreshold = obj.RoleProbe.FailureThreshold
+		pobj.RoleProbe.SuccessThreshold = obj.RoleProbe.SuccessThreshold
+	}
+}
+
 // DelayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
 func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
@@ -91,8 +100,16 @@ func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	updateLorryContainer(obj.Containers, pobj.Containers)
 }
 
+func UpdateRsmSystemFields(obj v1alpha1.ReplicatedStateMachineSpec, pobj *v1alpha1.ReplicatedStateMachineSpec) {
+	UpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
+	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
+		pobj.RoleProbe.FailureThreshold = obj.RoleProbe.FailureThreshold
+		pobj.RoleProbe.SuccessThreshold = obj.RoleProbe.SuccessThreshold
+	}
+}
+
 // UpdatePodSpecSystemFields to update system fields in pod spec.
-func UpdatePodSpecSystemFields(obj *corev1.PodSpec, pobj *corev1.PodSpec) {
+func UpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		updateKubeBlocksToolsImage(&pobj.Containers[i])
 	}

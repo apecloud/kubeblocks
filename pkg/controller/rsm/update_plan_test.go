@@ -37,7 +37,7 @@ var _ = Describe("update plan test.", func() {
 		rsm.Status.UpdateRevision = newRevision
 	})
 
-	Context("plan build&execute", func() {
+	Context("plan build&Execute", func() {
 		var pod0, pod1, pod2, pod3, pod4, pod5, pod6 *corev1.Pod
 
 		resetPods := func() {
@@ -107,7 +107,7 @@ var _ = Describe("update plan test.", func() {
 				}
 				pods := buildPodList()
 				plan := newUpdatePlan(*rsm, pods)
-				podUpdateList, err := plan.execute()
+				podUpdateList, err := plan.Execute()
 				Expect(err).Should(BeNil())
 				podList := toPodList(podUpdateList)
 				expectedPodList := toPodList(expectedPods)

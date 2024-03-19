@@ -160,8 +160,7 @@ var _ = Describe("update reconciler test", func() {
 			// expected: bar-0, bar-1 being deleted
 			_, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())
-			// TODO(free6om): PodManagementPolicy in Update is not supported currently
-			expectUpdatedPods(partitionTree, []string{"bar-0"})
+			expectUpdatedPods(partitionTree, []string{"bar-0", "bar-1"})
 
 			By("update 'bar-0' revision to the updated value")
 			partitionTree, err = newTree.DeepCopy()
@@ -174,7 +173,7 @@ var _ = Describe("update reconciler test", func() {
 					MaxUnavailable: &maxUnavailable,
 				},
 			}
-			for _, name := range []string{"bar-0"} {
+			for _, name := range []string{"bar-0", "bar-1"} {
 				pod := builder.NewPodBuilder(namespace, name).GetObject()
 				object, err := partitionTree.Get(pod)
 				Expect(err).Should(BeNil())
@@ -184,7 +183,7 @@ var _ = Describe("update reconciler test", func() {
 			}
 			_, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())
-			expectUpdatedPods(partitionTree, []string{"bar-1"})
+			expectUpdatedPods(partitionTree, []string{"bar-2"})
 
 			By("reconcile with UpdateStrategy='OnDelete'")
 			onDeleteTree, err := newTree.DeepCopy()

@@ -72,11 +72,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	}
 	oldNameSet := sets.NewString()
 	oldReplicaMap := make(map[string]*corev1.Pod)
-	oldReplicaList := tree.List(&corev1.Pod{})
-	for _, object := range oldReplicaList {
+	var oldPodList []*corev1.Pod
+	for _, object := range tree.List(&corev1.Pod{}) {
 		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)
 		oldReplicaMap[object.GetName()] = pod
+		oldPodList = append(oldPodList, pod)
 	}
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
@@ -91,15 +92,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	}
 
 	// handle 'RollingUpdate'
-	priorities := rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
-	sortObjects(oldReplicaList, priorities, false)
-	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(rsm.Spec.UpdateStrategy.RollingUpdate, len(oldReplicaList))
+	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(rsm.Spec.UpdateStrategy.RollingUpdate, len(oldPodList))
 	if err != nil {
 		return nil, err
 	}
 	currentUnavailable := 0
-	for _, object := range oldReplicaList {
-		pod, _ := object.(*corev1.Pod)
+	for _, pod := range oldPodList {
 		if !isHealthy(pod) {
 			currentUnavailable++
 		}
@@ -107,10 +105,20 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	unavailable := maxUnavailable - currentUnavailable
 
 	// TODO(free6om): compute updateCount from PodManagementPolicy(Serial/OrderedReady, Parallel, BestEffortParallel).
-	updateCount := 1
+	// align MemberUpdateStrategy with PodManagementPolicy if it has nil value.
+	rsmForPlan := getRSMForUpdatePlan(rsm)
+	plan := rsm1.NewUpdatePlan(*rsmForPlan, oldPodList)
+	podsToBeUpdated, err := plan.Execute()
+	if err != nil {
+		return nil, err
+	}
+	updateCount := len(podsToBeUpdated)
+
 	deletedPods := 0
 	updatedPods := 0
-	for _, object := range oldReplicaList {
+	priorities := rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
+	sortObjects(oldPodList, priorities, false)
+	for _, pod := range oldPodList {
 		if deletedPods >= updateCount || deletedPods >= unavailable {
 			break
 		}
@@ -118,7 +126,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			break
 		}
 
-		pod, _ := object.(*corev1.Pod)
 		if !isHealthy(pod) {
 			tree.Logger.Info(fmt.Sprintf("RSM %s/%s blocks on scale-in as the pod %s is not healthy", rsm.Namespace, rsm.Name, pod.Name))
 			break
@@ -135,6 +142,19 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		updatedPods++
 	}
 	return tree, nil
+}
+
+func getRSMForUpdatePlan(rsm *workloads.ReplicatedStateMachine) *workloads.ReplicatedStateMachine {
+	if rsm.Spec.MemberUpdateStrategy != nil {
+		return rsm
+	}
+	rsmForPlan := rsm.DeepCopy()
+	updateStrategy := workloads.SerialUpdateStrategy
+	if rsm.Spec.PodManagementPolicy == apps.ParallelPodManagement {
+		updateStrategy = workloads.ParallelUpdateStrategy
+	}
+	rsmForPlan.Spec.MemberUpdateStrategy = &updateStrategy
+	return rsmForPlan
 }
 
 func parsePartitionNMaxUnavailable(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, replicas int) (int, int, error) {

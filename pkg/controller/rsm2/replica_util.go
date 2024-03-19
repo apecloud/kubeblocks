@@ -53,7 +53,7 @@ type replica struct {
 // sortObjects sorts objects by their role priority and name
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
 // reverse it if reverse==true
-func sortObjects(objects []client.Object, rolePriorityMap map[string]int, reverse bool) {
+func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, reverse bool) {
 	getRolePriorityFunc := func(i int) int {
 		role := strings.ToLower(objects[i].GetLabels()[constant.RoleLabelKey])
 		return rolePriorityMap[role]

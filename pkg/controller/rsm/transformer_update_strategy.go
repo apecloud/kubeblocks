@@ -75,7 +75,7 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 
 	// generate the pods Deletion plan
 	plan := newUpdatePlan(*rsm, pods)
-	podsToBeUpdated, err := plan.execute()
+	podsToBeUpdated, err := plan.Execute()
 	if err != nil {
 		return err
 	}

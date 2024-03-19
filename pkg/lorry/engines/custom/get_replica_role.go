@@ -40,7 +40,7 @@ import (
 var perNodeRegx = regexp.MustCompile("^[^,]*$")
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
-	if mgr.actionSvcPorts != nil {
+	if mgr.actionSvcPorts != nil && len(*mgr.actionSvcPorts) > 0 {
 		return mgr.GetReplicaRoleThroughASMAction(ctx, cluster)
 	}
 	return mgr.GetReplicaRoleThroughCommands(ctx, cluster)

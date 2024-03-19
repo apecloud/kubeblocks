@@ -75,7 +75,7 @@ type GraphClient interface {
 
 // TODO(free6om): make DAG a member of realGraphClient
 type realGraphClient struct {
-	client.Client
+	client.Reader
 }
 
 func (r *realGraphClient) Root(dag *graph.DAG, objOld, objNew client.Object, action *Action) {
@@ -261,8 +261,8 @@ func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object
 
 var _ GraphClient = &realGraphClient{}
 
-func NewGraphClient(cli client.Client) GraphClient {
+func NewGraphClient(reader client.Reader) GraphClient {
 	return &realGraphClient{
-		Client: cli,
+		Reader: reader,
 	}
 }

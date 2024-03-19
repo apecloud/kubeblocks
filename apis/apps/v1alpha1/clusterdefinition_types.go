@@ -125,25 +125,23 @@ type ClusterTopologyComponent struct {
 
 // ClusterTopologyOrders defines the orders for components within a topology.
 type ClusterTopologyOrders struct {
-	// StartupOrder defines the order in which components should be started in the cluster.
+	// Provision defines the order in which components should be provisioned in the cluster.
 	// Components with the same order can be listed together, separated by commas.
 	//
 	// +optional
-	StartupOrder []string `json:"startupOrder,omitempty"`
+	Provision []string `json:"provision,omitempty"`
 
-	// ShutdownOrder defines the order in which components should be shut down in the cluster.
+	// Terminate defines the order in which components should be terminated in the cluster.
 	// Components with the same order can be listed together, separated by commas.
 	//
 	// +optional
-	ShutdownOrder []string `json:"shutdownOrder,omitempty"`
+	Terminate []string `json:"terminate,omitempty"`
 
-	// UpdateOrder defines the order in which components should be updated in the cluster.
+	// Update defines the order in which components should be updated in the cluster.
 	// Components with the same order can be listed together, separated by commas.
 	//
 	// +optional
-	UpdateOrder []string `json:"updateOrder,omitempty"`
-
-	// TODO: upgrade order?
+	Update []string `json:"update,omitempty"`
 }
 
 // SystemAccountSpec specifies information to create system accounts.

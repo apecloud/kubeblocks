@@ -106,6 +106,16 @@ jobs:
             exit 1
           fi
 
+      - name: make generate check
+        run: |
+          make generate
+          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          if [[ ! -z "$FILE_CHANGES" ]]; then
+            echo $FILE_CHANGES
+            echo "make generate causes inconsistent files"
+            exit 1
+          fi
+
       - name: make mod-vendor
         run: |
           make mod-vendor

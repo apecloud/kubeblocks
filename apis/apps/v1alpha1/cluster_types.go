@@ -305,6 +305,81 @@ type UserResourceRefs struct {
 	ConfigMapRefs []ConfigMapRef `json:"configMapRefs,omitempty"`
 }
 
+// InstanceTemplate defines values to override in pod template.
+type InstanceTemplate struct {
+	// Number of replicas of this template.
+	// Default is 1.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Defines the name of the instance.
+	// Only applied when Replicas is 1.
+	// +optional
+	Name *string `json:"name,omitempty"`
+
+	// GenerateName is an optional prefix, used by the server, to generate a unique
+	// name ONLY IF the Name field has not been provided.
+	// If this field is used, the name returned to the client will be different
+	// than the name passed. This value will also be combined with a unique suffix.
+	// The provided value has the same validation rules as the Name field,
+	// and may be truncated by the length of the suffix required to make the value
+	// unique on the server.
+	//
+	// Applied only if Name is not specified.
+	// +optional
+	GenerateName *string `json:"generateName,omitempty"`
+
+	// Defines annotations to override.
+	// Add new or override existing annotations.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Defines labels to override.
+	// Add new or override existing labels.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Defines image to override.
+	// Will override the first container's image of the pod.
+	// +optional
+	Image *string `json:"image,omitempty"`
+
+	// Defines NodeName to override.
+	// +optional
+	NodeName *string `json:"nodeName,omitempty"`
+
+	// Defines NodeSelector to override.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Defines Tolerations to override.
+	// Add new or override existing tolerations.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Defines Resources to override.
+	// Will override the first container's resources of the pod.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Defines Volumes to override.
+	// Add new or override existing volumes.
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// Defines VolumeMounts to override.
+	// Add new or override existing volume mounts of the first container in the pod.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// Defines VolumeClaimTemplates to override.
+	// Add new or override existing volume claim templates.
+	// +optional
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster.
 type ClusterStatus struct {
 	// The most recent generation number that has been observed by the controller.
@@ -525,7 +600,7 @@ type ClusterComponentSpec struct {
 
 	// Overrides values in default Template.
 	// +optional
-	Instances []workloads.InstanceTemplate `json:"instances,omitempty"`
+	Instances []InstanceTemplate `json:"instances,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

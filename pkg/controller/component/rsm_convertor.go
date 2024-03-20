@@ -48,6 +48,7 @@ func BuildRSMFrom(synthesizeComp *SynthesizedComponent, protoRSM *workloads.Repl
 		"memberupdatestrategy":      &rsmMemberUpdateStrategyConvertor{},
 		"podmanagementpolicy":       &rsmPodManagementPolicyConvertor{},
 		"updatestrategy":            &rsmUpdateStrategyConvertor{},
+		"instances":                 &rsmInstancesConvertor{},
 	}
 	if err := covertObject(convertors, &protoRSM.Spec, synthesizeComp); err != nil {
 		return nil, err
@@ -115,6 +116,42 @@ func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
 		return appsv1.StatefulSetUpdateStrategy{}, nil
 	}
 	return nil, nil
+}
+
+// rsmInstancesConvertor converts component instanceTemplate to rsm instanceTemplate
+type rsmInstancesConvertor struct{}
+
+func (c *rsmInstancesConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseRSMConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	componentInstanceToRSMInstance := func(instance *appsv1alpha1.InstanceTemplate) *workloads.InstanceTemplate {
+		if instance == nil {
+			return nil
+		}
+		return &workloads.InstanceTemplate{
+			Replicas:             instance.Replicas,
+			Name:                 instance.Name,
+			GenerateName:         instance.GenerateName,
+			Annotations:          instance.Annotations,
+			Labels:               instance.Labels,
+			Image:                instance.Image,
+			NodeName:             instance.NodeName,
+			NodeSelector:         instance.NodeSelector,
+			Tolerations:          instance.Tolerations,
+			Resources:            instance.Resources,
+			Volumes:              instance.Volumes,
+			VolumeMounts:         instance.VolumeMounts,
+			VolumeClaimTemplates: instance.VolumeClaimTemplates,
+		}
+	}
+	var instances []workloads.InstanceTemplate
+	for _, instance := range synthesizedComp.Instances {
+		instances = append(instances, *componentInstanceToRSMInstance(&instance))
+	}
+	return instances, nil
 }
 
 // parseRSMConvertorArgs parses the args of rsm convertor.

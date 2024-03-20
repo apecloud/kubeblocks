@@ -22,8 +22,6 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // ComponentSpec defines the desired state of Component
@@ -120,7 +118,7 @@ type ComponentSpec struct {
 
 	// Overrides values in default Template.
 	// +optional
-	Instances []workloads.InstanceTemplate `json:"instances,omitempty"`
+	Instances []InstanceTemplate `json:"instances,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the cluster.

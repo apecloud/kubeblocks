@@ -59,6 +59,7 @@ type SynthesizedComponent struct {
 	TemplateVars      map[string]any                         `json:"templateVars,omitempty"`
 	EnvVars           []corev1.EnvVar                        `json:"envVars,omitempty"`
 	EnvFromSources    []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
+	Instances         []v1alpha1.InstanceTemplate            `json:"instances,omitempty"`
 
 	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
 	Roles               []v1alpha1.ReplicaRole              `json:"roles,omitempty"`

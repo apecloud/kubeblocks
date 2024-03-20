@@ -249,6 +249,8 @@ spec:
                     instances:
                       description: Overrides values in default Template.
                       items:
+                        description: InstanceTemplate defines values to override in
+                          pod template.
                         properties:
                           annotations:
                             additionalProperties:
@@ -3886,6 +3888,8 @@ spec:
                         instances:
                           description: Overrides values in default Template.
                           items:
+                            description: InstanceTemplate defines values to override
+                              in pod template.
                             properties:
                               annotations:
                                 additionalProperties:

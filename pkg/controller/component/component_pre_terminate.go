@@ -49,13 +49,6 @@ func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 	comp *appsv1alpha1.Component,
 	dag *graph.DAG) error {
 	ctx := reqCtx.Ctx
-
-	// TODO(xingran): check if preTerminate action is needed for the component when cluster id deleting
-	// if !cluster.DeletionTimestamp.IsZero() {
-	//	reqCtx.Log.Info("cluster is deleting, skip reconciling component preTerminate", "cluster", cluster.Name)
-	//	return nil
-	// }
-
 	if comp == nil || len(comp.Spec.CompDef) == 0 {
 		reqCtx.Log.Info("comp is nil or compDef is empty, skip reconciling component preTerminate")
 		return nil

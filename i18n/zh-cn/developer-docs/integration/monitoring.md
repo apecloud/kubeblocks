@@ -138,7 +138,7 @@ Grafana 仪表盘可以帮助用户实时监控、分析和理解数据的趋势
 为此，需要在原有的 Helm chart 上，新加两个文件：
 
 - dashboards：保存 dashboard JSON 文件。
-- grafana：创建一个 ConfigMap 保存 dashbaord JSON 文件中的内容。
+- grafana：创建一个 ConfigMap 保存 dashboard JSON 文件中的内容。
 
 ```yaml
 tree oracle-mysql

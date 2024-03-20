@@ -87,7 +87,11 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 
 	// 3. persistent these revisions to status
 	rsm.Status.UpdateRevisions = updatedRevisions
-	rsm.Status.UpdateRevision = replicaRevisionList[len(replicaRevisionList)-1].revision
+	updateRevision := ""
+	if len(replicaRevisionList) > 0 {
+		updateRevision = replicaRevisionList[len(replicaRevisionList)-1].revision
+	}
+	rsm.Status.UpdateRevision = updateRevision
 	// The 'ObservedGeneration' field is used to indicate whether the revisions have been updated.
 	// Computing these revisions in each reconciliation loop can be time-consuming, so we optimize it by
 	// performing the computation only when the 'spec' is updated.

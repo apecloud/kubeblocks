@@ -74,7 +74,7 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	// step2: do the pre-terminate action if needed
-	if err := component.ReconcileCompPreTerminate(reqCtx, t.Client, cluster, comp, dag); err != nil {
+	if err := component.ReconcileCompPreTerminate(reqCtx, transCtx.Client, graphCli, cluster, comp, dag); err != nil {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
 			return newRequeueError(time.Second*3, "wait for preTerminate to be done")
 		}

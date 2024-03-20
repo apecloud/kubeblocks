@@ -129,7 +129,8 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
-			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
+			// graphCli := model.NewGraphClient(k8sClient)
+			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, graphCli, cluster, comp, synthesizeComp, dag)
 			Expect(err).Should(Succeed())
 
 			By("build component with preTerminate without PodList, check the built-in envs of cluster component available in action job")

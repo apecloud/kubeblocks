@@ -68,7 +68,9 @@ const (
 
 // createActionJobIfNotExist creates a job to execute component-level custom lifecycle action command, each component only has a corresponding job.
 func createActionJobIfNotExist(ctx context.Context,
-	cli client.Client,
+	cli client.Reader,
+	graphCli model.GraphClient,
+	dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component,
 	synthesizeComp *SynthesizedComponent,
@@ -97,15 +99,13 @@ func createActionJobIfNotExist(ctx context.Context,
 	}
 
 	// create the job if not exist
-	if err := cli.Create(ctx, renderJob); err != nil {
-		return renderJob, err
-	}
+	graphCli.Create(dag, renderJob)
 	return renderJob, nil
 }
 
 // renderActionCmdJob renders and creates the action command job.
 func renderActionCmdJob(ctx context.Context,
-	cli client.Client,
+	cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent,
 	actionType LifeCycleActionType) (*batchv1.Job, error) {
@@ -222,7 +222,7 @@ func renderActionCmdJob(ctx context.Context,
 
 // buildLifecycleActionEnvs builds the environment variables for lifecycle actions.
 func buildLifecycleActionEnvs(ctx context.Context,
-	cli client.Client,
+	cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
 	action *appsv1alpha1.Action,
 	pods []corev1.Pod,
@@ -253,7 +253,7 @@ func buildLifecycleActionEnvs(ctx context.Context,
 }
 
 // genClusterNComponentEnvs generates the cluster and component relative envs.
-func genClusterNComponentEnvs(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, pods []corev1.Pod) ([]corev1.EnvVar, error) {
+func genClusterNComponentEnvs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, pods []corev1.Pod) ([]corev1.EnvVar, error) {
 	if cluster == nil || (cluster.Spec.ComponentSpecs == nil && cluster.Spec.ShardingSpecs == nil) {
 		return nil, nil
 	}
@@ -325,7 +325,7 @@ func genComponentEnvs(compPods []corev1.Pod) ([]corev1.EnvVar, error) {
 }
 
 // genClusterEnvs generates the cluster scope relative envs.
-func genClusterEnvs(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, clusterComps []string) ([]corev1.EnvVar, error) {
+func genClusterEnvs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, clusterComps []string) ([]corev1.EnvVar, error) {
 	clusterPods := make([]corev1.Pod, 0)
 	for _, compName := range clusterComps {
 		compPodList, err := GetComponentPodList(ctx, cli, *cluster, compName)
@@ -375,7 +375,7 @@ func genClusterEnvs(ctx context.Context, cli client.Client, cluster *appsv1alpha
 }
 
 // needDoActionByCheckingJobNAnnotation checks if the action needs to be executed by checking the job and annotation.
-func needDoActionByCheckingJobNAnnotation(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster,
+func needDoActionByCheckingJobNAnnotation(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent, actionType LifeCycleActionType) (bool, error) {
 	if comp.Annotations == nil {
 		return true, nil
@@ -391,7 +391,7 @@ func needDoActionByCheckingJobNAnnotation(ctx context.Context, cli client.Client
 	return true, nil
 }
 
-func checkActionJobExist(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, jobName string) bool {
+func checkActionJobExist(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, jobName string) bool {
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
 	existJob := &batchv1.Job{}
 	exist, _ := intctrlutil.CheckResourceExists(ctx, cli, key, existJob)
@@ -399,8 +399,7 @@ func checkActionJobExist(ctx context.Context, cli client.Client, cluster *appsv1
 }
 
 // setActionDoneAnnotation sets the action done annotation for the component.
-func setActionDoneAnnotation(cli client.Client, comp *appsv1alpha1.Component, dag *graph.DAG, actionType LifeCycleActionType) error {
-	graphCli := model.NewGraphClient(cli)
+func setActionDoneAnnotation(graphCli model.GraphClient, comp *appsv1alpha1.Component, dag *graph.DAG, actionType LifeCycleActionType) error {
 	if comp.Annotations == nil {
 		comp.Annotations = make(map[string]string)
 	}
@@ -426,7 +425,8 @@ func setActionDoneAnnotation(cli client.Client, comp *appsv1alpha1.Component, da
 
 // cleanActionJob cleans the action job by name.
 func cleanActionJob(ctx context.Context,
-	cli client.Client,
+	cli client.Reader,
+	dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster,
 	comp appsv1alpha1.Component,
 	synthesizeComp SynthesizedComponent,
@@ -439,7 +439,7 @@ func cleanActionJob(ctx context.Context,
 	if !checkActionDoneAnnotationExist(*cluster, comp, synthesizeComp, actionType) {
 		return fmt.Errorf("cluster %s %s done annotation has not been set", cluster.Name, actionType)
 	}
-	return CleanJobByName(ctx, cli, cluster, jobName)
+	return CleanJobByNameWithDAG(ctx, cli, dag, cluster, jobName)
 }
 
 // checkActionDoneAnnotationExist checks if the action done annotation exists.

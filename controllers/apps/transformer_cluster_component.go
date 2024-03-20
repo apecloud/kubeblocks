@@ -151,7 +151,7 @@ func (t *clusterComponentTransformer) handleCompsDelete(transCtx *clusterTransfo
 		if err != nil {
 			return err
 		}
-		transCtx.Logger.V(1).Info(fmt.Sprintf("deleting component %s", runningComp.Name))
+		transCtx.Logger.Info(fmt.Sprintf("deleting component %s", runningComp.Name))
 		graphCli.Delete(dag, runningComp)
 	}
 	return nil

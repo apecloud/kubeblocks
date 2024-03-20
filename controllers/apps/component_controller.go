@@ -161,7 +161,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// add our finalizer to all objects
 			&componentOwnershipTransformer{},
 			// handle component postProvision lifecycle action
-			&componentPostProvisionTransformer{Client: r.Client},
+			&componentPostProvisionTransformer{},
 			// update component status
 			&componentStatusTransformer{Client: r.Client},
 		).Build()

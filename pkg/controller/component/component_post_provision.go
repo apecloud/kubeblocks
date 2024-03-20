@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -43,7 +44,8 @@ const (
 
 // ReconcileCompPostProvision reconciles the component-level postProvision command.
 func ReconcileCompPostProvision(ctx context.Context,
-	cli client.Client,
+	cli client.Reader,
+	graphCli model.GraphClient,
 	cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component,
 	synthesizeComp *SynthesizedComponent,
@@ -56,7 +58,7 @@ func ReconcileCompPostProvision(ctx context.Context,
 		return nil
 	}
 
-	job, err := createActionJobIfNotExist(ctx, cli, cluster, comp, synthesizeComp, PostProvisionAction)
+	job, err := createActionJobIfNotExist(ctx, cli, graphCli, dag, cluster, comp, synthesizeComp, PostProvisionAction)
 	if err != nil {
 		return err
 	}
@@ -74,18 +76,18 @@ func ReconcileCompPostProvision(ctx context.Context,
 
 	// job executed successfully, add the annotation to indicate that the postProvision has been executed and delete the job
 	compOrig := comp.DeepCopy()
-	if err := setActionDoneAnnotation(cli, comp, dag, PostProvisionAction); err != nil {
+	if err := setActionDoneAnnotation(graphCli, comp, dag, PostProvisionAction); err != nil {
 		return err
 	}
 
-	if err := cleanActionJob(ctx, cli, cluster, *compOrig, *synthesizeComp, PostProvisionAction, job.Name); err != nil {
+	if err := cleanActionJob(ctx, cli, dag, cluster, *compOrig, *synthesizeComp, PostProvisionAction, job.Name); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func needDoPostProvision(ctx context.Context, cli client.Client,
+func needDoPostProvision(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) (bool, error) {
 	// if the component does not have a custom postProvision, skip it
 	actionExist, _ := checkLifeCycleAction(synthesizeComp, PostProvisionAction)

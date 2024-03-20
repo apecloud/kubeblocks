@@ -27,6 +27,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -42,7 +43,8 @@ const (
 
 // ReconcileCompPreTerminate reconciles the component-level preTerminate command.
 func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli client.Reader,
+	graphCli model.GraphClient,
 	cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component,
 	dag *graph.DAG) error {
@@ -73,11 +75,12 @@ func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
-	return reconcileCompPreTerminate(ctx, cli, cluster, comp, synthesizedComp, dag)
+	return reconcileCompPreTerminate(ctx, cli, graphCli, cluster, comp, synthesizedComp, dag)
 }
 
 func reconcileCompPreTerminate(ctx context.Context,
-	cli client.Client,
+	cli client.Reader,
+	graphCli model.GraphClient,
 	cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component,
 	synthesizedComp *SynthesizedComponent,
@@ -90,7 +93,7 @@ func reconcileCompPreTerminate(ctx context.Context,
 		return nil
 	}
 
-	job, err := createActionJobIfNotExist(ctx, cli, cluster, comp, synthesizedComp, PreTerminateAction)
+	job, err := createActionJobIfNotExist(ctx, cli, graphCli, dag, cluster, comp, synthesizedComp, PreTerminateAction)
 	if err != nil {
 		return err
 	}
@@ -105,18 +108,18 @@ func reconcileCompPreTerminate(ctx context.Context,
 
 	// job executed successfully, add the annotation to indicate that the PreTerminate has been executed and delete the job
 	compOrig := comp.DeepCopy()
-	if err := setActionDoneAnnotation(cli, comp, dag, PreTerminateAction); err != nil {
+	if err := setActionDoneAnnotation(graphCli, comp, dag, PreTerminateAction); err != nil {
 		return err
 	}
 
-	if err := cleanActionJob(ctx, cli, cluster, *compOrig, *synthesizedComp, PreTerminateAction, job.Name); err != nil {
+	if err := cleanActionJob(ctx, cli, dag, cluster, *compOrig, *synthesizedComp, PreTerminateAction, job.Name); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func needDoPreTerminate(ctx context.Context, cli client.Client,
+func needDoPreTerminate(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) (bool, error) {
 	// if the component does not have a custom PreTerminate action, skip it
 	actionExist, _ := checkLifeCycleAction(synthesizeComp, PreTerminateAction)

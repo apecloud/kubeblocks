@@ -123,6 +123,7 @@ var _ = Describe("Component PreTerminate Test", func() {
 			comp.UID = cluster.UID
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
+			// graphCli := model.NewGraphClient(k8sClient)
 
 			By("test component without preTerminate action and no need to do PreTerminate action")
 			dag := graph.NewDAG()
@@ -130,7 +131,7 @@ var _ = Describe("Component PreTerminate Test", func() {
 			need, err := needDoPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeFalse())
-			err = reconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
+			err = reconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, graphCli, cluster, comp, synthesizeComp, dag)
 			Expect(err).Should(Succeed())
 
 			By("build component with preTerminate action and should do PreTerminate action")
@@ -154,18 +155,19 @@ var _ = Describe("Component PreTerminate Test", func() {
 				},
 			}
 			synthesizeComp.LifecycleActions.PreTerminate = &PreTerminate
-			need, err = needDoPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
+			need, err = needDoPreTerminate(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeTrue())
-			err = reconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
+
+			err = reconcileCompPreTerminate(testCtx.Ctx, k8sClient, graphCli, cluster, comp, synthesizeComp, dag)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
+			Expect(err.Error()).Should(ContainSubstring("job not exist, pls check"))
 
 			By("requeue to waiting for job")
 			jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, PreTerminateAction)
 			err = CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
+			Expect(err.Error()).Should(ContainSubstring("job not exist, pls check"))
 		})
 	})
 })

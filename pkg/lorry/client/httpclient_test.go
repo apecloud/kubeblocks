@@ -112,6 +112,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			pod1.Spec.Containers[0].Ports[0].ContainerPort = int32(port)
 			lorryClient, _ = NewHTTPClientWithPod(pod1)
 			Expect(lorryClient).ShouldNot(BeNil())
+			cache = make(map[string]*OperationResult)
 		})
 
 		AfterEach(func() {
@@ -122,7 +123,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			lorryClient.ReconcileTimeout = 1 * time.Second
 			_, err := lorryClient.GetRole(context.TODO())
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(lorryClient.cache).Should(BeEmpty())
+			Expect(cache).Should(BeEmpty())
 		})
 
 		It("response timeout", func() {
@@ -131,7 +132,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			Expect(err).Should(HaveOccurred())
 			// wait client to get response and cache it
 			time.Sleep(200 * time.Millisecond)
-			Expect(lorryClient.cache).Should(HaveLen(1))
+			Expect(cache).Should(HaveLen(1))
 		})
 
 		It("response by cache", func() {
@@ -144,7 +145,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			// get response from cache
 			_, err = lorryClient.GetRole(context.TODO())
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(lorryClient.cache).Should(BeEmpty())
+			Expect(cache).Should(BeEmpty())
 		})
 	})
 

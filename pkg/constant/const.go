@@ -162,6 +162,7 @@ const (
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
 	AutoCreateResourceAnnotationKey             = "apps.kubeblocks.io/auto-create-resource" // AutoCreateResourceAnnotationKey specifies whether the resource is automatically created by KubeBlocks
+	ComponentScaleInAnnotationKey               = "apps.kubeblocks.io/component-scale-in"   // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName         = "cluster.kubeblocks.io/finalizer"

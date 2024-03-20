@@ -152,7 +152,14 @@ func (t *clusterComponentTransformer) handleCompsDelete(transCtx *clusterTransfo
 			return err
 		}
 		transCtx.Logger.Info(fmt.Sprintf("deleting component %s", runningComp.Name))
-		graphCli.Delete(dag, runningComp)
+		runningCompCopy := runningComp.DeepCopy()
+		if runningComp.Annotations == nil {
+			runningComp.Annotations = make(map[string]string)
+		}
+		// mark the component as scale-in before deleting
+		runningComp.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
+		updateCompVertex := graphCli.Do(dag, runningCompCopy, runningComp, model.ActionUpdatePtr(), nil)
+		graphCli.Do(dag, nil, runningComp, model.ActionDeletePtr(), updateCompVertex)
 	}
 	return nil
 }

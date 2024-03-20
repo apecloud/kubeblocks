@@ -42,9 +42,7 @@ import (
 )
 
 // componentDeletionTransformer handles component deletion
-type componentDeletionTransformer struct {
-	client.Client
-}
+type componentDeletionTransformer struct{}
 
 var _ graph.Transformer = &componentDeletionTransformer{}
 
@@ -76,7 +74,8 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	// step2: do the pre-terminate action if needed
 	if err := component.ReconcileCompPreTerminate(reqCtx, transCtx.Client, graphCli, cluster, comp, dag); err != nil {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
-			return newRequeueError(time.Second*3, "wait for preTerminate to be done")
+			// waiting for the preTerminate action to be done, and watch the action finish event to trigger the next reconcile
+			return nil
 		}
 		return err
 	}
@@ -86,19 +85,50 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
-
-	// TODO(xingran): check it is necessary to add a component-level terminatePolicy to control the sub-resources deletion
-	// by default, all the sub-resources(including pvc) will be deleted when the component is deleted
 	ml := constant.GetComponentWellKnownLabels(cluster.Name, compShortName)
-	toPreserveKinds, toDeleteKinds := getPreserveNDeleteKinds(cluster)
+
+	compScaleIn, ok := comp.Annotations[constant.ComponentScaleInAnnotationKey]
+	if ok && compScaleIn == trueVal {
+		return t.handleCompDeleteWhenScaleIn(transCtx, graphCli, dag, comp, ml)
+	}
+	return t.handleCompDeleteWhenClusterDelete(transCtx, graphCli, dag, cluster, comp, ml)
+}
+
+// handleCompDeleteWhenScaleIn handles the component deletion when scale-in, this scenario will delete all the sub-resources owned by the component by default.
+func (t *componentDeletionTransformer) handleCompDeleteWhenScaleIn(transCtx *componentTransformContext, graphCli model.GraphClient,
+	dag *graph.DAG, comp *appsv1alpha1.Component, matchLabels map[string]string) error {
+	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, kindsForCompWipeOut())
+}
+
+// handleCompDeleteWhenClusterDelete handles the component deletion when the cluster is being deleted, the sub-resources owned by the component depends on the cluster's TerminationPolicy.
+func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCtx *componentTransformContext, graphCli model.GraphClient,
+	dag *graph.DAG, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, matchLabels map[string]string) error {
+	var (
+		toPreserveKinds, toDeleteKinds []client.ObjectList
+	)
+	switch cluster.Spec.TerminationPolicy {
+	case appsv1alpha1.Halt:
+		toPreserveKinds = haltPreserveKinds()
+		toDeleteKinds = kindsForCompHalt()
+	case appsv1alpha1.Delete:
+		toDeleteKinds = kindsForCompDelete()
+	case appsv1alpha1.WipeOut:
+		toDeleteKinds = kindsForCompWipeOut()
+	}
+
 	if len(toPreserveKinds) > 0 {
 		// preserve the objects owned by the component when the component is being deleted
-		if err := preserveCompObjects(transCtx.Context, transCtx.Client, graphCli, dag, comp, ml, toPreserveKinds); err != nil {
+		if err := preserveCompObjects(transCtx.Context, transCtx.Client, graphCli, dag, comp, matchLabels, toPreserveKinds); err != nil {
 			return newRequeueError(requeueDuration, err.Error())
 		}
 	}
+	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, toDeleteKinds)
+}
 
-	snapshot, err := model.ReadCacheSnapshot(transCtx, comp, ml, toDeleteKinds...)
+func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTransformContext, graphCli model.GraphClient,
+	dag *graph.DAG, comp *appsv1alpha1.Component, matchLabels map[string]string, toDeleteKinds []client.ObjectList) error {
+
+	snapshot, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, toDeleteKinds...)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
@@ -126,7 +156,7 @@ func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformCo
 		return nil, err
 	}
 	cluster := &appsv1alpha1.Cluster{}
-	err = t.Client.Get(transCtx.Context, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
+	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("failed to get cluster %s: %v", clusterName, err))
 	}
@@ -163,17 +193,8 @@ func kindsForCompWipeOut() []client.ObjectList {
 	return kindsForCompDelete()
 }
 
-func getPreserveNDeleteKinds(cluster *appsv1alpha1.Cluster) ([]client.ObjectList, []client.ObjectList) {
-	// backward compatibility with the behavior and semantics when a cluster's TerminationPolicy is set to Halt and cluster is deleting, some resources are retained here.
-	if cluster.Spec.TerminationPolicy == appsv1alpha1.Halt && !cluster.DeletionTimestamp.IsZero() {
-		return haltPreserveKinds(), kindsForCompHalt()
-	}
-	return nil, kindsForCompWipeOut()
-}
-
 // preserveCompObjects preserves the objects owned by the component when the component is being deleted
 func preserveCompObjects(ctx context.Context, cli client.Reader, graphCli model.GraphClient, dag *graph.DAG,
 	comp *appsv1alpha1.Component, ml client.MatchingLabels, toPreserveKinds []client.ObjectList) error {
-	// use LastAppliedClusterAnnotationKey to preserve the objects owned by the component when the cluster's TerminationPolicy is set to Halt during deletion
 	return preserveObjects(ctx, cli, graphCli, dag, comp, ml, toPreserveKinds, constant.DBComponentFinalizerName, constant.LastAppliedClusterAnnotationKey)
 }

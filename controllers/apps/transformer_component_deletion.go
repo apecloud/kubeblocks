@@ -86,30 +86,16 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
-	var (
-		toDeleteKinds   []client.ObjectList
-		toPreserveKinds []client.ObjectList
-	)
-	// by default, we inherit cluster termination policy to control the sub-resources deletion
-	// TODO(xingran): check it is necessary to add a component-level terminatePolicy to control the sub-resources deletion
-	switch cluster.Spec.TerminationPolicy {
-	case appsv1alpha1.DoNotTerminate:
-		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate",
-			"spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
-		return graph.ErrPrematureStop
-	case appsv1alpha1.Halt:
-		toDeleteKinds = kindsForCompHalt()
-		toPreserveKinds = haltPreserveKinds()
-	case appsv1alpha1.Delete:
-		toDeleteKinds = kindsForCompDelete()
-	case appsv1alpha1.WipeOut:
-		toDeleteKinds = kindsForCompWipeOut()
-	}
 
-	// handle preserved objects update vertex
+	// TODO(xingran): check it is necessary to add a component-level terminatePolicy to control the sub-resources deletion
+	// by default, all the sub-resources(including pvc) will be deleted when the component is deleted
 	ml := constant.GetComponentWellKnownLabels(cluster.Name, compShortName)
-	if err := preserveCompObjects(transCtx.Context, transCtx.Client, graphCli, dag, comp, ml, toPreserveKinds); err != nil {
-		return err
+	toPreserveKinds, toDeleteKinds := getPreserveNDeleteKinds(cluster)
+	if len(toPreserveKinds) > 0 {
+		// preserve the objects owned by the component when the component is being deleted
+		if err := preserveCompObjects(transCtx.Context, transCtx.Client, graphCli, dag, comp, ml, toPreserveKinds); err != nil {
+			return newRequeueError(requeueDuration, err.Error())
+		}
 	}
 
 	snapshot, err := model.ReadCacheSnapshot(transCtx, comp, ml, toDeleteKinds...)
@@ -177,8 +163,17 @@ func kindsForCompWipeOut() []client.ObjectList {
 	return kindsForCompDelete()
 }
 
+func getPreserveNDeleteKinds(cluster *appsv1alpha1.Cluster) ([]client.ObjectList, []client.ObjectList) {
+	// backward compatibility with the behavior and semantics when a cluster's TerminationPolicy is set to Halt and cluster is deleting, some resources are retained here.
+	if cluster.Spec.TerminationPolicy == appsv1alpha1.Halt && !cluster.DeletionTimestamp.IsZero() {
+		return haltPreserveKinds(), kindsForCompHalt()
+	}
+	return nil, kindsForCompWipeOut()
+}
+
 // preserveCompObjects preserves the objects owned by the component when the component is being deleted
 func preserveCompObjects(ctx context.Context, cli client.Reader, graphCli model.GraphClient, dag *graph.DAG,
 	comp *appsv1alpha1.Component, ml client.MatchingLabels, toPreserveKinds []client.ObjectList) error {
-	return preserveObjects(ctx, cli, graphCli, dag, comp, ml, toPreserveKinds, constant.DBComponentFinalizerName, constant.LastAppliedComponentAnnotationKey)
+	// use LastAppliedClusterAnnotationKey to preserve the objects owned by the component when the cluster's TerminationPolicy is set to Halt during deletion
+	return preserveObjects(ctx, cli, graphCli, dag, comp, ml, toPreserveKinds, constant.DBComponentFinalizerName, constant.LastAppliedClusterAnnotationKey)
 }

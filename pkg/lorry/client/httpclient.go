@@ -95,8 +95,8 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 	operationClient := &HTTPClient{
 		Client:           client,
 		URL:              fmt.Sprintf(urlTemplate, ip, port),
-		CacheTTL:         60 * time.Second,
-		RequestTimeout:   1 * time.Second,
+		CacheTTL:         1800 * time.Second,
+		RequestTimeout:   300 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,
 		logger:           ctrl.Log.WithName("Lorry HTTP client"),
 	}
@@ -125,8 +125,8 @@ func NewHTTPClientWithURL(url string) (*HTTPClient, error) {
 	operationClient := &HTTPClient{
 		Client:           client,
 		URL:              url,
-		CacheTTL:         60 * time.Second,
-		RequestTimeout:   30 * time.Second,
+		CacheTTL:         1800 * time.Second,
+		RequestTimeout:   300 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,
 	}
 	operationClient.lorryClient = lorryClient{requester: operationClient}

@@ -141,6 +141,10 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 	addrs := cluster.GetMemberAddrs()
 	envs = append(envs, "KB_MEMBER_ADDRESSES"+"="+strings.Join(addrs, ","))
 	envs = append(envs, "KB_NEW_MEMBER_POD_NAME"+"="+mgr.CurrentMemberName)
+	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
+	if member != nil {
+		envs = append(envs, "KB_NEW_MEMBER_POD_IP"+"="+member.PodIP)
+	}
 	output, err := util.ExecCommand(ctx, memberJoinCmd, envs)
 
 	if output != "" {
@@ -178,6 +182,10 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 	addrs := cluster.GetMemberAddrs()
 	envs = append(envs, "KB_MEMBER_ADDRESSES"+"="+strings.Join(addrs, ","))
 	envs = append(envs, "KB_LEAVE_MEMBER_POD_NAME"+"="+memberName)
+	member := cluster.GetMemberWithName(memberName)
+	if member != nil {
+		envs = append(envs, "KB_LEAVE_MEMBER_POD_IP"+"="+member.PodIP)
+	}
 	output, err := util.ExecCommand(ctx, memberLeaveCmd, envs)
 
 	if output != "" {

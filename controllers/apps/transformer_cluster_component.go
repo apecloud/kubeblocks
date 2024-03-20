@@ -156,10 +156,10 @@ func (t *clusterComponentTransformer) handleCompsDelete(transCtx *clusterTransfo
 		if runningComp.Annotations == nil {
 			runningComp.Annotations = make(map[string]string)
 		}
-		// mark the component as scale-in before deleting
+		// update the scale-in annotation to component before deleting
 		runningComp.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
-		updateCompVertex := graphCli.Do(dag, runningCompCopy, runningComp, model.ActionUpdatePtr(), nil)
-		graphCli.Do(dag, nil, runningComp, model.ActionDeletePtr(), updateCompVertex)
+		deleteCompVertex := graphCli.Do(dag, nil, runningComp, model.ActionDeletePtr(), nil)
+		graphCli.Do(dag, runningCompCopy, runningComp, model.ActionUpdatePtr(), deleteCompVertex)
 	}
 	return nil
 }

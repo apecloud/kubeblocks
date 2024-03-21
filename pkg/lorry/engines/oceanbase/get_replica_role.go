@@ -51,7 +51,7 @@ func (mgr *Manager) GetReplicaRoleForMember(ctx context.Context, cluster *dcs.Cl
 		return "", nil
 	}
 
-	sql := fmt.Sprintf("SELECT TENANT_ROLE,COMPATIBILITY_MODE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
+	sql := fmt.Sprintf("SELECT TENANT_ROLE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
 
 	db := mgr.DB
 	if member != nil && member.Name != mgr.CurrentMemberName {
@@ -76,7 +76,7 @@ func (mgr *Manager) GetReplicaRoleForMember(ctx context.Context, cluster *dcs.Cl
 	var role string
 	var isReady bool
 	for rows.Next() {
-		if err = rows.Scan(&role, &mgr.CompatibilityMode); err != nil {
+		if err = rows.Scan(&role); err != nil {
 			mgr.Logger.Info("Role query failed", "error", err.Error())
 			return role, err
 		}

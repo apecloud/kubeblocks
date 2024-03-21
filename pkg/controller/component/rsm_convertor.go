@@ -103,7 +103,7 @@ func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
 	return appsv1.ParallelPodManagement, nil
 }
 
-// rsmUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.UpdateStrategy.
+// rsmUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Instances.
 type rsmUpdateStrategyConvertor struct{}
 
 func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {

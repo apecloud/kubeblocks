@@ -23,7 +23,6 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -54,8 +53,7 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 	case model.IsObjectStatusUpdating(rsmOrig):
 		// read the underlying sts
 		sts := &apps.StatefulSet{}
-		err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts)
-		if err != nil && !apierrors.IsNotFound(err) {
+		if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts); err != nil {
 			return err
 		}
 		// keep rsm's ObservedGeneration to avoid override by sts's ObservedGeneration

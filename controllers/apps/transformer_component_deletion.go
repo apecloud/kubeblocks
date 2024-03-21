@@ -108,7 +108,7 @@ func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCt
 	)
 	switch cluster.Spec.TerminationPolicy {
 	case appsv1alpha1.Halt:
-		toPreserveKinds = haltPreserveKinds()
+		toPreserveKinds = compOwnedPreserveKinds()
 		toDeleteKinds = kindsForCompHalt()
 	case appsv1alpha1.Delete:
 		toDeleteKinds = kindsForCompDelete()
@@ -173,6 +173,14 @@ func compOwnedKinds() []client.ObjectList {
 	}
 }
 
+func compOwnedPreserveKinds() []client.ObjectList {
+	return []client.ObjectList{
+		&corev1.PersistentVolumeClaimList{},
+		&corev1.SecretList{},
+		&corev1.ConfigMapList{},
+	}
+}
+
 func kindsForCompDoNotTerminate() []client.ObjectList {
 	return []client.ObjectList{}
 }
@@ -185,7 +193,7 @@ func kindsForCompHalt() []client.ObjectList {
 
 func kindsForCompDelete() []client.ObjectList {
 	haltKinds := kindsForCompHalt()
-	preserveKinds := haltPreserveKinds()
+	preserveKinds := compOwnedPreserveKinds()
 	return append(haltKinds, preserveKinds...)
 }
 

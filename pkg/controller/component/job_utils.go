@@ -132,8 +132,8 @@ func CheckJobSucceed(ctx context.Context,
 		case batchv1.JobFailed:
 			return errors.New("job failed, pls check")
 		default:
-			return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeExpectedInProcess, "requeue to waiting for job %s finished.", key.Name)
 		}
 	}
-	return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeExpectedInProcess, "requeue to waiting for job %s finished.", key.Name)
 }

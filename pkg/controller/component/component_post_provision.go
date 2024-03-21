@@ -68,7 +68,7 @@ func ReconcileCompPostProvision(ctx context.Context,
 
 	err = CheckJobSucceed(ctx, cli, cluster, job.Name)
 	if err != nil {
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
 			return nil
 		}
 		return err

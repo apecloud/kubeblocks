@@ -255,7 +255,7 @@ func TestManager_GetMemberAddrs(t *testing.T) {
 	defer viper.Reset()
 	addrs := manager.GetMemberAddrs(ctx, cluster)
 	assert.Len(t, addrs, 1)
-	assert.Equal(t, "fake-mysql-0.-headless.fake-namespace.svc.cluster.local:fake-port", addrs[0])
+	assert.Equal(t, "fake-mysql-0.fake-mysql-headless.fake-namespace.svc.cluster.local:fake-port", addrs[0])
 }
 
 func TestManager_IsMemberLagging(t *testing.T) {

@@ -35,14 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 )
 
-const (
-	repUser      = "rep_user"
-	repPassword  = "rep_user"
-	normalStatus = "NORMAL"
-	MYSQL        = "MYSQL"
-	ORACLE       = "ORACLE"
-)
-
 func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primary, candidate string, force bool) error {
 	if mgr.ReplicaTenant == "" {
 		return errors.New("the cluster has no replica tenant set")
@@ -80,11 +72,6 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 		return err
 	}
 
-	opTimestamp, err := mgr.GetMemberOpTimestamp(ctx, cluster, primaryMember)
-	if err != nil {
-		return errors.Wrap(err, "get primary op timestamp failed")
-	}
-	mgr.OpTimestamp = opTimestamp
 	isLagging, _ := mgr.IsMemberLagging(ctx, cluster, candidateMember)
 	if isLagging {
 		return errors.New("candidate member is lagging")

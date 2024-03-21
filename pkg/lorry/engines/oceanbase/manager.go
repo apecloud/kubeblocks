@@ -21,17 +21,18 @@ package oceanbase
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/mysql"
-	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -39,6 +40,12 @@ const (
 	CurrentLeader = "CURRENT_LEADER"
 	PRIMARY       = "PRIMARY"
 	STANDBY       = "STANDBY"
+
+	repUser      = "rep_user"
+	repPassword  = "rep_user"
+	normalStatus = "NORMAL"
+	MYSQL        = "MYSQL"
+	ORACLE       = "ORACLE"
 )
 
 type Manager struct {
@@ -46,7 +53,6 @@ type Manager struct {
 	ReplicaTenant     string
 	CompatibilityMode string
 	Members           []dcs.Member
-	OpTimestamp       int64
 	MaxLag            int64
 }
 
@@ -54,23 +60,37 @@ var _ engines.DBManager = &Manager{}
 
 func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	logger := ctrl.Log.WithName("Oceanbase")
-	_, err := NewConfig(properties)
+	config, err := NewConfig(properties)
 	if err != nil {
 		return nil, err
 	}
 
-	mysqlMgr, err := mysql.NewManager(properties)
+	managerBase, err := engines.NewDBManagerBase(logger)
 	if err != nil {
 		return nil, err
+	}
+
+	db, err := config.GetLocalDBConn()
+	if err != nil {
+		return nil, errors.Wrap(err, "connect to Oceanbase failed")
 	}
 
 	mgr := &Manager{
-		Manager: *mysqlMgr.(*mysql.Manager),
+		Manager: mysql.Manager{
+			DBManagerBase: *managerBase,
+			DB:            db,
+		},
 	}
-
-	mgr.SetLogger(logger)
-	mgr.ReplicaTenant = viperx.GetString("TENANT_NAME")
+	mgr.ReplicaTenant = viper.GetString("TENANT_NAME")
+	if mgr.ReplicaTenant == "" {
+		return nil, errors.New("replica tenant is not set")
+	}
 	return mgr, nil
+}
+
+func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	time.Sleep(120 * time.Second)
+	return true, nil
 }
 
 func (mgr *Manager) InitializeCluster(context.Context, *dcs.Cluster) error {
@@ -93,6 +113,27 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, me
 	}
 
 	return false, nil
+}
+
+func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+	isLeader, err := mgr.IsLeader(ctx, cluster)
+	if err == nil && isLeader {
+		// if current member is leader, just return
+		return nil
+	}
+
+	for _, member := range cluster.Members {
+		if member.Name == mgr.CurrentMemberName {
+			continue
+		}
+
+		isLeader, err := mgr.IsLeaderMember(ctx, cluster, &member)
+		if err == nil && isLeader {
+			return &member
+		}
+	}
+
+	return nil
 }
 
 func (mgr *Manager) GetCompatibilityMode(ctx context.Context) (string, error) {
@@ -122,13 +163,22 @@ func (mgr *Manager) MemberHealthyCheck(ctx context.Context, cluster *dcs.Cluster
 	}
 }
 
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+	err := mgr.CurrentMemberHealthyCheck(ctx, cluster)
+	if err != nil {
+		mgr.Logger.Info("current member is unhealthy", "error", err.Error())
+		return false
+	}
+	return true
+}
+
 func (mgr *Manager) CurrentMemberHealthyCheck(ctx context.Context, cluster *dcs.Cluster) error {
 	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
 	return mgr.MemberHealthyCheck(ctx, cluster, member)
 }
 
 func (mgr *Manager) LeaderHealthyCheck(ctx context.Context, cluster *dcs.Cluster) error {
-	members := mgr.GetMembers(ctx, cluster)
+	members := cluster.Members
 	for _, member := range members {
 		if isLeader, _ := mgr.IsLeaderMember(ctx, cluster, &member); isLeader {
 			return mgr.MemberHealthyCheck(ctx, cluster, &member)
@@ -159,8 +209,26 @@ func (mgr *Manager) HealthyCheckForMySQLMode(ctx context.Context, cluster *dcs.C
 		return err
 	}
 
-	mgr.OpTimestamp, _ = mgr.GetOpTimestamp(ctx, db)
+	return nil
+}
 
+func (mgr *Manager) WriteCheck(ctx context.Context, db *sql.DB) error {
+	writeSQL := fmt.Sprintf(`BEGIN;
+CREATE DATABASE IF NOT EXISTS kubeblocks;
+CREATE TABLE IF NOT EXISTS kubeblocks.kb_health_check(type INT, check_ts BIGINT, PRIMARY KEY(type));
+INSERT INTO kubeblocks.kb_health_check VALUES(%d, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE check_ts = UNIX_TIMESTAMP();
+COMMIT;`, engines.CheckStatusType)
+	opTimestamp, _ := mgr.GetOpTimestamp(ctx, db)
+	if opTimestamp != 0 {
+		// if op timestamp is not 0, it means the table is ready created
+		writeSQL = fmt.Sprintf(`
+		INSERT INTO kubeblocks.kb_health_check VALUES(%d, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE check_ts = UNIX_TIMESTAMP();
+		`, engines.CheckStatusType)
+	}
+	_, err := db.ExecContext(ctx, writeSQL)
+	if err != nil {
+		return errors.Wrap(err, "Write check failed")
+	}
 	return nil
 }
 
@@ -176,52 +244,23 @@ func (mgr *Manager) HealthyCheckForOracleMode(ctx context.Context, cluster *dcs.
 	return nil
 }
 
-func (mgr *Manager) GetMembers(ctx context.Context, cluster *dcs.Cluster) []dcs.Member {
-	clusterCR, ok := cluster.Resource.(*appsv1alpha1.Cluster)
-	if !ok {
-		return nil
+func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
+	err := mgr.MemberHealthyCheck(ctx, cluster, member)
+	if err != nil {
+		mgr.Logger.Info("member is unhealthy", "error", err.Error())
+		return false
 	}
-	updateMembers := false
-	for _, component := range clusterCR.Spec.ComponentSpecs {
-		hasMember := false
-		for _, member := range mgr.Members {
-			if strings.Contains(member.Name, component.Name) {
-				hasMember = true
-				break
-			}
-		}
-		if !hasMember {
-			updateMembers = true
-			break
-		}
-	}
-	if !updateMembers {
-		return mgr.Members
-	}
-
-	mgr.Members = []dcs.Member{}
-	for _, component := range clusterCR.Spec.ComponentSpecs {
-		if strings.Contains(mgr.ClusterCompName, component.Name) {
-			mgr.Members = append(mgr.Members, cluster.Members...)
-			continue
-		}
-		k8sStore, _ := dcs.NewKubernetesStore()
-		k8sStore.SetCompName(component.Name)
-		c, err := k8sStore.GetCluster()
-		if err != nil {
-			return nil
-		}
-		mgr.Members = append(mgr.Members, c.Members...)
-	}
-
-	return mgr.Members
+	return true
 }
 
 func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
-	if mgr.CompatibilityMode == ORACLE {
+	var leaderOpTimestamp int64
+	if cluster.Leader == nil || cluster.Leader.DBState == nil {
+		mgr.Logger.Info("leader's db state is nil, maybe leader is not ready yet")
 		return false, 0
 	}
-	if mgr.OpTimestamp == 0 {
+	leaderOpTimestamp = cluster.Leader.DBState.OpTimestamp
+	if leaderOpTimestamp == 0 {
 		mgr.Logger.Info("leader's op timestamp is 0")
 		return true, 0
 	}
@@ -231,12 +270,30 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 		mgr.Logger.Info("get op timestamp failed", "error", err.Error())
 		return true, 0
 	}
-	lag := mgr.OpTimestamp - opTimestamp
+	lag := leaderOpTimestamp - opTimestamp
 	if lag > mgr.MaxLag {
-		mgr.Logger.Info("member is lagging", "opTimestamp", opTimestamp, "leaderOpTimestamp", mgr.OpTimestamp)
+		mgr.Logger.Info("member is lagging", "opTimestamp", opTimestamp, "leaderOpTimestamp", leaderOpTimestamp)
 		return true, lag
 	}
 	return false, lag
+}
+
+func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
+	if mgr.CompatibilityMode == ORACLE {
+		return nil
+	}
+
+	mgr.DBState = nil
+	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
+	opTimestamp, err := mgr.GetMemberOpTimestamp(ctx, cluster, member)
+	if err != nil {
+		mgr.Logger.Info("get op timestamp failed", "error", err)
+		return nil
+	}
+	mgr.DBState = &dcs.DBState{
+		OpTimestamp: opTimestamp,
+	}
+	return mgr.DBState
 }
 
 func (mgr *Manager) GetMemberOpTimestamp(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (int64, error) {
@@ -251,4 +308,102 @@ func (mgr *Manager) GetMemberOpTimestamp(ctx context.Context, cluster *dcs.Clust
 		return 0, err
 	}
 	return mgr.GetOpTimestamp(ctx, db)
+}
+
+func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
+	db := mgr.DB
+	isLeader, err := mgr.IsLeader(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "leader check failed")
+	}
+	if isLeader {
+		return nil
+	}
+	// if there is no switchover, it's a failover: old leader is down, we need to promote a new leader, and the old leader can't be used anymore.
+	primaryTenant := "ALTER SYSTEM ACTIVATE STANDBY TENANT = " + mgr.ReplicaTenant
+	if cluster.Switchover != nil {
+		// it's a manual switchover
+		primaryTenant = "ALTER SYSTEM SWITCHOVER TO PRIMARY TENANT = " + mgr.ReplicaTenant
+	}
+
+	_, err = db.Exec(primaryTenant)
+	if err != nil {
+		mgr.Logger.Info("activate standby tenant failed", "error", err)
+		return err
+	}
+
+	var tenantRole, roleStatus string
+	queryTenant := fmt.Sprintf("SELECT TENANT_ROLE, SWITCHOVER_STATUS FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
+	for {
+		err := db.QueryRowContext(ctx, queryTenant).Scan(&tenantRole, &roleStatus)
+		if err != nil {
+			return errors.Wrap(err, "query tenant role failed")
+		}
+
+		if tenantRole == PRIMARY && roleStatus == normalStatus {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	return nil
+}
+
+func (mgr *Manager) Demote(ctx context.Context) error {
+	db := mgr.DB
+	standbyTenant := "ALTER SYSTEM SWITCHOVER TO STANDBY TENANT = " + mgr.ReplicaTenant
+	_, err := db.Exec(standbyTenant)
+	if err != nil {
+		return errors.Wrap(err, "standby primary tenant failed")
+	}
+
+	var tenantRole, roleStatus string
+	queryTenant := fmt.Sprintf("SELECT TENANT_ROLE, SWITCHOVER_STATUS FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
+	for {
+		err := db.QueryRowContext(ctx, queryTenant).Scan(&tenantRole, &roleStatus)
+		if err != nil {
+			return errors.Wrap(err, "query tenant role failed")
+		}
+
+		if tenantRole == STANDBY && roleStatus == normalStatus {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	return nil
+}
+
+func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
+	leaderMember := cluster.GetLeaderMember()
+	if leaderMember == nil {
+		return errors.New("no leader found")
+	}
+	sourceAddr := leaderMember.PodIP + ":" + leaderMember.DBPort
+	db := mgr.DB
+
+	sql := fmt.Sprintf("ALTER SYSTEM SET LOG_RESTORE_SOURCE = 'SERVICE=%s USER=%s@%s PASSWORD=%s' TENANT = %s",
+		sourceAddr, repUser, mgr.ReplicaTenant, repPassword, mgr.ReplicaTenant)
+	_, err := db.Exec(sql)
+	if err != nil {
+		mgr.Logger.Info(sql+" failed", "error", err) //nolint:goconst
+		return err
+	}
+
+	time.Sleep(time.Second)
+	var scn int64
+	queryTenant := fmt.Sprintf("SELECT RECOVERY_UNTIL_SCN FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
+	for {
+		err := db.QueryRowContext(ctx, queryTenant).Scan(&scn)
+		if err != nil {
+			mgr.Logger.Info("query zone info failed", "error", err)
+			return err
+		}
+
+		if scn == 4611686018427387903 {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	return nil
 }

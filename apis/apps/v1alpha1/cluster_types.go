@@ -599,6 +599,14 @@ type ClusterComponentSpec struct {
 	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
 
 	// Overrides values in default Template.
+	//
+	// Instance is the fundamental unit managed by KubeBlocks.
+	// It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+	// A component manages instances with a total count of Replicas,
+	// and by default, all these instances are generated from the same template.
+	// The InstanceTemplate provides a way to override values in the default template,
+	// allowing the component to manage instances from different templates.
+	//
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
 }

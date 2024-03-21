@@ -247,7 +247,14 @@ spec:
                       type: array
                       x-kubernetes-list-type: set
                     instances:
-                      description: Overrides values in default Template.
+                      description: "Overrides values in default Template. \n Instance
+                        is the fundamental unit managed by KubeBlocks. It represents
+                        a Pod with additional objects such as PVCs, Services, ConfigMaps,
+                        etc. A component manages instances with a total count of Replicas,
+                        and by default, all these instances are generated from the
+                        same template. The InstanceTemplate provides a way to override
+                        values in the default template, allowing the component to
+                        manage instances from different templates."
                       items:
                         description: InstanceTemplate defines values to override in
                           pod template.
@@ -3886,7 +3893,15 @@ spec:
                           type: array
                           x-kubernetes-list-type: set
                         instances:
-                          description: Overrides values in default Template.
+                          description: "Overrides values in default Template. \n Instance
+                            is the fundamental unit managed by KubeBlocks. It represents
+                            a Pod with additional objects such as PVCs, Services,
+                            ConfigMaps, etc. A component manages instances with a
+                            total count of Replicas, and by default, all these instances
+                            are generated from the same template. The InstanceTemplate
+                            provides a way to override values in the default template,
+                            allowing the component to manage instances from different
+                            templates."
                           items:
                             description: InstanceTemplate defines values to override
                               in pod template.

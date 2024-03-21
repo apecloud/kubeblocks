@@ -962,7 +962,7 @@ TLSConfig
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
 []InstanceTemplate
 </a>
 </em>
@@ -4678,7 +4678,7 @@ UserResourceRefs
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
 []InstanceTemplate
 </a>
 </em>
@@ -4686,6 +4686,12 @@ UserResourceRefs
 <td>
 <em>(Optional)</em>
 <p>Overrides values in default Template.</p>
+<p>Instance is the fundamental unit managed by KubeBlocks.
+It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+A component manages instances with a total count of Replicas,
+and by default, all these instances are generated from the same template.
+The InstanceTemplate provides a way to override values in the default template,
+allowing the component to manage instances from different templates.</p>
 </td>
 </tr>
 </tbody>
@@ -8262,7 +8268,7 @@ TLSConfig
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
 []InstanceTemplate
 </a>
 </em>
@@ -11388,6 +11394,207 @@ string
 <td>
 <em>(Optional)</em>
 <p>A string that describes the name of the ini section.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+<p>InstanceTemplate defines values to override in pod template.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Number of replicas of this template.
+Default is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the name of the instance.
+Only applied when Replicas is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>generateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>GenerateName is an optional prefix, used by the server, to generate a unique
+name ONLY IF the Name field has not been provided.
+If this field is used, the name returned to the client will be different
+than the name passed. This value will also be combined with a unique suffix.
+The provided value has the same validation rules as the Name field,
+and may be truncated by the length of the suffix required to make the value
+unique on the server.</p>
+<p>Applied only if Name is not specified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines annotations to override.
+Add new or override existing annotations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines labels to override.
+Add new or override existing labels.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines image to override.
+Will override the first container&rsquo;s image of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines NodeName to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSelector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines NodeSelector to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tolerations</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
+[]Kubernetes core/v1.Toleration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Tolerations to override.
+Add new or override existing tolerations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Resources to override.
+Will override the first container&rsquo;s resources of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Volumes to override.
+Add new or override existing volumes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMounts</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
+[]Kubernetes core/v1.VolumeMount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeMounts to override.
+Add new or override existing volume mounts of the first container in the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeClaimTemplates to override.
+Add new or override existing volume claim templates.</p>
 </td>
 </tr>
 </tbody>
@@ -19501,6 +19708,12 @@ Kubernetes core/v1.PodTemplateSpec
 <td>
 <em>(Optional)</em>
 <p>Overrides values in default Template.</p>
+<p>Instance is the fundamental unit managed by KubeBlocks.
+It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+A RSM manages instances with a total count of Replicas,
+and by default, all these instances are generated from the same template.
+The InstanceTemplate provides a way to override values in the default template,
+allowing the RSM to manage instances from different templates.</p>
 </td>
 </tr>
 <tr>
@@ -19833,7 +20046,7 @@ Kubernetes core/v1.EnvVarSource
 <h3 id="workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
 </p>
 <div>
 </div>
@@ -20409,6 +20622,12 @@ Kubernetes core/v1.PodTemplateSpec
 <td>
 <em>(Optional)</em>
 <p>Overrides values in default Template.</p>
+<p>Instance is the fundamental unit managed by KubeBlocks.
+It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+A RSM manages instances with a total count of Replicas,
+and by default, all these instances are generated from the same template.
+The InstanceTemplate provides a way to override values in the default template,
+allowing the RSM to manage instances from different templates.</p>
 </td>
 </tr>
 <tr>

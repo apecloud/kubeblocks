@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -148,8 +149,12 @@ func (t *clusterComponentTransformer) handleCompsDelete(transCtx *clusterTransfo
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for compName := range deleteCompSet {
 		runningComp, err := getRunningCompObject(transCtx, cluster, compName)
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
+		} else if apierrors.IsNotFound(err) || model.IsObjectDeleting(runningComp) {
+			// component object not found or is being deleted, skip
+			transCtx.Logger.Info(fmt.Sprintf("component %s not found or is being deleted, skip it", compName))
+			continue
 		}
 		transCtx.Logger.Info(fmt.Sprintf("deleting component %s", runningComp.Name))
 		runningCompCopy := runningComp.DeepCopy()

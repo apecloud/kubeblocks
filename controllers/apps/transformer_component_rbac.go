@@ -278,20 +278,12 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 	}
 
 	buildSa := factory.BuildServiceAccount(cluster, serviceAccountName)
-	// this annotation is used to mark the service account created by KubeBlocks
-	buildSa.SetAnnotations(map[string]string{
-		constant.AutoCreateResourceAnnotationKey: trueVal,
-	})
 	// if volume protection is enabled, the service account needs to be bound to the clusterRoleBinding.
 	return buildSa, volumeProtectionEnable, nil
 }
 
 func buildRoleBinding(cluster *appsv1alpha1.Cluster, serviceAccountName string) *rbacv1.RoleBinding {
 	roleBinding := factory.BuildRoleBinding(cluster, serviceAccountName)
-	// this annotation is used to mark the role binding created by KubeBlocks
-	roleBinding.SetAnnotations(map[string]string{
-		constant.AutoCreateResourceAnnotationKey: trueVal,
-	})
 	return roleBinding
 }
 

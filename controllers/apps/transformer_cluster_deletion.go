@@ -217,9 +217,9 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster appsv1alpha1.Cluster) b
 			if strings.EqualFold(objType.GetName(), constant.GenerateDefaultServiceAccountName(cluster.GetName())) {
 				return false
 			}
-			annotations := obj.GetAnnotations()
-			_, ok := annotations[constant.AutoCreateResourceAnnotationKey]
-			if ok {
+			labels := obj.GetLabels()
+			value, ok := labels[constant.AppManagedByLabelKey]
+			if ok && value == constant.AppName {
 				return false
 			}
 		}

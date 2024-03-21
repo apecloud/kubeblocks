@@ -102,7 +102,8 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 func isProbesEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
 	// TODO(component): lorry
-	return compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.RoleProbe != nil
+	actions := compDef.Spec.LifecycleActions
+	return actions != nil && (actions.RoleProbe != nil || actions.ReplicaHealthProbe != nil || actions.ComponentHealthProbe != nil)
 }
 
 func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) bool {

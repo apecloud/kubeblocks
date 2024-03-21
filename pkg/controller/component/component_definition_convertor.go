@@ -576,6 +576,8 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	}
 
 	lifecycleActions.PreTerminate = nil
+	lifecycleActions.ReplicaHealthProbe = nil
+	lifecycleActions.ComponentHealthProbe = nil
 	lifecycleActions.MemberJoin = nil
 	lifecycleActions.MemberLeave = nil
 	lifecycleActions.Readonly = nil

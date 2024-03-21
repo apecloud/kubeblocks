@@ -402,12 +402,17 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 		synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 		return
 	}
-	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil {
+	if !isProbesEnabled(synthesizeComp) {
 		return
 	}
 	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.ClusterName)
 	// set component.PodSpec.ServiceAccountName
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
+}
+
+func isProbesEnabled(synthesizeComp *SynthesizedComponent) bool {
+	actions := synthesizeComp.LifecycleActions
+	return actions != nil && (actions.RoleProbe != nil || actions.ReplicaHealthProbe != nil || actions.ComponentHealthProbe != nil)
 }
 
 // buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion before KubeBlocks Version 0.7.0

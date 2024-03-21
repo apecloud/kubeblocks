@@ -659,6 +659,30 @@ type ComponentLifecycleActions struct {
 	// +optional
 	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
 
+	// ReplicaHealthProbe defines the health check for replicas.
+	//
+	// When specified, KB executes this probe on each replica according to the settings, and takes appropriate actions
+	// based on the probe results.
+	//
+	// Upon successful execution, the probe output should include the following information:
+	// - status: Indicates the health status of the replica. Possible values include:
+	//   - ok: The replica is healthy.
+	//   - warning: The replica has encountered events requiring attention. KB sends alerts if configured.
+	//   - recoverable: The replica has experienced recoverable errors. KB initiates a replica restart.
+	//   - unrecoverable: The replica has experienced unrecoverable errors. KB considers rebuilding the replica.
+	// - message: Provides detailed information when the replica's health is compromised, aiding in troubleshooting.
+	//
+	// +optional
+	ReplicaHealthProbe *corev1.Probe `json:"replicaHealthProbe,omitempty"`
+
+	// ComponentHealthProbe defines the health check for the component's availability.
+	//
+	// When specified, KB performs this check on the component to ensure the system remains operational and that
+	// replicas capable of data synchronization and validation are available.
+	//
+	// +optional
+	ComponentHealthProbe *corev1.Probe `json:"componentHealthProbe,omitempty"`
+
 	// Defines the method to proactively switch the current leader to a new replica to minimize the impact on availability.
 	// This action is typically invoked when the leader is about to become unavailable due to events, such as:
 	//

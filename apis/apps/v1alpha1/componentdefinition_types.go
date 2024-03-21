@@ -658,26 +658,6 @@ type ComponentLifecycleActions struct {
 	// +optional
 	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
 
-	// HealthyCheck represents the health check configuration for the replica.
-	// It specifies the conditions and criteria for determining the health status of the component.The specified action will be
-	// executed by Lorry. If the execution is successful, the replica will be treated as healthy.
-	//
-	// The following dedicated environment variables are available for the action:
-	//
-	// - KB_POD_FQDN: The pod FQDN of the replica to check the role.
-	// - KB_SERVICE_PORT: The port on which the DB service listens.
-	// - KB_SERVICE_USER: The username used to access the DB service and retrieve the role information with sufficient privileges.
-	// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information.
-	//
-	// Output of the action:
-	// - ROLE: the role of the replica. It must be one of the names defined in the roles.
-	// - ERROR: Any error message if the action fails.
-	//
-	// This field cannot be updated.
-	//
-	// +optional
-	HealthyCheck *HealthyCheck `json:"healthyCheck,omitempty"`
-
 	// Defines the method to proactively switch the current leader to a new replica to minimize the impact on availability.
 	// This action is typically invoked when the leader is about to become unavailable due to events, such as:
 	//
@@ -890,39 +870,4 @@ type RoleProbe struct {
 	//
 	// +optional
 	PeriodSeconds int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
-}
-
-type HealthyCheck struct {
-	LifecycleActionHandler `json:",inline"`
-
-	// Number of seconds after the container has started before liveness probes are initiated.
-	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
-	//
-	// +optional
-	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty" protobuf:"varint,2,opt,name=initialDelaySeconds"`
-
-	// Number of seconds after which the probe times out.
-	// Defaults to 1 second. Minimum value is 1.
-	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
-	//
-	// +optional
-	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,3,opt,name=timeoutSeconds"`
-
-	// How often (in seconds) to perform the probe.
-	// Default to 10 seconds. Minimum value is 1.
-	//
-	// +optional
-	PeriodSeconds int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
-
-	// Minimum consecutive successes for the probe to be considered successful after having failed.
-	// Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
-	//
-	// +optional
-	SuccessThreshold int32 `json:"successThreshold,omitempty" protobuf:"varint,5,opt,name=successThreshold"`
-
-	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
-	// Defaults to 3. Minimum value is 1.
-	//
-	// +optional
-	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
 }

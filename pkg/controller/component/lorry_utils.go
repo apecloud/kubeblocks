@@ -359,26 +359,27 @@ func buildEnv4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.En
 	}
 }
 
-func buildEnv4CronJobs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
-	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.HealthyCheck == nil {
-		return nil
-	}
-	healthyCheck := synthesizeComp.LifecycleActions.HealthyCheck
-	healthCheckSetting := make(map[string]string)
-	healthCheckSetting["periodSeconds"] = strconv.Itoa(int(healthyCheck.PeriodSeconds))
-	healthCheckSetting["timeoutSeconds"] = strconv.Itoa(int(healthyCheck.TimeoutSeconds))
-	healthCheckSetting["failureThreshold"] = strconv.Itoa(int(healthyCheck.FailureThreshold))
-	healthCheckSetting["successThreshold"] = strconv.Itoa(int(healthyCheck.SuccessThreshold))
-	cronJobs := make(map[string]map[string]string)
-	cronJobs["healthyCheck"] = healthCheckSetting
+func buildEnv4CronJobs(_ *SynthesizedComponent) []corev1.EnvVar {
+	return nil
+	// if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.HealthyCheck == nil {
+	// 	return nil
+	// }
+	// healthyCheck := synthesizeComp.LifecycleActions.HealthyCheck
+	// healthCheckSetting := make(map[string]string)
+	// healthCheckSetting["periodSeconds"] = strconv.Itoa(int(healthyCheck.PeriodSeconds))
+	// healthCheckSetting["timeoutSeconds"] = strconv.Itoa(int(healthyCheck.TimeoutSeconds))
+	// healthCheckSetting["failureThreshold"] = strconv.Itoa(int(healthyCheck.FailureThreshold))
+	// healthCheckSetting["successThreshold"] = strconv.Itoa(int(healthyCheck.SuccessThreshold))
+	// cronJobs := make(map[string]map[string]string)
+	// cronJobs["healthyCheck"] = healthCheckSetting
 
-	jsonStr, _ := json.Marshal(cronJobs)
-	return []corev1.EnvVar{
-		{
-			Name:  constant.KBEnvCronJobs,
-			Value: string(jsonStr),
-		},
-	}
+	// jsonStr, _ := json.Marshal(cronJobs)
+	// return []corev1.EnvVar{
+	// 	{
+	// 		Name:  constant.KBEnvCronJobs,
+	// 		Value: string(jsonStr),
+	// 	},
+	// }
 }
 
 // getBuiltinActionHandler gets the built-in handler.
@@ -392,14 +393,6 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil &&
 			*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != appsv1alpha1.UnknownBuiltinActionHandler {
 			return *synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
-		} else {
-			return appsv1alpha1.CustomActionHandler
-		}
-	}
-
-	if synthesizeComp.LifecycleActions.HealthyCheck != nil {
-		if synthesizeComp.LifecycleActions.HealthyCheck.BuiltinHandler != nil {
-			return *synthesizeComp.LifecycleActions.HealthyCheck.BuiltinHandler
 		} else {
 			return appsv1alpha1.CustomActionHandler
 		}
@@ -453,10 +446,6 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 
 	if synthesizeComp.LifecycleActions.RoleProbe != nil {
 		actions[constant.RoleProbeAction] = &synthesizeComp.LifecycleActions.RoleProbe.LifecycleActionHandler
-	}
-
-	if synthesizeComp.LifecycleActions.HealthyCheck != nil {
-		actions[constant.HealthyCheckAction] = &synthesizeComp.LifecycleActions.HealthyCheck.LifecycleActionHandler
 	}
 
 	var toolImage string

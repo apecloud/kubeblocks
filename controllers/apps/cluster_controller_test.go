@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -35,6 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -268,6 +270,17 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
+	multipleTemplateComponentProcessorWrapper := func(compName, compDefName string, processor ...func(*testapps.MockClusterFactory)) func(f *testapps.MockClusterFactory) {
+		return func(f *testapps.MockClusterFactory) {
+			f.AddMultipleTemplateComponent(compName, compDefName).SetReplicas(3)
+			for _, p := range processor {
+				if p != nil {
+					p(f)
+				}
+			}
+		}
+	}
+
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
 		createClusterObjNoWait("", "", componentProcessorWrapper(false, compName, compDefName, processor))
@@ -350,6 +363,35 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Eventually(testapps.List(&testCtx, generics.ComponentSignature,
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
+	}
+
+	createClusterObjWithMultipleTemplates := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
+		By("Creating a cluster with new component definition")
+		createClusterObjNoWait("", "", multipleTemplateComponentProcessorWrapper(compName, compDefName, processor))
+
+		By("Waiting for the cluster enter Creating phase")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+
+		By("Wait component created")
+		compKey := types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
+		}
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+
+		By("Wait RSM created")
+		rsmkey := compKey
+		rsm := &workloads.ReplicatedStateMachine{}
+		Eventually(testapps.CheckObjExists(&testCtx, rsmkey, rsm, true)).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Spec.ComponentSpecs).Should(HaveLen(1))
+			clusterJSON, err := json.Marshal(cluster.Spec.ComponentSpecs[0].Instances)
+			g.Expect(err).Should(BeNil())
+			rsmJSON, err := json.Marshal(rsm.Spec.Instances)
+			g.Expect(err).Should(BeNil())
+			g.Expect(clusterJSON).Should(Equal(rsmJSON))
+		})).Should(Succeed())
 	}
 
 	testClusterWithoutClusterVersion := func(compName, compDefName string) {
@@ -998,6 +1040,10 @@ var _ = Describe("Cluster Controller", func() {
 				f.SetServiceVersion(defaultServiceVersion)
 			}
 			testClusterComponentWithTopology(defaultTopology.Name, consensusCompName, setServiceVersion, compDefObj.Name, defaultServiceVersion)
+		})
+
+		It("create multiple templates cluster", func() {
+			testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjWithMultipleTemplates)
 		})
 	})
 

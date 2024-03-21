@@ -316,6 +316,9 @@ type InstanceTemplate struct {
 
 	// Defines the name of the instance.
 	// Only applied when Replicas is 1.
+	//
+	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name *string `json:"name,omitempty"`
 
@@ -328,6 +331,9 @@ type InstanceTemplate struct {
 	// unique on the server.
 	//
 	// Applied only if Name is not specified.
+	//
+	// +kubebuilder:validation:MaxLength=54
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	GenerateName *string `json:"generateName,omitempty"`
 

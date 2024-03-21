@@ -275,6 +275,8 @@ spec:
                               rules as the Name field, and may be truncated by the
                               length of the suffix required to make the value unique
                               on the server. \n Applied only if Name is not specified."
+                            maxLength: 54
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           image:
                             description: Defines image to override. Will override
@@ -289,6 +291,8 @@ spec:
                           name:
                             description: Defines the name of the instance. Only applied
                               when Replicas is 1.
+                            maxLength: 64
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           nodeName:
                             description: Defines NodeName to override.
@@ -3923,6 +3927,8 @@ spec:
                                   field, and may be truncated by the length of the
                                   suffix required to make the value unique on the
                                   server. \n Applied only if Name is not specified."
+                                maxLength: 54
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                 type: string
                               image:
                                 description: Defines image to override. Will override
@@ -3937,6 +3943,8 @@ spec:
                               name:
                                 description: Defines the name of the instance. Only
                                   applied when Replicas is 1.
+                                maxLength: 64
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                 type: string
                               nodeName:
                                 description: Defines NodeName to override.

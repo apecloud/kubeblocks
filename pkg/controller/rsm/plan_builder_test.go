@@ -54,7 +54,7 @@ var _ = Describe("plan builder test", func() {
 			rsmBuilder, _ = planBuilder.(*PlanBuilder)
 
 			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
-				AddFinalizers([]string{getFinalizer(&workloads.ReplicatedStateMachine{})}).
+				AddFinalizers([]string{GetFinalizer(&workloads.ReplicatedStateMachine{})}).
 				GetObject()
 		})
 

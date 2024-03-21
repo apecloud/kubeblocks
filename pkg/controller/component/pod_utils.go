@@ -25,6 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -75,32 +76,30 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 	if rsm.Status.ObservedGeneration != rsm.Generation {
 		return false, nil
 	}
-	if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
-		if rsm.Status.CurrentGeneration != rsm.Generation {
-			return false, nil
-		}
+	if rsm.Status.CurrentGeneration != rsm.Generation {
+		return false, nil
 	}
 
+	// check whether the underlying workload(sts) has sent the latest template to pods
+	sts := &appsv1.StatefulSet{}
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	if sts.Status.ObservedGeneration != sts.Generation {
+		return false, nil
+	}
 	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels)
 	if err != nil {
 		return false, err
 	}
-	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
-		// TODO pod ObservedGeneration
-	} else {
-		// check whether the underlying workload(sts) has sent the latest template to pods
-		sts := &appsv1.StatefulSet{}
-		if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
-			return false, err
-		}
-		if sts.Status.ObservedGeneration != sts.Generation {
+	for _, pod := range pods {
+		if intctrlutil.GetPodRevision(pod) != sts.Status.UpdateRevision {
 			return false, nil
 		}
-		for _, pod := range pods {
-			if intctrlutil.GetPodRevision(pod) != sts.Status.UpdateRevision {
-				return false, nil
-			}
-		}
 	}
+
 	return true, nil
 }

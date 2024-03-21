@@ -21,10 +21,8 @@ package builder
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 type ComponentBuilder struct {
@@ -92,21 +90,6 @@ func (builder *ComponentBuilder) SetMonitor(monitor bool) *ComponentBuilder {
 	return builder
 }
 
-func (builder *ComponentBuilder) SetTransformPolicy(transformPolicy workloads.RsmTransformPolicy) *ComponentBuilder {
-	builder.get().Spec.RsmTransformPolicy = transformPolicy
-	return builder
-}
-
-func (builder *ComponentBuilder) SetNodes(nodes []types.NodeName) *ComponentBuilder {
-	builder.get().Spec.Nodes = nodes
-	return builder
-}
-
-func (builder *ComponentBuilder) SetInstances(instances []string) *ComponentBuilder {
-	builder.get().Spec.Instances = instances
-	return builder
-}
-
 func (builder *ComponentBuilder) SetTLSConfig(enable bool, issuer *appsv1alpha1.Issuer) *ComponentBuilder {
 	if enable {
 		builder.get().Spec.TLSConfig = &appsv1alpha1.TLSConfig{
@@ -138,5 +121,10 @@ func (builder *ComponentBuilder) SetServiceRefs(serviceRefs []appsv1alpha1.Servi
 
 func (builder *ComponentBuilder) SetClassRef(classRef *appsv1alpha1.ClassDefRef) *ComponentBuilder {
 	builder.get().Spec.ClassDefRef = classRef
+	return builder
+}
+
+func (builder *ComponentBuilder) SetInstances(instances []appsv1alpha1.InstanceTemplate) *ComponentBuilder {
+	builder.get().Spec.Instances = instances
 	return builder
 }

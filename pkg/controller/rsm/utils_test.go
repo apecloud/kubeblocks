@@ -69,13 +69,13 @@ var _ = Describe("utils test", func() {
 	Context("SortPods function", func() {
 		It("should work well", func() {
 			pods := []corev1.Pod{
-				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(roleLabelKey, "logger").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(RoleLabelKey, "follower").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(RoleLabelKey, "logger").GetObject(),
 				*builder.NewPodBuilder(namespace, "pod-2").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-3").AddLabels(roleLabelKey, "learner").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-4").AddLabels(roleLabelKey, "candidate").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-5").AddLabels(roleLabelKey, "leader").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-6").AddLabels(roleLabelKey, "learner").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-3").AddLabels(RoleLabelKey, "learner").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-4").AddLabels(RoleLabelKey, "candidate").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-5").AddLabels(RoleLabelKey, "leader").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-6").AddLabels(RoleLabelKey, "learner").GetObject(),
 			}
 			expectedOrder := []string{"pod-4", "pod-2", "pod-3", "pod-6", "pod-1", "pod-0", "pod-5"}
 
@@ -92,23 +92,23 @@ var _ = Describe("utils test", func() {
 			membersStatus := []workloads.MemberStatus{
 				{
 					PodName:     "pod-0",
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 				{
 					PodName:     "pod-1",
-					ReplicaRole: workloads.ReplicaRole{Name: "learner"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "learner"},
 				},
 				{
 					PodName:     "pod-2",
-					ReplicaRole: workloads.ReplicaRole{Name: "learner"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "learner"},
 				},
 				{
 					PodName:     "pod-3",
-					ReplicaRole: workloads.ReplicaRole{Name: "leader"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader"},
 				},
 				{
 					PodName:     "pod-4",
-					ReplicaRole: workloads.ReplicaRole{Name: "logger"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "logger"},
 				},
 			}
 			expectedOrder := []string{"pod-3", "pod-0", "pod-4", "pod-2", "pod-1"}
@@ -120,12 +120,12 @@ var _ = Describe("utils test", func() {
 		})
 	})
 
-	Context("setMembersStatus function", func() {
+	Context("SetMembersStatus function", func() {
 		It("should work well", func() {
 			pods := []corev1.Pod{
-				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(roleLabelKey, "leader").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-2").AddLabels(roleLabelKey, "follower").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(RoleLabelKey, "follower").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(RoleLabelKey, "leader").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-2").AddLabels(RoleLabelKey, "follower").GetObject(),
 			}
 			readyCondition := corev1.PodCondition{
 				Type:   corev1.PodReady,
@@ -136,34 +136,34 @@ var _ = Describe("utils test", func() {
 			oldMembersStatus := []workloads.MemberStatus{
 				{
 					PodName:     "pod-0",
-					ReplicaRole: workloads.ReplicaRole{Name: "leader"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader"},
 				},
 				{
 					PodName:     "pod-1",
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 				{
 					PodName:     "pod-2",
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 			}
 			replicas := int32(3)
 			rsm.Spec.Replicas = &replicas
 			rsm.Status.MembersStatus = oldMembersStatus
-			setMembersStatus(rsm, pods)
+			SetMembersStatus(rsm, &pods)
 
 			Expect(rsm.Status.MembersStatus).Should(HaveLen(2))
 			Expect(rsm.Status.MembersStatus[0].PodName).Should(Equal("pod-1"))
-			Expect(rsm.Status.MembersStatus[0].Name).Should(Equal("leader"))
+			Expect(rsm.Status.MembersStatus[0].ReplicaRole.Name).Should(Equal("leader"))
 			Expect(rsm.Status.MembersStatus[1].PodName).Should(Equal("pod-0"))
-			Expect(rsm.Status.MembersStatus[1].Name).Should(Equal("follower"))
+			Expect(rsm.Status.MembersStatus[1].ReplicaRole.Name).Should(Equal("follower"))
 		})
 	})
 
-	Context("getRoleName function", func() {
+	Context("GetRoleName function", func() {
 		It("should work well", func() {
-			pod := builder.NewPodBuilder(namespace, name).AddLabels(roleLabelKey, "LEADER").GetObject()
-			role := getRoleName(*pod)
+			pod := builder.NewPodBuilder(namespace, name).AddLabels(RoleLabelKey, "LEADER").GetObject()
+			role := GetRoleName(*pod)
 			Expect(role).Should(Equal("leader"))
 		})
 	})
@@ -171,11 +171,11 @@ var _ = Describe("utils test", func() {
 	Context("getPodsOfStatefulSet function", func() {
 		It("should work well", func() {
 			sts := builder.NewStatefulSetBuilder(namespace, name).
-				AddMatchLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+				AddMatchLabels(constant.KBManagedByKey, KindReplicatedStateMachine).
 				AddMatchLabels(constant.AppInstanceLabelKey, name).
 				GetObject()
 			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
-				AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+				AddLabels(constant.KBManagedByKey, KindReplicatedStateMachine).
 				AddLabels(constant.AppInstanceLabelKey, name).
 				GetObject()
 			k8sMock.EXPECT().
@@ -229,7 +229,7 @@ var _ = Describe("utils test", func() {
 				ObjectMeta: pod.ObjectMeta,
 				Spec:       pod.Spec,
 			}
-			Expect(findSvcPort(*rsm)).Should(BeEquivalentTo(containerPort))
+			Expect(findSvcPort(rsm)).Should(BeEquivalentTo(containerPort))
 
 			By("set port number")
 			rsm.Spec.Service.Spec.Ports = []corev1.ServicePort{
@@ -240,7 +240,7 @@ var _ = Describe("utils test", func() {
 					TargetPort: intstr.FromInt(int(containerPort)),
 				},
 			}
-			Expect(findSvcPort(*rsm)).Should(BeEquivalentTo(containerPort))
+			Expect(findSvcPort(rsm)).Should(BeEquivalentTo(containerPort))
 
 			By("set no matched port")
 			rsm.Spec.Service.Spec.Ports = []corev1.ServicePort{
@@ -251,7 +251,7 @@ var _ = Describe("utils test", func() {
 					TargetPort: intstr.FromInt(int(containerPort - 1)),
 				},
 			}
-			Expect(findSvcPort(*rsm)).Should(BeZero())
+			Expect(findSvcPort(rsm)).Should(BeZero())
 		})
 	})
 
@@ -273,21 +273,21 @@ var _ = Describe("utils test", func() {
 			membersStatus := []workloads.MemberStatus{
 				{
 					PodName:     "pod-0",
-					ReplicaRole: workloads.ReplicaRole{Name: "leader", IsLeader: true},
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader", IsLeader: true},
 				},
 				{
 					PodName:     "pod-1",
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 				{
 					PodName:     "pod-2",
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 			}
 			Expect(getLeaderPodName(membersStatus)).Should(Equal(membersStatus[0].PodName))
 
 			By("set no leader")
-			membersStatus[0].IsLeader = false
+			membersStatus[0].ReplicaRole.IsLeader = false
 			Expect(getLeaderPodName(membersStatus)).Should(BeZero())
 		})
 	})
@@ -419,7 +419,7 @@ var _ = Describe("utils test", func() {
 			t := true
 			rsm.OwnerReferences = []metav1.OwnerReference{
 				{
-					Kind:       kindReplicatedStateMachine,
+					Kind:       KindReplicatedStateMachine,
 					Controller: &t,
 				},
 			}

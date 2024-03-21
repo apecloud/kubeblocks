@@ -58,40 +58,6 @@ var _ = Describe("object generation transformer test.", func() {
 			rsm:           rsm,
 		}
 
-		nodeAssignment := []workloads.NodeAssignment{
-			{
-				Name: name + "1",
-			},
-			{
-				Name: name + "2",
-			},
-			{
-				Name: name + "3",
-			},
-		}
-		rsmForPods = builder.NewReplicatedStateMachineBuilder(namespace, name).
-			SetUID(uid).
-			AddLabels(constant.AppComponentLabelKey, name).
-			SetReplicas(3).
-			AddMatchLabelsInMap(selectors).
-			SetServiceName(headlessSvcName).
-			SetNodeAssignment(nodeAssignment).
-			SetRsmTransformPolicy(workloads.ToPod).
-			SetService(service).
-			SetCredential(credential).
-			SetTemplate(template).
-			SetCustomHandler(observeActions).
-			GetObject()
-
-		transCtxForPods = &rsmTransformContext{
-			Context:       ctx,
-			Client:        graphCli,
-			EventRecorder: nil,
-			Logger:        logger,
-			rsmOrig:       rsmForPods.DeepCopy(),
-			rsm:           rsmForPods,
-		}
-
 		transformer = &ObjectGenerationTransformer{}
 	})
 
@@ -154,54 +120,21 @@ var _ = Describe("object generation transformer test.", func() {
 		})
 	})
 
-	Context("Transform function for rsm managing pods", func() {
-		It("should work well", func() {
-			pods := mockUnderlyingPods(*rsmForPods)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.ServiceList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.ServiceList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.ConfigMapList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.ConfigMapList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-
-			dagExpected := mockDAGForPods()
-			for i := range pods {
-				graphCli.Create(dagExpected, &pods[i])
-			}
-
-			// do Transform
-			dag := mockDAGForPods()
-			Expect(transformer.Transform(transCtxForPods, dag)).Should(Succeed())
-
-			// compare DAGs
-			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
-		})
-	})
-
 	Context("buildEnvConfigData function", func() {
 		It("should work well", func() {
 			By("build env config data")
 			rsm.Status.MembersStatus = []workloads.MemberStatus{
 				{
 					PodName:     getPodName(rsm.Name, 1),
-					ReplicaRole: workloads.ReplicaRole{Name: "leader", IsLeader: true},
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader", IsLeader: true},
 				},
 				{
 					PodName:     getPodName(rsm.Name, 0),
-					ReplicaRole: workloads.ReplicaRole{Name: "follower", CanVote: true},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower", CanVote: true},
 				},
 				{
 					PodName:     getPodName(rsm.Name, 2),
-					ReplicaRole: workloads.ReplicaRole{Name: "follower", CanVote: true},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower", CanVote: true},
 				},
 			}
 			requiredKeys := []string{
@@ -231,7 +164,7 @@ var _ = Describe("object generation transformer test.", func() {
 
 	Context("well-known service labels", func() {
 		It("should work well", func() {
-			svc := buildSvc(*rsm)
+			svc := BuildSvc(*rsm)
 			Expect(svc).ShouldNot(BeNil())
 			for k, ev := range service.Labels {
 				v, ok := svc.Labels[k]
@@ -258,7 +191,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
@@ -282,7 +215,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
@@ -306,7 +239,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
@@ -330,7 +263,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))

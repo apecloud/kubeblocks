@@ -193,7 +193,7 @@ func UpdateComponentInfoToPods(
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomp.SynthesizedComponent,
 	dag *graph.DAG) error {
-	if cluster == nil || component == nil || component.RsmTransformPolicy == v1alpha1.ToPod {
+	if cluster == nil || component == nil {
 		return nil
 	}
 	ml := client.MatchingLabels{

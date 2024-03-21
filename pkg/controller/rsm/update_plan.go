@@ -31,11 +31,11 @@ import (
 )
 
 type updatePlan interface {
-	// execute executes the plan
+	// Execute executes the plan
 	// return error when any error occurred
 	// return pods to be updated,
 	// nil slice means no pods need to be updated
-	execute() ([]*corev1.Pod, error)
+	Execute() ([]*corev1.Pod, error)
 }
 
 type realUpdatePlan struct {
@@ -117,7 +117,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	index := 0
 	podList := p.pods
 	for i, pod := range podList {
-		roleName := getRoleName(pod)
+		roleName := GetRoleName(pod)
 		if rolePriorityMap[roleName] <= learnerPriority {
 			vertex := &model.ObjectVertex{Obj: &podList[i]}
 			p.dag.AddConnect(preVertex, vertex)
@@ -131,7 +131,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	podList = podList[index:]
 	followerCount := 0
 	for _, pod := range podList {
-		roleName := getRoleName(pod)
+		roleName := GetRoleName(pod)
 		if rolePriorityMap[roleName] < leaderPriority {
 			followerCount++
 		}
@@ -182,7 +182,7 @@ func (p *realUpdatePlan) buildSerialUpdatePlan() {
 	}
 }
 
-func (p *realUpdatePlan) execute() ([]*corev1.Pod, error) {
+func (p *realUpdatePlan) Execute() ([]*corev1.Pod, error) {
 	p.build()
 	if err := p.dag.WalkBFS(p.planWalkFunc); err != ErrContinue && err != ErrWait && err != ErrStop {
 		return nil, err
@@ -197,4 +197,12 @@ func newUpdatePlan(rsm workloads.ReplicatedStateMachine, pods []corev1.Pod) upda
 		pods: pods,
 		dag:  graph.NewDAG(),
 	}
+}
+
+func NewUpdatePlan(rsm workloads.ReplicatedStateMachine, pods []*corev1.Pod) updatePlan {
+	var podList []corev1.Pod
+	for _, pod := range pods {
+		podList = append(podList, *pod)
+	}
+	return newUpdatePlan(rsm, podList)
 }

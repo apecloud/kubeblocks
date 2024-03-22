@@ -69,6 +69,7 @@ func (w *WorkflowContext) Run(compCustomSpec *appsv1alpha1.CustomOpsComponent) (
 			workflowStatus.IsCompleted = true
 			workflowStatus.ExistFailure = true
 		}
+		w.OpsRes.OpsRequest.Status.Components[compCustomSpec.ComponentName] = compStatus
 	}()
 	setSucceedWorkflowStatus := func(actionIndex int) {
 		workflowStatus.CompletedCount += 1

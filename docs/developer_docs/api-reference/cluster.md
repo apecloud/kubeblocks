@@ -36,6 +36,8 @@ Resource Types:
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentResourceConstraint">ComponentResourceConstraint</a>
 </li><li>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion</a>
+</li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraint">ConfigConstraint</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.Configuration">Configuration</a>
@@ -240,6 +242,19 @@ string
 </tr>
 <tr>
 <td>
+<code>topology</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topology specifies the topology to use for the cluster. If not specified, the default topology will be used.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>terminationPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.TerminationPolicyType">
@@ -327,6 +342,20 @@ Affinity
 <td>
 <em>(Optional)</em>
 <p>Attached to tolerate any taint that matches the triple <code>key,value,effect</code> using the matching operator <code>operator</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backup</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
+ClusterBackup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Cluster backup configuration.</p>
 </td>
 </tr>
 <tr>
@@ -428,20 +457,6 @@ ClusterNetwork
 <p>The configuration of network.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>backup</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
-ClusterBackup
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Cluster backup configuration.</p>
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -536,6 +551,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Provides the definitions for the cluster components.</p>
 </td>
 </tr>
@@ -565,6 +581,20 @@ where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.sp
 <code>&#123;&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306&#125;</code>, and <code>$(SVC_PORT_mysql)</code> in the
 connection credential value is 3306.</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologies</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">
+[]ClusterTopology
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topologies represents the different topologies within the cluster.</p>
 </td>
 </tr>
 </table>
@@ -748,6 +778,19 @@ string
 </tr>
 <tr>
 <td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the service provisioned by the component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>classDefRef</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClassDefRef">
@@ -917,49 +960,16 @@ TLSConfig
 </tr>
 <tr>
 <td>
-<code>rsmTransformPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
-RsmTransformPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy generate sts using rsm.</p>
-<ul>
-<li>ToSts: rsm transform to statefulSet</li>
-<li>ToPod: rsm transform to pods</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodes</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
-[]k8s.io/apimachinery/pkg/types.NodeName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the list of nodes that pods can schedule
-If the RsmTransformPolicy is specified as OneToMul,the list of nodes will be used. If the list of nodes is empty,
-no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
-across the nodes in the list.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>instances</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the list of instance to be deleted priorly</p>
+<p>Overrides values in default Template.</p>
 </td>
 </tr>
 </table>
@@ -1167,7 +1177,8 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the version of the well-known service that the component provides.
-This field is immutable.</p>
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+Cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -1604,6 +1615,104 @@ ComponentResourceConstraintSpec
 </td>
 </tr>
 </table>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion
+</h3>
+<div>
+<p>ComponentVersion is the Schema for the componentversions API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1alpha1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ComponentVersion</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">
+ComponentVersionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>compatibilityRules</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">
+[]ComponentVersionCompatibilityRule
+</a>
+</em>
+</td>
+<td>
+<p>CompatibilityRules defines compatibility rules between sets of component definitions and releases.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>releases</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionRelease">
+[]ComponentVersionRelease
+</a>
+</em>
+</td>
+<td>
+<p>Releases represents different releases of component instances within this ComponentVersion.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">
+ComponentVersionStatus
+</a>
+</em>
+</td>
+<td>
 </td>
 </tr>
 </tbody>
@@ -2192,6 +2301,20 @@ bool
 <em>(Optional)</em>
 <p>Defines the action to cancel the <code>Pending/Creating/Running</code> opsRequest, supported types: <code>VerticalScaling/HorizontalScaling</code>.
 Once set to true, this opsRequest will be canceled and modifying this property again will not take effect.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>force</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates if pre-checks should be bypassed, allowing the opsRequest to execute immediately. If set to true, pre-checks are skipped except for &lsquo;Start&rsquo; type.
+Particularly useful when concurrent execution of VerticalScaling and HorizontalScaling opsRequests is required,
+achievable through the use of the Force flag.</p>
 </td>
 </tr>
 <tr>
@@ -4311,6 +4434,21 @@ If both componentDefRef and componentDef are provided, the componentDef will tak
 </tr>
 <tr>
 <td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the service provisioned by the component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If not explicitly specified, the version defined in the referenced topology will be used.
+If no version is specified in the topology, the latest available version will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>classDefRef</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClassDefRef">
@@ -4538,46 +4676,22 @@ UserResourceRefs
 </tr>
 <tr>
 <td>
-<code>rsmTransformPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
-RsmTransformPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy to generate sts using rsm.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodes</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
-[]k8s.io/apimachinery/pkg/types.NodeName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the list of nodes that pods can schedule.
-If the RsmTransformPolicy is specified as ToPod, the list of nodes will be used. If the list of nodes is empty,
-no specific node will be assigned. However, if the list of nodes is filled, all pods will be evenly scheduled
-across the nodes in the list.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>instances</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the list of instances to be deleted priorly.
-If the RsmTransformPolicy is specified as ToPod, the list of instances will be used.</p>
+<p>Overrides values in default Template.</p>
+<p>Instance is the fundamental unit managed by KubeBlocks.
+It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+A component manages instances with a total count of Replicas,
+and by default, all these instances are generated from the same template.
+The InstanceTemplate provides a way to override values in the default template,
+allowing the component to manage instances from different templates.</p>
 </td>
 </tr>
 </tbody>
@@ -5083,6 +5197,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Provides the definitions for the cluster components.</p>
 </td>
 </tr>
@@ -5114,6 +5229,20 @@ connection credential value is 3306.</li>
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>topologies</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">
+[]ClusterTopology
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topologies represents the different topologies within the cluster.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus
@@ -5132,6 +5261,18 @@ connection credential value is 3306.</li>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the most recent generation observed for this ClusterDefinition.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>phase</code><br/>
@@ -5160,14 +5301,26 @@ string
 </tr>
 <tr>
 <td>
-<code>observedGeneration</code><br/>
+<code>topologies</code><br/>
 <em>
-int64
+string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the most recent generation observed for this ClusterDefinition.</p>
+<p>Topologies this ClusterDefinition supported.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceRefs</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The service references declared by this ClusterDefinition.</p>
 </td>
 </tr>
 </tbody>
@@ -5534,6 +5687,19 @@ string
 </tr>
 <tr>
 <td>
+<code>topology</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topology specifies the topology to use for the cluster. If not specified, the default topology will be used.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>terminationPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.TerminationPolicyType">
@@ -5621,6 +5787,20 @@ Affinity
 <td>
 <em>(Optional)</em>
 <p>Attached to tolerate any taint that matches the triple <code>key,value,effect</code> using the matching operator <code>operator</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backup</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
+ClusterBackup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Cluster backup configuration.</p>
 </td>
 </tr>
 <tr>
@@ -5720,20 +5900,6 @@ ClusterNetwork
 <td>
 <em>(Optional)</em>
 <p>The configuration of network.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>backup</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
-ClusterBackup
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Cluster backup configuration.</p>
 </td>
 </tr>
 </tbody>
@@ -5894,6 +6060,175 @@ SwitchPolicyType
 <td>
 <em>(Optional)</em>
 <p>Type specifies the type of switch policy to be applied.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopology">ClusterTopology
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionSpec">ClusterDefinitionSpec</a>)
+</p>
+<div>
+<p>ClusterTopology represents the definition for a specific cluster topology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the unique identifier for the cluster topology.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopologyComponent">
+[]ClusterTopologyComponent
+</a>
+</em>
+</td>
+<td>
+<p>Components specifies the components in the topology.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>orders</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopologyOrders">
+ClusterTopologyOrders
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Orders defines the orders of components within the topology.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>default</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Default indicates whether this topology is the default configuration.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopologyComponent">ClusterTopologyComponent
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">ClusterTopology</a>)
+</p>
+<div>
+<p>ClusterTopologyComponent defines a component within a cluster topology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name defines the name of the component.
+This name is also part of Service DNS name, following IANA Service Naming rules.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>CompDef specifies the component definition to use, either as a specific name or a name prefix.
+Cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopologyOrders">ClusterTopologyOrders
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">ClusterTopology</a>)
+</p>
+<div>
+<p>ClusterTopologyOrders defines the orders for components within a topology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>startupOrder</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>StartupOrder defines the order in which components should be started in the cluster.
+Components with the same order can be listed together, separated by commas.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shutdownOrder</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ShutdownOrder defines the order in which components should be shut down in the cluster.
+Components with the same order can be listed together, separated by commas.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateOrder</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdateOrder defines the order in which components should be updated in the cluster.
+Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
 </tbody>
@@ -6736,7 +7071,8 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the version of the well-known service that the component provides.
-This field is immutable.</p>
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+Cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -7748,6 +8084,19 @@ string
 </tr>
 <tr>
 <td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the service provisioned by the component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>classDefRef</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClassDefRef">
@@ -7917,49 +8266,16 @@ TLSConfig
 </tr>
 <tr>
 <td>
-<code>rsmTransformPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
-RsmTransformPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy generate sts using rsm.</p>
-<ul>
-<li>ToSts: rsm transform to statefulSet</li>
-<li>ToPod: rsm transform to pods</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodes</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
-[]k8s.io/apimachinery/pkg/types.NodeName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the list of nodes that pods can schedule
-If the RsmTransformPolicy is specified as OneToMul,the list of nodes will be used. If the list of nodes is empty,
-no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
-across the nodes in the list.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>instances</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the list of instance to be deleted priorly</p>
+<p>Overrides values in default Template.</p>
 </td>
 </tr>
 </tbody>
@@ -8294,6 +8610,232 @@ string
 <td><p>FromServiceRef refers to a service within the same namespace as the object.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">ComponentVersionCompatibilityRule
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">ComponentVersionSpec</a>)
+</p>
+<div>
+<p>ComponentVersionCompatibilityRule defines the compatibility between a set of component definitions and a set of releases.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>compDefs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>CompDefs specifies names for the component definitions associated with this ComponentVersion.
+Each name in the list can represent an exact name, or a name prefix.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
+<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>releases</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Releases is a list of identifiers for the releases.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionRelease">ComponentVersionRelease
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">ComponentVersionSpec</a>)
+</p>
+<div>
+<p>ComponentVersionRelease represents a release of component instances within a ComponentVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is a unique identifier for this release.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>changes</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Changes provides information about the changes made in this release.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ServiceVersion defines the version of the well-known service that the component provides.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>images</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<p>Images define the new images for different containers within the release.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">ComponentVersionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion</a>)
+</p>
+<div>
+<p>ComponentVersionSpec defines the desired state of ComponentVersion</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>compatibilityRules</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">
+[]ComponentVersionCompatibilityRule
+</a>
+</em>
+</td>
+<td>
+<p>CompatibilityRules defines compatibility rules between sets of component definitions and releases.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>releases</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionRelease">
+[]ComponentVersionRelease
+</a>
+</em>
+</td>
+<td>
+<p>Releases represents different releases of component instances within this ComponentVersion.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">ComponentVersionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion</a>)
+</p>
+<div>
+<p>ComponentVersionStatus defines the observed state of ComponentVersion</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ObservedGeneration is the most recent generation observed for this ComponentVersion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Phase valid values are `<code>,</code>Available<code>, 'Unavailable</code>.
+Available is ComponentVersion become available, and can be used for co-related objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Extra message for current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersions</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersions represent the supported service versions of this ComponentVersion.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentVolume">ComponentVolume
 </h3>
@@ -10736,43 +11278,6 @@ int32
 <p>Specifies the number of replicas for the workloads.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>nodes</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
-[]k8s.io/apimachinery/pkg/types.NodeName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the list of nodes where pods can be scheduled during a scale-up operation.
-If the RsmTransformPolicy is set to ToPod and the expected number of replicas is greater than the current number,
-the list of Nodes will be used. If the list of Nodes is empty, pods will not be assigned to any specific node.
-However, if the list of Nodes is populated, pods will be evenly distributed across the nodes in the list during scale-up.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>instances</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the names of instances that the rsm should prioritize for scale-down operations.
-If the RsmTransformPolicy is set to ToPod and the expected number of replicas is less than the current number,
-the list of Instances will be used.</p>
-<ul>
-<li><code>current replicas - expected replicas &gt; len(Instances)</code>: Scale down from the list of Instances priorly, the others
-will select from NodeAssignment.</li>
-<li><code>current replicas - expected replicas &lt; len(Instances)</code>: Scale down from the list of Instances.</li>
-<li><code>current replicas - expected replicas &lt; len(Instances)</code>: Scale down from a part of Instances.</li>
-</ul>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork
@@ -10889,6 +11394,207 @@ string
 <td>
 <em>(Optional)</em>
 <p>A string that describes the name of the ini section.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+<p>InstanceTemplate defines values to override in pod template.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Number of replicas of this template.
+Default is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the name of the instance.
+Only applied when Replicas is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>generateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>GenerateName is an optional prefix, used by the server, to generate a unique
+name ONLY IF the Name field has not been provided.
+If this field is used, the name returned to the client will be different
+than the name passed. This value will also be combined with a unique suffix.
+The provided value has the same validation rules as the Name field,
+and may be truncated by the length of the suffix required to make the value
+unique on the server.</p>
+<p>Applied only if Name is not specified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines annotations to override.
+Add new or override existing annotations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines labels to override.
+Add new or override existing labels.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines image to override.
+Will override the first container&rsquo;s image of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines NodeName to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSelector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines NodeSelector to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tolerations</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
+[]Kubernetes core/v1.Toleration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Tolerations to override.
+Add new or override existing tolerations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Resources to override.
+Will override the first container&rsquo;s resources of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Volumes to override.
+Add new or override existing volumes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMounts</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
+[]Kubernetes core/v1.VolumeMount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeMounts to override.
+Add new or override existing volume mounts of the first container in the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeClaimTemplates to override.
+Add new or override existing volume claim templates.</p>
 </td>
 </tr>
 </tbody>
@@ -11031,7 +11737,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LastConfiguration">LastConfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LastConfiguration">LastConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.OverrideBy">OverrideBy</a>)
 </p>
 <div>
 </div>
@@ -11973,6 +12679,17 @@ bool
 <p>indicates whether the current opsRequest is in the queue</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>queueBySelf</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>indicates that the operation is queued for execution within its own-type scope.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsRequestBehaviour">OpsRequestBehaviour
@@ -12100,6 +12817,21 @@ WorkloadType
 </tr>
 <tr>
 <td>
+<code>overrideBy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OverrideBy">
+OverrideBy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes the configuration covered by the latest OpsRequest of the same kind.
+when reconciling, this information will be used as a benchmark rather than the &lsquo;spec&rsquo;, such as &lsquo;Spec.HorizontalScaling&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>reason</code><br/>
 <em>
 string
@@ -12162,6 +12894,20 @@ bool
 <em>(Optional)</em>
 <p>Defines the action to cancel the <code>Pending/Creating/Running</code> opsRequest, supported types: <code>VerticalScaling/HorizontalScaling</code>.
 Once set to true, this opsRequest will be canceled and modifying this property again will not take effect.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>force</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates if pre-checks should be bypassed, allowing the opsRequest to execute immediately. If set to true, pre-checks are skipped except for &lsquo;Start&rsquo; type.
+Particularly useful when concurrent execution of VerticalScaling and HorizontalScaling opsRequests is required,
+achievable through the use of the Force flag.</p>
 </td>
 </tr>
 <tr>
@@ -12966,6 +13712,50 @@ Kubernetes core/v1.PodSpec
 <td></td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.OverrideBy">OverrideBy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">OpsRequestComponentStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>opsName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the opsRequest name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>LastComponentConfiguration</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">
+LastComponentConfiguration
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>LastComponentConfiguration</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Parameter">Parameter
 </h3>
 <p>
@@ -13329,7 +14119,7 @@ Kubernetes core/v1.PersistentVolumeMode
 <h3 id="apps.kubeblocks.io/v1alpha1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterVersionStatus">ClusterVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionStatus">OpsDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterVersionStatus">ClusterVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionStatus">OpsDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
 </p>
 <div>
 <p>Phase represents the current status of the ClusterDefinition and ClusterVersion CR.</p>
@@ -18908,6 +19698,26 @@ Kubernetes core/v1.PodTemplateSpec
 </tr>
 <tr>
 <td>
+<code>instances</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides values in default Template.</p>
+<p>Instance is the fundamental unit managed by KubeBlocks.
+It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+A RSM manages instances with a total count of Replicas,
+and by default, all these instances are generated from the same template.
+The InstanceTemplate provides a way to override values in the default template,
+allowing the RSM to manage instances from different templates.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeClaimTemplates</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
@@ -19046,36 +19856,6 @@ Credential
 <td>
 <em>(Optional)</em>
 <p>Credential used to connect to DB engine</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>rsmTransformPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
-RsmTransformPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy to generate sts using rsm. Passed from cluster.
-ToSts: rsm transform to statefulSet
-ToPod: rsm transform to pod</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeAssignment</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.NodeAssignment">
-[]NodeAssignment
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the expected assignment of nodes.</p>
 </td>
 </tr>
 </table>
@@ -19263,6 +20043,206 @@ Kubernetes core/v1.EnvVarSource
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Number of replicas of this template.
+Default is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the name of the instance.
+Only applied when Replicas is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>generateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>GenerateName is an optional prefix, used by the server, to generate a unique
+name ONLY IF the Name field has not been provided.
+If this field is used, the name returned to the client will be different
+than the name passed. This value will also be combined with a unique suffix.
+The provided value has the same validation rules as the Name field,
+and may be truncated by the length of the suffix required to make the value
+unique on the server.</p>
+<p>Applied only if Name is not specified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines annotations to override.
+Add new or override existing annotations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines labels to override.
+Add new or override existing labels.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines image to override.
+Will override the first container&rsquo;s image of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines NodeName to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSelector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines NodeSelector to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tolerations</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
+[]Kubernetes core/v1.Toleration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Tolerations to override.
+Add new or override existing tolerations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Resources to override.
+Will override the first container&rsquo;s resources of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Volumes to override.
+Add new or override existing volumes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMounts</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
+[]Kubernetes core/v1.VolumeMount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeMounts to override.
+Add new or override existing volume mounts of the first container in the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeClaimTemplates to override.
+Add new or override existing volume claim templates.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus
 </h3>
 <p>
@@ -19299,7 +20279,20 @@ ReplicaRole
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Defines the role of the replica in the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ready</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Whether the corresponding Pod is in ready condition.</p>
 </td>
 </tr>
 <tr>
@@ -19433,80 +20426,6 @@ Action
 <em>(Optional)</em>
 <p>Defines the action to inform the cluster that the new member can join voting now.
 If the Image is not configured, the Image from the previous non-nil action will be used.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1alpha1.NodeAssignment">NodeAssignment
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the identifier for the statefulSet requiring node allocation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeSpec</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.NodeSpec">
-NodeSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides comprehensive details of the node to be assigned to the statefulSet.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1alpha1.NodeSpec">NodeSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.NodeAssignment">NodeAssignment</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>nodeName</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#NodeName">
-k8s.io/apimachinery/pkg/types.NodeName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the name of the node. This is a unique identifier within the cluster and is used to identify the specific node for scheduling, reporting, and other tasks.</p>
 </td>
 </tr>
 </tbody>
@@ -19693,6 +20612,26 @@ Kubernetes core/v1.PodTemplateSpec
 </tr>
 <tr>
 <td>
+<code>instances</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides values in default Template.</p>
+<p>Instance is the fundamental unit managed by KubeBlocks.
+It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+A RSM manages instances with a total count of Replicas,
+and by default, all these instances are generated from the same template.
+The InstanceTemplate provides a way to override values in the default template,
+allowing the RSM to manage instances from different templates.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeClaimTemplates</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
@@ -19833,36 +20772,6 @@ Credential
 <p>Credential used to connect to DB engine</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>rsmTransformPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">
-RsmTransformPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy to generate sts using rsm. Passed from cluster.
-ToSts: rsm transform to statefulSet
-ToPod: rsm transform to pod</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeAssignment</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.NodeAssignment">
-[]NodeAssignment
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the expected assignment of nodes.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineStatus">ReplicatedStateMachineStatus
@@ -19945,6 +20854,32 @@ int64
 <td>
 <em>(Optional)</em>
 <p>Provides the status of each member in the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>currentRevisions, if not empty, indicates the old version of the RSM used to generate Pods.
+key is the pod name, value is the revision.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>updateRevisions, if not empty, indicates the new version of the RSM used to generate Pods.
+key is the pod name, value is the revision.</p>
 </td>
 </tr>
 </tbody>
@@ -20095,28 +21030,6 @@ RoleUpdateMechanism
 <tbody><tr><td><p>&#34;DirectAPIServerEventUpdate&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;ReadinessProbeEventUpdate&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1alpha1.RsmTransformPolicy">RsmTransformPolicy
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
-</p>
-<div>
-<p>RsmTransformPolicy defines rsm transform type
-ToSts and ToPod is supported</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;ToPod&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;ToSts&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

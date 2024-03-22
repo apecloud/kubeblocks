@@ -62,6 +62,12 @@ type OpsBehaviour struct {
 	// IsClusterCreation indicates whether the opsRequest will create a new cluster.
 	IsClusterCreation bool
 
+	// QueueByCluster indicates that the operation is queued for execution within the cluster-wide scope.
+	QueueByCluster bool
+
+	// QueueWithSelf indicates that the operation is queued for execution within opsType scope.
+	QueueBySelf bool
+
 	OpsHandler OpsHandler
 }
 

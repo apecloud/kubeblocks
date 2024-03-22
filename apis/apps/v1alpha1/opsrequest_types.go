@@ -20,7 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -38,6 +37,13 @@ type OpsRequestSpec struct {
 	// Once set to true, this opsRequest will be canceled and modifying this property again will not take effect.
 	// +optional
 	Cancel bool `json:"cancel,omitempty"`
+
+	// Indicates if pre-checks should be bypassed, allowing the opsRequest to execute immediately. If set to true, pre-checks are skipped except for 'Start' type.
+	// Particularly useful when concurrent execution of VerticalScaling and HorizontalScaling opsRequests is required,
+	// achievable through the use of the Force flag.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.force"
+	// +optional
+	Force bool `json:"force,omitempty"`
 
 	// Defines the operation type.
 	// +kubebuilder:validation:Required
@@ -119,7 +125,6 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.expose"
 	ExposeList []Expose `json:"expose,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Cluster RestoreFrom backup or point in time.
@@ -230,25 +235,6 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
-
-	// Defines the list of nodes where pods can be scheduled during a scale-up operation.
-	// If the RsmTransformPolicy is set to ToPod and the expected number of replicas is greater than the current number,
-	// the list of Nodes will be used. If the list of Nodes is empty, pods will not be assigned to any specific node.
-	// However, if the list of Nodes is populated, pods will be evenly distributed across the nodes in the list during scale-up.
-	// +optional
-	Nodes []types.NodeName `json:"nodes,omitempty"`
-
-	// Defines the names of instances that the rsm should prioritize for scale-down operations.
-	// If the RsmTransformPolicy is set to ToPod and the expected number of replicas is less than the current number,
-	// the list of Instances will be used.
-	//
-	// - `current replicas - expected replicas > len(Instances)`: Scale down from the list of Instances priorly, the others
-	//	 will select from NodeAssignment.
-	// - `current replicas - expected replicas < len(Instances)`: Scale down from the list of Instances.
-	// - `current replicas - expected replicas < len(Instances)`: Scale down from a part of Instances.
-	//
-	// +optional
-	Instances []string `json:"instances,omitempty"`
 }
 
 // Reconfigure represents the variables required for updating a configuration.
@@ -786,6 +772,11 @@ type OpsRequestComponentStatus struct {
 	// +optional
 	WorkloadType WorkloadType `json:"workloadType,omitempty"`
 
+	// Describes the configuration covered by the latest OpsRequest of the same kind.
+	// when reconciling, this information will be used as a benchmark rather than the 'spec', such as 'Spec.HorizontalScaling'.
+	// +optional
+	OverrideBy *OverrideBy `json:"overrideBy,omitempty"`
+
 	// Describes the reason for the component phase.
 	// +kubebuilder:validation:MaxLength=1024
 	// +optional
@@ -795,6 +786,14 @@ type OpsRequestComponentStatus struct {
 	// +kubebuilder:validation:MaxLength=32768
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+}
+
+type OverrideBy struct {
+	// Indicates the opsRequest name.
+	// +optional
+	OpsName string `json:"opsName"`
+
+	LastComponentConfiguration `json:",inline"`
 }
 
 type PreCheckResult struct {

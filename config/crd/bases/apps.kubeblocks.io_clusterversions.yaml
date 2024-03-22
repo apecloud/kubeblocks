@@ -31,6 +31,8 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
+    deprecated: true
+    deprecationWarning: The ClusterVersion CRD has been deprecated since 0.9.0
     name: v1alpha1
     schema:
       openAPIV3Schema:

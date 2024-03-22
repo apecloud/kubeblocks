@@ -144,7 +144,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("create horizontalScaling operation to test the progressDetails when scaling down the replicas")
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 2)
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp) // appsv1alpha1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 

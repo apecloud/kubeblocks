@@ -43,7 +43,8 @@ var _ OpsHandler = ExposeOpsHandler{}
 func init() {
 	// ToClusterPhase is not defined, because 'expose' does not affect the cluster status.
 	exposeBehavior := OpsBehaviour{
-		OpsHandler: ExposeOpsHandler{},
+		OpsHandler:  ExposeOpsHandler{},
+		QueueBySelf: true,
 	}
 
 	opsMgr := GetOpsManager()
@@ -55,7 +56,6 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 		exposeMap = opsRes.OpsRequest.Spec.ToExposeListToMap()
 	)
 	reqCtx.Log.Info("cluster service before action", "clusterService", opsRes.Cluster.Spec.Services)
-
 	compMap := make(map[string]appsv1alpha1.ClusterComponentSpec)
 	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
 		compMap[comp.Name] = comp
@@ -98,7 +98,6 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		oldOpsRequestStatus = opsRequest.Status.DeepCopy()
 		opsRequestPhase     = appsv1alpha1.OpsRunningPhase
 	)
-
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 
 	// update component status
@@ -376,6 +375,14 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 					return clusterCompDef.ConsensusSpec.Leader.Name, nil
 				}
 				return constant.Leader, nil
+			case appsv1alpha1.Stateful:
+				if clusterCompDef.RSMSpec != nil {
+					for _, role := range clusterCompDef.RSMSpec.Roles {
+						if role.IsLeader {
+							return role.Name, nil
+						}
+					}
+				}
 			}
 		}
 		return "", nil

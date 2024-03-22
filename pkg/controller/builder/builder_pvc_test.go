@@ -63,5 +63,22 @@ var _ = Describe("pvc builder", func() {
 		Expect(*pvc.Spec.StorageClassName).Should(Equal(sc))
 		Expect(pvc.Spec.DataSource).ShouldNot(BeNil())
 		Expect(*pvc.Spec.DataSource).Should(Equal(dataSource))
+
+		spec := corev1.PersistentVolumeClaimSpec{
+			Resources:        resources,
+			AccessModes:      accessModes,
+			StorageClassName: &sc,
+			DataSource:       &dataSource,
+		}
+
+		pvc = NewPVCBuilder(ns, name).SetSpec(spec).GetObject()
+		Expect(pvc.Name).Should(Equal(name))
+		Expect(pvc.Namespace).Should(Equal(ns))
+		Expect(pvc.Spec.Resources).Should(Equal(resources))
+		Expect(pvc.Spec.AccessModes).Should(Equal(accessModes))
+		Expect(pvc.Spec.StorageClassName).ShouldNot(BeNil())
+		Expect(*pvc.Spec.StorageClassName).Should(Equal(sc))
+		Expect(pvc.Spec.DataSource).ShouldNot(BeNil())
+		Expect(*pvc.Spec.DataSource).Should(Equal(dataSource))
 	})
 })

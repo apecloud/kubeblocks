@@ -43,6 +43,11 @@ func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory
 	return f
 }
 
+func (factory *MockClusterFactory) SetTopology(topology string) *MockClusterFactory {
+	factory.Get().Spec.Topology = topology
+	return factory
+}
+
 func (factory *MockClusterFactory) SetTerminationPolicy(policyType appsv1alpha1.TerminationPolicyType) *MockClusterFactory {
 	factory.Get().Spec.TerminationPolicy = policyType
 	return factory
@@ -109,6 +114,19 @@ func (factory *MockClusterFactory) AddComponentV2(compName string, compDefName s
 	return factory
 }
 
+func (factory *MockClusterFactory) AddMultipleTemplateComponent(compName string, compDefName string) *MockClusterFactory {
+	comp := appsv1alpha1.ClusterComponentSpec{
+		Name:         compName,
+		ComponentDef: compDefName,
+		Instances: []appsv1alpha1.InstanceTemplate{{
+			Replicas: func() *int32 { replicas := int32(1); return &replicas }(),
+			Name:     func() *string { name := "foo"; return &name }(),
+		}},
+	}
+	factory.Get().Spec.ComponentSpecs = append(factory.Get().Spec.ComponentSpecs, comp)
+	return factory
+}
+
 func (factory *MockClusterFactory) AddService(service appsv1alpha1.ClusterService) *MockClusterFactory {
 	services := factory.Get().Spec.Services
 	if len(services) == 0 {
@@ -150,6 +168,12 @@ func (factory *MockClusterFactory) SetShards(shards int32) *MockClusterFactory {
 func (factory *MockClusterFactory) SetCompDef(compDef string) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
 		comp.ComponentDef = compDef
+	})
+}
+
+func (factory *MockClusterFactory) SetServiceVersion(serviceVersion string) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.ServiceVersion = serviceVersion
 	})
 }
 

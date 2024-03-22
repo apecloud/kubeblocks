@@ -58,6 +58,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/metrics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -125,7 +126,7 @@ func init() {
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
-	viper.SetDefault(rsm.FeatureGateRSMToPod, true)
+	viper.SetDefault(rsm2.FeatureGateRSMReplicaProvider, string(rsm2.PodProvider))
 	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 }
@@ -368,6 +369,15 @@ func main() {
 			os.Exit(1)
 		}
 
+		if err = (&appscontrollers.ComponentVersionReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("component-version-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ComponentVersion")
+			os.Exit(1)
+		}
+
 		if err = (&appscontrollers.OpsDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -508,6 +518,11 @@ func main() {
 
 		if err = (&appsv1alpha1.ComponentDefinition{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentDefinition")
+			os.Exit(1)
+		}
+
+		if err = (&appsv1alpha1.ComponentVersion{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentVersion")
 			os.Exit(1)
 		}
 

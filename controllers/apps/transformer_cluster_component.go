@@ -182,20 +182,20 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Labels = compProto.Labels
 
 	// merge spec
-	compObjCopy.Spec.Monitor = compProto.Spec.Monitor
+	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
+	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
 	compObjCopy.Spec.ClassDefRef = compProto.Spec.ClassDefRef
-	compObjCopy.Spec.Resources = compProto.Spec.Resources
 	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
+	compObjCopy.Spec.Resources = compProto.Spec.Resources
+	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
 	compObjCopy.Spec.Configs = compProto.Spec.Configs
+	compObjCopy.Spec.Monitor = compProto.Spec.Monitor
 	compObjCopy.Spec.EnabledLogs = compProto.Spec.EnabledLogs
-	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
 	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
-	compObjCopy.Spec.Nodes = compProto.Spec.Nodes
-	compObjCopy.Spec.Instances = compProto.Spec.Instances
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&

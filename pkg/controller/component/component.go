@@ -59,43 +59,42 @@ func GetClusterUID(comp *appsv1alpha1.Component) (string, error) {
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
-func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	customLabels, customAnnotations map[string]string) (*appsv1alpha1.Component, error) {
-	compName := FullName(cluster.Name, clusterCompSpec.Name)
-	affinities := BuildAffinity(cluster, clusterCompSpec)
-	tolerations, err := BuildTolerations(cluster, clusterCompSpec)
+func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec,
+	labels, annotations map[string]string) (*appsv1alpha1.Component, error) {
+	compName := FullName(cluster.Name, compSpec.Name)
+	affinities := BuildAffinity(cluster, compSpec)
+	tolerations, err := BuildTolerations(cluster, compSpec)
 	if err != nil {
 		return nil, err
 	}
 	compDefName := func() string {
-		if strings.HasPrefix(clusterCompSpec.ComponentDef, constant.KBGeneratedVirtualCompDefPrefix) {
+		if strings.HasPrefix(compSpec.ComponentDef, constant.KBGeneratedVirtualCompDefPrefix) {
 			return ""
 		}
-		return clusterCompSpec.ComponentDef
+		return compSpec.ComponentDef
 	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, compDefName()).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
-		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
+		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
+		SetServiceVersion(compSpec.ServiceVersion).
 		SetAffinity(affinities).
 		SetTolerations(tolerations).
-		SetReplicas(clusterCompSpec.Replicas).
-		SetResources(clusterCompSpec.Resources).
-		SetMonitor(clusterCompSpec.Monitor).
-		SetServiceAccountName(clusterCompSpec.ServiceAccountName).
-		SetVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates).
-		SetEnabledLogs(clusterCompSpec.EnabledLogs).
-		SetServiceRefs(clusterCompSpec.ServiceRefs).
-		SetClassRef(clusterCompSpec.ClassDefRef).
-		SetTLSConfig(clusterCompSpec.TLS, clusterCompSpec.Issuer).
-		SetNodes(clusterCompSpec.Nodes).
-		SetInstances(clusterCompSpec.Instances).
-		SetTransformPolicy(clusterCompSpec.RsmTransformPolicy)
-	if customLabels != nil {
-		compBuilder.AddLabelsInMap(customLabels)
+		SetReplicas(compSpec.Replicas).
+		SetResources(compSpec.Resources).
+		SetMonitor(compSpec.Monitor).
+		SetServiceAccountName(compSpec.ServiceAccountName).
+		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
+		SetEnabledLogs(compSpec.EnabledLogs).
+		SetServiceRefs(compSpec.ServiceRefs).
+		SetClassRef(compSpec.ClassDefRef).
+		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
+		SetInstances(compSpec.Instances)
+	if labels != nil {
+		compBuilder.AddLabelsInMap(labels)
 	}
-	if customAnnotations != nil {
-		compBuilder.AddAnnotationsInMap(customAnnotations)
+	if annotations != nil {
+		compBuilder.AddAnnotationsInMap(annotations)
 	}
 	return compBuilder.GetObject(), nil
 }

@@ -106,11 +106,20 @@ func (r *OpsRequest) IsComplete(phases ...OpsPhase) bool {
 	return slices.Contains([]OpsPhase{OpsCancelledPhase, OpsSucceedPhase, OpsFailedPhase}, phases[0])
 }
 
+// Force checks if the current opsRequest can be forcibly executed
+func (r *OpsRequest) Force() bool {
+	// ops of type 'Start' do not support force execution.
+	return r.Spec.Force && r.Spec.Type != StartType
+}
+
 // validateClusterPhase validates whether the current cluster state supports the OpsRequest
 func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	opsBehaviour := OpsRequestBehaviourMapper[r.Spec.Type]
 	// if the OpsType has no cluster phases, ignore it
 	if len(opsBehaviour.FromClusterPhases) == 0 {
+		return nil
+	}
+	if r.Force() {
 		return nil
 	}
 	// validate whether existing the same type OpsRequest

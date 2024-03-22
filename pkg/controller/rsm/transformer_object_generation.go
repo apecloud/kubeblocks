@@ -725,7 +725,7 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	generateMemberEnv := func(prefix string) {
 		followers := ""
 		for _, memberStatus := range set.Status.MembersStatus {
-			if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName {
+			if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName || memberStatus.ReplicaRole == nil {
 				continue
 			}
 			switch {

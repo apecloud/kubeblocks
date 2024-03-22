@@ -323,7 +323,7 @@ func getActionName(parent string, generation, ordinal int, actionType string) st
 
 func getLeaderPodName(membersStatus []workloads.MemberStatus) string {
 	for _, memberStatus := range membersStatus {
-		if memberStatus.ReplicaRole.IsLeader {
+		if memberStatus.ReplicaRole != nil && memberStatus.ReplicaRole.IsLeader {
 			return memberStatus.PodName
 		}
 	}
@@ -730,7 +730,7 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 		if status.ReadyWithoutPrimary {
 			return true
 		}
-		if status.ReplicaRole.IsLeader {
+		if status.ReplicaRole != nil && status.ReplicaRole.IsLeader {
 			hasLeader = true
 			break
 		}

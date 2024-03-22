@@ -330,7 +330,7 @@ func abnormalAnalysis(rsm *workloads.ReplicatedStateMachine, action *batchv1.Job
 		if !ok {
 			abnormalPodList = append(abnormalPodList, podName)
 		}
-		if status.ReplicaRole.IsLeader {
+		if status.ReplicaRole != nil && status.ReplicaRole.IsLeader {
 			leaderPodList = append(leaderPodList, podName)
 		}
 	}

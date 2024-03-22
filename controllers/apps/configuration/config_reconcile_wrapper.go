@@ -91,7 +91,7 @@ func (c *configReconcileContext) RSM() *configReconcileContext {
 			// TODO(leon): sts, get -> list, ctx or obj annotation
 			stsKey := client.ObjectKeyFromObject(rsmcore.ConvertRSMToSTS(&rsm))
 			var stsObject appv1.StatefulSet
-			if err = c.Client.Get(c.Context, stsKey, &stsObject, multicluster.InLocalContext()); err != nil {
+			if err = c.Client.Get(c.Context, stsKey, &stsObject, multicluster.InDataContext()); err != nil {
 				return
 			}
 			c.StatefulSets = append(c.StatefulSets, stsObject)

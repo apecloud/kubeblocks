@@ -205,12 +205,12 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		if err := controllerutil.SetOwnerReference(manager.Cluster, cmObj, scheme); err != nil {
 			return err
 		}
-		return cli.Create(ctx, cmObj, multicluster.InLocalContext())
+		return cli.Create(ctx, cmObj, multicluster.InDataContext())
 	}
 	updateConfigCM := func(cm *corev1.ConfigMap, newConfig string) error {
 		patch := client.MergeFrom(cm.DeepCopy())
 		cm.Data[configManagerConfig] = newConfig
-		return cli.Patch(ctx, cm, patch, multicluster.InLocalContext())
+		return cli.Patch(ctx, cm, patch, multicluster.InDataContext())
 	}
 
 	config, err := cfgutil.ToYamlConfig(configInfo)
@@ -222,7 +222,7 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		Namespace: manager.Cluster.GetNamespace(),
 		Name:      fmt.Sprintf("%s%s-%s-config-manager-config", configManagerCMPrefix, manager.Cluster.GetName(), manager.ComponentName),
 	}
-	err = cli.Get(ctx, cmKey, cmObj, multicluster.InLocalContext())
+	err = cli.Get(ctx, cmKey, cmObj, multicluster.InDataContext())
 	switch {
 	default:
 		return err
@@ -357,7 +357,7 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 	if err = cli.Get(ctx, referenceCM, &refCM); err != nil {
 		return err
 	}
-	if err = cli.Get(ctx, scriptCMKey, &sidecarCM, multicluster.InLocalContext()); err != nil {
+	if err = cli.Get(ctx, scriptCMKey, &sidecarCM, multicluster.InDataContext()); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -376,7 +376,7 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 		if err := controllerutil.SetOwnerReference(cluster, &sidecarCM, scheme); err != nil {
 			return err
 		}
-		if err := cli.Create(ctx, &sidecarCM, multicluster.InLocalContext()); err != nil {
+		if err := cli.Create(ctx, &sidecarCM, multicluster.InDataContext()); err != nil {
 			return err
 		}
 	}

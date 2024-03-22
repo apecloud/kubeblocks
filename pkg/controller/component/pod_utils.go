@@ -97,7 +97,7 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 	}
 	updateRevisions := strings.Split(sts.Status.UpdateRevision, ",")
 
-	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels, multicluster.InLocalContext())
+	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels, multicluster.InDataContext())
 	if err != nil {
 		return false, err
 	}

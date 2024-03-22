@@ -102,8 +102,8 @@ func placement(obj client.Object) string {
 	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
 }
 
-func inLocalContext() model.GraphOption {
-	return model.WithClientOption(multicluster.InLocalContext())
+func inDataContext() model.GraphOption {
+	return model.WithClientOption(multicluster.InDataContext())
 }
 
 func inUniversalContext() model.GraphOption {
@@ -118,5 +118,5 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 		}
 		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
 	}
-	return multicluster.InGlobalContext()
+	return multicluster.InControlContext()
 }

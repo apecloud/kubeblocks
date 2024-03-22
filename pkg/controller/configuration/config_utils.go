@@ -44,7 +44,7 @@ import (
 
 func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object) error {
 	for _, obj := range objs {
-		if err := cli.Create(ctx, obj, multicluster.InLocalContext()); err != nil {
+		if err := cli.Create(ctx, obj, multicluster.InDataContext()); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				return err
 			}
@@ -52,7 +52,7 @@ func createConfigObjects(cli client.Client, ctx context.Context, objs []client.O
 			if core.IsSchedulableConfigResource(obj) {
 				continue
 			}
-			if err := cli.Update(ctx, obj, multicluster.InLocalContext()); err != nil {
+			if err := cli.Update(ctx, obj, multicluster.InDataContext()); err != nil {
 				return err
 			}
 		}

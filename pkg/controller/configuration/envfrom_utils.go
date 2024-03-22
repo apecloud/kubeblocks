@@ -121,7 +121,7 @@ func fetchConfigmap(localObjs []client.Object, cmName, namespace string, cli cli
 	if localObject != nil {
 		return localObject.(*corev1.ConfigMap), nil
 	}
-	if err := cli.Get(ctx, cmKey, cmObj, multicluster.InLocalContext()); err != nil {
+	if err := cli.Get(ctx, cmKey, cmObj, multicluster.InDataContext()); err != nil {
 		return nil, err
 	}
 	return cmObj, nil
@@ -133,7 +133,7 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 		Namespace: originKey.Namespace,
 	}
 	cm := &corev1.ConfigMap{}
-	err := cli.Get(ctx, cmKey, cm, multicluster.InLocalContext())
+	err := cli.Get(ctx, cmKey, cm, multicluster.InDataContext())
 	if err == nil {
 		return cm, nil
 	}
@@ -147,7 +147,7 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 	if err := intctrlutil.SetOwnerReference(cluster, cm); err != nil {
 		return nil, err
 	}
-	return cm, cli.Create(ctx, cm, multicluster.InLocalContext())
+	return cm, cli.Create(ctx, cm, multicluster.InDataContext())
 }
 
 func CheckEnvFrom(container *corev1.Container, cmName string) bool {

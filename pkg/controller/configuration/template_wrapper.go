@@ -83,7 +83,7 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 		}
 	}
 
-	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj, multicluster.InLocalContext())
+	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj, multicluster.InDataContext())
 	if cmErr != nil && !apierrors.IsNotFound(cmErr) {
 		// An unexpected error occurs
 		return nil, cmErr

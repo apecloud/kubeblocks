@@ -208,7 +208,7 @@ func updateComponentInfoToPods(
 	}
 	// list all pods in cache
 	podList := corev1.PodList{}
-	if err := cli.List(ctx, &podList, client.InNamespace(cluster.Namespace), ml, multicluster.InLocalContext()); err != nil {
+	if err := cli.List(ctx, &podList, client.InNamespace(cluster.Namespace), ml, multicluster.InDataContext()); err != nil {
 		return err
 	}
 	// list all pods in dag
@@ -241,7 +241,7 @@ func updateComponentInfoToPods(
 		}
 		// pod not in dag, add a new vertex
 		updateAnnotation(pod)
-		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil, inLocalContext())
+		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil, inDataContext())
 	}
 	return nil
 }
@@ -262,7 +262,7 @@ func updateCustomLabelsAndAnnotationsToPods(ctx context.Context,
 	// list all pods in cache
 	podList := &corev1.PodList{}
 	matchLabels := constant.GetComponentWellKnownLabels(cluster.Name, synthesizedComp.Name)
-	if err := getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels), multicluster.InLocalContext()); err != nil {
+	if err := getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels), multicluster.InDataContext()); err != nil {
 		return err
 	}
 	for i := range podList.Items {
@@ -278,7 +278,7 @@ func updateCustomLabelsAndAnnotationsToPods(ctx context.Context,
 
 		pod := &podList.Items[i]
 		updateObjLabelsAndAnnotations(pod, synthesizedComp.Labels, synthesizedComp.Annotations)
-		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil, inLocalContext())
+		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil, inDataContext())
 	}
 	return nil
 }

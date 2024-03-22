@@ -132,7 +132,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 
 	// get the component's underlying pods
 	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), multicluster.InLocalContext())
+		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), multicluster.InDataContext())
 	if err != nil {
 		return err
 	}
@@ -323,7 +323,7 @@ func (r *componentStatusHandler) isAllConfigSynced() (bool, error) {
 			Namespace: r.cluster.Namespace,
 			Name:      cfgcore.GetComponentCfgName(r.cluster.Name, r.synthesizeComp.Name, configSpec.Name),
 		}
-		if err := r.cli.Get(r.reqCtx.Ctx, cmKey, cmObj, multicluster.InLocalContext()); err != nil {
+		if err := r.cli.Get(r.reqCtx.Ctx, cmKey, cmObj, multicluster.InDataContext()); err != nil {
 			return false, err
 		}
 		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != appsv1alpha1.CFinishedPhase {
@@ -398,7 +398,7 @@ func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx
 	rsmObj *workloads.ReplicatedStateMachine) ([]*corev1.PersistentVolumeClaim, error) {
 	labels := constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name)
 	pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
-		generics.PersistentVolumeClaimSignature, r.cluster.Namespace, labels, multicluster.InLocalContext())
+		generics.PersistentVolumeClaimSignature, r.cluster.Namespace, labels, multicluster.InDataContext())
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
@@ -506,7 +506,7 @@ func (r *componentStatusHandler) updatePrimaryIndex() error {
 		return nil
 	}
 	podList, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), multicluster.InLocalContext())
+		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), multicluster.InDataContext())
 	if err != nil {
 		return err
 	}
@@ -551,7 +551,7 @@ func (r *componentStatusHandler) updatePrimaryIndex() error {
 		if !ok || pi != primaryPodName {
 			origPod := pod.DeepCopy()
 			pod.Annotations[constant.PrimaryAnnotationKey] = primaryPodName
-			graphCli.Do(r.dag, origPod, pod, model.ActionUpdatePtr(), nil, inLocalContext())
+			graphCli.Do(r.dag, origPod, pod, model.ActionUpdatePtr(), nil, inDataContext())
 		}
 	}
 	return nil

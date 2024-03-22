@@ -21,6 +21,12 @@ package multicluster
 
 import (
 	"context"
+	"strings"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func IntoContext(ctx context.Context, placement string) context.Context {
@@ -40,4 +46,43 @@ type placementNotFoundError struct{}
 
 func (placementNotFoundError) Error() string {
 	return "no placement was present"
+}
+
+func fromContextNObject(ctx context.Context, obj client.Object) []string {
+	p1, p2 := fromContext(ctx), fromObject(obj)
+	switch {
+	case p1 == nil:
+		return p2
+	case p2 == nil:
+		return p1
+	default:
+		s1, s2 := sets.New(p1...), sets.New(p2...)
+		// if !s1.IsSuperset(s2) {
+		//	panic("runtime error")
+		// }
+		// return p2
+		return sets.List(s1.Intersection(s2))
+	}
+}
+
+func fromContext(ctx context.Context) []string {
+	if ctx == nil {
+		return nil
+	}
+	p, err := FromContext(ctx)
+	if err != nil {
+		return nil
+	}
+	return strings.Split(p, ",")
+}
+
+func fromObject(obj client.Object) []string {
+	if obj == nil || obj.GetAnnotations() == nil {
+		return nil
+	}
+	p, ok := obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
+	if !ok {
+		return nil
+	}
+	return strings.Split(p, ",")
 }

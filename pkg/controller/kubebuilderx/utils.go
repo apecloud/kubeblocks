@@ -93,5 +93,5 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 		}
 		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
 	}
-	return multicluster.InGlobalContext()
+	return multicluster.InControlContext()
 }

@@ -148,7 +148,7 @@ func (r *ResourceFetcher[T]) ConfigMap(configSpec string) *T {
 
 	return r.Wrap(func() error {
 		r.ConfigMapObj = &corev1.ConfigMap{}
-		return r.Client.Get(r.Context, cmKey, r.ConfigMapObj, multicluster.InLocalContextUnspecified())
+		return r.Client.Get(r.Context, cmKey, r.ConfigMapObj, multicluster.InDataContextUnspecified())
 	})
 }
 

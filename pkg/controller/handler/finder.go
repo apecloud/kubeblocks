@@ -58,7 +58,7 @@ func getObjectFromKey(ctx *FinderContext, key *model.GVKNObjKey) client.Object {
 		return nil
 	}
 	// TODO(placement): optimize
-	if err = ctx.Reader.Get(ctx, key.ObjectKey, object, multicluster.InLocalContextUnspecified()); err != nil {
+	if err = ctx.Reader.Get(ctx, key.ObjectKey, object, multicluster.InDataContextUnspecified()); err != nil {
 		return nil
 	}
 	return object

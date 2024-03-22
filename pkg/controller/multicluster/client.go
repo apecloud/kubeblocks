@@ -23,78 +23,74 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 
 	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-func NewClient(global client.Client, workers map[string]client.Client) client.Client {
-	ctx := multiClientContext{
-		global:  global,
+func NewClient(control client.Client, workers map[string]client.Client) client.Client {
+	mctx := mcontext{
+		control: control,
 		workers: workers,
 	}
-	return &multiClient{
-		multiClientReader:                 multiClientReader{ctx},
-		multiClientWriter:                 multiClientWriter{ctx},
-		multiStatusClient:                 multiStatusClient{ctx},
-		multiSubResourceClientConstructor: multiSubResourceClientConstructor{ctx},
-		ctx:                               ctx,
+	return &mclient{
+		clientReader:                 clientReader{mctx},
+		clientWriter:                 clientWriter{mctx},
+		statusClient:                 statusClient{mctx},
+		subResourceClientConstructor: subResourceClientConstructor{mctx},
+		mctx:                         mctx,
 	}
 }
 
-type multiClientContext struct {
-	global  client.Client
-	workers map[string]client.Client
+type mcontext struct {
+	control client.Client            // client for control-plane k8s cluster
+	workers map[string]client.Client // clients for data-plane k8s clusters
 }
 
-type multiClient struct {
-	multiClientReader
-	multiClientWriter
-	multiStatusClient
-	multiSubResourceClientConstructor
+type mclient struct {
+	clientReader
+	clientWriter
+	statusClient
+	subResourceClientConstructor
 
-	ctx multiClientContext
+	mctx mcontext
 }
 
-var _ client.Client = &multiClient{}
+var _ client.Client = &mclient{}
 
-func (c *multiClient) Scheme() *runtime.Scheme {
-	return c.ctx.global.Scheme()
+func (c *mclient) Scheme() *runtime.Scheme {
+	return c.mctx.control.Scheme()
 }
 
-func (c *multiClient) RESTMapper() meta.RESTMapper {
-	return c.ctx.global.RESTMapper()
+func (c *mclient) RESTMapper() meta.RESTMapper {
+	return c.mctx.control.RESTMapper()
 }
 
-func (c *multiClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
-	return c.ctx.global.GroupVersionKindFor(obj)
+func (c *mclient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
+	return c.mctx.control.GroupVersionKindFor(obj)
 }
 
-func (c *multiClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
-	return c.ctx.global.IsObjectNamespaced(obj)
+func (c *mclient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
+	return c.mctx.control.IsObjectNamespaced(obj)
 }
 
-type multiClientReader struct {
-	ctx multiClientContext
+type clientReader struct {
+	mctx mcontext
 }
 
-var _ client.Reader = &multiClientReader{}
+var _ client.Reader = &clientReader{}
 
-func (c *multiClientReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+func (c *clientReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	request := func(cli client.Client) error {
 		return cli.Get(ctx, key, obj, opts...)
 	}
-	return anyOf(c.ctx, ctx, obj, request, opts)
+	return anyOf(c.mctx, ctx, obj, request, opts)
 }
 
-func (c *multiClientReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+func (c *clientReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	items := reflect.ValueOf(list).Elem().FieldByName("Items")
 	if !items.IsValid() {
 		return fmt.Errorf("ObjectList has no Items field: %s", list.GetObjectKind().GroupVersionKind().String())
@@ -113,20 +109,20 @@ func (c *multiClientReader) List(ctx context.Context, list client.ObjectList, op
 		}
 		return nil
 	}
-	err := allOf(c.ctx, ctx, nil, request, opts)
+	err := allOf(c.mctx, ctx, nil, request, opts)
 	if objects.Len() != 0 {
 		items.Set(objects)
 	}
 	return err
 }
 
-type multiClientWriter struct {
-	ctx multiClientContext
+type clientWriter struct {
+	mctx mcontext
 }
 
-var _ client.Writer = &multiClientWriter{}
+var _ client.Writer = &clientWriter{}
 
-func (c *multiClientWriter) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+func (c *clientWriter) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	request := func(cli client.Client) error {
 		o, ok := obj.DeepCopyObject().(client.Object)
 		if !ok {
@@ -134,17 +130,17 @@ func (c *multiClientWriter) Create(ctx context.Context, obj client.Object, opts 
 		}
 		return cli.Create(ctx, o, opts...)
 	}
-	return allOf(c.ctx, ctx, obj, request, opts)
+	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
-func (c *multiClientWriter) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+func (c *clientWriter) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	request := func(cli client.Client) error {
 		return cli.Delete(ctx, obj, opts...)
 	}
-	return allOf(c.ctx, ctx, obj, request, opts)
+	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
-func (c *multiClientWriter) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+func (c *clientWriter) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	request := func(cli client.Client) error {
 		o, ok := obj.DeepCopyObject().(client.Object)
 		if !ok {
@@ -152,10 +148,10 @@ func (c *multiClientWriter) Update(ctx context.Context, obj client.Object, opts 
 		}
 		return cli.Update(ctx, o, opts...)
 	}
-	return allOf(c.ctx, ctx, obj, request, opts)
+	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
-func (c *multiClientWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+func (c *clientWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 	request := func(cli client.Client) error {
 		o, ok := obj.DeepCopyObject().(client.Object)
 		if !ok {
@@ -163,74 +159,74 @@ func (c *multiClientWriter) Patch(ctx context.Context, obj client.Object, patch 
 		}
 		return cli.Patch(ctx, o, patch, opts...)
 	}
-	return allOf(c.ctx, ctx, obj, request, opts)
+	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
-func (c *multiClientWriter) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
+func (c *clientWriter) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
 	request := func(cli client.Client) error {
 		return cli.DeleteAllOf(ctx, obj, opts...)
 	}
-	return allOf(c.ctx, ctx, obj, request, opts)
+	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
-type multiStatusClient struct {
-	ctx multiClientContext
+type statusClient struct {
+	mctx mcontext
 }
 
-var _ client.StatusClient = &multiStatusClient{}
+var _ client.StatusClient = &statusClient{}
 
-func (c *multiStatusClient) Status() client.SubResourceWriter {
-	return &multiSubResourceWriter{
-		ctx: c.ctx,
+func (c *statusClient) Status() client.SubResourceWriter {
+	return &subResourceWriter{
+		mctx: c.mctx,
 	}
 }
 
-type multiSubResourceClientConstructor struct {
-	ctx multiClientContext
+type subResourceClientConstructor struct {
+	mctx mcontext
 }
 
-var _ client.SubResourceClientConstructor = &multiSubResourceClientConstructor{}
+var _ client.SubResourceClientConstructor = &subResourceClientConstructor{}
 
-func (c *multiSubResourceClientConstructor) SubResource(subResource string) client.SubResourceClient {
-	return &multiSubResourceClient{
-		multiSubResourceReader: multiSubResourceReader{
-			ctx:         c.ctx,
+func (c *subResourceClientConstructor) SubResource(subResource string) client.SubResourceClient {
+	return &subResourceClient{
+		subResourceReader: subResourceReader{
+			mctx:        c.mctx,
 			subResource: subResource,
 		},
-		multiSubResourceWriter: multiSubResourceWriter{
-			ctx: c.ctx,
+		subResourceWriter: subResourceWriter{
+			mctx: c.mctx,
 		},
 	}
 }
 
-type multiSubResourceClient struct {
-	multiSubResourceReader
-	multiSubResourceWriter
+type subResourceClient struct {
+	subResourceReader
+	subResourceWriter
 }
 
-var _ client.SubResourceClient = &multiSubResourceClient{}
+var _ client.SubResourceClient = &subResourceClient{}
 
-type multiSubResourceReader struct {
-	ctx         multiClientContext
+type subResourceReader struct {
+	mctx        mcontext
 	subResource string
 }
 
-var _ client.SubResourceReader = &multiSubResourceReader{}
+var _ client.SubResourceReader = &subResourceReader{}
 
-func (c *multiSubResourceReader) Get(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceGetOption) error {
+func (c *subResourceReader) Get(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceGetOption) error {
 	request := func(cli client.Client) error {
 		return cli.SubResource(c.subResource).Get(ctx, obj, subResource, opts...)
 	}
-	return anyOf(c.ctx, ctx, obj, request, opts)
+	return anyOf(c.mctx, ctx, obj, request, opts)
 }
 
-type multiSubResourceWriter struct {
-	ctx multiClientContext
+type subResourceWriter struct {
+	mctx mcontext
 }
 
-var _ client.SubResourceWriter = &multiSubResourceWriter{}
+var _ client.SubResourceWriter = &subResourceWriter{}
 
-func (c *multiSubResourceWriter) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+func (c *subResourceWriter) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
 	request := func(cli client.Client) error {
 		o, ok := obj.DeepCopyObject().(client.Object)
 		if !ok {
@@ -238,10 +234,10 @@ func (c *multiSubResourceWriter) Create(ctx context.Context, obj client.Object, 
 		}
 		return cli.Status().Create(ctx, o, subResource, opts...)
 	}
-	return allOf(c.ctx, ctx, obj, request, opts)
+	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
-func (c *multiSubResourceWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+func (c *subResourceWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 	request := func(cli client.Client) error {
 		o, ok := obj.DeepCopyObject().(client.Object)
 		if !ok {
@@ -249,10 +245,10 @@ func (c *multiSubResourceWriter) Update(ctx context.Context, obj client.Object, 
 		}
 		return cli.Status().Update(ctx, o, opts...)
 	}
-	return allOf(c.ctx, ctx, obj, request, opts)
+	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
-func (c *multiSubResourceWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+func (c *subResourceWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
 	request := func(cli client.Client) error {
 		o, ok := obj.DeepCopyObject().(client.Object)
 		if !ok {
@@ -260,12 +256,12 @@ func (c *multiSubResourceWriter) Patch(ctx context.Context, obj client.Object, p
 		}
 		return cli.Status().Patch(ctx, o, patch, opts...)
 	}
-	return allOf(c.ctx, ctx, obj, request, opts)
+	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
-func allOf(mctx multiClientContext, ctx context.Context, obj client.Object, request func(cli client.Client) error, opts any) error {
+func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(cli client.Client) error, opts any) error {
 	var err error
-	for _, cli := range clients(mctx, ctx, obj, opts) {
+	for _, cli := range targetClients(mctx, ctx, obj, opts) {
 		if e := request(cli); e != nil {
 			if err == nil {
 				err = e
@@ -275,9 +271,9 @@ func allOf(mctx multiClientContext, ctx context.Context, obj client.Object, requ
 	return err
 }
 
-func anyOf(mctx multiClientContext, ctx context.Context, obj client.Object, request func(cli client.Client) error, opts any) error {
+func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(cli client.Client) error, opts any) error {
 	var err error
-	for _, cli := range clients(mctx, ctx, obj, opts) {
+	for _, cli := range targetClients(mctx, ctx, obj, opts) {
 		if err = request(cli); err == nil {
 			return nil
 		}
@@ -285,19 +281,19 @@ func anyOf(mctx multiClientContext, ctx context.Context, obj client.Object, requ
 	return err
 }
 
-func clients(mctx multiClientContext, ctx context.Context, obj client.Object, opts any) []client.Client {
-	// has no worker k8s clusters
+func targetClients(mctx mcontext, ctx context.Context, obj client.Object, opts any) []client.Client {
+	// has no data-plane k8s clusters
 	if len(mctx.workers) == 0 {
-		return []client.Client{mctx.global}
+		return []client.Client{mctx.control}
 	}
 
 	o := hasClientOption(opts)
 	if o == nil {
-		return []client.Client{mctx.global}
+		return []client.Client{mctx.control}
 	}
 
-	if o.global {
-		return []client.Client{mctx.global}
+	if o.control {
+		return []client.Client{mctx.control}
 	}
 
 	if o.unspecified {
@@ -305,7 +301,7 @@ func clients(mctx multiClientContext, ctx context.Context, obj client.Object, op
 	}
 
 	if o.universal {
-		return append([]client.Client{mctx.global}, workerClients(mctx, fromContext(ctx))...)
+		return append([]client.Client{mctx.control}, workerClients(mctx, fromContext(ctx))...)
 	}
 
 	if o.oneshot {
@@ -332,7 +328,7 @@ func hasClientOption(opts any) *ClientOption {
 	return nil
 }
 
-func workerClients(mctx multiClientContext, workers []string) []client.Client {
+func workerClients(mctx mcontext, workers []string) []client.Client {
 	l := make([]client.Client, 0)
 	for _, c := range workers {
 		if cli, ok := mctx.workers[c]; ok {
@@ -340,43 +336,4 @@ func workerClients(mctx multiClientContext, workers []string) []client.Client {
 		}
 	}
 	return l
-}
-
-func fromContextNObject(ctx context.Context, obj client.Object) []string {
-	p1, p2 := fromContext(ctx), fromObject(obj)
-	switch {
-	case p1 == nil:
-		return p2
-	case p2 == nil:
-		return p1
-	default:
-		s1, s2 := sets.New(p1...), sets.New(p2...)
-		// if !s1.IsSuperset(s2) {
-		//	panic("runtime error")
-		// }
-		// return p2
-		return sets.List(s1.Intersection(s2))
-	}
-}
-
-func fromContext(ctx context.Context) []string {
-	if ctx == nil {
-		return nil
-	}
-	p, err := FromContext(ctx)
-	if err != nil {
-		return nil
-	}
-	return strings.Split(p, ",")
-}
-
-func fromObject(obj client.Object) []string {
-	if obj == nil || obj.GetAnnotations() == nil {
-		return nil
-	}
-	p, ok := obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
-	if !ok {
-		return nil
-	}
-	return strings.Split(p, ",")
 }

@@ -60,7 +60,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	reqCtx.Log.V(1).Info("event watcher")
 
 	event := &corev1.Event{}
-	if err := r.Client.Get(ctx, req.NamespacedName, event, multicluster.InLocalContextUnspecified()); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, event, multicluster.InDataContextUnspecified()); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
 	}
 

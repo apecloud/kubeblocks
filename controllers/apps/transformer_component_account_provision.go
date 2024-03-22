@@ -209,7 +209,7 @@ func (t *componentAccountProvisionTransformer) componentPodsWithRole(transCtx *c
 	labels := constant.GetComponentWellKnownLabels(cluster.Name, compSpecName)
 	labels[constant.RoleLabelKey] = role
 	if err := transCtx.Client.List(transCtx.Context, podList,
-		client.InNamespace(cluster.Namespace), client.MatchingLabels(labels), multicluster.InLocalContext()); err != nil {
+		client.InNamespace(cluster.Namespace), client.MatchingLabels(labels), multicluster.InDataContext()); err != nil {
 		return nil, err
 	}
 	return podList, nil

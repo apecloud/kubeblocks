@@ -163,16 +163,36 @@ func cfgManagerGrpcURL(pod *corev1.Pod) (string, error) {
 }
 
 func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
-	ip := net.ParseIP(pod.Status.PodIP)
-	if ip == nil {
-		return "", core.MakeError("%s is not a valid IP", pod.Status.PodIP)
-	}
-
-	// Sanity check PodIP
-	if ip.To4() == nil && ip.To16() == nil {
-		return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", pod.Status.PodIP)
+	ip, err := ipAddressFromPod(pod.Status)
+	if err != nil {
+		return "", err
 	}
 	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
+}
+
+func ipAddressFromPod(status corev1.PodStatus) (net.IP, error) {
+	// IPv4 address priority
+	for _, ip := range status.PodIPs {
+		address := net.ParseIP(ip.IP)
+		if validIPv4Address(address) {
+			return address, nil
+		}
+	}
+
+	// Using status.PodIP
+	address := net.ParseIP(status.PodIP)
+	if !validIPv4Address(address) && !validIPv6Address(address) {
+		return nil, fmt.Errorf("%s is not a valid IPv4/IPv6 address", status.PodIP)
+	}
+	return address, nil
+}
+
+func validIPv4Address(ip net.IP) bool {
+	return ip != nil && ip.To4() != nil
+}
+
+func validIPv6Address(ip net.IP) bool {
+	return ip != nil && ip.To16() != nil
 }
 
 func restartWorkloadComponent[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, annotationKey, annotationValue string, obj PT, _ func(T, PT, L, PL)) error {

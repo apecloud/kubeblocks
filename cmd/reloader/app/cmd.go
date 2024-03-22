@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,13 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
+)
+
+const (
+	InaddrAny   = "0.0.0.0"
+	Inaddr6Any  = "::"
+	InaddrLoop  = "localhost"
+	Inaddr6Loop = "::1"
 )
 
 var logger *zap.SugaredLogger
@@ -90,6 +98,7 @@ func run(ctx context.Context, opt *VolumeWatcherOpts) error {
 	if configHandler, err = cfgcore.CreateCombinedHandler(opt.CombConfig, opt.BackupPath); err != nil {
 		return err
 	}
+
 	if len(opt.VolumeDirs) > 0 {
 		if volumeWatcher, err = startVolumeWatcher(ctx, opt, configHandler); err != nil {
 			return err
@@ -145,8 +154,15 @@ func startGRPCService(opt *VolumeWatcherOpts, ctx context.Context, handler cfgco
 		return err
 	}
 
-	tcpSpec := fmt.Sprintf("%s:%d", proxy.opt.PodIP, proxy.opt.GrpcPort)
+	// ipv4 unspecified address: 0.0.0.0
+	hostIP := InaddrAny
+	if podIP := net.ParseIP(proxy.opt.PodIP); podIP != nil && podIP.To16() != nil {
+		// ipv6 unspecified address: ::
+		hostIP = Inaddr6Any
+	}
 
+	tcpSpec := net.JoinHostPort(hostIP, strconv.Itoa(proxy.opt.GrpcPort))
+	// tcpSpec := fmt.Sprintf("[::]:%d", proxy.opt.GrpcPort)
 	logger.Infof("starting reconfigure service: %s", tcpSpec)
 	listener, err := net.Listen("tcp", tcpSpec)
 	if err != nil {

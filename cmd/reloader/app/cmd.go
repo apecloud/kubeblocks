@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -156,7 +157,7 @@ func startGRPCService(opt *VolumeWatcherOpts, ctx context.Context, handler cfgco
 
 	// ipv4 unspecified address: 0.0.0.0
 	hostIP := InaddrAny
-	if podIP := net.ParseIP(proxy.opt.PodIP); podIP != nil && podIP.To16() != nil {
+	if ip, _ := netip.ParseAddr(proxy.opt.PodIP); ip.Is6() {
 		// ipv6 unspecified address: ::
 		hostIP = Inaddr6Any
 	}

@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strconv"
 
 	appv1 "k8s.io/api/apps/v1"
@@ -178,10 +179,11 @@ func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
 func ipAddressFromPod(status corev1.PodStatus) (net.IP, error) {
 	// IPv4 address priority
 	for _, ip := range status.PodIPs {
-		address := net.ParseIP(ip.IP)
-		if validIPv4Address(address) {
-			return address, nil
+		address, err := netip.ParseAddr(ip.IP)
+		if err != nil || address.Is6() {
+			continue
 		}
+		return net.ParseIP(ip.IP), nil
 	}
 
 	// Using status.PodIP

@@ -68,6 +68,7 @@ func CurrentReplicaProvider(ctx context.Context, cli client.Reader, objectKey cl
 		}
 		return provider
 	}
+	// TODO(leon): should get the rsm object firstly
 	sts := &appsv1.StatefulSet{}
 	switch err := cli.Get(ctx, objectKey, sts); {
 	case err == nil:

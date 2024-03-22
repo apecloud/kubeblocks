@@ -68,19 +68,20 @@ func (t *objectTree2DAGTransformer) Transform(ctx graph.TransformContext, dag *g
 
 	createNewObjects := func() {
 		for name := range createSet {
-			cli.Create(dag, newSnapshot[name])
+			// TODO(leon): create job object in a single cluster?
+			cli.Create(dag, newSnapshot[name], inDataContext())
 		}
 	}
 	updateObjects := func() {
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := newSnapshot[name]
-			cli.Update(dag, oldObj, newObj)
+			cli.Update(dag, oldObj, newObj, inDataContext())
 		}
 	}
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
-			cli.Delete(dag, oldSnapshot[name])
+			cli.Delete(dag, oldSnapshot[name], inDataContext())
 		}
 	}
 	handleDependencies := func() error {

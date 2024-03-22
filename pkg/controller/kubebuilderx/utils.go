@@ -28,6 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
@@ -52,11 +53,14 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 	}
 	tree.SetRoot(root)
 
+	// init placement
+	ctx = multicluster.IntoContext(ctx, placement(root))
+
 	// read child objects
 	ml := getMatchLabels(root, labelKeys)
 	inNS := client.InNamespace(req.Namespace)
 	for _, list := range kinds {
-		if err := reader.List(ctx, list, inNS, ml); err != nil {
+		if err := reader.List(ctx, list, inNS, ml, multicluster.InDataContext()); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items
@@ -83,6 +87,17 @@ func getMatchLabels(root client.Object, labelKeys []string) client.MatchingLabel
 		labels[key] = root.GetLabels()[key]
 	}
 	return labels
+}
+
+func placement(obj client.Object) string {
+	if obj.GetAnnotations() == nil {
+		return ""
+	}
+	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
+}
+
+func inDataContext() model.GraphOption {
+	return model.WithClientOption(multicluster.InDataContext())
 }
 
 func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {

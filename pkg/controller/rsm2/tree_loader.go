@@ -59,6 +59,9 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 }
 
 func loadCompressedInstanceTemplates(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
+	if tree.GetRoot() == nil {
+		return nil
+	}
 	templateMap, err := getInstanceTemplateMap(tree.GetRoot().GetAnnotations())
 	if err != nil {
 		return err

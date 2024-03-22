@@ -104,8 +104,6 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 	return nil
 }
 
-// SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
-// empty implementation here.
 func (r rebuildInstanceOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
 }
@@ -163,7 +161,7 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 			if completed {
 				// if the pod has been rebuilt, set progressDetail phase to Succeed.
 				progressDetail.SetStatusAndMessage(appsv1alpha1.SucceedProgressStatus,
-					fmt.Sprintf("Rebuild pod %s sucessfully", instance))
+					fmt.Sprintf("Rebuild pod %s successfully", instance))
 			}
 			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, *progressDetail)
 		}
@@ -687,6 +685,7 @@ func (r rebuildInstanceOpsHandler) recreateSourcePVC(reqCtx intctrlutil.RequestC
 	return cli.Create(reqCtx.Ctx, newPVC)
 }
 
+// releasePV releases the persistentVolume by resetting `claimRef`.
 func (r rebuildInstanceOpsHandler) releasePV(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	pv *corev1.PersistentVolume,
@@ -708,6 +707,7 @@ func (r rebuildInstanceOpsHandler) removePVCFinalizer(reqCtx intctrlutil.Request
 	return client.IgnoreNotFound(cli.Patch(reqCtx.Ctx, pvc, patch))
 }
 
+// instanceIsAvailable checks if the instance is available.
 func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 	synthesizedComp *component.SynthesizedComponent,
 	targetPod *corev1.Pod) (bool, error) {
@@ -732,6 +732,7 @@ func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 	return false, nil
 }
 
+// cleanupTmpResources clean up the temporary resources generated during the process of rebuilding the instance.
 func (r rebuildInstanceOpsHandler) cleanupTmpResources(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource) error {

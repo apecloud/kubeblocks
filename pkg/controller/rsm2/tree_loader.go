@@ -25,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,17 +39,41 @@ import (
 
 type treeLoader struct{}
 
-func (r *treeLoader) Read(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
+func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
 	keys := getMatchLabelKeys()
 	kinds := ownedKinds()
 	tree, err := kubebuilderx.ReadObjectTree[*workloads.ReplicatedStateMachine](ctx, reader, req, keys, kinds...)
 	if err != nil {
 		return nil, err
 	}
+
+	// load compressed instance templates if present
+	if err = loadCompressedInstanceTemplates(ctx, reader, tree); err != nil {
+		return nil, err
+	}
+
 	tree.EventRecorder = recorder
 	tree.Logger = logger
 
 	return tree, err
+}
+
+func loadCompressedInstanceTemplates(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
+	templateMap, err := getInstanceTemplateMap(tree.GetRoot().GetAnnotations())
+	if err != nil {
+		return err
+	}
+	ns := tree.GetRoot().GetNamespace()
+	for _, templateName := range templateMap {
+		template := &corev1.ConfigMap{}
+		if err := reader.Get(ctx, types.NamespacedName{Namespace: ns, Name: templateName}, template); err != nil {
+			return err
+		}
+		if err := tree.Add(template); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func getMatchLabelKeys() []string {

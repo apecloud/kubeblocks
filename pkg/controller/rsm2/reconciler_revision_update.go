@@ -44,7 +44,7 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 		return kubebuilderx.ResultUnsatisfied
 	}
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
-	if err := validateSpec(rsm); err != nil {
+	if err := validateSpec(rsm, tree); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
 	return kubebuilderx.ResultSatisfied
@@ -54,7 +54,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 
 	// 1. build all templates by applying instance template overrides to default pod template
-	replicaTemplateGroups := buildReplicaTemplateGroups(rsm)
+	replicaTemplateGroups := buildReplicaTemplateGroups(rsm, tree)
 
 	// build replica revision list by template groups
 	var replicaRevisionList []replicaRevision

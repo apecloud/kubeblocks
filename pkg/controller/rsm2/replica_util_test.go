@@ -32,6 +32,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
@@ -113,7 +114,7 @@ var _ = Describe("replica util test", func() {
 
 	Context("buildReplicaName2TemplateMap", func() {
 		It("build a rsm with default template only", func() {
-			nameTemplate, err := buildReplicaName2TemplateMap(rsm)
+			nameTemplate, err := buildReplicaName2TemplateMap(rsm, nil)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name0 := rsm.Name + "-0"
@@ -142,7 +143,7 @@ var _ = Describe("replica util test", func() {
 				Image:       &imageOverride,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instance)
-			nameTemplate, err := buildReplicaName2TemplateMap(rsm)
+			nameTemplate, err := buildReplicaName2TemplateMap(rsm, nil)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name0 := rsm.Name + "-0"
@@ -163,7 +164,7 @@ var _ = Describe("replica util test", func() {
 
 	Context("buildReplicaByTemplate", func() {
 		It("should work well", func() {
-			nameTemplate, err := buildReplicaName2TemplateMap(rsm)
+			nameTemplate, err := buildReplicaName2TemplateMap(rsm, nil)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"
@@ -194,7 +195,7 @@ var _ = Describe("replica util test", func() {
 	Context("validateSpec", func() {
 		It("should work well", func() {
 			By("a valid spec")
-			Expect(validateSpec(rsm)).Should(Succeed())
+			Expect(validateSpec(rsm, nil)).Should(Succeed())
 
 			By("instance.replicas exceeds 1 when name set")
 			rsm1 := rsm.DeepCopy()
@@ -205,7 +206,7 @@ var _ = Describe("replica util test", func() {
 				Replicas: &replicas,
 			}
 			rsm1.Spec.Instances = append(rsm1.Spec.Instances, instance)
-			err := validateSpec(rsm1)
+			err := validateSpec(rsm1, nil)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("replicas should be empty or no more than 1 if name set"))
 
@@ -218,7 +219,7 @@ var _ = Describe("replica util test", func() {
 				GenerateName: &generateName,
 			}
 			rsm2.Spec.Instances = append(rsm2.Spec.Instances, instance)
-			err = validateSpec(rsm2)
+			err = validateSpec(rsm2, nil)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("should not greater than replicas in spec"))
 		})
@@ -334,6 +335,47 @@ var _ = Describe("replica util test", func() {
 				GetObject()
 			secret := copyAndMerge(oldSecret, newSecret)
 			Expect(secret).Should(Equal(secret))
+		})
+	})
+
+	Context("getInstanceTemplates", func() {
+		It("should work well", func() {
+			By("prepare objects")
+			templateObj, annotation, err := mockCompressedInstanceTemplates(namespace, name)
+			Expect(err).Should(BeNil())
+			instances := []workloads.InstanceTemplate{
+				{
+					Replicas:     func() *int32 { r := int32(2); return &r }(),
+					GenerateName: func() *string { n := "hello"; return &n }(),
+				},
+				{
+					Replicas: func() *int32 { r := int32(1); return &r }(),
+					Name:     func() *string { n := "world"; return &n }(),
+				},
+			}
+			rsm := builder.NewReplicatedStateMachineBuilder(namespace, name).
+				AddAnnotations(templateRefAnnotationKey, annotation).
+				SetInstances(instances).
+				GetObject()
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(rsm)
+			Expect(tree.Add(templateObj)).Should(Succeed())
+
+			By("parse instance templates")
+			instanceTemplates := getInstanceTemplates(rsm, tree)
+			// append templates from mock function
+			instances = append(instances, []workloads.InstanceTemplate{
+				{
+					Replicas:     func() *int32 { r := int32(2); return &r }(),
+					GenerateName: func() *string { n := "foo"; return &n }(),
+				},
+				{
+					Replicas: func() *int32 { r := int32(1); return &r }(),
+					Name:     func() *string { n := "bar-0-1"; return &n }(),
+					Image:    func() *string { i := "busybox"; return &i }(),
+				},
+			}...)
+			Expect(instanceTemplates).Should(Equal(instances))
 		})
 	})
 })

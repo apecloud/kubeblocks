@@ -47,14 +47,15 @@ var _ = Describe("tree loader test", func() {
 			controller, k8sMock := testutil.SetupK8sMock()
 			defer controller.Finish()
 
-			root := builder.NewReplicatedStateMachineBuilder(namespace, name).GetObject()
+			templateObj, annotation, err := mockCompressedInstanceTemplates(namespace, name)
+			Expect(err).Should(BeNil())
+			root := builder.NewReplicatedStateMachineBuilder(namespace, name).AddAnnotations(templateRefAnnotationKey, annotation).GetObject()
 			obj0 := builder.NewPodBuilder(namespace, name+"-0").GetObject()
 			obj1 := builder.NewPodBuilder(namespace, name+"-1").GetObject()
 			obj2 := builder.NewPodBuilder(namespace, name+"-2").GetObject()
 			for _, pod := range []*corev1.Pod{obj0, obj1, obj2} {
 				Expect(controllerutil.SetControllerReference(root, pod, model.GetScheme())).Should(Succeed())
 			}
-
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &workloads.ReplicatedStateMachine{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *workloads.ReplicatedStateMachine, _ ...client.GetOption) error {
@@ -88,20 +89,28 @@ var _ = Describe("tree loader test", func() {
 				DoAndReturn(func(_ context.Context, list *batchv1.JobList, _ ...client.ListOption) error {
 					return nil
 				}).Times(1)
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.ConfigMap{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.ConfigMap, _ ...client.GetOption) error {
+					*obj = *templateObj
+					return nil
+				}).Times(1)
 			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(root)}
-
 			loader := NewTreeLoader()
-			tree, err := loader.Read(ctx, k8sMock, req, nil, logger)
+			tree, err := loader.Load(ctx, k8sMock, req, nil, logger)
 			Expect(err).Should(BeNil())
 			Expect(tree.GetRoot()).ShouldNot(BeNil())
 			Expect(tree.GetRoot()).Should(Equal(root))
-			Expect(tree.GetSecondaryObjects()).Should(HaveLen(3))
+			Expect(tree.GetSecondaryObjects()).Should(HaveLen(4))
 			objList := []*corev1.Pod{obj0, obj1, obj2}
 			for _, pod := range objList {
 				obj, err := tree.Get(pod)
 				Expect(err).Should(BeNil())
 				Expect(obj).Should(Equal(pod))
 			}
+			obj, err := tree.Get(templateObj)
+			Expect(err).Should(BeNil())
+			Expect(obj).Should(Equal(templateObj))
 		})
 	})
 })

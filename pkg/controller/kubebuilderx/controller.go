@@ -54,7 +54,7 @@ type controller struct {
 }
 
 func (c *controller) Prepare(reader TreeLoader) Controller {
-	c.oldTree, c.err = reader.Read(c.ctx, c.cli, c.req, c.recorder, c.logger)
+	c.oldTree, c.err = reader.Load(c.ctx, c.cli, c.req, c.recorder, c.logger)
 	if c.err != nil {
 		return c
 	}

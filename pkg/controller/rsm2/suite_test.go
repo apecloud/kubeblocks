@@ -20,11 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/klauspost/compress/zstd"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -117,6 +120,41 @@ var (
 )
 
 func init() {
+}
+
+func mockCompressedInstanceTemplates(ns, name string) (*corev1.ConfigMap, string, error) {
+	instances := []workloads.InstanceTemplate{
+		{
+			Replicas:     func() *int32 { r := int32(2); return &r }(),
+			GenerateName: func() *string { n := "foo"; return &n }(),
+		},
+		{
+			Replicas: func() *int32 { r := int32(1); return &r }(),
+			Name:     func() *string { n := "bar-0-1"; return &n }(),
+			Image:    func() *string { i := "busybox"; return &i }(),
+		},
+	}
+	templateByte, err := json.Marshal(instances)
+	if err != nil {
+		return nil, "", err
+	}
+	writer, err := zstd.NewWriter(nil)
+	if err != nil {
+		return nil, "", err
+	}
+	defer writer.Close()
+	templateData := writer.EncodeAll(templateByte, nil)
+	templateName := fmt.Sprintf("template-ref-%s", name)
+	templateObj := builder.NewConfigMapBuilder(ns, templateName).
+		SetBinaryData(map[string][]byte{
+			templateRefDataKey: templateData,
+		}).GetObject()
+	templateRef := map[string]string{name: templateName}
+	templateRefByte, err := json.Marshal(templateRef)
+	if err != nil {
+		return nil, "", err
+	}
+	return templateObj, string(templateRefByte), nil
 }
 
 func TestAPIs(t *testing.T) {

@@ -46,7 +46,7 @@ Currently, there are 4 types of issues:
 
 - Fork the KubeBlocks repository to your GitHub account, create a new branch and clone to your host.
   - Branch naming style should match the pattern: `feature/|bugfix/|release/|hotfix/|support/|dependabot/`. KubeBlocks performs a pull request check to verify the pull request branch name.
-- See the [Developing KubeBlocks docs](./index.md) for more information about setting up a KubeBlocks development environment.
+- See the [Developing KubeBlocks docs](./00%20-%20index.md) for more information about setting up a KubeBlocks development environment.
 - Make your changes.
 - Update relevant documentation for the change.
 - Make sure all tests and checks are passed.

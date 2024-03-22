@@ -61,3 +61,11 @@ func SafeAddInt(a, b int) int {
 	}
 	return a + b
 }
+
+// CutString cuts the string with specified length.
+func CutString(str string, length int) string {
+	if len(str) > length {
+		return str[:length]
+	}
+	return str
+}

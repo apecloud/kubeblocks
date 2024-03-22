@@ -263,8 +263,9 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory), phase *appsv1alpha1.ClusterPhase) {
-		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+	createClusterObjVx := func(clusterDefName, clusterVerName, compName, compDefName string, v2 bool,
+		processor func(*testapps.MockClusterFactory), phase *appsv1alpha1.ClusterPhase) {
+		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVerName).
 			WithRandomName()
 		if !v2 {
 			factory.AddComponent(compName, compDefName).SetReplicas(1)
@@ -308,17 +309,17 @@ var _ = Describe("Component Controller", func() {
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjVx(compName, compDefName, false, processor, nil)
+		createClusterObjVx(clusterDefObj.Name, clusterVersionObj.Name, compName, compDefName, false, processor, nil)
 	}
 
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor, nil)
+		createClusterObjVx("", "", compName, compDefName, true, processor, nil)
 	}
 
 	createClusterObjV2WithPhase := func(compName, compDefName string, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor, &phase)
+		createClusterObjVx("", "", compName, compDefName, true, processor, &phase)
 	}
 
 	mockCompRunning := func(compName string) {
@@ -2012,6 +2013,43 @@ var _ = Describe("Component Controller", func() {
 		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+1, 0, 1)
 	}
 
+	testCompInheritLabelsAndAnnotations := func(compName, compDefName string) {
+		By("Mock a cluster obj with custom labels and annotations.")
+		customLabelKey := "custom-inherit-label-key"
+		customLabelValue := "custom-inherit-label-value"
+		customLabelKeyBeFiltered := constant.RoleLabelKey
+		customLabelValueBeFiltered := "cluster-role-should-be-filtered"
+		customLabels := map[string]string{
+			customLabelKey:           customLabelValue,
+			customLabelKeyBeFiltered: customLabelValueBeFiltered,
+		}
+
+		customAnnotationKey := "custom-inherit-annotation-key"
+		customAnnotationValue := "custom-inherit-annotation-value"
+		customAnnotationKeyBeFiltered := constant.KubeBlocksGenerationKey
+		customAnnotationValueBeFiltered := "cluster-annotation-should-be-filtered"
+		customAnnotations := map[string]string{
+			customAnnotationKey:                                      customAnnotationValue,
+			customAnnotationKeyBeFiltered:                            customAnnotationValueBeFiltered,
+			constant.IgnoreResourceConstraint:                        "true",
+			constant.FeatureReconciliationInCompactModeAnnotationKey: "true",
+		}
+		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+			f.AddLabelsInMap(customLabels)
+			f.AddAnnotationsInMap(customAnnotations)
+		})
+
+		By("check component inherit clusters labels and annotations")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			g.Expect(comp.Labels).Should(HaveKeyWithValue(customLabelKey, customLabelValue))
+			g.Expect(comp.Labels).ShouldNot(HaveKeyWithValue(customLabelKeyBeFiltered, customLabelValueBeFiltered))
+			g.Expect(comp.Annotations).Should(HaveKeyWithValue(customAnnotationKey, customAnnotationValue))
+			g.Expect(comp.Annotations).ShouldNot(HaveKeyWithValue(customAnnotationKeyBeFiltered, customAnnotationValueBeFiltered))
+			g.Expect(comp.Annotations).Should(HaveKeyWithValue(constant.IgnoreResourceConstraint, "true"))
+			g.Expect(comp.Annotations).Should(HaveKeyWithValue(constant.FeatureReconciliationInCompactModeAnnotationKey, "true"))
+		})).Should(Succeed())
+	}
+
 	Context("component resources provisioning", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
@@ -2024,6 +2062,10 @@ var _ = Describe("Component Controller", func() {
 
 		It("component finalizers and labels", func() {
 			testCompFinalizerNLabel(defaultCompName, compDefName)
+		})
+
+		It("with inherit cluster labels and annotations", func() {
+			testCompInheritLabelsAndAnnotations(defaultCompName, compDefName)
 		})
 
 		It("with component services", func() {

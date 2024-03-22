@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -60,7 +59,12 @@ func setComponentStatusProgressDetail(
 	if progressDetails == nil {
 		return
 	}
-	existingProgressDetail := findStatusProgressDetail(*progressDetails, newProgressDetail.ObjectKey)
+	var existingProgressDetail *appsv1alpha1.ProgressStatusDetail
+	if newProgressDetail.ObjectKey != "" {
+		existingProgressDetail = findStatusProgressDetail(*progressDetails, newProgressDetail.ObjectKey)
+	} else {
+		existingProgressDetail = findActionProgress(*progressDetails, newProgressDetail.ActionName)
+	}
 	if existingProgressDetail == nil {
 		updateProgressDetailTime(&newProgressDetail)
 		*progressDetails = append(*progressDetails, newProgressDetail)
@@ -78,6 +82,7 @@ func setComponentStatusProgressDetail(
 	}
 	existingProgressDetail.Status = newProgressDetail.Status
 	existingProgressDetail.Message = newProgressDetail.Message
+	existingProgressDetail.ActionTasks = newProgressDetail.ActionTasks
 	updateProgressDetailTime(existingProgressDetail)
 	sendProgressDetailEvent(recorder, opsRequest, newProgressDetail)
 }
@@ -87,6 +92,15 @@ func findStatusProgressDetail(progressDetails []appsv1alpha1.ProgressStatusDetai
 	objectKey string) *appsv1alpha1.ProgressStatusDetail {
 	for i := range progressDetails {
 		if progressDetails[i].ObjectKey == objectKey {
+			return &progressDetails[i]
+		}
+	}
+	return nil
+}
+
+func findActionProgress(progressDetails []appsv1alpha1.ProgressStatusDetail, actionName string) *appsv1alpha1.ProgressStatusDetail {
+	for i := range progressDetails {
+		if actionName == progressDetails[i].ActionName {
 			return &progressDetails[i]
 		}
 	}
@@ -184,8 +198,7 @@ func handleComponentStatusProgress(
 	}
 	switch clusterComponentDef.WorkloadType {
 	case appsv1alpha1.Stateless:
-		policy := clusterComponent.RsmTransformPolicy
-		completedCount, err = handleStatelessProgress(reqCtx, cli, opsRes, podList, pgRes, compStatus, policy)
+		completedCount, err = handleStatelessProgress(reqCtx, cli, opsRes, podList, pgRes, compStatus)
 	default:
 		completedCount, err = handleStatefulSetProgress(reqCtx, cli, opsRes, podList, pgRes, compStatus)
 	}
@@ -204,18 +217,15 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 	opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	policy v1alpha1.RsmTransformPolicy) (int32, error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	if compStatus.Phase == appsv1alpha1.RunningClusterCompPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
 		return 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
 	}
-	var minReadySeconds int32 = 0
+	var minReadySeconds int32
 	var err error
-	if policy != v1alpha1.ToPod {
-		minReadySeconds, err = intctrlcomp.GetComponentDeployMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
-		if err != nil {
-			return 0, err
-		}
+	minReadySeconds, err = intctrlcomp.GetComponentDeployMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
+	if err != nil {
+		return 0, err
 	}
 	completedCount := handleRollingUpdateProgress(opsRes, podList, pgRes, compStatus, minReadySeconds)
 	compStatus.ProgressDetails = removeStatelessExpiredPods(podList, compStatus.ProgressDetails)
@@ -482,18 +492,12 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 		expectReplicas = opsRequest.Status.LastConfiguration.Components[clusterComponent.Name].Replicas
 	}
 	var (
-		isScaleOut          bool
 		expectProgressCount int32
 		completedCount      int32
 		dValue              = *expectReplicas - *lastComponentReplicas
 	)
 	if dValue > 0 {
 		expectProgressCount = dValue
-		isScaleOut = true
-	} else {
-		expectProgressCount = dValue * -1
-	}
-	if isScaleOut {
 		completedCount, err = handleScaleOutProgress(reqCtx, cli, opsRes, pgRes, podList, compStatus)
 		// if the workload type is Stateless, remove the progressDetails of the expired pods.
 		// because ReplicaSet may attempt to create a pod multiple times till it succeeds when scale out the replicas.
@@ -501,9 +505,10 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 			compStatus.ProgressDetails = removeStatelessExpiredPods(podList, compStatus.ProgressDetails)
 		}
 	} else {
+		expectProgressCount = dValue * -1
 		completedCount, err = handleScaleDownProgress(reqCtx, cli, opsRes, pgRes, podList, compStatus)
 	}
-	return getFinalExpectCount(compStatus, expectProgressCount), completedCount, err
+	return getFinalExpectCount(completedCount, expectProgressCount), completedCount, err
 }
 
 // handleScaleOutProgress handles the progressDetails of scaled out replicas.
@@ -628,10 +633,9 @@ func handleScaleDownProgress(
 }
 
 // getFinalExpectCount gets the number of pods which has been processed by controller.
-func getFinalExpectCount(compStatus *appsv1alpha1.OpsRequestComponentStatus, expectProgressCount int32) int32 {
-	progressDetailsLen := int32(len(compStatus.ProgressDetails))
-	if progressDetailsLen > expectProgressCount {
-		expectProgressCount = progressDetailsLen
+func getFinalExpectCount(completedCount, expectProgressCount int32) int32 {
+	if completedCount > expectProgressCount {
+		return completedCount
 	}
 	return expectProgressCount
 }

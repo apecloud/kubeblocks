@@ -81,17 +81,16 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 			}
 			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 		}
-		if opsBehaviour.ToClusterPhase != "" {
+		if opsBehaviour.QueueByCluster || opsBehaviour.QueueBySelf {
 			// if ToClusterPhase is not empty, enqueue OpsRequest to the cluster Annotation.
-			opsRecordeSlice, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, cli, opsRes, opsBehaviour)
+			opsRecorde, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, cli, opsRes, opsBehaviour)
 			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 			} else if err != nil {
 				return nil, err
 			}
-			// only one operation can be running at a time if these operations are mutually exclusive(exist opsBehaviour.ToClusterPhase).
-			// other opsRequest should be reconciled.
-			if len(opsRecordeSlice) > 0 && opsRecordeSlice[0].Name != opsRequest.Name {
+			if opsRecorde != nil && opsRecorde.InQueue {
+				// if the opsRequest is in the queue, return
 				return intctrlutil.ResultToP(intctrlutil.Reconciled())
 			}
 		}
@@ -133,6 +132,12 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return 0, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
 	opsRes.ToClusterPhase = opsBehaviour.ToClusterPhase
+	if opsRequest.Spec.Type == appsv1alpha1.CustomType {
+		err = initOpsDefAndValidate(reqCtx, cli, opsRes)
+		if err != nil {
+			return requeueAfter, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+		}
+	}
 	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(reqCtx, cli, opsRes); err != nil &&
 		!isOpsRequestFailedPhase(opsRequestPhase) {
 		// if the opsRequest phase is not failed, skipped

@@ -52,6 +52,11 @@ func NewComponentDefinitionFactoryExt(name, provider, description, serviceKind, 
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) SetServiceVersion(serviceVersion string) *MockComponentDefinitionFactory {
+	f.Get().Spec.ServiceVersion = serviceVersion
+	return f
+}
+
 func (f *MockComponentDefinitionFactory) SetDefaultSpec() *MockComponentDefinitionFactory {
 	f.Get().Spec = defaultComponentDefSpec
 	return f
@@ -114,6 +119,18 @@ func (f *MockComponentDefinitionFactory) AddVolume(name string, snapshot bool, w
 		f.Get().Spec.Volumes = make([]appsv1alpha1.ComponentVolume, 0)
 	}
 	f.Get().Spec.Volumes = append(f.Get().Spec.Volumes, vol)
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) AddHostNetworkContainerPort(container string, ports []string) *MockComponentDefinitionFactory {
+	containerPort := appsv1alpha1.HostNetworkContainerPort{
+		Container: container,
+		Ports:     ports,
+	}
+	if f.Get().Spec.HostNetwork == nil {
+		f.Get().Spec.HostNetwork = &appsv1alpha1.HostNetwork{}
+	}
+	f.Get().Spec.HostNetwork.ContainerPorts = append(f.Get().Spec.HostNetwork.ContainerPorts, containerPort)
 	return f
 }
 
@@ -294,7 +311,19 @@ func (f *MockComponentDefinitionFactory) SetLifecycleAction(name string, val int
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockComponentDefinitionFactory {
-	f.Get().Spec.Runtime.Containers = appendContainerVolumeMounts(f.Get().Spec.Runtime.Containers, containerName, volumeMounts)
+func (f *MockComponentDefinitionFactory) AddServiceRef(name, serviceKind, serviceVersion string) *MockComponentDefinitionFactory {
+	serviceRef := appsv1alpha1.ServiceRefDeclaration{
+		Name: name,
+		ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+			{
+				ServiceKind:    serviceKind,
+				ServiceVersion: serviceVersion,
+			},
+		},
+	}
+	if f.Get().Spec.ServiceRefDeclarations == nil {
+		f.Get().Spec.ServiceRefDeclarations = make([]appsv1alpha1.ServiceRefDeclaration, 0)
+	}
+	f.Get().Spec.ServiceRefDeclarations = append(f.Get().Spec.ServiceRefDeclarations, serviceRef)
 	return f
 }

@@ -78,35 +78,34 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 	if rsm.Status.ObservedGeneration != rsm.Generation {
 		return false, nil
 	}
-	if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
-		if rsm.Status.CurrentGeneration != rsm.Generation {
-			return false, nil
-		}
+	if rsm.Status.CurrentGeneration != rsm.Generation {
+		return false, nil
 	}
+
+	// TODO(leon): sts
+	// check whether the underlying workload(sts) has sent the latest template to pods
+	sts := rsmcore.ConvertRSMToSTS(rsm)
+	// sts := &appsv1.StatefulSet{}
+	// if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
+	//	if apierrors.IsNotFound(err) {
+	//		return true, nil
+	//	}
+	//	return false, err
+	// }
+	if sts.Status.ObservedGeneration != sts.Generation {
+		return false, nil
+	}
+	updateRevisions := strings.Split(sts.Status.UpdateRevision, ",")
 
 	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels, multicluster.InLocalContext())
 	if err != nil {
 		return false, err
 	}
-	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
-		// TODO pod ObservedGeneration
-	} else {
-		// TODO(leon): sts
-		// check whether the underlying workload(sts) has sent the latest template to pods
-		sts := rsmcore.ConvertRSMToSTS(rsm)
-		// sts := &appsv1.StatefulSet{}
-		// if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts, multicluster.InLocalContext()); err != nil {
-		//	return false, err
-		// }
-		if sts.Status.ObservedGeneration != sts.Generation {
+	for _, pod := range pods {
+		if !slices.Contains(updateRevisions, intctrlutil.GetPodRevision(pod)) {
 			return false, nil
 		}
-		updateRevisions := strings.Split(sts.Status.UpdateRevision, ",")
-		for _, pod := range pods {
-			if !slices.Contains(updateRevisions, intctrlutil.GetPodRevision(pod)) {
-				return false, nil
-			}
-		}
 	}
+
 	return true, nil
 }

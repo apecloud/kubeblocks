@@ -22,6 +22,7 @@ package configuration
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -31,14 +32,17 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ConfigurationReconciler reconciles a Configuration object
@@ -71,19 +75,19 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Recorder: r.Recorder,
 	}
 
-	configuration := &appsv1alpha1.Configuration{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configuration); err != nil {
+	config := &appsv1alpha1.Configuration{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configuration")
 	}
 
-	if !configuration.GetDeletionTimestamp().IsZero() {
-		reqCtx.Log.Info("configuration is deleting, skip reconcile")
-		return intctrlutil.Reconciled()
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, config, constant.ConfigFinalizerName, nil)
+	if res != nil {
+		return *res, err
 	}
 
-	tasks := make([]Task, 0, len(configuration.Spec.ConfigItemDetails))
-	for _, item := range configuration.Spec.ConfigItemDetails {
-		if status := fromItemStatus(reqCtx, &configuration.Status, item); status != nil {
+	tasks := make([]Task, 0, len(config.Spec.ConfigItemDetails))
+	for _, item := range config.Spec.ConfigItemDetails {
+		if status := fromItemStatus(reqCtx, &config.Status, item); status != nil {
 			tasks = append(tasks, NewTask(item, status))
 		}
 	}
@@ -92,29 +96,34 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	fetcherTask := &Task{}
-	err := fetcherTask.Init(&configctrl.ResourceCtx{
+	err = fetcherTask.Init(&configctrl.ResourceCtx{
 		Context:       ctx,
 		Client:        r.Client,
-		Namespace:     configuration.Namespace,
-		ClusterName:   configuration.Spec.ClusterRef,
-		ComponentName: configuration.Spec.ComponentName,
+		Namespace:     config.Namespace,
+		ClusterName:   config.Spec.ClusterRef,
+		ComponentName: config.Spec.ComponentName,
 	}, fetcherTask).Cluster().
-		ClusterDef().
-		ClusterVer().
+		// ClusterDef().
+		// ClusterVer().
 		ClusterComponent().
 		Complete()
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
 	}
 
-	if fetcherTask.ClusterComObj == nil {
-		return r.failWithInvalidComponent(configuration, reqCtx)
+	if !fetcherTask.ClusterObj.GetDeletionTimestamp().IsZero() {
+		reqCtx.Log.Info("cluster is deleting, skip reconcile")
+		return intctrlutil.Reconciled()
 	}
 
-	if err := r.runTasks(TaskContext{configuration, reqCtx, fetcherTask}, tasks); err != nil {
+	if fetcherTask.ClusterComObj == nil {
+		return r.failWithInvalidComponent(config, reqCtx)
+	}
+
+	if err := r.runTasks(TaskContext{config, reqCtx, fetcherTask}, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
-	if !isAllReady(configuration) {
+	if !isAllReady(config) {
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
@@ -187,8 +196,11 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.Configuration{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
+		}).
 		Owns(&corev1.ConfigMap{})
 
 	if multiClusterMgr != nil {

@@ -44,6 +44,17 @@ jobs:
       APECD_REF: "v0.1.38"
     secrets: inherit
 
+  package-addons-version-ent:
+    needs: [ package-version, release-branch ]
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.38
+    with:
+      GITHUB_REPO: "apecloud/apecloud-addons"
+      VERSION: "${{ needs.package-version.outputs.release-version }}"
+      BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
+      WORKFLOW_ID: "release-version.yml"
+      APECD_REF: "v0.1.38"
+    secrets: inherit
+
   package-kbcli-version:
     needs: [ package-version, release-branch ]
     uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.38

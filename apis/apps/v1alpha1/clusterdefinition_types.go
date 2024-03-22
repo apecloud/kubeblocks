@@ -33,17 +33,18 @@ type ClusterDefinitionSpec struct {
 	//
 	// +kubebuilder:validation:MaxLength=24
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Type string `json:"type,omitempty"`
 
 	// Provides the definitions for the cluster components.
 	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Connection credential template used for creating a connection credential secret for cluster objects.
@@ -64,8 +65,85 @@ type ClusterDefinitionSpec struct {
 	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and `$(SVC_PORT_mysql)` in the
 	//    connection credential value is 3306.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
+
+	// Topologies represents the different topologies within the cluster.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	// +optional
+	Topologies []ClusterTopology `json:"topologies,omitempty"`
+}
+
+// ClusterTopology represents the definition for a specific cluster topology.
+type ClusterTopology struct {
+	// Name is the unique identifier for the cluster topology.
+	// Cannot be updated.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=32
+	Name string `json:"name"`
+
+	// Components specifies the components in the topology.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	Components []ClusterTopologyComponent `json:"components"`
+
+	// Orders defines the orders of components within the topology.
+	//
+	// +optional
+	Orders *ClusterTopologyOrders `json:"orders,omitempty"`
+
+	// Default indicates whether this topology is the default configuration.
+	//
+	// +optional
+	Default bool `json:"default,omitempty"`
+}
+
+// ClusterTopologyComponent defines a component within a cluster topology.
+type ClusterTopologyComponent struct {
+	// Name defines the name of the component.
+	// This name is also part of Service DNS name, following IANA Service Naming rules.
+	// Cannot be updated.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=16
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// CompDef specifies the component definition to use, either as a specific name or a name prefix.
+	// Cannot be updated.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=64
+	CompDef string `json:"compDef"`
+}
+
+// ClusterTopologyOrders defines the orders for components within a topology.
+type ClusterTopologyOrders struct {
+	// StartupOrder defines the order in which components should be started in the cluster.
+	// Components with the same order can be listed together, separated by commas.
+	//
+	// +optional
+	StartupOrder []string `json:"startupOrder,omitempty"`
+
+	// ShutdownOrder defines the order in which components should be shut down in the cluster.
+	// Components with the same order can be listed together, separated by commas.
+	//
+	// +optional
+	ShutdownOrder []string `json:"shutdownOrder,omitempty"`
+
+	// UpdateOrder defines the order in which components should be updated in the cluster.
+	// Components with the same order can be listed together, separated by commas.
+	//
+	// +optional
+	UpdateOrder []string `json:"updateOrder,omitempty"`
+
+	// TODO: upgrade order?
 }
 
 // SystemAccountSpec specifies information to create system accounts.
@@ -208,6 +286,11 @@ type ProvisionStatements struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
+	// Represents the most recent generation observed for this ClusterDefinition.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Specifies the current phase of the ClusterDefinition. Valid values are `empty`, `Available`, `Unavailable`.
 	// When `Available`, the ClusterDefinition is ready and can be referenced by related objects.
 	Phase Phase `json:"phase,omitempty"`
@@ -217,10 +300,15 @@ type ClusterDefinitionStatus struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// Represents the most recent generation observed for this ClusterDefinition.
+	// Topologies this ClusterDefinition supported.
 	//
 	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	Topologies string `json:"topologies,omitempty"`
+
+	// The service references declared by this ClusterDefinition.
+	//
+	// +optional
+	ServiceRefs string `json:"serviceRefs,omitempty"`
 }
 
 func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
@@ -1012,6 +1100,7 @@ type SwitchoverAction struct {
 	// Used to select the script that need to be referenced.
 	// When defined, the scripts defined in scriptSpecs can be referenced within the SwitchoverAction.CmdExecutorConfig.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.9.0"
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
@@ -1084,13 +1173,18 @@ type GVKResource struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
+// TODO(API):
+//  1. how to display the aggregated topologies and its service references line by line?
+//  2. the services and versions supported
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd
-// +kubebuilder:printcolumn:name="MAIN-COMPONENT-NAME",type="string",JSONPath=".spec.componentDefs[0].name",description="main component names"
+// +kubebuilder:printcolumn:name="Topologies",type="string",JSONPath=".status.topologies",description="topologies"
+// +kubebuilder:printcolumn:name="ServiceRefs",type="string",JSONPath=".status.serviceRefs",description="service references"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

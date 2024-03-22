@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -134,8 +135,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentLoadResourcesTransformer{},
 			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
-			// allocate port for hostNetwork component
-			&componentHostPortTransformer{},
+			// allocate ports for host-network component
+			&componentHostNetworkTransformer{},
 			// handle component services
 			&componentServiceTransformer{},
 			// handle component system accounts
@@ -143,7 +144,9 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// provision component system accounts
 			&componentAccountProvisionTransformer{},
 			// handle tls volume and cert
-			&componentTLSTransformer{},
+			&componentTLSTransformer{Client: r.Client},
+			// rerender parameters after v-scale and h-scale
+			&componentRelatedParametersTransformer{Client: r.Client},
 			// handle component custom volumes
 			&componentCustomVolumesTransformer{},
 			// resolve and build vars for template and Env
@@ -189,8 +192,11 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 	if retryDurationMS != 0 {
 		requeueDuration = time.Millisecond * time.Duration(retryDurationMS)
 	}
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.Component{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
+		}).
 		Watches(&workloads.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).

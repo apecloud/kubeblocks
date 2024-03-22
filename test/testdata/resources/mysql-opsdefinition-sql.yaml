@@ -17,10 +17,14 @@ spec:
       required:
         - sql
       type: object
-  jobSpec:
-    backoffLimit: 3
-    template:
-      spec:
+  actions:
+  - name: sql
+    failurePolicy: Fail
+    parameters:
+      - sql
+    workload:
+      type: Job
+      podSpec:
         containers:
           - name: mysql
             image: docker.io/apecloud/apecloud-mysql-server:latest

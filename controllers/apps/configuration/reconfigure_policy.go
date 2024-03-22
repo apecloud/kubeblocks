@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -133,7 +134,7 @@ var (
 var upgradePolicyMap = map[appsv1alpha1.UpgradePolicy]reconfigurePolicy{}
 
 func init() {
-	RegisterPolicy(appsv1alpha1.AutoReload, &AutoReloadPolicy{})
+	RegisterPolicy(appsv1alpha1.AsyncDynamicReloadPolicy, &AutoReloadPolicy{})
 }
 
 // GetClientFactory support ut mock
@@ -166,8 +167,22 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 		return defaultRolling
 	}
 
+	var maxUnavailable *intstr.IntOrString
+	for _, rsm := range param.RSMList {
+		if rsm.Spec.UpdateStrategy.RollingUpdate != nil {
+			maxUnavailable = rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
+		}
+		if maxUnavailable != nil {
+			break
+		}
+	}
+
+	if maxUnavailable == nil {
+		return defaultRolling
+	}
+
 	// TODO(xingran&zhangtao): review this logic, set to nil in new API version
-	v, isPercentage, err := intctrlutil.GetIntOrPercentValue(nil)
+	v, isPercentage, err := intctrlutil.GetIntOrPercentValue(maxUnavailable)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to get maxUnavailable!")
 		return defaultRolling
@@ -186,7 +201,7 @@ func (param *reconfigureParams) getTargetReplicas() int {
 }
 
 func (param *reconfigureParams) podMinReadySeconds() int32 {
-	minReadySeconds := param.ComponentUnits[0].Spec.MinReadySeconds
+	minReadySeconds := param.SynthesizedComponent.MinReadySeconds
 	return util.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 
@@ -200,7 +215,7 @@ func (receiver AutoReloadPolicy) Upgrade(params reconfigureParams) (ReturnedStat
 }
 
 func (receiver AutoReloadPolicy) GetPolicyName() string {
-	return string(appsv1alpha1.AutoReload)
+	return string(appsv1alpha1.AsyncDynamicReloadPolicy)
 }
 
 func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
@@ -220,19 +235,19 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.
 		switch {
 		case !dynamicUpdate: // static parameters update
 		case configmanager.IsAutoReload(cc.ReloadOptions): // if core support hot update, don't need to do anything
-			policy = appsv1alpha1.AutoReload
+			policy = appsv1alpha1.AsyncDynamicReloadPolicy
 		case enableSyncTrigger(cc.ReloadOptions): // sync config-manager exec hot update
-			policy = appsv1alpha1.OperatorSyncUpdate
+			policy = appsv1alpha1.SyncDynamicReloadPolicy
 		default: // config-manager auto trigger to hot update
-			policy = appsv1alpha1.AutoReload
+			policy = appsv1alpha1.AsyncDynamicReloadPolicy
 		}
 	}
 
 	// if not specify policy, or cannot decision policy, use default policy.
 	if policy == appsv1alpha1.NonePolicy {
 		policy = appsv1alpha1.NormalPolicy
-		if cc.NeedForceUpdateHot() && enableSyncTrigger(cc.ReloadOptions) {
-			policy = appsv1alpha1.HotUpdateAndRestartPolicy
+		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.ReloadOptions) {
+			policy = appsv1alpha1.DynamicReloadAndRestartPolicy
 		}
 	}
 

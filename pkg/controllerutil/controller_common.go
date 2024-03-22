@@ -258,8 +258,7 @@ func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer st
 	if !controllerutil.ContainsFinalizer(obj, finalizer) {
 		// pvc objects do not need to add finalizer
 		_, ok := obj.(*corev1.PersistentVolumeClaim)
-		_, isPod := obj.(*corev1.Pod)
-		if !ok && !isPod {
+		if !ok {
 			if !controllerutil.AddFinalizer(obj, finalizer) {
 				return ErrFailedToAddFinalizer
 			}
@@ -593,8 +592,4 @@ func (pm *PortManager) ReleaseByPrefix(prefix string) error {
 		return err
 	}
 	return nil
-}
-
-func (pm *PortManager) NeedAllocate(port int32) bool {
-	return port <= 100
 }

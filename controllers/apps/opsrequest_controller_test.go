@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"golang.org/x/exp/slices"
@@ -748,36 +749,39 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 		})
 
+		createRestartOps := func(clusterName string, index int, force ...bool) *appsv1alpha1.OpsRequest {
+			opsName := fmt.Sprintf("restart-ops-%d", index)
+			ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
+				clusterName, appsv1alpha1.RestartType)
+			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
+				{ComponentName: mysqlCompName},
+			}
+			if len(force) > 0 {
+				ops.Spec.Force = force[0]
+			}
+			return testapps.CreateOpsRequest(ctx, testCtx, ops)
+		}
+
 		It("test opsRequest queue", func() {
 			By("create cluster and mock it to running")
 			replicas := int32(3)
 			createMysqlCluster(replicas)
 			mockCompRunning(replicas)
 
-			createRestartOps := func(clusterName string, index int) *appsv1alpha1.OpsRequest {
-				opsName := fmt.Sprintf("restart-ops-%d", index)
-				ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
-					clusterName, appsv1alpha1.RestartType)
-				ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
-					{ComponentName: mysqlCompName},
-				}
-				return testapps.CreateOpsRequest(ctx, testCtx, ops)
-			}
-
 			By("create first restart ops")
 			ops1 := createRestartOps(clusterObj.Name, 1)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.UpdatingClusterPhase))
 
-			By("create second horizontalScaling ops")
+			By("create second restart ops")
 			ops2 := createRestartOps(clusterObj.Name, 2)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsPendingPhase))
 
-			By("create third horizontalScaling ops")
+			By("create third restart ops")
 			ops3 := createRestartOps(clusterObj.Name, 3)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(appsv1alpha1.OpsPendingPhase))
 
-			By("expect for all opsRequests in queue")
+			By("expect for all opsRequests in the queue")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 				g.Expect(len(opsSlice)).Should(Equal(3))
@@ -802,6 +806,124 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 
 			// TODO: test head opsRequest phase is Failed by mocking pod is Failed
+		})
+
+		It("test opsRequest force flag", func() {
+			By("create cluster and mock it to running")
+			replicas := int32(3)
+			createMysqlCluster(replicas)
+			mockCompRunning(replicas)
+
+			By("create first restart ops")
+			ops1 := createRestartOps(clusterObj.Name, 1)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.UpdatingClusterPhase))
+
+			By("create secondary restart ops")
+			ops2 := createRestartOps(clusterObj.Name, 2)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsPendingPhase))
+
+			By("create third restart ops with force flag")
+			ops3 := createRestartOps(clusterObj.Name, 3, true)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+
+			By("expect for all opsRequests in the queue")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+				g.Expect(len(opsSlice)).Should(Equal(3))
+				// ops1/ops3 is running
+				g.Expect(opsSlice[0].InQueue).Should(BeFalse())
+				g.Expect(opsSlice[2].InQueue).Should(BeFalse())
+				g.Expect(opsSlice[1].InQueue).Should(BeTrue())
+			})).Should(Succeed())
+
+			By("mock component to running and expect ops1/op3 phase to Succeed")
+			mockCompRunning(replicas)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+
+			By("expect for next ops is Running")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				// ops1 should be dequeue
+				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+				g.Expect(len(opsSlice)).Should(Equal(1))
+				g.Expect(opsSlice[0].InQueue).Should(BeFalse())
+			})).Should(Succeed())
+		})
+
+		It("test opsRequest queue for QueueBySelf", func() {
+			By("create cluster and mock it to running")
+			replicas := int32(3)
+			createMysqlCluster(replicas)
+			mockCompRunning(replicas)
+
+			By("create first restart ops")
+			restartOps1 := createRestartOps(clusterObj.Name, 0)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps1))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.UpdatingClusterPhase))
+
+			createExposeOps := func(clusterName string, index int, exposeSwitch appsv1alpha1.ExposeSwitch) *appsv1alpha1.OpsRequest {
+				ops := testapps.NewOpsRequestObj(fmt.Sprintf("expose-ops-%d", index), testCtx.DefaultNamespace,
+					clusterName, appsv1alpha1.ExposeType)
+				ops.Spec.ExposeList = []appsv1alpha1.Expose{
+					{
+						ComponentOps: appsv1alpha1.ComponentOps{
+							ComponentName: mysqlCompName,
+						},
+						Switch: exposeSwitch,
+						Services: []appsv1alpha1.OpsService{
+							{
+								Name:        "svc1",
+								ServiceType: corev1.ServiceTypeLoadBalancer,
+								Ports: []corev1.ServicePort{
+									{Name: "port1", Port: 3306, TargetPort: intstr.IntOrString{Type: intstr.String, StrVal: "mysql"}},
+								},
+							},
+						},
+					},
+				}
+				return testapps.CreateOpsRequest(ctx, testCtx, ops)
+			}
+			By("create expose ops which needs to queue by self")
+			exposeOps1 := createExposeOps(clusterObj.Name, 1, appsv1alpha1.EnableExposeSwitch)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps1))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+
+			By("create secondary restart ops and expect it to Pending")
+			restartOps2 := createRestartOps(clusterObj.Name, 2)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(appsv1alpha1.OpsPendingPhase))
+
+			By("create secondary expose ops and expect it to Pending")
+			exposeOps2 := createExposeOps(clusterObj.Name, 3, appsv1alpha1.DisableExposeSwitch)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(appsv1alpha1.OpsPendingPhase))
+
+			By("check opsRequest queue")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+				g.Expect(len(opsSlice)).Should(Equal(4))
+				// restartOps1 is running
+				g.Expect(opsSlice[0].InQueue).Should(BeFalse())
+				// exposOps1 is running
+				g.Expect(opsSlice[1].InQueue).Should(BeFalse())
+				// restartOps2 type is pending
+				g.Expect(opsSlice[2].InQueue).Should(BeTrue())
+				// exposOps2 is pending
+				g.Expect(opsSlice[3].InQueue).Should(BeTrue())
+			})).Should(Succeed())
+
+			By("mock component to running and expect restartOps1 phase to Succeed")
+			mockCompRunning(replicas)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps1))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+
+			By("mock loadBalance service is ready")
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: fmt.Sprintf("%s-%s-svc1", clusterObj.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}, func(svc *corev1.Service) {
+				svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: "test", IP: "192.168.1.110"}}
+			})()).Should(Succeed())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps1))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+
+			By("expect restartOps2 to Running and exposeOps2 to Succeed")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 	})
 })

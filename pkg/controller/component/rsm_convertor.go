@@ -48,6 +48,7 @@ func BuildRSMFrom(synthesizeComp *SynthesizedComponent, protoRSM *workloads.Repl
 		"memberupdatestrategy":      &rsmMemberUpdateStrategyConvertor{},
 		"podmanagementpolicy":       &rsmPodManagementPolicyConvertor{},
 		"updatestrategy":            &rsmUpdateStrategyConvertor{},
+		"instances":                 &rsmInstancesConvertor{},
 	}
 	if err := covertObject(convertors, &protoRSM.Spec, synthesizeComp); err != nil {
 		return nil, err
@@ -102,7 +103,7 @@ func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
 	return appsv1.ParallelPodManagement, nil
 }
 
-// rsmUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.UpdateStrategy.
+// rsmUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Instances.
 type rsmUpdateStrategyConvertor struct{}
 
 func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
@@ -112,11 +113,45 @@ func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	}
 	if getMemberUpdateStrategy(synthesizedComp) != nil {
 		// appsv1.OnDeleteStatefulSetStrategyType is the default value if member update strategy is set.
-		return appsv1.StatefulSetUpdateStrategy{
-			Type: appsv1.OnDeleteStatefulSetStrategyType,
-		}, nil
+		return appsv1.StatefulSetUpdateStrategy{}, nil
 	}
 	return nil, nil
+}
+
+// rsmInstancesConvertor converts component instanceTemplate to rsm instanceTemplate
+type rsmInstancesConvertor struct{}
+
+func (c *rsmInstancesConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseRSMConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	componentInstanceToRSMInstance := func(instance *appsv1alpha1.InstanceTemplate) *workloads.InstanceTemplate {
+		if instance == nil {
+			return nil
+		}
+		return &workloads.InstanceTemplate{
+			Replicas:             instance.Replicas,
+			Name:                 instance.Name,
+			GenerateName:         instance.GenerateName,
+			Annotations:          instance.Annotations,
+			Labels:               instance.Labels,
+			Image:                instance.Image,
+			NodeName:             instance.NodeName,
+			NodeSelector:         instance.NodeSelector,
+			Tolerations:          instance.Tolerations,
+			Resources:            instance.Resources,
+			Volumes:              instance.Volumes,
+			VolumeMounts:         instance.VolumeMounts,
+			VolumeClaimTemplates: instance.VolumeClaimTemplates,
+		}
+	}
+	var instances []workloads.InstanceTemplate
+	for _, instance := range synthesizedComp.Instances {
+		instances = append(instances, *componentInstanceToRSMInstance(&instance))
+	}
+	return instances, nil
 }
 
 // parseRSMConvertorArgs parses the args of rsm convertor.
@@ -211,7 +246,7 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 		TimeoutSeconds:      synthesizeComp.LifecycleActions.RoleProbe.TimeoutSeconds,
 		PeriodSeconds:       synthesizeComp.LifecycleActions.RoleProbe.PeriodSeconds,
 		SuccessThreshold:    1,
-		FailureThreshold:    3,
+		FailureThreshold:    2,
 		RoleUpdateMechanism: workloads.DirectAPIServerEventUpdate,
 	}
 

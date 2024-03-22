@@ -96,7 +96,7 @@ func HandleBackupRepo(request *dpbackup.Request) error {
 	case repo.AccessByMount():
 		pvcName := repo.Status.BackupPVCName
 		if pvcName == "" {
-			return dperrors.NewBackupPVCNameIsEmpty(repo.Name, request.Spec.BackupPolicyName)
+			return dperrors.NewBackupPVCNameIsEmpty(repo.Name)
 		}
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: pvcName}
@@ -374,6 +374,29 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		return "", fmt.Errorf("failed to create service account: %w", err)
 	}
 	return saName, nil
+}
+
+func checkSecretKeyRef(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	namespace string, ref *corev1.SecretKeySelector) error {
+	if ref == nil {
+		return fmt.Errorf("ref is nil")
+	}
+	secret := &corev1.Secret{}
+	err := cli.Get(reqCtx.Ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      ref.Name,
+	}, secret)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("secret (%s/%s) is not found", ref.Name, namespace)
+		}
+		return err
+	}
+	if _, has := secret.Data[ref.Key]; !has {
+		return fmt.Errorf("secret (%s/%s) doesn't contain key %s",
+			ref.Name, namespace, ref.Key)
+	}
+	return nil
 }
 
 // ============================================================================

@@ -20,7 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // TODO: @wangyelei could refactor to ops group
@@ -37,6 +37,13 @@ type OpsRequestSpec struct {
 	// Once set to true, this opsRequest will be canceled and modifying this property again will not take effect.
 	// +optional
 	Cancel bool `json:"cancel,omitempty"`
+
+	// Indicates if pre-checks should be bypassed, allowing the opsRequest to execute immediately. If set to true, pre-checks are skipped except for 'Start' type.
+	// Particularly useful when concurrent execution of VerticalScaling and HorizontalScaling opsRequests is required,
+	// achievable through the use of the Force flag.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.force"
+	// +optional
+	Force bool `json:"force,omitempty"`
 
 	// Defines the operation type.
 	// +kubebuilder:validation:Required
@@ -118,7 +125,6 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.expose"
 	ExposeList []Expose `json:"expose,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Cluster RestoreFrom backup or point in time.
@@ -229,25 +235,6 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
-
-	// Defines the list of nodes where pods can be scheduled during a scale-up operation.
-	// If the RsmTransformPolicy is set to ToPod and the expected number of replicas is greater than the current number,
-	// the list of Nodes will be used. If the list of Nodes is empty, pods will not be assigned to any specific node.
-	// However, if the list of Nodes is populated, pods will be evenly distributed across the nodes in the list during scale-up.
-	// +optional
-	Nodes []types.NodeName `json:"nodes,omitempty"`
-
-	// Defines the names of instances that the rsm should prioritize for scale-down operations.
-	// If the RsmTransformPolicy is set to ToPod and the expected number of replicas is less than the current number,
-	// the list of Instances will be used.
-	//
-	// - `current replicas - expected replicas > len(Instances)`: Scale down from the list of Instances priorly, the others
-	//	 will select from NodeAssignment.
-	// - `current replicas - expected replicas < len(Instances)`: Scale down from the list of Instances.
-	// - `current replicas - expected replicas < len(Instances)`: Scale down from a part of Instances.
-	//
-	// +optional
-	Instances []string `json:"instances,omitempty"`
 }
 
 // Reconfigure represents the variables required for updating a configuration.
@@ -301,20 +288,55 @@ type ConfigurationItem struct {
 }
 
 type CustomOpsSpec struct {
-	// Refers to the name of the cluster component.
-	// +kubebuilder:validation:Required
-	ComponentName string `json:"componentName"`
 
 	// Is a reference to an OpsDefinition.
 	// +kubebuilder:validation:Required
 	OpsDefinitionRef string `json:"opsDefinitionRef"`
 
-	// Represents the input for this operation as declared in the opsDefinition.spec.parametersSchema.
-	// It will create corresponding jobs for each array element.
-	// If the param type is an array, the format must be "v1,v2,v3".
-	// +kubebuilder:validation:MaxItem=10
+	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
+
+	// Defines the execution concurrency. By default, all incoming Components will be executed simultaneously.
+	// The value can be an absolute number (e.g., 5) or a percentage of desired components (e.g., 10%).
+	// The absolute number is calculated from the percentage by rounding up.
+	// For instance, if the percentage value is 10% and the components length is 1,
+	// the calculated number will be rounded up to 1.
 	// +optional
-	Params []map[string]string `json:"params,omitempty"`
+	Parallelism intstr.IntOrString `json:"parallelism,omitempty"`
+
+	// Defines which components need to perform the actions defined by this OpsDefinition.
+	// At least one component is required. The components are identified by their name and can be merged or retained.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	CustomOpsComponents []CustomOpsComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+}
+
+type CustomOpsComponent struct {
+	// Specifies the unique identifier of the cluster component
+	// +kubebuilder:validation:Required
+	ComponentName string `json:"name"`
+
+	// Represents the parameters for this operation as declared in the opsDefinition.spec.parametersSchema.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Parameters []Parameter `json:"parameters,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+}
+
+type Parameter struct {
+	// Specifies the identifier of the parameter as defined in the OpsDefinition.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Holds the data associated with the parameter.
+	// If the parameter type is an array, the format should be "v1,v2,v3".
+	// +kubebuilder:validation:Required
+	Value string `json:"value"`
 }
 
 type ParameterPair struct {
@@ -359,10 +381,13 @@ type Expose struct {
 
 	// Controls the expose operation.
 	// If set to Enable, the corresponding service will be exposed. Conversely, if set to Disable, the service will be removed.
+	//
 	// +kubebuilder:validation:Required
 	Switch ExposeSwitch `json:"switch"`
 
 	// A list of services that are to be exposed or removed.
+	// If componentNamem is not specified, each `OpsService` in the list must specify ports and selectors.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minitems=0
 	Services []OpsService `json:"services"`
@@ -593,6 +618,9 @@ type OpsRequestStatus struct {
 	// +optional
 	Components map[string]OpsRequestComponentStatus `json:"components,omitempty"`
 
+	// A collection of additional key-value pairs that provide supplementary information for the opsRequest.
+	Extras []map[string]string `json:"extras,omitempty"`
+
 	// Indicates the time when the OpsRequest started processing.
 	// +optional
 	StartTimestamp metav1.Time `json:"startTimestamp,omitempty"`
@@ -623,6 +651,8 @@ type OpsRequestStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="has(self.objectKey) || has(self.actionName)", message="either objectKey and actionName."
+
 type ProgressStatusDetail struct {
 	// Specifies the group to which the current object belongs.
 	// If the objects of a component belong to the same group, they can be ignored.
@@ -630,8 +660,18 @@ type ProgressStatusDetail struct {
 	Group string `json:"group,omitempty"`
 
 	// Represents the unique key of the object.
-	// +kubebuilder:validation:Required
-	ObjectKey string `json:"objectKey"`
+	// either objectKey or actionName.
+	// +optional
+	ObjectKey string `json:"objectKey,omitempty"`
+
+	// Refer to the action name of the OpsDefinition.spec.actions[*].name.
+	// either objectKey or actionName.
+	// +optional
+	ActionName string `json:"actionName,omitempty"`
+
+	// Records the tasks associated with an action. such as Jobs/Pods that executes action.
+	// +optional
+	ActionTasks []ActionTask `json:"actionTasks,omitempty"`
 
 	// Indicates the state of processing the object.
 	// +kubebuilder:validation:Required
@@ -648,6 +688,28 @@ type ProgressStatusDetail struct {
 	// Represents the completion time of object processing.
 	// +optional
 	EndTime metav1.Time `json:"endTime,omitempty"`
+}
+
+type ActionTask struct {
+	// Specifies the name of the task workload.
+	// +kubebuilder:validation:Required
+	ObjectKey string `json:"objectKey"`
+
+	// Defines the namespace where the task workload is deployed.
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
+
+	// Indicates the current status of the task.
+	// +kubebuilder:validation:Required
+	Status ActionTaskStatus `json:"status"`
+
+	// The name of the target pod for the task.
+	// +optional
+	TargetPodName string `json:"targetPodName,omitempty"`
+
+	// The number of retry attempts for this task.
+	// +optional
+	Retries int32 `json:"retries,omitempty"`
 }
 
 type LastComponentConfiguration struct {
@@ -698,6 +760,10 @@ type OpsRequestComponentStatus struct {
 	// +optional
 	LastFailedTime metav1.Time `json:"lastFailedTime,omitempty"`
 
+	// Specifies the outcome of the preConditions check for the opsRequest. This result is crucial for determining the next steps in the operation.
+	// +optional
+	PreCheckResult *PreCheckResult `json:"preCheck,omitempty"`
+
 	// Describes the progress details of the component for this operation.
 	// +optional
 	ProgressDetails []ProgressStatusDetail `json:"progressDetails,omitempty"`
@@ -705,6 +771,11 @@ type OpsRequestComponentStatus struct {
 	// References the workload type of component in ClusterDefinition.
 	// +optional
 	WorkloadType WorkloadType `json:"workloadType,omitempty"`
+
+	// Describes the configuration covered by the latest OpsRequest of the same kind.
+	// when reconciling, this information will be used as a benchmark rather than the 'spec', such as 'Spec.HorizontalScaling'.
+	// +optional
+	OverrideBy *OverrideBy `json:"overrideBy,omitempty"`
 
 	// Describes the reason for the component phase.
 	// +kubebuilder:validation:MaxLength=1024
@@ -715,6 +786,24 @@ type OpsRequestComponentStatus struct {
 	// +kubebuilder:validation:MaxLength=32768
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+}
+
+type OverrideBy struct {
+	// Indicates the opsRequest name.
+	// +optional
+	OpsName string `json:"opsName"`
+
+	LastComponentConfiguration `json:",inline"`
+}
+
+type PreCheckResult struct {
+	// Indicates whether the preCheck operation was successful or not.
+	// +kubebuilder:validation:Required
+	Pass bool `json:"pass"`
+
+	// Provides additional details about the preCheck operation in a human-readable format.
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 type ReconfiguringStatus struct {

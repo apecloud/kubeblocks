@@ -185,6 +185,48 @@ func (mr *MockClientMockRecorder) ListUsers(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUsers", reflect.TypeOf((*MockClient)(nil).ListUsers), arg0)
 }
 
+// Lock mocks base method.
+func (m *MockClient) Lock(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Lock", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Lock indicates an expected call of Lock.
+func (mr *MockClientMockRecorder) Lock(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Lock", reflect.TypeOf((*MockClient)(nil).Lock), arg0)
+}
+
+// PostProvision mocks base method.
+func (m *MockClient) PostProvision(arg0 context.Context, arg1, arg2, arg3, arg4, arg5 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PostProvision", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PostProvision indicates an expected call of PostProvision.
+func (mr *MockClientMockRecorder) PostProvision(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProvision", reflect.TypeOf((*MockClient)(nil).PostProvision), arg0, arg1, arg2, arg3, arg4, arg5)
+}
+
+// PreTerminate mocks base method.
+func (m *MockClient) PreTerminate(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PreTerminate", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PreTerminate indicates an expected call of PreTerminate.
+func (mr *MockClientMockRecorder) PreTerminate(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PreTerminate", reflect.TypeOf((*MockClient)(nil).PreTerminate), arg0)
+}
+
 // RevokeUserRole mocks base method.
 func (m *MockClient) RevokeUserRole(arg0 context.Context, arg1, arg2 string) error {
 	m.ctrl.T.Helper()
@@ -211,4 +253,18 @@ func (m *MockClient) Switchover(arg0 context.Context, arg1, arg2 string, arg3 bo
 func (mr *MockClientMockRecorder) Switchover(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Switchover", reflect.TypeOf((*MockClient)(nil).Switchover), arg0, arg1, arg2, arg3)
+}
+
+// Unlock mocks base method.
+func (m *MockClient) Unlock(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Unlock", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Unlock indicates an expected call of Unlock.
+func (mr *MockClientMockRecorder) Unlock(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unlock", reflect.TypeOf((*MockClient)(nil).Unlock), arg0)
 }

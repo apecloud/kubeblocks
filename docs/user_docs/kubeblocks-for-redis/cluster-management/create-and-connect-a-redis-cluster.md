@@ -15,7 +15,7 @@ This tutorial shows how to create and connect to a Redis cluster.
 
 KuebBlocks for Redis supports Standalone clusters and Replication Cluster.
 
-But for your better high-availability experience, KubeBlocks creates a Redis Replication Cluster by default.
+For your better high-availability experience, KubeBlocks creates a Redis Replication Cluster by default.
 
 ## Create a Redis cluster
 

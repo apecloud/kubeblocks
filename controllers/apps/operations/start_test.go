@@ -87,8 +87,7 @@ var _ = Describe("Start OpsRequest", func() {
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("test start action and reconcile function")
-			startHandler := StartOpsHandler{}
-			oldComponentReplicasMap, _ := startHandler.getComponentReplicasSnapshot(opsRes.Cluster.Annotations)
+			oldComponentReplicasMap, _ := getComponentReplicasSnapshot(opsRes.Cluster.Annotations)
 			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
 			// mock cluster phase to stopped
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {

@@ -31,21 +31,21 @@ kbcli cluster list pulsar
 
     :::
 
-   - 扩展 `journal` 卷。
+      - 扩展 `journal` 卷。
 
-     ```bash
-     kbcli cluster volume-expand pulsar --storage=40Gi --components=bookies -t journal  
-     ```
+        ```bash
+        kbcli cluster volume-expand pulsar --storage=40Gi --components=bookies -t journal  
+        ```
 
-     - `--components` 表示需扩容的组件名称。
-     - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
-     - `--storage` 表示磁盘需扩容至的大小。
+        - `--components` 表示需扩容的组件名称。
+        - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
+        - `--storage` 表示磁盘需扩容至的大小。
 
-   - 扩展 `ledger` 卷。
+      - 扩展 `ledger` 卷。
 
-     ```bash
-     kbcli cluster volume-expand pulsar --storage=200Gi --components=bookies -t ledgers  
-     ```
+        ```bash
+        kbcli cluster volume-expand pulsar --storage=200Gi --components=bookies -t ledgers  
+        ```
 
     **选项 2.** 创建 OpsRequest
 

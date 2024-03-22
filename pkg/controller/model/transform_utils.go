@@ -165,6 +165,31 @@ func IsObjectStatusUpdating(object client.Object) bool {
 	return !IsObjectDeleting(object) && !IsObjectUpdating(object)
 }
 
+func IsReconciliationPaused(object client.Object) bool {
+	value := reflect.ValueOf(object)
+	if value.Kind() == reflect.Ptr {
+		value = value.Elem()
+	}
+	if value.Kind() != reflect.Struct {
+		return false
+	}
+	spec := value.FieldByName("Spec")
+	if !spec.IsValid() {
+		return false
+	}
+	paused := spec.FieldByName("Paused")
+	if !paused.IsValid() {
+		return false
+	}
+	if paused.Kind() == reflect.Ptr {
+		paused = paused.Elem()
+	}
+	if !paused.Type().AssignableTo(reflect.TypeOf(true)) {
+		return false
+	}
+	return paused.Interface().(bool)
+}
+
 func DefaultLess(v1, v2 graph.Vertex) bool {
 	o1, ok1 := v1.(*ObjectVertex)
 	o2, ok2 := v2.(*ObjectVertex)

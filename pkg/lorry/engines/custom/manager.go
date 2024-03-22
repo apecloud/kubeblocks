@@ -22,30 +22,30 @@ package custom
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 	"net"
 	"net/http"
-	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Manager struct {
 	engines.DBManagerBase
+
+	// For ASM Actions
 	actionSvcPorts *[]int
 	client         *http.Client
-}
 
-var perNodeRegx = regexp.MustCompile("^[^,]*$")
+	// For ComponentDefinition Actions
+	actionCommands map[string][]string
+}
 
 func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	logger := ctrl.Log.WithName("custom")
@@ -61,12 +61,27 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		DBManagerBase:  *managerBase,
 	}
 
+	err = mgr.InitASMActions()
+	if err != nil {
+		mgr.Logger.Info("init RSM commands failed", "error", err.Error())
+		return nil, err
+	}
+	err = mgr.InitComponentDefintionActions()
+	if err != nil {
+		mgr.Logger.Info("init component definition commands failed", "error", err.Error())
+		return nil, err
+	}
+	return mgr, nil
+}
+
+func (mgr *Manager) InitASMActions() error {
 	actionSvcList := viper.GetString("KB_RSM_ACTION_SVC_LIST")
-	if len(actionSvcList) > 0 {
-		err := json.Unmarshal([]byte(actionSvcList), mgr.actionSvcPorts)
-		if err != nil {
-			return nil, err
-		}
+	if actionSvcList == "" || actionSvcList == "null" {
+		return nil
+	}
+	err := json.Unmarshal([]byte(actionSvcList), mgr.actionSvcPorts)
+	if err != nil {
+		return err
 	}
 
 	// See guidance on proper HTTP client settings here:
@@ -83,78 +98,204 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		Transport: netTransport,
 	}
 
-	return mgr, nil
+	return nil
 }
 
-func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
-	if mgr.actionSvcPorts == nil {
-		return "", nil
-	}
-
-	var (
-		lastOutput []byte
-		err        error
-	)
-
-	for _, port := range *mgr.actionSvcPorts {
-		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_RSM_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
-		lastOutput, err = mgr.callAction(ctx, u)
+func (mgr *Manager) InitComponentDefintionActions() error {
+	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	if actionJSON != "" {
+		err := json.Unmarshal([]byte(actionJSON), &mgr.actionCommands)
 		if err != nil {
-			return "", err
+			return err
 		}
-		mgr.Logger.Info("action succeed", "url", u, "output", string(lastOutput))
 	}
-	finalOutput := strings.TrimSpace(string(lastOutput))
-
-	if perNodeRegx.MatchString(finalOutput) {
-		return finalOutput, nil
-	}
-
-	// csv format: term,podName,role
-	parseCSV := func(input string) (string, error) {
-		res := common.GlobalRoleSnapshot{}
-		lines := strings.Split(input, "\n")
-		for _, line := range lines {
-			fields := strings.Split(strings.TrimSpace(line), ",")
-			if len(fields) != 3 {
-				return "", err
-			}
-			res.Version = strings.TrimSpace(fields[0])
-			pair := common.PodRoleNamePair{
-				PodName:  strings.TrimSpace(fields[1]),
-				RoleName: strings.ToLower(strings.TrimSpace(fields[2])),
-			}
-			res.PodRoleNamePairs = append(res.PodRoleNamePairs, pair)
-		}
-		resByte, err := json.Marshal(res)
-		return string(resByte), err
-	}
-	return parseCSV(finalOutput)
+	return nil
 }
 
-// callAction performs an HTTP request to local HTTP endpoint specified by actionSvcPort
-func (mgr *Manager) callAction(ctx context.Context, url string) ([]byte, error) {
-	// compose http request
-	request, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+// JoinCurrentMemberToCluster provides the following dedicated environment variables for the action:
+//
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+// - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
+// - KB_MEMBER_ADDRESSES: The addresses of all members.
+// - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
+// - KB_NEW_MEMBER_POD_IP: The name of the new member's Pod.
+func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
+	memberJoinCmd, ok := mgr.actionCommands[constant.MemberJoinAction]
+	if !ok || len(memberJoinCmd) == 0 {
+		// return errors.New("member join command is empty!")
+		return nil
+	}
+	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// send http request
-	resp, err := mgr.client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// parse http response
-	if resp.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("received status code %d", resp.StatusCode)
-	}
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	if cluster.Leader != nil && cluster.Leader.Name != "" {
+		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
+		fqdn := cluster.GetMemberAddr(*leaderMember)
+		envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+fqdn)
 	}
 
-	return b, err
+	addrs := cluster.GetMemberAddrs()
+	envs = append(envs, "KB_MEMBER_ADDRESSES"+"="+strings.Join(addrs, ","))
+	envs = append(envs, "KB_NEW_MEMBER_POD_NAME"+"="+mgr.CurrentMemberName)
+	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
+	if member != nil {
+		envs = append(envs, "KB_NEW_MEMBER_POD_IP"+"="+member.PodIP)
+	}
+	output, err := util.ExecCommand(ctx, memberJoinCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("member join", "output", output)
+	}
+	return err
+}
+
+// LeaveMemberFromCluster provides the following dedicated environment variables for the action:
+//
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+// - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
+// - KB_MEMBER_ADDRESSES: The addresses of all members.
+// - KB_LEAVE_MEMBER_POD_NAME: The name of the leave member's Pod.
+// - KB_LEAVE_MEMBER_POD_IP: The IP of the leave member's Pod.
+func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+	memberLeaveCmd, ok := mgr.actionCommands[constant.MemberLeaveAction]
+	if !ok || len(memberLeaveCmd) == 0 {
+		// return errors.New("member leave command is empty!")
+		return nil
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+
+	if cluster.Leader != nil && cluster.Leader.Name != "" {
+		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
+		fqdn := cluster.GetMemberAddr(*leaderMember)
+		envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+fqdn)
+	}
+
+	addrs := cluster.GetMemberAddrs()
+	envs = append(envs, "KB_MEMBER_ADDRESSES"+"="+strings.Join(addrs, ","))
+	envs = append(envs, "KB_LEAVE_MEMBER_POD_NAME"+"="+memberName)
+	member := cluster.GetMemberWithName(memberName)
+	if member != nil {
+		envs = append(envs, "KB_LEAVE_MEMBER_POD_IP"+"="+member.PodIP)
+	}
+	output, err := util.ExecCommand(ctx, memberLeaveCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("member leave", "output", output)
+	}
+	return err
+}
+
+// Lock provides the following dedicated environment variables for the action:
+//
+// - KB_POD_FQDN: The FQDN of the replica pod to check the role.
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	readonlyCmd, ok := mgr.actionCommands[constant.ReadonlyAction]
+	if !ok || len(readonlyCmd) == 0 {
+		// return errors.New("member lock command is empty!")
+		return nil
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+	output, err := util.ExecCommand(ctx, readonlyCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("member lock", "output", output)
+	}
+	return err
+}
+
+// Unlock provides the following dedicated environment variables for the action:
+//
+// - KB_POD_FQDN: The FQDN of the replica pod to check the role.
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+func (mgr *Manager) Unlock(ctx context.Context) error {
+	readWriteCmd, ok := mgr.actionCommands[constant.ReadWriteAction]
+	if !ok || len(readWriteCmd) == 0 {
+		// return errors.New("member unlock command is empty!")
+		return nil
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+	output, err := util.ExecCommand(ctx, readWriteCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("member unlock", "output", output)
+	}
+	return err
+}
+
+// PostProvision provides the following dedicated environment variables for the action:
+//
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+// - KB_CLUSTER_COMPONENT_LIST: Lists all components in the cluster, joined by ',' (e.g., "comp1,comp2").
+// - KB_CLUSTER_COMPONENT_POD_NAME_LIST: Lists all pod names in this component, joined by ',' (e.g., "pod1,pod2").
+// - KB_CLUSTER_COMPONENT_POD_IP_LIST: Lists the IP addresses of each pod in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "podIp1,podIp2").
+// - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Lists the host names where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "hostName1,hostName2").
+// - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Lists the host IP addresses where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "hostIp1,hostIp2").
+func (mgr *Manager) PostProvision(ctx context.Context, componentNames, podNames, podIPs, podHostNames, podHostIPs string) error {
+	postProvisionCmd, ok := mgr.actionCommands[constant.PostProvisionAction]
+	if !ok || len(postProvisionCmd) == 0 {
+		// return errors.New("component postprovision command is empty!")
+		return nil
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+
+	envs = append(envs, "KB_CLUSTER_COMPONENT_LIST"+"="+componentNames)
+	envs = append(envs, "KB_CLUSTER_COMPONENT_POD_NAME_LIST"+"="+podNames)
+	envs = append(envs, "KB_CLUSTER_COMPONENT_POD_IP_LIST"+"="+podIPs)
+	envs = append(envs, "KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST"+"="+podHostNames)
+	envs = append(envs, "KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST"+"="+podHostIPs)
+	output, err := util.ExecCommand(ctx, postProvisionCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("component postprovision", "output", output)
+	}
+	return err
+}
+
+// PreTerminate provides the following dedicated environment variables for the action:
+//
+// - KB_POD_FQDN: The FQDN of the replica pod to check the role.
+// - KB_SERVICE_PORT: The port on which the DB service listens.
+// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
+// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
+func (mgr *Manager) PreTerminate(ctx context.Context) error {
+	preTerminateCmd, ok := mgr.actionCommands[constant.PreTerminateAction]
+	if !ok || len(preTerminateCmd) == 0 {
+		// return errors.New("component preterminate command is empty!")
+		return nil
+	}
+	envs, err := util.GetGlobalSharedEnvs()
+	if err != nil {
+		return err
+	}
+	output, err := util.ExecCommand(ctx, preTerminateCmd, envs)
+
+	if output != "" {
+		mgr.Logger.Info("component preterminate", "output", output)
+	}
+	return err
 }

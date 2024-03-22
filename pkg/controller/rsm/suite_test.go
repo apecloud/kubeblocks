@@ -45,16 +45,14 @@ import (
 )
 
 var (
-	controller      *gomock.Controller
-	k8sMock         *mocks.MockClient
-	graphCli        model.GraphClient
-	ctx             context.Context
-	logger          logr.Logger
-	transCtx        *rsmTransformContext
-	transCtxForPods *rsmTransformContext
-	dag             *graph.DAG
-	dagForPods      *graph.DAG
-	transformer     graph.Transformer
+	controller  *gomock.Controller
+	k8sMock     *mocks.MockClient
+	graphCli    model.GraphClient
+	ctx         context.Context
+	logger      logr.Logger
+	transCtx    *rsmTransformContext
+	dag         *graph.DAG
+	transformer graph.Transformer
 )
 
 const (
@@ -69,7 +67,7 @@ var (
 
 	selectors = map[string]string{
 		constant.AppInstanceLabelKey: name,
-		workloadsManagedByLabelKey:   kindReplicatedStateMachine,
+		WorkloadsManagedByLabelKey:   KindReplicatedStateMachine,
 	}
 
 	headlessSvcName = name + "-headless"
@@ -158,8 +156,6 @@ var (
 	observeActions = []workloads.Action{{Command: []string{"cmd"}}}
 
 	rsm *workloads.ReplicatedStateMachine
-
-	rsmForPods *workloads.ReplicatedStateMachine
 )
 
 func less(v1, v2 graph.Vertex) bool {
@@ -173,17 +169,16 @@ func makePodUpdateReady(newRevision string, pods ...*corev1.Pod) {
 	}
 	for _, pod := range pods {
 		pod.Labels[apps.StatefulSetRevisionLabel] = newRevision
-		if pod.Labels[roleLabelKey] == "" {
-			pod.Labels[roleLabelKey] = "learner"
+		if pod.Labels[RoleLabelKey] == "" {
+			pod.Labels[RoleLabelKey] = "learner"
 		}
 		pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)
 	}
 }
 
 func mockUnderlyingSts(rsm workloads.ReplicatedStateMachine, generation int64) *apps.StatefulSet {
-	headLessSvc := buildHeadlessSvc(rsm)
-	envConfig := buildEnvConfigMap(rsm)
-	sts := buildSts(rsm, headLessSvc.Name, *envConfig)
+	headLessSvc := BuildHeadlessSvc(rsm)
+	sts := buildSts(&rsm, headLessSvc.Name)
 	sts.Generation = generation
 	sts.Status.ObservedGeneration = generation
 	sts.Status.Replicas = *sts.Spec.Replicas
@@ -192,21 +187,6 @@ func mockUnderlyingSts(rsm workloads.ReplicatedStateMachine, generation int64) *
 	sts.Status.UpdatedReplicas = sts.Status.ReadyReplicas
 	sts.Status.UpdateRevision = rsm.Status.UpdateRevision
 	return sts
-}
-
-func mockUnderlyingPods(rsm workloads.ReplicatedStateMachine) []corev1.Pod {
-	podList := buildPods(rsm)
-	pods := make([]corev1.Pod, len(podList))
-	for i := range podList {
-		pods[i] = *podList[i]
-	}
-	return pods
-}
-
-func mockDAGForPods() *graph.DAG {
-	d := graph.NewDAG()
-	graphCli.Root(d, transCtxForPods.rsmOrig, transCtxForPods.rsm, model.ActionStatusPtr())
-	return d
 }
 
 func mockDAG() *graph.DAG {

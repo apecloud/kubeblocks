@@ -106,11 +106,20 @@ func (r *OpsRequest) IsComplete(phases ...OpsPhase) bool {
 	return slices.Contains([]OpsPhase{OpsCancelledPhase, OpsSucceedPhase, OpsFailedPhase}, phases[0])
 }
 
+// Force checks if the current opsRequest can be forcibly executed
+func (r *OpsRequest) Force() bool {
+	// ops of type 'Start' do not support force execution.
+	return r.Spec.Force && r.Spec.Type != StartType
+}
+
 // validateClusterPhase validates whether the current cluster state supports the OpsRequest
 func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	opsBehaviour := OpsRequestBehaviourMapper[r.Spec.Type]
 	// if the OpsType has no cluster phases, ignore it
 	if len(opsBehaviour.FromClusterPhases) == 0 {
+		return nil
+	}
+	if r.Force() {
 		return nil
 	}
 	// validate whether existing the same type OpsRequest
@@ -218,8 +227,41 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 		return r.validateSwitchover(ctx, k8sClient, cluster)
 	case DataScriptType:
 		return r.validateDataScript(ctx, k8sClient, cluster)
+	case ExposeType:
+		return r.validateExpose(ctx, cluster)
 	}
 	return nil
+}
+
+// validateExpose validates expose api when spec.type is Expose
+func (r *OpsRequest) validateExpose(ctx context.Context, cluster *Cluster) error {
+	exposeList := r.Spec.ExposeList
+	if exposeList == nil {
+		return notEmptyError("spec.expose")
+	}
+
+	// compNames := make([]string, len(exposeList))
+	var componentNames []string
+	counter := 0
+	for _, v := range exposeList {
+		if len(v.ComponentName) > 0 {
+			componentNames = append(componentNames, v.ComponentName)
+			continue
+		} else {
+			counter++
+		}
+		if counter > 1 {
+			return fmt.Errorf("at most one spec.expose.componentName can be empty")
+		}
+		if v.Switch == EnableExposeSwitch {
+			for _, opssvc := range v.Services {
+				if len(opssvc.Ports) == 0 {
+					return fmt.Errorf("spec.expose.services.ports must be specified when componentName is empty")
+				}
+			}
+		}
+	}
+	return r.checkComponentExistence(cluster, componentNames)
 }
 
 // validateUpgrade validates spec.restart

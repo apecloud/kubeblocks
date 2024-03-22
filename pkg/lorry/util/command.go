@@ -20,20 +20,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
-	"errors"
+	"context"
 	"os"
 	"os/exec"
+	"strings"
+
+	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-func ExecCommand(command []string) (string, error) {
+func ExecCommand(ctx context.Context, command []string, envs []string) (string, error) {
 	if len(command) == 0 {
 		return "", errors.New("command can not be empty")
 	}
-	cmd := exec.Command(command[0], command[1:]...)
-	cmd.Env = os.Environ()
+	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
+	cmd.Env = envs
 	bytes, err := cmd.Output()
 	if exitErr, ok := err.(*exec.ExitError); ok {
 		err = errors.New(string(exitErr.Stderr))
 	}
 	return string(bytes), err
+}
+
+func GetGlobalSharedEnvs() ([]string, error) {
+	envSetRequired := sets.New(
+		constant.KBEnvPodFQDN,
+		constant.KBEnvServicePort,
+		constant.KBEnvServiceUser,
+		constant.KBEnvServicePassword,
+	)
+	envSetGot := sets.KeySet(map[string]string{})
+	envs := make([]string, 0, envSetRequired.Len())
+	Es := os.Environ()
+	for _, env := range Es {
+		keys := strings.SplitN(env, "=", 2)
+		if len(keys) != 2 {
+			continue
+		}
+		if envSetRequired.Has(keys[0]) {
+			envs = append(envs, env)
+			envSetGot.Insert(keys[0])
+		}
+	}
+	// if len(envs) != envSetRequired.Len() {
+	// 	return nil, errors.Errorf("%v envs is unset", sets.List(envSetRequired.Difference(envSetGot)))
+	// }
+
+	return envs, nil
 }

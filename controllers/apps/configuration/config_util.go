@@ -197,7 +197,7 @@ func updateConfigMapFinalizerImpl(cli client.Client, ctx intctrlutil.RequestCtx,
 		return err
 	}
 
-	if controllerutil.ContainsFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName) {
+	if controllerutil.ContainsFinalizer(cmObj, constant.ConfigFinalizerName) {
 		return nil
 	}
 
@@ -207,7 +207,7 @@ func updateConfigMapFinalizerImpl(cli client.Client, ctx intctrlutil.RequestCtx,
 		cmObj.Labels = map[string]string{}
 	}
 	cmObj.Labels[constant.CMConfigurationTypeLabelKey] = constant.ConfigTemplateType
-	controllerutil.AddFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName)
+	controllerutil.AddFinalizer(cmObj, constant.ConfigFinalizerName)
 
 	// cmObj.Immutable = &tpl.Spec.Immutable
 	return cli.Patch(ctx.Ctx, cmObj, patch)
@@ -222,12 +222,12 @@ func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, con
 		return err
 	}
 
-	if !controllerutil.ContainsFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName) {
+	if !controllerutil.ContainsFinalizer(cmObj, constant.ConfigFinalizerName) {
 		return nil
 	}
 
 	patch := client.MergeFrom(cmObj.DeepCopy())
-	controllerutil.RemoveFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName)
+	controllerutil.RemoveFinalizer(cmObj, constant.ConfigFinalizerName)
 	return cli.Patch(ctx.Ctx, cmObj, patch)
 }
 

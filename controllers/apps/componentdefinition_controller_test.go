@@ -37,9 +37,6 @@ import (
 var _ = Describe("ComponentDefinition Controller", func() {
 	const (
 		componentDefName = "test-componentdef"
-
-		// configVolumeName = "mysql-config"
-		// cmName           = "mysql-tree-node-template-8.0"
 	)
 
 	var (
@@ -73,18 +70,6 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			})).Should(Succeed())
 	}
 
-	// assureCfgTplConfigMapObj := func() *corev1.ConfigMap {
-	//	By("Create a configmap and config template obj")
-	//	cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{}, testCtx.UseDefaultNamespace())
-	//
-	//	cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
-	//		&appsv1alpha1.ConfigConstraint{})
-	//	Expect(testapps.ChangeObjStatus(&testCtx, cfgTpl, func() {
-	//		cfgTpl.Status.Phase = appsv1alpha1.CCAvailablePhase
-	//	})).Should(Succeed())
-	//	return cm
-	// }
-
 	BeforeEach(func() {
 		cleanEnv()
 
@@ -111,49 +96,6 @@ var _ = Describe("ComponentDefinition Controller", func() {
 		})
 	})
 
-	// Context("with config spec", func() {
-	//	BeforeEach(func() {
-	//		By("create a ComponentDefinition obj")
-	//		componentDefObj = testapps.NewComponentDefinitionFactory(componentDefName).
-	//			SetRuntime(nil).
-	//			SetConfigTemplate(cmName, cmName, cmName, testCtx.DefaultNamespace, configVolumeName).
-	//			Create(&testCtx).GetObject()
-	//	})
-	//
-	//	It("should stop proceeding the status of clusterDefinition if configmap is invalid or doesn't exist", func() {
-	//		By("check the reconciler won't update Status.ObservedGeneration if configmap doesn't exist.")
-	//		// should use Consistently here, since cd.Status.ObservedGeneration is initialized to be zero,
-	//		// we must watch the value for a while to tell it's not changed by the reconciler.
-	//		Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
-	//			func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
-	//				g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(int64(0)))
-	//			})).Should(Succeed())
-	//
-	//		assureCfgTplConfigMapObj()
-	//
-	//		By("check the reconciler update Status.ObservedGeneration after configmap is created.")
-	//		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
-	//			func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
-	//				g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(int64(1)))
-	//				// check labels and finalizers
-	//				g.Expect(cmpd.Finalizers).ShouldNot(BeEmpty())
-	//				configCMLabel := cfgcore.GenerateTPLUniqLabelKeyWithConfig(cmName)
-	//				configConstraintLabel := cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(cmName)
-	//				g.Expect(cmpd.Labels[configCMLabel]).Should(Equal(cmName))
-	//				g.Expect(cmpd.Labels[configConstraintLabel]).Should(Equal(cmName))
-	//			})).Should(Succeed())
-	//
-	//		By("check the reconciler update configmap.Finalizer after configmap is created.")
-	//		cmKey := types.NamespacedName{
-	//			Namespace: testCtx.DefaultNamespace,
-	//			Name:      cmName,
-	//		}
-	//		Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cmObj *corev1.ConfigMap) {
-	//			g.Expect(controllerutil.ContainsFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName)).Should(BeTrue())
-	//		})).Should(Succeed())
-	//	})
-	// })
-
 	Context("volumes", func() {
 		It("enable volume protection w/o actions set", func() {
 			By("create a ComponentDefinition obj")
@@ -175,6 +117,49 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
+		})
+	})
+
+	Context("host network", func() {
+		It("ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddHostNetworkContainerPort(testapps.DefaultMySQLContainerName, []string{"mysql"}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
+		})
+
+		It("duplicate containers", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddHostNetworkContainerPort(testapps.DefaultMySQLContainerName, []string{"mysql"}).
+				AddHostNetworkContainerPort(testapps.DefaultMySQLContainerName, []string{"mysql"}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("undefined container", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddHostNetworkContainerPort("non-exist-container", []string{"mysql"}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("undefined container port", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddHostNetworkContainerPort(testapps.DefaultMySQLContainerName, []string{"non-exist-port"}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
 		})
 	})
 

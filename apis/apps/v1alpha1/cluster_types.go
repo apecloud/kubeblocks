@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -48,8 +47,16 @@ type ClusterSpec struct {
 	//
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
+
+	// Topology specifies the topology to use for the cluster. If not specified, the default topology will be used.
+	// Cannot be updated.
+	//
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	Topology string `json:"topology,omitempty"`
 
 	// Specifies the cluster termination policy.
 	//
@@ -100,50 +107,57 @@ type ClusterSpec struct {
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
+	// Cluster backup configuration.
+	//
+	// +optional
+	Backup *ClusterBackup `json:"backup,omitempty"`
+
 	// !!!!! The following fields may be deprecated in subsequent versions, please DO NOT rely on them for new requirements.
 
 	// Describes how pods are distributed across node.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Tenancy TenancyType `json:"tenancy,omitempty"`
 
 	// Describes the availability policy, including zone, node, and none.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	AvailabilityPolicy AvailabilityPolicyType `json:"availabilityPolicy,omitempty"`
 
 	// Specifies the replicas of the first componentSpec, if the replicas of the first componentSpec is specified,
 	// this value will be ignored.
 	//
+	//+kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Specifies the resources of the first componentSpec, if the resources of the first componentSpec is specified,
 	// this value will be ignored.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Resources ClusterResources `json:"resources,omitempty"`
 
 	// Specifies the storage of the first componentSpec, if the storage of the first componentSpec is specified,
 	// this value will be ignored.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Storage ClusterStorage `json:"storage,omitempty"`
 
 	// The configuration of monitor.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Monitor ClusterMonitor `json:"monitor,omitempty"`
 
 	// The configuration of network.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Network *ClusterNetwork `json:"network,omitempty"`
-
-	// Cluster backup configuration.
-	//
-	// +optional
-	Backup *ClusterBackup `json:"backup,omitempty"`
 }
 
 type ClusterBackup struct {
@@ -291,6 +305,87 @@ type UserResourceRefs struct {
 	ConfigMapRefs []ConfigMapRef `json:"configMapRefs,omitempty"`
 }
 
+// InstanceTemplate defines values to override in pod template.
+type InstanceTemplate struct {
+	// Number of replicas of this template.
+	// Default is 1.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Defines the name of the instance.
+	// Only applied when Replicas is 1.
+	//
+	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	Name *string `json:"name,omitempty"`
+
+	// GenerateName is an optional prefix, used by the server, to generate a unique
+	// name ONLY IF the Name field has not been provided.
+	// If this field is used, the name returned to the client will be different
+	// than the name passed. This value will also be combined with a unique suffix.
+	// The provided value has the same validation rules as the Name field,
+	// and may be truncated by the length of the suffix required to make the value
+	// unique on the server.
+	//
+	// Applied only if Name is not specified.
+	//
+	// +kubebuilder:validation:MaxLength=54
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	GenerateName *string `json:"generateName,omitempty"`
+
+	// Defines annotations to override.
+	// Add new or override existing annotations.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Defines labels to override.
+	// Add new or override existing labels.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Defines image to override.
+	// Will override the first container's image of the pod.
+	// +optional
+	Image *string `json:"image,omitempty"`
+
+	// Defines NodeName to override.
+	// +optional
+	NodeName *string `json:"nodeName,omitempty"`
+
+	// Defines NodeSelector to override.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Defines Tolerations to override.
+	// Add new or override existing tolerations.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Defines Resources to override.
+	// Will override the first container's resources of the pod.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Defines Volumes to override.
+	// Add new or override existing volumes.
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// Defines VolumeMounts to override.
+	// Add new or override existing volume mounts of the first container in the pod.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// Defines VolumeClaimTemplates to override.
+	// Add new or override existing volume claim templates.
+	// +optional
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster.
 type ClusterStatus struct {
 	// The most recent generation number that has been observed by the controller.
@@ -363,7 +458,6 @@ type ShardingSpec struct {
 }
 
 // ClusterComponentSpec defines the specifications for a cluster component.
-// +kubebuilder:validation:XValidation:rule="has(self.componentDefRef) || has(self.componentDef)",message="either componentDefRef or componentDef should be provided"
 // TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
 // TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
@@ -382,17 +476,26 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0, consider using the ComponentDef instead"
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
 	// References the name of the ComponentDefinition.
 	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
 	//
-	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:MaxLength=64
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
+
+	// ServiceVersion specifies the version of the service provisioned by the component.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+	// If not explicitly specified, the version defined in the referenced topology will be used.
+	// If no version is specified in the topology, the latest available version will be used.
+	//
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ServiceVersion string `json:"serviceVersion,omitempty"`
 
 	// References the class defined in ComponentClassDefinition.
 	//
@@ -464,11 +567,13 @@ type ClusterComponentSpec struct {
 
 	// Services expose endpoints that can be accessed by clients.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0, consider using the $.Spec.ClusterService instead"
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
 	// Defines the strategy for switchover and failover when workloadType is Replication.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
 
@@ -490,6 +595,7 @@ type ClusterComponentSpec struct {
 	// Defines the update strategy for the component.
 	// Not supported.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
@@ -498,26 +604,17 @@ type ClusterComponentSpec struct {
 	// +optional
 	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
 
-	// Defines the policy to generate sts using rsm.
+	// Overrides values in default Template.
 	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=ToSts
-	// +optional
-	RsmTransformPolicy workloads.RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
-
-	// Defines the list of nodes that pods can schedule.
-	// If the RsmTransformPolicy is specified as ToPod, the list of nodes will be used. If the list of nodes is empty,
-	// no specific node will be assigned. However, if the list of nodes is filled, all pods will be evenly scheduled
-	// across the nodes in the list.
+	// Instance is the fundamental unit managed by KubeBlocks.
+	// It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+	// A component manages instances with a total count of Replicas,
+	// and by default, all these instances are generated from the same template.
+	// The InstanceTemplate provides a way to override values in the default template,
+	// allowing the component to manage instances from different templates.
 	//
 	// +optional
-	Nodes []types.NodeName `json:"nodes,omitempty"`
-
-	// Defines the list of instances to be deleted priorly.
-	// If the RsmTransformPolicy is specified as ToPod, the list of instances will be used.
-	//
-	// +optional
-	Instances []string `json:"instances,omitempty"`
+	Instances []InstanceTemplate `json:"instances,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

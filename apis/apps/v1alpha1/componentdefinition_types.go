@@ -80,7 +80,8 @@ type ComponentDefinitionSpec struct {
 	ServiceKind string `json:"serviceKind,omitempty"`
 
 	// Specifies the version of the well-known service that the component provides.
-	// This field is immutable.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+	// Cannot be updated.
 	//
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
@@ -123,6 +124,11 @@ type ComponentDefinitionSpec struct {
 	//
 	// +optional
 	Volumes []ComponentVolume `json:"volumes"`
+
+	// Defines the host-network capability and resources.
+	//
+	// +optional
+	HostNetwork *HostNetwork `json:"hostNetwork,omitempty"`
 
 	// Defines endpoints that can be used to access the component service to manage the component.
 	//
@@ -184,6 +190,13 @@ type ComponentDefinitionSpec struct {
 	//
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// Defines static annotations that will be patched to all k8s resources created for the component.
+	// If an annotation key conflicts with any other system annotations or user-specified annotations, it will be silently ignored.
+	// This field is immutable.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Defines the limit of valid replicas supported.
 	// This field is immutable.
@@ -624,7 +637,7 @@ type ComponentLifecycleActions struct {
 
 	// RoleProbe defines the mechanism to probe the role of replicas periodically. The specified action will be
 	// executed by Lorry at the configured interval. If the execution is successful, the output will be used as
-	// the replica's assigned role, and the role must be one of the names defined in the componentdefinition roles.
+	// the replica's assigned role, and the role must be one of the names defined in the ComponentDefinition roles.
 	// The output will be compared with the last successful result.  If there is a change, a role change event will
 	// be created to notify the controller and trigger updating the replica's role.
 	// Defining a RoleProbe is required if roles are configured for the component. Otherwise, the replicas' pods will
@@ -674,18 +687,33 @@ type ComponentLifecycleActions struct {
 
 	// Defines the method to add a new replica to the replication group.
 	// This action is typically invoked when a new replica needs to be added, such as during scale-out.
-	// It may involve updating configuration, notifying other members, and ensuring data consistency.
+	// The function does not specify or constrain the role of the new member. The role assignment
+	// is handled by the scripts implemented in the action commands. This provides flexibility
+	// as the new member can be automatically scaled and assigned a role based on the cluster's needs.
 	//
 	// The following dedicated environment variables are available for the action:
 	//
 	// - KB_SERVICE_PORT: The port on which the DB service listens.
 	// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 	// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
-	// - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
+	// - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod.
+	// - KB_MEMBER_ADDRESSES: The addresses of all members.
 	// - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
+	// - KB_NEW_MEMBER_POD_IP: The name of the new member's Pod.
 	//
 	// Output of the action:
 	// - ERROR: Any error message if the action fails.
+	//
+	// For example, the following command can be used to add a new OBServer to the OceanBase Cluster in zone1:
+	// command:
+	// - bash
+	// - -c
+	// - |
+	//    ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
+	//    HOST=$(echo $ADDRESS | cut -d ':' -f 1)
+	//    PORT=$(echo $ADDRESS | cut -d ':' -f 2)
+	//    CLIENT="mysql -u $KB_SERVICE_USER -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e"
+	// 	  $CLIENT "ALTER SYSTEM ADD SERVER '$KB_NEW_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'"
 	//
 	// This field cannot be updated.
 	//
@@ -702,11 +730,24 @@ type ComponentLifecycleActions struct {
 	// - KB_SERVICE_PORT: The port on which the DB service listens.
 	// - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 	// - KB_SERVICE_PASSWORD: The password of the user used to access the DB service.
-	// - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
+	// - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod.
+	// - KB_MEMBER_ADDRESSES: The addresses of all members.
 	// - KB_LEAVE_MEMBER_POD_NAME: The name of the leave member's Pod.
+	// - KB_LEAVE_MEMBER_POD_IP: The IP of the leave member's Pod.
 	//
 	// Output of the action:
 	// - ERROR: Any error message if the action fails.
+	//
+	// For example, the following command can be used to delete a OBServer from the OceanBase Cluster in zone1:
+	// command:
+	// - bash
+	// - -c
+	// - |
+	//    ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
+	//    HOST=$(echo $ADDRESS | cut -d ':' -f 1)
+	//    PORT=$(echo $ADDRESS | cut -d ':' -f 2)
+	//    CLIENT="mysql -u $KB_SERVICE_USER  -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e"
+	// 	  $CLIENT "ALTER SYSTEM DELETE SERVER '$KB_NEW_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'"
 	//
 	// This field cannot be updated.
 	//
@@ -804,6 +845,7 @@ type ComponentSwitchover struct {
 	// Used to define the selectors for the scriptSpecs that need to be referenced.
 	// When this field is defined, the scripts specified in the scripts field can be referenced in the Action.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.9.0"
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }

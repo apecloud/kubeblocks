@@ -98,7 +98,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, constraintKey,
 				func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(appsv1alpha1.AvailablePhase))
-					g.Expect(tpl.Finalizers).To(ContainElement(constant.ConfigurationTemplateFinalizerName))
+					g.Expect(tpl.Finalizers).To(ContainElement(constant.ConfigFinalizerName))
 				})).Should(Succeed())
 
 			By("By delete ConfigConstraint")

@@ -87,12 +87,12 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	}
 
 	// component objects to be created
-	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, transCtx.Labels, createCompSet); err != nil {
+	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, createCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
 		return err
 	}
 
 	// component objects to be updated
-	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, transCtx.Labels, updateCompSet); err != nil {
+	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
 		return err
 	}
 
@@ -100,11 +100,12 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 }
 
 func (t *clusterComponentTransformer) handleCompsCreate(transCtx *clusterTransformContext, dag *graph.DAG,
-	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, protoCompLabelsMap map[string]map[string]string, createCompSet sets.Set[string]) error {
+	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, createCompSet sets.Set[string],
+	protoCompLabelsMap, protoCompAnnotationsMap map[string]map[string]string) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for compName := range createCompSet {
-		comp, err := component.BuildComponent(cluster, protoCompSpecMap[compName], protoCompLabelsMap[compName])
+		comp, err := component.BuildComponent(cluster, protoCompSpecMap[compName], protoCompLabelsMap[compName], protoCompAnnotationsMap[compName])
 		if err != nil {
 			return err
 		}
@@ -122,7 +123,8 @@ func (t *clusterComponentTransformer) initClusterCompStatus(cluster *appsv1alpha
 }
 
 func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransformContext, dag *graph.DAG,
-	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, protoCompLabelsMap map[string]map[string]string, updateCompSet sets.Set[string]) error {
+	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, updateCompSet sets.Set[string],
+	protoCompLabelsMap, protoCompAnnotationsMap map[string]map[string]string) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for compName := range updateCompSet {
@@ -130,7 +132,7 @@ func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 		if getErr != nil {
 			return getErr
 		}
-		comp, buildErr := component.BuildComponent(cluster, protoCompSpecMap[compName], protoCompLabelsMap[compName])
+		comp, buildErr := component.BuildComponent(cluster, protoCompSpecMap[compName], protoCompLabelsMap[compName], protoCompAnnotationsMap[compName])
 		if buildErr != nil {
 			return buildErr
 		}
@@ -180,20 +182,20 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Labels = compProto.Labels
 
 	// merge spec
-	compObjCopy.Spec.Monitor = compProto.Spec.Monitor
+	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
+	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
 	compObjCopy.Spec.ClassDefRef = compProto.Spec.ClassDefRef
-	compObjCopy.Spec.Resources = compProto.Spec.Resources
 	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
+	compObjCopy.Spec.Resources = compProto.Spec.Resources
+	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
 	compObjCopy.Spec.Configs = compProto.Spec.Configs
+	compObjCopy.Spec.Monitor = compProto.Spec.Monitor
 	compObjCopy.Spec.EnabledLogs = compProto.Spec.EnabledLogs
-	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
 	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
-	compObjCopy.Spec.Nodes = compProto.Spec.Nodes
-	compObjCopy.Spec.Instances = compProto.Spec.Instances
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&

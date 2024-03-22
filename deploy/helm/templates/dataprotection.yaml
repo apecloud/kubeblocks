@@ -58,6 +58,9 @@ spec:
             {{- with .Values.loggerSettings.encoder }}
             - "--zap-encoder={{ . }}"
             {{- end }}
+            {{- with .Values.managedNamespaces }}
+            - "--managed-namespaces={{ . }}"
+            {{- end }}
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
@@ -89,6 +92,18 @@ spec:
             {{- if .Values.admissionWebhooks.enabled }}
             - name: ENABLE_WEBHOOKS
               value: "true"
+            {{- end }}
+            {{- if .Values.dataProtection.reconcileWorkers }}
+            - name: DATAPROTECTION_RECONCILE_WORKERS
+              value: {{ .Values.dataProtection.reconcileWorkers | quote }}
+            {{- end }}
+            {{- if .Values.client.qps }}
+            - name: CLIENT_QPS
+              value: {{ .Values.client.qps | quote }}
+            {{- end }}
+            {{- if .Values.client.burst }}
+            - name: CLIENT_BURST
+              value: {{ .Values.client.burst | quote }}
             {{- end }}
             - name: DP_ENCRYPTION_KEY
               valueFrom:

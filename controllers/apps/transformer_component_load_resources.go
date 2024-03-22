@@ -20,12 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
 	"fmt"
 
-	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -59,13 +56,7 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	}
 	transCtx.Cluster = cluster
 
-	generated := false
-	generated, err = isGeneratedComponent(transCtx.Context, transCtx.Client, cluster, comp)
-	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
-
-	if generated {
+	if isGeneratedComponent(transCtx.ComponentOrig) {
 		err = t.transformForGeneratedComponent(transCtx)
 	} else {
 		err = t.transformForNativeComponent(transCtx)
@@ -96,8 +87,16 @@ func (t *componentLoadResourcesTransformer) transformForGeneratedComponent(trans
 }
 
 func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx *componentTransformContext) error {
-	compDef, err := t.getNCheckCompDef(transCtx)
+	var (
+		ctx  = transCtx.Context
+		cli  = transCtx.Client
+		comp = transCtx.Component
+	)
+	compDef, err := getNCheckCompDefinition(ctx, cli, comp.Spec.CompDef)
 	if err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+	if err = updateCompDefinitionImages4ServiceVersion(ctx, cli, compDef, comp.Spec.ServiceVersion); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 	transCtx.CompDef = compDef
@@ -107,7 +106,6 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 		Log:      transCtx.Logger,
 		Recorder: transCtx.EventRecorder,
 	}
-	comp := transCtx.Component
 	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, transCtx.Client, transCtx.Cluster, compDef, comp)
 	if err != nil {
 		message := fmt.Sprintf("build synthesized component for %s failed: %s", comp.Name, err.Error())
@@ -118,55 +116,7 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	return nil
 }
 
-func (t *componentLoadResourcesTransformer) getNCheckCompDef(transCtx *componentTransformContext) (*appsv1alpha1.ComponentDefinition, error) {
-	compKey := types.NamespacedName{
-		Namespace: transCtx.Component.Namespace,
-		Name:      transCtx.Component.Spec.CompDef,
-	}
-	compDef := &appsv1alpha1.ComponentDefinition{}
-	if err := transCtx.Client.Get(transCtx.Context, compKey, compDef); err != nil {
-		return nil, err
-	}
-	if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
-		return nil, fmt.Errorf("ComponentDefinition referenced is unavailable: %s", compDef.Name)
-	}
-	return compDef, nil
-}
-
-// isGeneratedComponent checks if the component is generated from componentDefRef.
-// TODO: remove the dependency on cluster.Spec
-func isGeneratedComponent(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (bool, error) {
-	compName, err := component.ShortName(cluster.Name, comp.Name)
-	if err != nil {
-		return false, err
-	}
-
-	validateCompDef := func(compDefName string) (bool, error) {
-		if len(compDefName) > 0 {
-			if compDefName != comp.Spec.CompDef {
-				err = fmt.Errorf("component definitions referred in cluster and component are different: %s vs %s",
-					compDefName, comp.Spec.CompDef)
-			}
-			return false, err
-		}
-		return true, nil
-	}
-
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if compSpec.Name == compName {
-			return validateCompDef(compSpec.ComponentDef)
-		}
-	}
-
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		shardCompNames, err := ictrlutil.ListShardingCompNames(ctx, cli, cluster, &shardingSpec)
-		if err != nil {
-			return false, err
-		}
-		if slices.Contains(shardCompNames, compName) {
-			return validateCompDef(shardingSpec.Template.ComponentDef)
-		}
-	}
-
-	return true, fmt.Errorf("component %s is not found in cluster %s", compName, cluster.Name)
+// isGeneratedComponent checks if the component is generated from legacy cluster definitions.
+func isGeneratedComponent(comp *appsv1alpha1.Component) bool {
+	return len(comp.Spec.CompDef) == 0
 }

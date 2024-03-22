@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"math"
 	"reflect"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -46,6 +48,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // OpsRequestReconciler reconciles a OpsRequest object
@@ -83,12 +86,16 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.OpsRequest{}).
-		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseFirstOpsRequest)).
-		Watches(&workloadsv1alpha1.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.parseFirstOpsRequestForRSM)).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
+		}).
+		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).
+		Watches(&workloadsv1alpha1.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForRSM)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
 		Owns(&batchv1.Job{}).
 		Complete(r)
 }
@@ -116,6 +123,9 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 		return nil, nil
 	}
 	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
+		if err := r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest); err != nil {
+			return nil, err
+		}
 		return nil, operations.DequeueOpsRequestInClusterAnnotation(reqCtx.Ctx, r.Client, opsRes)
 	})
 }
@@ -179,14 +189,21 @@ func (r *OpsRequestReconciler) handleCancelSignal(reqCtx intctrlutil.RequestCtx,
 	if opsRequest.IsComplete() || opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
 		return nil, nil
 	}
+	if opsRequest.Status.Phase == appsv1alpha1.OpsPendingPhase {
+		return &ctrl.Result{}, operations.PatchOpsStatus(reqCtx.Ctx, r.Client, opsRes, appsv1alpha1.OpsCancelledPhase)
+	}
 	opsBehaviour := operations.GetOpsManager().OpsMap[opsRequest.Spec.Type]
 	if opsBehaviour.CancelFunc == nil {
 		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsCancelActionNotSupported,
-			"Type: %s does not support cancel action.", opsRequest.Spec.Type)
+			"Type: %s does not support cancel action if the phase is not Pending.", opsRequest.Spec.Type)
 		return nil, nil
 	}
 	deepCopyOps := opsRequest.DeepCopy()
 	if err := opsBehaviour.CancelFunc(reqCtx, r.Client, opsRes); err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorIgnoreCancel) {
+			r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsCancelActionNotSupported, err.Error())
+			return nil, nil
+		}
 		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsCancelActionFailed, err.Error())
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
@@ -310,32 +327,58 @@ func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlut
 	return nil
 }
 
-func (r *OpsRequestReconciler) getFirstRequestsFromCluster(cluster *appsv1alpha1.Cluster) []reconcile.Request {
+func (r *OpsRequestReconciler) getRunningOpsRequestsFromCluster(cluster *appsv1alpha1.Cluster) []reconcile.Request {
 	var (
 		opsRequestSlice []appsv1alpha1.OpsRecorder
 		err             error
 		requests        []reconcile.Request
+		clusterType     = "cluster"
+		typeSet         = map[string]appsv1alpha1.OpsRecorder{}
 	)
 	if opsRequestSlice, err = opsutil.GetOpsRequestSliceFromCluster(cluster); err != nil {
 		return nil
 	}
-	if len(opsRequestSlice) > 0 {
-		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Namespace: cluster.Namespace,
-				Name:      opsRequestSlice[0].Name,
-			},
-		})
+	for i := range opsRequestSlice {
+		ops := opsRequestSlice[i]
+		if !ops.InQueue {
+			// append running opsRequest
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: cluster.Namespace,
+					Name:      ops.Name,
+				},
+			})
+		}
+		opsType := string(ops.Type)
+		if !opsRequestSlice[i].QueueBySelf {
+			// If opsRequest is not the type-scope queue, unified as "cluster" scope.
+			opsType = clusterType
+		}
+		if _, ok := typeSet[opsType]; !ok {
+			typeSet[opsType] = ops
+		}
+	}
+
+	for _, v := range typeSet {
+		if v.InQueue {
+			// append the first opsRequest which is in the queue.
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: cluster.Namespace,
+					Name:      v.Name,
+				},
+			})
+		}
 	}
 	return requests
 }
 
-func (r *OpsRequestReconciler) parseFirstOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
+func (r *OpsRequestReconciler) parseRunningOpsRequests(ctx context.Context, object client.Object) []reconcile.Request {
 	cluster := object.(*appsv1alpha1.Cluster)
-	return r.getFirstRequestsFromCluster(cluster)
+	return r.getRunningOpsRequestsFromCluster(cluster)
 }
 
-func (r *OpsRequestReconciler) parseFirstOpsRequestForRSM(ctx context.Context, object client.Object) []reconcile.Request {
+func (r *OpsRequestReconciler) parseRunningOpsRequestsForRSM(ctx context.Context, object client.Object) []reconcile.Request {
 	rsm := object.(*workloadsv1alpha1.ReplicatedStateMachine)
 	clusterName := rsm.Labels[constant.AppInstanceLabelKey]
 	if clusterName == "" {
@@ -345,7 +388,7 @@ func (r *OpsRequestReconciler) parseFirstOpsRequestForRSM(ctx context.Context, o
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: rsm.Namespace}, cluster); err != nil {
 		return nil
 	}
-	return r.getFirstRequestsFromCluster(cluster)
+	return r.getRunningOpsRequestsFromCluster(cluster)
 }
 
 func (r *OpsRequestReconciler) parseVolumeExpansionOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
@@ -402,6 +445,44 @@ func (r *OpsRequestReconciler) parseBackupOpsRequest(ctx context.Context, object
 		})
 	}
 	return requests
+}
+
+func (r *OpsRequestReconciler) parsePod(ctx context.Context, object client.Object) []reconcile.Request {
+	pod := object.(*corev1.Pod)
+	var (
+		requests []reconcile.Request
+	)
+	opsName := pod.Labels[constant.OpsRequestNameLabelKey]
+	opsNamespace := pod.Labels[constant.OpsRequestNamespaceLabelKey]
+	if opsName != "" && opsNamespace != "" {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: opsNamespace,
+				Name:      opsName,
+			},
+		})
+	}
+	return requests
+}
+
+func (r *OpsRequestReconciler) deleteCreatedPodsInKBNamespace(reqCtx intctrlutil.RequestCtx, opsRequest *appsv1alpha1.OpsRequest) error {
+	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	if namespace == "" {
+		return nil
+	}
+	podList := &corev1.PodList{}
+	if err := r.Client.List(reqCtx.Ctx, podList, client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS)), client.MatchingLabels{
+		constant.OpsRequestNameLabelKey:      opsRequest.Name,
+		constant.OpsRequestNamespaceLabelKey: opsRequest.Namespace,
+	}); err != nil {
+		return err
+	}
+	for i := range podList.Items {
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &podList.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type opsRequestStep func(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error)

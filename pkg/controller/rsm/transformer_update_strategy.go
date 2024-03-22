@@ -30,7 +30,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -46,45 +45,29 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 		return nil
 	}
 
-	var pods []corev1.Pod
+	// read the underlying sts
+	stsObj := &apps.StatefulSet{}
+	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), stsObj); err != nil {
+		return err
+	}
+	// read all pods belong to the sts, hence belong to the rsm
+	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, stsObj)
+	if err != nil {
+		return err
+	}
 
-	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
-		podList := &corev1.PodList{}
-		ml := GetPodsLabels(rsm.Labels)
-		if err := transCtx.Client.List(transCtx, podList, client.InNamespace(rsm.Namespace), ml, multicluster.InLocalContext()); err != nil {
-			return err
-		}
-		pods = podList.Items
-	} else {
-		var err error
-		// read the underlying sts
-		stsList := &apps.StatefulSetList{}
-		if err = transCtx.Client.List(transCtx.Context, stsList, client.InNamespace(rsm.Namespace),
-			client.MatchingLabels(rsm.Labels), multicluster.InLocalContext()); err != nil {
-			return err
-		}
+	// prepare to do pods Deletion, that's the only thing we should do,
+	// the stateful_set reconciler will do the others.
+	// to simplify the process, we do pods Deletion after stateful_set reconcile done,
+	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
+	if stsObj.Generation != stsObj.Status.ObservedGeneration {
+		return nil
+	}
 
-		// prepare to do pods Deletion, that's the only thing we should do,
-		// the stateful_set reconciler will do the others.
-		// to simplify the process, we do pods Deletion after stateful_set reconcile done,
-		// that is stsObj.Generation == stsObj.Status.ObservedGeneration
-		for _, sts := range stsList.Items {
-			if sts.Generation != sts.Status.ObservedGeneration {
-				return nil
-			}
-		}
-
-		// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
-		// only then, we have enough info about the previous pods before delete the current one
-		podList := &corev1.PodList{}
-		if err := transCtx.Client.List(transCtx.Context, podList, client.InNamespace(rsm.Namespace),
-			client.MatchingLabels(rsm.Labels), multicluster.InLocalContext()); err != nil {
-			return err
-		}
-		pods = podList.Items
-		if len(pods) != int(*rsm.Spec.Replicas) {
-			return nil
-		}
+	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
+	// only then, we have enough info about the previous pods before delete the current one
+	if len(pods) != int(*stsObj.Spec.Replicas) {
+		return nil
 	}
 
 	// we don't check whether pod role label present: prefer stateful_set's Update done than role probing ready
@@ -95,7 +78,7 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 
 	// generate the pods Deletion plan
 	plan := newUpdatePlan(*rsm, pods)
-	podsToBeUpdated, err := plan.execute()
+	podsToBeUpdated, err := plan.Execute()
 	if err != nil {
 		return err
 	}
@@ -185,7 +168,7 @@ func selectSwitchoverTarget(rsm *workloads.ReplicatedStateMachine, pods []corev1
 		if len(podUpdated) == 0 {
 			podUpdated = pod.Name
 		}
-		if _, ok := pod.Labels[roleLabelKey]; !ok {
+		if _, ok := pod.Labels[RoleLabelKey]; !ok {
 			continue
 		}
 		if len(podUpdatedWithLabel) == 0 {

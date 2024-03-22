@@ -179,7 +179,7 @@ func (mgr *Manager) InitializeCluster(ctx context.Context, _ *dcs.Cluster) error
 }
 
 func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (string, error) {
-	sql := `select role from consensus_cluster_status;`
+	sql := `select role from consensus_member_status;`
 
 	resp, err := mgr.QueryWithHost(ctx, sql, host)
 	if err != nil {

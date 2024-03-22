@@ -300,6 +300,11 @@ func (factory *MockClusterDefFactory) AddNamedServicePort(name string, port int3
 	return factory
 }
 
+func (factory *MockClusterDefFactory) AddClusterTopology(topology appsv1alpha1.ClusterTopology) *MockClusterDefFactory {
+	factory.Get().Spec.Topologies = append(factory.Get().Spec.Topologies, topology)
+	return factory
+}
+
 // There are default volumeMounts for containers in clusterdefinition in pusrpose of a simple & fast creation,
 // but when mounts specified volumes in certain mountPaths, they may conflict with the default volumeMounts,
 // so here provides a way to overwrite the default volumeMounts.

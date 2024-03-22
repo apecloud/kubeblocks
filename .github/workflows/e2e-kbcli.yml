@@ -15,7 +15,7 @@ on:
         description: 'test type (e.g.  apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|mysqlscale|weaviate|qdrant|smartengine|
         greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|foxlake|orioledb|oracle-mysql|official-pg|asmysql|openldap|
         polardbx|opensearch|elasticsearch|vllm|tdengine|milvus|clickhouse|pika|ggml|zookeeper|mariadb|tidb|xinference|
-        oracle|opengauss|influxdb|flink|solr|doris|halo|mogdb|oceanbase-ent|starrocks-ent|yashandb)'
+        oracle|opengauss|influxdb|flink|solr|doris|halo|mogdb|oceanbase-ent|starrocks-ent|yashandb|redis-cluster|camellia-redis-proxy|pulsar-nodeport)'
         required: false
         default: ''
       CLOUD_PROVIDER:
@@ -26,12 +26,16 @@ on:
         options:
           - gke
           - eks
+          - aks
+          - aks-cn
       CLUSTER_VERSION:
-        description: 'k8s cluster version (e.g. 1.26)'
+        description: 'k8s cluster version'
         required: false
-        default: '1.26'
+        default: '1.27'
         type: choice
         options:
+          - 1.29
+          - 1.28
           - 1.27
           - 1.26
           - 1.25
@@ -83,7 +87,11 @@ jobs:
           if [[ "${{ inputs.CLOUD_PROVIDER }}" == 'eks' && -z "$CLUSTER_REGION" ]]; then
               CLUSTER_REGION="${{ vars.REGION_AWS_EKS }}"
           elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'gke' && -z "$CLUSTER_REGION" ]]; then
-              CLUSTER_REGION="${{ vars.REGION_GCP_GEK }}"
+              CLUSTER_REGION="${{ vars.REGION_GCP_GKE }}"
+          elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'aks' && -z "$CLUSTER_REGION" ]]; then
+              CLUSTER_REGION="${{ vars.REGION_AZURE_AKS }}"
+          elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'aks-cn' && -z "$CLUSTER_REGION" ]]; then
+              CLUSTER_REGION="${{ vars.REGION_AZURE_CN_AKS }}"
           fi
           echo cluster-region=$CLUSTER_REGION >> $GITHUB_OUTPUT
 

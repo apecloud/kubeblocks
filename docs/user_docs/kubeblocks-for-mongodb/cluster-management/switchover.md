@@ -6,6 +6,9 @@ sidebar_position: 6
 sidebar_label: Switchover
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Switch over a MongoDB cluster
 
 You can initiate a switchover for a MongoDB ReplicaSet by executing the kbcli or kubectl command. Then KubeBlocks modifies the instance roles.

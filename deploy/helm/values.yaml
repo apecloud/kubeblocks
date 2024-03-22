@@ -27,6 +27,17 @@ image:
 ##
 replicaCount: 1
 
+## MaxConcurrentReconciles for component, rsm and opsRequest controllers.
+##
+reconcileWorkers: ""
+
+## k8s client configuration.
+client:
+  # default is 20
+  qps: ""
+  # default is 30
+  burst: ""
+
 ## @param nameOverride
 ##
 nameOverride: ""
@@ -101,6 +112,11 @@ podDisruptionBudget:
   # Cannot be used if `minAvailable` is set.
   maxUnavailable:
 
+## Specify the namespaces that the operators will manage, multiple namespaces are separated by commas.
+##
+## @param managedNamespaces
+##
+managedNamespaces:
 
 ## Logger settings
 ##
@@ -309,7 +325,8 @@ dataProtection:
   # if 'get/list' role of the backup CR are compromised.
   encryptionKey: ""
   gcFrequencySeconds: 3600
-
+  ## MaxConcurrentReconciles for backup controller.
+  reconcileWorkers: ""
   worker:
     serviceAccount:
       # The name of the service account for worker pods.
@@ -332,7 +349,7 @@ dataProtection:
     imagePullSecrets: []
     datasafed:
       repository: apecloud/datasafed
-      tag: "0.1.0"
+      tag: "0.2.0"
 
 ## BackupRepo settings
 ##
@@ -1430,7 +1447,7 @@ prometheus:
           action: replace
           target_label: pod
         - source_labels: [__meta_kubernetes_pod_phase]
-          regex: Pending|Succeeded|Failed|Completed
+          regex: Succeeded|Failed|Completed
           action: drop
 
       - job_name: 'kubeblocks-agamotto'

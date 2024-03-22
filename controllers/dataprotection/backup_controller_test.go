@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -325,6 +326,95 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					g.Expect(fetched.Status.CompletionTimestamp).ShouldNot(BeNil())
 					g.Expect(fetched.Status.Expiration.Second()).Should(Equal(fetched.Status.CompletionTimestamp.Add(time.Hour).Second()))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("creates a backup with encryption", func() {
+			const (
+				encryptionKeySecretName = "backup-encryption"
+				keyName                 = "password"
+			)
+			It("should fail if encryption key secret is not present", func() {
+				By("set encryptionConfig")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.EncryptionConfig = &dpv1alpha1.EncryptionConfig{
+						Algorithm: "AES-256-CFB",
+						PassPhraseSecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: encryptionKeySecretName,
+							},
+							Key: keyName,
+						},
+					}
+				})).Should(Succeed())
+
+				By("create a backup")
+				backup := testdp.NewFakeBackup(&testCtx, nil)
+
+				By("check the backup, and it should be failed")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+
+			It("should run the backup with encryption envs", func() {
+				By("set encryptionConfig")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.EncryptionConfig = &dpv1alpha1.EncryptionConfig{
+						Algorithm: "AES-256-CFB",
+						PassPhraseSecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: encryptionKeySecretName,
+							},
+							Key: keyName,
+						},
+					}
+				})).Should(Succeed())
+
+				By("create the encryption key secret")
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      encryptionKeySecretName,
+						Namespace: testCtx.DefaultNamespace,
+					},
+					StringData: map[string]string{
+						keyName: "whatever",
+					},
+				}
+				testapps.CreateK8sResource(&testCtx, secret)
+
+				By("create a backup")
+				backup := testdp.NewFakeBackup(&testCtx, nil)
+
+				By("check the backup")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
+					g.Expect(fetched.Status.EncryptionConfig).ShouldNot(BeNil())
+				})).Should(Succeed())
+
+				By("check the backup job")
+				getJobKey := func(index int) client.ObjectKey {
+					return client.ObjectKey{
+						Name:      dpbackup.GenerateBackupJobName(backup, fmt.Sprintf("%s-%d", dpbackup.BackupDataJobNamePrefix, index)),
+						Namespace: backup.Namespace,
+					}
+				}
+				Eventually(testapps.CheckObj(&testCtx, getJobKey(0), func(g Gomega, job *batchv1.Job) {
+					g.Expect(len(job.Spec.Template.Spec.Containers)).ShouldNot(BeZero())
+					expectedEnvs := []string{
+						dptypes.DPDatasafedEncryptionAlgorithm,
+						dptypes.DPDatasafedEncryptionPassPhrase,
+					}
+					for _, c := range job.Spec.Template.Spec.Containers {
+						count := 0
+						for _, env := range c.Env {
+							if slices.Contains(expectedEnvs, env.Name) {
+								count++
+							}
+						}
+						g.Expect(count).To(BeEquivalentTo(len(expectedEnvs)))
+					}
 				})).Should(Succeed())
 			})
 		})

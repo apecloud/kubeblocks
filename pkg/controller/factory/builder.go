@@ -59,6 +59,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 		clusterName        = synthesizedComp.ClusterName
 		compName           = synthesizedComp.Name
 	)
+	// build labels
 	labels := constant.GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, compName)
 	compDefLabel := constant.GetComponentDefLabel(compDefName)
 	if len(clusterDefName) > 0 {
@@ -68,7 +69,10 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	}
 	mergeLabels := intctrlutil.MergeMetadataMaps(labels, compDefLabel, synthesizedComp.Labels)
 
-	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
+	// build annotations
+	mergeAnnotations := intctrlutil.MergeMetadataMaps(constant.GetKBGenerationAnnotation(synthesizedComp.ClusterGeneration),
+		getMonitorAnnotations(synthesizedComp), synthesizedComp.Annotations)
+
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(labels).
 		AddLabelsInMap(compDefLabel).
@@ -80,15 +84,12 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 
 	rsmName := constant.GenerateRSMNamePattern(clusterName, compName)
 	rsmBuilder := builder.NewReplicatedStateMachineBuilder(namespace, rsmName).
-		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.ClusterGeneration).
-		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp)).
 		AddLabelsInMap(mergeLabels).
+		AddAnnotationsInMap(mergeAnnotations).
 		AddMatchLabelsInMap(labels).
 		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
-		SetRsmTransformPolicy(synthesizedComp.RsmTransformPolicy).
-		SetNodeAssignment(synthesizedComp.NodesAssignment).
 		SetTemplate(template)
 
 	var vcts []corev1.PersistentVolumeClaim
@@ -276,6 +277,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	// if exists, replace the random password
 	if restorePassword != "" {
 		randomPassword = restorePassword
+		strongRandomPasswd = restorePassword
 	}
 	m := map[string]string{
 		"$(RANDOM_PASSWD)":        randomPassword,

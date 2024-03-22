@@ -306,7 +306,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// multi-cluster manager for all worker k8s
+	// multi-cluster manager for data-plane k8s
 	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetClient(), kubeContexts)
 	if err != nil {
 		setupLog.Error(err, "unable to setup multi-cluster manager")

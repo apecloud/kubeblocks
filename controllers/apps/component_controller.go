@@ -181,6 +181,10 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
+	if retryDurationMS != 0 {
+		requeueDuration = time.Millisecond * time.Duration(retryDurationMS)
+	}
 	if multiClusterMgr == nil {
 		return r.setupWithManager(mgr)
 	}
@@ -188,10 +192,6 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr
 }
 
 func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
-	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
-	if retryDurationMS != 0 {
-		requeueDuration = time.Millisecond * time.Duration(retryDurationMS)
-	}
 	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.Component{}).
 		WithOptions(controller.Options{
@@ -222,9 +222,12 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.Component{}).
-		Owns(&workloads.ReplicatedStateMachine{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
+		}).
+		Watches(&workloads.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&dpv1alpha1.Backup{}).
 		Owns(&dpv1alpha1.Restore{}).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))

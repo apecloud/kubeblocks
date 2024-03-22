@@ -228,8 +228,11 @@ func (r *ReplicatedStateMachineReconciler) setupWithMultiClusterManager(mgr ctrl
 	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 	podHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
 
-	b := ctrl.NewControllerManagedBy(mgr).
-		For(&workloads.ReplicatedStateMachine{})
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+		For(&workloads.ReplicatedStateMachine{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
+		})
 
 	multiClusterMgr.Watch(b, &appsv1.StatefulSet{}, stsHandler).
 		Watch(b, &batchv1.Job{}, jobHandler).

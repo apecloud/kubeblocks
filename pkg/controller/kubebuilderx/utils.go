@@ -21,6 +21,7 @@ package kubebuilderx
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 // ReadObjectTree reads all objects owned by the root object which is type of 'T' with key in 'req'.
@@ -81,4 +83,15 @@ func getMatchLabels(root client.Object, labelKeys []string) client.MatchingLabel
 		labels[key] = root.GetLabels()[key]
 	}
 	return labels
+}
+
+func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
+	if v.ClientOpt != nil {
+		opt, ok := v.ClientOpt.(*multicluster.ClientOption)
+		if ok {
+			return opt
+		}
+		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
+	}
+	return multicluster.InGlobalContext()
 }

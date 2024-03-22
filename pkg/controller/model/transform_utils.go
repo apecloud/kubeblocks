@@ -190,6 +190,31 @@ func IsReconciliationPaused(object client.Object) bool {
 	return paused.Interface().(bool)
 }
 
+// ReadCacheSnapshot reads all objects owned by our cluster
+func ReadCacheSnapshot(ctx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (ObjectSnapshot, error) {
+	// list what kinds of object cluster owns
+	snapshot := make(ObjectSnapshot)
+	inNS := client.InNamespace(root.GetNamespace())
+	for _, list := range kinds {
+		if err := ctx.GetClient().List(ctx.GetContext(), list, inNS, ml); err != nil {
+			return nil, err
+		}
+		// reflect get list.Items
+		items := reflect.ValueOf(list).Elem().FieldByName("Items")
+		l := items.Len()
+		for i := 0; i < l; i++ {
+			// get the underlying object
+			object := items.Index(i).Addr().Interface().(client.Object)
+			name, err := GetGVKName(object)
+			if err != nil {
+				return nil, err
+			}
+			snapshot[*name] = object
+		}
+	}
+	return snapshot, nil
+}
+
 func DefaultLess(v1, v2 graph.Vertex) bool {
 	o1, ok1 := v1.(*ObjectVertex)
 	o2, ok2 := v2.(*ObjectVertex)

@@ -92,7 +92,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	// read cache snapshot
 	ml := getLabels(rsm)
-	oldSnapshot, err := readCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
+	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
 	if err != nil {
 		return err
 	}
@@ -108,33 +108,25 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	createNewObjects := func() {
 		for name := range createSet {
 			obj := newSnapshot[name]
-			cli.Create(dag, obj, inLocalContext())
+			cli.Create(dag, obj)
 		}
 	}
 	updateObjects := func() {
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := copyAndMerge(oldObj, newSnapshot[name])
-			if reflect.DeepEqual(oldObj, newObj) {
-				continue
-			}
-			// TODO(leon): update service
-			// if _, ok := oldObj.(*corev1.Service); ok {
-			//	continue
-			// }
-			cli.Update(dag, oldObj, newObj, inLocalContext())
+			cli.Update(dag, oldObj, newObj)
 		}
 	}
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
-			oldObj := oldSnapshot[name]
 			if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 				// filter non-env configmaps
-				if _, ok := oldObj.(*corev1.ConfigMap); ok {
+				if _, ok := oldSnapshot[name].(*corev1.ConfigMap); ok {
 					continue
 				}
 			}
-			cli.Delete(dag, oldObj, inLocalContext())
+			cli.Delete(dag, oldSnapshot[name])
 		}
 	}
 	handleDependencies := func() {
@@ -723,9 +715,8 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	svcName := getHeadlessSvcName(set)
 	uid := string(set.UID)
 	strReplicas := strconv.Itoa(int(*set.Spec.Replicas))
-	generateReplicaEnv := func(prefix string, withDef bool) {
+	generateReplicaEnv := func(prefix string) {
 		for i := 0; i < int(*set.Spec.Replicas); i++ {
-			// TODO(leon)
 			hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
 			hostNameTplValue := set.Name + "-" + strconv.Itoa(i)
 			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
@@ -755,7 +746,7 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 
 	prefix := constant.KBPrefix + "_RSM_"
 	envData[prefix+"N"] = strReplicas
-	generateReplicaEnv(prefix, false)
+	generateReplicaEnv(prefix)
 	generateMemberEnv(prefix)
 	// set owner uid to let pod know if the owner is recreated
 	envData[prefix+"OWNER_UID"] = uid
@@ -764,7 +755,7 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	// have backward compatible handling for env generated in version prior 0.6.0
 	prefix = constant.KBPrefix + "_"
 	envData[prefix+"REPLICA_COUNT"] = strReplicas
-	generateReplicaEnv(prefix, true)
+	generateReplicaEnv(prefix)
 	generateMemberEnv(prefix)
 
 	// have backward compatible handling for CM key with 'compDefName' being part of the key name, prior 0.5.0
@@ -772,7 +763,7 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	componentDefName := set.Labels[constant.AppComponentLabelKey]
 	prefixWithCompDefName := prefix + strings.ToUpper(componentDefName) + "_"
 	envData[prefixWithCompDefName+"N"] = strReplicas
-	generateReplicaEnv(prefixWithCompDefName, true)
+	generateReplicaEnv(prefixWithCompDefName)
 	generateMemberEnv(prefixWithCompDefName)
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
 

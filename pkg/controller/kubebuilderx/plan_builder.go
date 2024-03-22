@@ -145,7 +145,7 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 }
 
 func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := b.cli.Create(ctx, vertex.Obj, rsm1.ClientOption(vertex))
+	err := b.cli.Create(ctx, vertex.Obj, clientOption(vertex))
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -153,7 +153,7 @@ func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := b.cli.Update(ctx, vertex.Obj, rsm1.ClientOption(vertex))
+	err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -162,7 +162,7 @@ func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVert
 
 func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	patch := client.MergeFrom(vertex.OriObj)
-	err := b.cli.Patch(ctx, vertex.Obj, patch, rsm1.ClientOption(vertex))
+	err := b.cli.Patch(ctx, vertex.Obj, patch, clientOption(vertex))
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -172,14 +172,14 @@ func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVerte
 func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	finalizer := rsm1.GetFinalizer(vertex.Obj)
 	if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
-		err := b.cli.Update(ctx, vertex.Obj, rsm1.ClientOption(vertex))
+		err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {
 			b.transCtx.logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
 			return err
 		}
 	}
 	if !model.IsObjectDeleting(vertex.Obj) {
-		err := b.cli.Delete(ctx, vertex.Obj, rsm1.ClientOption(vertex))
+		err := b.cli.Delete(ctx, vertex.Obj, clientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -188,7 +188,7 @@ func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 func (b *PlanBuilder) statusObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	if err := b.cli.Status().Update(ctx, vertex.Obj, rsm1.ClientOption(vertex)); err != nil {
+	if err := b.cli.Status().Update(ctx, vertex.Obj, clientOption(vertex)); err != nil {
 		return err
 	}
 	return nil

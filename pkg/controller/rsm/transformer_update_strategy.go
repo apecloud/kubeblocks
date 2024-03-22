@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
-	"slices"
-	"strings"
-
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -159,10 +156,9 @@ func createSwitchoverAction(dag *graph.DAG, cli model.GraphClient, rsm *workload
 }
 
 func selectSwitchoverTarget(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) int {
-	updateRevisions := strings.Split(rsm.Status.UpdateRevision, ",")
 	var podUpdated, podUpdatedWithLabel string
 	for _, pod := range pods {
-		if !slices.Contains(updateRevisions, intctrlutil.GetPodRevision(&pod)) {
+		if intctrlutil.GetPodRevision(&pod) != rsm.Status.UpdateRevision {
 			continue
 		}
 		if len(podUpdated) == 0 {

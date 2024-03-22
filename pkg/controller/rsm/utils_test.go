@@ -41,7 +41,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 type testTransCtx struct {
@@ -463,43 +462,6 @@ var _ = Describe("utils test", func() {
 				},
 			}
 			Expect(IsOwnedByRsm(rsm)).Should(BeFalse())
-		})
-	})
-
-	Context("readCacheSnapshot function", func() {
-		It("should work well", func() {
-			controller, k8sMock := testutil.SetupK8sMock()
-			defer controller.Finish()
-
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			obj0 := builder.NewPodBuilder(namespace, name+"-0").GetObject()
-			obj1 := builder.NewPodBuilder(namespace, name+"-1").GetObject()
-			obj2 := builder.NewPodBuilder(namespace, name+"-2").GetObject()
-
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
-					Expect(list).ShouldNot(BeNil())
-					list.Items = []corev1.Pod{*obj0, *obj1, *obj2}
-					return nil
-				}).Times(1)
-			transCtx := &testTransCtx{
-				Context:     context.Background(),
-				GraphClient: model.NewGraphClient(k8sMock),
-			}
-			snapshot, err := readCacheSnapshot(transCtx, root, nil, &corev1.PodList{})
-			Expect(err).Should(BeNil())
-			Expect(snapshot).Should(HaveLen(3))
-			objList := []*corev1.Pod{obj0, obj1, obj2}
-			for _, pod := range objList {
-				gvk, err := model.GetGVKName(pod)
-				Expect(err).Should(BeNil())
-				obj, ok := snapshot[*gvk]
-				Expect(ok).Should(BeTrue())
-				p, ok := obj.(*corev1.Pod)
-				Expect(ok).Should(BeTrue())
-				Expect(p).Should(Equal(pod))
-			}
 		})
 	})
 })

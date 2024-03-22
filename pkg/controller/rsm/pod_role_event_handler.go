@@ -196,3 +196,31 @@ func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) 
 	}
 	return nil
 }
+
+// updatePodRoleLabel updates pod role label when internal container role changed
+func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
+	rsm workloads.ReplicatedStateMachine, pod *corev1.Pod, roleName string, version string) error {
+	ctx := reqCtx.Ctx
+	roleMap := composeRoleMap(rsm)
+	// role not defined in CR, ignore it
+	roleName = strings.ToLower(roleName)
+
+	// update pod role label
+	patch := client.MergeFrom(pod.DeepCopy())
+	role, ok := roleMap[roleName]
+	switch ok {
+	case true:
+		pod.Labels[RoleLabelKey] = role.Name
+		pod.Labels[rsmAccessModeLabelKey] = string(role.AccessMode)
+	case false:
+		delete(pod.Labels, RoleLabelKey)
+		delete(pod.Labels, rsmAccessModeLabelKey)
+	}
+
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
+	// TODO(placement): optimize
+	return cli.Patch(ctx, pod, patch, multicluster.InLocalContextUnspecified())
+}

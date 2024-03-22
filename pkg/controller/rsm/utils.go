@@ -22,7 +22,6 @@ package rsm
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -46,7 +45,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -137,34 +135,6 @@ func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	return rolePriorityMap
 }
 
-// updatePodRoleLabel updates pod role label when internal container role changed
-func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	rsm workloads.ReplicatedStateMachine, pod *corev1.Pod, roleName string, version string) error {
-	ctx := reqCtx.Ctx
-	roleMap := composeRoleMap(rsm)
-	// role not defined in CR, ignore it
-	roleName = strings.ToLower(roleName)
-
-	// update pod role label
-	patch := client.MergeFrom(pod.DeepCopy())
-	role, ok := roleMap[roleName]
-	switch ok {
-	case true:
-		pod.Labels[RoleLabelKey] = role.Name
-		pod.Labels[rsmAccessModeLabelKey] = string(role.AccessMode)
-	case false:
-		delete(pod.Labels, RoleLabelKey)
-		delete(pod.Labels, rsmAccessModeLabelKey)
-	}
-
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
-	}
-	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	// TODO(placement): optimize
-	return cli.Patch(ctx, pod, patch, multicluster.InLocalContextUnspecified())
-}
-
 func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
 	roleMap := make(map[string]workloads.ReplicaRole, 0)
 	for _, role := range rsm.Spec.Roles {
@@ -250,8 +220,9 @@ func getPodsOfStatefulSet(ctx context.Context, cli client.Reader, stsObj *appsv1
 	if err != nil {
 		return nil, err
 	}
-	if err := cli.List(ctx, podList, &client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels(selector), multicluster.InLocalContext()); err != nil {
+	if err := cli.List(ctx, podList,
+		&client.ListOptions{Namespace: stsObj.Namespace},
+		client.MatchingLabels(selector)); err != nil {
 		return nil, err
 	}
 	isMemberOf := func(stsName string, pod *corev1.Pod) bool {
@@ -295,7 +266,7 @@ func getActionList(transCtx *rsmTransformContext, actionScenario string) ([]*bat
 
 	var actionList []*batchv1.Job
 	jobList := &batchv1.JobList{}
-	if err := transCtx.Client.List(transCtx.Context, jobList, ml, multicluster.InLocalContextOneshot()); err != nil {
+	if err := transCtx.Client.List(transCtx.Context, jobList, ml); err != nil {
 		return nil, err
 	}
 	for i := range jobList.Items {
@@ -344,7 +315,7 @@ func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.Replicat
 	if err := SetOwnership(rsm, action, model.GetScheme(), GetFinalizer(action)); err != nil {
 		return err
 	}
-	cli.Create(dag, action, inLocalContextOneshot())
+	cli.Create(dag, action)
 	return nil
 }
 
@@ -517,7 +488,7 @@ func doActionCleanup(dag *graph.DAG, graphCli model.GraphClient, action *batchv1
 	actionOld := action.DeepCopy()
 	actionNew := actionOld.DeepCopy()
 	actionNew.Labels[jobHandledLabel] = jobHandledTrue
-	graphCli.Update(dag, actionOld, actionNew, inLocalContextOneshot())
+	graphCli.Update(dag, actionOld, actionNew)
 }
 
 func emitEvent(transCtx *rsmTransformContext, action *batchv1.Job) {
@@ -721,9 +692,7 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 		return false
 	}
 	for i := 0; i < int(*rsm.Spec.Replicas); i++ {
-		// TODO(leon): sts
-		// podName := getPodName(rsm.Name, i)
-		podName := fmt.Sprintf("%s-0", getPodName(rsm.Name, i))
+		podName := getPodName(rsm.Name, i)
 		if !isMemberReady(podName, membersStatus) {
 			return false
 		}
@@ -824,55 +793,4 @@ func IsOwnedByRsm(obj client.Object) bool {
 		}
 	}
 	return false
-}
-
-// readCacheSnapshot reads all objects owned by our cluster
-func readCacheSnapshot(ctx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (model.ObjectSnapshot, error) {
-	// list what kinds of object cluster owns
-	snapshot := make(model.ObjectSnapshot)
-	inNS := client.InNamespace(root.GetNamespace())
-	for _, list := range kinds {
-		if err := ctx.GetClient().List(ctx.GetContext(), list, inNS, ml, multicluster.InLocalContext()); err != nil {
-			return nil, err
-		}
-		// reflect get list.Items
-		items := reflect.ValueOf(list).Elem().FieldByName("Items")
-		l := items.Len()
-		for i := 0; i < l; i++ {
-			// get the underlying object
-			object := items.Index(i).Addr().Interface().(client.Object)
-			name, err := model.GetGVKName(object)
-			if err != nil {
-				return nil, err
-			}
-			snapshot[*name] = object
-		}
-	}
-	return snapshot, nil
-}
-
-func placement(rsm workloads.ReplicatedStateMachine) string {
-	if rsm.Annotations == nil {
-		return ""
-	}
-	return rsm.Annotations[constant.KBAppMultiClusterPlacementKey]
-}
-
-func inLocalContext() model.GraphOption {
-	return model.WithClientOption(multicluster.InLocalContext())
-}
-
-func inLocalContextOneshot() model.GraphOption {
-	return model.WithClientOption(multicluster.InLocalContextOneshot())
-}
-
-func ClientOption(v *model.ObjectVertex) *multicluster.ClientOption {
-	if v.ClientOpt != nil {
-		opt, ok := v.ClientOpt.(*multicluster.ClientOption)
-		if ok {
-			return opt
-		}
-		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
-	}
-	return multicluster.InGlobalContext()
 }

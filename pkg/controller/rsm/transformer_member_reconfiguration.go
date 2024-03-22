@@ -31,7 +31,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 // MemberReconfigurationTransformer handles member reconfiguration
@@ -87,36 +86,23 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 		return nil
 	}
 
-	// TODO(leon)
 	// get the underlying sts
-	stsList := &apps.StatefulSetList{}
-	if err := graphCli.List(transCtx.Context, stsList, client.InNamespace(rsm.Namespace),
-		client.MatchingLabels(rsm.Labels), multicluster.InLocalContext()); err != nil {
+	sts := &apps.StatefulSet{}
+	if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts); err != nil {
 		return err
 	}
-	readyReplicas := int32(0)
-	readyStatefulSetCnt := 0
-	for _, sts := range stsList.Items {
-		readyReplicas += sts.Status.ReadyReplicas
-		if isStatefulSetReady(&sts) {
-			readyStatefulSetCnt += 1
-		}
-	}
-	statefulSetReady := readyStatefulSetCnt == len(stsList.Items)
 
 	// no enough replicas in scale out, tell sts to create them.
 	memberReadyReplicas := int32(len(rsm.Status.MembersStatus))
 	if memberReadyReplicas < *rsm.Spec.Replicas &&
-		readyReplicas < *rsm.Spec.Replicas {
+		sts.Status.ReadyReplicas < *rsm.Spec.Replicas {
 		return nil
 	}
 
-	for i := range stsList.Items {
-		graphCli.Noop(dag, &stsList.Items[i])
-	}
+	graphCli.Noop(dag, sts)
 
 	// barrier: the underlying sts is ready and has enough replicas
-	if readyReplicas < *rsm.Spec.Replicas || !statefulSetReady {
+	if sts.Status.ReadyReplicas < *rsm.Spec.Replicas || !isStatefulSetReady(sts) {
 		return nil
 	}
 

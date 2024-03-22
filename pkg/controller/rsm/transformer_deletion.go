@@ -42,14 +42,14 @@ func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *g
 	// ignore the problem currently
 	// TODO: GC the leaked objects
 	ml := getLabels(obj)
-	snapshot, err := readCacheSnapshot(transCtx, obj, ml, deletionKinds()...)
+	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, deletionKinds()...)
 	if err != nil {
 		return err
 	}
 	for _, object := range snapshot {
 		// don't delete cm that not created by rsm
 		if IsOwnedByRsm(object) {
-			graphCli.Delete(dag, object, inLocalContext())
+			graphCli.Delete(dag, object)
 		}
 	}
 	graphCli.Delete(dag, obj)

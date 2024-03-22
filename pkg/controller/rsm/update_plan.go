@@ -21,8 +21,6 @@ package rsm
 
 import (
 	"errors"
-	"slices"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -73,8 +71,7 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	}
 
 	// if pod is the latest version, we do nothing
-	updateRevisions := strings.Split(p.rsm.Status.UpdateRevision, ",")
-	if slices.Contains(updateRevisions, intctrlutil.GetPodRevision(pod)) {
+	if intctrlutil.GetPodRevision(pod) == p.rsm.Status.UpdateRevision {
 		if intctrlutil.PodIsReadyWithLabel(*pod) {
 			return ErrContinue
 		} else {

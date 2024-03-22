@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -306,6 +305,87 @@ type UserResourceRefs struct {
 	ConfigMapRefs []ConfigMapRef `json:"configMapRefs,omitempty"`
 }
 
+// InstanceTemplate defines values to override in pod template.
+type InstanceTemplate struct {
+	// Number of replicas of this template.
+	// Default is 1.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Defines the name of the instance.
+	// Only applied when Replicas is 1.
+	//
+	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	Name *string `json:"name,omitempty"`
+
+	// GenerateName is an optional prefix, used by the server, to generate a unique
+	// name ONLY IF the Name field has not been provided.
+	// If this field is used, the name returned to the client will be different
+	// than the name passed. This value will also be combined with a unique suffix.
+	// The provided value has the same validation rules as the Name field,
+	// and may be truncated by the length of the suffix required to make the value
+	// unique on the server.
+	//
+	// Applied only if Name is not specified.
+	//
+	// +kubebuilder:validation:MaxLength=54
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	GenerateName *string `json:"generateName,omitempty"`
+
+	// Defines annotations to override.
+	// Add new or override existing annotations.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Defines labels to override.
+	// Add new or override existing labels.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Defines image to override.
+	// Will override the first container's image of the pod.
+	// +optional
+	Image *string `json:"image,omitempty"`
+
+	// Defines NodeName to override.
+	// +optional
+	NodeName *string `json:"nodeName,omitempty"`
+
+	// Defines NodeSelector to override.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Defines Tolerations to override.
+	// Add new or override existing tolerations.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Defines Resources to override.
+	// Will override the first container's resources of the pod.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Defines Volumes to override.
+	// Add new or override existing volumes.
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// Defines VolumeMounts to override.
+	// Add new or override existing volume mounts of the first container in the pod.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// Defines VolumeClaimTemplates to override.
+	// Add new or override existing volume claim templates.
+	// +optional
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster.
 type ClusterStatus struct {
 	// The most recent generation number that has been observed by the controller.
@@ -524,26 +604,17 @@ type ClusterComponentSpec struct {
 	// +optional
 	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
 
-	// Defines the policy to generate sts using rsm.
+	// Overrides values in default Template.
 	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=ToSts
-	// +optional
-	RsmTransformPolicy workloads.RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
-
-	// Defines the list of nodes that pods can schedule.
-	// If the RsmTransformPolicy is specified as ToPod, the list of nodes will be used. If the list of nodes is empty,
-	// no specific node will be assigned. However, if the list of nodes is filled, all pods will be evenly scheduled
-	// across the nodes in the list.
+	// Instance is the fundamental unit managed by KubeBlocks.
+	// It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+	// A component manages instances with a total count of Replicas,
+	// and by default, all these instances are generated from the same template.
+	// The InstanceTemplate provides a way to override values in the default template,
+	// allowing the component to manage instances from different templates.
 	//
 	// +optional
-	Nodes []types.NodeName `json:"nodes,omitempty"`
-
-	// Defines the list of instances to be deleted priorly.
-	// If the RsmTransformPolicy is specified as ToPod, the list of instances will be used.
-	//
-	// +optional
-	Instances []string `json:"instances,omitempty"`
+	Instances []InstanceTemplate `json:"instances,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

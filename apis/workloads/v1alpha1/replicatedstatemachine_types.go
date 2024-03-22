@@ -23,26 +23,90 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-)
-
-const (
-	ReplicatedStateMachineKind = "ReplicatedStateMachine"
-)
-
-// RsmTransformPolicy defines rsm transform type
-// ToSts and ToPod is supported
-// +enum
-// +kubebuilder:validation:Enum={ToPod,ToSts}
-type RsmTransformPolicy string
-
-const (
-	ToSts RsmTransformPolicy = "ToSts"
-	ToPod RsmTransformPolicy = "ToPod"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+type InstanceTemplate struct {
+	// Number of replicas of this template.
+	// Default is 1.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Defines the name of the instance.
+	// Only applied when Replicas is 1.
+	//
+	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	Name *string `json:"name,omitempty"`
+
+	// GenerateName is an optional prefix, used by the server, to generate a unique
+	// name ONLY IF the Name field has not been provided.
+	// If this field is used, the name returned to the client will be different
+	// than the name passed. This value will also be combined with a unique suffix.
+	// The provided value has the same validation rules as the Name field,
+	// and may be truncated by the length of the suffix required to make the value
+	// unique on the server.
+	//
+	// Applied only if Name is not specified.
+	//
+	// +kubebuilder:validation:MaxLength=54
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	GenerateName *string `json:"generateName,omitempty"`
+
+	// Defines annotations to override.
+	// Add new or override existing annotations.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Defines labels to override.
+	// Add new or override existing labels.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Defines image to override.
+	// Will override the first container's image of the pod.
+	// +optional
+	Image *string `json:"image,omitempty"`
+
+	// Defines NodeName to override.
+	// +optional
+	NodeName *string `json:"nodeName,omitempty"`
+
+	// Defines NodeSelector to override.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Defines Tolerations to override.
+	// Add new or override existing tolerations.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Defines Resources to override.
+	// Will override the first container's resources of the pod.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Defines Volumes to override.
+	// Add new or override existing volumes.
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// Defines VolumeMounts to override.
+	// Add new or override existing volume mounts of the first container in the pod.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// Defines VolumeClaimTemplates to override.
+	// Add new or override existing volume claim templates.
+	// +optional
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+}
 
 // ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine
 type ReplicatedStateMachineSpec struct {
@@ -85,6 +149,18 @@ type ReplicatedStateMachineSpec struct {
 	AlternativeServices []corev1.Service `json:"alternativeServices,omitempty"`
 
 	Template corev1.PodTemplateSpec `json:"template"`
+
+	// Overrides values in default Template.
+	//
+	// Instance is the fundamental unit managed by KubeBlocks.
+	// It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+	// A RSM manages instances with a total count of Replicas,
+	// and by default, all these instances are generated from the same template.
+	// The InstanceTemplate provides a way to override values in the default template,
+	// allowing the RSM to manage instances from different templates.
+	//
+	// +optional
+	Instances []InstanceTemplate `json:"instances,omitempty"`
 
 	// Represents a list of claims that pods are allowed to reference.
 	// The ReplicatedStateMachine controller is responsible for mapping network identities to
@@ -142,37 +218,6 @@ type ReplicatedStateMachineSpec struct {
 	// Credential used to connect to DB engine
 	// +optional
 	Credential *Credential `json:"credential,omitempty"`
-
-	// Defines the policy to generate sts using rsm. Passed from cluster.
-	// ToSts: rsm transform to statefulSet
-	// ToPod: rsm transform to pod
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=ToSts
-	// +optional
-	RsmTransformPolicy RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
-
-	// Defines the expected assignment of nodes.
-	// +optional
-	NodeAssignment []NodeAssignment `json:"nodeAssignment,omitempty"`
-}
-
-type NodeAssignment struct {
-	// Specifies the identifier for the statefulSet requiring node allocation.
-	//
-	// +optional
-	Name string `json:"name,omitempty"`
-
-	// Provides comprehensive details of the node to be assigned to the statefulSet.
-	//
-	// +optional
-	NodeSpec NodeSpec `json:"nodeSpec,omitempty"`
-}
-
-type NodeSpec struct {
-	// Represents the name of the node. This is a unique identifier within the cluster and is used to identify the specific node for scheduling, reporting, and other tasks.
-	//
-	// +optional
-	NodeName types.NodeName `json:"nodeName,omitempty"`
 }
 
 // ReplicatedStateMachineStatus defines the observed state of ReplicatedStateMachine
@@ -198,6 +243,18 @@ type ReplicatedStateMachineStatus struct {
 	//
 	// +optional
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
+
+	// currentRevisions, if not empty, indicates the old version of the RSM used to generate Pods.
+	// key is the pod name, value is the revision.
+	//
+	// +optional
+	CurrentRevisions map[string]string `json:"currentRevisions,omitempty"`
+
+	// updateRevisions, if not empty, indicates the new version of the RSM used to generate Pods.
+	// key is the pod name, value is the revision.
+	//
+	// +optional
+	UpdateRevisions map[string]string `json:"updateRevisions,omitempty"`
 }
 
 // +genclient
@@ -452,7 +509,13 @@ type MemberStatus struct {
 	PodName string `json:"podName"`
 
 	// Defines the role of the replica in the cluster.
-	ReplicaRole `json:"role"`
+	//
+	// +optional
+	ReplicaRole *ReplicaRole `json:"role,omitempty"`
+
+	// Whether the corresponding Pod is in ready condition.
+	// +optional
+	Ready bool `json:"ready,omitempty"`
 
 	// Indicates whether it is required for the replica set manager (rsm) to have at least one primary pod ready.
 	//

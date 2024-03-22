@@ -49,7 +49,6 @@ type HTTPClient struct {
 	lorryClient
 	Client           *http.Client
 	URL              string
-	cache            map[string]*OperationResult
 	CacheTTL         time.Duration
 	ReconcileTimeout time.Duration
 	RequestTimeout   time.Duration
@@ -61,8 +60,11 @@ var _ Client = &HTTPClient{}
 type OperationResult struct {
 	response *http.Response
 	err      error
+	reqTime  time.Time
 	respTime time.Time
 }
+
+var cache map[string]*OperationResult = make(map[string]*OperationResult)
 
 func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 	logger := ctrl.Log.WithName("Lorry HTTP client")
@@ -93,10 +95,9 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 	operationClient := &HTTPClient{
 		Client:           client,
 		URL:              fmt.Sprintf(urlTemplate, ip, port),
-		CacheTTL:         60 * time.Second,
-		RequestTimeout:   30 * time.Second,
+		CacheTTL:         1800 * time.Second,
+		RequestTimeout:   300 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,
-		cache:            make(map[string]*OperationResult),
 		logger:           ctrl.Log.WithName("Lorry HTTP client"),
 	}
 	operationClient.lorryClient = lorryClient{requester: operationClient}
@@ -124,10 +125,9 @@ func NewHTTPClientWithURL(url string) (*HTTPClient, error) {
 	operationClient := &HTTPClient{
 		Client:           client,
 		URL:              url,
-		CacheTTL:         60 * time.Second,
-		RequestTimeout:   30 * time.Second,
+		CacheTTL:         1800 * time.Second,
+		RequestTimeout:   300 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,
-		cache:            make(map[string]*OperationResult),
 	}
 	operationClient.lorryClient = lorryClient{requester: operationClient}
 	return operationClient, nil
@@ -185,7 +185,7 @@ func (cli *HTTPClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.
 	var err error
 	select {
 	case <-ctxWithReconcileTimeout.Done():
-		err = fmt.Errorf("invoke error : %v", ctxWithReconcileTimeout.Err())
+		err = fmt.Errorf("request timeout: %v", ctxWithReconcileTimeout.Err())
 	case result := <-ch:
 		resp = result.response
 		err = result.err
@@ -208,25 +208,42 @@ func (cli *HTTPClient) InvokeComponent(ctxWithReconcileTimeout context.Context, 
 	}
 
 	mapKey := GetMapKeyFromRequest(req)
-	operationRes, ok := cli.cache[mapKey]
+	operationRes, ok := cache[mapKey]
 	if ok {
-		delete(cli.cache, mapKey)
-		if time.Since(operationRes.respTime) <= cli.CacheTTL {
-			ch <- operationRes
-			return
+		if operationRes.response != nil {
+			// if the response is not nil, it means the request has been sent and the response is cached
+			delete(cache, mapKey)
+			if time.Since(operationRes.respTime) <= cli.CacheTTL {
+				ch <- operationRes
+				return
+			}
+			cli.logger.Info("cache expired", "url", url, "method", method, "cacheTTL", cli.CacheTTL, "since", time.Since(operationRes.respTime))
+		} else {
+			// if the response is nil, it means the request has been sent and not finished yet
+			if time.Since(operationRes.reqTime) >= 2*cli.RequestTimeout {
+				// if the request has been sent for less than 2 times of cacheTTL, and there is no the response, clean the cache and send the request again
+				delete(cache, mapKey)
+				cli.logger.Info("request timeout, and try again", "url", url, "method", method, "timeout", 2*cli.RequestTimeout, "since", time.Since(operationRes.reqTime))
+			} else {
+				ch <- operationRes
+				return
+			}
 		}
 	}
-
-	resp, err := cli.Client.Do(req)
 	operationRes = &OperationResult{
-		response: resp,
-		err:      err,
-		respTime: time.Now(),
+		err:     fmt.Errorf("request not finished"),
+		reqTime: time.Now(),
 	}
+
+	cache[mapKey] = operationRes
+	resp, err := cli.Client.Do(req)
+	operationRes.response = resp
+	operationRes.err = err
+	operationRes.respTime = time.Now()
 	select {
 	case <-ctxWithReconcileTimeout.Done():
-		cli.cache[mapKey] = operationRes
 	default:
+		delete(cache, mapKey)
 		ch <- operationRes
 	}
 }

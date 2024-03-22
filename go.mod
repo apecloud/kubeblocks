@@ -75,7 +75,6 @@ require (
 	k8s.io/api v0.28.2
 	k8s.io/apiextensions-apiserver v0.28.1
 	k8s.io/apimachinery v0.28.2
-	k8s.io/apiserver v0.28.1
 	k8s.io/cli-runtime v0.28.2
 	k8s.io/client-go v0.28.2
 	k8s.io/code-generator v0.28.2
@@ -317,6 +316,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.0 // indirect
+	k8s.io/apiserver v0.28.1 // indirect
 	k8s.io/component-base v0.28.2 // indirect
 	oras.land/oras-go v1.2.4 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

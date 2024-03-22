@@ -58,6 +58,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/metrics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -125,7 +126,7 @@ func init() {
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
-	viper.SetDefault(rsm.FeatureGateRSMToPod, true)
+	viper.SetDefault(rsm2.FeatureGateRSMReplicaProvider, string(rsm2.PodProvider))
 	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 }

@@ -20,7 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -236,25 +235,6 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
-
-	// Defines the list of nodes where pods can be scheduled during a scale-up operation.
-	// If the RsmTransformPolicy is set to ToPod and the expected number of replicas is greater than the current number,
-	// the list of Nodes will be used. If the list of Nodes is empty, pods will not be assigned to any specific node.
-	// However, if the list of Nodes is populated, pods will be evenly distributed across the nodes in the list during scale-up.
-	// +optional
-	Nodes []types.NodeName `json:"nodes,omitempty"`
-
-	// Defines the names of instances that the rsm should prioritize for scale-down operations.
-	// If the RsmTransformPolicy is set to ToPod and the expected number of replicas is less than the current number,
-	// the list of Instances will be used.
-	//
-	// - `current replicas - expected replicas > len(Instances)`: Scale down from the list of Instances priorly, the others
-	//	 will select from NodeAssignment.
-	// - `current replicas - expected replicas < len(Instances)`: Scale down from the list of Instances.
-	// - `current replicas - expected replicas < len(Instances)`: Scale down from a part of Instances.
-	//
-	// +optional
-	Instances []string `json:"instances,omitempty"`
 }
 
 // Reconfigure represents the variables required for updating a configuration.

@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -125,7 +124,8 @@ func (mgr *Manager) InitComponentDefintionActions() error {
 func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	memberJoinCmd, ok := mgr.actionCommands[constant.MemberJoinAction]
 	if !ok || len(memberJoinCmd) == 0 {
-		return errors.New("member join command is empty!")
+		// return errors.New("member join command is empty!")
+		return nil
 	}
 	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {
@@ -141,6 +141,10 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 	addrs := cluster.GetMemberAddrs()
 	envs = append(envs, "KB_MEMBER_ADDRESSES"+"="+strings.Join(addrs, ","))
 	envs = append(envs, "KB_NEW_MEMBER_POD_NAME"+"="+mgr.CurrentMemberName)
+	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
+	if member != nil {
+		envs = append(envs, "KB_NEW_MEMBER_POD_IP"+"="+member.PodIP)
+	}
 	output, err := util.ExecCommand(ctx, memberJoinCmd, envs)
 
 	if output != "" {
@@ -161,7 +165,8 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	memberLeaveCmd, ok := mgr.actionCommands[constant.MemberLeaveAction]
 	if !ok || len(memberLeaveCmd) == 0 {
-		return errors.New("member leave command is empty!")
+		// return errors.New("member leave command is empty!")
+		return nil
 	}
 	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {
@@ -177,6 +182,10 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 	addrs := cluster.GetMemberAddrs()
 	envs = append(envs, "KB_MEMBER_ADDRESSES"+"="+strings.Join(addrs, ","))
 	envs = append(envs, "KB_LEAVE_MEMBER_POD_NAME"+"="+memberName)
+	member := cluster.GetMemberWithName(memberName)
+	if member != nil {
+		envs = append(envs, "KB_LEAVE_MEMBER_POD_IP"+"="+member.PodIP)
+	}
 	output, err := util.ExecCommand(ctx, memberLeaveCmd, envs)
 
 	if output != "" {
@@ -194,7 +203,8 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 	readonlyCmd, ok := mgr.actionCommands[constant.ReadonlyAction]
 	if !ok || len(readonlyCmd) == 0 {
-		return errors.New("member lock command is empty!")
+		// return errors.New("member lock command is empty!")
+		return nil
 	}
 	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {
@@ -217,7 +227,8 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 func (mgr *Manager) Unlock(ctx context.Context) error {
 	readWriteCmd, ok := mgr.actionCommands[constant.ReadWriteAction]
 	if !ok || len(readWriteCmd) == 0 {
-		return errors.New("member unlock command is empty!")
+		// return errors.New("member unlock command is empty!")
+		return nil
 	}
 	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {
@@ -244,7 +255,8 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 func (mgr *Manager) PostProvision(ctx context.Context, componentNames, podNames, podIPs, podHostNames, podHostIPs string) error {
 	postProvisionCmd, ok := mgr.actionCommands[constant.PostProvisionAction]
 	if !ok || len(postProvisionCmd) == 0 {
-		return errors.New("component postprovision command is empty!")
+		// return errors.New("component postprovision command is empty!")
+		return nil
 	}
 	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {
@@ -273,7 +285,8 @@ func (mgr *Manager) PostProvision(ctx context.Context, componentNames, podNames,
 func (mgr *Manager) PreTerminate(ctx context.Context) error {
 	preTerminateCmd, ok := mgr.actionCommands[constant.PreTerminateAction]
 	if !ok || len(preTerminateCmd) == 0 {
-		return errors.New("component preterminate command is empty!")
+		// return errors.New("component preterminate command is empty!")
+		return nil
 	}
 	envs, err := util.GetGlobalSharedEnvs()
 	if err != nil {

@@ -21,6 +21,7 @@ package rsm2
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
@@ -59,7 +60,7 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 }
 
 func loadCompressedInstanceTemplates(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
-	if tree.GetRoot() == nil {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return nil
 	}
 	templateMap, err := getInstanceTemplateMap(tree.GetRoot().GetAnnotations())

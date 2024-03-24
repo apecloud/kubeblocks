@@ -86,7 +86,11 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	}
 
 	// 3. persistent these revisions to status
-	rsm.Status.UpdateRevisions = updatedRevisions
+	revisions, err := buildUpdateRevisions(updatedRevisions)
+	if err != nil {
+		return nil, err
+	}
+	rsm.Status.UpdateRevisions = revisions
 	updateRevision := ""
 	if len(replicaRevisionList) > 0 {
 		updateRevision = replicaRevisionList[len(replicaRevisionList)-1].revision

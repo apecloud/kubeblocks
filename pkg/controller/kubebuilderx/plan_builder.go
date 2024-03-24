@@ -167,8 +167,10 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := newSnapshot[name]
-			v := newVertex(oldObj, newObj, model.ActionUpdatePtr())
-			findAndAppend(v)
+			if !reflect.DeepEqual(oldObj, newObj) {
+				v := newVertex(oldObj, newObj, model.ActionUpdatePtr())
+				findAndAppend(v)
+			}
 		}
 	}
 	deleteOrphanObjects := func() {
@@ -197,8 +199,8 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 
 func (p *Plan) Execute() error {
 	var err error
-	for _, vertex := range p.vertices {
-		if err = p.walkFunc(vertex); err != nil {
+	for i := len(p.vertices) - 1; i >= 0; i-- {
+		if err = p.walkFunc(p.vertices[i]); err != nil {
 			return err
 		}
 	}

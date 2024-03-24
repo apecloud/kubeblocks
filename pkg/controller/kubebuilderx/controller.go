@@ -54,6 +54,7 @@ type controller struct {
 }
 
 func (c *controller) Prepare(reader TreeLoader) Controller {
+	c.logger.Info("**************** prepare")
 	c.oldTree, c.err = reader.Load(c.ctx, c.cli, c.req, c.recorder, c.logger)
 	if c.err != nil {
 		return c
@@ -72,6 +73,7 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 	}
 
 	for _, reconciler := range reconcilers {
+		c.logger.Info(fmt.Sprintf("**************** do reconciler %T", reconciler))
 		switch result := reconciler.PreCondition(c.tree); {
 		case result.Err != nil:
 			c.err = result.Err
@@ -90,22 +92,24 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 }
 
 func (c *controller) Commit() error {
+	c.logger.Info("**************** commit start")
 	if c.err != nil {
 		return c.err
 	}
 	if c.oldTree.GetRoot() == nil {
 		return nil
 	}
-	builder := NewPlanBuilder(c.ctx, c.cli, c.recorder, c.logger)
+	builder := NewPlanBuilder(c.ctx, c.cli, c.oldTree, c.tree, c.recorder, c.logger)
 	if err := builder.Init(); err != nil {
 		return err
 	}
-	builder.AddTransformer(newObjectTree2DAGTransformer(c.oldTree, c.tree))
 	plan, err := builder.Build()
 	if err != nil {
 		return err
 	}
-	return plan.Execute()
+	err = plan.Execute()
+	c.logger.Info("**************** commit done")
+	return err
 }
 
 func NewController(ctx context.Context, cli client.Client, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) Controller {

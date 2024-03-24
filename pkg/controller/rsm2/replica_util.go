@@ -23,7 +23,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
@@ -53,6 +55,22 @@ type replica struct {
 	pvcs []*corev1.PersistentVolumeClaim
 }
 
+var replicaNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+
+func parseParentNameAndOrdinal(s string) (string, int) {
+	parent := s
+	ordinal := -1
+	subMatches := replicaNameRegex.FindStringSubmatch(s)
+	if len(subMatches) < 3 {
+		return parent, ordinal
+	}
+	parent = subMatches[1]
+	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
+		ordinal = int(i)
+	}
+	return parent, ordinal
+}
+
 // sortObjects sorts objects by their role priority and name
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
 // reverse it if reverse==true
@@ -61,13 +79,13 @@ func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, r
 		role := strings.ToLower(objects[i].GetLabels()[constant.RoleLabelKey])
 		return rolePriorityMap[role]
 	}
-	getNameFunc := func(i int) string {
-		return objects[i].GetName()
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return parseParentNameAndOrdinal(objects[i].GetName())
 	}
-	baseSort(objects, getNameFunc, getRolePriorityFunc, reverse)
+	baseSort(objects, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }
 
-func baseSort(x any, getNameFunc func(i int) string, getRolePriorityFunc func(i int) int, reverse bool) {
+func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePriorityFunc func(i int) int, reverse bool) {
 	if getRolePriorityFunc == nil {
 		getRolePriorityFunc = func(_ int) int {
 			return 0
@@ -79,12 +97,15 @@ func baseSort(x any, getNameFunc func(i int) string, getRolePriorityFunc func(i 
 		}
 		rolePriI := getRolePriorityFunc(i)
 		rolePriJ := getRolePriorityFunc(j)
-		if rolePriI == rolePriJ {
-			ordinal1 := getNameFunc(i)
-			ordinal2 := getNameFunc(j)
-			return ordinal1 < ordinal2
+		if rolePriI != rolePriJ {
+			return rolePriI < rolePriJ
 		}
-		return rolePriI < rolePriJ
+		name1, ordinal1 := getNameNOrdinalFunc(i)
+		name2, ordinal2 := getNameNOrdinalFunc(j)
+		if name1 != name2 {
+			return name1 < name2
+		}
+		return ordinal1 < ordinal2
 	})
 }
 

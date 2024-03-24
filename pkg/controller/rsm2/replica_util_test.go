@@ -58,8 +58,10 @@ var _ = Describe("replica util test", func() {
 				builder.NewPodBuilder(namespace, "pod-4").AddLabels(rsm1.RoleLabelKey, "candidate").GetObject(),
 				builder.NewPodBuilder(namespace, "pod-5").AddLabels(rsm1.RoleLabelKey, "leader").GetObject(),
 				builder.NewPodBuilder(namespace, "pod-6").AddLabels(rsm1.RoleLabelKey, "learner").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-10").AddLabels(rsm1.RoleLabelKey, "learner").GetObject(),
+				builder.NewPodBuilder(namespace, "foo-20").AddLabels(rsm1.RoleLabelKey, "learner").GetObject(),
 			}
-			expectedOrder := []string{"pod-4", "pod-2", "pod-3", "pod-6", "pod-1", "pod-0", "pod-5"}
+			expectedOrder := []string{"pod-4", "pod-2", "foo-20", "pod-3", "pod-6", "pod-10", "pod-1", "pod-0", "pod-5"}
 
 			sortObjects(pods, priorityMap, false)
 			for i, pod := range pods {

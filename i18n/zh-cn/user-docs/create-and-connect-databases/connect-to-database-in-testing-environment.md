@@ -23,7 +23,7 @@ kbcli cluster connect ${cluster-name}
 执行以下命令以获取目标数据库的网络信息，并使用其打印输出的 IP 地址进行连接。
 
 ```bash
-kbcli cluster connect --show-example ${cluster-name}
+kbcli cluster connect --show-example --show-password ${cluster-name}
 ```
 
 其打印输出的信息包括数据库地址、端口号、用户名和密码。下图以 MySQL 数据库为例。

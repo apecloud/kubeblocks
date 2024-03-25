@@ -640,6 +640,18 @@ Kubernetes core/v1.SecretReference
 <p>References to the secret that holds the credentials for the <code>StorageProvider</code>.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>pathPrefix</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the prefix of the path for storing backup data.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -2075,6 +2087,18 @@ Kubernetes core/v1.SecretReference
 <td>
 <em>(Optional)</em>
 <p>References to the secret that holds the credentials for the <code>StorageProvider</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pathPrefix</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the prefix of the path for storing backup data.</p>
 </td>
 </tr>
 </tbody>

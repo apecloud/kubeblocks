@@ -296,7 +296,7 @@ type ShellTrigger struct {
 	// The default value is 'False'.
 	//
 	// +optional
-	BatchReload *bool `json:"batchRefresh,omitempty"`
+	BatchReload *bool `json:"batchReload,omitempty"`
 }
 
 type TPLScriptTrigger struct {

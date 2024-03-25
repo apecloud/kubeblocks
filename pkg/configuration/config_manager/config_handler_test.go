@@ -378,27 +378,22 @@ var _ = Describe("Config Handler Test", func() {
 		})
 	})
 
-	Describe("Test execHandler for shellCommandHandler", func() {
+	Describe("Test exec reload command", func() {
 		updatedParams := map[string]string{
 			"key1": "val1",
 			"key2": "val2",
 			"key3": "",
 		}
-		Context("execute handler by reloading individually", func() {
+		Describe("Test execute command with separate reload", func() {
 			var (
 				stdouts []string
 				err     error
 			)
 			BeforeEach(func() {
-				shellTrigger := &shellCommandHandler{
-					command:       "echo",
-					isBatchReload: false,
-				}
-				stdouts, err = shellTrigger.execHandler(context.TODO(),
+				stdouts, err = execWithSeparateReload(context.TODO(),
 					updatedParams,
-					[]string{
-						"hello",
-					},
+					"echo",
+					"hello",
 				)
 			})
 			It("should execute the script successfully and have correct stdout content", func() {
@@ -422,22 +417,17 @@ var _ = Describe("Config Handler Test", func() {
 				})
 			})
 		})
-		Context("execute handler by reloading in a batch", func() {
+		Describe("Test execute command with batch reload", func() {
 			var (
-				stdouts []string
-				err     error
+				stdout string
+				err    error
 			)
 			BeforeEach(func() {
-				shellTrigger := &shellCommandHandler{
-					command:       "/bin/sh",
-					isBatchReload: true,
-				}
-				stdouts, err = shellTrigger.execHandler(context.TODO(),
+				stdout, err = execWithBatchReload(context.TODO(),
 					updatedParams,
-					[]string{
-						"-c",
-						`tab=$(printf '\t'); sort | while IFS="$tab" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`, // use `sort` to ensure the sequence for verify
-					},
+					"/bin/sh",
+					"-c",
+					`tab=$(printf '\t'); sort | while IFS="$tab" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`, // use `sort` to ensure the sequence for verify
 				)
 			})
 			It("should execute the script successfully and have correct stdout content", func() {
@@ -445,7 +435,6 @@ var _ = Describe("Config Handler Test", func() {
 					Expect(err).Should(Succeed())
 				})
 				By("checking that should have correct stdout content", func() {
-					Expect(len(stdouts)).Should(Equal(1))
 					keys := make([]string, 0, len(updatedParams))
 					for k := range updatedParams {
 						keys = append(keys, k)
@@ -456,7 +445,7 @@ var _ = Describe("Config Handler Test", func() {
 						v := updatedParams[k]
 						expectOutputSB.WriteString(fmt.Sprintf("key='%s'; val='%s'\n", k, v))
 					}
-					Expect(stdouts[0]).Should(Equal(expectOutputSB.String()))
+					Expect(stdout).Should(Equal(expectOutputSB.String()))
 				})
 			})
 		})

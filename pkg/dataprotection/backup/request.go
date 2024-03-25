@@ -63,6 +63,7 @@ type Request struct {
 	BackupRepo           *dpv1alpha1.BackupRepo
 	ToolConfigSecret     *corev1.Secret
 	WorkerServiceAccount string
+	SnapshotVolumes      bool
 }
 
 func (r *Request) GetBackupType() string {
@@ -344,7 +345,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 			},
 			{
 				Name:  dptypes.DPBackupBasePath,
-				Value: BuildBackupPath(r.Backup, r.BackupPolicy.Spec.PathPrefix),
+				Value: BuildBackupPath(r.Backup, r.BackupRepo.Spec.PathPrefix, r.BackupPolicy.Spec.PathPrefix),
 			},
 			{
 				Name:  dptypes.DPBackupInfoFile,

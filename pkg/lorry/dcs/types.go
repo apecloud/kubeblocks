@@ -36,7 +36,7 @@ type Cluster struct {
 	Members         []Member
 	Switchover      *Switchover
 	Extra           map[string]string
-	resource        any
+	Resource        any
 }
 
 func (c *Cluster) HasMember(memberName string) bool {
@@ -99,11 +99,21 @@ func (c *Cluster) GetMemberAddr(member Member) string {
 		return member.PodIP
 	}
 	clusterDomain := viper.GetString(constant.KubernetesClusterDomainEnv)
-	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", member.Name, c.ClusterCompName, c.Namespace, clusterDomain)
+	clusterCompName := ""
+	index := strings.LastIndex(member.Name, "-")
+	if index > 0 {
+		clusterCompName = member.Name[:index]
+	}
+	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", member.Name, clusterCompName, c.Namespace, clusterDomain)
 }
 
 func (c *Cluster) GetMemberShortAddr(member Member) string {
-	return fmt.Sprintf("%s.%s-headless", member.Name, c.ClusterCompName)
+	clusterCompName := ""
+	index := strings.LastIndex(member.Name, "-")
+	if index > 0 {
+		clusterCompName = member.Name[:index]
+	}
+	return fmt.Sprintf("%s.%s-headless", member.Name, clusterCompName)
 }
 
 func (c *Cluster) GetMemberAddrs() []string {

@@ -46,6 +46,9 @@ type DBManager interface {
 	IsClusterHealthy(context.Context, *dcs.Cluster) bool
 
 	// Member healthy check
+	MemberHealthyCheck(context.Context, *dcs.Cluster, *dcs.Member) error
+	LeaderHealthyCheck(context.Context, *dcs.Cluster) error
+	CurrentMemberHealthyCheck(context.Context, *dcs.Cluster) error
 	// IsMemberHealthy focuses on the database's read and write capabilities.
 	IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool
 	IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool

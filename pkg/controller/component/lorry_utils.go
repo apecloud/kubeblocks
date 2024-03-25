@@ -261,6 +261,7 @@ func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComp
 	if volumeProtectionEnabled(synthesizeComp) {
 		envs = append(envs, buildEnv4VolumeProtection(*synthesizeComp.VolumeProtection))
 	}
+	envs = append(envs, buildEnv4CronJobs(synthesizeComp)...)
 
 	container.Env = append(container.Env, envs...)
 }
@@ -356,6 +357,29 @@ func buildEnv4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.En
 		Name:  constant.KBEnvVolumeProtectionSpec,
 		Value: string(value),
 	}
+}
+
+func buildEnv4CronJobs(_ *SynthesizedComponent) []corev1.EnvVar {
+	return nil
+	// if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.HealthyCheck == nil {
+	// 	return nil
+	// }
+	// healthyCheck := synthesizeComp.LifecycleActions.HealthyCheck
+	// healthCheckSetting := make(map[string]string)
+	// healthCheckSetting["periodSeconds"] = strconv.Itoa(int(healthyCheck.PeriodSeconds))
+	// healthCheckSetting["timeoutSeconds"] = strconv.Itoa(int(healthyCheck.TimeoutSeconds))
+	// healthCheckSetting["failureThreshold"] = strconv.Itoa(int(healthyCheck.FailureThreshold))
+	// healthCheckSetting["successThreshold"] = strconv.Itoa(int(healthyCheck.SuccessThreshold))
+	// cronJobs := make(map[string]map[string]string)
+	// cronJobs["healthyCheck"] = healthCheckSetting
+
+	// jsonStr, _ := json.Marshal(cronJobs)
+	// return []corev1.EnvVar{
+	// 	{
+	// 		Name:  constant.KBEnvCronJobs,
+	// 		Value: string(jsonStr),
+	// 	},
+	// }
 }
 
 // getBuiltinActionHandler gets the built-in handler.

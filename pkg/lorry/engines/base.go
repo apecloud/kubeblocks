@@ -125,6 +125,19 @@ func (mgr *DBManagerBase) IsClusterHealthy(context.Context, *dcs.Cluster) bool {
 	return true
 }
 
+func (mgr *DBManagerBase) MemberHealthyCheck(context.Context, *dcs.Cluster, *dcs.Member) error {
+	return nil
+}
+
+func (mgr *DBManagerBase) LeaderHealthyCheck(context.Context, *dcs.Cluster) error {
+	return nil
+}
+
+func (mgr *DBManagerBase) CurrentMemberHealthyCheck(ctx context.Context, cluster *dcs.Cluster) error {
+	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
+	return mgr.MemberHealthyCheck(ctx, cluster, member)
+}
+
 func (mgr *DBManagerBase) HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member {
 	return nil
 }

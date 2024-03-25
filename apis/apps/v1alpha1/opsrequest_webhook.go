@@ -225,7 +225,7 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 }
 
 // validateExpose validates expose api when spec.type is Expose
-func (r *OpsRequest) validateExpose(ctx context.Context, cluster *Cluster) error {
+func (r *OpsRequest) validateExpose(_ context.Context, cluster *Cluster) error {
 	exposeList := r.Spec.ExposeList
 	if exposeList == nil {
 		return notEmptyError("spec.expose")
@@ -376,7 +376,7 @@ func compareQuantity(requestQuantity, limitQuantity *resource.Quantity) bool {
 }
 
 // validateHorizontalScaling validates api when spec.type is HorizontalScaling
-func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.Client, cluster *Cluster) error {
+func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Client, cluster *Cluster) error {
 	horizontalScalingList := r.Spec.HorizontalScalingList
 	if len(horizontalScalingList) == 0 {
 		return notEmptyError("spec.horizontalScaling")
@@ -558,7 +558,7 @@ func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
 	if err := cli.Get(ctx, types.NamespacedName{Name: *storageClassName}, storageClass); err != nil && !apierrors.IsNotFound(err) {
 		return false, err
 	}
-	if storageClass == nil || storageClass.AllowVolumeExpansion == nil {
+	if storageClass.AllowVolumeExpansion == nil {
 		return false, nil
 	}
 	return *storageClass.AllowVolumeExpansion, nil

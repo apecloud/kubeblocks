@@ -177,13 +177,13 @@ func TestGetMemberAddrs(t *testing.T) {
 	t.Run("get addrs", func(t *testing.T) {
 		cluster.ClusterCompName = "pg"
 		cluster.Members = append(cluster.Members, dcs.Member{
-			Name:   "test",
+			Name:   "test-0",
 			DBPort: "5432",
 		})
 		addrs := manager.GetMemberAddrs(ctx, cluster)
 
 		assert.Equal(t, 1, len(addrs))
-		assert.Equal(t, "test.pg-headless.default.svc.cluster.local:5432", addrs[0])
+		assert.Equal(t, "test-0.test-headless.default.svc.cluster.local:5432", addrs[0])
 	})
 }
 

@@ -42,22 +42,24 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	k8s "github.com/apecloud/kubeblocks/pkg/lorry/util/kubernetes"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type KubernetesStore struct {
-	ctx                context.Context
-	clusterName        string
-	componentName      string
-	clusterCompName    string
-	currentMemberName  string
-	namespace          string
-	cluster            *Cluster
-	client             *rest.RESTClient
-	clientset          *kubernetes.Clientset
-	LeaderObservedTime int64
-	logger             logr.Logger
+	ctx                 context.Context
+	clusterName         string
+	componentName       string
+	clusterCompName     string
+	currentMemberName   string
+	namespace           string
+	cluster             *Cluster
+	client              *rest.RESTClient
+	clientset           *kubernetes.Clientset
+	LeaderObservedTime  int64
+	logger              logr.Logger
+	IsLeaderClusterWide bool
 }
 
 func NewKubernetesStore() (*KubernetesStore, error) {
@@ -90,25 +92,35 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 	}
 
 	currentMemberName := os.Getenv(constant.KBEnvPodName)
-	if clusterName == "" {
+	if currentMemberName == "" {
 		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvPodName))
 	}
 
 	namespace := os.Getenv(constant.KBEnvNamespace)
 	if namespace == "" {
-		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvNamespace))
+		return nil, errors.New("KB_NAMESPACE must be set")
+	}
+
+	characterType := viper.GetString(constant.KBEnvCharacterType)
+	if viper.IsSet(constant.KBEnvBuiltinHandler) {
+		characterType = viper.GetString(constant.KBEnvBuiltinHandler)
+	}
+	isLeaderClusterWide := false
+	if characterType == string(models.Oceanbase) {
+		isLeaderClusterWide = true
 	}
 
 	store := &KubernetesStore{
-		ctx:               ctx,
-		clusterName:       clusterName,
-		componentName:     componentName,
-		clusterCompName:   clusterCompName,
-		currentMemberName: currentMemberName,
-		namespace:         namespace,
-		client:            client,
-		clientset:         clientset,
-		logger:            logger,
+		ctx:                 ctx,
+		clusterName:         clusterName,
+		componentName:       componentName,
+		clusterCompName:     clusterCompName,
+		currentMemberName:   currentMemberName,
+		namespace:           namespace,
+		client:              client,
+		clientset:           clientset,
+		logger:              logger,
+		IsLeaderClusterWide: isLeaderClusterWide,
 	}
 	return store, err
 }
@@ -165,7 +177,9 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 
 	var replicas int32
 	for _, component := range clusterResource.Spec.ComponentSpecs {
-		if component.Name == store.componentName {
+		if store.IsLeaderClusterWide {
+			replicas += component.Replicas
+		} else if component.Name == store.componentName {
 			replicas = component.Replicas
 			break
 		}
@@ -204,7 +218,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		Leader:          leader,
 		Switchover:      switchover,
 		HaConfig:        haConfig,
-		resource:        clusterResource,
+		Resource:        clusterResource,
 	}
 
 	store.cluster = cluster
@@ -213,9 +227,11 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 
 func (store *KubernetesStore) GetMembers() ([]Member, error) {
 	labelsMap := map[string]string{
-		constant.AppInstanceLabelKey:    store.clusterName,
-		constant.AppManagedByLabelKey:   "kubeblocks",
-		constant.KBAppComponentLabelKey: store.componentName,
+		constant.AppInstanceLabelKey:  store.clusterName,
+		constant.AppManagedByLabelKey: "kubeblocks",
+	}
+	if !store.IsLeaderClusterWide {
+		labelsMap[constant.KBAppComponentLabelKey] = store.componentName
 	}
 
 	selector := labels.SelectorFromSet(labelsMap)
@@ -263,7 +279,7 @@ func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 
 func (store *KubernetesStore) IsLeaseExist() (bool, error) {
 	leaderConfigMap, err := store.GetLeaderConfigMap()
-	appCluster, ok := store.cluster.resource.(*appsv1alpha1.Cluster)
+	appCluster, ok := store.cluster.Resource.(*appsv1alpha1.Cluster)
 	if leaderConfigMap != nil && ok && leaderConfigMap.CreationTimestamp.Before(&appCluster.CreationTimestamp) {
 		store.logger.Info("A previous leader configmap resource exists, delete it", "name", leaderConfigMap.Name)
 		_ = store.DeleteLeader()
@@ -602,22 +618,33 @@ func (store *KubernetesStore) DeleteSwitchover() error {
 }
 
 func (store *KubernetesStore) getLeaderName() string {
+	if store.IsLeaderClusterWide {
+		return store.clusterName + "-leader"
+	}
 	return store.clusterCompName + "-leader"
 }
 
 func (store *KubernetesStore) getHAConfigName() string {
+	if store.IsLeaderClusterWide {
+		return store.clusterName + "-haconfig"
+	}
 	return store.clusterCompName + "-haconfig"
 }
 
 func (store *KubernetesStore) getSwitchoverName() string {
+	if store.IsLeaderClusterWide {
+		return store.clusterName + "-switchover"
+	}
 	return store.clusterCompName + "-switchover"
 }
 
 func (store *KubernetesStore) createConfigMap(configMap *corev1.ConfigMap) error {
 	labelsMap := map[string]string{
-		constant.AppInstanceLabelKey:    store.clusterName,
-		constant.AppManagedByLabelKey:   "kubeblocks",
-		constant.KBAppComponentLabelKey: store.componentName,
+		constant.AppInstanceLabelKey:  store.clusterName,
+		constant.AppManagedByLabelKey: "kubeblocks",
+	}
+	if !store.IsLeaderClusterWide {
+		labelsMap[constant.KBAppComponentLabelKey] = store.componentName
 	}
 
 	configMap.Labels = labelsMap
@@ -654,7 +681,7 @@ func getLorryPort(pod *corev1.Pod) string {
 }
 
 func getOwnerRef(cluster *Cluster) metav1.OwnerReference {
-	clusterObj := cluster.resource.(*appsv1alpha1.Cluster)
+	clusterObj := cluster.Resource.(*appsv1alpha1.Cluster)
 	gvk, _ := apiutil.GVKForObject(clusterObj, scheme.Scheme)
 	ownerRef := metav1.OwnerReference{
 		APIVersion: gvk.GroupVersion().String(),

@@ -29,11 +29,10 @@ import (
 	context "context"
 	reflect "reflect"
 
-	logr "github.com/go-logr/logr"
-	gomock "github.com/golang/mock/gomock"
-
 	dcs "github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	models "github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
+	logr "github.com/go-logr/logr"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockDBManager is a mock of DBManager interface.
@@ -85,6 +84,20 @@ func (m *MockDBManager) CreateUser(arg0 context.Context, arg1, arg2 string) erro
 func (mr *MockDBManagerMockRecorder) CreateUser(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockDBManager)(nil).CreateUser), arg0, arg1, arg2)
+}
+
+// CurrentMemberHealthyCheck mocks base method.
+func (m *MockDBManager) CurrentMemberHealthyCheck(arg0 context.Context, arg1 *dcs.Cluster) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CurrentMemberHealthyCheck", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CurrentMemberHealthyCheck indicates an expected call of CurrentMemberHealthyCheck.
+func (mr *MockDBManagerMockRecorder) CurrentMemberHealthyCheck(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CurrentMemberHealthyCheck", reflect.TypeOf((*MockDBManager)(nil).CurrentMemberHealthyCheck), arg0, arg1)
 }
 
 // DeleteUser mocks base method.
@@ -517,6 +530,20 @@ func (mr *MockDBManagerMockRecorder) JoinCurrentMemberToCluster(arg0, arg1 inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "JoinCurrentMemberToCluster", reflect.TypeOf((*MockDBManager)(nil).JoinCurrentMemberToCluster), arg0, arg1)
 }
 
+// LeaderHealthyCheck mocks base method.
+func (m *MockDBManager) LeaderHealthyCheck(arg0 context.Context, arg1 *dcs.Cluster) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LeaderHealthyCheck", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LeaderHealthyCheck indicates an expected call of LeaderHealthyCheck.
+func (mr *MockDBManagerMockRecorder) LeaderHealthyCheck(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeaderHealthyCheck", reflect.TypeOf((*MockDBManager)(nil).LeaderHealthyCheck), arg0, arg1)
+}
+
 // LeaveMemberFromCluster mocks base method.
 func (m *MockDBManager) LeaveMemberFromCluster(arg0 context.Context, arg1 *dcs.Cluster, arg2 string) error {
 	m.ctrl.T.Helper()
@@ -573,6 +600,20 @@ func (m *MockDBManager) Lock(arg0 context.Context, arg1 string) error {
 func (mr *MockDBManagerMockRecorder) Lock(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Lock", reflect.TypeOf((*MockDBManager)(nil).Lock), arg0, arg1)
+}
+
+// MemberHealthyCheck mocks base method.
+func (m *MockDBManager) MemberHealthyCheck(arg0 context.Context, arg1 *dcs.Cluster, arg2 *dcs.Member) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MemberHealthyCheck", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MemberHealthyCheck indicates an expected call of MemberHealthyCheck.
+func (mr *MockDBManagerMockRecorder) MemberHealthyCheck(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MemberHealthyCheck", reflect.TypeOf((*MockDBManager)(nil).MemberHealthyCheck), arg0, arg1, arg2)
 }
 
 // MoveData mocks base method.

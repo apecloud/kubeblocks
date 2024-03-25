@@ -240,11 +240,11 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 	}
 
 	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
-		if !mgr.WriteCheck(ctx, db) {
+		if mgr.WriteCheck(ctx, db) != nil {
 			return false
 		}
 	}
-	if !mgr.ReadCheck(ctx, db) {
+	if mgr.ReadCheck(ctx, db) != nil {
 		return false
 	}
 
@@ -327,7 +327,7 @@ func (mgr *Manager) GetSecondsBehindMaster(ctx context.Context) (int, error) {
 	return strconv.Atoi(secondsBehindMaster)
 }
 
-func (mgr *Manager) WriteCheck(ctx context.Context, db *sql.DB) bool {
+func (mgr *Manager) WriteCheck(ctx context.Context, db *sql.DB) error {
 	writeSQL := fmt.Sprintf(`BEGIN;
 CREATE DATABASE IF NOT EXISTS kubeblocks;
 CREATE TABLE IF NOT EXISTS kubeblocks.kb_health_check(type INT, check_ts BIGINT, PRIMARY KEY(type));
@@ -336,30 +336,30 @@ COMMIT;`, engines.CheckStatusType)
 	_, err := db.ExecContext(ctx, writeSQL)
 	if err != nil {
 		mgr.Logger.Info(writeSQL+" executing failed", "error", err.Error())
-		return false
+		return err
 	}
-	return true
+	return nil
 }
 
-func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
+func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) error {
 	_, err := mgr.GetOpTimestamp(ctx, db)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// no healthy check records, return true
-			return true
+			return nil
 		}
 		var mysqlErr *mysql.MySQLError
 		if errors.As(err, &mysqlErr) && (mysqlErr.Number == 1049 || mysqlErr.Number == 1146) {
 			// error 1049: database does not exists
 			// error 1146: table does not exists
 			// no healthy database, return true
-			return true
+			return nil
 		}
 		mgr.Logger.Info("Read check failed", "error", err)
-		return false
+		return err
 	}
 
-	return true
+	return nil
 }
 
 func (mgr *Manager) GetOpTimestamp(ctx context.Context, db *sql.DB) (int64, error) {
@@ -633,7 +633,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	// MySQL 5.7 has a limitation where the length of the master_host cannot exceed 60 characters.
 	masterHost := cluster.GetMemberShortAddr(*leaderMember)
 	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
-		masterHost, config.Username, config.password, leaderMember.DBPort)
+		masterHost, config.Username, config.Password, leaderMember.DBPort)
 	mgr.Logger.Info("follow new leader", "changemaster", changeMaster)
 	startSlave := `start slave;`
 

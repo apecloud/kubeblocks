@@ -58,7 +58,7 @@ func SentEventForProbe(ctx context.Context, data map[string]any) error {
 		}
 		event, err := CreateEvent(string(operation.(OperationKind)), data)
 		if err != nil {
-			logger.Error(err, "generate event failed")
+			logger.Info("generate event failed", "error", err.Error())
 			return err
 		}
 
@@ -116,22 +116,23 @@ func SendEvent(ctx context.Context, event *corev1.Event) error {
 	ctx1 := context.Background()
 	config, err := ctlruntime.GetConfig()
 	if err != nil {
-		logger.Error(err, "get k8s client config failed")
+		logger.Info("get k8s client config failed", "error", err.Error())
 		return err
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		logger.Error(err, "k8s client create failed")
+		logger.Info("k8s client create failed", "error", err.Error())
 		return err
 	}
 	namespace := os.Getenv(constant.KBEnvNamespace)
 	for i := 0; i < 30; i++ {
 		_, err = clientset.CoreV1().Events(namespace).Create(ctx1, event, metav1.CreateOptions{})
 		if err == nil {
+			logger.Info("send event success", "message", event.Message)
 			break
 		}
-		logger.Error(err, "send event failed")
+		logger.Info("send event failed", "error", err.Error())
 		time.Sleep(10 * time.Second)
 	}
 	return err

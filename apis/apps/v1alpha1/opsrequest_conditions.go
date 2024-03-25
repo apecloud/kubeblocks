@@ -296,7 +296,7 @@ func NewDataScriptCondition(ops *OpsRequest) *metav1.Condition {
 	return newOpsCondition(ops, ConditionTypeDataScript, "DataScriptStarted", fmt.Sprintf("Start to execute data script in Cluster: %s", ops.Spec.ClusterRef))
 }
 
-func newOpsCondition(ops *OpsRequest, condType, reason, message string) *metav1.Condition {
+func newOpsCondition(_ *OpsRequest, condType, reason, message string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               condType,
 		Status:             metav1.ConditionTrue,

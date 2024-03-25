@@ -19,7 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package operations
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type FakeFuncType string
 
@@ -69,6 +72,9 @@ func NewFakeOperations(funcType FakeFuncType, fakeFunc interface{}) *FakeOperati
 
 func (f *FakeOperations) Init(ctx context.Context) error {
 	return f.InitFunc(ctx)
+}
+
+func (f *FakeOperations) SetTimeout(timeout time.Duration) {
 }
 
 func (f *FakeOperations) IsReadonly(ctx context.Context) bool {

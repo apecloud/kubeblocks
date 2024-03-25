@@ -67,7 +67,7 @@ func TestNewConfig(t *testing.T) {
 		fakeConfig, err := NewConfig(map[string]string{})
 		assert.Nil(t, err)
 		assert.NotNil(t, fakeConfig)
-		assert.Equal(t, "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true", fakeConfig.url)
+		assert.Equal(t, "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true", fakeConfig.URL)
 	})
 
 	t.Run("with default properties", func(t *testing.T) {
@@ -77,13 +77,13 @@ func TestNewConfig(t *testing.T) {
 		fakeConfig, err := NewConfig(fakeProperties)
 		assert.Nil(t, err)
 		assert.NotNil(t, fakeConfig)
-		assert.Equal(t, "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true", fakeConfig.url)
+		assert.Equal(t, "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true", fakeConfig.URL)
 		assert.Equal(t, 5, fakeConfig.maxOpenConns)
 		assert.Equal(t, 4, fakeConfig.maxIdleConns)
 		assert.Equal(t, time.Minute*10, fakeConfig.connMaxLifetime)
 		assert.Equal(t, time.Second*500, fakeConfig.connMaxIdletime)
 		assert.Equal(t, fakeUser, fakeConfig.Username)
-		assert.Equal(t, fakePassword, fakeConfig.password)
+		assert.Equal(t, fakePassword, fakeConfig.Password)
 	})
 
 	t.Run("can't open pem file", func(t *testing.T) {

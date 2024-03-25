@@ -169,7 +169,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(k8sClient.Update(context.Background(), opsRequest).Error()).Should(ContainSubstring("forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"))
 	}
 
-	testVerticalScaling := func(cluster *Cluster) {
+	testVerticalScaling := func(_ *Cluster) {
 		verticalScalingList := []VerticalScaling{
 			{
 				ComponentOps:         ComponentOps{ComponentName: "vs-not-exist"},
@@ -266,7 +266,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		}
 	}
 
-	testVolumeExpansion := func(cluster *Cluster) {
+	testVolumeExpansion := func(_ *Cluster) {
 		getSingleVolumeExpansionList := func(compName, vctName, storage string) []VolumeExpansion {
 			return []VolumeExpansion{
 				{
@@ -343,7 +343,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, opsRequest1).Error()).Should(ContainSubstring("existing other VolumeExpansion OpsRequest"))
 	}
 
-	testHorizontalScaling := func(clusterDef *ClusterDefinition, cluster *Cluster) {
+	testHorizontalScaling := func(clusterDef *ClusterDefinition, _ *Cluster) {
 		hScalingList := []HorizontalScaling{
 			{
 				ComponentOps: ComponentOps{ComponentName: "hs-not-exist"},
@@ -481,7 +481,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 	}
 
-	testSwitchoverWithCompDef := func(clusterDef *ClusterDefinition, compDef *ComponentDefinition, cluster *Cluster) {
+	testSwitchoverWithCompDef := func(_ *ClusterDefinition, compDef *ComponentDefinition, cluster *Cluster) {
 		switchoverList := []Switchover{
 			{
 				ComponentOps: ComponentOps{ComponentName: "switchover-component-not-exist"},
@@ -591,7 +591,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(k8sClient.Patch(ctx, opsRequest, patch)).Should(Succeed())
 	}
 
-	testRestart := func(cluster *Cluster) *OpsRequest {
+	testRestart := func(_ *Cluster) *OpsRequest {
 		By("By testing restart when componentNames is not correct")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, RestartType)
 		opsRequest.Spec.RestartList = []ComponentOps{
@@ -605,7 +605,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		return opsRequest
 	}
 
-	testReconfiguring := func(cluster *Cluster, clusterDef *ClusterDefinition) {
+	testReconfiguring := func(_ *Cluster, _ *ClusterDefinition) {
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName+"-reconfiguring", ReconfiguringType)
 
 		createReconfigureObj := func(compName string) *Reconfigure {

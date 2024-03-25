@@ -49,7 +49,7 @@ type CheckRole struct {
 	OriRole                    string
 	CheckRoleFailedCount       int
 	FailedEventReportFrequency int
-	ProbeTimeout               time.Duration
+	Timeout                    time.Duration
 	DBRoles                    map[string]AccessMode
 	Command                    []string
 }
@@ -90,7 +90,7 @@ func (s *CheckRole) Init(ctx context.Context) error {
 	}
 	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
 	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
-	s.ProbeTimeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
+	s.Timeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
 	actionJSON := viper.GetString(constant.KBEnvActionCommands)
 	if actionJSON != "" {
 		actionCommands := map[string][]string{}
@@ -112,7 +112,7 @@ func (s *CheckRole) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operations.OpsResponse, error) {
 	resp := &operations.OpsResponse{
 		Data: map[string]any{},
 	}
@@ -133,7 +133,7 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 
 	cluster := s.dcsStore.GetClusterFromCache()
 
-	ctx1, cancel := context.WithTimeout(ctx, s.ProbeTimeout)
+	ctx1, cancel := context.WithTimeout(ctx, s.Timeout)
 	defer cancel()
 	role, err = manager.GetReplicaRole(ctx1, cluster)
 

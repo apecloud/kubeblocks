@@ -21,22 +21,30 @@ package operations
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 )
 
 type Operation interface {
 	Init(context.Context) error
+	SetTimeout(timeout time.Duration)
 	IsReadonly(context.Context) bool
 	PreCheck(context.Context, *OpsRequest) error
 	Do(context.Context, *OpsRequest) (*OpsResponse, error)
 }
 
 type Base struct {
+	Timeout time.Duration
+	Command []string
 }
 
 func (b *Base) Init(ctx context.Context) error {
 	return nil
+}
+
+func (b *Base) SetTimeout(timeout time.Duration) {
+	b.Timeout = timeout
 }
 
 func (b *Base) IsReadonly(ctx context.Context) bool {

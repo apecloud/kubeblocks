@@ -36,6 +36,7 @@ import (
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/lorry/cronjobs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/grpcserver"
@@ -114,13 +115,20 @@ func main() {
 		panic(fmt.Errorf("fatal error grpcserver serve failed: %v", err))
 	}
 
-	// Start HTTP Server
+	// start HTTP Server
 	ops := opsregister.Operations()
 	httpServer := httpserver.NewServer(ops)
 	err = httpServer.StartNonBlocking()
 	if err != nil {
 		panic(errors.Wrap(err, "HTTP server initialize failed"))
 	}
+
+	// start cron jobs
+	jobManager, err := cronjobs.NewManager()
+	if err != nil {
+		panic(errors.Wrap(err, "Cron jobs initialize failed"))
+	}
+	jobManager.Start()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

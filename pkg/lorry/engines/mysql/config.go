@@ -62,10 +62,10 @@ const (
 )
 
 type Config struct {
-	url             string
+	URL             string
 	port            string
 	Username        string
-	password        string
+	Password        string
 	pemPath         string
 	maxIdleConns    int
 	maxOpenConns    int
@@ -81,9 +81,9 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	config = &Config{}
 
 	if val, ok := properties[connectionURLKey]; ok && val != "" {
-		config.url = val
+		config.URL = val
 	} else {
-		config.url = "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true"
+		config.URL = "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true"
 	}
 
 	if viper.IsSet(constant.KBEnvServiceUser) {
@@ -93,7 +93,7 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	}
 
 	if viper.IsSet(constant.KBEnvServicePassword) {
-		config.password = viper.GetString(constant.KBEnvServicePassword)
+		config.Password = viper.GetString(constant.KBEnvServicePassword)
 	}
 
 	if viper.IsSet(constant.KBEnvServicePort) {
@@ -149,12 +149,12 @@ func NewConfig(properties map[string]string) (*Config, error) {
 }
 
 func (config *Config) GetLocalDBConn() (*sql.DB, error) {
-	mysqlConfig, err := mysql.ParseDSN(config.url)
+	mysqlConfig, err := mysql.ParseDSN(config.URL)
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
 	}
 	mysqlConfig.User = config.Username
-	mysqlConfig.Passwd = config.password
+	mysqlConfig.Passwd = config.Password
 	if config.port != "" {
 		mysqlConfig.Addr = "127.0.0.1:" + config.port
 	}
@@ -167,12 +167,12 @@ func (config *Config) GetLocalDBConn() (*sql.DB, error) {
 }
 
 func (config *Config) GetDBConnWithAddr(addr string) (*sql.DB, error) {
-	mysqlConfig, err := mysql.ParseDSN(config.url)
+	mysqlConfig, err := mysql.ParseDSN(config.URL)
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
 	}
 	mysqlConfig.User = config.Username
-	mysqlConfig.Passwd = config.password
+	mysqlConfig.Passwd = config.Password
 	mysqlConfig.Addr = addr
 	db, err := GetDBConnection(mysqlConfig.FormatDSN())
 	if err != nil {
@@ -183,7 +183,7 @@ func (config *Config) GetDBConnWithAddr(addr string) (*sql.DB, error) {
 }
 
 func (config *Config) GetDBPort() int {
-	mysqlConfig, err := mysql.ParseDSN(config.url)
+	mysqlConfig, err := mysql.ParseDSN(config.URL)
 	if err != nil {
 		return defaultDBPort
 	}

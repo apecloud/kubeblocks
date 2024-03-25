@@ -473,7 +473,7 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 	populatePVC *corev1.PersistentVolumeClaim,
 	index int) (*batchv1.Job, error) {
 	prepareDataConfig := r.Restore.Spec.PrepareDataConfig
-	if prepareDataConfig == nil && prepareDataConfig.DataSourceRef == nil {
+	if prepareDataConfig == nil || prepareDataConfig.DataSourceRef == nil {
 		return nil, nil
 	}
 	if !backupSet.ActionSet.HasPrepareDataStage() {

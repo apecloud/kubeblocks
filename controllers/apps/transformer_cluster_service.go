@@ -349,7 +349,7 @@ func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 	if len(objCopy.SessionAffinity) == 0 {
 		objCopy.SessionAffinity = obj.SessionAffinity
 	}
-	if len(objCopy.IPFamilies) == 0 {
+	if len(objCopy.IPFamilies) == 0 || (len(objCopy.IPFamilies) == 1 && *objCopy.IPFamilyPolicy != corev1.IPFamilyPolicySingleStack) {
 		objCopy.IPFamilies = obj.IPFamilies
 	}
 	if objCopy.IPFamilyPolicy == nil {

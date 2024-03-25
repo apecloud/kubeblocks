@@ -21,7 +21,6 @@ package rsm2
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
@@ -34,6 +33,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )

@@ -128,6 +128,14 @@ func MockConsensusComponentStsPod(
 		AddRoleLabel(podRole).
 		AddConsensusSetAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
+		AddVolume(corev1.Volume{
+			Name: DataVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: fmt.Sprintf("%s-%s", DataVolumeName, podName),
+				},
+			},
+		}).
 		AddContainer(corev1.Container{
 			Name:  DefaultMySQLContainerName,
 			Image: ApeCloudMySQLImage,
@@ -148,6 +156,9 @@ func MockConsensusComponentStsPod(
 						Port: intstr.FromInt(1024),
 					},
 				},
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{Name: DataVolumeName, MountPath: "/test"},
 			},
 		})
 	if sts != nil && sts.Labels[constant.AppNameLabelKey] != "" {

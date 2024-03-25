@@ -265,7 +265,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithNoBackup(reqCtx intctrluti
 	insHelper *instanceHelper,
 	progressDetail *appsv1alpha1.ProgressStatusDetail) (bool, error) {
 	// 1. restore the new pvs.
-	completed, err := r.rebuildInstancePVByPod(reqCtx, cli, opsRes, insHelper)
+	completed, err := r.rebuildInstancePVByPod(reqCtx, cli, opsRes, insHelper, progressDetail)
 	if err != nil || !completed {
 		return false, err
 	}
@@ -308,7 +308,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 				if err != nil || !available {
 					return false, err
 				}
-				progressDetail.Message = fmt.Sprintf(`Waiting for Restore "%s" to Completed`, restoreName)
+				progressDetail.Message = fmt.Sprintf(`Waiting for Restore "%s" to be completed`, restoreName)
 				return false, r.createPostReadyRestore(reqCtx, cli, opsRes.OpsRequest, insHelper, restoreName)
 			}
 			return false, r.createPrepareDataRestore(reqCtx, cli, opsRes.OpsRequest, insHelper, restoreName)
@@ -328,7 +328,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 		completed, err = waitRestoreCompleted(dpv1alpha1.PrepareData)
 	} else {
 		// if no prepareData stage, restore the pv by a tmp pod.
-		completed, err = r.rebuildInstancePVByPod(reqCtx, cli, opsRes, insHelper)
+		completed, err = r.rebuildInstancePVByPod(reqCtx, cli, opsRes, insHelper, progressDetail)
 	}
 	if err != nil || !completed {
 		return false, err
@@ -348,7 +348,8 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 func (r rebuildInstanceOpsHandler) rebuildInstancePVByPod(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	insHelper *instanceHelper) (bool, error) {
+	insHelper *instanceHelper,
+	progressDetail *appsv1alpha1.ProgressStatusDetail) (bool, error) {
 	rebuildPodName := fmt.Sprintf("%s-%s-%s-%d", insHelper.rebuildPrefix, common.CutString(opsRes.OpsRequest.Name, 20), insHelper.comp.Name, insHelper.index)
 	rebuildPod := &corev1.Pod{}
 	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, client.ObjectKey{Name: rebuildPodName, Namespace: opsRes.Cluster.Namespace}, rebuildPod)
@@ -358,7 +359,11 @@ func (r rebuildInstanceOpsHandler) rebuildInstancePVByPod(reqCtx intctrlutil.Req
 	if !exists {
 		return false, r.createTmpPVCsAndPod(reqCtx, cli, opsRes.OpsRequest, insHelper, rebuildPodName)
 	}
-	return rebuildPod.Status.Phase == corev1.PodSucceeded, nil
+	if rebuildPod.Status.Phase != corev1.PodSucceeded {
+		progressDetail.Message = fmt.Sprintf(`Waiting for rebuilding pod "%s" to be completed`, rebuildPod.Name)
+		return false, nil
+	}
+	return true, nil
 }
 
 func (r rebuildInstanceOpsHandler) getWellKnownLabels(synthesizedComp *component.SynthesizedComponent) map[string]string {
@@ -397,6 +402,9 @@ func (r rebuildInstanceOpsHandler) getPVCMapAndVolumes(opsRes *OpsResource,
 				Name:      fmt.Sprintf("%s-%s-%d", rebuildPrefix, common.CutString(synthesizedComp.Name+"-"+vct.Name, 30), index),
 				Namespace: targetPod.Namespace,
 				Labels:    pvcLabels,
+				Annotations: map[string]string{
+					rebuildFromAnnotation: opsRes.OpsRequest.Name,
+				},
 			},
 			Spec: vct.Spec,
 		}
@@ -657,25 +665,29 @@ func (r rebuildInstanceOpsHandler) recreateSourcePVC(reqCtx intctrlutil.RequestC
 	opsRequestName string) error {
 	sourcePvc := &corev1.PersistentVolumeClaim{}
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: sourcePVCName, Namespace: tmpPVC.Namespace}, sourcePvc); err != nil {
+		// if not exists, wait for the pvc to recreate by external controller.
 		return err
 	}
 	// if the pvc is rebuilt by current opsRequest, return.
 	if sourcePvc.Annotations[rebuildFromAnnotation] == opsRequestName {
 		return nil
 	}
-	// 1. delete the old pvc
+	// 1. retain labels of the source pvc.
+	intctrlutil.MergeMetadataMapInplace(sourcePvc.Labels, &tmpPVC.Labels)
+	// 2. delete the old pvc
 	if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, sourcePvc); err != nil {
 		return err
 	}
 	if err := r.removePVCFinalizer(reqCtx, cli, sourcePvc); err != nil {
 		return err
 	}
-	// 2. recreate the pvc with restored PV.
+
+	// 3. recreate the pvc with restored PV.
 	newPVC := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      sourcePVCName,
-			Labels:    tmpPVC.Labels,
 			Namespace: tmpPVC.Namespace,
+			Labels:    tmpPVC.Labels,
 			Annotations: map[string]string{
 				rebuildFromAnnotation: opsRequestName,
 			},

@@ -46,6 +46,7 @@ spec:
     {{ `{{- end }}` }}
     endpoint = {{ `{{ $endpoint }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
+    no_check_certificate = {{ `{{ index .Parameters "insecure" }}` }}
     chunk_size = 50Mi
 
   parametersSchema:
@@ -78,6 +79,10 @@ spec:
         secretAccessKey:
           type: string
           description: "OSS secret key"
+        insecure:
+          type: boolean
+          default: false
+          description: "Do not verify the server SSL certificate"
 
       required:
         - bucket

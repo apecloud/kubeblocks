@@ -254,6 +254,13 @@ spec:
                   shellTrigger:
                     description: Used to perform the reload command in shell script.
                     properties:
+                      batchRefresh:
+                        description: Specifies whether to reconfigure dynamic parameters
+                          individually or in a batch. - Set to 'True' to execute the
+                          reload action in a batch, incorporating all parameter changes.
+                          - Set to 'False' to execute the reload action for each parameter
+                          change individually. The default value is 'False'.
+                        type: boolean
                       command:
                         description: Specifies the list of commands for reload.
                         items:

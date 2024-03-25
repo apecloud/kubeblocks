@@ -289,6 +289,14 @@ type ShellTrigger struct {
 	//
 	// +optional
 	Sync *bool `json:"sync,omitempty"`
+
+	// Specifies whether to reconfigure dynamic parameters individually or in a batch.
+	// - Set to 'True' to execute the reload action in a batch, incorporating all parameter changes.
+	// - Set to 'False' to execute the reload action for each parameter change individually.
+	// The default value is 'False'.
+	//
+	// +optional
+	BatchReload *bool `json:"batchRefresh,omitempty"`
 }
 
 type TPLScriptTrigger struct {

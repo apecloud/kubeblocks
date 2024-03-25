@@ -58,40 +58,26 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// generate objects by current spec
+	svc := BuildSvc(*rsm)
+	altSvs := BuildAlternativeSvs(*rsm)
+	headLessSvc := BuildHeadlessSvc(*rsm)
+	envConfig := BuildEnvConfigMap(*rsm)
+	sts := buildSts(rsm, headLessSvc.Name)
+
 	var objects []client.Object
-	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
-		pods := buildPods(*rsm)
-		for idx := range pods {
-			pod := pods[idx]
-			objects = append(objects, pod)
-		}
-	} else {
-		svc := buildSvc(*rsm)
-		altSvs := buildAlternativeSvs(*rsm)
-		headLessSvc := buildHeadlessSvc(*rsm)
-		envConfig := buildEnvConfigMap(*rsm)
-		sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
-		objects = append(objects, sts)
-		objects = append(objects, headLessSvc, envConfig)
-		if svc != nil {
-			objects = append(objects, svc)
-		}
-		for _, s := range altSvs {
-			objects = append(objects, s)
-		}
+	objects = append(objects, sts)
+	objects = append(objects, headLessSvc, envConfig)
+	if svc != nil {
+		objects = append(objects, svc)
+	}
+	for _, s := range altSvs {
+		objects = append(objects, s)
 	}
 
 	for _, object := range objects {
-		if err := setOwnership(rsm, object, model.GetScheme(), getFinalizer(object)); err != nil {
+		if err := SetOwnership(rsm, object, model.GetScheme(), GetFinalizer(object)); err != nil {
 			return err
 		}
-	}
-
-	// read cache snapshot
-	ml := getLabels(rsm)
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds(rsm.Spec.RsmTransformPolicy)...)
-	if err != nil {
-		return err
 	}
 
 	// compute create/update/delete set
@@ -102,6 +88,13 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 			return err
 		}
 		newSnapshot[*name] = object
+	}
+
+	// read cache snapshot
+	ml := getLabels(rsm)
+	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
+	if err != nil {
+		return err
 	}
 
 	// now compute the diff between old and target snapshot and generate the plan
@@ -121,9 +114,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := copyAndMerge(oldObj, newSnapshot[name])
-			if reflect.DeepEqual(oldObj, newObj) {
-				continue
-			}
 			cli.Update(dag, oldObj, newObj)
 		}
 	}
@@ -139,11 +129,8 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 	}
 	handleDependencies := func() {
-		// RsmTransformPolicy might be "", treat empty as ToSts for backward compatibility
-		if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
-			// objects[0] is the sts object
-			cli.DependOn(dag, objects[0], objects[1:]...)
-		}
+		// objects[0] is the sts object
+		cli.DependOn(dag, objects[0], objects[1:]...)
 	}
 
 	// objects to be created
@@ -244,18 +231,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return oldCm
 	}
 
-	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
-		oldPod.Spec.ActiveDeadlineSeconds = newPod.Spec.ActiveDeadlineSeconds
-		for idx := range oldPod.Spec.Containers {
-			oldPod.Spec.Containers[idx].Image = newPod.Spec.Containers[idx].Image
-		}
-		for idx := range oldPod.Spec.InitContainers {
-			oldPod.Spec.InitContainers[idx].Image = newPod.Spec.InitContainers[idx].Image
-		}
-		// TODO `spec.tolerations` (only additions to existing tolerations),`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)
-		return oldPod
-	}
-
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
 	case *apps.StatefulSet:
@@ -264,14 +239,12 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
 	case *corev1.ConfigMap:
 		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
-	case *corev1.Pod:
-		return copyAndMergePod(targetObj.(*corev1.Pod), o)
 	default:
 		return newObj
 	}
 }
 
-func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
+func BuildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
@@ -288,7 +261,7 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 		GetObject()
 }
 
-func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service {
+func BuildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
@@ -319,7 +292,7 @@ func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service
 	return services
 }
 
-func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
+func BuildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	selectors := getSvcSelector(&rsm, true)
@@ -349,10 +322,11 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	return hdlBuilder.GetObject()
 }
 
-func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
-	template := buildStsPodTemplate(rsm, envConfig)
+func buildSts(rsm *workloads.ReplicatedStateMachine, headlessSvcName string) *apps.StatefulSet {
+	envConfigName := GetEnvConfigMapName(rsm.Name)
+	template := BuildPodTemplate(rsm, envConfigName)
 	annotations := ParseAnnotationsOfScope(RootScope, rsm.Annotations)
-	labels := getLabels(&rsm)
+	labels := getLabels(rsm)
 	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(labels).
 		AddLabels(rsmGenerationLabelKey, strconv.FormatInt(rsm.Generation, 10)).
@@ -364,40 +338,40 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
 		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
 		SetTemplate(*template).
-		SetUpdateStrategy(rsm.Spec.UpdateStrategy).
+		SetUpdateStrategy(apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType}).
 		GetObject()
 }
 
-func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
+func BuildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
 	annotations := ParseAnnotationsOfScope(ConfigMapScope, rsm.Annotations)
 	labels := getLabels(&rsm)
-	return builder.NewConfigMapBuilder(rsm.Namespace, getEnvConfigMapName(rsm.Name)).
+	return builder.NewConfigMapBuilder(rsm.Namespace, GetEnvConfigMapName(rsm.Name)).
 		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
 		SetData(envData).GetObject()
 }
 
-func buildStsPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
-	template := rsm.Spec.Template
+func BuildPodTemplate(rsm *workloads.ReplicatedStateMachine, envConfigName string) *corev1.PodTemplateSpec {
+	template := rsm.Spec.Template.DeepCopy()
 	// inject env ConfigMap into workload pods only
 	for i := range template.Spec.Containers {
 		template.Spec.Containers[i].EnvFrom = append(template.Spec.Containers[i].EnvFrom,
 			corev1.EnvFromSource{
 				ConfigMapRef: &corev1.ConfigMapEnvSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: envConfig.Name,
+						Name: envConfigName,
 					},
 					Optional: func() *bool { optional := false; return &optional }(),
 				}})
 	}
 
-	injectRoleProbeContainer(rsm, &template)
+	injectRoleProbeContainer(rsm, template)
 
-	return &template
+	return template
 }
 
-func injectRoleProbeContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
+func injectRoleProbeContainer(rsm *workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
 	roleProbe := rsm.Spec.RoleProbe
 	if roleProbe == nil {
 		return
@@ -466,7 +440,7 @@ func buildActionSvcPorts(template *corev1.PodTemplateSpec, actions []workloads.A
 	return actionSvcPorts
 }
 
-func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
+func injectRoleProbeBaseContainer(rsm *workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role probe base container
 	roleProbe := rsm.Spec.RoleProbe
 	if roleProbe == nil {
@@ -676,7 +650,7 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 	template.Spec.Containers = append(template.Spec.Containers, *container)
 }
 
-func injectCustomRoleProbeContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+func injectCustomRoleProbeContainer(rsm *workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
 	if rsm.Spec.RoleProbe == nil {
 		return
 	}
@@ -751,13 +725,13 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	generateMemberEnv := func(prefix string) {
 		followers := ""
 		for _, memberStatus := range set.Status.MembersStatus {
-			if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName {
+			if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName || memberStatus.ReplicaRole == nil {
 				continue
 			}
 			switch {
-			case memberStatus.IsLeader:
+			case memberStatus.ReplicaRole.IsLeader:
 				envData[prefix+"LEADER"] = memberStatus.PodName
-			case memberStatus.CanVote:
+			case memberStatus.ReplicaRole.CanVote:
 				if len(followers) > 0 {
 					followers += ","
 				}

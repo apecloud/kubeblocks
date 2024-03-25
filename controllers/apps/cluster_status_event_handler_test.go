@@ -57,7 +57,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		By("clean resources")
 
 		if clusterName != "" {
-			testapps.ClearClusterResources(&testCtx)
+			testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 			inNS := client.InNamespace(testCtx.DefaultNamespace)
 			ml := client.HasLabels{testCtx.TestObjLabelKey}

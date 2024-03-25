@@ -130,7 +130,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				// only create backup schedule for the default backup policy template
 				// if there are more than one backup policy templates.
 				if r.isDefaultTemplate != trueVal && r.tplCount > 1 {
-					r.V(1).Info("Skip creating backup schedule for non-default backup policy template %s", tpl.Name)
+					r.V(1).Info("Skip creating backup schedule for non-default backup policy template", "template", tpl.Name)
 					return
 				}
 

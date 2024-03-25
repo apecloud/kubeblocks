@@ -38,11 +38,7 @@ func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *gr
 	transCtx, _ := ctx.(*componentTransformContext)
 	comp := transCtx.Component
 
-	// if !controllerutil.ContainsFinalizer(component, constant.DBComponentFinalizerName) {
-	//	controllerutil.AddFinalizer(component, constant.DBComponentFinalizerName)
-	//	needUpdate = true
-	// }
-	controllerutil.AddFinalizer(comp, constant.DBClusterFinalizerName)
+	controllerutil.AddFinalizer(comp, constant.DBComponentFinalizerName)
 
 	t.setMetaLabels(comp)
 

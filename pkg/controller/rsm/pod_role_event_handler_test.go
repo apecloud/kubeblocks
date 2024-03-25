@@ -91,7 +91,7 @@ var _ = Describe("pod role label event handler test", func() {
 				DoAndReturn(func(_ context.Context, pd *corev1.Pod, patch client.Patch, _ ...client.PatchOption) error {
 					Expect(pd).ShouldNot(BeNil())
 					Expect(pd.Labels).ShouldNot(BeNil())
-					Expect(pd.Labels[roleLabelKey]).Should(Equal(role.Name))
+					Expect(pd.Labels[RoleLabelKey]).Should(Equal(role.Name))
 					Expect(pd.Labels[rsmAccessModeLabelKey]).Should(BeEquivalentTo(role.AccessMode))
 					return nil
 				}).Times(1)

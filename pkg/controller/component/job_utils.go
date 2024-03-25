@@ -28,6 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -86,12 +88,31 @@ func CleanJobByName(ctx context.Context,
 	return nil
 }
 
+// CleanJobByNameWithDAG cleans up the job task by name with DAG.
+func CleanJobByNameWithDAG(ctx context.Context,
+	cli client.Reader,
+	dag *graph.DAG,
+	cluster *appsv1alpha1.Cluster,
+	jobName string) error {
+	job := &batchv1.Job{}
+	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
+	if err := cli.Get(ctx, key, job); err != nil {
+		return err
+	}
+	var ttl = int32(KBJobTTLSecondsAfterFinished)
+	patch := job.DeepCopy()
+	job.Spec.TTLSecondsAfterFinished = &ttl
+	graphCli, _ := cli.(model.GraphClient)
+	graphCli.Update(dag, patch, job, &model.ReplaceIfExistingOption{})
+	return nil
+}
+
 // CheckJobSucceed checks the result of job execution.
 // Returns:
 // - bool: whether job exist, true exist
 // - error: any error that occurred during the handling
 func CheckJobSucceed(ctx context.Context,
-	cli client.Client,
+	cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
 	jobName string) error {
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
@@ -111,8 +132,8 @@ func CheckJobSucceed(ctx context.Context,
 		case batchv1.JobFailed:
 			return errors.New("job failed, pls check")
 		default:
-			return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeExpectedInProcess, "requeue to waiting for job %s finished.", key.Name)
 		}
 	}
-	return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeExpectedInProcess, "requeue to waiting for job %s finished.", key.Name)
 }

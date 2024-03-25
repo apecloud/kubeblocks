@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"time"
@@ -32,9 +34,12 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -62,31 +67,30 @@ func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
 	}
 }
 
-// getClusterOwningNamespacedObjects reads namespaced objects owned by our cluster with kinds.
-func getClusterOwningNamespacedObjects(transCtx *clusterTransformContext,
-	cluster appsv1alpha1.Cluster,
+func getOwningNamespacedObjects(ctx context.Context,
+	cli client.Reader,
+	namespace string,
 	labels client.MatchingLabels,
-	kinds []client.ObjectList) (clusterOwningObjects, error) {
-	inNS := client.InNamespace(cluster.Namespace)
-	return getClusterOwningObjectsWithOptions(transCtx, kinds, inNS, labels)
+	kinds []client.ObjectList) (owningObjects, error) {
+	inNS := client.InNamespace(namespace)
+	return getOwningObjectsWithOptions(ctx, cli, kinds, inNS, labels)
 }
 
-// getClusterOwningNonNamespacedObjects reads non-namespaced objects owned by our cluster with kinds.
-func getClusterOwningNonNamespacedObjects(transCtx *clusterTransformContext,
-	_ appsv1alpha1.Cluster,
+func getOwningNonNamespacedObjects(ctx context.Context,
+	cli client.Reader,
 	labels client.MatchingLabels,
-	kinds []client.ObjectList) (clusterOwningObjects, error) {
-	return getClusterOwningObjectsWithOptions(transCtx, kinds, labels)
+	kinds []client.ObjectList) (owningObjects, error) {
+	return getOwningObjectsWithOptions(ctx, cli, kinds, labels)
 }
 
-// getClusterOwningObjectsWithOptions reads objects owned by our cluster with kinds and specified options.
-func getClusterOwningObjectsWithOptions(transCtx *clusterTransformContext,
+func getOwningObjectsWithOptions(ctx context.Context,
+	cli client.Reader,
 	kinds []client.ObjectList,
-	opts ...client.ListOption) (clusterOwningObjects, error) {
+	opts ...client.ListOption) (owningObjects, error) {
 	// list what kinds of object cluster owns
-	objs := make(clusterOwningObjects)
+	objs := make(owningObjects)
 	for _, list := range kinds {
-		if err := transCtx.Client.List(transCtx.Context, list, opts...); err != nil {
+		if err := cli.List(ctx, list, opts...); err != nil {
 			// check for policy/v1 discovery error, to support k8s clusters before 1.21.
 			if isPolicyV1DiscoveryNotFoundError(err) {
 				continue
@@ -180,4 +184,66 @@ func isPolicyV1DiscoveryNotFoundError(err error) bool {
 		return false
 	}
 	return apierrors.IsNotFound(statusErr)
+}
+
+func preserveObjects[T client.Object](ctx context.Context, cli client.Reader, graphCli model.GraphClient, dag *graph.DAG,
+	obj T, ml client.MatchingLabels, toPreserveKinds []client.ObjectList, finalizerName string, lastApplyAnnotationKey string) error {
+	if len(toPreserveKinds) == 0 {
+		return nil
+	}
+
+	objs, err := getOwningNamespacedObjects(ctx, cli, obj.GetNamespace(), ml, toPreserveKinds)
+	if err != nil {
+		return err
+	}
+
+	objSpec := obj.DeepCopyObject().(client.Object)
+	objSpec.SetNamespace("")
+	objSpec.SetName(obj.GetName())
+	objSpec.SetUID(obj.GetUID())
+	objSpec.SetResourceVersion("")
+	objSpec.SetGeneration(0)
+	objSpec.SetManagedFields(nil)
+
+	b, err := json.Marshal(objSpec)
+	if err != nil {
+		return err
+	}
+	objJSON := string(b)
+
+	for _, o := range objs {
+		origObj := o.DeepCopyObject().(client.Object)
+		controllerutil.RemoveFinalizer(o, finalizerName)
+		removeOwnerRefOfType(o, obj.GetObjectKind().GroupVersionKind())
+
+		annot := o.GetAnnotations()
+		if annot == nil {
+			annot = make(map[string]string)
+		}
+		annot[lastApplyAnnotationKey] = objJSON
+		o.SetAnnotations(annot)
+		graphCli.Update(dag, origObj, o)
+	}
+	return nil
+}
+
+func removeOwnerRefOfType(obj client.Object, gvk schema.GroupVersionKind) {
+	ownerRefs := obj.GetOwnerReferences()
+	for i, ref := range ownerRefs {
+		if ref.Kind == gvk.Kind && ref.APIVersion == gvk.GroupVersion().String() {
+			ownerRefs = append(ownerRefs[:i], ownerRefs[i+1:]...)
+			break
+		}
+	}
+	obj.SetOwnerReferences(ownerRefs)
+}
+
+// isOwnedByComp is used to judge if the obj is owned by Component.
+func isOwnedByComp(obj client.Object) bool {
+	for _, ref := range obj.GetOwnerReferences() {
+		if ref.Kind == appsv1alpha1.ComponentKind && ref.Controller != nil && *ref.Controller {
+			return true
+		}
+	}
+	return false
 }

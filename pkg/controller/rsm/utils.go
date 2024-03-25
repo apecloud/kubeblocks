@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -68,7 +70,7 @@ var podNameRegex = regexp.MustCompile(`(.*)-([0-9]+)$`)
 // reverse it if reverse==true
 func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 	getRoleFunc := func(i int) string {
-		return getRoleName(pods[i])
+		return GetRoleName(pods[i])
 	}
 	getOrdinalFunc := func(i int) int {
 		_, ordinal := intctrlutil.GetParentNameAndOrdinal(&pods[i])
@@ -79,7 +81,7 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 
 func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {
 	getRoleFunc := func(i int) string {
-		return membersStatus[i].Name
+		return membersStatus[i].ReplicaRole.Name
 	}
 	getOrdinalFunc := func(i int) int {
 		ordinal, _ := getPodOrdinal(membersStatus[i].PodName)
@@ -147,10 +149,10 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	role, ok := roleMap[roleName]
 	switch ok {
 	case true:
-		pod.Labels[roleLabelKey] = role.Name
+		pod.Labels[RoleLabelKey] = role.Name
 		pod.Labels[rsmAccessModeLabelKey] = string(role.AccessMode)
 	case false:
-		delete(pod.Labels, roleLabelKey)
+		delete(pod.Labels, RoleLabelKey)
 		delete(pod.Labels, rsmAccessModeLabelKey)
 	}
 
@@ -169,16 +171,21 @@ func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.R
 	return roleMap
 }
 
-func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
+func SetMembersStatus(rsm *workloads.ReplicatedStateMachine, pods *[]corev1.Pod) {
+	// no roles defined
+	if rsm.Spec.Roles == nil {
+		setMembersStatusWithoutRole(rsm, pods)
+		return
+	}
 	// compose new status
 	newMembersStatus := make([]workloads.MemberStatus, 0)
 	roleMap := composeRoleMap(*rsm)
-	for _, pod := range pods {
+	for _, pod := range *pods {
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
 		readyWithoutPrimary := false
-		roleName := getRoleName(pod)
+		roleName := GetRoleName(pod)
 		role, ok := roleMap[roleName]
 		if !ok {
 			continue
@@ -188,7 +195,8 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 		}
 		memberStatus := workloads.MemberStatus{
 			PodName:             pod.Name,
-			ReplicaRole:         role,
+			ReplicaRole:         &role,
+			Ready:               true,
 			ReadyWithoutPrimary: readyWithoutPrimary,
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)
@@ -200,26 +208,36 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 	rsm.Status.MembersStatus = newMembersStatus
 }
 
-// getRoleName gets role name of pod 'pod'
-func getRoleName(pod corev1.Pod) string {
+func setMembersStatusWithoutRole(rsm *workloads.ReplicatedStateMachine, pods *[]corev1.Pod) {
+	var membersStatus []workloads.MemberStatus
+	for _, pod := range *pods {
+		memberStatus := workloads.MemberStatus{
+			PodName: pod.Name,
+			Ready:   podutils.IsPodReady(&pod),
+		}
+		membersStatus = append(membersStatus, memberStatus)
+	}
+	slices.SortStableFunc(membersStatus, func(a, b workloads.MemberStatus) bool {
+		return a.PodName < b.PodName
+	})
+	rsm.Status.MembersStatus = membersStatus
+}
+
+// GetRoleName gets role name of pod 'pod'
+func GetRoleName(pod corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
 
-func ownedKinds(policy workloads.RsmTransformPolicy) []client.ObjectList {
-	kinds := []client.ObjectList{
+func ownedKinds() []client.ObjectList {
+	return []client.ObjectList{
+		&appsv1.StatefulSetList{},
 		&corev1.ServiceList{},
 		&corev1.ConfigMapList{},
 	}
-	if policy == workloads.ToPod {
-		kinds = append(kinds, &corev1.PodList{})
-	} else {
-		kinds = append(kinds, &appsv1.StatefulSetList{})
-	}
-	return kinds
 }
 
-func deletionKinds(policy workloads.RsmTransformPolicy) []client.ObjectList {
-	kinds := ownedKinds(policy)
+func deletionKinds() []client.ObjectList {
+	kinds := ownedKinds()
 	kinds = append(kinds, &batchv1.JobList{})
 	return kinds
 }
@@ -252,7 +270,7 @@ func getHeadlessSvcName(rsm workloads.ReplicatedStateMachine) string {
 	return strings.Join([]string{rsm.Name, "headless"}, "-")
 }
 
-func findSvcPort(rsm workloads.ReplicatedStateMachine) int {
+func findSvcPort(rsm *workloads.ReplicatedStateMachine) int {
 	if rsm.Spec.Service == nil || len(rsm.Spec.Service.Spec.Ports) == 0 {
 		return 0
 	}
@@ -305,7 +323,7 @@ func getActionName(parent string, generation, ordinal int, actionType string) st
 
 func getLeaderPodName(membersStatus []workloads.MemberStatus) string {
 	for _, memberStatus := range membersStatus {
-		if memberStatus.IsLeader {
+		if memberStatus.ReplicaRole != nil && memberStatus.ReplicaRole.IsLeader {
 			return memberStatus.PodName
 		}
 	}
@@ -322,7 +340,7 @@ func getPodOrdinal(podName string) (int, error) {
 
 // ordinal is the ordinal of pod which this action applies to
 func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
-	if err := setOwnership(rsm, action, model.GetScheme(), getFinalizer(action)); err != nil {
+	if err := SetOwnership(rsm, action, model.GetScheme(), GetFinalizer(action)); err != nil {
 		return err
 	}
 	cli.Create(dag, action)
@@ -385,7 +403,7 @@ func buildActionEnv(rsm *workloads.ReplicatedStateMachine, leader, target string
 	svcName := getHeadlessSvcName(*rsm)
 	leaderHost := fmt.Sprintf("%s.%s", leader, svcName)
 	targetHost := fmt.Sprintf("%s.%s", target, svcName)
-	svcPort := findSvcPort(*rsm)
+	svcPort := findSvcPort(rsm)
 	return []corev1.EnvVar{
 		{
 			Name:  leaderHostVarName,
@@ -529,14 +547,14 @@ func emitActionEvent(transCtx *rsmTransformContext, eventType, reason, message s
 	transCtx.EventRecorder.Event(transCtx.rsm, eventType, strings.ToUpper(reason), message)
 }
 
-func getFinalizer(obj client.Object) string {
+func GetFinalizer(obj client.Object) string {
 	if _, ok := obj.(*workloads.ReplicatedStateMachine); ok {
-		return rsmFinalizerName
+		return FinalizerName
 	}
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		return constant.DBClusterFinalizerName
 	}
-	return rsmFinalizerName
+	return FinalizerName
 }
 
 func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
@@ -557,8 +575,8 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 		return labels
 	}
 	return map[string]string{
-		workloadsManagedByLabelKey: kindReplicatedStateMachine,
-		workloadsInstanceLabelKey:  rsm.Name,
+		WorkloadsManagedByLabelKey: KindReplicatedStateMachine,
+		WorkloadsInstanceLabelKey:  rsm.Name,
 	}
 }
 
@@ -594,7 +612,7 @@ func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[st
 	return selectors
 }
 
-func setOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
+func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
 	// if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 	//	return CopyOwnership(owner, obj, scheme, finalizer)
 	// }
@@ -676,13 +694,8 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 		return false
 	}
 	// check whether latest spec has been sent to the underlying workload(sts)
-	if rsm.Status.ObservedGeneration != rsm.Generation {
+	if rsm.Status.ObservedGeneration != rsm.Generation || rsm.Status.CurrentGeneration != rsm.Generation {
 		return false
-	}
-	if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
-		if rsm.Status.CurrentGeneration != rsm.Generation {
-			return false
-		}
 	}
 	// check whether the underlying workload(sts) is ready
 	if rsm.Spec.Replicas == nil {
@@ -717,7 +730,7 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 		if status.ReadyWithoutPrimary {
 			return true
 		}
-		if status.IsLeader {
+		if status.ReplicaRole != nil && status.ReplicaRole.IsLeader {
 			hasLeader = true
 			break
 		}
@@ -796,14 +809,14 @@ func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet 
 	return sts
 }
 
-func getEnvConfigMapName(rsmName string) string {
+func GetEnvConfigMapName(rsmName string) string {
 	return fmt.Sprintf("%s-rsm-env", rsmName)
 }
 
 // IsOwnedByRsm is used to judge if the obj is owned by rsm
 func IsOwnedByRsm(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == workloads.ReplicatedStateMachineKind && ref.Controller != nil && *ref.Controller {
+		if ref.Kind == KindReplicatedStateMachine && ref.Controller != nil && *ref.Controller {
 			return true
 		}
 	}
@@ -825,7 +838,7 @@ func IsOwnedByRsm(obj client.Object) bool {
 //	return model.WithClientOption(multicluster.InLocalContextOneshot())
 // }
 
-func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
+func ClientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	// if v.ClientOpt != nil {
 	//	opt, ok := v.ClientOpt.(*multicluster.ClientOption)
 	//	if ok {

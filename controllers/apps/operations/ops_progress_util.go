@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -199,8 +198,7 @@ func handleComponentStatusProgress(
 	}
 	switch clusterComponentDef.WorkloadType {
 	case appsv1alpha1.Stateless:
-		policy := clusterComponent.RsmTransformPolicy
-		completedCount, err = handleStatelessProgress(reqCtx, cli, opsRes, podList, pgRes, compStatus, policy)
+		completedCount, err = handleStatelessProgress(reqCtx, cli, opsRes, podList, pgRes, compStatus)
 	default:
 		completedCount, err = handleStatefulSetProgress(reqCtx, cli, opsRes, podList, pgRes, compStatus)
 	}
@@ -219,18 +217,15 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 	opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	policy v1alpha1.RsmTransformPolicy) (int32, error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	if compStatus.Phase == appsv1alpha1.RunningClusterCompPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
 		return 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
 	}
-	var minReadySeconds int32 = 0
+	var minReadySeconds int32
 	var err error
-	if policy != v1alpha1.ToPod {
-		minReadySeconds, err = intctrlcomp.GetComponentDeployMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
-		if err != nil {
-			return 0, err
-		}
+	minReadySeconds, err = intctrlcomp.GetComponentDeployMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
+	if err != nil {
+		return 0, err
 	}
 	completedCount := handleRollingUpdateProgress(opsRes, podList, pgRes, compStatus, minReadySeconds)
 	compStatus.ProgressDetails = removeStatelessExpiredPods(podList, compStatus.ProgressDetails)

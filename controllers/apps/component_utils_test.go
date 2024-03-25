@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -162,6 +163,14 @@ var _ = Describe("Component Utils", func() {
 				AddRoleLabel(role).
 				AddConsensusSetAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").
+				AddVolume(corev1.Volume{
+					Name: testapps.DataVolumeName,
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: fmt.Sprintf("%s-%s", testapps.DataVolumeName, podName),
+						},
+					},
+				}).
 				AddContainer(corev1.Container{
 					Name:  testapps.DefaultMySQLContainerName,
 					Image: testapps.ApeCloudMySQLImage,
@@ -182,6 +191,9 @@ var _ = Describe("Component Utils", func() {
 								Port: intstr.FromInt(1024),
 							},
 						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: testapps.DataVolumeName, MountPath: "/test"},
 					},
 				}).
 				GetObject()

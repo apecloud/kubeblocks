@@ -145,7 +145,7 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes := prepareOpsRes("")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 
-			By("fake cluster phase is Abnormal and component phase is Running")
+			By("fake cluster phase to Abnormal and component phase to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 				opsRes.Cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
 			})).Should(Succeed())
@@ -236,7 +236,7 @@ var _ = Describe("OpsUtil functions", func() {
 			}
 			Expect(tmpPVCCount).Should(Equal(rebuildInstanceCount))
 
-			By("fake the rebuilding pod to Completed and fake pvs are created.")
+			By("fake the rebuilding pod to be Completed and fake pvs are created.")
 			for i := range podList.Items {
 				pod := &podList.Items[i]
 				Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -80,7 +81,7 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	// default OrderedReady policy
 	createCount, deleteCount := 1, 1
 	shouldReady := true
-	if rsm.Spec.PodManagementPolicy == "" {
+	if rsm.Spec.PodManagementPolicy == appsv1.ParallelPodManagement {
 		createCount = len(createNameSet)
 		deleteCount = len(deleteNameSet)
 		shouldReady = false

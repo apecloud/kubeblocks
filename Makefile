@@ -418,7 +418,7 @@ controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 ifeq (, $(shell ls $(LOCALBIN)/setup-envtest 2>/dev/null))
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20240320141353-395cfc7486e6
 endif
 
 .PHONY: install-docker-buildx

@@ -76,10 +76,6 @@ func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 		return errors.Wrap(err, "get manager failed")
 	}
 
-	if _, ok := manager.(SwitchoverManager); ok {
-		return nil
-	}
-
 	if cluster.HaConfig == nil || !cluster.HaConfig.IsEnable() {
 		return errors.New("cluster's ha is disabled")
 	}
@@ -118,23 +114,18 @@ func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 func (s *Switchover) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
 	primary := req.GetString("primary")
 	candidate := req.GetString("candidate")
-	force := req.GetBool("force")
-	manager, err := register.GetDBManager(nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
+	// force := req.GetBool("force")
+	// if swManager, ok := manager.(SwitchoverManager); ok {
+	// 	cluster, err := s.dcsStore.GetCluster()
+	// 	if cluster == nil {
+	// 		return nil, errors.Wrap(err, "get cluster failed")
+	// 	}
 
-	if swManager, ok := manager.(SwitchoverManager); ok {
-		cluster, err := s.dcsStore.GetCluster()
-		if cluster == nil {
-			return nil, errors.Wrap(err, "get cluster failed")
-		}
+	// 	err = swManager.Switchover(ctx, cluster, primary, candidate, force)
+	// 	return nil, err
+	// }
 
-		err = swManager.Switchover(ctx, cluster, primary, candidate, force)
-		return nil, err
-	}
-
-	err = s.dcsStore.CreateSwitchover(primary, candidate)
+	err := s.dcsStore.CreateSwitchover(primary, candidate)
 	if err != nil {
 		message := fmt.Sprintf("Create switchover failed: %v", err)
 		return nil, errors.New(message)

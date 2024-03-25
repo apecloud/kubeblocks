@@ -159,7 +159,7 @@ func handleServiceDescriptorTypeServiceRef(reqCtx intctrlutil.RequestCtx,
 	serviceRefDecl appsv1alpha1.ServiceRefDeclaration,
 	serviceReferences map[string]*appsv1alpha1.ServiceDescriptor) error {
 	// verify service kind and version
-	verifyServiceKindAndVersion := func(serviceDescriptor appsv1alpha1.ServiceDescriptor, serviceRefDeclSpecs ...appsv1alpha1.ServiceRefDeclarationSpec) bool {
+	verifyServiceKindAndVersion := func(serviceDescriptor appsv1alpha1.ServiceDescriptor, _ ...appsv1alpha1.ServiceRefDeclarationSpec) bool {
 		for _, serviceRefDeclSpec := range serviceRefDecl.ServiceRefDeclarationSpecs {
 			if getWellKnownServiceKindAliasMapping(serviceRefDeclSpec.ServiceKind) != getWellKnownServiceKindAliasMapping(serviceDescriptor.Spec.ServiceKind) {
 				continue

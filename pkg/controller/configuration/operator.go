@@ -33,27 +33,29 @@ type configOperator struct {
 
 func NewConfigReconcileTask(resourceCtx *ResourceCtx,
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
+	component *appsv1alpha1.Component,
+	synthesizedComponent *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,
 	localObjs []client.Object,
 ) *configOperator {
 	return &configOperator{
 		ReconcileCtx{
-			ResourceCtx: resourceCtx,
-			Cluster:     cluster,
-			Component:   component,
-			PodSpec:     podSpec,
-			Cache:       localObjs,
+			ResourceCtx:          resourceCtx,
+			Cluster:              cluster,
+			Component:            component,
+			SynthesizedComponent: synthesizedComponent,
+			PodSpec:              podSpec,
+			Cache:                localObjs,
 		},
 	}
 }
 
 func (c *configOperator) Reconcile() error {
-	var component = c.Component
+	var synthesizedComponent = c.SynthesizedComponent
 
 	// Need to Merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
-	if len(component.ConfigTemplates) == 0 && len(component.ScriptTemplates) == 0 {
+	if len(synthesizedComponent.ConfigTemplates) == 0 && len(synthesizedComponent.ScriptTemplates) == 0 {
 		return c.UpdateConfiguration()
 	}
 

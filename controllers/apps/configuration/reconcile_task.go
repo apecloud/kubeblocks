@@ -78,16 +78,17 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 func syncImpl(fetcher *Task,
 	item appsv1alpha1.ConfigurationItemDetail,
 	status *appsv1alpha1.ConfigurationItemDetailStatus,
-	component *component.SynthesizedComponent,
+	synthesizedComponent *component.SynthesizedComponent,
 	revision string,
 	configSpec *appsv1alpha1.ComponentConfigSpec,
 	dependOnObjs []client.Object) (err error) {
 	err = configctrl.NewReconcilePipeline(configctrl.ReconcileCtx{
-		ResourceCtx: fetcher.ResourceCtx,
-		Cluster:     fetcher.ClusterObj,
-		Component:   component,
-		PodSpec:     component.PodSpec,
-		Cache:       dependOnObjs,
+		ResourceCtx:          fetcher.ResourceCtx,
+		Cluster:              fetcher.ClusterObj,
+		Component:            fetcher.ComponentObj,
+		SynthesizedComponent: synthesizedComponent,
+		PodSpec:              synthesizedComponent.PodSpec,
+		Cache:                dependOnObjs,
 	}, item, status, configSpec).
 		ConfigMap(item.Name).
 		ConfigConstraints(configSpec.ConfigConstraintRef).

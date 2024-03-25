@@ -40,6 +40,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -50,6 +51,7 @@ import (
 
 var cfg *rest.Config
 var k8sClient client.Client
+var graphCli model.GraphClient
 var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
@@ -58,6 +60,7 @@ var logger logr.Logger
 
 func init() {
 	viper.AutomaticEnv()
+	model.AddScheme(appsv1alpha1.AddToScheme)
 	// viper.Set("ENABLE_DEBUG_LOG", "true")
 }
 
@@ -110,6 +113,8 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	graphCli = model.NewGraphClient(k8sClient)
 
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{

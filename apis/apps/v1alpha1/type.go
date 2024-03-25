@@ -31,6 +31,7 @@ const (
 	ClusterVersionKind    = "ClusterVersion"
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"
+	ComponentKind         = "Component"
 	OpsRequestKind        = "OpsRequestKind"
 )
 

@@ -59,6 +59,9 @@ const (
 	// ErrorType for preflight
 	ErrorTypePreflightCommon = "PreflightCommon"
 	ErrorTypeSkipPreflight   = "SkipPreflight"
+
+	// ErrorTypeExpectedInProcess is used to indicate that the operation is expected to be in process.
+	ErrorTypeExpectedInProcess ErrorType = "ExpectedInProcess"
 )
 
 var ErrFailedToAddFinalizer = errors.New("failed to add finalizer")

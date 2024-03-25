@@ -77,7 +77,7 @@ var _ = Describe("Component Utils", func() {
 		// create the new objects.
 		By("clean resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// clear rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -122,25 +122,6 @@ var _ = Describe("Component Utils", func() {
 			minReadySeconds, _ = component.GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
 				appsv1alpha1.Consensus, statelessCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
-		})
-	})
-
-	Context("Custom Label test", func() {
-		Context("parseCustomLabelPattern func", func() {
-			It("should parse pattern well", func() {
-				pattern := "v1/Pod"
-				gvk, err := parseCustomLabelPattern(pattern)
-				Expect(err).Should(BeNil())
-				Expect(gvk.Group).Should(BeEmpty())
-				Expect(gvk.Version).Should(Equal("v1"))
-				Expect(gvk.Kind).Should(Equal("Pod"))
-				pattern = "apps/v1/StatefulSet"
-				gvk, err = parseCustomLabelPattern(pattern)
-				Expect(err).Should(BeNil())
-				Expect(gvk.Group).Should(Equal("apps"))
-				Expect(gvk.Version).Should(Equal("v1"))
-				Expect(gvk.Kind).Should(Equal("StatefulSet"))
-			})
 		})
 	})
 

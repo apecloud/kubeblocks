@@ -264,7 +264,7 @@ api-doc:  ## generate API reference manual.
 	$(GO) run ./hack/docgen/api/main.go -api-dir github.com/apecloud/kubeblocks/apis -config ./hack/docgen/api/gen-api-doc-config.json -template-dir ./hack/docgen/api/template -out-dir ./docs/developer_docs/api-reference/
 
 .PHONY: doc
-doc: lorryctl-doc api-doc ## generate all documents.
+doc: api-doc ## generate all documents.
 
 ##@ Operator Controller Manager
 
@@ -418,7 +418,7 @@ controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 ifeq (, $(shell ls $(LOCALBIN)/setup-envtest 2>/dev/null))
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20240320141353-395cfc7486e6
 endif
 
 .PHONY: install-docker-buildx
@@ -431,7 +431,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	fi
 
 .PHONY: golangci
-golangci: GOLANGCILINT_VERSION = v1.54.2
+golangci: GOLANGCILINT_VERSION = v1.55.2
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	@echo golangci-lint is already installed

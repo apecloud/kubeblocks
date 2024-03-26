@@ -15166,6 +15166,22 @@ unless your component only has one replica. Such as &lsquo;xtrabackup&rsquo; is 
 And if no specified backupName, the instance will be recreated with empty &lsquo;PersistentVolumes&rsquo;.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>envForRestore</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to set in the container for restore. These will be
+merged with the env of Backup and ActionSet.</p>
+<p>The priority of merging is as follows: <code>Restore env &gt; Backup env &gt; ActionSet env</code>.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ReconcileDetail">ReconcileDetail

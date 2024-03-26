@@ -64,6 +64,7 @@ type instanceHelper struct {
 	synthesizedComp *component.SynthesizedComponent
 	volumes         []corev1.Volume
 	volumeMounts    []corev1.VolumeMount
+	envForRestore   []corev1.EnvVar
 	rebuildPrefix   string
 	index           int
 }
@@ -148,7 +149,7 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 				continue
 			}
 			// rebuild instance
-			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, progressDetail, instance, v.BackupName, i)
+			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.EnvForRestore, progressDetail, instance, v.BackupName, i)
 			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				// If a fatal error occurs, this instance rebuilds failed.
 				progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, err.Error())
@@ -185,11 +186,12 @@ func (r rebuildInstanceOpsHandler) rebuildInstance(reqCtx intctrlutil.RequestCtx
 	cli client.Client,
 	opsRes *OpsResource,
 	comp *appsv1alpha1.ClusterComponentSpec,
+	envForRestore []corev1.EnvVar,
 	progressDetail *appsv1alpha1.ProgressStatusDetail,
 	targetPodName,
 	backupName string,
 	index int) (bool, error) {
-	insHelper, err := r.prepareInstanceHelper(reqCtx, cli, opsRes, comp, targetPodName, backupName, index)
+	insHelper, err := r.prepareInstanceHelper(reqCtx, cli, opsRes, comp, envForRestore, targetPodName, backupName, index)
 	if err != nil {
 		return false, err
 	}
@@ -203,6 +205,7 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 	cli client.Client,
 	opsRes *OpsResource,
 	comp *appsv1alpha1.ClusterComponentSpec,
+	envForRestore []corev1.EnvVar,
 	targetPodName,
 	backupName string,
 	index int) (*instanceHelper, error) {
@@ -255,6 +258,7 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 		targetPod:       targetPod,
 		volumeMounts:    volumeMounts,
 		rebuildPrefix:   rebuildPrefix,
+		envForRestore:   envForRestore,
 	}, nil
 }
 
@@ -473,6 +477,7 @@ func (r rebuildInstanceOpsHandler) createPrepareDataRestore(reqCtx intctrlutil.R
 				Name:      insHelper.backup.Name,
 				Namespace: opsRequest.Namespace,
 			},
+			Env: insHelper.envForRestore,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
 				SchedulingSpec: dpv1alpha1.SchedulingSpec{
 					Tolerations:               insHelper.targetPod.Spec.Tolerations,
@@ -509,6 +514,7 @@ func (r rebuildInstanceOpsHandler) createPostReadyRestore(reqCtx intctrlutil.Req
 				Name:      insHelper.backup.Name,
 				Namespace: insHelper.backup.Namespace,
 			},
+			Env: insHelper.envForRestore,
 			ReadyConfig: &dpv1alpha1.ReadyConfig{
 				ExecAction: &dpv1alpha1.ExecAction{
 					Target: dpv1alpha1.ExecActionTarget{PodSelector: podSelector},

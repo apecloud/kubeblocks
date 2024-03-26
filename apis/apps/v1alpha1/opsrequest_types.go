@@ -184,6 +184,15 @@ type RebuildInstance struct {
 	// And if no specified backupName, the instance will be recreated with empty 'PersistentVolumes'.
 	// +optional
 	BackupName string `json:"backupName,omitempty"`
+
+	// List of environment variables to set in the container for restore. These will be
+	// merged with the env of Backup and ActionSet.
+	//
+	// The priority of merging is as follows: `Restore env > Backup env > ActionSet env`.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	EnvForRestore []corev1.EnvVar `json:"envForRestore,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 type Switchover struct {

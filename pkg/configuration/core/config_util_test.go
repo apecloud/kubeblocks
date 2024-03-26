@@ -53,7 +53,7 @@ var _ = Describe("config_util", func() {
 		It("GetReloadOptions Should success without error", func() {
 			mockTpl := v1.ConfigConstraint{
 				Spec: v1.ConfigConstraintSpec{
-					ReloadOptions: &v1.ReloadOptions{
+					DynamicReloadAction: &v1.DynamicReloadAction{
 						UnixSignalTrigger: &v1.UnixSignalTrigger{
 							Signal:      "HUB",
 							ProcessName: "for_test",
@@ -64,7 +64,7 @@ var _ = Describe("config_util", func() {
 			tests := []struct {
 				name    string
 				tpls    []v1alpha1.ComponentConfigSpec
-				want    *v1.ReloadOptions
+				want    *v1.DynamicReloadAction
 				wantErr bool
 			}{{
 				// empty config templates
@@ -101,7 +101,7 @@ var _ = Describe("config_util", func() {
 					},
 					ConfigConstraintRef: "eg_v1",
 				}},
-				want:    mockTpl.Spec.ReloadOptions,
+				want:    mockTpl.Spec.DynamicReloadAction,
 				wantErr: false,
 			}, {
 				// not exist config constraint
@@ -209,7 +209,7 @@ test=test`),
 			},
 			formatConfig: &v1.FormatterConfig{
 				Format: v1.Ini,
-				FormatterOptions: v1.FormatterOptions{
+				FormatterAction: v1.FormatterAction{
 					IniConfig: &v1.IniConfig{
 						SectionName: "test",
 					}}},

@@ -230,9 +230,9 @@ func NewReconfigurePolicy(cc *v1.ConfigConstraintSpec, cfgPatch *core.ConfigPatc
 		// make decision
 		switch {
 		case !dynamicUpdate: // static parameters update
-		case configmanager.IsAutoReload(cc.ReloadOptions): // if core support hot update, don't need to do anything
+		case configmanager.IsAutoReload(cc.DynamicReloadAction): // if core support hot update, don't need to do anything
 			policy = appsv1alpha1.AsyncDynamicReloadPolicy
-		case enableSyncTrigger(cc.ReloadOptions): // sync config-manager exec hot update
+		case enableSyncTrigger(cc.DynamicReloadAction): // sync config-manager exec hot update
 			policy = appsv1alpha1.SyncDynamicReloadPolicy
 		default: // config-manager auto trigger to hot update
 			policy = appsv1alpha1.AsyncDynamicReloadPolicy
@@ -242,7 +242,7 @@ func NewReconfigurePolicy(cc *v1.ConfigConstraintSpec, cfgPatch *core.ConfigPatc
 	// if not specify policy, or cannot decision policy, use default policy.
 	if policy == appsv1alpha1.NonePolicy {
 		policy = appsv1alpha1.NormalPolicy
-		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.ReloadOptions) {
+		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.DynamicReloadAction) {
 			policy = appsv1alpha1.DynamicReloadAndRestartPolicy
 		}
 	}
@@ -257,7 +257,7 @@ func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
 	return !restart && policy == appsv1alpha1.NonePolicy
 }
 
-func enableSyncTrigger(options *v1.ReloadOptions) bool {
+func enableSyncTrigger(options *v1.DynamicReloadAction) bool {
 	if options == nil {
 		return false
 	}

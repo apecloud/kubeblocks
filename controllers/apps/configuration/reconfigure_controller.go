@@ -205,7 +205,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		RSMUnits:                 reconcileContext.RSMList,
 		ClusterComponent:         reconcileContext.ClusterComObj,
 		SynthesizedComponent:     reconcileContext.BuiltinComponent,
-		Restart:                  forceRestart || !cfgcm.IsSupportReload(resources.configConstraintObj.Spec.ReloadOptions),
+		Restart:                  forceRestart || !cfgcm.IsSupportReload(resources.configConstraintObj.Spec.DynamicReloadAction),
 		ReconfigureClientFactory: GetClientFactory(),
 	})
 }

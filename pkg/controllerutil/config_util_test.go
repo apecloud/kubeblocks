@@ -312,7 +312,7 @@ var _ = Describe("config_util", func() {
 			configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
 				&v1.ConfigConstraint{}, func(cc *v1.ConfigConstraint) {
 					if ccContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.cue"); err == nil {
-						cc.Spec.ConfigurationSchema = &v1.CustomParametersValidation{
+						cc.Spec.ConfigSchema = &v1.ConfigSchema{
 							CUE: string(ccContext),
 						}
 					}

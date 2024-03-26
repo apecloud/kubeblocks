@@ -77,7 +77,7 @@ var _ = Describe("Config Handler Test", func() {
 
 	newFormatter := func() v1.FormatterConfig {
 		return v1.FormatterConfig{
-			FormatterOptions: v1.FormatterOptions{
+			FormatterAction: v1.FormatterAction{
 				IniConfig: &v1.IniConfig{
 					SectionName: "test",
 				},
@@ -88,7 +88,7 @@ var _ = Describe("Config Handler Test", func() {
 
 	newUnixSignalConfig := func() ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadOptions: &v1.ReloadOptions{
+			DynamicReloadAction: &v1.DynamicReloadAction{
 				UnixSignalTrigger: &v1.UnixSignalTrigger{
 					ProcessName: findCurrProcName(),
 					Signal:      v1.SIGHUP,
@@ -116,7 +116,7 @@ var _ = Describe("Config Handler Test", func() {
 
 	newDownwardAPIConfig := func() ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadOptions: &v1.ReloadOptions{
+			DynamicReloadAction: &v1.DynamicReloadAction{
 				ShellTrigger: &v1.ShellTrigger{
 					Command: []string{"sh", "-c", `echo "hello world" "$@"`},
 				},
@@ -131,7 +131,7 @@ var _ = Describe("Config Handler Test", func() {
 
 	newTPLScriptsConfig := func(configPath string) ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadOptions: &v1.ReloadOptions{
+			DynamicReloadAction: &v1.DynamicReloadAction{
 				TPLScriptTrigger: &v1.TPLScriptTrigger{},
 			},
 			ReloadType:      v1.TPLScriptType,

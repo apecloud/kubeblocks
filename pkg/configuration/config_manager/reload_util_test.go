@@ -67,7 +67,7 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 			oldVersion: filepath.Join(rootPath, "lastVersion"),
 			formatCfg: &v1.FormatterConfig{
 				Format: v1.Ini,
-				FormatterOptions: v1.FormatterOptions{IniConfig: &v1.IniConfig{
+				FormatterAction: v1.FormatterAction{IniConfig: &v1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			}},
@@ -240,7 +240,7 @@ var _ = Describe("ReloadUtil Test", func() {
 
 	createIniFormatter := func(sectionName string) *v1.FormatterConfig {
 		return &v1.FormatterConfig{
-			FormatterOptions: v1.FormatterOptions{
+			FormatterAction: v1.FormatterAction{
 				IniConfig: &v1.IniConfig{
 					SectionName: sectionName,
 				}},

@@ -87,7 +87,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 				Name: mysqlConfigConstraintName,
 			},
 			Spec: v1.ConfigConstraintSpec{
-				ReloadOptions: &v1.ReloadOptions{
+				DynamicReloadAction: &v1.DynamicReloadAction{
 					ShellTrigger: &v1.ShellTrigger{
 						Command: []string{"echo", "hello"},
 						Sync:    cfgutil.ToPointer(true),
@@ -95,7 +95,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 				},
 				FormatterConfig: &v1.FormatterConfig{
 					Format: v1.Ini,
-					FormatterOptions: v1.FormatterOptions{
+					FormatterAction: v1.FormatterAction{
 						IniConfig: &v1.IniConfig{
 							SectionName: "mysqld",
 						},

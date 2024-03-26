@@ -74,7 +74,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 						ReloadType:      v1.TPLScriptType,
 						FormatterConfig: v1.FormatterConfig{},
 					},
-					ToolsImageSpec: &v1.ToolsImageSpec{
+					ToolsImageSpec: &v1.ReloadToolsImage{
 						MountPoint: "/opt/images",
 						ToolConfigs: []v1.ToolConfig{
 							{

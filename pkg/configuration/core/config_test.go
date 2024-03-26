@@ -206,7 +206,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				UpdateConfig: map[string][]byte{"key": testUpdatedParams}},
 			formatConfig: &v1.FormatterConfig{
 				Format: v1.Ini,
-				FormatterOptions: v1.FormatterOptions{IniConfig: &v1.IniConfig{
+				FormatterAction: v1.FormatterAction{IniConfig: &v1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			},
@@ -235,7 +235,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 			},
 			formatConfig: &v1.FormatterConfig{
 				Format: v1.Ini,
-				FormatterOptions: v1.FormatterOptions{IniConfig: &v1.IniConfig{
+				FormatterAction: v1.FormatterAction{IniConfig: &v1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			},
@@ -261,7 +261,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 			},
 			formatConfig: &v1.FormatterConfig{
 				Format: v1.Ini,
-				FormatterOptions: v1.FormatterOptions{IniConfig: &v1.IniConfig{
+				FormatterAction: v1.FormatterAction{IniConfig: &v1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			},

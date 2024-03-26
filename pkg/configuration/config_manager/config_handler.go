@@ -407,7 +407,7 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 	}
 
 	var formatterConfig *v1.FormatterConfig
-	if backupPath != "" && configMeta != nil && configMeta.ReloadOptions != nil {
+	if backupPath != "" && configMeta != nil && configMeta.DynamicReloadAction != nil {
 		if err := backupConfigFiles([]string{configMeta.MountPoint}, filter, backupPath); err != nil {
 			return nil, err
 		}
@@ -591,9 +591,9 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		case v1.ShellType:
 			h, err = shellHandler(configMeta, tmpPath)
 		case v1.UnixSignalType:
-			h, err = signalHandler(configMeta.ReloadOptions.UnixSignalTrigger, configMeta.MountPoint)
+			h, err = signalHandler(configMeta.DynamicReloadAction.UnixSignalTrigger, configMeta.MountPoint)
 		case v1.TPLScriptType:
-			h, err = tplHandler(configMeta.ReloadOptions.TPLScriptTrigger, configMeta, tmpPath)
+			h, err = tplHandler(configMeta.DynamicReloadAction.TPLScriptTrigger, configMeta, tmpPath)
 		}
 		if err != nil {
 			return nil, err

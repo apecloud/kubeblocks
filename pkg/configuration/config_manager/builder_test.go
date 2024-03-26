@@ -78,7 +78,7 @@ var _ = Describe("Config Builder Test", func() {
 				Name:      "pg_config",
 			}}
 	}
-	newReloadOptions := func(t v1.CfgReloadType, sync *bool) *v1.ReloadOptions {
+	newReloadOptions := func(t v1.CfgReloadType, sync *bool) *v1.DynamicReloadAction {
 		signalHandle := &v1.UnixSignalTrigger{
 			ProcessName: "postgres",
 			Signal:      v1.SIGHUP,
@@ -101,16 +101,16 @@ var _ = Describe("Config Builder Test", func() {
 		default:
 			return nil
 		case v1.UnixSignalType:
-			return &v1.ReloadOptions{
+			return &v1.DynamicReloadAction{
 				UnixSignalTrigger: signalHandle}
 		case v1.ShellType:
-			return &v1.ReloadOptions{
+			return &v1.DynamicReloadAction{
 				ShellTrigger: shellHandle}
 		case v1.TPLScriptType:
-			return &v1.ReloadOptions{
+			return &v1.DynamicReloadAction{
 				TPLScriptTrigger: scriptHandle}
 		case v1.AutoType:
-			return &v1.ReloadOptions{
+			return &v1.DynamicReloadAction{
 				AutoTrigger: autoHandle}
 		}
 	}
@@ -181,8 +181,8 @@ formatterConfig:
 		mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 	}
 
-	newDownwardAPIVolumes := func() []v1.DownwardAPIOption {
-		return []v1.DownwardAPIOption{
+	newDownwardAPIVolumes := func() []v1.DownwardAction {
+		return []v1.DownwardAction{
 			{
 				Name:       "downward-api",
 				MountPoint: "/etc/podinfo",
@@ -206,7 +206,7 @@ formatterConfig:
 			reloadOptions := newReloadOptions(v1.UnixSignalType, nil)
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.ReloadOptions = reloadOptions
+				buildParam.DynamicReloadAction = reloadOptions
 				buildParam.ReloadType = v1.UnixSignalType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), ctx, param, newVolumeMounts2())).Should(Succeed())
@@ -230,7 +230,7 @@ formatterConfig:
 			reloadOptions := newReloadOptions(v1.ShellType, nil)
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.ReloadOptions = reloadOptions
+				buildParam.DynamicReloadAction = reloadOptions
 				buildParam.ReloadType = v1.ShellType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
@@ -245,7 +245,7 @@ formatterConfig:
 			reloadOptions := newReloadOptions(v1.TPLScriptType, syncFn(true))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.ReloadOptions = reloadOptions
+				buildParam.DynamicReloadAction = reloadOptions
 				buildParam.ReloadType = v1.TPLScriptType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
@@ -260,7 +260,7 @@ formatterConfig:
 			reloadOptions := newReloadOptions(v1.TPLScriptType, syncFn(false))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.ReloadOptions = reloadOptions
+				buildParam.DynamicReloadAction = reloadOptions
 				buildParam.ReloadType = v1.TPLScriptType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
@@ -275,7 +275,7 @@ formatterConfig:
 			reloadOptions := newReloadOptions(v1.TPLScriptType, syncFn(false))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.ReloadOptions = reloadOptions
+				buildParam.DynamicReloadAction = reloadOptions
 				buildParam.ReloadType = v1.TPLScriptType
 				buildParam.ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
 					ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
@@ -295,7 +295,7 @@ formatterConfig:
 			param := newCMBuildParams(false)
 			buildParam := &param.ConfigSpecsBuildParams[0]
 			buildParam.DownwardAPIOptions = newDownwardAPIVolumes()
-			buildParam.ReloadOptions = newReloadOptions(v1.TPLScriptType, syncFn(true))
+			buildParam.DynamicReloadAction = newReloadOptions(v1.TPLScriptType, syncFn(true))
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			Expect(FindVolumeMount(param.DownwardAPIVolumes, buildParam.DownwardAPIOptions[0].Name)).ShouldNot(BeNil())
 		})

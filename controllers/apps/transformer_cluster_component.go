@@ -22,8 +22,8 @@ package apps
 import (
 	"fmt"
 	"reflect"
-	"strings"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,10 +81,6 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	createCompSet := protoCompSet.Difference(runningCompSet)
 	updateCompSet := protoCompSet.Intersection(runningCompSet)
 	deleteCompSet := runningCompSet.Difference(protoCompSet)
-	if len(deleteCompSet) > 0 {
-		return fmt.Errorf("cluster components cannot be removed at runtime: %s",
-			strings.Join(deleteCompSet.UnsortedList(), ","))
-	}
 
 	// component objects to be created
 	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, createCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
@@ -93,6 +89,11 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 
 	// component objects to be updated
 	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
+		return err
+	}
+
+	// component objects to be deleted
+	if err := t.handleCompsDelete(transCtx, dag, deleteCompSet); err != nil {
 		return err
 	}
 
@@ -139,6 +140,31 @@ func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 		if newCompObj := copyAndMergeComponent(runningComp, comp); newCompObj != nil {
 			graphCli.Update(dag, runningComp, newCompObj)
 		}
+	}
+	return nil
+}
+
+func (t *clusterComponentTransformer) handleCompsDelete(transCtx *clusterTransformContext, dag *graph.DAG, deleteCompSet sets.Set[string]) error {
+	cluster := transCtx.Cluster
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for compName := range deleteCompSet {
+		runningComp, err := getRunningCompObject(transCtx, cluster, compName)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		} else if apierrors.IsNotFound(err) || model.IsObjectDeleting(runningComp) {
+			// component object not found or is being deleted, skip
+			transCtx.Logger.Info(fmt.Sprintf("component %s not found or is being deleted, skip it", compName))
+			continue
+		}
+		transCtx.Logger.Info(fmt.Sprintf("deleting component %s", runningComp.Name))
+		runningCompCopy := runningComp.DeepCopy()
+		if runningComp.Annotations == nil {
+			runningComp.Annotations = make(map[string]string)
+		}
+		// update the scale-in annotation to component before deleting
+		runningComp.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
+		deleteCompVertex := graphCli.Do(dag, nil, runningComp, model.ActionDeletePtr(), nil)
+		graphCli.Do(dag, runningCompCopy, runningComp, model.ActionUpdatePtr(), deleteCompVertex)
 	}
 	return nil
 }

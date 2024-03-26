@@ -142,7 +142,7 @@ var _ = Describe("builder", func() {
 		}
 		return reqCtx
 	}
-	newAllFieldsComponent := func(clusterDef *appsv1alpha1.ClusterDefinition,
+	newAllFieldsSynthesizedComponent := func(clusterDef *appsv1alpha1.ClusterDefinition,
 		clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
 		reqCtx := newReqCtx()
 		By("assign every available fields")
@@ -159,7 +159,7 @@ var _ = Describe("builder", func() {
 	}
 	newClusterObjs := func(clusterDefObj *appsv1alpha1.ClusterDefinition) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
 		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDefObj, nil, false)
-		synthesizedComponent := newAllFieldsComponent(clusterDef, clusterVersion, cluster)
+		synthesizedComponent := newAllFieldsSynthesizedComponent(clusterDef, clusterVersion, cluster)
 		return clusterDef, cluster, synthesizedComponent
 	}
 
@@ -279,7 +279,7 @@ var _ = Describe("builder", func() {
 				},
 			}
 			cluster.Spec.ComponentSpecs[0].Replicas = 2
-			replComponent := newAllFieldsComponent(clusterDef, nil, cluster)
+			replComponent := newAllFieldsSynthesizedComponent(clusterDef, nil, cluster)
 			rsm, err = BuildRSM(cluster, replComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
@@ -318,7 +318,7 @@ var _ = Describe("builder", func() {
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
 			cluster.Spec.ComponentSpecs[0].Replicas = 3
-			csComponent := newAllFieldsComponent(clusterDef, nil, cluster)
+			csComponent := newAllFieldsSynthesizedComponent(clusterDef, nil, cluster)
 			rsm, err = BuildRSM(cluster, csComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())

@@ -38,6 +38,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 
 	var mockK8sCli *testutil.K8sClientMockHelper
 	var clusterObj *appsv1alpha1.Cluster
+	var componentObj *appsv1alpha1.Component
 	var clusterVersionObj *appsv1alpha1.ClusterVersion
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
 	var clusterComponent *component.SynthesizedComponent
@@ -45,7 +46,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 	mockTemplateWrapper := func() renderWrapper {
 		mockConfigTemplater := newTemplateBuilder(clusterName, testCtx.DefaultNamespace, ctx, mockK8sCli.Client())
 		mockConfigTemplater.injectBuiltInObjectsAndFunctions(&corev1.PodSpec{}, clusterComponent.ConfigTemplates, clusterComponent, nil, clusterObj)
-		return newTemplateRenderWrapper(mockConfigTemplater, clusterObj, ctx, mockK8sCli.Client())
+		return newTemplateRenderWrapper(ctx, mockK8sCli.Client(), mockConfigTemplater, clusterObj, componentObj)
 	}
 
 	BeforeEach(func() {
@@ -53,7 +54,8 @@ var _ = Describe("TemplateWrapperTest", func() {
 		mockK8sCli = testutil.NewK8sMockClient()
 
 		clusterObj, clusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
-		clusterComponent = newAllFieldsComponent(clusterDefObj, clusterVersionObj, clusterObj)
+		clusterComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterVersionObj, clusterObj)
+		componentObj = newAllFieldsComponent(clusterObj)
 	})
 
 	AfterEach(func() {

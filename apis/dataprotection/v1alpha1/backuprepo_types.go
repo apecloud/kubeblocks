@@ -70,6 +70,12 @@ type BackupRepoSpec struct {
 	//
 	// +optional
 	Credential *corev1.SecretReference `json:"credential,omitempty"`
+
+	// Specifies the prefix of the path for storing backup data.
+	//
+	// +kubebuilder:validation:Pattern=`^([a-zA-Z0-9-_]+/?)*$`
+	// +optional
+	PathPrefix string `json:"pathPrefix,omitempty"`
 }
 
 // BackupRepoStatus defines the observed state of `BackupRepo`.

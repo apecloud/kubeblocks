@@ -146,7 +146,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("check backup status")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
-					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, backupPolicy.Spec.PathPrefix)))
+					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
@@ -889,8 +889,8 @@ var _ = Describe("Backup Controller test", func() {
 				By("check backup status again")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
-					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, backupPolicy.Spec.PathPrefix)))
-					g.Expect(fetched.Status.KopiaRepoPath).Should(Equal(dpbackup.BuildKopiaRepoPath(fetched, backupPolicy.Spec.PathPrefix)))
+					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
+					g.Expect(fetched.Status.KopiaRepoPath).Should(Equal(dpbackup.BuildKopiaRepoPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())

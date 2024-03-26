@@ -197,17 +197,17 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 
 	leader, err := store.GetLeader()
 	if err != nil {
-		store.logger.Info("get leader failed", "error", err)
+		store.logger.Info("get leader failed", "error", err.Error())
 	}
 
 	switchover, err := store.GetSwitchover()
 	if err != nil {
-		store.logger.Info("get switchover failed", "error", err)
+		store.logger.Info("get switchover failed", "error", err.Error())
 	}
 
 	haConfig, err := store.GetHaConfig()
 	if err != nil {
-		store.logger.Info("get HaConfig failed", "error", err)
+		store.logger.Info("get HaConfig failed", "error", err.Error())
 	}
 
 	cluster := &Cluster{

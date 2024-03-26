@@ -297,6 +297,15 @@ type ShellTrigger struct {
 	//
 	// +optional
 	BatchReload *bool `json:"batchReload,omitempty"`
+
+	// When `batchReload` is set to 'True', this parameter allows for the optional specification
+	// of the batch input format that is passed into the STDIN of the script.
+	// If this parameter is not specified, the default format used for STDIN is as follows:
+	// Each updated parameter generates a line that concatenates the parameter's key and value with a equal sign ('=').
+	// These lines are then sorted by their keys and inserted accordingly.
+	//
+	// +optional
+	BatchInputTemplate string `json:"batchInputTemplate,omitempty"`
 }
 
 type TPLScriptTrigger struct {

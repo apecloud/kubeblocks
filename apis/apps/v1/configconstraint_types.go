@@ -355,8 +355,8 @@ type IniConfig struct {
 }
 
 // +genclient
-// +genclient:nonNamespaced
 // +k8s:openapi-gen=true
+// +genclient:nonNamespaced
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion

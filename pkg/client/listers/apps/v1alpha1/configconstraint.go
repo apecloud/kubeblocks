@@ -19,10 +19,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
+
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
+	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 // ConfigConstraintLister helps list ConfigConstraints.
@@ -30,10 +32,10 @@ import (
 type ConfigConstraintLister interface {
 	// List lists all ConfigConstraints in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ConfigConstraint, err error)
+	List(selector labels.Selector) (ret []*v1.ConfigConstraint, err error)
 	// Get retrieves the ConfigConstraint from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ConfigConstraint, error)
+	Get(name string) (*v1.ConfigConstraint, error)
 	ConfigConstraintListerExpansion
 }
 
@@ -48,15 +50,15 @@ func NewConfigConstraintLister(indexer cache.Indexer) ConfigConstraintLister {
 }
 
 // List lists all ConfigConstraints in the indexer.
-func (s *configConstraintLister) List(selector labels.Selector) (ret []*v1alpha1.ConfigConstraint, err error) {
+func (s *configConstraintLister) List(selector labels.Selector) (ret []*v1.ConfigConstraint, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ConfigConstraint))
+		ret = append(ret, m.(*v1.ConfigConstraint))
 	})
 	return ret, err
 }
 
 // Get retrieves the ConfigConstraint from the index for a given name.
-func (s *configConstraintLister) Get(name string) (*v1alpha1.ConfigConstraint, error) {
+func (s *configConstraintLister) Get(name string) (*v1.ConfigConstraint, error) {
 	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
@@ -64,5 +66,5 @@ func (s *configConstraintLister) Get(name string) (*v1alpha1.ConfigConstraint, e
 	if !exists {
 		return nil, errors.NewNotFound(v1alpha1.Resource("configconstraint"), name)
 	}
-	return obj.(*v1alpha1.ConfigConstraint), nil
+	return obj.(*v1.ConfigConstraint), nil
 }

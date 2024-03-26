@@ -298,7 +298,7 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	return nil
 }
 
-func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1alpha1.DownwardAPIOption) {
+func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo v1.DownwardAPIOption) {
 	manager.DownwardAPIVolumes = append(manager.DownwardAPIVolumes, corev1.VolumeMount{
 		Name:      fieldInfo.Name,
 		MountPath: fieldInfo.MountPoint,
@@ -383,7 +383,7 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 	return nil
 }
 
-func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig appsv1alpha1.FormatterConfig) (map[string]string, error) {
+func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig v1.FormatterConfig) (map[string]string, error) {
 	configObject := make(map[string]interface{})
 	if content, ok := data[reloadConfig]; ok {
 		if err := yaml.Unmarshal([]byte(content), &configObject); err != nil {
@@ -409,7 +409,7 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 	return data, nil
 }
 
-func buildCfgManagerScripts(options appsv1alpha1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1alpha1.ComponentConfigSpec) error {
+func buildCfgManagerScripts(options v1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1alpha1.ComponentConfigSpec) error {
 	mountPoint := filepath.Join(KBScriptVolumePath, configSpec.Name)
 	referenceCMKey := client.ObjectKey{
 		Namespace: options.Namespace,

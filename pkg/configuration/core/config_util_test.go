@@ -51,10 +51,10 @@ var _ = Describe("config_util", func() {
 
 	Context("common funcs test", func() {
 		It("GetReloadOptions Should success without error", func() {
-			mockTpl := v1alpha1.ConfigConstraint{
-				Spec: v1alpha1.ConfigConstraintSpec{
-					ReloadOptions: &v1alpha1.ReloadOptions{
-						UnixSignalTrigger: &v1alpha1.UnixSignalTrigger{
+			mockTpl := v1.ConfigConstraint{
+				Spec: v1.ConfigConstraintSpec{
+					ReloadOptions: &v1.ReloadOptions{
+						UnixSignalTrigger: &v1.UnixSignalTrigger{
 							Signal:      "HUB",
 							ProcessName: "for_test",
 						},
@@ -64,7 +64,7 @@ var _ = Describe("config_util", func() {
 			tests := []struct {
 				name    string
 				tpls    []v1alpha1.ComponentConfigSpec
-				want    *v1alpha1.ReloadOptions
+				want    *v1.ReloadOptions
 				wantErr bool
 			}{{
 				// empty config templates
@@ -191,7 +191,7 @@ func TestApplyConfigPatch(t *testing.T) {
 	type args struct {
 		baseCfg           []byte
 		updatedParameters map[string]string
-		formatConfig      *v1alpha1.FormatterConfig
+		formatConfig      *v1.FormatterConfig
 	}
 	tests := []struct {
 		name    string
@@ -207,10 +207,10 @@ test=test`),
 				"a":               "b",
 				"max_connections": "600",
 			},
-			formatConfig: &v1alpha1.FormatterConfig{
+			formatConfig: &v1.FormatterConfig{
 				Format: v1.Ini,
-				FormatterOptions: v1alpha1.FormatterOptions{
-					IniConfig: &v1alpha1.IniConfig{
+				FormatterOptions: v1.FormatterOptions{
+					IniConfig: &v1.IniConfig{
 						SectionName: "test",
 					}}},
 		},
@@ -228,7 +228,7 @@ test=test
 				"a": "b",
 				"c": "d e f g",
 			},
-			formatConfig: &v1alpha1.FormatterConfig{
+			formatConfig: &v1.FormatterConfig{
 				Format: v1.RedisCfg,
 			},
 		},
@@ -242,7 +242,7 @@ test=test
 				"ENABLE_MODULES":     "true",
 				"HUGGINGFACE_APIKEY": "kssdlsdjskwssl",
 			},
-			formatConfig: &v1alpha1.FormatterConfig{
+			formatConfig: &v1.FormatterConfig{
 				Format: v1.Dotenv,
 			},
 		},

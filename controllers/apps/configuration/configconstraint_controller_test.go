@@ -77,7 +77,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 
 			constraint := testapps.CreateCustomizedObj(&testCtx,
 				"resources/mysql-config-constraint.yaml",
-				&appsv1alpha1.ConfigConstraint{})
+				&v1.ConfigConstraint{})
 			constraintKey := client.ObjectKeyFromObject(constraint)
 
 			By("Create a clusterDefinition obj")
@@ -97,7 +97,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 
 			By("check ConfigConstraint(template) status and finalizer")
 			Eventually(testapps.CheckObj(&testCtx, constraintKey,
-				func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
+				func(g Gomega, tpl *v1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(appsv1alpha1.AvailablePhase))
 					g.Expect(tpl.Finalizers).To(ContainElement(constant.ConfigFinalizerName))
 				})).Should(Succeed())
@@ -107,11 +107,11 @@ var _ = Describe("ConfigConstraint Controller", func() {
 
 			By("check ConfigConstraint should not be deleted")
 			log.Log.Info("expect that ConfigConstraint is not deleted.")
-			Consistently(testapps.CheckObjExists(&testCtx, constraintKey, &appsv1alpha1.ConfigConstraint{}, true)).Should(Succeed())
+			Consistently(testapps.CheckObjExists(&testCtx, constraintKey, &v1.ConfigConstraint{}, true)).Should(Succeed())
 
 			By("check ConfigConstraint status should be deleting")
 			Eventually(testapps.CheckObj(&testCtx, constraintKey,
-				func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
+				func(g Gomega, tpl *v1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(v1.CCDeletingPhase))
 				})).Should(Succeed())
 
@@ -120,7 +120,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			Expect(k8sClient.Delete(testCtx.Ctx, clusterDefObj)).Should(Succeed())
 
 			By("check ConfigConstraint should be deleted")
-			Eventually(testapps.CheckObjExists(&testCtx, constraintKey, &appsv1alpha1.ConfigConstraint{}, false), time.Second*60, time.Second*1).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, constraintKey, &v1.ConfigConstraint{}, false), time.Second*60, time.Second*1).Should(Succeed())
 		})
 	})
 
@@ -132,11 +132,11 @@ var _ = Describe("ConfigConstraint Controller", func() {
 				testCtx.UseDefaultNamespace())
 
 			constraint := testapps.CreateCustomizedObj(&testCtx, "resources/mysql-config-constraint-not-validate.yaml",
-				&appsv1alpha1.ConfigConstraint{})
+				&v1.ConfigConstraint{})
 
 			By("check config constraint status")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint),
-				func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
+				func(g Gomega, tpl *v1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.AvailablePhase))
 				})).Should(Succeed())
 		})

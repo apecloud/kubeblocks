@@ -51,7 +51,7 @@ type configVolumeHandleMeta struct {
 	reloadType v1.CfgReloadType
 	configSpec appsv1alpha1.ComponentTemplateSpec
 
-	formatterConfig *appsv1alpha1.FormatterConfig
+	formatterConfig *v1.FormatterConfig
 }
 
 func (s *configVolumeHandleMeta) OnlineUpdate(_ context.Context, _ string, _ map[string]string) error {
@@ -367,7 +367,7 @@ func (s *shellCommandHandler) isDownwardAPITrigger() bool {
 	return s.downwardAPITrigger
 }
 
-func createConfigVolumeMeta(configSpecName string, reloadType v1.CfgReloadType, mountPoint []string, formatterConfig *appsv1alpha1.FormatterConfig) configVolumeHandleMeta {
+func createConfigVolumeMeta(configSpecName string, reloadType v1.CfgReloadType, mountPoint []string, formatterConfig *v1.FormatterConfig) configVolumeHandleMeta {
 	return configVolumeHandleMeta{
 		reloadType: reloadType,
 		mountPoint: mountPoint,
@@ -406,7 +406,7 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		return nil, err
 	}
 
-	var formatterConfig *appsv1alpha1.FormatterConfig
+	var formatterConfig *v1.FormatterConfig
 	if backupPath != "" && configMeta != nil && configMeta.ReloadOptions != nil {
 		if err := backupConfigFiles([]string{configMeta.MountPoint}, filter, backupPath); err != nil {
 			return nil, err
@@ -552,13 +552,13 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		shellTrigger := configMeta.ShellTrigger
 		return CreateExecHandler(shellTrigger.Command, configMeta.MountPoint, &configMeta, filepath.Join(backupPath, configMeta.ConfigSpec.Name))
 	}
-	signalHandler := func(signalTrigger *appsv1alpha1.UnixSignalTrigger, mountPoint string) (ConfigHandler, error) {
+	signalHandler := func(signalTrigger *v1.UnixSignalTrigger, mountPoint string) (ConfigHandler, error) {
 		if signalTrigger == nil {
 			return nil, cfgcore.MakeError("signal trigger is nil")
 		}
 		return CreateSignalHandler(signalTrigger.Signal, signalTrigger.ProcessName, mountPoint)
 	}
-	tplHandler := func(tplTrigger *appsv1alpha1.TPLScriptTrigger, configMeta ConfigSpecInfo, backupPath string) (ConfigHandler, error) {
+	tplHandler := func(tplTrigger *v1.TPLScriptTrigger, configMeta ConfigSpecInfo, backupPath string) (ConfigHandler, error) {
 		if tplTrigger == nil {
 			return nil, cfgcore.MakeError("tpl trigger is nil")
 		}

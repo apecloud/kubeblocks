@@ -65,7 +65,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}),
 				withMockRSM(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigConstraintSpec(&appsv1alpha1.FormatterConfig{Format: v1.RedisCfg}),
+				withConfigConstraintSpec(&v1.FormatterConfig{Format: v1.RedisCfg}),
 				withConfigPatch(map[string]string{
 					"a": "c b e f",
 				}),
@@ -122,7 +122,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}),
 				withMockRSM(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigConstraintSpec(&appsv1alpha1.FormatterConfig{Format: v1.RedisCfg}),
+				withConfigConstraintSpec(&v1.FormatterConfig{Format: v1.RedisCfg}),
 				withConfigPatch(map[string]string{
 					"a": "c b e f",
 				}),

@@ -42,6 +42,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
@@ -158,7 +159,7 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 	By("Create a constraint obj")
 	constraint := testapps.CreateCustomizedObj(&testCtx,
 		mysqlConfigConstraintPath,
-		&appsv1alpha1.ConfigConstraint{})
+		&v1.ConfigConstraint{})
 
 	mysqlVolumeMounts := []corev1.VolumeMount{
 		{

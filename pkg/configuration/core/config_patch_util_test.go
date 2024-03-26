@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -315,7 +314,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 
 	type args struct {
 		data         map[string]string
-		formatConfig *v1alpha1.FormatterConfig
+		formatConfig *v1.FormatterConfig
 		keys         []string
 	}
 	tests := []struct {
@@ -326,10 +325,10 @@ func TestLoadRawConfigObject(t *testing.T) {
 		name: "test",
 		args: args{
 			data: map[string]string{"key": getFileContentFn("cue_testdata/mysql.cnf")},
-			formatConfig: &v1alpha1.FormatterConfig{
+			formatConfig: &v1.FormatterConfig{
 				Format: v1.Ini,
-				FormatterOptions: v1alpha1.FormatterOptions{
-					IniConfig: &v1alpha1.IniConfig{
+				FormatterOptions: v1.FormatterOptions{
+					IniConfig: &v1.IniConfig{
 						SectionName: "mysqld",
 					}},
 			}},
@@ -338,7 +337,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 		name: "test",
 		args: args{
 			data: map[string]string{"key": getFileContentFn("cue_testdata/pg14.conf")},
-			formatConfig: &v1alpha1.FormatterConfig{
+			formatConfig: &v1.FormatterConfig{
 				Format: v1.Properties,
 			}},
 		wantErr: false,
@@ -350,7 +349,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 				"key2": getFileContentFn("cue_testdata/mysql.cnf"),
 			},
 			keys: []string{"key"},
-			formatConfig: &v1alpha1.FormatterConfig{
+			formatConfig: &v1.FormatterConfig{
 				Format: v1.Properties,
 			}},
 		wantErr: false,
@@ -361,7 +360,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 				"key": getFileContentFn("cue_testdata/pg14.conf"),
 			},
 			keys: []string{"key"},
-			formatConfig: &v1alpha1.FormatterConfig{
+			formatConfig: &v1.FormatterConfig{
 				Format: v1.XML,
 			}},
 		wantErr: true,
@@ -392,16 +391,16 @@ systemLog:
 	tests := []struct {
 		name         string
 		fileName     string
-		formatConfig *v1alpha1.FormatterConfig
+		formatConfig *v1.FormatterConfig
 		configData   []byte
 		expected     map[string]string
 	}{{
 		name:     "mysql-test",
 		fileName: "my.cnf",
-		formatConfig: &v1alpha1.FormatterConfig{
+		formatConfig: &v1.FormatterConfig{
 			Format: v1.Ini,
-			FormatterOptions: v1alpha1.FormatterOptions{
-				IniConfig: &v1alpha1.IniConfig{
+			FormatterOptions: v1.FormatterOptions{
+				IniConfig: &v1.IniConfig{
 					SectionName: "mysqld",
 				},
 			},
@@ -414,10 +413,10 @@ systemLog:
 	}, {
 		name:     "mongodb-test",
 		fileName: "mongodb.conf",
-		formatConfig: &v1alpha1.FormatterConfig{
+		formatConfig: &v1.FormatterConfig{
 			Format: v1.YAML,
-			FormatterOptions: v1alpha1.FormatterOptions{
-				IniConfig: &v1alpha1.IniConfig{
+			FormatterOptions: v1.FormatterOptions{
+				IniConfig: &v1.IniConfig{
 					SectionName: "default",
 				},
 			},

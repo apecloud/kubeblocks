@@ -26,7 +26,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -38,12 +37,12 @@ var fromTestData = func(fileName string) string {
 	return string(content)
 }
 
-var newFakeConfConstraint = func(cueFile string, cfgFormatter v1.CfgFileFormat) *appsv1alpha1.ConfigConstraintSpec {
-	return &appsv1alpha1.ConfigConstraintSpec{
-		ConfigurationSchema: &appsv1alpha1.CustomParametersValidation{
+var newFakeConfConstraint = func(cueFile string, cfgFormatter v1.CfgFileFormat) *v1.ConfigConstraintSpec {
+	return &v1.ConfigConstraintSpec{
+		ConfigurationSchema: &v1.CustomParametersValidation{
 			CUE: fromTestData(cueFile),
 		},
-		FormatterConfig: &appsv1alpha1.FormatterConfig{
+		FormatterConfig: &v1.FormatterConfig{
 			Format: cfgFormatter,
 		},
 	}

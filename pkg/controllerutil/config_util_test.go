@@ -303,20 +303,20 @@ var _ = Describe("config_util", func() {
 	Context("MergeAndValidateConfigs", func() {
 		It("Should succeed with no error", func() {
 			type args struct {
-				configConstraint v1alpha1.ConfigConstraintSpec
+				configConstraint v1.ConfigConstraintSpec
 				baseCfg          map[string]string
 				updatedParams    []core.ParamPairs
 				cmKeys           []string
 			}
 
 			configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
-				&v1alpha1.ConfigConstraint{}, func(cc *v1alpha1.ConfigConstraint) {
+				&v1.ConfigConstraint{}, func(cc *v1.ConfigConstraint) {
 					if ccContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.cue"); err == nil {
-						cc.Spec.ConfigurationSchema = &v1alpha1.CustomParametersValidation{
+						cc.Spec.ConfigurationSchema = &v1.CustomParametersValidation{
 							CUE: string(ccContext),
 						}
 					}
-					cc.Spec.FormatterConfig = &v1alpha1.FormatterConfig{
+					cc.Spec.FormatterConfig = &v1.FormatterConfig{
 						Format: v1.Properties,
 					}
 				})

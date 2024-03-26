@@ -51,7 +51,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
-	var configConstraint *appsv1alpha1.ConfigConstraint
+	var configConstraint *v1.ConfigConstraint
 	var configurationObj *appsv1alpha1.Configuration
 	var k8sMockClient *testutil.K8sClientMockHelper
 
@@ -115,12 +115,12 @@ max_connections = '1000'
 			ClusterRef(clusterName).
 			Component(mysqlCompName).
 			GetObject()
-		configConstraint = &appsv1alpha1.ConfigConstraint{
+		configConstraint = &v1.ConfigConstraint{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: mysqlConfigConstraintName,
 			},
-			Spec: appsv1alpha1.ConfigConstraintSpec{
-				FormatterConfig: &appsv1alpha1.FormatterConfig{
+			Spec: v1.ConfigConstraintSpec{
+				FormatterConfig: &v1.FormatterConfig{
 					Format: v1.Properties,
 				},
 			}}

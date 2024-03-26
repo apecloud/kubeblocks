@@ -56,7 +56,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	var (
 		configMapObj        *corev1.ConfigMap
-		configConstraintObj *appsv1alpha1.ConfigConstraint
+		configConstraintObj *v1.ConfigConstraint
 		clusterDefObj       *appsv1alpha1.ClusterDefinition
 		clusterVersionObj   *appsv1alpha1.ClusterVersion
 	)
@@ -92,7 +92,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 		configConstraintObj = testapps.CreateCustomizedObj(&testCtx,
 			"resources/mysql-config-constraint.yaml",
-			&appsv1alpha1.ConfigConstraint{})
+			&v1.ConfigConstraint{})
 
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

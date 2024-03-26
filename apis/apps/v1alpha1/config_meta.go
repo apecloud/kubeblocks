@@ -21,8 +21,6 @@ package v1alpha1
 
 import (
 	"encoding/json"
-
-	"github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // MarshalJSON implements the Marshaler interface.
@@ -56,20 +54,6 @@ func (c *Payload) DeepCopyInto(out *Payload) {
 		return // ignore
 	}
 	out.Data = clone
-}
-
-func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
-	if in.DynamicActionCanBeMerged != nil {
-		return !*in.DynamicActionCanBeMerged
-	}
-	return false
-}
-
-func (in *ConfigConstraintSpec) DynamicParametersPolicy() v1.DynamicParameterSelectedPolicy {
-	if in.DynamicParameterSelectedPolicy != nil {
-		return *in.DynamicParameterSelectedPolicy
-	}
-	return v1.SelectedDynamicParameters
 }
 
 func (configuration *ConfigurationSpec) GetConfigurationItem(name string) *ConfigurationItemDetail {

@@ -17,19 +17,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1alpha1
+package v1
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 func TestConfigConstraintStatus_IsConfigConstraintTerminalPhases(t *testing.T) {
 	type fields struct {
-		Phase              v1.ConfigConstraintPhase
+		Phase              ConfigConstraintPhase
 		Message            string
 		ObservedGeneration int64
 	}
@@ -40,19 +38,19 @@ func TestConfigConstraintStatus_IsConfigConstraintTerminalPhases(t *testing.T) {
 	}{{
 		name: "available phase test",
 		fields: fields{
-			Phase: v1.CCAvailablePhase,
+			Phase: CCAvailablePhase,
 		},
 		want: true,
 	}, {
 		name: "available phase test",
 		fields: fields{
-			Phase: v1.CCUnavailablePhase,
+			Phase: CCUnavailablePhase,
 		},
 		want: false,
 	}, {
 		name: "available phase test",
 		fields: fields{
-			Phase: v1.CCDeletingPhase,
+			Phase: CCDeletingPhase,
 		},
 		want: false,
 	}}

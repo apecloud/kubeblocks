@@ -408,7 +408,7 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		synthesizeComp.LifecycleActions.DataPopulate,
 		synthesizeComp.LifecycleActions.DataAssemble,
 		synthesizeComp.LifecycleActions.Reconfigure,
-		synthesizeComp.LifecycleActions.AccountProvision,
+		// synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
 	hasAction := false

@@ -213,18 +213,6 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 		r.setComponentStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "component is Abnormal")
 	}
 
-	// update component info to pods' annotations
-	// TODO(xingran): should be move this to rsm controller
-	if err := UpdateComponentInfoToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
-		return err
-	}
-
-	// patch the current componentSpec workload's custom labels and annotations.
-	if err := UpdateCustomLabelsAndAnnotationsToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
-		r.reqCtx.Event(r.cluster, corev1.EventTypeWarning, "component controller patch custom labels and annotations failed", err.Error())
-		return err
-	}
-
 	// set primary-pod annotation
 	// TODO(free6om): primary-pod is only used in redis to bootstrap the redis cluster correctly.
 	// it is too hacky to be replaced by a better design.

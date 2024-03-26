@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"hash"
@@ -155,4 +156,37 @@ func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) str
 func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	hasher.Reset()
 	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
+}
+
+func getUpdateRevisions(revisions map[string]string) (map[string]string, error) {
+	if revisions == nil {
+		return nil, nil
+	}
+	revisionsStr, ok := revisions[revisionsZSTDKey]
+	if !ok {
+		return nil, nil
+	}
+	revisionsData, err := base64.StdEncoding.DecodeString(revisionsStr)
+	if err != nil {
+		return nil, err
+	}
+	revisionsJSON, err := reader.DecodeAll(revisionsData, nil)
+	if err != nil {
+		return nil, err
+	}
+	updateRevisions := make(map[string]string)
+	if err = json.Unmarshal(revisionsJSON, &updateRevisions); err != nil {
+		return nil, err
+	}
+	return updateRevisions, nil
+}
+
+func buildUpdateRevisions(updateRevisions map[string]string) (map[string]string, error) {
+	revisionsJSON, err := json.Marshal(updateRevisions)
+	if err != nil {
+		return nil, err
+	}
+	revisionsData := writer.EncodeAll(revisionsJSON, nil)
+	revisionsStr := base64.StdEncoding.EncodeToString(revisionsData)
+	return map[string]string{revisionsZSTDKey: revisionsStr}, nil
 }

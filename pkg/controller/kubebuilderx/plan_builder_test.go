@@ -21,17 +21,20 @@ package kubebuilderx
 
 import (
 	"context"
+	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
+	"golang.org/x/exp/slices"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
@@ -51,7 +54,7 @@ var _ = Describe("plan builder test", func() {
 		)
 
 		BeforeEach(func() {
-			bldr := NewPlanBuilder(ctx, k8sMock, nil, logger)
+			bldr := NewPlanBuilder(ctx, k8sMock, nil, nil, nil, logger)
 			planBuilder, _ = bldr.(*PlanBuilder)
 			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 				AddFinalizers([]string{rsm1.GetFinalizer(&workloads.ReplicatedStateMachine{})}).
@@ -210,6 +213,69 @@ var _ = Describe("plan builder test", func() {
 				Action: model.ActionNoopPtr(),
 			}
 			Expect(planBuilder.rsmWalkFunc(v)).Should(Succeed())
+		})
+	})
+
+	Context("buildOrderedVertices", func() {
+		const (
+			namespace = "foo"
+			name      = "bar"
+		)
+
+		var (
+			rsm         *workloads.ReplicatedStateMachine
+			currentTree *ObjectTree
+			desiredTree *ObjectTree
+		)
+
+		BeforeEach(func() {
+			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+				AddLabels(constant.AppComponentLabelKey, name).
+				SetReplicas(3).
+				GetObject()
+			currentTree = NewObjectTree()
+			desiredTree = NewObjectTree()
+		})
+
+		Context("buildOrderedVertices", func() {
+			It("should work well", func() {
+				newVertex := func(oldObj, newObj client.Object, action *model.Action) *model.ObjectVertex {
+					return &model.ObjectVertex{
+						Obj:    newObj,
+						OriObj: oldObj,
+						Action: action,
+					}
+				}
+
+				pod := builder.NewPodBuilder(namespace, name).GetObject()
+				headlessSvc := builder.NewHeadlessServiceBuilder(namespace, name+"-headless").GetObject()
+				svc := builder.NewServiceBuilder(namespace, name).GetObject()
+				env := builder.NewConfigMapBuilder(namespace, name+"-rsm-env").GetObject()
+
+				var verticesExpected []*model.ObjectVertex
+				verticesExpected = append(verticesExpected, newVertex(rsm.DeepCopy(), rsm, model.ActionStatusPtr()))
+				verticesExpected = append(verticesExpected, newVertex(nil, pod, model.ActionCreatePtr()))
+				verticesExpected = append(verticesExpected, newVertex(nil, headlessSvc, model.ActionCreatePtr()))
+				verticesExpected = append(verticesExpected, newVertex(nil, svc, model.ActionCreatePtr()))
+				verticesExpected = append(verticesExpected, newVertex(nil, env, model.ActionCreatePtr()))
+
+				// build ordered vertices
+				currentTree.SetRoot(rsm)
+				desiredTree.SetRoot(rsm)
+				Expect(desiredTree.Add(pod, headlessSvc, svc, env)).Should(Succeed())
+				vertices := buildOrderedVertices(currentTree, desiredTree)
+
+				// compare vertices
+				Expect(vertices).Should(HaveLen(len(verticesExpected)))
+				for _, vertex := range vertices {
+					Expect(slices.IndexFunc(verticesExpected, func(v *model.ObjectVertex) bool {
+						if reflect.DeepEqual(v.Obj, vertex.Obj) && *v.Action == *vertex.Action {
+							return true
+						}
+						return false
+					})).Should(BeNumerically(">=", 0))
+				}
+			})
 		})
 	})
 })

@@ -51,7 +51,7 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 		return kubebuilderx.ResultUnsatisfied
 	}
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
-	if err := validateSpec(rsm); err != nil {
+	if err := validateSpec(rsm, tree); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
 	return kubebuilderx.ResultSatisfied
@@ -60,7 +60,7 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 	// 1. build desired name to template map
-	nameToTemplateMap, err := buildReplicaName2TemplateMap(rsm)
+	nameToTemplateMap, err := buildReplicaName2TemplateMap(rsm, tree)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +114,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	}
 	updateCount := len(podsToBeUpdated)
 
+	updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+	if err != nil {
+		return nil, err
+	}
+
 	deletedPods := 0
 	updatedPods := 0
 	priorities := rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
@@ -130,7 +135,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			tree.Logger.Info(fmt.Sprintf("RSM %s/%s blocks on scale-in as the pod %s is not healthy", rsm.Namespace, rsm.Name, pod.Name))
 			break
 		}
-		newPodRevision := rsm.Status.UpdateRevisions[pod.Name]
+		newPodRevision := updateRevisions[pod.Name]
 		if getPodRevision(pod) != newPodRevision && !isTerminating(pod) {
 			if err = tree.Delete(pod); err != nil {
 				return nil, err

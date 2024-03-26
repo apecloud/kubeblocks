@@ -66,6 +66,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	// patch updated revision to the outdated pod as a label
 	//
 	// proposal 1 is used currently.
+	updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+	if err != nil {
+		return nil, err
+	}
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
@@ -81,7 +85,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			switch revision, ok := rsm.Status.UpdateRevisions[pod.Name]; {
+			switch revision, ok := updateRevisions[pod.Name]; {
 			case !ok, revision != getPodRevision(pod):
 				currentReplicas++
 			default:

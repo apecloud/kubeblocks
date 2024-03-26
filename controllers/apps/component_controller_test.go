@@ -459,6 +459,7 @@ var _ = Describe("Component Controller", func() {
 		clusterName := cluster.Name
 		stsName := cluster.Name + "-" + componentName
 		pods := make([]corev1.Pod, 0)
+		replicasStr := strconv.Itoa(number)
 		for i := 0; i < number; i++ {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -472,7 +473,8 @@ var _ = Describe("Component Controller", func() {
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
 					Annotations: map[string]string{
-						podAnnotationKey4Test: fmt.Sprintf("%d", number),
+						podAnnotationKey4Test:                   fmt.Sprintf("%d", number),
+						constant.ComponentReplicasAnnotationKey: replicasStr,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -902,9 +904,11 @@ var _ = Describe("Component Controller", func() {
 				Namespace: clusterKey.Namespace,
 				Name:      getPVCName(testapps.DataVolumeName, compName, i),
 			}
-			Expect(k8sClient.Get(testCtx.Ctx, pvcKey, pvc)).Should(Succeed())
-			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newVolumeQuantity))
-			Expect(pvc.Status.Capacity[corev1.ResourceStorage]).To(Equal(volumeQuantity))
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(testCtx.Ctx, pvcKey, pvc)).Should(Succeed())
+				g.Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newVolumeQuantity))
+				g.Expect(pvc.Status.Capacity[corev1.ResourceStorage]).To(Equal(volumeQuantity))
+			}).Should(Succeed())
 		}
 
 		By("Mock resizing of data volumes finished")
@@ -1721,7 +1725,6 @@ var _ = Describe("Component Controller", func() {
 			AddAppComponentLabel(rsm.Labels[constant.KBAppComponentLabelKey]).
 			AddAppInstanceLabel(rsm.Labels[constant.AppInstanceLabelKey]).
 			SetReplicas(*rsm.Spec.Replicas).Create(&testCtx).GetObject()
-
 		By("Creating mock pods in StatefulSet, and set controller reference")
 		pods := mockPodsForTest(clusterObj, replicas)
 		for i, pod := range pods {

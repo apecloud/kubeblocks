@@ -34,4 +34,8 @@ const (
 	FeatureGateRSMReplicaProvider = "RSM_REPLICA_PROVIDER"
 
 	defaultReplicaProvider = PodProvider
+
+	templateRefAnnotationKey = "kubeblocks.io/template-ref"
+	templateRefDataKey       = "instances"
+	revisionsZSTDKey         = "zstd"
 )

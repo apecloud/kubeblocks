@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -189,6 +190,7 @@ func MockConsensusComponentPods(
 		return int(*sts.Spec.Replicas)
 	}
 	replicas := getReplicas()
+	replicasStr := strconv.Itoa(replicas)
 	podList := make([]*corev1.Pod, replicas)
 	for i := 0; i < replicas; i++ {
 		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
@@ -200,6 +202,12 @@ func MockConsensusComponentPods(
 		}
 		// mock StatefulSet to create all pods
 		pod := MockConsensusComponentStsPod(testCtx, sts, clusterName, consensusCompName, podName, podRole, accessMode)
+		annotations := pod.Annotations
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
+		pod.Annotations = annotations
 		podList[i] = pod
 	}
 	return podList

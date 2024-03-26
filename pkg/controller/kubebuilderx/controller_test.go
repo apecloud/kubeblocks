@@ -84,7 +84,7 @@ type dummyLoader struct {
 	tree *ObjectTree
 }
 
-func (d *dummyLoader) Read(ctx context.Context, reader client.Reader, request ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*ObjectTree, error) {
+func (d *dummyLoader) Load(ctx context.Context, reader client.Reader, request ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*ObjectTree, error) {
 	return d.tree, d.err
 }
 

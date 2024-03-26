@@ -90,14 +90,14 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		versionHash = params.getTargetVersionHash()
 	)
 
-	if params.ConfigConstraint.Selector != nil {
-		pods, err = matchLabel(pods, params.ConfigConstraint.Selector)
+	if params.ConfigConstraint.DynamicReloadSelector != nil {
+		pods, err = matchLabel(pods, params.ConfigConstraint.DynamicReloadSelector)
 	}
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 	if len(pods) == 0 {
-		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %s", params.ConfigConstraint.Selector.String()))
+		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %s", params.ConfigConstraint.DynamicReloadSelector.String()))
 		return makeReturnedStatus(ESRetry), nil
 	}
 

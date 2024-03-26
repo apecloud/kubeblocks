@@ -128,7 +128,7 @@ func WithKeySelector(keys []string) ValidatorOptions {
 func NewConfigValidator(configConstraint *v1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
 	var (
 		validator    ConfigValidator
-		configSchema = configConstraint.ConfigurationSchema
+		configSchema = configConstraint.ConfigSchema
 	)
 
 	switch {
@@ -142,14 +142,14 @@ func NewConfigValidator(configConstraint *v1.ConfigConstraintSpec, options ...Va
 			cfgType:   configConstraint.FormatterConfig.Format,
 			cueScript: configSchema.CUE,
 		}
-	case configSchema.Schema != nil:
+	case configSchema.SchemaInJson != nil:
 		validator = &schemaValidator{
 			cmKeySelector: cmKeySelector{
 				keySelector: options,
 			},
-			typeName: configConstraint.CfgSchemaTopLevelName,
+			typeName: configConstraint.ConfigSchemaTopLevelKey,
 			cfgType:  configConstraint.FormatterConfig.Format,
-			schema:   configSchema.Schema,
+			schema:   configSchema.SchemaInJson,
 		}
 	default:
 		validator = &emptyValidator{}

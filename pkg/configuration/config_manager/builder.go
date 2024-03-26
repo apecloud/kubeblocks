@@ -100,9 +100,9 @@ func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecM
 			}
 			switch param.ReloadType {
 			case v1.TPLScriptType:
-				return core.IsWatchModuleForTplTrigger(param.ReloadOptions.TPLScriptTrigger)
+				return core.IsWatchModuleForTplTrigger(param.DynamicReloadAction.TPLScriptTrigger)
 			case v1.ShellType:
-				return core.IsWatchModuleForShellTrigger(param.ReloadOptions.ShellTrigger)
+				return core.IsWatchModuleForShellTrigger(param.DynamicReloadAction.ShellTrigger)
 			default:
 				return true
 			}
@@ -298,7 +298,7 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	return nil
 }
 
-func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo v1.DownwardAPIOption) {
+func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo v1.DownwardAction) {
 	manager.DownwardAPIVolumes = append(manager.DownwardAPIVolumes, corev1.VolumeMount{
 		Name:      fieldInfo.Name,
 		MountPath: fieldInfo.MountPoint,

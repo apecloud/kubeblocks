@@ -62,22 +62,22 @@ type CfgManagerBuildParams struct {
 	ContainerPort int32 `json:"containerPort"`
 }
 
-func IsSupportReload(reload *v1.ReloadOptions) bool {
+func IsSupportReload(reload *v1.DynamicReloadAction) bool {
 	return reload != nil && isValidReloadPolicy(*reload)
 }
 
-func isValidReloadPolicy(reload v1.ReloadOptions) bool {
+func isValidReloadPolicy(reload v1.DynamicReloadAction) bool {
 	return reload.AutoTrigger != nil ||
 		reload.ShellTrigger != nil ||
 		reload.TPLScriptTrigger != nil ||
 		reload.UnixSignalTrigger != nil
 }
 
-func IsAutoReload(reload *v1.ReloadOptions) bool {
+func IsAutoReload(reload *v1.DynamicReloadAction) bool {
 	return reload != nil && reload.AutoTrigger != nil
 }
 
-func FromReloadTypeConfig(reloadOptions *v1.ReloadOptions) v1.CfgReloadType {
+func FromReloadTypeConfig(reloadOptions *v1.DynamicReloadAction) v1.CfgReloadType {
 	switch {
 	case reloadOptions.UnixSignalTrigger != nil:
 		return v1.UnixSignalType
@@ -91,7 +91,7 @@ func FromReloadTypeConfig(reloadOptions *v1.ReloadOptions) v1.CfgReloadType {
 	return ""
 }
 
-func ValidateReloadOptions(reloadOptions *v1.ReloadOptions, cli client.Client, ctx context.Context) error {
+func ValidateReloadOptions(reloadOptions *v1.DynamicReloadAction, cli client.Client, ctx context.Context) error {
 	switch {
 	case reloadOptions.UnixSignalTrigger != nil:
 		return checkSignalTrigger(reloadOptions.UnixSignalTrigger)
@@ -167,19 +167,19 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 		if err := cli.Get(ctx, ccKey, cc); err != nil {
 			return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 		}
-		reloadOptions := cc.Spec.ReloadOptions
+		reloadOptions := cc.Spec.DynamicReloadAction
 		if !IsSupportReload(reloadOptions) || IsAutoReload(reloadOptions) {
 			continue
 		}
 		reloadConfigSpecMeta = append(reloadConfigSpecMeta, ConfigSpecMeta{
-			ToolsImageSpec: cc.Spec.ToolsImageSpec,
+			ToolsImageSpec: cc.Spec.ReloadToolsImage,
 			ScriptConfig:   cc.Spec.ScriptConfigs,
 			ConfigSpecInfo: ConfigSpecInfo{
-				ReloadOptions:      cc.Spec.ReloadOptions,
-				ConfigSpec:         configSpec,
-				ReloadType:         FromReloadTypeConfig(reloadOptions),
-				DownwardAPIOptions: cc.Spec.DownwardAPIOptions,
-				FormatterConfig:    *cc.Spec.FormatterConfig,
+				DynamicReloadAction: cc.Spec.DynamicReloadAction,
+				ConfigSpec:          configSpec,
+				ReloadType:          FromReloadTypeConfig(reloadOptions),
+				DownwardAPIOptions:  cc.Spec.DownwardActions,
+				FormatterConfig:     *cc.Spec.FormatterConfig,
 			},
 		})
 	}

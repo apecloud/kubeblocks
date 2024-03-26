@@ -43,7 +43,7 @@ import (
 )
 
 type ValidateConfigMap func(configTpl, ns string) (*corev1.ConfigMap, error)
-type ValidateConfigSchema func(tpl *v1.CustomParametersValidation) (bool, error)
+type ValidateConfigSchema func(tpl *v1.ConfigSchema) (bool, error)
 
 func checkConfigLabels(object client.Object, requiredLabs []string) bool {
 	labels := object.GetLabels()
@@ -84,7 +84,7 @@ func getConfigMapByTemplateName(cli client.Client, ctx intctrlutil.RequestCtx, t
 
 func checkConfigConstraint(ctx intctrlutil.RequestCtx, configConstraint *v1.ConfigConstraint) (bool, error) {
 	// validate configuration template
-	validateConfigSchema := func(ccSchema *v1.CustomParametersValidation) (bool, error) {
+	validateConfigSchema := func(ccSchema *v1.ConfigSchema) (bool, error) {
 		if ccSchema == nil || len(ccSchema.CUE) == 0 {
 			return true, nil
 		}
@@ -94,8 +94,8 @@ func checkConfigConstraint(ctx intctrlutil.RequestCtx, configConstraint *v1.Conf
 	}
 
 	// validate schema
-	if ok, err := validateConfigSchema(configConstraint.Spec.ConfigurationSchema); !ok || err != nil {
-		ctx.Log.Error(err, "failed to validate template schema!", "configMapName", fmt.Sprintf("%v", configConstraint.Spec.ConfigurationSchema))
+	if ok, err := validateConfigSchema(configConstraint.Spec.ConfigSchema); !ok || err != nil {
+		ctx.Log.Error(err, "failed to validate template schema!", "configMapName", fmt.Sprintf("%v", configConstraint.Spec.ConfigSchema))
 		return ok, err
 	}
 	return true, nil
@@ -351,10 +351,10 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 			logger.Error(err, "failed to validate config template!")
 			return false, err
 		}
-		if configConstraint == nil || configConstraint.Spec.ReloadOptions == nil {
+		if configConstraint == nil || configConstraint.Spec.DynamicReloadAction == nil {
 			continue
 		}
-		if err := cfgcm.ValidateReloadOptions(configConstraint.Spec.ReloadOptions, cli, ctx.Ctx); err != nil {
+		if err := cfgcm.ValidateReloadOptions(configConstraint.Spec.DynamicReloadAction, cli, ctx.Ctx); err != nil {
 			return false, err
 		}
 		if !validateConfigConstraintStatus(configConstraint.Status) {
@@ -391,24 +391,24 @@ func createConfigPatch(cfg *corev1.ConfigMap, formatter *v1.FormatterConfig, cmK
 }
 
 func updateConfigSchema(cc *v1.ConfigConstraint, cli client.Client, ctx context.Context) error {
-	schema := cc.Spec.ConfigurationSchema
+	schema := cc.Spec.ConfigSchema
 	if schema == nil || schema.CUE == "" {
 		return nil
 	}
 
 	// Because the conversion of cue to openAPISchema is restricted, and the definition of some cue may not be converted into openAPISchema, and won't return error.
-	openAPISchema, err := openapi.GenerateOpenAPISchema(schema.CUE, cc.Spec.CfgSchemaTopLevelName)
+	openAPISchema, err := openapi.GenerateOpenAPISchema(schema.CUE, cc.Spec.ConfigSchemaTopLevelKey)
 	if err != nil {
 		return err
 	}
 	if openAPISchema == nil {
 		return nil
 	}
-	if reflect.DeepEqual(openAPISchema, schema.Schema) {
+	if reflect.DeepEqual(openAPISchema, schema.SchemaInJson) {
 		return nil
 	}
 
 	ccPatch := client.MergeFrom(cc.DeepCopy())
-	cc.Spec.ConfigurationSchema.Schema = openAPISchema
+	cc.Spec.ConfigSchema.SchemaInJson = openAPISchema
 	return cli.Patch(ctx, cc, ccPatch)
 }

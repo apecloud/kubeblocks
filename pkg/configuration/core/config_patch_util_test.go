@@ -327,7 +327,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 			data: map[string]string{"key": getFileContentFn("cue_testdata/mysql.cnf")},
 			formatConfig: &v1.FormatterConfig{
 				Format: v1.Ini,
-				FormatterOptions: v1.FormatterOptions{
+				FormatterAction: v1.FormatterAction{
 					IniConfig: &v1.IniConfig{
 						SectionName: "mysqld",
 					}},
@@ -399,7 +399,7 @@ systemLog:
 		fileName: "my.cnf",
 		formatConfig: &v1.FormatterConfig{
 			Format: v1.Ini,
-			FormatterOptions: v1.FormatterOptions{
+			FormatterAction: v1.FormatterAction{
 				IniConfig: &v1.IniConfig{
 					SectionName: "mysqld",
 				},
@@ -415,7 +415,7 @@ systemLog:
 		fileName: "mongodb.conf",
 		formatConfig: &v1.FormatterConfig{
 			Format: v1.YAML,
-			FormatterOptions: v1.FormatterOptions{
+			FormatterAction: v1.FormatterAction{
 				IniConfig: &v1.IniConfig{
 					SectionName: "default",
 				},

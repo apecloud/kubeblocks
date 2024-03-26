@@ -122,7 +122,7 @@ func NeedReloadVolume(config appsv1alpha1.ComponentConfigSpec) bool {
 	return config.ConfigConstraintRef != ""
 }
 
-func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*v1.ReloadOptions, *v1.FormatterConfig, error) {
+func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*v1.DynamicReloadAction, *v1.FormatterConfig, error) {
 	for _, configSpec := range configSpecs {
 		if !NeedReloadVolume(configSpec) {
 			continue
@@ -135,8 +135,8 @@ func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []apps
 		if err := cli.Get(ctx, ccKey, cfgConst); err != nil {
 			return nil, nil, WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 		}
-		if cfgConst.Spec.ReloadOptions != nil {
-			return cfgConst.Spec.ReloadOptions, cfgConst.Spec.FormatterConfig, nil
+		if cfgConst.Spec.DynamicReloadAction != nil {
+			return cfgConst.Spec.DynamicReloadAction, cfgConst.Spec.FormatterConfig, nil
 		}
 	}
 	return nil, nil, nil

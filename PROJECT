@@ -243,4 +243,11 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+  domain: kubeblocks.io
+  group: apps
+  kind: ConfigConstraint
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
 version: "3"

@@ -136,7 +136,9 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 		// delete the sub-resources owned by the component before deleting the component
 		for _, object := range snapshot {
 			if rsm.IsOwnedByRsm(object) {
-				continue
+				if _, ok := object.(*corev1.PersistentVolumeClaim); !ok {
+					continue
+				}
 			}
 			graphCli.Delete(dag, object)
 		}

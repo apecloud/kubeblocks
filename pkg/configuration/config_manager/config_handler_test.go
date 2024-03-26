@@ -75,10 +75,10 @@ var _ = Describe("Config Handler Test", func() {
 		}
 	}
 
-	newFormatter := func() appsv1alpha1.FormatterConfig {
-		return appsv1alpha1.FormatterConfig{
-			FormatterOptions: appsv1alpha1.FormatterOptions{
-				IniConfig: &appsv1alpha1.IniConfig{
+	newFormatter := func() v1.FormatterConfig {
+		return v1.FormatterConfig{
+			FormatterOptions: v1.FormatterOptions{
+				IniConfig: &v1.IniConfig{
 					SectionName: "test",
 				},
 			},
@@ -88,8 +88,8 @@ var _ = Describe("Config Handler Test", func() {
 
 	newUnixSignalConfig := func() ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadOptions: &appsv1alpha1.ReloadOptions{
-				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+			ReloadOptions: &v1.ReloadOptions{
+				UnixSignalTrigger: &v1.UnixSignalTrigger{
 					ProcessName: findCurrProcName(),
 					Signal:      v1.SIGHUP,
 				}},
@@ -99,8 +99,8 @@ var _ = Describe("Config Handler Test", func() {
 		}
 	}
 
-	newDownwardAPIOptions := func() []appsv1alpha1.DownwardAPIOption {
-		return []appsv1alpha1.DownwardAPIOption{
+	newDownwardAPIOptions := func() []v1.DownwardAPIOption {
+		return []v1.DownwardAPIOption{
 			{
 				Name:       "labels",
 				MountPoint: filepath.Join(tmpWorkDir, "labels"),
@@ -116,8 +116,8 @@ var _ = Describe("Config Handler Test", func() {
 
 	newDownwardAPIConfig := func() ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadOptions: &appsv1alpha1.ReloadOptions{
-				ShellTrigger: &appsv1alpha1.ShellTrigger{
+			ReloadOptions: &v1.ReloadOptions{
+				ShellTrigger: &v1.ShellTrigger{
 					Command: []string{"sh", "-c", `echo "hello world" "$@"`},
 				},
 			},
@@ -131,8 +131,8 @@ var _ = Describe("Config Handler Test", func() {
 
 	newTPLScriptsConfig := func(configPath string) ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadOptions: &appsv1alpha1.ReloadOptions{
-				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{},
+			ReloadOptions: &v1.ReloadOptions{
+				TPLScriptTrigger: &v1.TPLScriptTrigger{},
 			},
 			ReloadType:      v1.TPLScriptType,
 			MountPoint:      "/tmp/test",
@@ -269,8 +269,8 @@ var _ = Describe("Config Handler Test", func() {
 			})
 			It("should succeed on reload individually", func() {
 				configSpec := ConfigSpecInfo{
-					ReloadOptions: &appsv1alpha1.ReloadOptions{
-						ShellTrigger: &appsv1alpha1.ShellTrigger{
+					ReloadOptions: &v1.ReloadOptions{
+						ShellTrigger: &v1.ShellTrigger{
 							Command: []string{"sh", "-c", `echo "hello world" "$@"`, "sh"},
 						}},
 					ReloadType:      v1.ShellType,
@@ -284,8 +284,8 @@ var _ = Describe("Config Handler Test", func() {
 				isBatchReload := true
 				It("should succeed on the default batch input format", func() {
 					configSpec := ConfigSpecInfo{
-						ReloadOptions: &appsv1alpha1.ReloadOptions{
-							ShellTrigger: &appsv1alpha1.ShellTrigger{
+						ReloadOptions: &v1.ReloadOptions{
+							ShellTrigger: &v1.ShellTrigger{
 								Command: []string{"sh", "-c",
 									`while IFS="=" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
 								},
@@ -303,8 +303,8 @@ var _ = Describe("Config Handler Test", func() {
 {{ printf "%s:%s" $pKey $pValue }}
 {{- end }}`
 					configSpec := ConfigSpecInfo{
-						ReloadOptions: &appsv1alpha1.ReloadOptions{
-							ShellTrigger: &appsv1alpha1.ShellTrigger{
+						ReloadOptions: &v1.ReloadOptions{
+							ShellTrigger: &v1.ShellTrigger{
 								Command: []string{"sh", "-c",
 									`while IFS=":" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
 								},

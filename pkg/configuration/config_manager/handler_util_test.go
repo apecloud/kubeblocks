@@ -40,7 +40,7 @@ import (
 
 func TestIsSupportReload(t *testing.T) {
 	type args struct {
-		reload *appsv1alpha1.ReloadOptions
+		reload *v1.ReloadOptions
 	}
 	tests := []struct {
 		name string
@@ -55,14 +55,14 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "reload_test_with_empty_reload_options",
 		args: args{
-			reload: &appsv1alpha1.ReloadOptions{},
+			reload: &v1.ReloadOptions{},
 		},
 		want: false,
 	}, {
 		name: "reload_test_with_unix_signal",
 		args: args{
-			reload: &appsv1alpha1.ReloadOptions{
-				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+			reload: &v1.ReloadOptions{
+				UnixSignalTrigger: &v1.UnixSignalTrigger{
 					ProcessName: "test",
 					Signal:      v1.SIGHUP,
 				},
@@ -72,8 +72,8 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "reload_test_with_shell",
 		args: args{
-			reload: &appsv1alpha1.ReloadOptions{
-				ShellTrigger: &appsv1alpha1.ShellTrigger{
+			reload: &v1.ReloadOptions{
+				ShellTrigger: &v1.ShellTrigger{
 					Command: strings.Fields("pg_ctl reload"),
 				},
 			},
@@ -82,9 +82,9 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "reload_test_with_tpl_script",
 		args: args{
-			reload: &appsv1alpha1.ReloadOptions{
-				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-					ScriptConfig: appsv1alpha1.ScriptConfig{
+			reload: &v1.ReloadOptions{
+				TPLScriptTrigger: &v1.TPLScriptTrigger{
+					ScriptConfig: v1.ScriptConfig{
 						ScriptConfigMapRef: "cm",
 						Namespace:          "default",
 					},
@@ -95,8 +95,8 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "auto_trigger_reload_test_with_process_name",
 		args: args{
-			reload: &appsv1alpha1.ReloadOptions{
-				AutoTrigger: &appsv1alpha1.AutoTrigger{
+			reload: &v1.ReloadOptions{
+				AutoTrigger: &v1.AutoTrigger{
 					ProcessName: "test",
 				},
 			},
@@ -105,8 +105,8 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "auto_trigger_reload_test",
 		args: args{
-			reload: &appsv1alpha1.ReloadOptions{
-				AutoTrigger: &appsv1alpha1.AutoTrigger{},
+			reload: &v1.ReloadOptions{
+				AutoTrigger: &v1.AutoTrigger{},
 			},
 		},
 		want: true,
@@ -133,14 +133,14 @@ var _ = Describe("Handler Util Test", func() {
 		DeferCleanup(mockK8sCli.Finish)
 	})
 
-	mockConfigConstraint := func(ccName string, reloadOptions *appsv1alpha1.ReloadOptions) *appsv1alpha1.ConfigConstraint {
-		return &appsv1alpha1.ConfigConstraint{
+	mockConfigConstraint := func(ccName string, reloadOptions *v1.ReloadOptions) *v1.ConfigConstraint {
+		return &v1.ConfigConstraint{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ccName,
 			},
-			Spec: appsv1alpha1.ConfigConstraintSpec{
+			Spec: v1.ConfigConstraintSpec{
 				ReloadOptions: reloadOptions,
-				FormatterConfig: &appsv1alpha1.FormatterConfig{
+				FormatterConfig: &v1.FormatterConfig{
 					Format: v1.Properties,
 				},
 			}}
@@ -166,7 +166,7 @@ var _ = Describe("Handler Util Test", func() {
 			)
 
 			type args struct {
-				reloadOptions *appsv1alpha1.ReloadOptions
+				reloadOptions *v1.ReloadOptions
 				cli           client.Client
 				ctx           context.Context
 			}
@@ -177,8 +177,8 @@ var _ = Describe("Handler Util Test", func() {
 			}{{
 				name: "unixSignalTest",
 				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+					reloadOptions: &v1.ReloadOptions{
+						UnixSignalTrigger: &v1.UnixSignalTrigger{
 							Signal: v1.SIGHUP,
 						}},
 				},
@@ -186,8 +186,8 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "unixSignalTest",
 				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+					reloadOptions: &v1.ReloadOptions{
+						UnixSignalTrigger: &v1.UnixSignalTrigger{
 							Signal: "SIGNOEXIST",
 						}},
 				},
@@ -195,8 +195,8 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "shellTest",
 				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						ShellTrigger: &appsv1alpha1.ShellTrigger{
+					reloadOptions: &v1.ReloadOptions{
+						ShellTrigger: &v1.ShellTrigger{
 							Command: nil,
 						}},
 				},
@@ -204,8 +204,8 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "shellTest",
 				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						ShellTrigger: &appsv1alpha1.ShellTrigger{
+					reloadOptions: &v1.ReloadOptions{
+						ShellTrigger: &v1.ShellTrigger{
 							Command: strings.Fields("go"),
 						}},
 				},
@@ -213,9 +213,9 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "TPLScriptTest",
 				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-							ScriptConfig: appsv1alpha1.ScriptConfig{
+					reloadOptions: &v1.ReloadOptions{
+						TPLScriptTrigger: &v1.TPLScriptTrigger{
+							ScriptConfig: v1.ScriptConfig{
 								ScriptConfigMapRef: "test",
 							},
 						}},
@@ -226,9 +226,9 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "TPLScriptTest",
 				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-							ScriptConfig: appsv1alpha1.ScriptConfig{
+					reloadOptions: &v1.ReloadOptions{
+						TPLScriptTrigger: &v1.TPLScriptTrigger{
+							ScriptConfig: v1.ScriptConfig{
 								ScriptConfigMapRef: "test",
 							},
 						}},
@@ -239,8 +239,8 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "autoTriggerTest",
 				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						AutoTrigger: &appsv1alpha1.AutoTrigger{
+					reloadOptions: &v1.ReloadOptions{
+						AutoTrigger: &v1.AutoTrigger{
 							ProcessName: "test",
 						}},
 				},
@@ -248,8 +248,8 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "autoTriggerTest",
 				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						AutoTrigger: &appsv1alpha1.AutoTrigger{}},
+					reloadOptions: &v1.ReloadOptions{
+						AutoTrigger: &v1.AutoTrigger{}},
 				},
 				wantErr: false,
 			}}
@@ -298,8 +298,8 @@ var _ = Describe("Handler Util Test", func() {
 
 		It("normal test", func() {
 			ccName := "config_constraint"
-			cc := mockConfigConstraint(ccName, &appsv1alpha1.ReloadOptions{
-				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+			cc := mockConfigConstraint(ccName, &v1.ReloadOptions{
+				UnixSignalTrigger: &v1.UnixSignalTrigger{
 					ProcessName: "test",
 					Signal:      v1.SIGHUP,
 				},
@@ -321,8 +321,8 @@ var _ = Describe("Handler Util Test", func() {
 
 		It("auto trigger test", func() {
 			ccName := "auto_trigger_config_constraint"
-			cc := mockConfigConstraint(ccName, &appsv1alpha1.ReloadOptions{
-				AutoTrigger: &appsv1alpha1.AutoTrigger{
+			cc := mockConfigConstraint(ccName, &v1.ReloadOptions{
+				AutoTrigger: &v1.AutoTrigger{
 					ProcessName: "test",
 				},
 			})
@@ -341,31 +341,31 @@ var _ = Describe("Handler Util Test", func() {
 
 	Context("TestFromReloadTypeConfig", func() {
 		It("TestSignalTrigger", func() {
-			Expect(v1.UnixSignalType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
-				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+			Expect(v1.UnixSignalType).Should(BeEquivalentTo(FromReloadTypeConfig(&v1.ReloadOptions{
+				UnixSignalTrigger: &v1.UnixSignalTrigger{
 					ProcessName: "test",
 					Signal:      v1.SIGHUP,
 				}})))
 		})
 
 		It("TestAutoTrigger", func() {
-			Expect(v1.AutoType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
-				AutoTrigger: &appsv1alpha1.AutoTrigger{
+			Expect(v1.AutoType).Should(BeEquivalentTo(FromReloadTypeConfig(&v1.ReloadOptions{
+				AutoTrigger: &v1.AutoTrigger{
 					ProcessName: "test",
 				}})))
 		})
 
 		It("TestShellTrigger", func() {
-			Expect(v1.ShellType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
-				ShellTrigger: &appsv1alpha1.ShellTrigger{
+			Expect(v1.ShellType).Should(BeEquivalentTo(FromReloadTypeConfig(&v1.ReloadOptions{
+				ShellTrigger: &v1.ShellTrigger{
 					Command: []string{"/bin/true"},
 				}})))
 		})
 
 		It("TestTplScriptsTrigger", func() {
-			Expect(v1.TPLScriptType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
-				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-					ScriptConfig: appsv1alpha1.ScriptConfig{
+			Expect(v1.TPLScriptType).Should(BeEquivalentTo(FromReloadTypeConfig(&v1.ReloadOptions{
+				TPLScriptTrigger: &v1.TPLScriptTrigger{
+					ScriptConfig: v1.ScriptConfig{
 						ScriptConfigMapRef: "test",
 						Namespace:          "default",
 					},
@@ -373,14 +373,14 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("TestInvalidTrigger", func() {
-			Expect("").Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{})))
+			Expect("").Should(BeEquivalentTo(FromReloadTypeConfig(&v1.ReloadOptions{})))
 		})
 	})
 
 	Context("TestValidateReloadOptions", func() {
 		It("TestSignalTrigger", func() {
-			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{
-				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+			Expect(ValidateReloadOptions(&v1.ReloadOptions{
+				UnixSignalTrigger: &v1.UnixSignalTrigger{
 					ProcessName: "test",
 					Signal:      v1.SIGHUP,
 				}}, nil, nil),
@@ -388,16 +388,16 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("TestSignalTrigger", func() {
-			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{
-				AutoTrigger: &appsv1alpha1.AutoTrigger{
+			Expect(ValidateReloadOptions(&v1.ReloadOptions{
+				AutoTrigger: &v1.AutoTrigger{
 					ProcessName: "test",
 				}}, nil, nil),
 			).Should(Succeed())
 		})
 
 		It("TestShellTrigger", func() {
-			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{
-				ShellTrigger: &appsv1alpha1.ShellTrigger{
+			Expect(ValidateReloadOptions(&v1.ReloadOptions{
+				ShellTrigger: &v1.ShellTrigger{
 					Command: []string{"/bin/true"},
 				}}, nil, nil),
 			).Should(Succeed())
@@ -417,9 +417,9 @@ var _ = Describe("Handler Util Test", func() {
 			}), testutil.WithTimes(2)))
 
 			By("Test valid")
-			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{
-				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-					ScriptConfig: appsv1alpha1.ScriptConfig{
+			Expect(ValidateReloadOptions(&v1.ReloadOptions{
+				TPLScriptTrigger: &v1.TPLScriptTrigger{
+					ScriptConfig: v1.ScriptConfig{
 						ScriptConfigMapRef: testName1,
 						Namespace:          ns,
 					},
@@ -427,9 +427,9 @@ var _ = Describe("Handler Util Test", func() {
 			).Should(Succeed())
 
 			By("Test invalid")
-			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{
-				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-					ScriptConfig: appsv1alpha1.ScriptConfig{
+			Expect(ValidateReloadOptions(&v1.ReloadOptions{
+				TPLScriptTrigger: &v1.TPLScriptTrigger{
+					ScriptConfig: v1.ScriptConfig{
 						ScriptConfigMapRef: testName2,
 						Namespace:          ns,
 					},
@@ -438,7 +438,7 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("TestInvalidTrigger", func() {
-			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{}, nil, nil)).ShouldNot(Succeed())
+			Expect(ValidateReloadOptions(&v1.ReloadOptions{}, nil, nil)).ShouldNot(Succeed())
 		})
 	})
 })

@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -68,7 +69,7 @@ max_connections=666
 		mockClient          *testutil.K8sClientMockHelper
 		templateBuilder     *configTemplateBuilder
 		configSpec          appsv1alpha1.ComponentConfigSpec
-		configConstraintObj *appsv1alpha1.ConfigConstraint
+		configConstraintObj *v1.ConfigConstraint
 
 		baseCMObject    *corev1.ConfigMap
 		updatedCMObject *corev1.ConfigMap
@@ -78,7 +79,7 @@ max_connections=666
 		mockClient = testutil.NewK8sMockClient()
 		configConstraintObj = testapps.CheckedCreateCustomizedObj(&testCtx,
 			"resources/mysql-config-constraint.yaml",
-			&appsv1alpha1.ConfigConstraint{})
+			&v1.ConfigConstraint{})
 		baseCMObject = &corev1.ConfigMap{
 			Data: map[string]string{
 				testConfigName: baseConfig,

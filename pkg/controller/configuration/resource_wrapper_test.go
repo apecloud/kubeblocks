@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -83,7 +84,7 @@ var _ = Describe("resource Fetcher", func() {
 					clusterVersion,
 					cluster,
 					testapps.NewConfigMap("default", cfgcore.GetComponentCfgName(clusterName, mysqlCompName, mysqlConfigName)),
-					&appsv1alpha1.ConfigConstraint{
+					&v1.ConfigConstraint{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: mysqlConfigName,
 						},

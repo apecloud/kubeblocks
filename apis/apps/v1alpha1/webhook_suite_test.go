@@ -44,6 +44,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -137,7 +138,7 @@ var _ = BeforeSuite(func() {
 			&Cluster{},
 			&ClusterVersion{},
 			&OpsRequest{},
-			&ConfigConstraint{},
+			&v1.ConfigConstraint{},
 		},
 	})
 	Expect(err).NotTo(HaveOccurred())

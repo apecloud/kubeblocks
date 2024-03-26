@@ -91,7 +91,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			testCtx.UseDefaultNamespace())
 
 		cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
-			&appsv1alpha1.ConfigConstraint{})
+			&v1.ConfigConstraint{})
 		Expect(testapps.ChangeObjStatus(&testCtx, cfgTpl, func() {
 			cfgTpl.Status.Phase = v1.CCAvailablePhase
 		})).Should(Succeed())

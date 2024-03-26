@@ -22,7 +22,7 @@ package configuration
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"

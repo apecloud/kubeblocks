@@ -28,7 +28,6 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -126,7 +125,7 @@ func WithKeySelector(keys []string) ValidatorOptions {
 	}
 }
 
-func NewConfigValidator(configConstraint *appsv1alpha1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
+func NewConfigValidator(configConstraint *v1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
 	var (
 		validator    ConfigValidator
 		configSchema = configConstraint.ConfigurationSchema

@@ -78,22 +78,22 @@ var _ = Describe("Config Builder Test", func() {
 				Name:      "pg_config",
 			}}
 	}
-	newReloadOptions := func(t v1.CfgReloadType, sync *bool) *appsv1alpha1.ReloadOptions {
-		signalHandle := &appsv1alpha1.UnixSignalTrigger{
+	newReloadOptions := func(t v1.CfgReloadType, sync *bool) *v1.ReloadOptions {
+		signalHandle := &v1.UnixSignalTrigger{
 			ProcessName: "postgres",
 			Signal:      v1.SIGHUP,
 		}
-		shellHandle := &appsv1alpha1.ShellTrigger{
+		shellHandle := &v1.ShellTrigger{
 			Command: []string{"pwd"},
 		}
-		scriptHandle := &appsv1alpha1.TPLScriptTrigger{
+		scriptHandle := &v1.TPLScriptTrigger{
 			Sync: sync,
-			ScriptConfig: appsv1alpha1.ScriptConfig{
+			ScriptConfig: v1.ScriptConfig{
 				ScriptConfigMapRef: "reload-script",
 				Namespace:          scriptsNS,
 			},
 		}
-		autoHandle := &appsv1alpha1.AutoTrigger{
+		autoHandle := &v1.AutoTrigger{
 			ProcessName: "postgres",
 		}
 
@@ -101,16 +101,16 @@ var _ = Describe("Config Builder Test", func() {
 		default:
 			return nil
 		case v1.UnixSignalType:
-			return &appsv1alpha1.ReloadOptions{
+			return &v1.ReloadOptions{
 				UnixSignalTrigger: signalHandle}
 		case v1.ShellType:
-			return &appsv1alpha1.ReloadOptions{
+			return &v1.ReloadOptions{
 				ShellTrigger: shellHandle}
 		case v1.TPLScriptType:
-			return &appsv1alpha1.ReloadOptions{
+			return &v1.ReloadOptions{
 				TPLScriptTrigger: scriptHandle}
 		case v1.AutoType:
-			return &appsv1alpha1.ReloadOptions{
+			return &v1.ReloadOptions{
 				AutoTrigger: autoHandle}
 		}
 	}
@@ -144,7 +144,7 @@ var _ = Describe("Config Builder Test", func() {
 			DownwardAPIVolumes:        make([]corev1.VolumeMount, 0),
 		}
 		if hasScripts {
-			param.ConfigSpecsBuildParams[0].ScriptConfig = []appsv1alpha1.ScriptConfig{
+			param.ConfigSpecsBuildParams[0].ScriptConfig = []v1.ScriptConfig{
 				{
 					Namespace:          scriptsNS,
 					ScriptConfigMapRef: scriptsName,
@@ -181,8 +181,8 @@ formatterConfig:
 		mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 	}
 
-	newDownwardAPIVolumes := func() []appsv1alpha1.DownwardAPIOption {
-		return []appsv1alpha1.DownwardAPIOption{
+	newDownwardAPIVolumes := func() []v1.DownwardAPIOption {
+		return []v1.DownwardAPIOption{
 			{
 				Name:       "downward-api",
 				MountPoint: "/etc/podinfo",
@@ -326,7 +326,7 @@ func TestCheckAndUpdateReloadYaml(t *testing.T) {
 	type args struct {
 		data            map[string]string
 		reloadConfig    string
-		formatterConfig *appsv1alpha1.FormatterConfig
+		formatterConfig *v1.FormatterConfig
 	}
 	tests := []struct {
 		name    string
@@ -341,7 +341,7 @@ fileRegex: my.cnf
 scripts: reload.tpl
 `},
 			reloadConfig: "reload.yaml",
-			formatterConfig: &appsv1alpha1.FormatterConfig{
+			formatterConfig: &v1.FormatterConfig{
 				Format: v1.Ini,
 			},
 		},
@@ -358,7 +358,7 @@ formatterConfig:
 		args: args{
 			data:            map[string]string{},
 			reloadConfig:    "reload.yaml",
-			formatterConfig: &appsv1alpha1.FormatterConfig{Format: v1.Ini},
+			formatterConfig: &v1.FormatterConfig{Format: v1.Ini},
 		},
 		wantErr: true,
 		want:    map[string]string{},

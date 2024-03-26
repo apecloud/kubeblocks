@@ -128,7 +128,7 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
 }
 
-func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) map[string]string {
+func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *v1.ConfigConstraintSpec) map[string]string {
 	r := make(map[string]string)
 	dynamicAction := cc.NeedDynamicReloadAction()
 	selectedPolicy := cc.DynamicParametersPolicy()

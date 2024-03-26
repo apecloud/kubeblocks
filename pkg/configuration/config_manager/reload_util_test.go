@@ -53,7 +53,7 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 	type args struct {
 		newVersion string
 		oldVersion string
-		formatCfg  *appsv1alpha1.FormatterConfig
+		formatCfg  *v1.FormatterConfig
 	}
 	tests := []struct {
 		name    string
@@ -65,9 +65,9 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 		args: args{
 			newVersion: filepath.Join(rootPath, "currentVersion"),
 			oldVersion: filepath.Join(rootPath, "lastVersion"),
-			formatCfg: &appsv1alpha1.FormatterConfig{
+			formatCfg: &v1.FormatterConfig{
 				Format: v1.Ini,
-				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
+				FormatterOptions: v1.FormatterOptions{IniConfig: &v1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			}},
@@ -139,7 +139,7 @@ func TestOnlineUpdateParamsHandle(t *testing.T) {
 
 	type args struct {
 		tplScriptPath string
-		formatConfig  *appsv1alpha1.FormatterConfig
+		formatConfig  *v1.FormatterConfig
 		dataType      string
 		dsn           string
 	}
@@ -152,7 +152,7 @@ func TestOnlineUpdateParamsHandle(t *testing.T) {
 		name: "online_update_params_handle_test",
 		args: args{
 			tplScriptPath: filepath.Join(tmpTestData, partroniPath),
-			formatConfig: &appsv1alpha1.FormatterConfig{
+			formatConfig: &v1.FormatterConfig{
 				Format: v1.Properties,
 			},
 			dsn:      server.URL,
@@ -238,10 +238,10 @@ var _ = Describe("ReloadUtil Test", func() {
 	AfterEach(func() {
 	})
 
-	createIniFormatter := func(sectionName string) *appsv1alpha1.FormatterConfig {
-		return &appsv1alpha1.FormatterConfig{
-			FormatterOptions: appsv1alpha1.FormatterOptions{
-				IniConfig: &appsv1alpha1.IniConfig{
+	createIniFormatter := func(sectionName string) *v1.FormatterConfig {
+		return &v1.FormatterConfig{
+			FormatterOptions: v1.FormatterOptions{
+				IniConfig: &v1.IniConfig{
 					SectionName: sectionName,
 				}},
 			Format: v1.Ini,

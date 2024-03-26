@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 )
@@ -95,7 +96,7 @@ func FromStringPointerMap(m map[string]string) map[string]*string {
 	return r
 }
 
-func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]*string, formatConfig *appsv1alpha1.FormatterConfig) (string, error) {
+func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]*string, formatConfig *v1.FormatterConfig) (string, error) {
 	configLoaderOption := CfgOption{
 		Type:    CfgRawType,
 		Log:     log.FromContext(context.TODO()),
@@ -121,7 +122,7 @@ func NeedReloadVolume(config appsv1alpha1.ComponentConfigSpec) bool {
 	return config.ConfigConstraintRef != ""
 }
 
-func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ReloadOptions, *appsv1alpha1.FormatterConfig, error) {
+func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*v1.ReloadOptions, *v1.FormatterConfig, error) {
 	for _, configSpec := range configSpecs {
 		if !NeedReloadVolume(configSpec) {
 			continue
@@ -130,7 +131,7 @@ func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []apps
 			Namespace: "",
 			Name:      configSpec.ConfigConstraintRef,
 		}
-		cfgConst := &appsv1alpha1.ConfigConstraint{}
+		cfgConst := &v1.ConfigConstraint{}
 		if err := cli.Get(ctx, ccKey, cfgConst); err != nil {
 			return nil, nil, WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 		}
@@ -141,14 +142,14 @@ func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []apps
 	return nil, nil, nil
 }
 
-func IsWatchModuleForShellTrigger(trigger *appsv1alpha1.ShellTrigger) bool {
+func IsWatchModuleForShellTrigger(trigger *v1.ShellTrigger) bool {
 	if trigger == nil || trigger.Sync == nil {
 		return true
 	}
 	return !*trigger.Sync
 }
 
-func IsWatchModuleForTplTrigger(trigger *appsv1alpha1.TPLScriptTrigger) bool {
+func IsWatchModuleForTplTrigger(trigger *v1.TPLScriptTrigger) bool {
 	if trigger == nil || trigger.Sync == nil {
 		return true
 	}

@@ -47,7 +47,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
 	var scriptsObj *corev1.ConfigMap
-	var configConstraint *appsv1alpha1.ConfigConstraint
+	var configConstraint *v1.ConfigConstraint
 	var configurationObj *appsv1alpha1.Configuration
 	var k8sMockClient *testutil.K8sClientMockHelper
 
@@ -82,21 +82,21 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			ClusterRef(clusterName).
 			Component(mysqlCompName).
 			GetObject()
-		configConstraint = &appsv1alpha1.ConfigConstraint{
+		configConstraint = &v1.ConfigConstraint{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: mysqlConfigConstraintName,
 			},
-			Spec: appsv1alpha1.ConfigConstraintSpec{
-				ReloadOptions: &appsv1alpha1.ReloadOptions{
-					ShellTrigger: &appsv1alpha1.ShellTrigger{
+			Spec: v1.ConfigConstraintSpec{
+				ReloadOptions: &v1.ReloadOptions{
+					ShellTrigger: &v1.ShellTrigger{
 						Command: []string{"echo", "hello"},
 						Sync:    cfgutil.ToPointer(true),
 					},
 				},
-				FormatterConfig: &appsv1alpha1.FormatterConfig{
+				FormatterConfig: &v1.FormatterConfig{
 					Format: v1.Ini,
-					FormatterOptions: appsv1alpha1.FormatterOptions{
-						IniConfig: &appsv1alpha1.IniConfig{
+					FormatterOptions: v1.FormatterOptions{
+						IniConfig: &v1.IniConfig{
 							SectionName: "mysqld",
 						},
 					},

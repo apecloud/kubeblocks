@@ -125,12 +125,12 @@ var _ = Describe("TemplateWrapperTest", func() {
 						"test-config-spec-new": "test-config-spec-update",
 					},
 				},
-				&appsv1alpha1.ConfigConstraint{
+				&v1.ConfigConstraint{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: configSpecName,
 					},
-					Spec: appsv1alpha1.ConfigConstraintSpec{
-						FormatterConfig: &appsv1alpha1.FormatterConfig{
+					Spec: v1.ConfigConstraintSpec{
+						FormatterConfig: &v1.FormatterConfig{
 							Format: v1.Ini,
 						},
 					},

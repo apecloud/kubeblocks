@@ -65,7 +65,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Recorder: r.Recorder,
 	}
 
-	configConstraint := &appsv1alpha1.ConfigConstraint{}
+	configConstraint := &v1.ConfigConstraint{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configConstraint); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -119,7 +119,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 // SetupWithManager sets up the controller with the Manager.
 func (r *ConfigConstraintReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&appsv1alpha1.ConfigConstraint{}).
+		For(&v1.ConfigConstraint{}).
 		// for other resource
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)

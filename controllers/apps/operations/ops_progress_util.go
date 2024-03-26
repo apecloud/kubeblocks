@@ -21,6 +21,7 @@ package operations
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -638,4 +639,18 @@ func getFinalExpectCount(completedCount, expectProgressCount int32) int32 {
 		return completedCount
 	}
 	return expectProgressCount
+}
+
+func syncProgressToOpsRequest(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	oldOpsRequest *appsv1alpha1.OpsRequest,
+	completedCount, expectCount int) error {
+	// sync progress
+	opsRes.OpsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectCount)
+	if !reflect.DeepEqual(opsRes.OpsRequest.Status, oldOpsRequest.Status) {
+		return cli.Status().Patch(reqCtx.Ctx, opsRes.OpsRequest, client.MergeFrom(oldOpsRequest))
+	}
+	return nil
 }

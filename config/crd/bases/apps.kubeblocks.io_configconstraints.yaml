@@ -19,39 +19,6 @@ spec:
     singular: configconstraint
   scope: Cluster
   versions:
-  - name: v1
-    schema:
-      openAPIV3Schema:
-        description: ConfigConstraint is the Schema for the configconstraints API
-        properties:
-          apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-            type: string
-          kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-            type: string
-          metadata:
-            type: object
-          spec:
-            description: ConfigConstraintSpec defines the desired state of ConfigConstraint
-            properties:
-              foo:
-                description: Foo is an example field of ConfigConstraint. Edit configconstraint_types.go
-                  to remove/update
-                type: string
-            type: object
-          status:
-            description: ConfigConstraintStatus defines the observed state of ConfigConstraint
-            type: object
-        type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
   - additionalPrinterColumns:
     - description: status phase
       jsonPath: .status.phase
@@ -60,7 +27,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: ConfigConstraint is the Schema for the configconstraint API
@@ -80,30 +47,27 @@ spec:
           spec:
             description: ConfigConstraintSpec defines the desired state of ConfigConstraint
             properties:
-              cfgSchemaTopLevelName:
-                description: Top level key used to get the cue rules to validate the
-                  config file. It must exist in 'ConfigSchema' TODO (refactored to
-                  ConfigSchemaTopLevelKey)
-                type: string
-              configurationSchema:
-                description: List constraints rules for each config parameters. TODO
-                  (refactored to ConfigSchema)
+              configSchema:
+                description: List constraints rules for each config parameters.
                 properties:
                   cue:
                     description: Enables providers to verify user configurations using
                       the CUE language.
                     type: string
-                  schema:
+                  schemaInJson:
                     description: Transforms the schema from CUE to json for further
-                      OpenAPI validation TODO (refactored to SchemaInJson)
+                      OpenAPI validation
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
-              downwardAPIOptions:
+              configSchemaTopLevelKey:
+                description: Top level key used to get the cue rules to validate the
+                  config file. It must exist in 'ConfigSchema'
+                type: string
+              downwardActions:
                 description: "A set of actions for regenerating local configs. \n
                   It works when: - different engine roles have different config, such
                   as redis primary & secondary - after a role switch, the local config
-                  will be regenerated with the help of DownwardActions TODO (refactored
-                  to DownwardActions)"
+                  will be regenerated with the help of DownwardActions"
                 items:
                   properties:
                     command:
@@ -217,64 +181,12 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
-              formatterConfig:
-                description: 'Describes the format of the config file. The controller
-                  works as follows: 1. Parse the config file 2. Get the modified parameters
-                  3. Trigger the corresponding action'
-                properties:
-                  format:
-                    description: "The config file format. Valid values are `ini`,
-                      `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties` and `toml`.
-                      Each format has its own characteristics and use cases. \n -
-                      ini: is a text-based content with a structure and syntax comprising
-                      key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
-                      - xml: refers to wiki: https://en.wikipedia.org/wiki/XML - yaml:
-                      supports for complex data types and structures. - json: refers
-                      to wiki: https://en.wikipedia.org/wiki/JSON - hcl: The HashiCorp
-                      Configuration Language (HCL) is a configuration language authored
-                      by HashiCorp, reference url: https://www.linode.com/docs/guides/introduction-to-hcl/
-                      - dotenv: is a plain text file with simple key–value pairs,
-                      reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
-                      - properties: a file extension mainly used in Java, reference
-                      wiki: https://en.wikipedia.org/wiki/.properties - toml: refers
-                      to wiki: https://en.wikipedia.org/wiki/TOML - props-plus: a
-                      file extension mainly used in Java, supports CamelCase(e.g:
-                      brokerMaxConnectionsPerIp)"
-                    enum:
-                    - xml
-                    - ini
-                    - yaml
-                    - json
-                    - hcl
-                    - dotenv
-                    - toml
-                    - properties
-                    - redis
-                    - props-plus
-                    type: string
-                  iniConfig:
-                    description: A pointer to an IniConfig struct that holds the ini
-                      options.
-                    properties:
-                      sectionName:
-                        description: A string that describes the name of the ini section.
-                        type: string
-                    type: object
-                required:
-                - format
-                type: object
-              immutableParameters:
-                description: Describes parameters that are prohibited to do any modifications.
-                items:
-                  type: string
-                type: array
-                x-kubernetes-list-type: set
-              reloadOptions:
+              dynamicReloadAction:
                 description: Specifies the dynamic reload actions supported by the
                   engine. If set, the controller call the scripts defined in the actions
                   for a dynamic parameter upgrade. The actions are called only when
-                  the modified parameter is defined in dynamicParameters part && DynamicReloadActions
-                  != nil TODO (refactored to DynamicReloadActions)
+                  the modified parameter is defined in dynamicParameters part && DynamicReloadAction
+                  != nil
                 properties:
                   autoTrigger:
                     description: Used to automatically perform the reload command
@@ -407,33 +319,8 @@ spec:
                     - signal
                     type: object
                 type: object
-              scriptConfigs:
-                description: A list of ScriptConfig used by the actions defined in
-                  dynamic reload and downward actions.
-                items:
-                  properties:
-                    namespace:
-                      default: default
-                      description: Specifies the namespace where the referenced tpl
-                        script ConfigMap in. If left empty, by default in the "default"
-                        namespace.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
-                      type: string
-                    scriptConfigMapRef:
-                      description: Specifies the reference to the ConfigMap that contains
-                        the script to be executed for reload.
-                      type: string
-                  required:
-                  - scriptConfigMapRef
-                  type: object
-                type: array
-                x-kubernetes-list-map-keys:
-                - scriptConfigMapRef
-                x-kubernetes-list-type: map
-              selector:
+              dynamicReloadSelector:
                 description: Used to match labels on the pod to do a dynamic reload
-                  TODO (refactored to DynamicReloadSelector)
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -477,17 +364,61 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
-              staticParameters:
-                description: A list of StaticParameter. Modifications of static parameters
-                  trigger a process restart.
+              formatterConfig:
+                description: 'Describes the format of the config file. The controller
+                  works as follows: 1. Parse the config file 2. Get the modified parameters
+                  3. Trigger the corresponding action'
+                properties:
+                  format:
+                    description: "The config file format. Valid values are `ini`,
+                      `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties` and `toml`.
+                      Each format has its own characteristics and use cases. \n -
+                      ini: is a text-based content with a structure and syntax comprising
+                      key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
+                      - xml: refers to wiki: https://en.wikipedia.org/wiki/XML - yaml:
+                      supports for complex data types and structures. - json: refers
+                      to wiki: https://en.wikipedia.org/wiki/JSON - hcl: The HashiCorp
+                      Configuration Language (HCL) is a configuration language authored
+                      by HashiCorp, reference url: https://www.linode.com/docs/guides/introduction-to-hcl/
+                      - dotenv: is a plain text file with simple key–value pairs,
+                      reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
+                      - properties: a file extension mainly used in Java, reference
+                      wiki: https://en.wikipedia.org/wiki/.properties - toml: refers
+                      to wiki: https://en.wikipedia.org/wiki/TOML - props-plus: a
+                      file extension mainly used in Java, supports CamelCase(e.g:
+                      brokerMaxConnectionsPerIp)"
+                    enum:
+                    - xml
+                    - ini
+                    - yaml
+                    - json
+                    - hcl
+                    - dotenv
+                    - toml
+                    - properties
+                    - redis
+                    - props-plus
+                    type: string
+                  iniConfig:
+                    description: A pointer to an IniConfig struct that holds the ini
+                      options.
+                    properties:
+                      sectionName:
+                        description: A string that describes the name of the ini section.
+                        type: string
+                    type: object
+                required:
+                - format
+                type: object
+              immutableParameters:
+                description: Describes parameters that are prohibited to do any modifications.
                 items:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
-              toolsImageSpec:
+              reloadToolsImage:
                 description: Tools used by the dynamic reload actions. Usually it
                   is referenced by the 'init container' for 'cp' it to a binary volume.
-                  TODO (refactored to ReloadToolsImage)
                 properties:
                   mountPoint:
                     description: Represents the point where the scripts file will
@@ -518,6 +449,37 @@ spec:
                 required:
                 - mountPoint
                 type: object
+              scriptConfigs:
+                description: A list of ScriptConfig used by the actions defined in
+                  dynamic reload and downward actions.
+                items:
+                  properties:
+                    namespace:
+                      default: default
+                      description: Specifies the namespace where the referenced tpl
+                        script ConfigMap in. If left empty, by default in the "default"
+                        namespace.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
+                    scriptConfigMapRef:
+                      description: Specifies the reference to the ConfigMap that contains
+                        the script to be executed for reload.
+                      type: string
+                  required:
+                  - scriptConfigMapRef
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - scriptConfigMapRef
+                x-kubernetes-list-type: map
+              staticParameters:
+                description: A list of StaticParameter. Modifications of static parameters
+                  trigger a process restart.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
             required:
             - formatterConfig
             type: object
@@ -543,6 +505,6 @@ spec:
             type: object
         type: object
     served: true
-    storage: false
+    storage: true
     subresources:
       status: {}

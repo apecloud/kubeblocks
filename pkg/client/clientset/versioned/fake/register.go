@@ -19,6 +19,7 @@ limitations under the License.
 package fake
 
 import (
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
@@ -36,6 +37,7 @@ var codecs = serializer.NewCodecFactory(scheme)
 
 var localSchemeBuilder = runtime.SchemeBuilder{
 	appsv1alpha1.AddToScheme,
+	appsv1.AddToScheme,
 	dataprotectionv1alpha1.AddToScheme,
 	extensionsv1alpha1.AddToScheme,
 	storagev1alpha1.AddToScheme,

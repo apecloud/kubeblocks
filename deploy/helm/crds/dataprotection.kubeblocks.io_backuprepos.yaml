@@ -80,6 +80,10 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              pathPrefix:
+                description: Specifies the prefix of the path for storing backup data.
+                pattern: ^([a-zA-Z0-9-_]+/?)*$
+                type: string
               pvReclaimPolicy:
                 description: Specifies reclaim policy of the PV created by this backup
                   repository.

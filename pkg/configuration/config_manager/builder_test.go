@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -77,10 +78,10 @@ var _ = Describe("Config Builder Test", func() {
 				Name:      "pg_config",
 			}}
 	}
-	newReloadOptions := func(t appsv1alpha1.CfgReloadType, sync *bool) *appsv1alpha1.ReloadOptions {
+	newReloadOptions := func(t v1.CfgReloadType, sync *bool) *appsv1alpha1.ReloadOptions {
 		signalHandle := &appsv1alpha1.UnixSignalTrigger{
 			ProcessName: "postgres",
-			Signal:      appsv1alpha1.SIGHUP,
+			Signal:      v1.SIGHUP,
 		}
 		shellHandle := &appsv1alpha1.ShellTrigger{
 			Command: []string{"pwd"},
@@ -99,16 +100,16 @@ var _ = Describe("Config Builder Test", func() {
 		switch t {
 		default:
 			return nil
-		case appsv1alpha1.UnixSignalType:
+		case v1.UnixSignalType:
 			return &appsv1alpha1.ReloadOptions{
 				UnixSignalTrigger: signalHandle}
-		case appsv1alpha1.ShellType:
+		case v1.ShellType:
 			return &appsv1alpha1.ReloadOptions{
 				ShellTrigger: shellHandle}
-		case appsv1alpha1.TPLScriptType:
+		case v1.TPLScriptType:
 			return &appsv1alpha1.ReloadOptions{
 				TPLScriptTrigger: scriptHandle}
-		case appsv1alpha1.AutoType:
+		case v1.AutoType:
 			return &appsv1alpha1.ReloadOptions{
 				AutoTrigger: autoHandle}
 		}
@@ -202,11 +203,11 @@ formatterConfig:
 		It("builds unixSignal reloader correctly", func() {
 			param := newCMBuildParams(false)
 			mockTplScriptCM()
-			reloadOptions := newReloadOptions(appsv1alpha1.UnixSignalType, nil)
+			reloadOptions := newReloadOptions(v1.UnixSignalType, nil)
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadOptions = reloadOptions
-				buildParam.ReloadType = appsv1alpha1.UnixSignalType
+				buildParam.ReloadType = v1.UnixSignalType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), ctx, param, newVolumeMounts2())).Should(Succeed())
 			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`, `--volume-dir`, `/postgresql/conf2`} {
@@ -226,11 +227,11 @@ formatterConfig:
 			mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(2)))
 
 			param := newCMBuildParams(true)
-			reloadOptions := newReloadOptions(appsv1alpha1.ShellType, nil)
+			reloadOptions := newReloadOptions(v1.ShellType, nil)
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadOptions = reloadOptions
-				buildParam.ReloadType = appsv1alpha1.ShellType
+				buildParam.ReloadType = v1.ShellType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`} {
@@ -241,11 +242,11 @@ formatterConfig:
 		It("builds tplScriptsTrigger reloader correctly", func() {
 			mockTplScriptCM()
 			param := newCMBuildParams(false)
-			reloadOptions := newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(true))
+			reloadOptions := newReloadOptions(v1.TPLScriptType, syncFn(true))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadOptions = reloadOptions
-				buildParam.ReloadType = appsv1alpha1.TPLScriptType
+				buildParam.ReloadType = v1.TPLScriptType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			for _, arg := range []string{`--operator-update-enable`} {
@@ -256,11 +257,11 @@ formatterConfig:
 		It("builds tplScriptsTrigger reloader correctly with sync", func() {
 			mockTplScriptCM()
 			param := newCMBuildParams(false)
-			reloadOptions := newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(false))
+			reloadOptions := newReloadOptions(v1.TPLScriptType, syncFn(false))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadOptions = reloadOptions
-				buildParam.ReloadType = appsv1alpha1.TPLScriptType
+				buildParam.ReloadType = v1.TPLScriptType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`} {
@@ -271,11 +272,11 @@ formatterConfig:
 		It("builds secondary render correctly", func() {
 			mockTplScriptCM()
 			param := newCMBuildParams(false)
-			reloadOptions := newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(false))
+			reloadOptions := newReloadOptions(v1.TPLScriptType, syncFn(false))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadOptions = reloadOptions
-				buildParam.ReloadType = appsv1alpha1.TPLScriptType
+				buildParam.ReloadType = v1.TPLScriptType
 				buildParam.ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
 					ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
 						Namespace:   scriptsNS,
@@ -294,7 +295,7 @@ formatterConfig:
 			param := newCMBuildParams(false)
 			buildParam := &param.ConfigSpecsBuildParams[0]
 			buildParam.DownwardAPIOptions = newDownwardAPIVolumes()
-			buildParam.ReloadOptions = newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(true))
+			buildParam.ReloadOptions = newReloadOptions(v1.TPLScriptType, syncFn(true))
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			Expect(FindVolumeMount(param.DownwardAPIVolumes, buildParam.DownwardAPIOptions[0].Name)).ShouldNot(BeNil())
 		})
@@ -341,7 +342,7 @@ scripts: reload.tpl
 `},
 			reloadConfig: "reload.yaml",
 			formatterConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.Ini,
+				Format: v1.Ini,
 			},
 		},
 		wantErr: false,
@@ -357,7 +358,7 @@ formatterConfig:
 		args: args{
 			data:            map[string]string{},
 			reloadConfig:    "reload.yaml",
-			formatterConfig: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.Ini},
+			formatterConfig: &appsv1alpha1.FormatterConfig{Format: v1.Ini},
 		},
 		wantErr: true,
 		want:    map[string]string{},

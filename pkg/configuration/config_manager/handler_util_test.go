@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -63,7 +64,7 @@ func TestIsSupportReload(t *testing.T) {
 			reload: &appsv1alpha1.ReloadOptions{
 				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
 					ProcessName: "test",
-					Signal:      appsv1alpha1.SIGHUP,
+					Signal:      v1.SIGHUP,
 				},
 			},
 		},
@@ -140,7 +141,7 @@ var _ = Describe("Handler Util Test", func() {
 			Spec: appsv1alpha1.ConfigConstraintSpec{
 				ReloadOptions: reloadOptions,
 				FormatterConfig: &appsv1alpha1.FormatterConfig{
-					Format: appsv1alpha1.Properties,
+					Format: v1.Properties,
 				},
 			}}
 	}
@@ -178,7 +179,7 @@ var _ = Describe("Handler Util Test", func() {
 				args: args{
 					reloadOptions: &appsv1alpha1.ReloadOptions{
 						UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
-							Signal: appsv1alpha1.SIGHUP,
+							Signal: v1.SIGHUP,
 						}},
 				},
 				wantErr: false,
@@ -300,7 +301,7 @@ var _ = Describe("Handler Util Test", func() {
 			cc := mockConfigConstraint(ccName, &appsv1alpha1.ReloadOptions{
 				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
 					ProcessName: "test",
-					Signal:      appsv1alpha1.SIGHUP,
+					Signal:      v1.SIGHUP,
 				},
 			})
 			mockK8sCli.MockGetMethod(testutil.WithGetReturned(
@@ -314,7 +315,7 @@ var _ = Describe("Handler Util Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(len(configSpecs)).Should(BeEquivalentTo(1))
 			Expect(configSpecs[0].ConfigSpec).Should(BeEquivalentTo(mockConfigSpec(ccName)))
-			Expect(configSpecs[0].ReloadType).Should(BeEquivalentTo(appsv1alpha1.UnixSignalType))
+			Expect(configSpecs[0].ReloadType).Should(BeEquivalentTo(v1.UnixSignalType))
 			Expect(configSpecs[0].FormatterConfig).Should(BeEquivalentTo(*cc.Spec.FormatterConfig))
 		})
 
@@ -340,29 +341,29 @@ var _ = Describe("Handler Util Test", func() {
 
 	Context("TestFromReloadTypeConfig", func() {
 		It("TestSignalTrigger", func() {
-			Expect(appsv1alpha1.UnixSignalType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
+			Expect(v1.UnixSignalType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
 				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
 					ProcessName: "test",
-					Signal:      appsv1alpha1.SIGHUP,
+					Signal:      v1.SIGHUP,
 				}})))
 		})
 
 		It("TestAutoTrigger", func() {
-			Expect(appsv1alpha1.AutoType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
+			Expect(v1.AutoType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
 				AutoTrigger: &appsv1alpha1.AutoTrigger{
 					ProcessName: "test",
 				}})))
 		})
 
 		It("TestShellTrigger", func() {
-			Expect(appsv1alpha1.ShellType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
+			Expect(v1.ShellType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
 				ShellTrigger: &appsv1alpha1.ShellTrigger{
 					Command: []string{"/bin/true"},
 				}})))
 		})
 
 		It("TestTplScriptsTrigger", func() {
-			Expect(appsv1alpha1.TPLScriptType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
+			Expect(v1.TPLScriptType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
 				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
 					ScriptConfig: appsv1alpha1.ScriptConfig{
 						ScriptConfigMapRef: "test",
@@ -381,7 +382,7 @@ var _ = Describe("Handler Util Test", func() {
 			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{
 				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
 					ProcessName: "test",
-					Signal:      appsv1alpha1.SIGHUP,
+					Signal:      v1.SIGHUP,
 				}}, nil, nil),
 			).Should(Succeed())
 		})
@@ -443,7 +444,7 @@ var _ = Describe("Handler Util Test", func() {
 })
 
 func TestFilterSubPathVolumeMount(t *testing.T) {
-	createConfigMeta := func(volumeName string, reloadType appsv1alpha1.CfgReloadType) ConfigSpecMeta {
+	createConfigMeta := func(volumeName string, reloadType v1.CfgReloadType) ConfigSpecMeta {
 		return ConfigSpecMeta{ConfigSpecInfo: ConfigSpecInfo{
 			ReloadType: reloadType,
 			ConfigSpec: appsv1alpha1.ComponentConfigSpec{
@@ -464,9 +465,9 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 		name: "test1",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", appsv1alpha1.UnixSignalType),
-				createConfigMeta("test2", appsv1alpha1.ShellType),
-				createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+				createConfigMeta("test1", v1.UnixSignalType),
+				createConfigMeta("test2", v1.ShellType),
+				createConfigMeta("test3", v1.TPLScriptType),
 			},
 			volumes: []corev1.VolumeMount{
 				{Name: "test1", SubPath: "test1"},
@@ -475,15 +476,15 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 			},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+			createConfigMeta("test3", v1.TPLScriptType),
 		},
 	}, {
 		name: "test2",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", appsv1alpha1.UnixSignalType),
-				createConfigMeta("test2", appsv1alpha1.ShellType),
-				createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+				createConfigMeta("test1", v1.UnixSignalType),
+				createConfigMeta("test2", v1.ShellType),
+				createConfigMeta("test3", v1.TPLScriptType),
 			},
 			volumes: []corev1.VolumeMount{
 				{Name: "test1"},
@@ -492,24 +493,24 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 			},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test1", appsv1alpha1.UnixSignalType),
-			createConfigMeta("test2", appsv1alpha1.ShellType),
-			createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+			createConfigMeta("test1", v1.UnixSignalType),
+			createConfigMeta("test2", v1.ShellType),
+			createConfigMeta("test3", v1.TPLScriptType),
 		},
 	}, {
 		name: "test3",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", appsv1alpha1.UnixSignalType),
-				createConfigMeta("test2", appsv1alpha1.ShellType),
-				createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+				createConfigMeta("test1", v1.UnixSignalType),
+				createConfigMeta("test2", v1.ShellType),
+				createConfigMeta("test3", v1.TPLScriptType),
 			},
 			volumes: []corev1.VolumeMount{},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test1", appsv1alpha1.UnixSignalType),
-			createConfigMeta("test2", appsv1alpha1.ShellType),
-			createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+			createConfigMeta("test1", v1.UnixSignalType),
+			createConfigMeta("test2", v1.ShellType),
+			createConfigMeta("test3", v1.TPLScriptType),
 		},
 	}}
 	for _, tt := range tests {

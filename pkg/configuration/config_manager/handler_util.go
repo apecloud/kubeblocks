@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
@@ -76,16 +77,16 @@ func IsAutoReload(reload *appsv1alpha1.ReloadOptions) bool {
 	return reload != nil && reload.AutoTrigger != nil
 }
 
-func FromReloadTypeConfig(reloadOptions *appsv1alpha1.ReloadOptions) appsv1alpha1.CfgReloadType {
+func FromReloadTypeConfig(reloadOptions *appsv1alpha1.ReloadOptions) v1.CfgReloadType {
 	switch {
 	case reloadOptions.UnixSignalTrigger != nil:
-		return appsv1alpha1.UnixSignalType
+		return v1.UnixSignalType
 	case reloadOptions.ShellTrigger != nil:
-		return appsv1alpha1.ShellType
+		return v1.ShellType
 	case reloadOptions.TPLScriptTrigger != nil:
-		return appsv1alpha1.TPLScriptType
+		return v1.TPLScriptType
 	case reloadOptions.AutoTrigger != nil:
-		return appsv1alpha1.AutoType
+		return v1.AutoType
 	}
 	return ""
 }
@@ -189,7 +190,7 @@ func FilterSubPathVolumeMount(metas []ConfigSpecMeta, volumes []corev1.VolumeMou
 	var filtered []ConfigSpecMeta
 	for _, meta := range metas {
 		v := FindVolumeMount(volumes, meta.ConfigSpec.VolumeName)
-		if v == nil || v.SubPath == "" || meta.ReloadType == appsv1alpha1.TPLScriptType {
+		if v == nil || v.SubPath == "" || meta.ReloadType == v1.TPLScriptType {
 			filtered = append(filtered, meta)
 		}
 	}

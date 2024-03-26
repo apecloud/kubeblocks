@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -135,7 +136,7 @@ func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1alpha1.C
 	for _, key := range parameters {
 		if key.UpdateType == core.UpdatedType {
 			for _, p := range key.Parameters {
-				if dynamicAction && selectedPolicy == appsv1alpha1.SelectedDynamicParameters && !core.IsDynamicParameter(p.Key, cc) {
+				if dynamicAction && selectedPolicy == v1.SelectedDynamicParameters && !core.IsDynamicParameter(p.Key, cc) {
 					continue
 				}
 				if p.Value != nil {

@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -366,10 +367,10 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 }
 
 func validateConfigConstraintStatus(ccStatus appsv1alpha1.ConfigConstraintStatus) bool {
-	return ccStatus.Phase == appsv1alpha1.CCAvailablePhase
+	return ccStatus.Phase == v1.CCAvailablePhase
 }
 
-func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx, configConstraint *appsv1alpha1.ConfigConstraint, phase appsv1alpha1.ConfigConstraintPhase) error {
+func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx, configConstraint *appsv1alpha1.ConfigConstraint, phase v1.ConfigConstraintPhase) error {
 	patch := client.MergeFrom(configConstraint.DeepCopy())
 	configConstraint.Status.Phase = phase
 	configConstraint.Status.ObservedGeneration = configConstraint.Generation

@@ -31,6 +31,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -47,7 +48,7 @@ type configVolumeHandleMeta struct {
 	ConfigHandler
 
 	mountPoint []string
-	reloadType appsv1alpha1.CfgReloadType
+	reloadType v1.CfgReloadType
 	configSpec appsv1alpha1.ComponentTemplateSpec
 
 	formatterConfig *appsv1alpha1.FormatterConfig
@@ -152,7 +153,7 @@ func (u *unixSignalHandler) MountPoint() []string {
 	return []string{u.mountPoint}
 }
 
-func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string, mountPoint string) (ConfigHandler, error) {
+func CreateSignalHandler(sig v1.SignalType, processName string, mountPoint string) (ConfigHandler, error) {
 	signal, ok := allUnixSignals[sig]
 	if !ok {
 		err := cfgcore.MakeError("not supported unix signal: %s", sig)
@@ -366,7 +367,7 @@ func (s *shellCommandHandler) isDownwardAPITrigger() bool {
 	return s.downwardAPITrigger
 }
 
-func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgReloadType, mountPoint []string, formatterConfig *appsv1alpha1.FormatterConfig) configVolumeHandleMeta {
+func createConfigVolumeMeta(configSpecName string, reloadType v1.CfgReloadType, mountPoint []string, formatterConfig *appsv1alpha1.FormatterConfig) configVolumeHandleMeta {
 	return configVolumeHandleMeta{
 		reloadType: reloadType,
 		mountPoint: mountPoint,
@@ -426,7 +427,7 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		// for downward api watch
 		downwardAPIMountPoint:  cfgutil.ToSet(handler).AsSlice(),
 		downwardAPIHandler:     handler,
-		configVolumeHandleMeta: createConfigVolumeMeta(configMeta.ConfigSpec.Name, appsv1alpha1.ShellType, []string{mountPoint}, formatterConfig),
+		configVolumeHandleMeta: createConfigVolumeMeta(configMeta.ConfigSpec.Name, v1.ShellType, []string{mountPoint}, formatterConfig),
 		isBatchReload:          isBatchReload(configMeta),
 		batchInputTemplate:     getBatchInputTemplate(configMeta),
 	}
@@ -532,7 +533,7 @@ func CreateTPLScriptHandler(name, configPath string, dirs []string, backupPath s
 		return nil, err
 	}
 	tplHandler := &tplScriptHandler{
-		configVolumeHandleMeta: createConfigVolumeMeta(name, appsv1alpha1.TPLScriptType, dirs, &tplConfig.FormatterConfig),
+		configVolumeHandleMeta: createConfigVolumeMeta(name, v1.TPLScriptType, dirs, &tplConfig.FormatterConfig),
 		tplContent:             string(tplContent),
 		tplScripts:             tplScripts,
 		fileFilter:             filter,
@@ -587,11 +588,11 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		switch configMeta.ReloadType {
 		default:
 			return nil, fmt.Errorf("not support reload type: %s", configMeta.ReloadType)
-		case appsv1alpha1.ShellType:
+		case v1.ShellType:
 			h, err = shellHandler(configMeta, tmpPath)
-		case appsv1alpha1.UnixSignalType:
+		case v1.UnixSignalType:
 			h, err = signalHandler(configMeta.ReloadOptions.UnixSignalTrigger, configMeta.MountPoint)
-		case appsv1alpha1.TPLScriptType:
+		case v1.TPLScriptType:
 			h, err = tplHandler(configMeta.ReloadOptions.TPLScriptTrigger, configMeta, tmpPath)
 		}
 		if err != nil {

@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 )
@@ -72,7 +73,7 @@ func TestConfigMapConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: appsv1alpha1.Ini,
+		CfgType: v1.Ini,
 		ConfigResource: &ConfigResource{
 			CfgKey: client.ObjectKey{
 				Name:      "xxxx",    // set cm name
@@ -205,7 +206,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				IsModify:     true,
 				UpdateConfig: map[string][]byte{"key": testUpdatedParams}},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.Ini,
+				Format: v1.Ini,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
@@ -234,7 +235,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				AddConfig: map[string]interface{}{"key": testJSON},
 			},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.Ini,
+				Format: v1.Ini,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
@@ -260,7 +261,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				DeleteConfig: map[string]interface{}{"key": testJSON},
 			},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.Ini,
+				Format: v1.Ini,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},

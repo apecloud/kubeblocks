@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -98,9 +99,9 @@ func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecM
 				continue
 			}
 			switch param.ReloadType {
-			case appsv1alpha1.TPLScriptType:
+			case v1.TPLScriptType:
 				return core.IsWatchModuleForTplTrigger(param.ReloadOptions.TPLScriptTrigger)
-			case appsv1alpha1.ShellType:
+			case v1.ShellType:
 				return core.IsWatchModuleForShellTrigger(param.ReloadOptions.ShellTrigger)
 			default:
 				return true
@@ -259,7 +260,7 @@ func buildConfigSpecHandleMeta(cli client.Client, ctx context.Context, buildPara
 			return err
 		}
 	}
-	if buildParam.ReloadType == appsv1alpha1.TPLScriptType {
+	if buildParam.ReloadType == v1.TPLScriptType {
 		return buildTPLScriptCM(buildParam, cmBuildParam, cli, ctx)
 	}
 	return nil

@@ -31,6 +31,7 @@ import (
 	"strings"
 	"text/template/parse"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -305,7 +306,7 @@ func NeedSharedProcessNamespace(configSpecs []ConfigSpecMeta) bool {
 		if configSpec.ConfigSpec.ConfigConstraintRef == "" {
 			continue
 		}
-		if configSpec.ReloadType == appsv1alpha1.UnixSignalType {
+		if configSpec.ReloadType == v1.UnixSignalType {
 			return true
 		}
 	}

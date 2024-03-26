@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -298,7 +299,7 @@ func TestValidateConfigPatch(t *testing.T) {
 		name: "test",
 		args: args{
 			patch:     &ConfigPatchInfo{},
-			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+			formatCfg: &appsv1alpha1.FormatterConfig{Format: v1.YAML},
 		},
 		wantErr: false,
 	}, {
@@ -310,7 +311,7 @@ func TestValidateConfigPatch(t *testing.T) {
 					"file1": []byte(`{"a":"b"}`),
 				},
 			},
-			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+			formatCfg: &appsv1alpha1.FormatterConfig{Format: v1.YAML},
 		},
 		wantErr: false,
 	}, {
@@ -322,7 +323,7 @@ func TestValidateConfigPatch(t *testing.T) {
 					"file1": []byte(`{"a":null}`),
 				},
 			},
-			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+			formatCfg: &appsv1alpha1.FormatterConfig{Format: v1.YAML},
 		},
 		wantErr: true,
 	}}

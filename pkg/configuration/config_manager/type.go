@@ -24,6 +24,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
@@ -36,7 +37,7 @@ type ConfigHandler interface {
 type ConfigSpecInfo struct {
 	*appsv1alpha1.ReloadOptions `json:",inline"`
 
-	ReloadType      appsv1alpha1.CfgReloadType       `json:"reloadType"`
+	ReloadType      v1.CfgReloadType                 `json:"reloadType"`
 	ConfigSpec      appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
 	FormatterConfig appsv1alpha1.FormatterConfig     `json:"formatterConfig"`
 

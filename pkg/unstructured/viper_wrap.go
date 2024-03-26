@@ -29,7 +29,7 @@ import (
 	oviper "github.com/spf13/viper"
 	"gopkg.in/ini.v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type viperWrap struct {

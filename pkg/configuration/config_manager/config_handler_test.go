@@ -36,6 +36,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -81,7 +82,7 @@ var _ = Describe("Config Handler Test", func() {
 					SectionName: "test",
 				},
 			},
-			Format: appsv1alpha1.Ini,
+			Format: v1.Ini,
 		}
 	}
 
@@ -90,9 +91,9 @@ var _ = Describe("Config Handler Test", func() {
 			ReloadOptions: &appsv1alpha1.ReloadOptions{
 				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
 					ProcessName: findCurrProcName(),
-					Signal:      appsv1alpha1.SIGHUP,
+					Signal:      v1.SIGHUP,
 				}},
-			ReloadType: appsv1alpha1.UnixSignalType,
+			ReloadType: v1.UnixSignalType,
 			MountPoint: "/tmp/test",
 			ConfigSpec: newConfigSpec(),
 		}
@@ -120,7 +121,7 @@ var _ = Describe("Config Handler Test", func() {
 					Command: []string{"sh", "-c", `echo "hello world" "$@"`},
 				},
 			},
-			ReloadType:         appsv1alpha1.ShellType,
+			ReloadType:         v1.ShellType,
 			MountPoint:         tmpWorkDir,
 			ConfigSpec:         newConfigSpec(),
 			FormatterConfig:    newFormatter(),
@@ -133,7 +134,7 @@ var _ = Describe("Config Handler Test", func() {
 			ReloadOptions: &appsv1alpha1.ReloadOptions{
 				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{},
 			},
-			ReloadType:      appsv1alpha1.TPLScriptType,
+			ReloadType:      v1.TPLScriptType,
 			MountPoint:      "/tmp/test",
 			ConfigSpec:      newConfigSpec(),
 			FormatterConfig: newFormatter(),
@@ -162,7 +163,7 @@ var _ = Describe("Config Handler Test", func() {
 
 	Context("TestSimpleHandler", func() {
 		It("CreateSignalHandler", func() {
-			_, err := CreateSignalHandler(appsv1alpha1.SIGALRM, "test", "")
+			_, err := CreateSignalHandler(v1.SIGALRM, "test", "")
 			Expect(err).Should(Succeed())
 			_, err = CreateSignalHandler("NOSIGNAL", "test", "")
 			Expect(err.Error()).To(ContainSubstring("not supported unix signal: NOSIGNAL"))
@@ -272,7 +273,7 @@ var _ = Describe("Config Handler Test", func() {
 						ShellTrigger: &appsv1alpha1.ShellTrigger{
 							Command: []string{"sh", "-c", `echo "hello world" "$@"`, "sh"},
 						}},
-					ReloadType:      appsv1alpha1.ShellType,
+					ReloadType:      v1.ShellType,
 					MountPoint:      configPath,
 					ConfigSpec:      newConfigSpec(),
 					FormatterConfig: newFormatter(),
@@ -290,7 +291,7 @@ var _ = Describe("Config Handler Test", func() {
 								},
 								BatchReload: &isBatchReload,
 							}},
-						ReloadType:      appsv1alpha1.ShellType,
+						ReloadType:      v1.ShellType,
 						MountPoint:      configPath,
 						ConfigSpec:      newConfigSpec(),
 						FormatterConfig: newFormatter(),
@@ -310,7 +311,7 @@ var _ = Describe("Config Handler Test", func() {
 								BatchReload:        &isBatchReload,
 								BatchInputTemplate: customBatchInputTemplate,
 							}},
-						ReloadType:      appsv1alpha1.ShellType,
+						ReloadType:      v1.ShellType,
 						MountPoint:      configPath,
 						ConfigSpec:      newConfigSpec(),
 						FormatterConfig: newFormatter(),

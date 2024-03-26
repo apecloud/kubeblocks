@@ -19,7 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package v1alpha1
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
+)
 
 // MarshalJSON implements the Marshaler interface.
 func (c *Payload) MarshalJSON() ([]byte, error) {
@@ -61,11 +65,11 @@ func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
 	return false
 }
 
-func (in *ConfigConstraintSpec) DynamicParametersPolicy() DynamicParameterSelectedPolicy {
+func (in *ConfigConstraintSpec) DynamicParametersPolicy() v1.DynamicParameterSelectedPolicy {
 	if in.DynamicParameterSelectedPolicy != nil {
 		return *in.DynamicParameterSelectedPolicy
 	}
-	return SelectedDynamicParameters
+	return v1.SelectedDynamicParameters
 }
 
 func (configuration *ConfigurationSpec) GetConfigurationItem(name string) *ConfigurationItemDetail {

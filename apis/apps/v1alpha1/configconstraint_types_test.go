@@ -23,11 +23,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 func TestConfigConstraintStatus_IsConfigConstraintTerminalPhases(t *testing.T) {
 	type fields struct {
-		Phase              ConfigConstraintPhase
+		Phase              v1.ConfigConstraintPhase
 		Message            string
 		ObservedGeneration int64
 	}
@@ -38,19 +40,19 @@ func TestConfigConstraintStatus_IsConfigConstraintTerminalPhases(t *testing.T) {
 	}{{
 		name: "available phase test",
 		fields: fields{
-			Phase: CCAvailablePhase,
+			Phase: v1.CCAvailablePhase,
 		},
 		want: true,
 	}, {
 		name: "available phase test",
 		fields: fields{
-			Phase: CCUnavailablePhase,
+			Phase: v1.CCUnavailablePhase,
 		},
 		want: false,
 	}, {
 		name: "available phase test",
 		fields: fields{
-			Phase: CCDeletingPhase,
+			Phase: v1.CCDeletingPhase,
 		},
 		want: false,
 	}}

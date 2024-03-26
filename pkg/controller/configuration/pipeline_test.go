@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -120,7 +121,7 @@ max_connections = '1000'
 			},
 			Spec: appsv1alpha1.ConfigConstraintSpec{
 				FormatterConfig: &appsv1alpha1.FormatterConfig{
-					Format: appsv1alpha1.Properties,
+					Format: v1.Properties,
 				},
 			}}
 	})
@@ -165,7 +166,7 @@ max_connections = '1000'
 
 			err := createPipeline.Prepare().
 				UpdateConfiguration(). // reconcile Configuration
-				Configuration().       // sync Configuration
+				Configuration(). // sync Configuration
 				CreateConfigTemplate().
 				UpdatePodVolumes().
 				BuildConfigManagerSidecar().

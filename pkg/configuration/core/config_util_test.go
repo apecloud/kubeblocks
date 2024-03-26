@@ -29,6 +29,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -207,7 +208,7 @@ test=test`),
 				"max_connections": "600",
 			},
 			formatConfig: &v1alpha1.FormatterConfig{
-				Format: v1alpha1.Ini,
+				Format: v1.Ini,
 				FormatterOptions: v1alpha1.FormatterOptions{
 					IniConfig: &v1alpha1.IniConfig{
 						SectionName: "test",
@@ -228,7 +229,7 @@ test=test
 				"c": "d e f g",
 			},
 			formatConfig: &v1alpha1.FormatterConfig{
-				Format: v1alpha1.RedisCfg,
+				Format: v1.RedisCfg,
 			},
 		},
 		want:    "a b\nc d e f g",
@@ -242,7 +243,7 @@ test=test
 				"HUGGINGFACE_APIKEY": "kssdlsdjskwssl",
 			},
 			formatConfig: &v1alpha1.FormatterConfig{
-				Format: v1alpha1.Dotenv,
+				Format: v1.Dotenv,
 			},
 		},
 		// fix begin

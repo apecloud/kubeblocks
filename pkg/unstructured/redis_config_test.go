@@ -26,7 +26,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 

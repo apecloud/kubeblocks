@@ -26,7 +26,7 @@ import (
 	mxjv2 "github.com/clbanning/mxj/v2"
 	"github.com/spf13/cast"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type xmlConfig struct {

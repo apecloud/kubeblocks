@@ -25,7 +25,7 @@ import (
 	"os"
 	"syscall"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 var allUnixSignals = map[appsv1alpha1.SignalType]os.Signal{

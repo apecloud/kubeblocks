@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -115,7 +116,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 	Context("clusterdefinition CR test", func() {
 		It("Should success without error", func() {
 			availableTPL := configConstraintObj.DeepCopy()
-			availableTPL.Status.Phase = appsv1alpha1.CCAvailablePhase
+			availableTPL.Status.Phase = v1.CCAvailablePhase
 
 			k8sMockClient.MockPatchMethod(testutil.WithSucceed())
 			k8sMockClient.MockListMethod(testutil.WithSucceed())
@@ -187,7 +188,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			Expect(err).Should(Succeed())
 
 			availableTPL := configConstraintObj.DeepCopy()
-			availableTPL.Status.Phase = appsv1alpha1.CCAvailablePhase
+			availableTPL.Status.Phase = v1.CCAvailablePhase
 
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSequenceResult(
 				map[client.ObjectKey][]testutil.MockGetReturned{
@@ -230,7 +231,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 		It("Should success without error", func() {
 			updateAVTemplates()
 			availableTPL := configConstraintObj.DeepCopy()
-			availableTPL.Status.Phase = appsv1alpha1.CCAvailablePhase
+			availableTPL.Status.Phase = v1.CCAvailablePhase
 
 			k8sMockClient.MockPatchMethod(testutil.WithSucceed())
 			k8sMockClient.MockListMethod(testutil.WithSucceed())

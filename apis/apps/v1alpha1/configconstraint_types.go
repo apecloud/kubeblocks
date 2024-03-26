@@ -20,6 +20,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // ConfigConstraintSpec defines the desired state of ConfigConstraint
@@ -43,7 +45,7 @@ type ConfigConstraintSpec struct {
 	// Specifies the policy for selecting the parameters of dynamic reload actions.
 	//
 	// +optional
-	DynamicParameterSelectedPolicy *DynamicParameterSelectedPolicy `json:"dynamicParameterSelectedPolicy,omitempty"`
+	DynamicParameterSelectedPolicy *v1.DynamicParameterSelectedPolicy `json:"dynamicParameterSelectedPolicy,omitempty"`
 
 	// Tools used by the dynamic reload actions.
 	// Usually it is referenced by the 'init container' for 'cp' it to a binary volume.
@@ -125,7 +127,7 @@ type ConfigConstraintStatus struct {
 	// When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.
 	//
 	// +optional
-	Phase ConfigConstraintPhase `json:"phase,omitempty"`
+	Phase v1.ConfigConstraintPhase `json:"phase,omitempty"`
 
 	// Provides descriptions for abnormal states.
 	//
@@ -139,7 +141,7 @@ type ConfigConstraintStatus struct {
 }
 
 func (cs ConfigConstraintStatus) IsConfigConstraintTerminalPhases() bool {
-	return cs.Phase == CCAvailablePhase
+	return cs.Phase == v1.CCAvailablePhase
 }
 
 type CustomParametersValidation struct {
@@ -187,7 +189,7 @@ type UnixSignalTrigger struct {
 	// Refer to the following URL for a list of all Unix signals: ../../pkg/configuration/configmap/handler.go:allUnixSignals
 	//
 	// +kubebuilder:validation:Required
-	Signal SignalType `json:"signal"`
+	Signal v1.SignalType `json:"signal"`
 
 	// Represents the name of the process that the Unix signal sent to.
 	//
@@ -389,7 +391,7 @@ type FormatterConfig struct {
 	// - props-plus: a file extension mainly used in Java, supports CamelCase(e.g: brokerMaxConnectionsPerIp)
 	//
 	// +kubebuilder:validation:Required
-	Format CfgFileFormat `json:"format"`
+	Format v1.CfgFileFormat `json:"format"`
 }
 
 // Encapsulates the unique options for a configuration file.

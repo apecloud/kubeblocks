@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -316,7 +317,7 @@ var _ = Describe("config_util", func() {
 						}
 					}
 					cc.Spec.FormatterConfig = &v1alpha1.FormatterConfig{
-						Format: v1alpha1.Properties,
+						Format: v1.Properties,
 					}
 				})
 

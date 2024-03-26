@@ -25,13 +25,14 @@ import (
 	"github.com/StudioSol/set"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
 
 // CreateConfigPatch creates a patch for configuration files with different version.
-func CreateConfigPatch(oldVersion, newVersion map[string]string, format appsv1alpha1.CfgFileFormat, keys []string, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
+func CreateConfigPatch(oldVersion, newVersion map[string]string, format v1.CfgFileFormat, keys []string, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
 	var hasFilesUpdated = false
 
 	if comparableAllFiles && len(keys) > 0 {

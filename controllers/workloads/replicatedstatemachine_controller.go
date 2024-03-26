@@ -193,6 +193,7 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 			Watches(&batchv1.Job{}, jobHandler).
 			Watches(&corev1.Pod{}, stsPodHandler).
 			Owns(&corev1.Pod{}).
+			Owns(&corev1.PersistentVolumeClaim{}).
 			Complete(r)
 	}
 
@@ -208,5 +209,6 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Owns(&batchv1.Job{}).
 		Watches(&corev1.Pod{}, podHandler).
 		Owns(&corev1.Pod{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
 }

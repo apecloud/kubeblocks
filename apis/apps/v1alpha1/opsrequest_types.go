@@ -136,6 +136,15 @@ type OpsRequestSpec struct {
 	// +optional
 	ScriptSpec *ScriptSpec `json:"scriptSpec,omitempty"`
 
+	// Specifies the instances that require re-creation.
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.rebuildFrom"
+	RebuildFrom []RebuildInstance `json:"rebuildFrom,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
 	// Defines how to backup the cluster.
 	// +optional
 	BackupSpec *BackupSpec `json:"backupSpec,omitempty"`
@@ -155,6 +164,29 @@ type ComponentOps struct {
 	// Specifies the name of the cluster component.
 	// +kubebuilder:validation:Required
 	ComponentName string `json:"componentName"`
+}
+
+type RebuildInstance struct {
+	ComponentOps `json:",inline"`
+
+	// Defines the names of the instances that need to be rebuilt. These are essentially the names of the pods.
+	// +kubebuilder:validation:Required
+	InstanceNames []string `json:"instanceNames"`
+
+	// Indicates the name of the backup from which to recover. Currently, only a full physical backup is supported
+	// unless your component only has one replica. Such as 'xtrabackup' is full physical backup for mysql and 'mysqldump' is not.
+	// And if no specified backupName, the instance will be recreated with empty 'PersistentVolumes'.
+	// +optional
+	BackupName string `json:"backupName,omitempty"`
+
+	// List of environment variables to set in the container for restore. These will be
+	// merged with the env of Backup and ActionSet.
+	//
+	// The priority of merging is as follows: `Restore env > Backup env > ActionSet env`.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	EnvForRestore []corev1.EnvVar `json:"envForRestore,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 type Switchover struct {

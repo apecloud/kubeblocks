@@ -42,6 +42,7 @@ const (
 	ConditionTypeExpose             = "Exposing"
 	ConditionTypeDataScript         = "ExecuteDataScript"
 	ConditionTypeBackup             = "Backup"
+	ConditionTypeInstanceRebuilding = "InstancesRebuilding"
 	ConditionTypeCustomOperation    = "CustomOperation"
 
 	// condition and event reasons
@@ -176,6 +177,17 @@ func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 		Reason:             "RestartStarted",
 		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to restart database in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewInstancesRebuildingCondition creates a condition that the operation starts to rebuild the instances.
+func NewInstancesRebuildingCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeInstanceRebuilding,
+		Status:             metav1.ConditionTrue,
+		Reason:             "StartToRebuildInstances",
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf("Start to rebuild the instances in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 

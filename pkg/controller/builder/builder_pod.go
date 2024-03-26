@@ -95,3 +95,13 @@ func (builder *PodBuilder) SetNodeSelector(nodeSelector map[string]string) *PodB
 	builder.get().Spec.NodeSelector = nodeSelector
 	return builder
 }
+
+func (builder *PodBuilder) SetAffinity(affinity *corev1.Affinity) *PodBuilder {
+	builder.get().Spec.Affinity = affinity
+	return builder
+}
+
+func (builder *PodBuilder) SetTopologySpreadConstraints(topologySpreadConstraints []corev1.TopologySpreadConstraint) *PodBuilder {
+	builder.get().Spec.TopologySpreadConstraints = topologySpreadConstraints
+	return builder
+}

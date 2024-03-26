@@ -95,6 +95,8 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&workloadsv1alpha1.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.parseFirstOpsRequestForRSM)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
+		Owns(&dpv1alpha1.Restore{}).
 		Owns(&batchv1.Job{}).
 		Complete(r)
 }
@@ -352,6 +354,24 @@ func (r *OpsRequestReconciler) parseFirstOpsRequestForRSM(ctx context.Context, o
 		return nil
 	}
 	return r.getFirstRequestsFromCluster(cluster)
+}
+
+func (r *OpsRequestReconciler) parsePod(ctx context.Context, object client.Object) []reconcile.Request {
+	pod := object.(*corev1.Pod)
+	var (
+		requests []reconcile.Request
+	)
+	opsName := pod.Labels[constant.OpsRequestNameLabelKey]
+	opsNamespace := pod.Labels[constant.OpsRequestNamespaceLabelKey]
+	if opsName != "" && opsNamespace != "" {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: opsNamespace,
+				Name:      opsName,
+			},
+		})
+	}
+	return requests
 }
 
 func (r *OpsRequestReconciler) parseVolumeExpansionOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {

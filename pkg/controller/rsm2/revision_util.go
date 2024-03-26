@@ -27,7 +27,6 @@ import (
 	"hash/fnv"
 	"strconv"
 
-	"github.com/klauspost/compress/zstd"
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -171,11 +170,6 @@ func getUpdateRevisions(revisions map[string]string) (map[string]string, error) 
 	if err != nil {
 		return nil, err
 	}
-	reader, err := zstd.NewReader(nil)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
 	revisionsJSON, err := reader.DecodeAll(revisionsData, nil)
 	if err != nil {
 		return nil, err
@@ -192,11 +186,6 @@ func buildUpdateRevisions(updateRevisions map[string]string) (map[string]string,
 	if err != nil {
 		return nil, err
 	}
-	writer, err := zstd.NewWriter(nil)
-	if err != nil {
-		return nil, err
-	}
-	defer writer.Close()
 	revisionsData := writer.EncodeAll(revisionsJSON, nil)
 	revisionsStr := base64.StdEncoding.EncodeToString(revisionsData)
 	return map[string]string{revisionsZSTDKey: revisionsStr}, nil

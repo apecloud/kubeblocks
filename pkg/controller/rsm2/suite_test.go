@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/klauspost/compress/zstd"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,11 +137,6 @@ func mockCompressedInstanceTemplates(ns, name string) (*corev1.ConfigMap, string
 	if err != nil {
 		return nil, "", err
 	}
-	writer, err := zstd.NewWriter(nil)
-	if err != nil {
-		return nil, "", err
-	}
-	defer writer.Close()
 	templateData := writer.EncodeAll(templateByte, nil)
 	templateName := fmt.Sprintf("template-ref-%s", name)
 	templateObj := builder.NewConfigMapBuilder(ns, templateName).

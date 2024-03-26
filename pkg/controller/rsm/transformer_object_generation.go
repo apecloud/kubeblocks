@@ -716,7 +716,8 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	strReplicas := strconv.Itoa(int(*set.Spec.Replicas))
 	generateReplicaEnv := func(prefix string) {
 		// avoid to build too many envs
-		maxEnv := 64
+		// TODO(free6om): don't hard code
+		maxEnv := 128
 		for i := 0; i < int(*set.Spec.Replicas) && i < maxEnv; i++ {
 			hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
 			hostNameTplValue := set.Name + "-" + strconv.Itoa(i)

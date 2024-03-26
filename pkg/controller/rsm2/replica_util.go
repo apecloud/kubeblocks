@@ -22,6 +22,7 @@ package rsm2
 import (
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"reflect"
 	"regexp"
 	"sort"
@@ -56,6 +57,19 @@ type replica struct {
 }
 
 var replicaNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+
+var (
+	reader *zstd.Decoder
+	writer *zstd.Encoder
+)
+
+func init() {
+	var err error
+	reader, err = zstd.NewReader(nil)
+	runtime.Must(err)
+	writer, err = zstd.NewWriter(nil)
+	runtime.Must(err)
+}
 
 func parseParentNameAndOrdinal(s string) (string, int) {
 	parent := s
@@ -524,11 +538,6 @@ func getInstanceTemplates(rsm *workloads.ReplicatedStateMachine, tree *kubebuild
 	if !ok {
 		return nil
 	}
-	reader, err := zstd.NewReader(nil)
-	if err != nil {
-		return nil
-	}
-	defer reader.Close()
 	templateByte, err := reader.DecodeAll(templateData, nil)
 	if err != nil {
 		return nil

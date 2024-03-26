@@ -80,7 +80,11 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	oldSnapshot := make(map[model.GVKNObjKey]client.Object)
 	svcList := tree.List(&corev1.Service{})
 	cmList := tree.List(&corev1.ConfigMap{})
-	for _, objectList := range [][]client.Object{svcList, cmList} {
+	cmListFiltered, err := filterTemplate(cmList, rsm.Annotations)
+	if err != nil {
+		return nil, err
+	}
+	for _, objectList := range [][]client.Object{svcList, cmListFiltered} {
 		for _, object := range objectList {
 			name, err := model.GetGVKName(object)
 			if err != nil {
@@ -114,6 +118,29 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 		}
 	}
 	return tree, nil
+}
+
+func filterTemplate(cmList []client.Object, annotations map[string]string) ([]client.Object, error) {
+	templateMap, err := getInstanceTemplateMap(annotations)
+	if err != nil {
+		return nil, err
+	}
+	isTemplate := func(cm client.Object) bool {
+		for _, name := range templateMap {
+			if name == cm.GetName() {
+				return true
+			}
+		}
+		return false
+	}
+	var cmListFiltered []client.Object
+	for _, cm := range cmList {
+		if isTemplate(cm) {
+			continue
+		}
+		cmListFiltered = append(cmListFiltered, cm)
+	}
+	return cmListFiltered, nil
 }
 
 var _ kubebuilderx.Reconciler = &assistantObjectReconciler{}

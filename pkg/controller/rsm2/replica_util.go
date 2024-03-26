@@ -20,14 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/klauspost/compress/zstd"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -35,6 +40,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
@@ -50,6 +56,35 @@ type replica struct {
 	pvcs []*corev1.PersistentVolumeClaim
 }
 
+var replicaNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+
+var (
+	reader *zstd.Decoder
+	writer *zstd.Encoder
+)
+
+func init() {
+	var err error
+	reader, err = zstd.NewReader(nil)
+	runtime.Must(err)
+	writer, err = zstd.NewWriter(nil)
+	runtime.Must(err)
+}
+
+func parseParentNameAndOrdinal(s string) (string, int) {
+	parent := s
+	ordinal := -1
+	subMatches := replicaNameRegex.FindStringSubmatch(s)
+	if len(subMatches) < 3 {
+		return parent, ordinal
+	}
+	parent = subMatches[1]
+	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
+		ordinal = int(i)
+	}
+	return parent, ordinal
+}
+
 // sortObjects sorts objects by their role priority and name
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
 // reverse it if reverse==true
@@ -58,13 +93,13 @@ func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, r
 		role := strings.ToLower(objects[i].GetLabels()[constant.RoleLabelKey])
 		return rolePriorityMap[role]
 	}
-	getNameFunc := func(i int) string {
-		return objects[i].GetName()
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return parseParentNameAndOrdinal(objects[i].GetName())
 	}
-	baseSort(objects, getNameFunc, getRolePriorityFunc, reverse)
+	baseSort(objects, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }
 
-func baseSort(x any, getNameFunc func(i int) string, getRolePriorityFunc func(i int) int, reverse bool) {
+func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePriorityFunc func(i int) int, reverse bool) {
 	if getRolePriorityFunc == nil {
 		getRolePriorityFunc = func(_ int) int {
 			return 0
@@ -76,12 +111,15 @@ func baseSort(x any, getNameFunc func(i int) string, getRolePriorityFunc func(i 
 		}
 		rolePriI := getRolePriorityFunc(i)
 		rolePriJ := getRolePriorityFunc(j)
-		if rolePriI == rolePriJ {
-			ordinal1 := getNameFunc(i)
-			ordinal2 := getNameFunc(j)
-			return ordinal1 < ordinal2
+		if rolePriI != rolePriJ {
+			return rolePriI < rolePriJ
 		}
-		return rolePriI < rolePriJ
+		name1, ordinal1 := getNameNOrdinalFunc(i)
+		name2, ordinal2 := getNameNOrdinalFunc(j)
+		if name1 != name2 {
+			return name1 < name2
+		}
+		return ordinal1 < ordinal2
 	})
 }
 
@@ -142,8 +180,8 @@ func validateDupReplicaNames[T any](replicas []T, getNameFunc func(item T) strin
 	return nil
 }
 
-func buildReplicaName2TemplateMap(rsm *workloads.ReplicatedStateMachine) (map[string]*podTemplateSpecExt, error) {
-	replicaTemplateGroups := buildReplicaTemplateGroups(rsm)
+func buildReplicaName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (map[string]*podTemplateSpecExt, error) {
+	replicaTemplateGroups := buildReplicaTemplateGroups(rsm, tree)
 	nameTemplateMap := make(map[string]*podTemplateSpecExt)
 	var (
 		replicaNameList []string
@@ -342,10 +380,11 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func validateSpec(rsm *workloads.ReplicatedStateMachine) error {
+func validateSpec(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) error {
 	replicasInTemplates := int32(0)
 	var names string
-	for _, instance := range rsm.Spec.Instances {
+	instanceTemplates := getInstanceTemplates(rsm, tree)
+	for _, instance := range instanceTemplates {
 		replicas := int32(1)
 		if instance.Replicas != nil {
 			replicas = *instance.Replicas
@@ -387,7 +426,7 @@ func buildPodTemplateRevision(template *podTemplateSpecExt, parent *workloads.Re
 	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
-func buildReplicaTemplateGroups(rsm *workloads.ReplicatedStateMachine) map[string][]*podTemplateSpecExt {
+func buildReplicaTemplateGroups(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) map[string][]*podTemplateSpecExt {
 	var podTemplates []*podTemplateSpecExt
 	var replicasInTemplates int32
 	envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
@@ -403,7 +442,8 @@ func buildReplicaTemplateGroups(rsm *workloads.ReplicatedStateMachine) map[strin
 			VolumeClaimTemplates: claims,
 		}
 	}
-	for _, instance := range rsm.Spec.Instances {
+	instanceTemplates := getInstanceTemplates(rsm, tree)
+	for _, instance := range instanceTemplates {
 		replicas := int32(1)
 		if instance.Replicas != nil {
 			replicas = *instance.Replicas
@@ -438,6 +478,77 @@ func buildReplicaTemplateGroups(rsm *workloads.ReplicatedStateMachine) map[strin
 	}
 
 	return replicaTemplateGroups
+}
+
+func getInstanceTemplateMap(annotations map[string]string) (map[string]string, error) {
+	if annotations == nil {
+		return nil, nil
+	}
+	templateRef, ok := annotations[templateRefAnnotationKey]
+	if !ok {
+		return nil, nil
+	}
+	templateMap := make(map[string]string)
+	if err := json.Unmarshal([]byte(templateRef), &templateMap); err != nil {
+		return nil, err
+	}
+	return templateMap, nil
+}
+
+func getInstanceTemplates(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) []workloads.InstanceTemplate {
+	if tree == nil {
+		return rsm.Spec.Instances
+	}
+	templateMap, err := getInstanceTemplateMap(rsm.Annotations)
+	// error has been checked in prepare stage, there should be no error occurs
+	if err != nil {
+		return nil
+	}
+	findTemplate := func() (*corev1.ConfigMap, error) {
+		for name, templateName := range templateMap {
+			if name != rsm.Name {
+				continue
+			}
+			// find the compressed instance templates, parse them
+			template := builder.NewConfigMapBuilder(rsm.Namespace, templateName).GetObject()
+			templateObj, err := tree.Get(template)
+			if err != nil {
+				return nil, err
+			}
+			template, _ = templateObj.(*corev1.ConfigMap)
+			return template, nil
+		}
+		return nil, nil
+	}
+
+	template, err := findTemplate()
+	// error should not occur as has been checked in tree load stage.
+	if err != nil {
+		return nil
+	}
+	if template == nil {
+		return rsm.Spec.Instances
+	}
+
+	// if template is found with incorrect format, try it as the whole templates is corrupted.
+	if template.BinaryData == nil {
+		return nil
+	}
+	templateData, ok := template.BinaryData[templateRefDataKey]
+	if !ok {
+		return nil
+	}
+	templateByte, err := reader.DecodeAll(templateData, nil)
+	if err != nil {
+		return nil
+	}
+	extraTemplates := make([]workloads.InstanceTemplate, 0)
+	err = json.Unmarshal(templateByte, &extraTemplates)
+	if err != nil {
+		return nil
+	}
+
+	return append(rsm.Spec.Instances, extraTemplates...)
 }
 
 func applyInstanceTemplate(instance workloads.InstanceTemplate, template *podTemplateSpecExt) {

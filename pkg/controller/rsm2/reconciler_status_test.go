@@ -133,10 +133,12 @@ var _ = Describe("status reconciler test", func() {
 			Expect(rsm.Status.CurrentGeneration).Should(BeEquivalentTo(rsm.Generation))
 
 			By("make all pods available with latest revision")
+			updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+			Expect(err).Should(BeNil())
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
-				makePodAvailableWithOldRevision(pod, rsm.Status.UpdateRevisions[pod.Name])
+				makePodAvailableWithOldRevision(pod, updateRevisions[pod.Name])
 			}
 			_, err = reconciler.Reconcile(newTree)
 			Expect(err).Should(BeNil())

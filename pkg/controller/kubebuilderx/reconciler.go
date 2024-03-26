@@ -42,7 +42,7 @@ type ObjectTree struct {
 }
 
 type TreeLoader interface {
-	Read(context.Context, client.Reader, ctrl.Request, record.EventRecorder, logr.Logger) (*ObjectTree, error)
+	Load(context.Context, client.Reader, ctrl.Request, record.EventRecorder, logr.Logger) (*ObjectTree, error)
 }
 
 type CheckResult struct {

@@ -130,7 +130,9 @@ var _ = Describe("update reconciler test", func() {
 				if labels == nil {
 					labels = make(map[string]string)
 				}
-				labels[appsv1.ControllerRevisionHashLabelKey] = rsm.Status.UpdateRevisions[pod.Name]
+				updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+				Expect(err).Should(BeNil())
+				labels[appsv1.ControllerRevisionHashLabelKey] = updateRevisions[pod.Name]
 			}
 			reconciler = NewUpdateReconciler()
 

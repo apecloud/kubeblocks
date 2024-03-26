@@ -181,3 +181,8 @@ func (builder *ReplicatedStateMachineBuilder) SetCredential(credential workloads
 	builder.get().Spec.Credential = &credential
 	return builder
 }
+
+func (builder *ReplicatedStateMachineBuilder) SetInstances(instances []workloads.InstanceTemplate) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.Instances = instances
+	return builder
+}

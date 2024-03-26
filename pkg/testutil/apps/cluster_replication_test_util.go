@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -41,6 +42,7 @@ func MockReplicationComponentPod(
 	compName,
 	podName,
 	roleName string) *corev1.Pod {
+	replicasStr := strconv.Itoa(int(*sts.Spec.Replicas))
 	pod := NewPodFactory(testCtx.DefaultNamespace, podName).
 		SetOwnerReferences("apps/v1", constant.StatefulSetKind, sts).
 		AddAppInstanceLabel(clusterName).
@@ -48,6 +50,7 @@ func MockReplicationComponentPod(
 		AddAppManagedByLabel().
 		AddRoleLabel(roleName).
 		AddControllerRevisionHashLabel(sts.Status.UpdateRevision).
+		AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr).
 		AddContainer(corev1.Container{Name: DefaultRedisContainerName, Image: DefaultRedisImageName}).
 		Create(&testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())

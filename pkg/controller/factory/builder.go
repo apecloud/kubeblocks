@@ -73,10 +73,13 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	mergeAnnotations := intctrlutil.MergeMetadataMaps(constant.GetKBGenerationAnnotation(synthesizedComp.ClusterGeneration),
 		getMonitorAnnotations(synthesizedComp), synthesizedComp.Annotations)
 
+	replicasStr := strconv.Itoa(int(synthesizedComp.Replicas))
 	podBuilder := builder.NewPodBuilder("", "").
+		AddLabelsInMap(synthesizedComp.Labels).
 		AddLabelsInMap(labels).
 		AddLabelsInMap(compDefLabel).
-		AddLabelsInMap(constant.GetAppVersionLabel(compDefName))
+		AddLabelsInMap(constant.GetAppVersionLabel(compDefName)).
+		AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr)
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),

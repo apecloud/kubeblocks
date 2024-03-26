@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -48,7 +48,7 @@ func (r *replicasAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 		return kubebuilderx.ResultUnsatisfied
 	}
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
-	if err := validateSpec(rsm); err != nil {
+	if err := validateSpec(rsm, tree); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
 	return kubebuilderx.ResultSatisfied
@@ -57,7 +57,7 @@ func (r *replicasAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 	// 1. build desired name to template map
-	nameToTemplateMap, err := buildReplicaName2TemplateMap(rsm)
+	nameToTemplateMap, err := buildReplicaName2TemplateMap(rsm, tree)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	// default OrderedReady policy
 	createCount, deleteCount := 1, 1
 	shouldReady := true
-	if rsm.Spec.PodManagementPolicy == apps.ParallelPodManagement {
+	if rsm.Spec.PodManagementPolicy == appsv1.ParallelPodManagement {
 		createCount = len(createNameSet)
 		deleteCount = len(deleteNameSet)
 		shouldReady = false
@@ -91,8 +91,8 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	// 3. handle alignment (create new replicas and delete useless replicas)
 	// create new replicas
 	newNameList := newNameSet.List()
-	baseSort(newNameList, func(i int) string {
-		return newNameList[i]
+	baseSort(newNameList, func(i int) (string, int) {
+		return parseParentNameAndOrdinal(newNameList[i])
 	}, nil, false)
 	getPredecessor := func(i int) *corev1.Pod {
 		if i <= 0 {

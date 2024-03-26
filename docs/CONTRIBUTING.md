@@ -39,14 +39,14 @@ Currently, there are 4 types of issues:
 
 - **Bug report**: You’ve found a bug with the code, and want to report or track the bug. Show more details, and let us know about an unexpected error, a crash, or an incorrect behavior.
 - **Feature request**: Suggest a new feature. This allows feedback from others before the code is written.
-- **Document request**: Contribute to the [KubeBlocks documentation](https://kubeblocks.io/docs/preview/user_docs/introduction).
+- **Improvement request**: Suggest an improvement idea for this project. Use this issue type for document related improvements.
 - **Report a security vulnerability**: Review our security policy first and then report a vulnerability.
 
 ### Make your changes
 
 - Fork the KubeBlocks repository to your GitHub account, create a new branch and clone to your host.
   - Branch naming style should match the pattern: `feature/|bugfix/|release/|hotfix/|support/|dependabot/`. KubeBlocks performs a pull request check to verify the pull request branch name.
-- See the [Developing KubeBlocks docs](./DEVELOPING.md) for more information about setting up a KubeBlocks development environment.
+- See the [Developing KubeBlocks docs](./00%20-%20index.md) for more information about setting up a KubeBlocks development environment.
 - Make your changes.
 - Update relevant documentation for the change.
 - Make sure all tests and checks are passed.
@@ -89,7 +89,7 @@ All pull requests are squashed and merged. After the code review is finished, th
 
 ## Legal
 
-To protect all users of KubeBlocks, the following legal requirements are made. If you have additional questions, please [contact us](mailto:kubeblocks@apecloud.com).
+To protect all users of KubeBlocks, the following legal requirements are made. If you have additional questions, please contact us at `kubeblocks@apecloud.com`.
 
 ### Contributor License Agreement
 

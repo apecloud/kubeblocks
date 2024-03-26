@@ -240,6 +240,7 @@ func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *w
 		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, pod.GetName())
 		pvc := builder.NewPVCBuilder(template.Namespace, pvcName).
 			AddLabelsInMap(template.Labels).
+			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
 		pvcMap[pvcName] = pvc

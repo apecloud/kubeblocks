@@ -35,13 +35,13 @@ func GetOriginalOrGeneratedComponentSpecByName(ctx context.Context, cli client.R
 		return compSpec, nil
 	}
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		genShardingCompList, err := listShardingCompSpecs(ctx, cli, cluster, &shardingSpec)
+		shardingCompList, err := listAllShardingCompSpecs(ctx, cli, cluster, &shardingSpec)
 		if err != nil {
 			return nil, err
 		}
-		for i, shardingComp := range genShardingCompList {
+		for i, shardingComp := range shardingCompList {
 			if shardingComp.Name == componentName {
-				compSpec = genShardingCompList[i]
+				compSpec = shardingCompList[i]
 				return compSpec, nil
 			}
 		}

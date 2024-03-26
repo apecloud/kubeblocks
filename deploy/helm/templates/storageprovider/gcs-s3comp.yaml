@@ -46,6 +46,7 @@ spec:
     endpoint = {{ `{{ $endpoint }}` }}
     region = {{ `{{ index .Parameters "region" }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
+    no_check_certificate = {{ `{{ index .Parameters "insecure" }}` }}
     no_check_bucket = true
     chunk_size = 50Mi
 
@@ -79,6 +80,10 @@ spec:
         secretAccessKey:
           type: string
           description: "GCS secret key"
+        insecure:
+          type: boolean
+          default: false
+          description: "Do not verify the server SSL certificate"
 
       required:
         - bucket

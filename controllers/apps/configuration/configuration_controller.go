@@ -101,9 +101,8 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		ClusterName:   config.Spec.ClusterRef,
 		ComponentName: config.Spec.ComponentName,
 	}, fetcherTask).Cluster().
-		// ClusterDef().
-		// ClusterVer().
-		ClusterComponent().
+		ComponentAndComponentDef().
+		ComponentSpec().
 		Complete()
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
@@ -113,11 +112,9 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		reqCtx.Log.Info("cluster is deleting, skip reconcile")
 		return intctrlutil.Reconciled()
 	}
-
-	if fetcherTask.ClusterComObj == nil {
+	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
 		return r.failWithInvalidComponent(config, reqCtx)
 	}
-
 	if err := r.runTasks(TaskContext{config, reqCtx, fetcherTask}, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
@@ -157,7 +154,13 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 		configuration = taskCtx.configuration
 	)
 
-	synthesizedComp, err = component.BuildSynthesizedComponentWrapper(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ClusterComObj)
+	if len(taskCtx.fetcher.ComponentObj.Spec.CompDef) == 0 {
+		// build synthesized component for generated component
+		synthesizedComp, err = component.BuildSynthesizedComponentWrapper(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ClusterComObj)
+	} else {
+		// build synthesized component for native component
+		synthesizedComp, err = component.BuildSynthesizedComponent(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ComponentDefObj, taskCtx.fetcher.ComponentObj)
+	}
 	if err != nil {
 		return err
 	}

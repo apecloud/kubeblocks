@@ -1627,7 +1627,7 @@ var _ = Describe("Component Controller", func() {
 		checkRBACResourcesExistence(saName, true)
 	}
 
-	testRecreateCompWithRBAC := func(compName, compDefName string) {
+	testRecreateCompWithRBACCreateByKubeBlocks := func(compName, compDefName string) {
 		saName := "test-sa-" + randomStr()
 		testCompRBAC(compName, compDefName, saName)
 
@@ -1640,6 +1640,35 @@ var _ = Describe("Component Controller", func() {
 
 		By("re-create cluster(component) with same name")
 		testCompRBAC(compName, compDefName, saName)
+	}
+
+	tesCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
+		saName := "test-sa-exist" + randomStr()
+
+		testCompRBAC(compName, compDefName, saName)
+
+		saKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      saName,
+		}
+		By("mock the ServiceAccount and RoleBinding created by user by setting annotations to nil")
+		Eventually(testapps.GetAndChangeObj(&testCtx, saKey, func(sa *corev1.ServiceAccount) {
+			sa.Annotations = nil
+		})).Should(Succeed())
+		rbKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      saName,
+		}
+		Eventually(testapps.GetAndChangeObj(&testCtx, rbKey, func(rb *rbacv1.RoleBinding) {
+			rb.Annotations = nil
+		})).Should(Succeed())
+
+		By("delete the cluster(component)")
+		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+
+		By("check the RBAC resources deleted")
+		checkRBACResourcesExistence(saName, true)
 	}
 
 	testReplicationWorkloadRunning := func(compName, compDefName string) {
@@ -2107,8 +2136,12 @@ var _ = Describe("Component Controller", func() {
 			testCompRBAC(defaultCompName, compDefName, "")
 		})
 
-		It("re-create component with RBAC set", func() {
-			testRecreateCompWithRBAC(defaultCompName, compDefName)
+		It("re-create component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
+			testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefName)
+		})
+
+		It("create component with custom RBAC which is already exist created by User", func() {
+			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
 		})
 	})
 

@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -29,9 +27,7 @@ import (
 )
 
 // componentPostProvisionTransformer handles component postProvision lifecycle action.
-type componentPostProvisionTransformer struct {
-	client.Client
-}
+type componentPostProvisionTransformer struct{}
 
 var _ graph.Transformer = &componentPostProvisionTransformer{}
 
@@ -42,6 +38,7 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 		Log:      transCtx.Logger,
 		Recorder: transCtx.EventRecorder,
 	}
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
 	cluster := transCtx.Cluster
 	compOrig := transCtx.ComponentOrig
@@ -51,7 +48,7 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 		return nil
 	}
 
-	if err := component.ReconcileCompPostProvision(reqCtx.Ctx, t.Client, cluster, comp, synthesizeComp, dag); err != nil {
+	if err := component.ReconcileCompPostProvision(reqCtx.Ctx, transCtx.Client, graphCli, cluster, comp, synthesizeComp, dag); err != nil {
 		return err
 	}
 	return nil

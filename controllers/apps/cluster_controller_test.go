@@ -48,16 +48,17 @@ import (
 
 var _ = Describe("Cluster Controller", func() {
 	const (
-		clusterDefName        = "test-clusterdef"
-		clusterVersionName    = "test-clusterversion"
-		compDefName           = "test-compdef"
-		compVersionName       = "test-compversion"
-		clusterName           = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
-		consensusCompName     = "consensus"
-		consensusCompDefName  = "consensus"
-		defaultServiceVersion = "8.0.31-r0"
-		latestServiceVersion  = "8.0.31-r1"
-		defaultShardCount     = 2
+		clusterDefName         = "test-clusterdef"
+		clusterVersionName     = "test-clusterversion"
+		compDefName            = "test-compdef"
+		compVersionName        = "test-compversion"
+		clusterName            = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
+		consensusCompName      = "consensus"
+		consensusCompDefName   = "consensus"
+		multiConsensusCompName = "consensus1"
+		defaultServiceVersion  = "8.0.31-r0"
+		latestServiceVersion   = "8.0.31-r1"
+		defaultShardCount      = 2
 	)
 
 	var (
@@ -466,6 +467,64 @@ var _ = Describe("Cluster Controller", func() {
 			constant.KBAppShardingNameLabelKey: compName,
 		}
 		Eventually(testapps.List(&testCtx, generics.ComponentSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(shards))
+	}
+
+	testClusterComponentScaleIn := func(compName, compDefName string) {
+		By("creating and checking a cluster with multi component")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, "").
+			AddComponent(compName, compDefName).SetReplicas(3).
+			AddComponent(multiConsensusCompName, compDefName).SetReplicas(3).
+			WithRandomName().
+			Create(&testCtx).
+			GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName, multiConsensusCompName)
+
+		By("scale in the target component")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			for i, compSpec := range cluster.Spec.ComponentSpecs {
+				if compSpec.Name == compName {
+					// delete the target component
+					cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs[:i], cluster.Spec.ComponentSpecs[i+1:]...)
+				}
+			}
+		})()).ShouldNot(HaveOccurred())
+
+		By("check component deleted")
+		compKey := types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
+		}
+		multiCompKey := types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      constant.GenerateClusterComponentName(clusterObj.Name, multiConsensusCompName),
+		}
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, false)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, multiCompKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+	}
+
+	testClusterShardingComponentScaleIn := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory)), shards int) {
+		By("creating and checking a cluster with sharding component")
+		testShardingClusterComponent(compName, compDefName, createObj, shards)
+
+		By("scale in the sharding component")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			for i := range cluster.Spec.ShardingSpecs {
+				if cluster.Spec.ShardingSpecs[i].Name == compName {
+					cluster.Spec.ShardingSpecs[i].Shards = int32(shards - 1)
+				}
+			}
+		})()).ShouldNot(HaveOccurred())
+
+		By("check sharding component scaled in")
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:       clusterKey.Name,
+			constant.KBAppShardingNameLabelKey: compName,
+		}
+		Eventually(testapps.List(&testCtx, generics.ComponentSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(shards - 1))
 	}
 
 	testClusterService := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
@@ -879,7 +938,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		namespacedKinds, clusteredKinds := kindsForWipeOut()
 		allKinds := append(namespacedKinds, clusteredKinds...)
-		createdObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), allKinds)
+		createdObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), allKinds)
 		Expect(err).Should(Succeed())
 
 		By("delete the cluster")
@@ -887,7 +946,7 @@ var _ = Describe("Cluster Controller", func() {
 		Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
 		By("check all cluster resources again")
-		objs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), allKinds)
+		objs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), allKinds)
 		Expect(err).Should(Succeed())
 		// check all objects existed before cluster deletion still be there
 		for key, obj := range createdObjs {
@@ -904,7 +963,7 @@ var _ = Describe("Cluster Controller", func() {
 			Client:  testCtx.Cli,
 		}
 		preserveKinds := haltPreserveKinds()
-		preserveObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), preserveKinds)
+		preserveObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), preserveKinds)
 		Expect(err).Should(Succeed())
 		for _, obj := range preserveObjs {
 			// Expect(obj.GetFinalizers()).Should(ContainElements(constant.DBClusterFinalizerName))
@@ -918,7 +977,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 
 		By("check expected preserved objects")
-		keptObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), preserveKinds)
+		keptObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), preserveKinds)
 		Expect(err).Should(Succeed())
 		for key, obj := range preserveObjs {
 			Expect(keptObjs).Should(HaveKey(key))
@@ -931,7 +990,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("check all other resources deleted")
 		namespacedKinds, clusteredKinds := kindsForHalt()
 		kindsToDelete := append(namespacedKinds, clusteredKinds...)
-		otherObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), kindsToDelete)
+		otherObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), kindsToDelete)
 		Expect(err).Should(Succeed())
 		Expect(otherObjs).Should(HaveLen(0))
 	}
@@ -983,7 +1042,7 @@ var _ = Describe("Cluster Controller", func() {
 			namespacedKinds, clusteredKinds = kindsForDelete()
 		}
 		kindsToDelete := append(namespacedKinds, clusteredKinds...)
-		otherObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), kindsToDelete)
+		otherObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), kindsToDelete)
 		Expect(err).Should(Succeed())
 		Expect(otherObjs).Should(HaveLen(0))
 	}
@@ -1044,6 +1103,24 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("create multiple templates cluster", func() {
 			testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjWithMultipleTemplates)
+		})
+	})
+
+	Context("cluster component scale-in", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+		})
+
+		AfterEach(func() {
+			cleanEnv()
+		})
+
+		It("with cluster component scale-in", func() {
+			testClusterComponentScaleIn(consensusCompName, consensusCompDefName)
+		})
+
+		It("with cluster sharding scale-in", func() {
+			testClusterShardingComponentScaleIn(consensusCompName, compDefObj.Name, createClusterObjWithSharding, defaultShardCount)
 		})
 	})
 

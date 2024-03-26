@@ -312,7 +312,7 @@ kbcli cluster connect mycluster
 
 1. Get Credentials.
    ```bash
-   kbcli cluster connect --show-example --client=cli mycluster
+   kbcli cluster connect --show-example --show-password --client=cli mycluster
    ```
 2. Run `port-forward`.
 

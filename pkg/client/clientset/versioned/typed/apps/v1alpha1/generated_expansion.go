@@ -36,6 +36,8 @@ type ComponentResourceConstraintExpansion interface{}
 
 type ComponentVersionExpansion interface{}
 
+type ConfigConstraintExpansion interface{}
+
 type OpsDefinitionExpansion interface{}
 
 type OpsRequestExpansion interface{}

@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
-	"fmt"
-
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -105,14 +103,6 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 }
 
 func buildReplicaRevisions(template *podTemplateSpecExt, ordinal int, parent *workloads.ReplicatedStateMachine) ([]replicaRevision, int, error) {
-	generatePodName := func(name, generateName string, ordinal int) (string, int) {
-		if len(name) > 0 {
-			return name, ordinal
-		}
-		n := fmt.Sprintf("%s-%d", generateName, ordinal)
-		ordinal++
-		return n, ordinal
-	}
 	revision, err := buildPodTemplateRevision(template, parent)
 	if err != nil {
 		return nil, ordinal, err
@@ -120,7 +110,7 @@ func buildReplicaRevisions(template *podTemplateSpecExt, ordinal int, parent *wo
 	var replicaList []replicaRevision
 	var name string
 	for i := 0; i < int(template.Replicas); i++ {
-		name, ordinal = generatePodName(template.Name, template.GenerateName, ordinal)
+		name, ordinal = generatePodName(template.Name, template.GenerateName, ordinal, int(template.OrdinalStart), i)
 		replicaList = append(replicaList, replicaRevision{name: name, revision: revision})
 	}
 	return replicaList, ordinal, nil

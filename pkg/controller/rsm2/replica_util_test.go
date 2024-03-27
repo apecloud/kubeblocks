@@ -28,6 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -380,6 +381,91 @@ var _ = Describe("replica util test", func() {
 				},
 			}...)
 			Expect(instanceTemplates).Should(Equal(instances))
+		})
+	})
+
+	// - name: ""
+	//   generateName: "foo"
+	//   replicas: 2
+	//   ordinalStart: 0
+	// - name: ""
+	//   generateName: "foo"
+	//   replicas: 2
+	//   ordinalStart: 100
+	// - name: "foo"
+	//   generateName: ""
+	//   ordinalStart: 0
+	// - name: ""
+	//   generateName: "foo"
+	//   replicas: 2
+	//   ordinalStart: 0
+	//
+	// Based on rule #1, we generate a pod name 'foo' from template #3.
+	// Based on rule #2, we generate 2 pod names 'foo-100', 'foo-101' from template #2.
+	// Based on rule #3, template #1 and #4 share the same ordinal range and start from 0, we generate 4 pod names 'foo-0','foo-1','foo-2','foo-3'.
+	// So the final 7 pod names are: 'foo', 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', 'foo-101'.
+	Context("generatePodName", func() {
+		It("should work well", func() {
+			templates := []podTemplateSpecExt{
+				{
+					Replicas:     2,
+					OrdinalStart: 0,
+					PodTemplateSpec: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:         "",
+							GenerateName: "foo",
+						},
+					},
+				},
+				{
+					Replicas:     2,
+					OrdinalStart: 100,
+					PodTemplateSpec: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:         "",
+							GenerateName: "foo",
+						},
+					},
+				},
+				{
+					Replicas:     1,
+					OrdinalStart: 0,
+					PodTemplateSpec: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:         "foo",
+							GenerateName: "",
+						},
+					},
+				},
+				{
+					Replicas:     2,
+					OrdinalStart: 0,
+					PodTemplateSpec: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:         "",
+							GenerateName: "foo",
+						},
+					},
+				},
+			}
+			var (
+				podNames []string
+				ordinal  = 0
+				podName  string
+			)
+
+			for _, template := range templates {
+				for i := 0; i < int(template.Replicas); i++ {
+					podName, ordinal = generatePodName(template.Name, template.GenerateName, ordinal, int(template.OrdinalStart), i)
+					podNames = append(podNames, podName)
+				}
+			}
+			getNameNOrdinalFunc := func(i int) (string, int) {
+				return parseParentNameAndOrdinal(podNames[i])
+			}
+			baseSort(podNames, getNameNOrdinalFunc, nil, false)
+			podNamesExpected := []string{"foo", "foo-0", "foo-1", "foo-2", "foo-3", "foo-100", "foo-101"}
+			Expect(podNames).Should(Equal(podNamesExpected))
 		})
 	})
 })

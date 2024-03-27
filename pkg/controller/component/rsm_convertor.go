@@ -135,6 +135,7 @@ func (c *rsmInstancesConvertor) convert(args ...any) (any, error) {
 			Replicas:             instance.Replicas,
 			Name:                 instance.Name,
 			GenerateName:         instance.GenerateName,
+			OrdinalStart:         instance.OrdinalStart,
 			Annotations:          instance.Annotations,
 			Labels:               instance.Labels,
 			Image:                instance.Image,

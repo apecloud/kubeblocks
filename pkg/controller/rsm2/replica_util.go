@@ -46,7 +46,8 @@ import (
 )
 
 type podTemplateSpecExt struct {
-	Replicas int32
+	Replicas     int32
+	OrdinalStart int32
 	corev1.PodTemplateSpec
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 }
@@ -214,21 +215,56 @@ func buildReplicaName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *k
 }
 
 func buildReplicaNames(template *podTemplateSpecExt, ordinal int) ([]string, int, error) {
-	generatePodName := func(name, generateName string, ordinal int) (string, int) {
-		if len(name) > 0 {
-			return name, ordinal
-		}
-		n := fmt.Sprintf("%s-%d", generateName, ordinal)
-		ordinal++
-		return n, ordinal
-	}
 	var replicaNameList []string
 	var name string
 	for i := 0; i < int(template.Replicas); i++ {
-		name, ordinal = generatePodName(template.Name, template.GenerateName, ordinal)
+		name, ordinal = generatePodName(template.Name, template.GenerateName, ordinal, int(template.OrdinalStart), i)
 		replicaNameList = append(replicaNameList, name)
 	}
 	return replicaNameList, ordinal, nil
+}
+
+// generatePodName generates a pod name.
+// the rules are:
+// 1. if a 'name' is provided in the InstanceTemplate, use it directly
+// 2. if a 'ordinalStart' is provided in the InstanceTemplate, we index all the pods by a separate ordinal range, i.e. [ordinalStart, ordinalStart+Replicas). In this function, the ordinal will be 'ordinalStart'+'index'
+// 3. all other InstanceTemplates with the same generateName will be indexed by a shared ordinal range, we call it the default ordinal range here.
+//
+// For example:
+// Assume we have 4 InstanceTemplates in a template group:
+//   - name: ""
+//     generateName: "foo"
+//     replicas: 2
+//     ordinalStart: 0
+//   - name: ""
+//     generateName: "foo"
+//     replicas: 2
+//     ordinalStart: 100
+//   - name: "foo"
+//     generateName: ""
+//     ordinalStart: 0
+//   - name: ""
+//     generateName: "foo"
+//     replicas: 2
+//     ordinalStart: 0
+//
+// Based on rule #1, we generate a pod name 'foo' from template #3.
+// Based on rule #2, we generate 2 pod names 'foo-100', 'foo-101' from template #2.
+// Based on rule #3, template #1 and #4 share the same ordinal range and start from 0, we generate 4 pod names 'foo-0','foo-1','foo-2','foo-3'.
+// So the final 7 pod names are: 'foo', 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', 'foo-101'.
+func generatePodName(name, generateName string, defaultOrdinal, ordinalStart, index int) (podName string, updatedDefaultOrdinal int) {
+	switch {
+	case len(name) > 0:
+		podName = name
+		updatedDefaultOrdinal = defaultOrdinal
+	case ordinalStart > 0:
+		podName = fmt.Sprintf("%s-%d", generateName, ordinalStart+index)
+		updatedDefaultOrdinal = defaultOrdinal
+	default:
+		podName = fmt.Sprintf("%s-%d", generateName, defaultOrdinal)
+		updatedDefaultOrdinal = defaultOrdinal + 1
+	}
+	return
 }
 
 func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *workloads.ReplicatedStateMachine) (*replica, error) {
@@ -558,6 +594,11 @@ func applyInstanceTemplate(instance workloads.InstanceTemplate, template *podTem
 	if instance.GenerateName != nil {
 		template.GenerateName = *instance.GenerateName
 	}
+	ordinalStart := int32(0)
+	if instance.OrdinalStart != nil {
+		ordinalStart = *instance.OrdinalStart
+	}
+	template.OrdinalStart = ordinalStart
 	if instance.NodeName != nil {
 		template.Spec.NodeName = *instance.NodeName
 	}

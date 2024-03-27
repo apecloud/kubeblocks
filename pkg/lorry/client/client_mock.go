@@ -227,6 +227,20 @@ func (mr *MockClientMockRecorder) PreTerminate(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PreTerminate", reflect.TypeOf((*MockClient)(nil).PreTerminate), arg0)
 }
 
+// Rebuild mocks base method.
+func (m *MockClient) Rebuild(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Rebuild", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Rebuild indicates an expected call of Rebuild.
+func (mr *MockClientMockRecorder) Rebuild(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Rebuild", reflect.TypeOf((*MockClient)(nil).Rebuild), arg0)
+}
+
 // RevokeUserRole mocks base method.
 func (m *MockClient) RevokeUserRole(arg0 context.Context, arg1, arg2 string) error {
 	m.ctrl.T.Helper()

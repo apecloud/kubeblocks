@@ -188,7 +188,7 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 			validator := &schemaValidator{
 				typeName: tt.args.SchemaTypeName,
 				cfgType:  tplConstraint.FormatterConfig.Format,
-				schema:   tplConstraint.ConfigSchema.SchemaInJson,
+				schema:   tplConstraint.ConfigSchema.SchemaInJSON,
 			}
 			require.Equal(t, tt.err, validator.Validate(
 				map[string]string{

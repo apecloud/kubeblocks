@@ -139,7 +139,7 @@ type ConfigSchema struct {
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:ComponentDefRef=object
 	// +kubebuilder:pruning:PreserveUnknownFields
-	SchemaInJson *apiext.JSONSchemaProps `json:"schemaInJson,omitempty"`
+	SchemaInJSON *apiext.JSONSchemaProps `json:"schemaInJSON,omitempty"`
 
 	// Enables providers to verify user configurations using the CUE language.
 	//

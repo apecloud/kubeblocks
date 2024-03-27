@@ -83,7 +83,7 @@ func convertSchema(schema *CustomParametersValidation, ccv1 *appsv1.ConfigConstr
 
 	ccv1.ConfigSchema = &appsv1.ConfigSchema{
 		CUE:          schema.CUE,
-		SchemaInJson: schema.Schema,
+		SchemaInJSON: schema.Schema,
 	}
 }
 

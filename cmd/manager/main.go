@@ -497,6 +497,10 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	if err = (&appsv1.ConfigConstraint{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ConfigConstraint")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if viper.GetBool("enable_webhooks") {

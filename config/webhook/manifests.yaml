@@ -136,6 +136,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-apps-kubeblocks-io-v1-configconstraint
+  failurePolicy: Fail
+  name: vconfigconstraint.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - configconstraints
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
   failurePolicy: Fail
   name: vreplicatedstatemachine.kb.io

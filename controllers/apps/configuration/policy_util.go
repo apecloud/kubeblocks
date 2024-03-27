@@ -45,8 +45,8 @@ import (
 // GetComponentPods gets all pods of the component.
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
-	for i := range params.ComponentUnits {
-		pods, err := intctrlutil.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
+	for i := range params.RSMUnits {
+		pods, err := intctrlutil.GetPodListByRSM(params.Ctx.Ctx, params.Client, &params.RSMUnits[i])
 		if err != nil {
 			return nil, err
 		}
@@ -72,11 +72,11 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 }
 
 func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
-	if len(params.ComponentUnits) > 1 {
-		return nil, core.MakeError("component require only one statefulSet, actual %d components", len(params.ComponentUnits))
+	if len(params.RSMUnits) > 1 {
+		return nil, core.MakeError("component require only one rsm, actual %d components", len(params.RSMUnits))
 	}
 
-	if len(params.ComponentUnits) == 0 {
+	if len(params.RSMUnits) == 0 {
 		return nil, nil
 	}
 

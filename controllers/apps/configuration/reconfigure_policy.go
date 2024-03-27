@@ -24,7 +24,6 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -111,12 +110,8 @@ type reconfigureParams struct {
 	// TODO(xingran): remove this field when test case is refactored.
 	Component *appsv1alpha1.ClusterComponentDefinition
 
-	// List of StatefulSets using this config template.
-	ComponentUnits []appsv1.StatefulSet
-	// List of Deployment using this config template.
-	DeploymentUnits []appsv1.Deployment
 	// List of ReplicatedStateMachine using this config template.
-	RSMList []workloads.ReplicatedStateMachine
+	RSMUnits []workloads.ReplicatedStateMachine
 }
 
 var (
@@ -168,7 +163,7 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	}
 
 	var maxUnavailable *intstr.IntOrString
-	for _, rsm := range param.RSMList {
+	for _, rsm := range param.RSMUnits {
 		if rsm.Spec.UpdateStrategy.RollingUpdate != nil {
 			maxUnavailable = rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
 		}
@@ -302,17 +297,7 @@ func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) 
 
 func fromWorkloadObjects(params reconfigureParams) []client.Object {
 	r := make([]client.Object, 0)
-	for _, unit := range params.RSMList {
-		r = append(r, &unit)
-	}
-	// migrated workload
-	if len(r) != 0 {
-		return r
-	}
-	for _, unit := range params.ComponentUnits {
-		r = append(r, &unit)
-	}
-	for _, unit := range params.DeploymentUnits {
+	for _, unit := range params.RSMUnits {
 		r = append(r, &unit)
 	}
 	return r

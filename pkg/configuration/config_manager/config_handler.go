@@ -378,14 +378,11 @@ func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgRe
 }
 
 func isBatchReload(configMeta *ConfigSpecInfo) bool {
-	isBatchReload := false
-	if configMeta != nil &&
+	return configMeta != nil &&
 		configMeta.ReloadOptions != nil &&
 		configMeta.ReloadOptions.ShellTrigger != nil &&
-		configMeta.ReloadOptions.ShellTrigger.BatchReload != nil {
-		isBatchReload = *(configMeta.ShellTrigger.BatchReload)
-	}
-	return isBatchReload
+		configMeta.ReloadOptions.ShellTrigger.BatchReload != nil &&
+		*(configMeta.ShellTrigger.BatchReload)
 }
 
 func getBatchInputTemplate(configMeta *ConfigSpecInfo) string {

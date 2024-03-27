@@ -95,7 +95,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return *res, err
 	}
 
-	if configConstraint.Status.ObservedGeneration == configConstraint.Generation && configConstraint.Status.IsConfigConstraintTerminalPhases() {
+	if configConstraint.Status.ObservedGeneration == configConstraint.Generation && configConstraint.Status.ConfigConstraintTerminalPhases() {
 		return intctrlutil.Reconciled()
 	}
 

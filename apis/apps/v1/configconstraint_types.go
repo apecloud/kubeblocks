@@ -133,10 +133,6 @@ type ConfigConstraintStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-func (cs ConfigConstraintStatus) IsConfigConstraintTerminalPhases() bool {
-	return cs.Phase == CCAvailablePhase
-}
-
 type ConfigSchema struct {
 	// Transforms the schema from CUE to json for further OpenAPI validation
 	//

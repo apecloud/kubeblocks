@@ -412,13 +412,6 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
 		return err
 	}
-	runningOpsList, err := GetRunningOpsByOpsType(ctx, cli, r.Spec.ClusterRef, r.Namespace, string(VolumeExpansionType))
-	if err != nil {
-		return err
-	}
-	if len(runningOpsList) > 0 && runningOpsList[0].Name != r.Name {
-		return fmt.Errorf("existing other VolumeExpansion OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", runningOpsList[0].Name, cluster.Name)
-	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
 }
 
@@ -435,13 +428,6 @@ func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, 
 	}
 	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
 		return err
-	}
-	runningOpsList, err := GetRunningOpsByOpsType(ctx, cli, r.Spec.ClusterRef, r.Namespace, string(SwitchoverType))
-	if err != nil {
-		return err
-	}
-	if len(runningOpsList) > 0 && runningOpsList[0].Name != r.Name {
-		return fmt.Errorf("existing other Switchover OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", runningOpsList[0].Name, cluster.Name)
 	}
 	return validateSwitchoverResourceList(ctx, cli, cluster, switchoverList)
 }

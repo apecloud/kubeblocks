@@ -118,7 +118,6 @@ func InitMockDBManager() {
 func InitMockDCSStore() {
 	ctrl := gomock.NewController(GinkgoT())
 	mockDCSStore = dcs.NewMockDCS(ctrl)
-	//mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{}).AnyTimes()
 	dcs.SetStore(mockDCSStore)
 	dcsStore = mockDCSStore
 }

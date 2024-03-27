@@ -22,6 +22,8 @@ package rsm2
 import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // deletionReconciler handles object and its secondary resources' deletion
@@ -39,14 +41,30 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	// delete secondary objects first
-	if len(tree.GetSecondaryObjects()) > 0 {
-		tree.DeleteSecondaryObjects()
-		return tree, nil
+	// retain all pvcs
+	// TODO(free6om): respect PVCManagementPolicy
+	allObjects := tree.GetSecondaryObjects()
+	objects := filterType(allObjects, &corev1.PersistentVolumeClaim{})
+	if len(objects) > 0 {
+		return tree, tree.Delete(objects...)
 	}
 
 	// delete root object
 	tree.DeleteRoot()
 	return tree, nil
+}
+
+func filterType[T client.Object](snapshot model.ObjectSnapshot, t T) []client.Object {
+	var objects []client.Object
+	for _, object := range snapshot {
+		switch object.(type) {
+		case T:
+			continue
+		default:
+			objects = append(objects, object)
+		}
+	}
+	return objects
 }
 
 func NewDeletionReconciler() kubebuilderx.Reconciler {

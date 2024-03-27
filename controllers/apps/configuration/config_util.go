@@ -404,11 +404,11 @@ func updateConfigSchema(cc *v1.ConfigConstraint, cli client.Client, ctx context.
 	if openAPISchema == nil {
 		return nil
 	}
-	if reflect.DeepEqual(openAPISchema, schema.SchemaInJson) {
+	if reflect.DeepEqual(openAPISchema, schema.SchemaInJSON) {
 		return nil
 	}
 
 	ccPatch := client.MergeFrom(cc.DeepCopy())
-	cc.Spec.ConfigSchema.SchemaInJson = openAPISchema
+	cc.Spec.ConfigSchema.SchemaInJSON = openAPISchema
 	return cli.Patch(ctx, cc, ccPatch)
 }

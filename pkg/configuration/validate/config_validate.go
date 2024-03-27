@@ -142,14 +142,14 @@ func NewConfigValidator(configConstraint *v1.ConfigConstraintSpec, options ...Va
 			cfgType:   configConstraint.FormatterConfig.Format,
 			cueScript: configSchema.CUE,
 		}
-	case configSchema.SchemaInJson != nil:
+	case configSchema.SchemaInJSON != nil:
 		validator = &schemaValidator{
 			cmKeySelector: cmKeySelector{
 				keySelector: options,
 			},
 			typeName: configConstraint.ConfigSchemaTopLevelKey,
 			cfgType:  configConstraint.FormatterConfig.Format,
-			schema:   configSchema.SchemaInJson,
+			schema:   configSchema.SchemaInJSON,
 		}
 	default:
 		validator = &emptyValidator{}

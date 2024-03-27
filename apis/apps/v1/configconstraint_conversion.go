@@ -19,5 +19,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package v1
 
-func (cc *ConfigConstraint) Hub() {
+func (r *ConfigConstraint) Hub() {
 }

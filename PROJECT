@@ -250,4 +250,8 @@ resources:
   kind: ConfigConstraint
   path: github.com/apecloud/kubeblocks/apis/apps/v1
   version: v1
+  webhooks:
+    conversion: true
+    validation: true
+    webhookVersion: v1
 version: "3"

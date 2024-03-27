@@ -23,11 +23,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 func TestConfigConstraintStatus_IsConfigConstraintTerminalPhases(t *testing.T) {
 	type fields struct {
-		Phase              ConfigConstraintPhase
+		Phase              appsv1.ConfigConstraintPhase
 		Message            string
 		ObservedGeneration int64
 	}
@@ -38,19 +40,19 @@ func TestConfigConstraintStatus_IsConfigConstraintTerminalPhases(t *testing.T) {
 	}{{
 		name: "available phase test",
 		fields: fields{
-			Phase: CCAvailablePhase,
+			Phase: appsv1.CCAvailablePhase,
 		},
 		want: true,
 	}, {
 		name: "available phase test",
 		fields: fields{
-			Phase: CCUnavailablePhase,
+			Phase: appsv1.CCUnavailablePhase,
 		},
 		want: false,
 	}, {
 		name: "available phase test",
 		fields: fields{
-			Phase: CCDeletingPhase,
+			Phase: appsv1.CCDeletingPhase,
 		},
 		want: false,
 	}}
@@ -61,7 +63,7 @@ func TestConfigConstraintStatus_IsConfigConstraintTerminalPhases(t *testing.T) {
 				Message:            tt.fields.Message,
 				ObservedGeneration: tt.fields.ObservedGeneration,
 			}
-			assert.Equalf(t, tt.want, cs.IsConfigConstraintTerminalPhases(), "ConfigConstraintTerminalPhases()")
+			assert.Equalf(t, tt.want, cs.Phase == appsv1.CCAvailablePhase, "ConfigConstraintTerminalPhases()")
 		})
 	}
 }

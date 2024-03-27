@@ -22,17 +22,26 @@ package configmanager
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/pkg/errors"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 )
+
+// According to 'https://pkg.go.dev/text/template' :
+// For `range`, if the value is a map and the keys can be sorted, the elements will be visited in sorted key order.
+const defaultBatchInputTemplate string = `{{- range $pKey, $pValue := $ }}
+{{ printf "%s=%s" $pKey $pValue }}
+{{- end }}`
 
 type configVolumeHandleMeta struct {
 	ConfigHandler
@@ -172,20 +181,72 @@ type shellCommandHandler struct {
 	backupPath string
 	configMeta *ConfigSpecInfo
 	filter     regexFilter
+
+	isBatchReload      bool
+	batchInputTemplate string
+}
+
+func generateBatchStdinData(updatedParams map[string]string, batchInputTemplate string) (string, error) {
+	tplValues := gotemplate.TplValues{}
+	for k, v := range updatedParams {
+		tplValues[k] = v
+	}
+	engine := gotemplate.NewTplEngine(
+		&tplValues, nil, "render-batch-input-parameters", nil, context.TODO(),
+	)
+	stdinStr, err := engine.Render(batchInputTemplate)
+	return strings.TrimSpace(stdinStr) + "\n", err
 }
 
 func (s *shellCommandHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
 	logger.V(1).Info(fmt.Sprintf("online update[%v]", updatedParams))
 	logger.Info(fmt.Sprintf("updated parameters: %v", updatedParams))
 	args := make([]string, len(s.arg))
-	return s.execHandler(ctx, updatedParams, args)
+	copy(args, s.arg)
+	return s.execHandler(ctx, updatedParams, args...)
 }
 
-func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map[string]string, args []string) error {
+func execWithBatchReload(ctx context.Context, updatedParams map[string]string, batchInputTemplate string, commandName string, args ...string) (string, error) {
+	command := exec.CommandContext(ctx, commandName, args...)
+	stdin, err := command.StdinPipe()
+	if err != nil {
+		return "", errors.Wrap(err, "cannot create a pipe connecting to the STDIN of the command")
+	}
+	var batchStdinStr string
+	go func() {
+		defer stdin.Close()
+		var err error
+		batchStdinStr, err = generateBatchStdinData(updatedParams, batchInputTemplate)
+		if err != nil {
+			logger.Error(err, "cannot generate batch stdin data")
+			return
+		}
+		if _, err := io.WriteString(stdin, batchStdinStr); err != nil {
+			logger.Error(err, "cannot write batch stdin data into STDIN stream")
+			return
+		}
+	}()
+	stdout, err := cfgutil.ExecShellCommand(command)
+	logger.Info("batch execute",
+		"exec", command.String(),
+		"stdin", batchStdinStr,
+		"stdout", stdout,
+		"error", err,
+	)
+	return stdout, err
+}
+
+func execWithSeparateReload(ctx context.Context, updatedParams map[string]string, commandName string, args ...string) ([]string, error) {
+	stdouts := []string{}
 	commonHandle := func(args []string) error {
-		command := exec.CommandContext(ctx, s.command, args...)
+		command := exec.CommandContext(ctx, commandName, args...)
 		stdout, err := cfgutil.ExecShellCommand(command)
-		logger.Info(fmt.Sprintf("exec: [%s], stdout: [%s], stderr:%v", command.String(), stdout, err))
+		logger.Info("execute single param reload",
+			"exec", command.String(),
+			"stdout", stdout,
+			"err", err,
+		)
+		stdouts = append(stdouts, stdout)
 		return err
 	}
 	volumeHandle := func(baseCMD []string, paramName, paramValue string) error {
@@ -196,7 +257,35 @@ func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map
 	}
 	for key, value := range updatedParams {
 		if err := volumeHandle(args, key, value); err != nil {
-			return err
+			return nil, err
+		}
+	}
+	return stdouts, nil
+}
+
+func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map[string]string, args ...string) error {
+	if s.isBatchReload {
+		stdout, err := execWithBatchReload(ctx, updatedParams, s.batchInputTemplate, s.command, args...)
+		logger.Info("execute with batch reload",
+			"updated_params", updatedParams,
+			"batch_input_template", s.batchInputTemplate,
+			"execute_args", append([]string{s.command}, args...),
+			"stdout", stdout,
+		)
+		if err != nil {
+			return errors.Wrap(err, "execute with batch reload failed")
+		}
+	} else {
+		stdouts, err := execWithSeparateReload(ctx, updatedParams, s.command, args...)
+		execArgs := append([]string{s.command}, args...)
+		execArgs = append(execArgs, "param_key_N", "param_value_N")
+		logger.Info("execute with individual param reload",
+			"updated_params", updatedParams,
+			"execute_args", execArgs,
+			"stdouts", stdouts,
+		)
+		if err != nil {
+			return errors.Wrap(err, "execute with individual param reload failed")
 		}
 	}
 	return nil
@@ -232,7 +321,7 @@ func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.E
 	}
 
 	logger.Info(fmt.Sprintf("updated parameters: %v", updatedParams))
-	if err := s.execHandler(ctx, updatedParams, args); err != nil {
+	if err := s.execHandler(ctx, updatedParams, args...); err != nil {
 		return err
 	}
 	if len(files) != 0 {
@@ -288,6 +377,25 @@ func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgRe
 	}
 }
 
+func isBatchReload(configMeta *ConfigSpecInfo) bool {
+	return configMeta != nil &&
+		configMeta.ReloadOptions != nil &&
+		configMeta.ReloadOptions.ShellTrigger != nil &&
+		configMeta.ReloadOptions.ShellTrigger.BatchReload != nil &&
+		*(configMeta.ShellTrigger.BatchReload)
+}
+
+func getBatchInputTemplate(configMeta *ConfigSpecInfo) string {
+	batchInputTemplate := defaultBatchInputTemplate
+	if configMeta != nil &&
+		configMeta.ReloadOptions != nil &&
+		configMeta.ReloadOptions.ShellTrigger != nil &&
+		len(configMeta.ReloadOptions.ShellTrigger.BatchInputTemplate) > 0 {
+		batchInputTemplate = configMeta.ShellTrigger.BatchInputTemplate
+	}
+	return batchInputTemplate
+}
+
 func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSpecInfo, backupPath string) (ConfigHandler, error) {
 	if len(command) == 0 {
 		return nil, cfgcore.MakeError("invalid command: %s", command)
@@ -319,6 +427,8 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		downwardAPIMountPoint:  cfgutil.ToSet(handler).AsSlice(),
 		downwardAPIHandler:     handler,
 		configVolumeHandleMeta: createConfigVolumeMeta(configMeta.ConfigSpec.Name, appsv1alpha1.ShellType, []string{mountPoint}, formatterConfig),
+		isBatchReload:          isBatchReload(configMeta),
+		batchInputTemplate:     getBatchInputTemplate(configMeta),
 	}
 	return shellTrigger, nil
 }

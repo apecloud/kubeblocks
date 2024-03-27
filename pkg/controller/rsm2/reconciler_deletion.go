@@ -45,7 +45,7 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuil
 	// retain all pvcs
 	// TODO(free6om): respect PVCManagementPolicy
 	allObjects := tree.GetSecondaryObjects()
-	objects := filterType(allObjects, &corev1.PersistentVolumeClaim{})
+	objects := filterByType(allObjects, &corev1.PersistentVolumeClaim{})
 	if len(objects) > 0 {
 		return tree, tree.Delete(objects...)
 	}
@@ -55,7 +55,7 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuil
 	return tree, nil
 }
 
-func filterType[T client.Object](snapshot model.ObjectSnapshot, t T) []client.Object {
+func filterByType[T client.Object](snapshot model.ObjectSnapshot, t T) []client.Object {
 	var objects []client.Object
 	for _, object := range snapshot {
 		switch object.(type) {

@@ -19,20 +19,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package v1
 
-func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
-	if in.DynamicActionCanBeMerged != nil {
-		return !*in.DynamicActionCanBeMerged
-	}
-	return false
-}
-
-func (in *ConfigConstraintSpec) DynamicParametersPolicy() DynamicParameterSelectedPolicy {
-	if in.DynamicParameterSelectedPolicy != nil {
-		return *in.DynamicParameterSelectedPolicy
-	}
-	return SelectedDynamicParameters
-}
-
-func (cs *ConfigConstraintStatus) ConfigConstraintTerminalPhases() bool {
-	return cs.Phase == CCAvailablePhase
+func (cc *ConfigConstraint) Hub() {
 }

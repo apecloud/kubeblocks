@@ -61,7 +61,7 @@ func TestConfigConstraintStatus_IsConfigConstraintTerminalPhases(t *testing.T) {
 				Message:            tt.fields.Message,
 				ObservedGeneration: tt.fields.ObservedGeneration,
 			}
-			assert.Equalf(t, tt.want, cs.IsConfigConstraintTerminalPhases(), "IsConfigConstraintTerminalPhases()")
+			assert.Equalf(t, tt.want, cs.IsConfigConstraintTerminalPhases(), "ConfigConstraintTerminalPhases()")
 		})
 	}
 }

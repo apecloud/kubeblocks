@@ -101,6 +101,24 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.UpdatingClusterCompPhase}, compStatus.Phase) {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`the phase of component "%s" can not be %s`, v.ComponentName, compStatus.Phase))
 		}
+		comp := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
+		synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, comp)
+		if err != nil {
+			return err
+		}
+		for _, podName := range v.InstanceNames {
+			targetPod := &corev1.Pod{}
+			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: podName, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
+				return err
+			}
+			isAvailable, err := r.instanceIsAvailable(synthesizedComp, targetPod)
+			if err != nil {
+				return err
+			}
+			if isAvailable {
+				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is availabled, can not rebuild it`, podName))
+			}
+		}
 	}
 	return nil
 }

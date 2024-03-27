@@ -164,7 +164,17 @@ var _ = Describe("OpsUtil functions", func() {
 				opsRes.Cluster.Status.Components[consensusComp] = compStatus
 			})).Should(Succeed())
 
-			By("expect for opsRequest phase is Running")
+			By("expect for opsRequest phase is Failed due to the pod is Available")
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
+
+			By("fake pod is unavailable")
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
+			for _, podName := range opsRes.OpsRequest.Spec.RebuildFrom[0].InstanceNames {
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: podName, Namespace: opsRes.OpsRequest.Namespace}, func(pod *corev1.Pod) {
+					pod.Status.Conditions = nil
+				})()).Should(Succeed())
+			}
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 		})

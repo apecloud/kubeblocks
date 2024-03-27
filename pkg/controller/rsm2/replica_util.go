@@ -281,11 +281,6 @@ func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *w
 	if err = controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
-	for _, pvc := range pvcs {
-		if err = controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
-			return nil, err
-		}
-	}
 	replica := &replica{
 		pod:  pod,
 		pvcs: pvcs,

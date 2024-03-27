@@ -67,7 +67,7 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 // skipSetCompOwnership returns true if the object should not be set ownership to the component
 func skipSetCompOwnership(obj client.Object) bool {
 	switch obj.(type) {
-	case *rbacv1.ClusterRoleBinding, *corev1.PersistentVolume, *corev1.Pod:
+	case *rbacv1.ClusterRoleBinding, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim, *corev1.Pod:
 		return true
 	default:
 		return false

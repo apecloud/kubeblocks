@@ -50,6 +50,10 @@ var _ = Describe("Config Handler Test", func() {
 	const (
 		oldVersion = "[test]\na = 1\nb = 2\n"
 		newVersion = "[test]\na = 2\nb = 2\n\nc = 100"
+
+		defaultBatchInputTemplate string = `{{- range $pKey, $pValue := $ }}
+{{ printf "%s=%s" $pKey $pValue }}
+{{- end }}`
 	)
 
 	BeforeEach(func() {
@@ -99,8 +103,8 @@ var _ = Describe("Config Handler Test", func() {
 		}
 	}
 
-	newDownwardAPIOptions := func() []v1.DownwardAPIOption {
-		return []v1.DownwardAPIOption{
+	newDownwardAPIOptions := func() []v1.DownwardAction {
+		return []v1.DownwardAction{
 			{
 				Name:       "labels",
 				MountPoint: filepath.Join(tmpWorkDir, "labels"),
@@ -269,7 +273,7 @@ var _ = Describe("Config Handler Test", func() {
 			})
 			It("should succeed on reload individually", func() {
 				configSpec := ConfigSpecInfo{
-					ReloadOptions: &v1.ReloadOptions{
+					DynamicReloadAction: &v1.DynamicReloadAction{
 						ShellTrigger: &v1.ShellTrigger{
 							Command: []string{"sh", "-c", `echo "hello world" "$@"`, "sh"},
 						}},
@@ -281,15 +285,15 @@ var _ = Describe("Config Handler Test", func() {
 				testShellHandlerCommon(configPath, configSpec)
 			})
 			Describe("Test reload in a batch", func() {
-				isBatchReload := true
 				It("should succeed on the default batch input format", func() {
 					configSpec := ConfigSpecInfo{
-						ReloadOptions: &v1.ReloadOptions{
+						DynamicReloadAction: &v1.DynamicReloadAction{
 							ShellTrigger: &v1.ShellTrigger{
 								Command: []string{"sh", "-c",
 									`while IFS="=" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
 								},
-								BatchReload: &isBatchReload,
+								BatchReload:             util.ToPointer(true),
+								BatchParametersTemplate: defaultBatchInputTemplate,
 							}},
 						ReloadType:      v1.ShellType,
 						MountPoint:      configPath,
@@ -303,13 +307,13 @@ var _ = Describe("Config Handler Test", func() {
 {{ printf "%s:%s" $pKey $pValue }}
 {{- end }}`
 					configSpec := ConfigSpecInfo{
-						ReloadOptions: &v1.ReloadOptions{
+						DynamicReloadAction: &v1.DynamicReloadAction{
 							ShellTrigger: &v1.ShellTrigger{
 								Command: []string{"sh", "-c",
 									`while IFS=":" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
 								},
-								BatchReload:        &isBatchReload,
-								BatchInputTemplate: customBatchInputTemplate,
+								BatchReload:             util.ToPointer(true),
+								BatchParametersTemplate: customBatchInputTemplate,
 							}},
 						ReloadType:      v1.ShellType,
 						MountPoint:      configPath,
@@ -400,8 +404,11 @@ var _ = Describe("Config Handler Test", func() {
 				err     error
 			)
 			BeforeEach(func() {
-				stdouts, err = execWithSeparateReload(context.TODO(),
+				err = doReloadAction(context.TODO(),
 					updatedParams,
+					func(output string, _ error) {
+						stdouts = append(stdouts, output)
+					},
 					"echo",
 					"hello",
 				)
@@ -433,8 +440,11 @@ var _ = Describe("Config Handler Test", func() {
 				err    error
 			)
 			BeforeEach(func() {
-				stdout, err = execWithBatchReload(context.TODO(),
+				err = doBatchReloadAction(context.TODO(),
 					updatedParams,
+					func(out string, err error) {
+						stdout = out
+					},
 					defaultBatchInputTemplate,
 					"/bin/sh",
 					"-c",
@@ -475,7 +485,7 @@ var _ = Describe("Config Handler Test", func() {
 			batchInputTemplate := `{{- range $pKey, $pValue := $ }}
 {{ printf "%s:%s" $pKey $pValue }}
 {{- end }}`
-			stdinStr, err := generateBatchStdinData(updatedParams, batchInputTemplate)
+			stdinStr, err := generateBatchStdinData(updatedParams, batchInputTemplate, context.TODO())
 			By("checking there's no error", func() {
 				Expect(err).Should(Succeed())
 			})

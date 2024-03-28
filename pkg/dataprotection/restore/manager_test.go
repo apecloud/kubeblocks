@@ -118,7 +118,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			return backup
 		}
 
-		initResources := func(reqCtx intctrlutil.RequestCtx, startingIndex int, useVolumeSnapshotBackup bool, change func(f *testdp.MockRestoreFactory)) (*RestoreManager, *BackupActionSet) {
+		initResources := func(reqCtx intctrlutil.RequestCtx, _ int, _ bool, change func(f *testdp.MockRestoreFactory)) (*RestoreManager, *BackupActionSet) {
 			By("create a completed backup")
 			backup := mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, false)
 

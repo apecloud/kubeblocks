@@ -317,6 +317,7 @@ func (r *BackupReconciler) prepareBackupRequest(
 	if !snapshotVolumes && backupMethod.ActionSetName == "" {
 		return nil, fmt.Errorf("backup method %s should specify snapshotVolumes or actionSetName", backupMethod.Name)
 	}
+	request.SnapshotVolumes = snapshotVolumes
 
 	if backupMethod.ActionSetName != "" {
 		actionSet, err := dputils.GetActionSetByName(reqCtx, r.Client, backupMethod.ActionSetName)
@@ -371,7 +372,10 @@ func (r *BackupReconciler) patchBackupStatus(
 	original *dpv1alpha1.Backup,
 	request *dpbackup.Request) error {
 	request.Status.FormatVersion = dpbackup.FormatVersion
-	request.Status.Path = dpbackup.BuildBackupPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
+	if !request.SnapshotVolumes {
+		request.Status.Path = dpbackup.BuildBackupPath(
+			request.Backup, request.BackupRepo.Spec.PathPrefix, request.BackupPolicy.Spec.PathPrefix)
+	}
 	request.Status.Target = request.BackupPolicy.Spec.Target
 	request.Status.BackupMethod = request.BackupMethod
 	if request.BackupRepo != nil {
@@ -380,8 +384,9 @@ func (r *BackupReconciler) patchBackupStatus(
 	if request.BackupRepoPVC != nil {
 		request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name
 	}
-	if request.BackupPolicy.Spec.UseKopia {
-		request.Status.KopiaRepoPath = dpbackup.BuildKopiaRepoPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
+	if !request.SnapshotVolumes && request.BackupPolicy.Spec.UseKopia {
+		request.Status.KopiaRepoPath = dpbackup.BuildKopiaRepoPath(
+			request.Backup, request.BackupRepo.Spec.PathPrefix, request.BackupPolicy.Spec.PathPrefix)
 	}
 	if request.BackupPolicy.Spec.EncryptionConfig != nil {
 		request.Status.EncryptionConfig = request.BackupPolicy.Spec.EncryptionConfig

@@ -310,7 +310,7 @@ kbcli cluster connect mycluster
 1. 获取连接凭证。
 
    ```bash
-   kbcli cluster connect --show-example --client=cli mycluster
+   kbcli cluster connect --show-example --show-password --client=cli mycluster
    ```
 2. 执行 `port-forward`。
 

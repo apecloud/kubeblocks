@@ -85,10 +85,6 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	createCompSet := protoCompSet.Difference(runningCompSet)
 	updateCompSet := protoCompSet.Intersection(runningCompSet)
 	deleteCompSet := runningCompSet.Difference(protoCompSet)
-	if len(deleteCompSet) > 0 {
-		return fmt.Errorf("cluster components cannot be removed at runtime: %s",
-			strings.Join(deleteCompSet.UnsortedList(), ","))
-	}
 
 	// component objects to be deleted
 	if err := t.handleCompsDelete(transCtx, dag, protoCompSpecMap, deleteCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
@@ -204,8 +200,6 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
 	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
-	compObjCopy.Spec.Nodes = compProto.Spec.Nodes
-	compObjCopy.Spec.Instances = compProto.Spec.Instances
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
@@ -485,6 +479,24 @@ func (h *createCompHandler) initClusterCompStatus(cluster *appsv1alpha1.Cluster,
 type deleteCompHandler struct{}
 
 func (h *deleteCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
+	cluster := transCtx.Cluster
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	comp, err := getRunningCompObject(transCtx, cluster, compName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if apierrors.IsNotFound(err) || model.IsObjectDeleting(comp) {
+		return nil
+	}
+	transCtx.Logger.Info(fmt.Sprintf("deleting component %s", comp.Name))
+	compCopy := comp.DeepCopy()
+	if comp.Annotations == nil {
+		comp.Annotations = make(map[string]string)
+	}
+	// update the scale-in annotation to component before deleting
+	comp.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
+	deleteCompVertex := graphCli.Do(dag, nil, comp, model.ActionDeletePtr(), nil)
+	graphCli.Do(dag, compCopy, comp, model.ActionUpdatePtr(), deleteCompVertex)
 	return nil
 }
 

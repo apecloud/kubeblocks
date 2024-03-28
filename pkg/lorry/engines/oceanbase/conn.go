@@ -21,10 +21,13 @@ package oceanbase
 
 import (
 	"database/sql"
+	"fmt"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	mysqlengine "github.com/apecloud/kubeblocks/pkg/lorry/engines/mysql"
 )
 
 // GetDBConnWithMember retrieves a database connection for a specific member of a cluster.
@@ -38,5 +41,36 @@ func (mgr *Manager) GetDBConnWithMember(cluster *dcs.Cluster, member *dcs.Member
 	} else {
 		db = mgr.DB
 	}
+	return db, nil
+}
+
+func (mgr *Manager) GetMySQLDBConn() (*sql.DB, error) {
+	mysqlConfig, err := mysql.ParseDSN(config.URL)
+	if err != nil {
+		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", config.URL)
+	}
+	mysqlConfig.User = fmt.Sprintf("%s@%s", "root", mgr.ReplicaTenant)
+	mysqlConfig.Passwd = config.Password
+	db, err := mysqlengine.GetDBConnection(mysqlConfig.FormatDSN())
+	if err != nil {
+		return nil, errors.Wrap(err, "get DB connection failed")
+	}
+
+	return db, nil
+}
+
+func (mgr *Manager) GetMySQLDBConnWithAddr(addr string) (*sql.DB, error) {
+	mysqlConfig, err := mysql.ParseDSN(config.URL)
+	if err != nil {
+		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", config.URL)
+	}
+	mysqlConfig.User = fmt.Sprintf("%s@%s", "root", mgr.ReplicaTenant)
+	mysqlConfig.Passwd = config.Password
+	mysqlConfig.Addr = addr
+	db, err := mysqlengine.GetDBConnection(mysqlConfig.FormatDSN())
+	if err != nil {
+		return nil, errors.Wrap(err, "get DB connection failed")
+	}
+
 	return db, nil
 }

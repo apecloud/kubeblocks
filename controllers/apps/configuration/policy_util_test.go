@@ -46,53 +46,20 @@ var (
 	stsSchemaKind    = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 )
 
-func newMockDeployments(replicas int, name string, labels map[string]string) appsv1.Deployment {
-	uid, _ := password.Generate(12, 12, 0, true, false)
-	return appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "StatefulSet",
-			APIVersion: "apps/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: defaultNamespace,
-			UID:       types.UID(uid),
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{},
-					Volumes: []corev1.Volume{{
-						Name: "for_test",
-						VolumeSource: corev1.VolumeSource{
-							HostPath: &corev1.HostPathVolumeSource{
-								Path: "/tmp",
-							},
-						}}},
-				},
-			},
-		},
-	}
-}
-
-func newMockStatefulSet(replicas int, name string, labels map[string]string) appsv1.StatefulSet {
+func newMockRSM(replicas int, name string, labels map[string]string) workloads.ReplicatedStateMachine {
 	uid, _ := password.Generate(12, 12, 0, true, false)
 	serviceName, _ := password.Generate(12, 0, 0, true, false)
-	return appsv1.StatefulSet{
+	return workloads.ReplicatedStateMachine{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "StatefulSet",
-			APIVersion: "apps/v1",
+			Kind:       "ReplicatedStateMachine",
+			APIVersion: "workloads.kubeblocks.io/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: defaultNamespace,
 			UID:       types.UID(uid),
 		},
-		Spec: appsv1.StatefulSetSpec{
+		Spec: workloads.ReplicatedStateMachineSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -119,22 +86,12 @@ func newMockStatefulSet(replicas int, name string, labels map[string]string) app
 
 type ParamsOps func(params *reconfigureParams)
 
-func withMockStatefulSet(replicas int, labels map[string]string) ParamsOps {
+func withMockRSM(replicas int, labels map[string]string) ParamsOps {
 	return func(params *reconfigureParams) {
 		rand, _ := password.Generate(12, 8, 0, true, false)
 		stsName := "test_" + rand
-		params.ComponentUnits = []appsv1.StatefulSet{
-			newMockStatefulSet(replicas, stsName, labels),
-		}
-	}
-}
-
-func withMockDeployments(replicas int, labels map[string]string) ParamsOps {
-	return func(params *reconfigureParams) {
-		rand, _ := password.Generate(12, 8, 0, true, false)
-		deployName := "test_" + rand
-		params.DeploymentUnits = []appsv1.Deployment{
-			newMockDeployments(replicas, deployName, labels),
+		params.RSMUnits = []workloads.ReplicatedStateMachine{
+			newMockRSM(replicas, stsName, labels),
 		}
 	}
 }
@@ -262,27 +219,11 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 	return params
 }
 
-func newMockPodsWithStatefulSet(sts *appsv1.StatefulSet, replicas int, options ...PodOptions) []corev1.Pod {
+func newMockPodsWithRSM(rsm *workloads.ReplicatedStateMachine, replicas int, options ...PodOptions) []corev1.Pod {
 	pods := make([]corev1.Pod, replicas)
 	for i := 0; i < replicas; i++ {
-		pods[i] = newMockPod(sts.Name+"-"+fmt.Sprint(i), &sts.Spec.Template.Spec)
-		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(sts, stsSchemaKind)}
-		pods[i].Status.PodIP = "1.1.1.1"
-	}
-	for _, customFn := range options {
-		for i := range pods {
-			pod := &pods[i]
-			customFn(pod, i)
-		}
-	}
-	return pods
-}
-
-func newMockPodsWithDeployment(deploy *appsv1.Deployment, replicas int, options ...PodOptions) []corev1.Pod {
-	pods := make([]corev1.Pod, replicas)
-	for i := 0; i < replicas; i++ {
-		pods[i] = newMockPod(deploy.Name+"-"+fmt.Sprint(i), &deploy.Spec.Template.Spec)
-		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(deploy, stsSchemaKind)}
+		pods[i] = newMockPod(rsm.Name+"-"+fmt.Sprint(i), &rsm.Spec.Template.Spec)
+		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(rsm, stsSchemaKind)}
 		pods[i].Status.PodIP = "1.1.1.1"
 	}
 	for _, customFn := range options {

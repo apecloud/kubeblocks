@@ -234,7 +234,7 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 }
 
 // validateExpose validates expose api when spec.type is Expose
-func (r *OpsRequest) validateExpose(ctx context.Context, cluster *Cluster) error {
+func (r *OpsRequest) validateExpose(_ context.Context, cluster *Cluster) error {
 	exposeList := r.Spec.ExposeList
 	if exposeList == nil {
 		return notEmptyError("spec.expose")
@@ -385,7 +385,7 @@ func compareQuantity(requestQuantity, limitQuantity *resource.Quantity) bool {
 }
 
 // validateHorizontalScaling validates api when spec.type is HorizontalScaling
-func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.Client, cluster *Cluster) error {
+func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Client, cluster *Cluster) error {
 	horizontalScalingList := r.Spec.HorizontalScalingList
 	if len(horizontalScalingList) == 0 {
 		return notEmptyError("spec.horizontalScaling")
@@ -412,13 +412,6 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
 		return err
 	}
-	runningOpsList, err := GetRunningOpsByOpsType(ctx, cli, r.Spec.ClusterRef, r.Namespace, string(VolumeExpansionType))
-	if err != nil {
-		return err
-	}
-	if len(runningOpsList) > 0 && runningOpsList[0].Name != r.Name {
-		return fmt.Errorf("existing other VolumeExpansion OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", runningOpsList[0].Name, cluster.Name)
-	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
 }
 
@@ -435,13 +428,6 @@ func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, 
 	}
 	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
 		return err
-	}
-	runningOpsList, err := GetRunningOpsByOpsType(ctx, cli, r.Spec.ClusterRef, r.Namespace, string(SwitchoverType))
-	if err != nil {
-		return err
-	}
-	if len(runningOpsList) > 0 && runningOpsList[0].Name != r.Name {
-		return fmt.Errorf("existing other Switchover OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", runningOpsList[0].Name, cluster.Name)
 	}
 	return validateSwitchoverResourceList(ctx, cli, cluster, switchoverList)
 }
@@ -567,7 +553,7 @@ func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
 	if err := cli.Get(ctx, types.NamespacedName{Name: *storageClassName}, storageClass); err != nil && !apierrors.IsNotFound(err) {
 		return false, err
 	}
-	if storageClass == nil || storageClass.AllowVolumeExpansion == nil {
+	if storageClass.AllowVolumeExpansion == nil {
 		return false, nil
 	}
 	return *storageClass.AllowVolumeExpansion, nil

@@ -20,8 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"reflect"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -41,19 +45,14 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
 
+	// find all objects that are not component and set ownership to the component
 	objects := graphCli.FindAll(dag, &appsv1alpha1.Component{}, &model.HaveDifferentTypeWithOption{})
-	// controllerutil.AddFinalizer(comp, constant.DBComponentFinalizerName)
-	controllerutil.AddFinalizer(comp, constant.DBClusterFinalizerName)
-
 	for _, object := range objects {
-		// TODO: skip to set ownership for ClusterRoleBinding/PersistentVolume which is a cluster-scoped object.
-		if _, ok := object.(*rbacv1.ClusterRoleBinding); ok {
+		if skipSetCompOwnership(object) {
 			continue
 		}
-		if _, ok := object.(*corev1.PersistentVolume); ok {
-			continue
-		}
-		// if err := intctrlutil.SetOwnership(comp, object, rscheme, constant.DBComponentFinalizerName); err != nil {
+		// add component and cluster finalizers at the same time
+		addComponentFinalizer(object, comp)
 		if err := intctrlutil.SetOwnership(comp, object, rscheme, constant.DBClusterFinalizerName); err != nil {
 			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 				continue
@@ -63,4 +62,41 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 	}
 
 	return nil
+}
+
+// skipSetCompOwnership returns true if the object should not be set ownership to the component
+func skipSetCompOwnership(obj client.Object) bool {
+	switch obj.(type) {
+	case *rbacv1.ClusterRoleBinding, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim, *corev1.Pod:
+		return true
+	default:
+		return false
+	}
+}
+
+func addComponentFinalizer(obj client.Object, comp *appsv1alpha1.Component) {
+	if shouldSkipAddingCompFinalizer(obj, comp) {
+		return
+	}
+	controllerutil.AddFinalizer(obj, constant.DBComponentFinalizerName)
+}
+
+func shouldSkipAddingCompFinalizer(obj client.Object, comp *appsv1alpha1.Component) bool {
+	// Due to compatibility reasons, the component controller creates cluster-scoped RoleBinding and ServiceAccount objects in the following two scenarios:
+	// 1. When the user does not specify a ServiceAccount, KubeBlocks automatically creates a ServiceAccount and a RoleBinding with named pattern kb-{cluster.Name}.
+	// 2. When the user specifies a ServiceAccount that does not exist, KubeBlocks will automatically create a ServiceAccount and a RoleBinding with the same name.
+	// In both cases, the lifecycle of the RoleBinding and ServiceAccount should not be tied to the component.
+	skipTypes := []interface{}{
+		&rbacv1.RoleBinding{},
+		&corev1.ServiceAccount{},
+	}
+
+	for _, t := range skipTypes {
+		if objType, ok := obj.(interface{ GetName() string }); ok && reflect.TypeOf(obj) == reflect.TypeOf(t) {
+			if !strings.HasPrefix(objType.GetName(), constant.GenerateDefaultServiceAccountName(comp.GetName())) {
+				return true
+			}
+		}
+	}
+	return false
 }

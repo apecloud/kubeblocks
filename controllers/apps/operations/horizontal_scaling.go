@@ -38,7 +38,6 @@ func init() {
 	hsHandler := horizontalScalingOpsHandler{}
 	horizontalScalingBehaviour := OpsBehaviour{
 		// if cluster is Abnormal or Failed, new opsRequest may repair it.
-		// TODO: we should add "force" flag for these opsRequest.
 		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
 		QueueByCluster:    true,
@@ -67,8 +66,6 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		}
 		r := horizontalScaling.Replicas
 		opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
-		opsRes.Cluster.Spec.ComponentSpecs[index].Instances = horizontalScaling.Instances
-		opsRes.Cluster.Spec.ComponentSpecs[index].Nodes = horizontalScaling.Nodes
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }

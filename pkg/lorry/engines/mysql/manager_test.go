@@ -255,7 +255,7 @@ func TestManager_GetMemberAddrs(t *testing.T) {
 	defer viper.Reset()
 	addrs := manager.GetMemberAddrs(ctx, cluster)
 	assert.Len(t, addrs, 1)
-	assert.Equal(t, "fake-mysql-0.-headless.fake-namespace.svc.cluster.local:fake-port", addrs[0])
+	assert.Equal(t, "fake-mysql-0.fake-mysql-headless.fake-namespace.svc.cluster.local:fake-port", addrs[0])
 }
 
 func TestManager_IsMemberLagging(t *testing.T) {
@@ -352,7 +352,7 @@ func TestManager_WriteCheck(t *testing.T) {
 			WillReturnError(fmt.Errorf("some error"))
 
 		canWrite := manager.WriteCheck(ctx, manager.DB)
-		assert.False(t, canWrite)
+		assert.NotNil(t, canWrite)
 	})
 
 	t.Run("write check successfully", func(t *testing.T) {
@@ -360,7 +360,7 @@ func TestManager_WriteCheck(t *testing.T) {
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		canWrite := manager.WriteCheck(ctx, manager.DB)
-		assert.True(t, canWrite)
+		assert.Nil(t, canWrite)
 	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -377,7 +377,7 @@ func TestManager_ReadCheck(t *testing.T) {
 			WillReturnError(sql.ErrNoRows)
 
 		canRead := manager.ReadCheck(ctx, manager.DB)
-		assert.True(t, canRead)
+		assert.Nil(t, canRead)
 	})
 
 	t.Run("no healthy database", func(t *testing.T) {
@@ -385,7 +385,7 @@ func TestManager_ReadCheck(t *testing.T) {
 			WillReturnError(&mysql.MySQLError{Number: 1049})
 
 		canRead := manager.ReadCheck(ctx, manager.DB)
-		assert.True(t, canRead)
+		assert.Nil(t, canRead)
 	})
 
 	t.Run("Read check failed", func(t *testing.T) {
@@ -393,7 +393,7 @@ func TestManager_ReadCheck(t *testing.T) {
 			WillReturnError(fmt.Errorf("some error"))
 
 		canRead := manager.ReadCheck(ctx, manager.DB)
-		assert.False(t, canRead)
+		assert.NotNil(t, canRead)
 	})
 
 	t.Run("Read check successfully", func(t *testing.T) {
@@ -401,7 +401,7 @@ func TestManager_ReadCheck(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"check_ts"}).AddRow(1))
 
 		canRead := manager.ReadCheck(ctx, manager.DB)
-		assert.True(t, canRead)
+		assert.Nil(t, canRead)
 	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -699,10 +699,10 @@ func TestManager_Follow(t *testing.T) {
 		mock.ExpectExec("SET GLOBAL rpl_semi_sync_source_timeout = 4294967295").
 			WillReturnResult(sqlmock.NewResult(1, 1))
 		addr := cluster.GetMemberAddrWithPort(*cluster.GetLeaderMember())
-		mysqlConfig, err := mysql.ParseDSN(config.url)
+		mysqlConfig, err := mysql.ParseDSN(config.URL)
 		assert.Nil(t, err)
 		mysqlConfig.User = config.Username
-		mysqlConfig.Passwd = config.password
+		mysqlConfig.Passwd = config.Password
 		mysqlConfig.Addr = addr
 		connectionPoolCache[mysqlConfig.FormatDSN()] = manager.DB
 

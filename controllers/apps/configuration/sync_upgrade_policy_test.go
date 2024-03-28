@@ -62,7 +62,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
 					return reconfigureClient, nil
 				}),
-				withMockStatefulSet(3, nil),
+				withMockRSM(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigConstraintSpec(&appsv1alpha1.FormatterConfig{Format: appsv1alpha1.RedisCfg}),
 				withConfigPatch(map[string]string{
@@ -79,9 +79,9 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
-					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 3,
+					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3,
 						withReadyPod(0, 1))),
-					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 3,
+					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3,
 						withReadyPod(0, 3))),
 				}),
 				testutil.WithAnyTimes()))
@@ -119,7 +119,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
 					return reconfigureClient, nil
 				}),
-				withMockStatefulSet(3, nil),
+				withMockRSM(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigConstraintSpec(&appsv1alpha1.FormatterConfig{Format: appsv1alpha1.RedisCfg}),
 				withConfigPatch(map[string]string{
@@ -143,7 +143,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(
-					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 3,
+					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3,
 						withReadyPod(0, 1), func(pod *corev1.Pod, index int) {
 							if index == 0 {
 								if pod.Labels == nil {

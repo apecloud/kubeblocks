@@ -89,9 +89,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetClassRef(compSpec.ClassDefRef).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
-		SetNodes(compSpec.Nodes).
-		SetInstances(compSpec.Instances).
-		SetTransformPolicy(compSpec.RsmTransformPolicy)
+		SetInstances(compSpec.Instances)
 	if labels != nil {
 		compBuilder.AddLabelsInMap(labels)
 	}

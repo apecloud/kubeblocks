@@ -51,16 +51,19 @@ type renderWrapper struct {
 	templateAnnotations map[string]string
 	renderedObjs        []client.Object
 
-	ctx     context.Context
-	cli     client.Client
-	cluster *appsv1alpha1.Cluster
+	ctx       context.Context
+	cli       client.Client
+	cluster   *appsv1alpha1.Cluster
+	component *appsv1alpha1.Component
 }
 
-func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *appsv1alpha1.Cluster, ctx context.Context, cli client.Client) renderWrapper {
+func newTemplateRenderWrapper(ctx context.Context, cli client.Client, templateBuilder *configTemplateBuilder,
+	cluster *appsv1alpha1.Cluster, component *appsv1alpha1.Component) renderWrapper {
 	return renderWrapper{
-		ctx:     ctx,
-		cli:     cli,
-		cluster: cluster,
+		ctx:       ctx,
+		cli:       cli,
+		cluster:   cluster,
+		component: component,
 
 		templateBuilder:     templateBuilder,
 		templateAnnotations: make(map[string]string),
@@ -249,7 +252,7 @@ func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.Compon
 	if configuration != nil {
 		err = intctrlutil.SetControllerReference(configuration, cm)
 	} else {
-		err = intctrlutil.SetOwnerReference(wrapper.cluster, cm)
+		err = intctrlutil.SetControllerReference(wrapper.component, cm)
 	}
 	if err != nil {
 		return err

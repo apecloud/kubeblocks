@@ -69,6 +69,7 @@ func (w *WorkflowContext) Run(compCustomSpec *appsv1alpha1.CustomOpsComponent) (
 			workflowStatus.IsCompleted = true
 			workflowStatus.ExistFailure = true
 		}
+		w.OpsRes.OpsRequest.Status.Components[compCustomSpec.ComponentName] = compStatus
 	}()
 	setSucceedWorkflowStatus := func(actionIndex int) {
 		workflowStatus.CompletedCount += 1
@@ -97,8 +98,8 @@ steps:
 				return nil, err
 			}
 			progressDetail.ActionTasks = actionStatus.ActionTasks
-			progressDetail.Status = appsv1alpha1.ProcessingProgressStatus
-			progressDetail.Message = fmt.Sprintf(`Start to processing action "%s" of the component %s`, actions[i].Name, comp.Name)
+			progressDetail.SetStatusAndMessage(appsv1alpha1.ProcessingProgressStatus,
+				fmt.Sprintf(`Start to processing action "%s" of the component %s`, actions[i].Name, comp.Name))
 			setComponentStatusProgressDetail(w.reqCtx.Recorder, w.OpsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			break steps
 		case appsv1alpha1.ProcessingProgressStatus:

@@ -258,8 +258,7 @@ func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer st
 	if !controllerutil.ContainsFinalizer(obj, finalizer) {
 		// pvc objects do not need to add finalizer
 		_, ok := obj.(*corev1.PersistentVolumeClaim)
-		_, isPod := obj.(*corev1.Pod)
-		if !ok && !isPod {
+		if !ok {
 			if !controllerutil.AddFinalizer(obj, finalizer) {
 				return ErrFailedToAddFinalizer
 			}
@@ -271,7 +270,7 @@ func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer st
 // CheckResourceExists checks whether resource exist or not.
 func CheckResourceExists(
 	ctx context.Context,
-	cli client.Client,
+	cli client.Reader,
 	key client.ObjectKey,
 	obj client.Object) (bool, error) {
 	if err := cli.Get(ctx, key, obj); err != nil {

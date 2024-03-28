@@ -160,6 +160,16 @@ var _ = Describe("replicated_state_machine builder", func() {
 			Username: workloads.CredentialVar{Value: "foo"},
 			Password: workloads.CredentialVar{Value: "bar"},
 		}
+		instances := []workloads.InstanceTemplate{
+			{
+				Replicas:     func() *int32 { r := int32(2); return &r }(),
+				GenerateName: func() *string { n := "hello"; return &n }(),
+			},
+			{
+				Replicas: func() *int32 { r := int32(1); return &r }(),
+				Name:     func() *string { n := "world"; return &n }(),
+			},
+		}
 		rsm := NewReplicatedStateMachineBuilder(ns, name).
 			SetReplicas(replicas).
 			SetMinReadySeconds(minReadySeconds).
@@ -183,6 +193,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 			SetAlternativeServices(alternativeServices).
 			SetPaused(paused).
 			SetCredential(credential).
+			SetInstances(instances).
 			GetObject()
 
 		Expect(rsm.Name).Should(Equal(name))
@@ -225,5 +236,6 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(rsm.Spec.Paused).Should(Equal(paused))
 		Expect(rsm.Spec.Credential).ShouldNot(BeNil())
 		Expect(*rsm.Spec.Credential).Should(Equal(credential))
+		Expect(rsm.Spec.Instances).Should(Equal(instances))
 	})
 })

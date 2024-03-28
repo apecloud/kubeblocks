@@ -53,16 +53,6 @@ func (builder *ReplicatedStateMachineBuilder) SetMinReadySeconds(minReadySeconds
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetRsmTransformPolicy(transformPolicy workloads.RsmTransformPolicy) *ReplicatedStateMachineBuilder {
-	builder.get().Spec.RsmTransformPolicy = transformPolicy
-	return builder
-}
-
-func (builder *ReplicatedStateMachineBuilder) SetNodeAssignment(nodeAssignment []workloads.NodeAssignment) *ReplicatedStateMachineBuilder {
-	builder.get().Spec.NodeAssignment = nodeAssignment
-	return builder
-}
-
 func (builder *ReplicatedStateMachineBuilder) AddMatchLabel(key, value string) *ReplicatedStateMachineBuilder {
 	labels := make(map[string]string, 1)
 	labels[key] = value
@@ -189,5 +179,10 @@ func (builder *ReplicatedStateMachineBuilder) SetPaused(paused bool) *Replicated
 
 func (builder *ReplicatedStateMachineBuilder) SetCredential(credential workloads.Credential) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.Credential = &credential
+	return builder
+}
+
+func (builder *ReplicatedStateMachineBuilder) SetInstances(instances []workloads.InstanceTemplate) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.Instances = instances
 	return builder
 }

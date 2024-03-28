@@ -306,3 +306,18 @@ func GetPodFirstContainerPort(pod *corev1.Pod) int32 {
 	}
 	return ports[0].ContainerPort
 }
+
+// ExistTargetVolume checks if the backup.status.backupMethod.targetVolumes exists the target volume which should be restored.
+func ExistTargetVolume(targetVolumes *dpv1alpha1.TargetVolumeInfo, volumeName string) bool {
+	for _, v := range targetVolumes.Volumes {
+		if v == volumeName {
+			return true
+		}
+	}
+	for _, v := range targetVolumes.VolumeMounts {
+		if v.Name == volumeName {
+			return true
+		}
+	}
+	return false
+}

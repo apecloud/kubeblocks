@@ -251,7 +251,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.LorryPort = getLorryPort(&pod)
-		member.SyncerPort = getSyncerPort(&pod)
+		member.HAPort = getHAPort(&pod)
 		member.UID = string(pod.UID)
 		if pod.Spec.HostNetwork {
 			member.UseIP = true
@@ -681,10 +681,10 @@ func getLorryPort(pod *corev1.Pod) string {
 	return ""
 }
 
-func getSyncerPort(pod *corev1.Pod) string {
+func getHAPort(pod *corev1.Pod) string {
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
-			if port.Name == "syncer" {
+			if port.Name == "ha" {
 				return strconv.Itoa(int(port.ContainerPort))
 			}
 		}

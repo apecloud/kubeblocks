@@ -97,14 +97,14 @@ func (s *Rebuild) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 
 	cluster := s.dcsStore.GetClusterFromCache()
 	currentMember := cluster.GetMemberWithName(s.dbManager.GetCurrentMemberName())
-	if currentMember == nil || currentMember.SyncerPort == "" {
-		return nil, errors.Errorf("current node does not support rebuild, there is no syncer yet")
+	if currentMember == nil || currentMember.HAPort == "" {
+		return nil, errors.Errorf("current node does not support rebuild, there is no ha service yet")
 	}
 
-	syncerAddr := fmt.Sprintf("http://127.0.0.1:%s/v1.0/rebuild", currentMember.SyncerPort)
-	httpResp, err := http.Post(syncerAddr, "application/json", nil)
+	haAddr := fmt.Sprintf("http://127.0.0.1:%s/v1.0/rebuild", currentMember.HAPort)
+	httpResp, err := http.Post(haAddr, "application/json", nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "request syncer failed")
+		return nil, errors.Wrap(err, "request ha service failed")
 	}
 	bodyBytes, err := io.ReadAll(httpResp.Body)
 	if err != nil {
@@ -116,7 +116,7 @@ func (s *Rebuild) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 		return resp, nil
 	}
 
-	s.logger.Info("request syncer failed", "status code", httpResp.StatusCode, "body", bodyString)
+	s.logger.Info("request ha service failed", "status code", httpResp.StatusCode, "body", bodyString)
 	errResult := make(map[string]string)
 	err = json.Unmarshal(bodyBytes, &errResult)
 	if err != nil {

@@ -842,16 +842,16 @@ var _ = Describe("Lorry HTTP Client", func() {
 			mockDCSStore.EXPECT().GetClusterFromCache().Return(cluster)
 			err := lorryClient.Rebuild(context.TODO())
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("there is no syncer yet"))
+			Expect(err.Error()).Should(ContainSubstring("there is no ha service yet"))
 		})
 
 		It("request failed", func() {
-			cluster.Members[0].SyncerPort = "63601"
+			cluster.Members[0].HAPort = "63601"
 			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName)
 			mockDCSStore.EXPECT().GetClusterFromCache().Return(cluster)
 			err := lorryClient.Rebuild(context.TODO())
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("request syncer failed"))
+			Expect(err.Error()).Should(ContainSubstring("request ha service failed"))
 		})
 	})
 })

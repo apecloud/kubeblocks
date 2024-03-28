@@ -52,7 +52,10 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 
 	// 1. build all templates by applying instance template overrides to default pod template
-	replicaTemplateGroups := buildReplicaTemplateGroups(rsm, tree)
+	replicaTemplateGroups, err := buildReplicaTemplateGroups(rsm, tree)
+	if err != nil {
+		return nil, err
+	}
 
 	// build replica revision list by template groups
 	var replicaRevisionList []replicaRevision
@@ -110,7 +113,7 @@ func buildReplicaRevisions(template *podTemplateSpecExt, ordinal int, parent *wo
 	var replicaList []replicaRevision
 	var name string
 	for i := 0; i < int(template.Replicas); i++ {
-		name, ordinal = generatePodName(template.Name, template.GenerateName, ordinal, int(template.OrdinalStart), i)
+		name, ordinal = GeneratePodName(template.Name, template.GenerateName, ordinal, int(template.OrdinalStart), i)
 		replicaList = append(replicaList, replicaRevision{name: name, revision: revision})
 	}
 	return replicaList, ordinal, nil

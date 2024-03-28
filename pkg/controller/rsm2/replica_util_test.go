@@ -367,7 +367,9 @@ var _ = Describe("replica util test", func() {
 			Expect(tree.Add(templateObj)).Should(Succeed())
 
 			By("parse instance templates")
-			instanceTemplates := getInstanceTemplates(rsm, tree)
+			template, err := findTemplate(rsm, tree)
+			Expect(err).Should(BeNil())
+			instanceTemplates := getInstanceTemplates(rsm.Spec.Instances, template)
 			// append templates from mock function
 			instances = append(instances, []workloads.InstanceTemplate{
 				{
@@ -404,7 +406,7 @@ var _ = Describe("replica util test", func() {
 	// Based on rule #2, we generate 2 pod names 'foo-100', 'foo-101' from template #2.
 	// Based on rule #3, template #1 and #4 share the same ordinal range and start from 0, we generate 4 pod names 'foo-0','foo-1','foo-2','foo-3'.
 	// So the final 7 pod names are: 'foo', 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', 'foo-101'.
-	Context("generatePodName", func() {
+	Context("GeneratePodName", func() {
 		It("should work well", func() {
 			templates := []podTemplateSpecExt{
 				{
@@ -456,14 +458,14 @@ var _ = Describe("replica util test", func() {
 
 			for _, template := range templates {
 				for i := 0; i < int(template.Replicas); i++ {
-					podName, ordinal = generatePodName(template.Name, template.GenerateName, ordinal, int(template.OrdinalStart), i)
+					podName, ordinal = GeneratePodName(template.Name, template.GenerateName, ordinal, int(template.OrdinalStart), i)
 					podNames = append(podNames, podName)
 				}
 			}
 			getNameNOrdinalFunc := func(i int) (string, int) {
-				return parseParentNameAndOrdinal(podNames[i])
+				return ParseParentNameAndOrdinal(podNames[i])
 			}
-			baseSort(podNames, getNameNOrdinalFunc, nil, false)
+			BaseSort(podNames, getNameNOrdinalFunc, nil, false)
 			podNamesExpected := []string{"foo", "foo-0", "foo-1", "foo-2", "foo-3", "foo-100", "foo-101"}
 			Expect(podNames).Should(Equal(podNamesExpected))
 		})

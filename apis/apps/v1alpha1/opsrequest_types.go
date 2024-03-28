@@ -267,6 +267,37 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
+
+	// Specifies instances to add for the workloads.
+	// +optional
+	InstancesToAdd []InstanceTemplate `json:"instancesToAdd,omitempty"`
+
+	// Specifies the instances to be updated for the workloads.
+	// The template will be matched based on the provided Name or GenerateName if Name is not provided.
+	// If a Name is provided, and it belongs to a specific template, the template will be divided into three new templates.
+	// For example, if an instance with the Name 'foo-2' in InstancesToUpdate matches a template with the GenerateName 'foo' and Replicas 5 in the target component Instances,
+	// the target template will be split into three templates:
+	// template 1 with the GenerateName 'foo', Replicas 2, and OrdinalStart 0;
+	// template 2 with the Name 'foo-2';
+	// template 3 with the GenerateName 'foo', Replicas 2, and OrdinalStart 3.
+	//
+	// An error will be raised if no matching template is found.
+	//
+	// +optional
+	InstancesToUpdate []InstanceTemplate `json:"instancesToUpdate,omitempty"`
+
+	// Specifies instances to delete for the workloads.
+	// The template will be matched based on the provided Name or GenerateName if Name is not provided.
+	// If a Name is provided, and it belongs to a specific template, the template will be divided into two new templates.
+	// For example, if an instance with the Name 'foo-2' in InstancesToDelete matches a template with the GenerateName 'foo' and Replicas 5 in the target component Instances,
+	// the target template will be split into two templates:
+	// template 1 with the GenerateName 'foo', Replicas 2, and OrdinalStart 0;
+	// template 2 with the GenerateName 'foo', Replicas 2, and OrdinalStart 3.
+	//
+	// An error will be raised if no matching template is found.
+	//
+	// +optional
+	InstancesToDelete []InstanceTemplate `json:"instancesToDelete,omitempty"`
 }
 
 // Reconfigure represents the variables required for updating a configuration.
@@ -771,6 +802,10 @@ type LastComponentConfiguration struct {
 	// The resource key is in the list of [pods].
 	// +optional
 	TargetResources map[ComponentResourceKey][]string `json:"targetResources,omitempty"`
+
+	// Records the last instances of the component.
+	// +optional
+	Instances *[]InstanceTemplate `json:"instances,omitempty"`
 }
 
 type LastConfiguration struct {

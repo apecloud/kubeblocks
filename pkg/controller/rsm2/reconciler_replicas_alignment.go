@@ -91,8 +91,8 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	// 3. handle alignment (create new replicas and delete useless replicas)
 	// create new replicas
 	newNameList := newNameSet.List()
-	baseSort(newNameList, func(i int) (string, int) {
-		return parseParentNameAndOrdinal(newNameList[i])
+	BaseSort(newNameList, func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(newNameList[i])
 	}, nil, false)
 	getPredecessor := func(i int) *corev1.Pod {
 		if i <= 0 {

@@ -38,12 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 )
 
-// According to 'https://pkg.go.dev/text/template' :
-// For `range`, if the value is a map and the keys can be sorted, the elements will be visited in sorted key order.
-const defaultBatchInputTemplate string = `{{- range $pKey, $pValue := $ }}
-{{ printf "%s=%s" $pKey $pValue }}
-{{- end }}`
-
 type configVolumeHandleMeta struct {
 	ConfigHandler
 
@@ -187,14 +181,12 @@ type shellCommandHandler struct {
 	batchInputTemplate string
 }
 
-func generateBatchStdinData(updatedParams map[string]string, batchInputTemplate string) (string, error) {
+func generateBatchStdinData(updatedParams map[string]string, batchInputTemplate string, ctx context.Context) (string, error) {
 	tplValues := gotemplate.TplValues{}
 	for k, v := range updatedParams {
 		tplValues[k] = v
 	}
-	engine := gotemplate.NewTplEngine(
-		&tplValues, nil, "render-batch-input-parameters", nil, context.TODO(),
-	)
+	engine := gotemplate.NewTplEngine(&tplValues, nil, "render-batch-input-parameters", nil, ctx)
 	stdinStr, err := engine.Render(batchInputTemplate)
 	return strings.TrimSpace(stdinStr) + "\n", err
 }
@@ -207,47 +199,55 @@ func (s *shellCommandHandler) OnlineUpdate(ctx context.Context, name string, upd
 	return s.execHandler(ctx, updatedParams, args...)
 }
 
-func execWithBatchReload(ctx context.Context, updatedParams map[string]string, batchInputTemplate string, commandName string, args ...string) (string, error) {
+func doBatchReloadAction(ctx context.Context, updatedParams map[string]string, fn ActionCallback, batchInputTemplate string, commandName string, args ...string) error {
+	// If there are any errors, try to check them before all steps.
+	batchStdinStr, err := generateBatchStdinData(updatedParams, batchInputTemplate, ctx)
+	if err != nil {
+		logger.Error(err, "cannot generate batch stdin data")
+		return err
+	}
+
 	command := exec.CommandContext(ctx, commandName, args...)
 	stdin, err := command.StdinPipe()
 	if err != nil {
-		return "", errors.Wrap(err, "cannot create a pipe connecting to the STDIN of the command")
+		return errors.Wrap(err, "cannot create a pipe connecting to the STDIN of the command")
 	}
-	var batchStdinStr string
+
 	go func() {
 		defer stdin.Close()
-		var err error
-		batchStdinStr, err = generateBatchStdinData(updatedParams, batchInputTemplate)
-		if err != nil {
-			logger.Error(err, "cannot generate batch stdin data")
-			return
-		}
 		if _, err := io.WriteString(stdin, batchStdinStr); err != nil {
 			logger.Error(err, "cannot write batch stdin data into STDIN stream")
-			return
 		}
 	}()
+
 	stdout, err := cfgutil.ExecShellCommand(command)
-	logger.Info("batch execute",
-		"exec", command.String(),
+	if fn != nil {
+		fn(stdout, err)
+	}
+	logger.Info("do batch reload action",
+		"command", command.String(),
 		"stdin", batchStdinStr,
 		"stdout", stdout,
 		"error", err,
 	)
-	return stdout, err
+	return err
 }
 
-func execWithSeparateReload(ctx context.Context, updatedParams map[string]string, commandName string, args ...string) ([]string, error) {
-	stdouts := []string{}
+// ActionCallback is a callback function for testcase.
+type ActionCallback func(output string, err error)
+
+func doReloadAction(ctx context.Context, updatedParams map[string]string, fn ActionCallback, commandName string, args ...string) error {
 	commonHandle := func(args []string) error {
 		command := exec.CommandContext(ctx, commandName, args...)
 		stdout, err := cfgutil.ExecShellCommand(command)
-		logger.Info("execute single param reload",
-			"exec", command.String(),
+		if fn != nil {
+			fn(stdout, err)
+		}
+		logger.Info("do reload action",
+			"command", command.String(),
 			"stdout", stdout,
 			"err", err,
 		)
-		stdouts = append(stdouts, stdout)
 		return err
 	}
 	volumeHandle := func(baseCMD []string, paramName, paramValue string) error {
@@ -258,38 +258,17 @@ func execWithSeparateReload(ctx context.Context, updatedParams map[string]string
 	}
 	for key, value := range updatedParams {
 		if err := volumeHandle(args, key, value); err != nil {
-			return nil, err
-		}
-	}
-	return stdouts, nil
-}
-
-func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map[string]string, args ...string) error {
-	if s.isBatchReload {
-		stdout, err := execWithBatchReload(ctx, updatedParams, s.batchInputTemplate, s.command, args...)
-		logger.Info("execute with batch reload",
-			"updated_params", updatedParams,
-			"batch_input_template", s.batchInputTemplate,
-			"execute_args", append([]string{s.command}, args...),
-			"stdout", stdout,
-		)
-		if err != nil {
-			return errors.Wrap(err, "execute with batch reload failed")
-		}
-	} else {
-		stdouts, err := execWithSeparateReload(ctx, updatedParams, s.command, args...)
-		execArgs := append([]string{s.command}, args...)
-		execArgs = append(execArgs, "param_key_N", "param_value_N")
-		logger.Info("execute with individual param reload",
-			"updated_params", updatedParams,
-			"execute_args", execArgs,
-			"stdouts", stdouts,
-		)
-		if err != nil {
-			return errors.Wrap(err, "execute with individual param reload failed")
+			return err
 		}
 	}
 	return nil
+}
+
+func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map[string]string, args ...string) error {
+	if s.isBatchReload && s.batchInputTemplate != "" {
+		return doBatchReloadAction(ctx, updatedParams, nil, s.batchInputTemplate, s.command, args...)
+	}
+	return doReloadAction(ctx, updatedParams, nil, s.command, args...)
 }
 
 func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
@@ -378,23 +357,34 @@ func createConfigVolumeMeta(configSpecName string, reloadType v1.CfgReloadType, 
 	}
 }
 
-func isBatchReload(configMeta *ConfigSpecInfo) bool {
+func isShellCommand(configMeta *ConfigSpecInfo) bool {
 	return configMeta != nil &&
-		configMeta.ReloadOptions != nil &&
-		configMeta.ReloadOptions.ShellTrigger != nil &&
-		configMeta.ReloadOptions.ShellTrigger.BatchReload != nil &&
-		*(configMeta.ShellTrigger.BatchReload)
+		configMeta.DynamicReloadAction != nil &&
+		configMeta.DynamicReloadAction.ShellTrigger != nil
+}
+
+func isBatchReloadMode(shellAction *v1.ShellTrigger) bool {
+	return shellAction.BatchReload != nil && *shellAction.BatchReload
+}
+
+func isValidBatchReload(shellAction *v1.ShellTrigger) bool {
+	return isBatchReloadMode(shellAction) && len(shellAction.BatchParametersTemplate) > 0
+}
+
+func isBatchReload(configMeta *ConfigSpecInfo) bool {
+	return isShellCommand(configMeta) && isBatchReloadMode(configMeta.DynamicReloadAction.ShellTrigger)
 }
 
 func getBatchInputTemplate(configMeta *ConfigSpecInfo) string {
-	batchInputTemplate := defaultBatchInputTemplate
-	if configMeta != nil &&
-		configMeta.ReloadOptions != nil &&
-		configMeta.ReloadOptions.ShellTrigger != nil &&
-		len(configMeta.ReloadOptions.ShellTrigger.BatchInputTemplate) > 0 {
-		batchInputTemplate = configMeta.ShellTrigger.BatchInputTemplate
+	if !isShellCommand(configMeta) {
+		return ""
 	}
-	return batchInputTemplate
+
+	shellAction := configMeta.DynamicReloadAction.ShellTrigger
+	if isValidBatchReload(shellAction) {
+		return shellAction.BatchParametersTemplate
+	}
+	return ""
 }
 
 func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSpecInfo, backupPath string) (ConfigHandler, error) {

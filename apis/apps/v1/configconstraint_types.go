@@ -279,6 +279,61 @@ type ShellTrigger struct {
 	//
 	// +optional
 	Sync *bool `json:"sync,omitempty"`
+
+	// Specifies whether to reconfigure dynamic parameters individually or in a batch.
+	// - Set to 'True' to execute the reload action in a batch, incorporating all parameter changes.
+	// - Set to 'False' to execute the reload action for each parameter change individually.
+	// The default value is 'False'.
+	//
+	// +optional
+	BatchReload *bool `json:"batchReload,omitempty"`
+
+	// When `batchReload` is set to 'True', this parameter allows for the optional specification
+	// of the batch input format that is passed into the STDIN of the script.
+	// The format should be provided as a Go template string.
+	// In the template, the updated parameters' key-value map can be referenced using the dollar sign ('$') variable.
+	// Here's an example of an input template:
+	//
+	// ```yaml
+	//
+	// batchParametersTemplate: |-
+	//
+	// {{- range $pKey, $pValue := $ }}
+	//
+	// {{ printf "%s:%s" $pKey $pValue }}
+	//
+	// {{- end }}
+	//
+	// ```
+	//
+	// In this example, each updated parameter is iterated over in a sorted order by keys to generate the batch input data as follows:
+	//
+	// ```
+	//
+	// key1:value1
+	//
+	// key2:value2
+	//
+	// key3:value3
+	//
+	// ```
+	//
+	// If this parameter is not specified, the default format used for STDIN is as follows:
+	// Each updated parameter generates a line that concatenates the parameter's key and value with a equal sign ('=').
+	// These lines are then sorted by their keys and inserted accordingly. Here's an example of the batch input data using the default template:
+	//
+	// ```
+	//
+	// key1=value1
+	//
+	// key2=value2
+	//
+	// key3=value3
+	//
+	// ```
+	//
+	// +optional
+	BatchParametersTemplate string `json:"batchParametersTemplate,omitempty"`
 }
 
 type TPLScriptTrigger struct {

@@ -23,6 +23,7 @@ import (
 	"errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -51,16 +52,16 @@ func (cc *ConfigConstraint) ConvertFrom(srcRaw conversion.Hub) error {
 
 func convertToImpl(cc *ConfigConstraint, ccv1 *appsv1.ConfigConstraint) error {
 	convertObjectMeta(cc.ObjectMeta, ccv1)
-	convertConstraintSpec(&cc.Spec, &ccv1.Spec)
+	convertToConstraintSpec(&cc.Spec, &ccv1.Spec)
 	return nil
 }
 
-func convertObjectMeta(meta metav1.ObjectMeta, ccv1 *appsv1.ConfigConstraint) {
-	ccv1.Labels = meta.Labels
-	ccv1.Annotations = meta.Annotations
+func convertObjectMeta(src metav1.ObjectMeta, dst client.Object) {
+	dst.SetLabels(src.GetLabels())
+	dst.SetAnnotations(src.GetAnnotations())
 }
 
-func convertConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1.ConfigConstraintSpec) {
+func convertToConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1.ConfigConstraintSpec) {
 	ccv1.DynamicActionCanBeMerged = cc.DynamicActionCanBeMerged
 	ccv1.DynamicParameterSelectedPolicy = cc.DynamicParameterSelectedPolicy
 	ccv1.ReloadToolsImage = cc.ToolsImageSpec
@@ -99,6 +100,37 @@ func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1.ConfigConst
 	}
 }
 
-func convertFromImpl(_ *appsv1.ConfigConstraint, _ *ConfigConstraint) error {
-	return errors.New("not implemented")
+func convertFromImpl(ccv1 *appsv1.ConfigConstraint, cc *ConfigConstraint) error {
+	convertObjectMeta(ccv1.ObjectMeta, cc)
+	convertFromConstraintSpec(&ccv1.Spec, &cc.Spec)
+	return nil
+}
+
+func convertFromConstraintSpec(ccv1 *appsv1.ConfigConstraintSpec, cc *ConfigConstraintSpec) {
+	cc.DynamicActionCanBeMerged = ccv1.DynamicActionCanBeMerged
+	cc.DynamicParameterSelectedPolicy = ccv1.DynamicParameterSelectedPolicy
+	cc.ToolsImageSpec = ccv1.ReloadToolsImage
+	cc.DownwardAPIOptions = ccv1.DownwardActions
+	cc.ScriptConfigs = ccv1.ScriptConfigs
+	cc.CfgSchemaTopLevelName = ccv1.ConfigSchemaTopLevelKey
+	cc.StaticParameters = ccv1.StaticParameters
+	cc.DynamicParameters = ccv1.DynamicParameters
+	cc.ImmutableParameters = ccv1.ImmutableParameters
+	cc.Selector = ccv1.DynamicReloadSelector
+	cc.FormatterConfig = ccv1.FormatterConfig
+
+	if ccv1.DynamicReloadAction != nil {
+		cc.ReloadOptions = &ReloadOptions{
+			UnixSignalTrigger: ccv1.DynamicReloadAction.UnixSignalTrigger,
+			ShellTrigger:      ccv1.DynamicReloadAction.ShellTrigger,
+			TPLScriptTrigger:  ccv1.DynamicReloadAction.TPLScriptTrigger,
+			AutoTrigger:       ccv1.DynamicReloadAction.AutoTrigger,
+		}
+	}
+	if ccv1.ConfigSchema != nil {
+		cc.ConfigurationSchema = &CustomParametersValidation{
+			Schema: ccv1.ConfigSchema.SchemaInJSON,
+			CUE:    ccv1.ConfigSchema.CUE,
+		}
+	}
 }

@@ -103,6 +103,9 @@ var _ = BeforeSuite(func() {
 	err = AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = v1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	err = admissionv1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 

@@ -7724,7 +7724,7 @@ LifecycleActionHandler
 </tr>
 <tr>
 <td>
-<code>dataPopulate</code><br/>
+<code>dataDump</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
 LifecycleActionHandler
@@ -7733,7 +7733,7 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the method to populate the data to create new replicas.
+<p>Defines the method to dump the data from a replica.
 This action is typically used when a new replica needs to be constructed, such as:</p>
 <ul>
 <li>scale-out</li>
@@ -7746,7 +7746,7 @@ This field cannot be updated.</p>
 </tr>
 <tr>
 <td>
-<code>dataAssemble</code><br/>
+<code>dataLoad</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
 LifecycleActionHandler
@@ -7755,14 +7755,14 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the method to assemble data synchronized from external before starting the service for a new replica.
+<p>Defines the method to load data into a replica.
 This action is typically used when creating a new replica, such as:</p>
 <ul>
 <li>scale-out</li>
 <li>rebuild</li>
 <li>clone</li>
 </ul>
-<p>The data will be streamed in via stdin. If any error occurs during the assembly process,
+<p>The data will be streamed in via stdin. If any error occurs during the process,
 the action must be able to guarantee idempotence to allow for retries from the beginning.
 This field cannot be updated.</p>
 </td>

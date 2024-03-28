@@ -1975,13 +1975,13 @@ func (in *ComponentLifecycleActions) DeepCopyInto(out *ComponentLifecycleActions
 		*out = new(LifecycleActionHandler)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.DataPopulate != nil {
-		in, out := &in.DataPopulate, &out.DataPopulate
+	if in.DataDump != nil {
+		in, out := &in.DataDump, &out.DataDump
 		*out = new(LifecycleActionHandler)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.DataAssemble != nil {
-		in, out := &in.DataAssemble, &out.DataAssemble
+	if in.DataLoad != nil {
+		in, out := &in.DataLoad, &out.DataLoad
 		*out = new(LifecycleActionHandler)
 		(*in).DeepCopyInto(*out)
 	}

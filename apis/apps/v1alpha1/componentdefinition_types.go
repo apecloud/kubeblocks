@@ -789,7 +789,7 @@ type ComponentLifecycleActions struct {
 	// +optional
 	Readwrite *LifecycleActionHandler `json:"readwrite,omitempty"`
 
-	// Defines the method to populate the data to create new replicas.
+	// Defines the method to dump the data from a replica.
 	// This action is typically used when a new replica needs to be constructed, such as:
 	//
 	// - scale-out
@@ -800,21 +800,21 @@ type ComponentLifecycleActions struct {
 	// This field cannot be updated.
 	//
 	// +optional
-	DataPopulate *LifecycleActionHandler `json:"dataPopulate,omitempty"`
+	DataDump *LifecycleActionHandler `json:"dataDump,omitempty"`
 
-	// Defines the method to assemble data synchronized from external before starting the service for a new replica.
+	// Defines the method to load data into a replica.
 	// This action is typically used when creating a new replica, such as:
 	//
 	// - scale-out
 	// - rebuild
 	// - clone
 	//
-	// The data will be streamed in via stdin. If any error occurs during the assembly process,
+	// The data will be streamed in via stdin. If any error occurs during the process,
 	// the action must be able to guarantee idempotence to allow for retries from the beginning.
 	// This field cannot be updated.
 	//
 	// +optional
-	DataAssemble *LifecycleActionHandler `json:"dataAssemble,omitempty"`
+	DataLoad *LifecycleActionHandler `json:"dataLoad,omitempty"`
 
 	// Defines the method to notify the replica service that there is a configuration update.
 	// This field cannot be updated.

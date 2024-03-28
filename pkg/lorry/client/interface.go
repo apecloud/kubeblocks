@@ -45,4 +45,7 @@ type Client interface {
 	Unlock(ctx context.Context) error
 	PostProvision(ctx context.Context, componentNames, podNames, podIPs, podHostNames, podHostIPs string) error
 	PreTerminate(ctx context.Context) error
+
+	DataDump(ctx context.Context) error
+	DataLoad(ctx context.Context) error
 }

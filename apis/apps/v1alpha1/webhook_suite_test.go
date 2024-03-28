@@ -44,7 +44,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -103,7 +103,7 @@ var _ = BeforeSuite(func() {
 	err = AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = v1.AddToScheme(scheme)
+	err = appsv1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = admissionv1.AddToScheme(scheme)
@@ -141,7 +141,7 @@ var _ = BeforeSuite(func() {
 			&Cluster{},
 			&ClusterVersion{},
 			&OpsRequest{},
-			&v1.ConfigConstraint{},
+			&appsv1.ConfigConstraint{},
 		},
 	})
 	Expect(err).NotTo(HaveOccurred())

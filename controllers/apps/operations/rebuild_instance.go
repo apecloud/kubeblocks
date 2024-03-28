@@ -498,9 +498,9 @@ func (r rebuildInstanceOpsHandler) createPrepareDataRestore(reqCtx intctrlutil.R
 		Affinity:                  insHelper.targetPod.Spec.Affinity,
 		TopologySpreadConstraints: insHelper.targetPod.Spec.TopologySpreadConstraints,
 	}
-	if insHelper.instance.NodeName != "" {
+	if insHelper.instance.TargetNodeName != "" {
 		schedulePolicy.NodeSelector = map[string]string{
-			corev1.LabelHostname: insHelper.instance.NodeName,
+			corev1.LabelHostname: insHelper.instance.TargetNodeName,
 		}
 	}
 	restore := &dpv1alpha1.Restore{
@@ -590,9 +590,9 @@ func (r rebuildInstanceOpsHandler) createTmpPVCsAndPod(reqCtx intctrlutil.Reques
 		AddLabels(constant.OpsRequestNamespaceLabelKey, opsRequest.Namespace).
 		SetTopologySpreadConstraints(insHelper.targetPod.Spec.TopologySpreadConstraints).
 		SetAffinity(insHelper.targetPod.Spec.Affinity)
-	if insHelper.instance.NodeName != "" {
+	if insHelper.instance.TargetNodeName != "" {
 		rebuildPodBuilder.SetNodeSelector(map[string]string{
-			corev1.LabelHostname: insHelper.instance.NodeName,
+			corev1.LabelHostname: insHelper.instance.TargetNodeName,
 		})
 	}
 	rebuildPod := rebuildPodBuilder.GetObject()

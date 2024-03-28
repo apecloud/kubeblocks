@@ -200,10 +200,10 @@ type Instance struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// The instance will be restored on the specified node when using local PV as the storage disk.
-	// If not set, it will be restored on a random node.
+	// The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+	// If not set, it will rebuild on a random node.
 	// +optional
-	NodeName string `json:"nodeName,omitempty"`
+	TargetNodeName string `json:"targetNodeName,omitempty"`
 }
 
 type Switchover struct {

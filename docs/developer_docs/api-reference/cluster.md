@@ -11440,15 +11440,15 @@ string
 </tr>
 <tr>
 <td>
-<code>nodeName</code><br/>
+<code>targetNodeName</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The instance will be restored on the specified node when using local PV as the storage disk.
-If not set, it will be restored on a random node.</p>
+<p>The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+If not set, it will rebuild on a random node.</p>
 </td>
 </tr>
 </tbody>

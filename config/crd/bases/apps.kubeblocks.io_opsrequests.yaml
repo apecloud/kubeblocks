@@ -513,10 +513,11 @@ spec:
                           name:
                             description: Pod name of the instance.
                             type: string
-                          nodeName:
-                            description: The instance will be restored on the specified
-                              node when using local PV as the storage disk. If not
-                              set, it will be restored on a random node.
+                          targetNodeName:
+                            description: The instance will rebuild on the specified
+                              node when the instance uses local PersistentVolume as
+                              the storage disk. If not set, it will rebuild on a random
+                              node.
                             type: string
                         required:
                         - name

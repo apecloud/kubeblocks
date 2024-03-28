@@ -506,15 +506,26 @@ spec:
                         type: object
                       type: array
                       x-kubernetes-preserve-unknown-fields: true
-                    instanceNames:
-                      description: Defines the names of the instances that need to
-                        be rebuilt. These are essentially the names of the pods.
+                    instances:
+                      description: Defines the instances that need to be rebuilt.
                       items:
-                        type: string
+                        properties:
+                          name:
+                            description: Pod name of the instance.
+                            type: string
+                          targetNodeName:
+                            description: The instance will rebuild on the specified
+                              node when the instance uses local PersistentVolume as
+                              the storage disk. If not set, it will rebuild on a random
+                              node.
+                            type: string
+                        required:
+                        - name
+                        type: object
                       type: array
                   required:
                   - componentName
-                  - instanceNames
+                  - instances
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:

@@ -78,11 +78,17 @@ var _ = Describe("OpsUtil functions", func() {
 			opsName := "rebuild-instance-" + testCtx.GetRandomStr()
 			ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.RebuildInstanceType)
+			var instances []appsv1alpha1.Instance
+			for _, insName := range instanceNames {
+				instances = append(instances, appsv1alpha1.Instance{
+					Name: insName,
+				})
+			}
 			ops.Spec.RebuildFrom = []appsv1alpha1.RebuildInstance{
 				{
-					ComponentOps:  appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-					InstanceNames: instanceNames,
-					BackupName:    backupName,
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					Instances:    instances,
+					BackupName:   backupName,
 				},
 			}
 			opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
@@ -170,8 +176,8 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("fake pod is unavailable")
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
-			for _, podName := range opsRes.OpsRequest.Spec.RebuildFrom[0].InstanceNames {
-				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: podName, Namespace: opsRes.OpsRequest.Namespace}, func(pod *corev1.Pod) {
+			for _, ins := range opsRes.OpsRequest.Spec.RebuildFrom[0].Instances {
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.OpsRequest.Namespace}, func(pod *corev1.Pod) {
 					pod.Status.Conditions = nil
 				})()).Should(Succeed())
 			}

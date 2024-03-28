@@ -11412,6 +11412,47 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.Instance">Instance
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Pod name of the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetNodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+If not set, it will rebuild on a random node.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
@@ -15143,13 +15184,15 @@ ComponentOps
 </tr>
 <tr>
 <td>
-<code>instanceNames</code><br/>
+<code>instances</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.Instance">
+[]Instance
+</a>
 </em>
 </td>
 <td>
-<p>Defines the names of the instances that need to be rebuilt. These are essentially the names of the pods.</p>
+<p>Defines the instances that need to be rebuilt.</p>
 </td>
 </tr>
 <tr>

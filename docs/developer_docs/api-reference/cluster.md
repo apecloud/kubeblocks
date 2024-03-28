@@ -5417,7 +5417,7 @@ bool
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
-<p>ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.</p>
+<p>ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.</p>
 </div>
 <table>
 <thead>
@@ -5436,7 +5436,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>CompDef specifies the definition used by the component that the referent object resident in.</p>
+<p>CompDef specifies the definition used by the component that the referent object resident in.
+If not specified, the component itself will be used.</p>
 </td>
 </tr>
 <tr>
@@ -5461,6 +5462,21 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specify whether the object must be defined.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>multipleClusterObjectOption</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectOption">
+MultipleClusterObjectOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>This option defines the behavior when multiple component objects match the specified @CompDef.
+If not provided, an error will be raised when handling multiple matches.</p>
 </td>
 </tr>
 </tbody>
@@ -12258,6 +12274,198 @@ ExporterConfig
 <em>(Optional)</em>
 <p>Provided by the provider and contains the necessary information for the Time Series Database.
 This field is only valid when BuiltIn is set to false.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectOption">MultipleClusterObjectOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectCombinedOption defines options for handling combined variables.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>newVarSuffix</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If set, the existing variable will be kept, and a new variable will be defined with the specified suffix
+in pattern: <var.name>_<suffix>.
+The new variable will be auto-created and placed behind the existing one.
+If not set, the existing variable will be reused with the value format defined below.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>valueFormat</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectValueFormat">
+MultipleClusterObjectValueFormat
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The format of the value that the operator will use to compose values from multiple components.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>flattenFormat</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectValueFormatFlatten">
+MultipleClusterObjectValueFormatFlatten
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The flatten format, default is: <comp-name-1>:value,<comp-name-2>:value.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectOption">MultipleClusterObjectOption
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference</a>)
+</p>
+<div>
+<p>MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>strategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectStrategy">
+MultipleClusterObjectStrategy
+</a>
+</em>
+</td>
+<td>
+<p>Define the strategy for handling multiple cluster objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>combinedOption</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">
+MultipleClusterObjectCombinedOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Define the options for handling combined variables.
+Valid only when the strategy is set to &ldquo;combined&rdquo;.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectStrategy">MultipleClusterObjectStrategy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectOption">MultipleClusterObjectOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectStrategy defines the strategy for handling multiple cluster objects.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;combined&#34;</p></td>
+<td><p>MultipleClusterObjectStrategyCombined - the values from all matched components will be combined into a single
+variable using the specified option.</p>
+</td>
+</tr><tr><td><p>&#34;individual&#34;</p></td>
+<td><p>MultipleClusterObjectStrategyIndividual - each matched component will have its individual variable with its name
+as the suffix.
+This is required when referencing credential variables that cannot be passed by values.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectValueFormat">MultipleClusterObjectValueFormat
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectValueFormat defines the format details for the value.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Flatten&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectValueFormatFlatten">MultipleClusterObjectValueFormatFlatten
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectValueFormatFlatten defines the flatten format for the value.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>delimiter</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Pair delimiter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>keyValueDelimiter</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Key-value delimiter.</p>
 </td>
 </tr>
 </tbody>

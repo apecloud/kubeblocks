@@ -175,9 +175,9 @@ type ComponentOps struct {
 type RebuildInstance struct {
 	ComponentOps `json:",inline"`
 
-	// Defines the names of the instances that need to be rebuilt. These are essentially the names of the pods.
+	// Defines the instances that need to be rebuilt.
 	// +kubebuilder:validation:Required
-	InstanceNames []string `json:"instanceNames"`
+	Instances []Instance `json:"instances"`
 
 	// Indicates the name of the backup from which to recover. Currently, only a full physical backup is supported
 	// unless your component only has one replica. Such as 'xtrabackup' is full physical backup for mysql and 'mysqldump' is not.
@@ -193,6 +193,17 @@ type RebuildInstance struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	EnvForRestore []corev1.EnvVar `json:"envForRestore,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+type Instance struct {
+	// Pod name of the instance.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The instance will be restored on the specified node when using local PV as the storage disk.
+	// If not set, it will be restored on a random node.
+	// +optional
+	NodeName string `json:"nodeName,omitempty"`
 }
 
 type Switchover struct {

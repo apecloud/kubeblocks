@@ -506,15 +506,25 @@ spec:
                         type: object
                       type: array
                       x-kubernetes-preserve-unknown-fields: true
-                    instanceNames:
-                      description: Defines the names of the instances that need to
-                        be rebuilt. These are essentially the names of the pods.
+                    instances:
+                      description: Defines the instances that need to be rebuilt.
                       items:
-                        type: string
+                        properties:
+                          name:
+                            description: Pod name of the instance.
+                            type: string
+                          nodeName:
+                            description: The instance will be restored on the specified
+                              node when using local PV as the storage disk. If not
+                              set, it will be restored on a random node.
+                            type: string
+                        required:
+                        - name
+                        type: object
                       type: array
                   required:
                   - componentName
-                  - instanceNames
+                  - instances
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:

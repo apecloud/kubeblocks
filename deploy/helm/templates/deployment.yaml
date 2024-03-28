@@ -68,6 +68,12 @@ spec:
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
             {{- end }}
+            {{- if .Values.multiCluster.kubeConfig }}
+            - "--multi-cluster-kubeconfig={{ .Values.multiCluster.mountPath }}/kubeconfig"
+            {{- end }}
+            {{- if .Values.multiCluster.contexts }}
+            - "--multi-cluster-contexts={{ .Values.multiCluster.contexts }}"
+            {{- end }}
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
@@ -178,13 +184,18 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-          - mountPath: /etc/kubeblocks
-            name: manager-config
-          {{- if .Values.admissionWebhooks.enabled }}
+            - mountPath: /etc/kubeblocks
+              name: manager-config
+            {{- if .Values.admissionWebhooks.enabled }}
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
               readOnly: true
-          {{- end }}
+            {{- end }}
+            {{- if .Values.multiCluster.kubeConfig }}
+            - mountPath: {{ .Values.multiCluster.mountPath }}
+              name: multi-cluster-kubeconfig
+              readOnly: true
+            {{- end }}
       {{- if .Values.hostNetwork }}
       hostNetwork: {{ .Values.hostNetwork }}
       {{- end }}
@@ -217,4 +228,10 @@ spec:
           secret:
             defaultMode: 420
             secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+        {{- end }}
+        {{- if .Values.multiCluster.kubeConfig }}
+        - name: multi-cluster-kubeconfig
+          secret:
+            secretName: {{ .Values.multiCluster.kubeConfig }}
+            defaultMode: 420
         {{- end }}

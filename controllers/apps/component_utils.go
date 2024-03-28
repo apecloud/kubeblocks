@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -29,7 +28,6 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -82,24 +80,13 @@ func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
-// parseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
-func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
-	patterns := strings.Split(pattern, "/")
-	switch len(patterns) {
-	case 2:
-		return schema.GroupVersionKind{
-			Group:   "",
-			Version: patterns[0],
-			Kind:    patterns[1],
-		}, nil
-	case 3:
-		return schema.GroupVersionKind{
-			Group:   patterns[0],
-			Version: patterns[1],
-			Kind:    patterns[2],
-		}, nil
+func DelayUpdateRsmSystemFields(obj v1alpha1.ReplicatedStateMachineSpec, pobj *v1alpha1.ReplicatedStateMachineSpec) {
+	DelayUpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
+
+	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
+		pobj.RoleProbe.FailureThreshold = obj.RoleProbe.FailureThreshold
+		pobj.RoleProbe.SuccessThreshold = obj.RoleProbe.SuccessThreshold
 	}
-	return schema.GroupVersionKind{}, fmt.Errorf("invalid pattern %s", pattern)
 }
 
 // DelayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
@@ -113,8 +100,16 @@ func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	updateLorryContainer(obj.Containers, pobj.Containers)
 }
 
+func UpdateRsmSystemFields(obj v1alpha1.ReplicatedStateMachineSpec, pobj *v1alpha1.ReplicatedStateMachineSpec) {
+	UpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
+	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
+		pobj.RoleProbe.FailureThreshold = obj.RoleProbe.FailureThreshold
+		pobj.RoleProbe.SuccessThreshold = obj.RoleProbe.SuccessThreshold
+	}
+}
+
 // UpdatePodSpecSystemFields to update system fields in pod spec.
-func UpdatePodSpecSystemFields(obj *corev1.PodSpec, pobj *corev1.PodSpec) {
+func UpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		updateKubeBlocksToolsImage(&pobj.Containers[i])
 	}
@@ -176,7 +171,7 @@ func UpdateComponentInfoToPods(
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomp.SynthesizedComponent,
 	dag *graph.DAG) error {
-	if cluster == nil || component == nil || component.RsmTransformPolicy == v1alpha1.ToPod {
+	if cluster == nil || component == nil {
 		return nil
 	}
 	ml := client.MatchingLabels{

@@ -33,6 +33,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -156,4 +157,29 @@ func GeKubeRestConfig() *rest.Config {
 		cfg.Burst = clientBurst
 	}
 	return cfg
+}
+
+// DeleteOwnedResources deletes the matched resources which are owned by the owner.
+func DeleteOwnedResources[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](ctx context.Context,
+	cli client.Client,
+	owner client.Object,
+	resourceMatchLabels client.MatchingLabels,
+	_ func(T, PT, L, PL)) error {
+	var objList L
+	if err := cli.List(ctx, PL(&objList), client.InNamespace(owner.GetNamespace()), resourceMatchLabels); err != nil {
+		return err
+	}
+	items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+	for _, obj := range items {
+		pobj := PT(&obj)
+		for _, v := range pobj.GetOwnerReferences() {
+			if v.UID != owner.GetUID() {
+				continue
+			}
+			if err := BackgroundDeleteObject(cli, ctx, pobj); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

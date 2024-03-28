@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strconv"
 
 	appv1 "k8s.io/api/apps/v1"
@@ -44,8 +45,8 @@ import (
 // GetComponentPods gets all pods of the component.
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
-	for i := range params.ComponentUnits {
-		pods, err := intctrlutil.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
+	for i := range params.RSMUnits {
+		pods, err := intctrlutil.GetPodListByRSM(params.Ctx.Ctx, params.Client, &params.RSMUnits[i])
 		if err != nil {
 			return nil, err
 		}
@@ -71,11 +72,11 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 }
 
 func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
-	if len(params.ComponentUnits) > 1 {
-		return nil, core.MakeError("component require only one statefulSet, actual %d components", len(params.ComponentUnits))
+	if len(params.RSMUnits) > 1 {
+		return nil, core.MakeError("component require only one rsm, actual %d components", len(params.RSMUnits))
 	}
 
-	if len(params.ComponentUnits) == 0 {
+	if len(params.RSMUnits) == 0 {
 		return nil, nil
 	}
 
@@ -163,16 +164,37 @@ func cfgManagerGrpcURL(pod *corev1.Pod) (string, error) {
 }
 
 func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
-	ip := net.ParseIP(pod.Status.PodIP)
-	if ip == nil {
-		return "", core.MakeError("%s is not a valid IP", pod.Status.PodIP)
-	}
-
-	// Sanity check PodIP
-	if ip.To4() == nil && ip.To16() == nil {
-		return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", pod.Status.PodIP)
+	ip, err := ipAddressFromPod(pod.Status)
+	if err != nil {
+		return "", err
 	}
 	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
+}
+
+func ipAddressFromPod(status corev1.PodStatus) (net.IP, error) {
+	// IPv4 address priority
+	for _, ip := range status.PodIPs {
+		address, err := netip.ParseAddr(ip.IP)
+		if err != nil || address.Is6() {
+			continue
+		}
+		return net.ParseIP(ip.IP), nil
+	}
+
+	// Using status.PodIP
+	address := net.ParseIP(status.PodIP)
+	if !validIPv4Address(address) && !validIPv6Address(address) {
+		return nil, fmt.Errorf("%s is not a valid IPv4/IPv6 address", status.PodIP)
+	}
+	return address, nil
+}
+
+func validIPv4Address(ip net.IP) bool {
+	return ip != nil && ip.To4() != nil
+}
+
+func validIPv6Address(ip net.IP) bool {
+	return ip != nil && ip.To16() != nil
 }
 
 func restartWorkloadComponent[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, annotationKey, annotationValue string, obj PT, _ func(T, PT, L, PL)) error {

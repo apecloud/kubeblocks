@@ -20,7 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -152,6 +151,15 @@ type OpsRequestSpec struct {
 	// +optional
 	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
 
+	// Specifies the instances that require re-creation.
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.rebuildFrom"
+	RebuildFrom []RebuildInstance `json:"rebuildFrom,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
 	// Specifies a custom operation as defined by OpsDefinition.
 	// +optional
 	CustomSpec *CustomOpsSpec `json:"customSpec,omitempty"`
@@ -162,6 +170,29 @@ type ComponentOps struct {
 	// Specifies the name of the cluster component.
 	// +kubebuilder:validation:Required
 	ComponentName string `json:"componentName"`
+}
+
+type RebuildInstance struct {
+	ComponentOps `json:",inline"`
+
+	// Defines the names of the instances that need to be rebuilt. These are essentially the names of the pods.
+	// +kubebuilder:validation:Required
+	InstanceNames []string `json:"instanceNames"`
+
+	// Indicates the name of the backup from which to recover. Currently, only a full physical backup is supported
+	// unless your component only has one replica. Such as 'xtrabackup' is full physical backup for mysql and 'mysqldump' is not.
+	// And if no specified backupName, the instance will be recreated with empty 'PersistentVolumes'.
+	// +optional
+	BackupName string `json:"backupName,omitempty"`
+
+	// List of environment variables to set in the container for restore. These will be
+	// merged with the env of Backup and ActionSet.
+	//
+	// The priority of merging is as follows: `Restore env > Backup env > ActionSet env`.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	EnvForRestore []corev1.EnvVar `json:"envForRestore,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 type Switchover struct {
@@ -236,25 +267,6 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
-
-	// Defines the list of nodes where pods can be scheduled during a scale-up operation.
-	// If the RsmTransformPolicy is set to ToPod and the expected number of replicas is greater than the current number,
-	// the list of Nodes will be used. If the list of Nodes is empty, pods will not be assigned to any specific node.
-	// However, if the list of Nodes is populated, pods will be evenly distributed across the nodes in the list during scale-up.
-	// +optional
-	Nodes []types.NodeName `json:"nodes,omitempty"`
-
-	// Defines the names of instances that the rsm should prioritize for scale-down operations.
-	// If the RsmTransformPolicy is set to ToPod and the expected number of replicas is less than the current number,
-	// the list of Instances will be used.
-	//
-	// - `current replicas - expected replicas > len(Instances)`: Scale down from the list of Instances priorly, the others
-	//	 will select from NodeAssignment.
-	// - `current replicas - expected replicas < len(Instances)`: Scale down from the list of Instances.
-	// - `current replicas - expected replicas < len(Instances)`: Scale down from a part of Instances.
-	//
-	// +optional
-	Instances []string `json:"instances,omitempty"`
 }
 
 // Reconfigure represents the variables required for updating a configuration.

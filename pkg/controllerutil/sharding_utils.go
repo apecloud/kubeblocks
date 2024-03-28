@@ -39,21 +39,22 @@ const (
 func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0)
-	existShardingCompSpecs, err := listShardingCompSpecs(ctx, cli, cluster, shardingSpec)
+	// list undeleted sharding component specs, the deleting ones are not included
+	undeletedShardingCompSpecs, err := listUndeletedShardingCompSpecs(ctx, cli, cluster, shardingSpec)
 	if err != nil {
 		return nil, err
 	}
-	compSpecList = append(compSpecList, existShardingCompSpecs...)
+	compSpecList = append(compSpecList, undeletedShardingCompSpecs...)
 	compNameMap := make(map[string]string)
-	for _, existShardingCompSpec := range existShardingCompSpecs {
+	for _, existShardingCompSpec := range undeletedShardingCompSpecs {
 		compNameMap[existShardingCompSpec.Name] = existShardingCompSpec.Name
 	}
 	shardTpl := shardingSpec.Template
 	switch {
-	case len(existShardingCompSpecs) == int(shardingSpec.Shards):
-		return existShardingCompSpecs, err
-	case len(existShardingCompSpecs) < int(shardingSpec.Shards):
-		for i := len(existShardingCompSpecs); i < int(shardingSpec.Shards); i++ {
+	case len(undeletedShardingCompSpecs) == int(shardingSpec.Shards):
+		return undeletedShardingCompSpecs, err
+	case len(undeletedShardingCompSpecs) < int(shardingSpec.Shards):
+		for i := len(undeletedShardingCompSpecs); i < int(shardingSpec.Shards); i++ {
 			shardClusterCompSpec := shardTpl.DeepCopy()
 			genCompName, err := genRandomShardName(shardingSpec.Name, compNameMap)
 			if err != nil {
@@ -63,44 +64,72 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 			compSpecList = append(compSpecList, shardClusterCompSpec)
 			compNameMap[genCompName] = genCompName
 		}
-	case len(existShardingCompSpecs) > int(shardingSpec.Shards):
+	case len(undeletedShardingCompSpecs) > int(shardingSpec.Shards):
 		// TODO: order by?
 		compSpecList = compSpecList[:int(shardingSpec.Shards)]
 	}
 	return compSpecList, nil
 }
 
+// ListShardingCompNames lists sharding component names. It returns undeleted and deleting sharding component names.
 func ListShardingCompNames(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]string, error) {
-	compNameList := make([]string, 0)
+	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]string, []string, error) {
 	if shardingSpec == nil {
-		return compNameList, nil
+		return []string{}, []string{}, nil
 	}
 
-	existShardingComps, err := listNCheckShardingComponents(ctx, cli, cluster, shardingSpec)
+	undeletedShardingComps, deletingShardingComps, err := listNCheckShardingComponents(ctx, cli, cluster, shardingSpec)
 	if err != nil {
-		return compNameList, err
+		return nil, nil, err
 	}
-	for _, comp := range existShardingComps {
+
+	appendCompShortName := func(comp appsv1alpha1.Component, nameList *[]string) error {
 		compShortName, err := parseCompShortName(cluster.Name, comp.Name)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		compNameList = append(compNameList, compShortName)
+		*nameList = append(*nameList, compShortName)
+		return nil
 	}
-	return compNameList, nil
+
+	undeletedCompNameList := make([]string, 0, len(undeletedShardingComps))
+	deletingCompNameList := make([]string, 0, len(deletingShardingComps))
+	for _, comp := range undeletedShardingComps {
+		if err := appendCompShortName(comp, &undeletedCompNameList); err != nil {
+			return nil, nil, err
+		}
+	}
+	for _, comp := range deletingShardingComps {
+		if err := appendCompShortName(comp, &deletingCompNameList); err != nil {
+			return nil, nil, err
+		}
+	}
+	return undeletedCompNameList, deletingCompNameList, nil
 }
 
+// listNCheckShardingComponents lists sharding components and checks if the sharding components are correct. It returns undeleted and deleting sharding components.
 func listNCheckShardingComponents(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]appsv1alpha1.Component, error) {
+	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]appsv1alpha1.Component, []appsv1alpha1.Component, error) {
 	shardingComps, err := listShardingComponents(ctx, cli, cluster, shardingSpec)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if cluster.Generation == cluster.Status.ObservedGeneration && len(shardingComps) != int(shardingSpec.Shards) {
-		return nil, errors.New("sharding components are not correct when cluster is not updating")
+
+	deletingShardingComps := make([]appsv1alpha1.Component, 0)
+	undeletedShardingComps := make([]appsv1alpha1.Component, 0)
+	for _, comp := range shardingComps {
+		if comp.GetDeletionTimestamp().IsZero() {
+			undeletedShardingComps = append(undeletedShardingComps, comp)
+		} else {
+			deletingShardingComps = append(deletingShardingComps, comp)
+		}
 	}
-	return shardingComps, nil
+
+	if cluster.Generation == cluster.Status.ObservedGeneration && len(undeletedShardingComps) != int(shardingSpec.Shards) {
+		return nil, nil, errors.New("sharding components are not correct when cluster is not updating")
+	}
+
+	return undeletedShardingComps, deletingShardingComps, nil
 }
 
 func listShardingComponents(ctx context.Context, cli client.Reader,
@@ -116,30 +145,55 @@ func listShardingComponents(ctx context.Context, cli client.Reader,
 	return compList.Items, nil
 }
 
-func listShardingCompSpecs(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
-	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0)
-	compNameMap := make(map[string]string)
+// listUndeletedShardingCompSpecs lists undeleted sharding component specs.
+func listUndeletedShardingCompSpecs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+	return listShardingCompSpecs(ctx, cli, cluster, shardingSpec, false)
+}
+
+// listAllShardingCompSpecs lists all sharding component specs, including undeleted and deleting ones.
+func listAllShardingCompSpecs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+	return listShardingCompSpecs(ctx, cli, cluster, shardingSpec, true)
+}
+
+// listShardingCompSpecs lists sharding component specs, with an option to include those marked for deletion.
+func listShardingCompSpecs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec, includeDeleting bool) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	if shardingSpec == nil {
-		return compSpecList, nil
+		return nil, nil
 	}
 
-	existShardingComps, err := listNCheckShardingComponents(ctx, cli, cluster, shardingSpec)
+	undeletedShardingComps, deletingShardingComps, err := listNCheckShardingComponents(ctx, cli, cluster, shardingSpec)
 	if err != nil {
 		return nil, err
 	}
 
+	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0, len(undeletedShardingComps)+len(deletingShardingComps))
 	shardTpl := shardingSpec.Template
-	for _, existShardingComp := range existShardingComps {
-		existShardingCompShortName, err := parseCompShortName(cluster.Name, existShardingComp.Name)
+
+	processComps := func(comps []appsv1alpha1.Component) error {
+		for _, comp := range comps {
+			compShortName, err := parseCompShortName(cluster.Name, comp.Name)
+			if err != nil {
+				return err
+			}
+			shardClusterCompSpec := shardTpl.DeepCopy()
+			shardClusterCompSpec.Name = compShortName
+			compSpecList = append(compSpecList, shardClusterCompSpec)
+		}
+		return nil
+	}
+
+	err = processComps(undeletedShardingComps)
+	if err != nil {
+		return nil, err
+	}
+
+	if includeDeleting {
+		err = processComps(deletingShardingComps)
 		if err != nil {
 			return nil, err
 		}
-		shardClusterCompSpec := shardTpl.DeepCopy()
-		shardClusterCompSpec.Name = existShardingCompShortName
-		compSpecList = append(compSpecList, shardClusterCompSpec)
-		compNameMap[existShardingCompShortName] = existShardingCompShortName
 	}
+
 	return compSpecList, nil
 }
 

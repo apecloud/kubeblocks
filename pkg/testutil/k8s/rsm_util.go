@@ -116,7 +116,7 @@ func MockRSMReady(rsm *workloads.ReplicatedStateMachine, pods ...*corev1.Pod) {
 		}
 		memberStatus := workloads.MemberStatus{
 			PodName:     pod.Name,
-			ReplicaRole: role,
+			ReplicaRole: &role,
 		}
 		membersStatus = append(membersStatus, memberStatus)
 	}

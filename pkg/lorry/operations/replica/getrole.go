@@ -21,11 +21,14 @@ package replica
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
@@ -55,13 +58,27 @@ func (s *GetRole) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
+	s.logger = ctrl.Log.WithName("getrole")
+
+	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	if actionJSON != "" {
+		actionCommands := map[string][]string{}
+		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
+		if err != nil {
+			s.logger.Info("get action commands failed", "error", err.Error())
+			return err
+		}
+		roleProbeCmd, ok := actionCommands[constant.RoleProbeAction]
+		if ok && len(roleProbeCmd) > 0 {
+			s.Command = roleProbeCmd
+		}
+	}
 	dbManager, err := register.GetDBManager(nil)
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}
 
 	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("getrole")
 	return nil
 }
 

@@ -36,8 +36,10 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/handler"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -71,10 +73,30 @@ type ReplicatedStateMachineReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("ReplicatedStateMachine", req.NamespacedName)
+
+	provider, err := rsm2.CurrentReplicaProvider(ctx, r.Client, req.NamespacedName)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if provider == rsm2.PodProvider {
+		err = kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+			Prepare(rsm2.NewTreeLoader()).
+			Do(rsm2.NewFixMetaReconciler()).
+			Do(rsm2.NewDeletionReconciler()).
+			Do(rsm2.NewStatusReconciler()).
+			Do(rsm2.NewRevisionUpdateReconciler()).
+			Do(rsm2.NewAssistantObjectReconciler()).
+			Do(rsm2.NewReplicasAlignmentReconciler()).
+			Do(rsm2.NewUpdateReconciler()).
+			Commit()
+		return ctrl.Result{}, err
+	}
+
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("ReplicatedStateMachine", req.NamespacedName),
+		Log:      logger,
 		Recorder: r.Recorder,
 	}
 
@@ -159,7 +181,8 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
 		stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		podHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
+		// pod owned by legacy StatefulSet
+		stsPodHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
 
 		return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
@@ -168,23 +191,9 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 			}).
 			Watches(&appsv1.StatefulSet{}, stsHandler).
 			Watches(&batchv1.Job{}, jobHandler).
-			Watches(&corev1.Pod{}, podHandler).
+			Watches(&corev1.Pod{}, stsPodHandler).
 			Owns(&corev1.Pod{}).
-			Complete(r)
-	}
-
-	if viper.GetBool(rsm.FeatureGateRSMToPod) {
-		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
-		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
-		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		podHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-			For(&workloads.ReplicatedStateMachine{}).
-			WithOptions(controller.Options{
-				MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
-			}).
-			Watches(&batchv1.Job{}, jobHandler).
-			Watches(&corev1.Pod{}, podHandler).
+			Owns(&corev1.PersistentVolumeClaim{}).
 			Complete(r)
 	}
 
@@ -199,5 +208,7 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
 		Watches(&corev1.Pod{}, podHandler).
+		Owns(&corev1.Pod{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
 }

@@ -21,10 +21,13 @@ package configmanager
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -92,19 +95,6 @@ var _ = Describe("Config Handler Test", func() {
 			ReloadType: appsv1alpha1.UnixSignalType,
 			MountPoint: "/tmp/test",
 			ConfigSpec: newConfigSpec(),
-		}
-	}
-
-	newShellConfig := func(mountPoint string) ConfigSpecInfo {
-		return ConfigSpecInfo{
-			ReloadOptions: &appsv1alpha1.ReloadOptions{
-				ShellTrigger: &appsv1alpha1.ShellTrigger{
-					Command: []string{"sh", "-c", `echo "hello world" "$@"`},
-				}},
-			ReloadType:      appsv1alpha1.ShellType,
-			MountPoint:      mountPoint,
-			ConfigSpec:      newConfigSpec(),
-			FormatterConfig: newFormatter(),
 		}
 	}
 
@@ -254,24 +244,81 @@ var _ = Describe("Config Handler Test", func() {
 			Expect(handler.VolumeHandle(ctx, fsnotify.Event{Name: "not_exist_mount_point"})).Should(Succeed())
 		})
 
-		It("ShellHandler", func() {
-			configPath := filepath.Join(tmpWorkDir, "config")
-			prepareTestConfig(configPath, oldVersion)
-			config := newShellConfig(configPath)
-			handler, err := CreateCombinedHandler(toJSONString(config), filepath.Join(tmpWorkDir, "backup"))
-			Expect(err).Should(Succeed())
-			Expect(handler.MountPoint()).Should(ContainElement(configPath))
-
-			// mock modify config
-			prepareTestConfig(configPath, newVersion)
-			By("change config")
-			Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: configPath})).Should(Succeed())
-			By("not change config")
-			Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: configPath})).Should(Succeed())
-			By("not support onlineUpdate")
-			Expect(handler.OnlineUpdate(context.TODO(), config.ConfigSpec.Name, nil)).Should(Succeed())
+		Describe("Test ShellHandler", func() {
+			var configPath string
+			testShellHandlerCommon := func(configPath string, configSpec ConfigSpecInfo) {
+				handler, err := CreateCombinedHandler(toJSONString(configSpec), filepath.Join(tmpWorkDir, "backup"))
+				Expect(err).Should(Succeed())
+				Expect(handler.MountPoint()).Should(ContainElement(configPath))
+				By("change config", func() {
+					// mock modify config
+					prepareTestConfig(configPath, newVersion)
+					Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: configPath})).Should(Succeed())
+				})
+				By("not change config", func() {
+					Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: configPath})).Should(Succeed())
+				})
+				By("not support onlineUpdate", func() {
+					Expect(handler.OnlineUpdate(context.TODO(), configSpec.ConfigSpec.Name, nil)).Should(Succeed())
+				})
+			}
+			BeforeEach(func() {
+				configPath = filepath.Join(tmpWorkDir, "config")
+				prepareTestConfig(configPath, oldVersion)
+			})
+			It("should succeed on reload individually", func() {
+				configSpec := ConfigSpecInfo{
+					ReloadOptions: &appsv1alpha1.ReloadOptions{
+						ShellTrigger: &appsv1alpha1.ShellTrigger{
+							Command: []string{"sh", "-c", `echo "hello world" "$@"`, "sh"},
+						}},
+					ReloadType:      appsv1alpha1.ShellType,
+					MountPoint:      configPath,
+					ConfigSpec:      newConfigSpec(),
+					FormatterConfig: newFormatter(),
+				}
+				testShellHandlerCommon(configPath, configSpec)
+			})
+			Describe("Test reload in a batch", func() {
+				isBatchReload := true
+				It("should succeed on the default batch input format", func() {
+					configSpec := ConfigSpecInfo{
+						ReloadOptions: &appsv1alpha1.ReloadOptions{
+							ShellTrigger: &appsv1alpha1.ShellTrigger{
+								Command: []string{"sh", "-c",
+									`while IFS="=" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
+								},
+								BatchReload: &isBatchReload,
+							}},
+						ReloadType:      appsv1alpha1.ShellType,
+						MountPoint:      configPath,
+						ConfigSpec:      newConfigSpec(),
+						FormatterConfig: newFormatter(),
+					}
+					testShellHandlerCommon(configPath, configSpec)
+				})
+				It("should succeed on the custom batch input format", func() {
+					customBatchInputTemplate := `{{- range $pKey, $pValue := $ }}
+{{ printf "%s:%s" $pKey $pValue }}
+{{- end }}`
+					configSpec := ConfigSpecInfo{
+						ReloadOptions: &appsv1alpha1.ReloadOptions{
+							ShellTrigger: &appsv1alpha1.ShellTrigger{
+								Command: []string{"sh", "-c",
+									`while IFS=":" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
+								},
+								BatchReload:        &isBatchReload,
+								BatchInputTemplate: customBatchInputTemplate,
+							}},
+						ReloadType:      appsv1alpha1.ShellType,
+						MountPoint:      configPath,
+						ConfigSpec:      newConfigSpec(),
+						FormatterConfig: newFormatter(),
+					}
+					testShellHandlerCommon(configPath, configSpec)
+				})
+			})
 		})
-
 		It("TplScriptsHandler", func() {
 			By("mock command channel")
 			newCommandChannel = func(ctx context.Context, dataType, dsn string) (DynamicParamUpdater, error) {
@@ -337,6 +384,114 @@ var _ = Describe("Config Handler Test", func() {
 			Expect(handler.MountPoint()).Should(ContainElement(config.MountPoint))
 			Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: config.DownwardAPIOptions[0].MountPoint})).Should(Succeed())
 			Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: config.DownwardAPIOptions[1].MountPoint})).Should(Succeed())
+		})
+	})
+
+	Describe("Test exec reload command", func() {
+		updatedParams := map[string]string{
+			"key2": "val2",
+			"key1": "val1",
+			"key3": "",
+		}
+		Describe("Test execute command with separate reload", func() {
+			var (
+				stdouts []string
+				err     error
+			)
+			BeforeEach(func() {
+				stdouts, err = execWithSeparateReload(context.TODO(),
+					updatedParams,
+					"echo",
+					"hello",
+				)
+			})
+			It("should execute the script successfully and have correct stdout content", func() {
+				By("checking that should execute the script successfully", func() {
+					Expect(err).Should(Succeed())
+				})
+				By("checking that should have correct stdout content", func() {
+					Expect(len(stdouts)).Should(Equal(len(updatedParams)))
+					// sort the result stdout and the iteratation key sequence
+					keys := make([]string, 0, len(updatedParams))
+					for k := range updatedParams {
+						keys = append(keys, k)
+					}
+					sort.Strings(keys)
+					sort.Strings(stdouts)
+					for i, theStdout := range stdouts {
+						k := keys[i]
+						v := updatedParams[k]
+						Expect(theStdout).Should(Equal(fmt.Sprintf("hello %s %s\n", k, v)))
+					}
+				})
+			})
+		})
+		Describe("Test execute command with batch reload", func() {
+			var (
+				stdout string
+				err    error
+			)
+			BeforeEach(func() {
+				stdout, err = execWithBatchReload(context.TODO(),
+					updatedParams,
+					defaultBatchInputTemplate,
+					"/bin/sh",
+					"-c",
+					`while IFS="=" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
+				)
+			})
+			It("should execute the script successfully and have correct stdout content", func() {
+				By("checking that should execute the script successfully", func() {
+					Expect(err).Should(Succeed())
+				})
+				By("checking that should have correct stdout content", func() {
+					keys := make([]string, 0, len(updatedParams))
+					for k := range updatedParams {
+						keys = append(keys, k)
+					}
+					sort.Strings(keys)
+					var expectOutputSB strings.Builder
+					for _, k := range keys { // iterate the map in sorted order
+						v := updatedParams[k]
+						expectOutputSB.WriteString(fmt.Sprintf("key='%s'; val='%s'\n", k, v))
+					}
+					Expect(stdout).Should(Equal(expectOutputSB.String()))
+				})
+			})
+		})
+	})
+
+	Describe("Test generate batch stdin data", func() {
+		It("should pass the base scenario", func() {
+			// deliberately make the keys unsorted
+			updatedParams := map[string]string{
+				"key2": "val2",
+				"key1": "val1",
+				"key3": "",
+			}
+			// According to 'https://pkg.go.dev/text/template' :
+			// For `range`, if the value is a map and the keys can be sorted, the elements will be visited in sorted key order.
+			batchInputTemplate := `{{- range $pKey, $pValue := $ }}
+{{ printf "%s:%s" $pKey $pValue }}
+{{- end }}`
+			stdinStr, err := generateBatchStdinData(updatedParams, batchInputTemplate)
+			By("checking there's no error", func() {
+				Expect(err).Should(Succeed())
+			})
+			By("checking the generated content is correct", func() {
+				keys := make([]string, 0, len(updatedParams))
+				for k := range updatedParams {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				var expectOutputSB strings.Builder
+				for _, k := range keys { // iterate the map in sorted order
+					v := updatedParams[k]
+					expectOutputSB.WriteString(fmt.Sprintf("%s:%s\n", k, v))
+				}
+
+				Expect(stdinStr).Should(Equal(expectOutputSB.String()))
+			})
 		})
 	})
 })

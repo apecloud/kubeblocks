@@ -43,7 +43,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		for i := 0; i < replicas; i++ {
 			status := workloads.MemberStatus{
 				PodName:     getPodName(rsm.Name, i),
-				ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+				ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 			}
 			membersStatus = append(membersStatus, status)
 		}
@@ -51,7 +51,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		if replicas > 1 {
 			leaderIndex = 1
 		}
-		membersStatus[leaderIndex].ReplicaRole = workloads.ReplicaRole{Name: "leader", IsLeader: true}
+		membersStatus[leaderIndex].ReplicaRole = &workloads.ReplicaRole{Name: "leader", IsLeader: true}
 		return membersStatus
 	}
 	setRSMStatus := func(replicas int) {
@@ -69,7 +69,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		action := builder.NewJobBuilder(name, actionName).
 			AddLabelsInMap(map[string]string{
 				constant.AppInstanceLabelKey: rsm.Name,
-				constant.KBManagedByKey:      kindReplicatedStateMachine,
+				constant.KBManagedByKey:      KindReplicatedStateMachine,
 				jobScenarioLabel:             jobScenarioMembership,
 				jobTypeLabel:                 actionType,
 				jobHandledLabel:              jobHandledFalse,
@@ -317,11 +317,11 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			membersStatus := []workloads.MemberStatus{
 				{
 					PodName:     getPodName(rsm.Name, 0),
-					ReplicaRole: workloads.ReplicaRole{Name: "leader", IsLeader: true},
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader", IsLeader: true},
 				},
 				{
 					PodName:     getPodName(rsm.Name, 1),
-					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
 				},
 			}
 			rsm.Status.MembersStatus = membersStatus

@@ -46,7 +46,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
 		clusterObj, ClusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
-		clusterComponent = newAllFieldsComponent(ClusterDefObj, clusterVersionObj, clusterObj)
+		clusterComponent = newAllFieldsSynthesizedComponent(ClusterDefObj, clusterVersionObj, clusterObj)
 		viper.SetDefault(constant.KBToolsImage, kbToolsImage)
 	})
 

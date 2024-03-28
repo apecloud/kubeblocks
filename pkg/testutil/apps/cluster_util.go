@@ -55,6 +55,7 @@ func InitClusterWithHybridComps(
 	cluster := NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 		AddComponent(statelessCompDefName, statelessCompDefName).SetReplicas(1).
 		AddComponent(consensusCompDefName, consensusCompDefName).SetReplicas(3).
+		AddVolumeClaimTemplate(DataVolumeName, pvcSpec).
 		AddComponent(statefulCompDefName, statefulCompDefName).SetReplicas(3).
 		AddVolumeClaimTemplate(DataVolumeName, pvcSpec).
 		Create(testCtx).GetObject()

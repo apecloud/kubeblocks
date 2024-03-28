@@ -64,9 +64,9 @@ func GetGlobalSharedEnvs() ([]string, error) {
 			envSetGot.Insert(keys[0])
 		}
 	}
-	if len(envs) != envSetRequired.Len() {
-		return nil, errors.Errorf("%v envs is unset", sets.List(envSetRequired.Difference(envSetGot)))
-	}
+	// if len(envs) != envSetRequired.Len() {
+	// 	return nil, errors.Errorf("%v envs is unset", sets.List(envSetRequired.Difference(envSetGot)))
+	// }
 
 	return envs, nil
 }

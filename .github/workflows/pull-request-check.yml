@@ -27,9 +27,11 @@ jobs:
 
       - uses: actions/checkout@v4
       - name: check issue link
+        env:
+          PR_TITLE: ${{github.event.pull_request.title}}
         run: |
           bash ${{ github.workspace }}/.github/utils/issue_link.sh \
             ${{ github.repository }} \
             ${{ github.repository_owner }} \
             ${{ github.event.pull_request.number }} \
-            "${{ github.event.pull_request.title }}"
+            "${PR_TITLE}"

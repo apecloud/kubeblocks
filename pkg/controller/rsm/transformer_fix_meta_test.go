@@ -67,7 +67,7 @@ var _ = Describe("fix meta transformer test.", func() {
 			rsmNew, ok := root.Obj.(*workloads.ReplicatedStateMachine)
 			Expect(ok).Should(BeTrue())
 			Expect(rsmNew.Finalizers).ShouldNot(BeNil())
-			Expect(slices.Contains(rsmNew.Finalizers, getFinalizer(rsmNew))).Should(BeTrue())
+			Expect(slices.Contains(rsmNew.Finalizers, GetFinalizer(rsmNew))).Should(BeTrue())
 		})
 	})
 })

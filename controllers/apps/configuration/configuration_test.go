@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -97,7 +100,7 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 	return configmap, constraint
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
+func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint, *appsv1alpha1.Cluster, *appsv1alpha1.Component, *component.SynthesizedComponent) {
 	configmap, constraint := mockConfigResource()
 
 	By("Create a clusterDefinition obj")
@@ -120,6 +123,23 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint,
 		clusterDefObj.Name, clusterVersionObj.Name).
 		AddComponent(statefulCompName, statefulCompDefName).Create(&testCtx).GetObject()
 
+	By("Create a component definition obj and mock to available")
+	componentDefObj := testapps.NewComponentDefinitionFactory(statefulCompDefName).
+		SetRuntime(nil).
+		Create(&testCtx).GetObject()
+	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(obj *appsv1alpha1.ComponentDefinition) {
+		obj.Status.Phase = appsv1alpha1.AvailablePhase
+	})()).Should(Succeed())
+
+	By("Create a component obj")
+	fullCompName := constant.GenerateClusterComponentName(clusterName, statefulCompName)
+	componentObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, componentDefObj.Name).
+		AddLabels(constant.AppInstanceLabelKey, clusterName).
+		AddLabels(constant.KBAppClusterUIDLabelKey, string(clusterObj.UID)).
+		SetUID(types.UID(fmt.Sprintf("%s-%s", clusterObj.Name, "test-uid"))).
+		SetReplicas(1).
+		Create(&testCtx).GetObject()
+
 	container := *builder.NewContainerBuilder("mock-container").
 		AddVolumeMounts(corev1.VolumeMount{
 			Name:      configVolumeName,
@@ -140,15 +160,19 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint,
 	}, testCtx.Cli, clusterObj, clusterObj.Spec.GetComponentByName(statefulCompName))
 	Expect(err).ShouldNot(HaveOccurred())
 
-	return configmap, constraint, clusterObj, synthesizedComp
+	return configmap, constraint, clusterObj, componentObj, synthesizedComp
 }
 
-func initConfiguration(resourceCtx *configctrl.ResourceCtx, synthesizedComponent *component.SynthesizedComponent, clusterObj *appsv1alpha1.Cluster) error {
+func initConfiguration(resourceCtx *configctrl.ResourceCtx,
+	synthesizedComponent *component.SynthesizedComponent,
+	clusterObj *appsv1alpha1.Cluster,
+	componentObj *appsv1alpha1.Component) error {
 	return configctrl.NewCreatePipeline(configctrl.ReconcileCtx{
-		ResourceCtx: resourceCtx,
-		Component:   synthesizedComponent,
-		Cluster:     clusterObj,
-		PodSpec:     synthesizedComponent.PodSpec,
+		ResourceCtx:          resourceCtx,
+		Component:            componentObj,
+		SynthesizedComponent: synthesizedComponent,
+		Cluster:              clusterObj,
+		PodSpec:              synthesizedComponent.PodSpec,
 	}).
 		Prepare().
 		UpdateConfiguration(). // reconcile Configuration
@@ -174,7 +198,9 @@ func cleanEnv() {
 	ml := client.HasLabels{testCtx.TestObjLabelKey}
 	// non-namespaced
 	testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+	testapps.ClearResources(&testCtx, generics.ComponentDefinitionSignature, ml)
 	// namespaced
+	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StatefulSetSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigurationSignature, false, inNS, ml)

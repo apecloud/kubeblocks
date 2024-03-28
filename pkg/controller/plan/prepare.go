@@ -32,13 +32,15 @@ import (
 // and generates configManager sidecar for the reconfigure operation.
 func RenderConfigNScriptFiles(resourceCtx *configuration.ResourceCtx,
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
+	component *appsv1alpha1.Component,
+	synthesizedComponent *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,
 	localObjs []client.Object) error {
 	return configuration.NewConfigReconcileTask(
 		resourceCtx,
 		cluster,
 		component,
+		synthesizedComponent,
 		podSpec,
 		localObjs).Reconcile()
 }

@@ -22,6 +22,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -173,21 +174,18 @@ func generateUniqueNameWithBackupSchedule(backupSchedule *dpv1alpha1.BackupSched
 }
 
 // BuildBackupPath builds the path to storage backup data in backup repository.
-func BuildBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
-	pathPrefix = strings.TrimRight(pathPrefix, "/")
-	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
-		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, backup.Name)
-	}
-	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
+func BuildBackupPath(backup *dpv1alpha1.Backup, repoPathPrefix, pathPrefix string) string {
+	repoPathPrefix = strings.Trim(repoPathPrefix, "/")
+	pathPrefix = strings.Trim(pathPrefix, "/")
+	// pattern: ${repoPathPrefix}/${namespace}/${pathPrefix}/${backupName}
+	return filepath.Join("/", repoPathPrefix, backup.Namespace, pathPrefix, backup.Name)
 }
 
 // BuildKopiaRepoPath builds the path of kopia repository.
-func BuildKopiaRepoPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
+func BuildKopiaRepoPath(backup *dpv1alpha1.Backup, repoPathPrefix, pathPrefix string) string {
+	repoPathPrefix = strings.Trim(repoPathPrefix, "/")
 	pathPrefix = strings.TrimRight(pathPrefix, "/")
-	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
-		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, types.KopiaRepoFolderName)
-	}
-	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, types.KopiaRepoFolderName)
+	return filepath.Join("/", repoPathPrefix, backup.Namespace, pathPrefix, types.KopiaRepoFolderName)
 }
 
 func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method string) *dpv1alpha1.SchedulePolicy {

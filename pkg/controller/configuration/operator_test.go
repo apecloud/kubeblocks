@@ -42,7 +42,8 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var clusterObj *appsv1alpha1.Cluster
 	var clusterVersionObj *appsv1alpha1.ClusterVersion
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
-	var clusterComponent *component.SynthesizedComponent
+	var componentObj *appsv1alpha1.Component
+	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
 	var scriptsObj *corev1.ConfigMap
 	var configConstraint *appsv1alpha1.ConfigConstraint
@@ -58,8 +59,9 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			ComponentName: mysqlCompName,
 		},
 			clusterObj,
-			clusterComponent,
-			clusterComponent.PodSpec,
+			componentObj,
+			synthesizedComponent,
+			synthesizedComponent.PodSpec,
 			nil)
 		return task
 	}
@@ -68,7 +70,8 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 		// Add any setup steps that needs to be executed before each test
 		k8sMockClient = testutil.NewK8sMockClient()
 		clusterObj, clusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
-		clusterComponent = newAllFieldsComponent(clusterDefObj, clusterVersionObj, clusterObj)
+		synthesizedComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterVersionObj, clusterObj)
+		componentObj = newAllFieldsComponent(clusterObj)
 		configMapObj = testapps.NewConfigMap("default", mysqlConfigName,
 			testapps.SetConfigMapData("test", "test"))
 		scriptsObj = testapps.NewConfigMap("default", mysqlScriptsConfigName,
@@ -153,8 +156,8 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 				},
 			), testutil.WithAnyTimes()))
 
-			clusterComponent.ConfigTemplates = nil
-			clusterComponent.ScriptTemplates = nil
+			synthesizedComponent.ConfigTemplates = nil
+			synthesizedComponent.ScriptTemplates = nil
 			Expect(createConfigReconcileTask().Reconcile()).Should(Succeed())
 		})
 

@@ -45,9 +45,10 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	const testConfigFile = "postgresql.conf"
 
 	var clusterObj *appsv1alpha1.Cluster
+	var componentObj *appsv1alpha1.Component
 	var clusterVersionObj *appsv1alpha1.ClusterVersion
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
-	var clusterComponent *component.SynthesizedComponent
+	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
 	var configConstraint *appsv1alpha1.ConfigConstraint
 	var configurationObj *appsv1alpha1.Configuration
@@ -93,7 +94,8 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 		// Add any setup steps that needs to be executed before each test
 		k8sMockClient = testutil.NewK8sMockClient()
 		clusterObj, clusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
-		clusterComponent = newAllFieldsComponent(clusterDefObj, clusterVersionObj, clusterObj)
+		componentObj = newAllFieldsComponent(clusterObj)
+		synthesizedComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterVersionObj, clusterObj)
 		configMapObj = testapps.NewConfigMap("default", mysqlConfigName,
 			testapps.SetConfigMapData(testConfigFile, `
 bgwriter_delay = '200ms'
@@ -130,7 +132,7 @@ max_connections = '1000'
 	Context("ConfigPipelineTest", func() {
 		It("NormalTest", func() {
 			By("mock configSpec keys")
-			clusterComponent.ConfigTemplates[0].Keys = []string{testConfigFile}
+			synthesizedComponent.ConfigTemplates[0].Keys = []string{testConfigFile}
 
 			By("create configuration resource")
 			createPipeline := NewCreatePipeline(ReconcileCtx{
@@ -141,9 +143,10 @@ max_connections = '1000'
 					ClusterName:   clusterName,
 					ComponentName: mysqlCompName,
 				},
-				Cluster:   clusterObj,
-				Component: clusterComponent,
-				PodSpec:   clusterComponent.PodSpec,
+				Cluster:              clusterObj,
+				Component:            componentObj,
+				SynthesizedComponent: synthesizedComponent,
+				PodSpec:              synthesizedComponent.PodSpec,
 			})
 
 			By("mock api resource for configuration")
@@ -184,10 +187,11 @@ max_connections = '1000'
 				},
 			}
 			reconcileTask := NewReconcilePipeline(ReconcileCtx{
-				ResourceCtx: createPipeline.ResourceCtx,
-				Cluster:     clusterObj,
-				Component:   clusterComponent,
-				PodSpec:     clusterComponent.PodSpec,
+				ResourceCtx:          createPipeline.ResourceCtx,
+				Cluster:              clusterObj,
+				Component:            componentObj,
+				SynthesizedComponent: synthesizedComponent,
+				PodSpec:              synthesizedComponent.PodSpec,
 			}, item, &configurationObj.Status.ConfigurationItemStatus[0], nil)
 
 			By("update configuration resource")

@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -128,6 +129,14 @@ func MockConsensusComponentStsPod(
 		AddRoleLabel(podRole).
 		AddConsensusSetAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
+		AddVolume(corev1.Volume{
+			Name: DataVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: fmt.Sprintf("%s-%s", DataVolumeName, podName),
+				},
+			},
+		}).
 		AddContainer(corev1.Container{
 			Name:  DefaultMySQLContainerName,
 			Image: ApeCloudMySQLImage,
@@ -148,6 +157,9 @@ func MockConsensusComponentStsPod(
 						Port: intstr.FromInt(1024),
 					},
 				},
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{Name: DataVolumeName, MountPath: "/test"},
 			},
 		})
 	if sts != nil && sts.Labels[constant.AppNameLabelKey] != "" {
@@ -178,6 +190,7 @@ func MockConsensusComponentPods(
 		return int(*sts.Spec.Replicas)
 	}
 	replicas := getReplicas()
+	replicasStr := strconv.Itoa(replicas)
 	podList := make([]*corev1.Pod, replicas)
 	for i := 0; i < replicas; i++ {
 		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
@@ -189,6 +202,12 @@ func MockConsensusComponentPods(
 		}
 		// mock StatefulSet to create all pods
 		pod := MockConsensusComponentStsPod(testCtx, sts, clusterName, consensusCompName, podName, podRole, accessMode)
+		annotations := pod.Annotations
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
+		pod.Annotations = annotations
 		podList[i] = pod
 	}
 	return podList

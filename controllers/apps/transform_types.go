@@ -54,4 +54,4 @@ type gvkNObjKey struct {
 	client.ObjectKey
 }
 
-type clusterOwningObjects map[gvkNObjKey]client.Object
+type owningObjects map[gvkNObjKey]client.Object

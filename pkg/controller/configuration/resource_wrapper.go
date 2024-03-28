@@ -21,12 +21,16 @@ package configuration
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -46,7 +50,11 @@ type ResourceFetcher[T any] struct {
 	obj *T
 	*ResourceCtx
 
-	ClusterObj *appsv1alpha1.Cluster
+	ClusterObj      *appsv1alpha1.Cluster
+	ComponentObj    *appsv1alpha1.Component
+	ComponentDefObj *appsv1alpha1.ComponentDefinition
+	ClusterComObj   *appsv1alpha1.ClusterComponentSpec
+
 	// Deprecated: this API will be removed from version 0.9.0
 	ClusterDefObj *appsv1alpha1.ClusterDefinition
 	// Deprecated: use ComponentDefinition instead
@@ -55,8 +63,6 @@ type ResourceFetcher[T any] struct {
 	ConfigMapObj        *corev1.ConfigMap
 	ConfigurationObj    *appsv1alpha1.Configuration
 	ConfigConstraintObj *appsv1alpha1.ConfigConstraint
-
-	ClusterComObj *appsv1alpha1.ClusterComponentSpec
 }
 
 func (r *ResourceFetcher[T]) Init(ctx *ResourceCtx, object *T) *T {
@@ -82,6 +88,38 @@ func (r *ResourceFetcher[T]) Cluster() *T {
 	return r.Wrap(func() error {
 		r.ClusterObj = &appsv1alpha1.Cluster{}
 		return r.Client.Get(r.Context, clusterKey, r.ClusterObj)
+	})
+}
+
+func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
+	componentKey := client.ObjectKey{
+		Namespace: r.Namespace,
+		Name:      constant.GenerateClusterComponentName(r.ClusterName, r.ComponentName),
+	}
+	return r.Wrap(func() error {
+		r.ComponentObj = &appsv1alpha1.Component{}
+		err := r.Client.Get(r.Context, componentKey, r.ComponentObj)
+		if apierrors.IsNotFound(err) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+
+		if len(r.ComponentObj.Spec.CompDef) == 0 {
+			return nil
+		}
+
+		compDefKey := types.NamespacedName{
+			Name: r.ComponentObj.Spec.CompDef,
+		}
+		r.ComponentDefObj = &appsv1alpha1.ComponentDefinition{}
+		if err := r.Client.Get(r.Context, compDefKey, r.ComponentDefObj); err != nil {
+			return err
+		}
+		if r.ComponentDefObj.Status.Phase != appsv1alpha1.AvailablePhase {
+			return fmt.Errorf("ComponentDefinition referenced is unavailable: %s", r.ComponentDefObj.Name)
+		}
+		return nil
 	})
 }
 
@@ -114,7 +152,7 @@ func (r *ResourceFetcher[T]) ClusterVer() *T {
 	})
 }
 
-func (r *ResourceFetcher[T]) ClusterComponent() *T {
+func (r *ResourceFetcher[T]) ComponentSpec() *T {
 	return r.Wrap(func() (err error) {
 		r.ClusterComObj, err = controllerutil.GetOriginalOrGeneratedComponentSpecByName(r.Context, r.Client, r.ClusterObj, r.ComponentName)
 		if err != nil {

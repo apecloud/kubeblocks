@@ -38,7 +38,7 @@ const (
 	ListOperation   OperationKind = "list"
 
 	CheckRunningOperation OperationKind = "checkRunning"
-	CheckStatusOperation  OperationKind = "checkStatus"
+	HealthyCheckOperation OperationKind = "healthyCheck"
 	CheckRoleOperation    OperationKind = "checkRole"
 	GetRoleOperation      OperationKind = "getRole"
 	GetLagOperation       OperationKind = "getLag"
@@ -72,6 +72,9 @@ const (
 	OperationSuccess           = "Success"
 	OperationFailed            = "Failed"
 	DefaultProbeTimeoutSeconds = 2
+
+	DataDumpOperation OperationKind = "dataDump"
+	DataLoadOperation OperationKind = "dataLoad"
 
 	// this is a general script template, which can be used for all kinds of exec request to databases.
 	DataScriptRequestTpl string = `

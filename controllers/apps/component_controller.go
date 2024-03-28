@@ -127,7 +127,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	plan, errBuild := planBuilder.
 		AddTransformer(
-			// handle component deletion first
+			// handle component deletion and pre-terminate
 			&componentDeletionTransformer{},
 			// handle finalizers and referenced definition labels
 			&componentMetaTransformer{},
@@ -162,7 +162,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// add our finalizer to all objects
 			&componentOwnershipTransformer{},
 			// handle component postProvision lifecycle action
-			&componentPostProvisionTransformer{Client: r.Client},
+			&componentPostProvisionTransformer{},
 			// update component status
 			&componentStatusTransformer{Client: r.Client},
 		).Build()

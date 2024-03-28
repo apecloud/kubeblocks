@@ -27,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"sort"
@@ -807,6 +808,7 @@ func (r *BackupRepoReconciler) runPreCheckJobForTool(reconCtx *reconcileContext,
 	if err != nil {
 		return nil, err
 	}
+	precheckFilePath := filepath.Join("/", reconCtx.repo.Spec.PathPrefix, "precheck.txt")
 	// run pre-check job
 	job = &batchv1.Job{}
 	job.Name = reconCtx.preCheckResourceName()
@@ -822,10 +824,10 @@ func (r *BackupRepoReconciler) runPreCheckJobForTool(reconCtx *reconcileContext,
 						ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 						Command: []string{
 							"sh", "-c",
-							`
+							fmt.Sprintf(`
 set -ex
 export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
-echo "pre-check" | datasafed push - /precheck.txt`,
+echo "pre-check" | datasafed push - %s`, precheckFilePath),
 						},
 					}},
 					ServiceAccountName: saName,

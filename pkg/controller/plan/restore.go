@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 // RestoreManager restores manager functions
@@ -132,7 +133,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	var templates []dpv1alpha1.RestoreVolumeClaim
 	pvcLabels := constant.GetKBWellKnownLabels(r.Cluster.Spec.ClusterDefRef, r.Cluster.Name, comp.Name)
 	for _, v := range comp.VolumeClaimTemplates {
-		if !r.existVolumeSource(targetVolumes, v.Name) {
+		if !dputils.ExistTargetVolume(targetVolumes, v.Name) {
 			continue
 		}
 		pvc := &corev1.PersistentVolumeClaim{
@@ -259,21 +260,6 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 		Namespace: r.Cluster.Namespace,
 		Labels:    r.restoreLabels,
 	}
-}
-
-// existVolumeSource checks if the backup.status.backupMethod.targetVolumes exists the target volume which should be restored.
-func (r *RestoreManager) existVolumeSource(targetVolumes *dpv1alpha1.TargetVolumeInfo, volumeName string) bool {
-	for _, v := range targetVolumes.Volumes {
-		if v == volumeName {
-			return true
-		}
-	}
-	for _, v := range targetVolumes.VolumeMounts {
-		if v.Name == volumeName {
-			return true
-		}
-	}
-	return false
 }
 
 func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.SynthesizedComponent) (*dpv1alpha1.Backup, error) {

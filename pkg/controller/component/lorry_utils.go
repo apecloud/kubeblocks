@@ -261,6 +261,7 @@ func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComp
 	if volumeProtectionEnabled(synthesizeComp) {
 		envs = append(envs, buildEnv4VolumeProtection(*synthesizeComp.VolumeProtection))
 	}
+	envs = append(envs, buildEnv4CronJobs(synthesizeComp)...)
 
 	container.Env = append(container.Env, envs...)
 }
@@ -358,6 +359,29 @@ func buildEnv4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.En
 	}
 }
 
+func buildEnv4CronJobs(_ *SynthesizedComponent) []corev1.EnvVar {
+	return nil
+	// if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.HealthyCheck == nil {
+	// 	return nil
+	// }
+	// healthyCheck := synthesizeComp.LifecycleActions.HealthyCheck
+	// healthCheckSetting := make(map[string]string)
+	// healthCheckSetting["periodSeconds"] = strconv.Itoa(int(healthyCheck.PeriodSeconds))
+	// healthCheckSetting["timeoutSeconds"] = strconv.Itoa(int(healthyCheck.TimeoutSeconds))
+	// healthCheckSetting["failureThreshold"] = strconv.Itoa(int(healthyCheck.FailureThreshold))
+	// healthCheckSetting["successThreshold"] = strconv.Itoa(int(healthyCheck.SuccessThreshold))
+	// cronJobs := make(map[string]map[string]string)
+	// cronJobs["healthyCheck"] = healthCheckSetting
+
+	// jsonStr, _ := json.Marshal(cronJobs)
+	// return []corev1.EnvVar{
+	// 	{
+	// 		Name:  constant.KBEnvCronJobs,
+	// 		Value: string(jsonStr),
+	// 	},
+	// }
+}
+
 // getBuiltinActionHandler gets the built-in handler.
 // The BuiltinActionHandler within the same synthesizeComp LifecycleActions should be consistent, we can take any one of them.
 func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.BuiltinActionHandlerType {
@@ -381,10 +405,10 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		synthesizeComp.LifecycleActions.MemberLeave,
 		synthesizeComp.LifecycleActions.Readonly,
 		synthesizeComp.LifecycleActions.Readwrite,
-		synthesizeComp.LifecycleActions.DataPopulate,
-		synthesizeComp.LifecycleActions.DataAssemble,
+		synthesizeComp.LifecycleActions.DataDump,
+		synthesizeComp.LifecycleActions.DataLoad,
 		synthesizeComp.LifecycleActions.Reconfigure,
-		synthesizeComp.LifecycleActions.AccountProvision,
+		// synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
 	hasAction := false
@@ -414,9 +438,9 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 		constant.MemberLeaveAction:   synthesizeComp.LifecycleActions.MemberLeave,
 		constant.ReadonlyAction:      synthesizeComp.LifecycleActions.Readonly,
 		constant.ReadWriteAction:     synthesizeComp.LifecycleActions.Readwrite,
-		// "dataPopulate":     synthesizeComp.LifecycleActions.DataPopulate,
-		// "dataAssemble":     synthesizeComp.LifecycleActions.DataAssemble,
-		// "reconfigure":      synthesizeComp.LifecycleActions.Reconfigure,
+		constant.DataDumpAction:      synthesizeComp.LifecycleActions.DataDump,
+		constant.DataLoadAction:      synthesizeComp.LifecycleActions.DataLoad,
+		// "reconfigure":                synthesizeComp.LifecycleActions.Reconfigure,
 		// "accountProvision": synthesizeComp.LifecycleActions.AccountProvision,
 	}
 

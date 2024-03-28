@@ -118,6 +118,18 @@ podDisruptionBudget:
 ##
 managedNamespaces:
 
+## Specify the configurations for multi-cluster management.
+##
+## @param multiCluster.kubeConfig
+## @param multiCluster.contexts
+multiCluster:
+  # Configure the kubeconfig secret. The config content should be in the item with the key kubeconfig.
+  kubeConfig:
+  # Configure the contexts to use, multiple contexts are separated by commas.
+  contexts:
+  # The path to which kubeconfig is mounted.
+  mountPath: /var/run/secrets/kubeblocks.io/multicluster
+
 ## Logger settings
 ##
 ## @param loggerSettings.developmentMode

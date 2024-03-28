@@ -42,6 +42,7 @@ const (
 	ConditionTypeExpose             = "Exposing"
 	ConditionTypeDataScript         = "ExecuteDataScript"
 	ConditionTypeBackup             = "Backup"
+	ConditionTypeInstanceRebuilding = "InstancesRebuilding"
 	ConditionTypeCustomOperation    = "CustomOperation"
 
 	// condition and event reasons
@@ -179,6 +180,17 @@ func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
+// NewInstancesRebuildingCondition creates a condition that the operation starts to rebuild the instances.
+func NewInstancesRebuildingCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeInstanceRebuilding,
+		Status:             metav1.ConditionTrue,
+		Reason:             "StartToRebuildInstances",
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf("Start to rebuild the instances in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
 // NewSwitchoveringCondition creates a condition that the operation starts to switchover components
 func NewSwitchoveringCondition(generation int64, message string) *metav1.Condition {
 	return &metav1.Condition{
@@ -284,7 +296,7 @@ func NewDataScriptCondition(ops *OpsRequest) *metav1.Condition {
 	return newOpsCondition(ops, ConditionTypeDataScript, "DataScriptStarted", fmt.Sprintf("Start to execute data script in Cluster: %s", ops.Spec.ClusterRef))
 }
 
-func newOpsCondition(ops *OpsRequest, condType, reason, message string) *metav1.Condition {
+func newOpsCondition(_ *OpsRequest, condType, reason, message string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               condType,
 		Status:             metav1.ConditionTrue,

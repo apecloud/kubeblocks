@@ -28,7 +28,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 )
 
-func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string, error) {
+func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
+	return mgr.GetReplicaRoleForMember(ctx, cluster, nil)
+}
+
+func (mgr *Manager) GetReplicaRoleForMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (string, error) {
 	if mgr.ReplicaTenant == "" {
 		mgr.Logger.V(1).Info("the cluster has no replica tenant set")
 		return "", nil
@@ -49,7 +53,16 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 
 	sql := fmt.Sprintf("SELECT TENANT_ROLE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
 
-	rows, err := mgr.DB.QueryContext(ctx, sql)
+	db := mgr.DB
+	if member != nil && member.Name != mgr.CurrentMemberName {
+		addr := cluster.GetMemberAddrWithPort(*member)
+		db, err = config.GetDBConnWithAddr(addr)
+		if err != nil {
+			return "", errors.Wrap(err, "new db connection failed")
+		}
+	}
+
+	rows, err := db.QueryContext(ctx, sql)
 	if err != nil {
 		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
 		return "", errors.Wrapf(err, "error executing %s", sql)
@@ -64,7 +77,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 	var isReady bool
 	for rows.Next() {
 		if err = rows.Scan(&role); err != nil {
-			mgr.Logger.Error(err, "Role query error")
+			mgr.Logger.Info("Role query failed", "error", err.Error())
 			return role, err
 		}
 		isReady = true

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -77,7 +78,7 @@ var _ = Describe("Component Utils", func() {
 		// create the new objects.
 		By("clean resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// clear rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -125,25 +126,6 @@ var _ = Describe("Component Utils", func() {
 		})
 	})
 
-	Context("Custom Label test", func() {
-		Context("parseCustomLabelPattern func", func() {
-			It("should parse pattern well", func() {
-				pattern := "v1/Pod"
-				gvk, err := parseCustomLabelPattern(pattern)
-				Expect(err).Should(BeNil())
-				Expect(gvk.Group).Should(BeEmpty())
-				Expect(gvk.Version).Should(Equal("v1"))
-				Expect(gvk.Kind).Should(Equal("Pod"))
-				pattern = "apps/v1/StatefulSet"
-				gvk, err = parseCustomLabelPattern(pattern)
-				Expect(err).Should(BeNil())
-				Expect(gvk.Group).Should(Equal("apps"))
-				Expect(gvk.Version).Should(Equal("v1"))
-				Expect(gvk.Kind).Should(Equal("StatefulSet"))
-			})
-		})
-	})
-
 	Context("test mergeServiceAnnotations", func() {
 		It("test sync pod spec default values set by k8s", func() {
 			var (
@@ -162,6 +144,14 @@ var _ = Describe("Component Utils", func() {
 				AddRoleLabel(role).
 				AddConsensusSetAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").
+				AddVolume(corev1.Volume{
+					Name: testapps.DataVolumeName,
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: fmt.Sprintf("%s-%s", testapps.DataVolumeName, podName),
+						},
+					},
+				}).
 				AddContainer(corev1.Container{
 					Name:  testapps.DefaultMySQLContainerName,
 					Image: testapps.ApeCloudMySQLImage,
@@ -182,6 +172,9 @@ var _ = Describe("Component Utils", func() {
 								Port: intstr.FromInt(1024),
 							},
 						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: testapps.DataVolumeName, MountPath: "/test"},
 					},
 				}).
 				GetObject()

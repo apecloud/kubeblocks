@@ -23,9 +23,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -44,15 +47,15 @@ type transformContext struct {
 }
 
 type PlanBuilder struct {
-	transCtx     *transformContext
-	cli          client.Client
-	transformers graph.TransformerChain
+	transCtx    *transformContext
+	cli         client.Client
+	currentTree *ObjectTree
+	desiredTree *ObjectTree
 }
 
 type Plan struct {
-	dag      *graph.DAG
+	vertices []*model.ObjectVertex
 	walkFunc graph.WalkFunc
-	transCtx *transformContext
 }
 
 var _ graph.TransformContext = &transformContext{}
@@ -85,37 +88,123 @@ func (b *PlanBuilder) Init() error {
 	return nil
 }
 
-func (b *PlanBuilder) AddTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
-	b.transformers = append(b.transformers, transformer...)
+func (b *PlanBuilder) AddTransformer(_ ...graph.Transformer) graph.PlanBuilder {
 	return b
 }
 
-func (b *PlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
-	b.transformers = append(b.transformers, &model.ParallelTransformer{Transformers: transformer})
+func (b *PlanBuilder) AddParallelTransformer(_ ...graph.Transformer) graph.PlanBuilder {
 	return b
 }
 
 func (b *PlanBuilder) Build() (graph.Plan, error) {
-	var err error
-	// new a DAG and apply chain on it, after that we should get the final Plan
-	dag := graph.NewDAG()
-	err = b.transformers.ApplyTo(b.transCtx, dag)
-	// log for debug
-	b.transCtx.logger.Info(fmt.Sprintf("DAG: %s", dag))
-
-	// we got the execution plan
+	vertices := buildOrderedVertices(b.currentTree, b.desiredTree)
 	plan := &Plan{
-		dag:      dag,
 		walkFunc: b.rsmWalkFunc,
-		transCtx: b.transCtx,
+		vertices: vertices,
 	}
-	return plan, err
+	return plan, nil
+}
+
+func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*model.ObjectVertex {
+	var vertices []*model.ObjectVertex
+	newVertex := func(oldObj, newObj client.Object, action *model.Action) *model.ObjectVertex {
+		return &model.ObjectVertex{
+			Obj:    newObj,
+			OriObj: oldObj,
+			Action: action,
+		}
+	}
+
+	// handle root object
+	if desiredTree.GetRoot() == nil {
+		root := newVertex(currentTree.GetRoot(), currentTree.GetRoot(), model.ActionDeletePtr())
+		vertices = append(vertices, root)
+	} else {
+		root := newVertex(currentTree.GetRoot(), desiredTree.GetRoot(), model.ActionStatusPtr())
+		vertices = append(vertices, root)
+		// if annotations, labels or finalizers updated, do both meta patch and status update.
+		if !reflect.DeepEqual(currentTree.GetRoot().GetAnnotations(), desiredTree.GetRoot().GetAnnotations()) ||
+			!reflect.DeepEqual(currentTree.GetRoot().GetLabels(), desiredTree.GetRoot().GetLabels()) ||
+			!reflect.DeepEqual(currentTree.GetRoot().GetFinalizers(), desiredTree.GetRoot().GetFinalizers()) {
+			currentRoot, _ := currentTree.GetRoot().DeepCopyObject().(client.Object)
+			desiredRoot, _ := desiredTree.GetRoot().DeepCopyObject().(client.Object)
+			patchRoot := newVertex(currentRoot, desiredRoot, model.ActionPatchPtr())
+			vertices = append(vertices, patchRoot)
+		}
+	}
+
+	// handle secondary objects
+	oldSnapshot := currentTree.GetSecondaryObjects()
+	newSnapshot := desiredTree.GetSecondaryObjects()
+
+	// now compute the diff between old and target snapshot and generate the plan
+	oldNameSet := sets.KeySet(oldSnapshot)
+	newNameSet := sets.KeySet(newSnapshot)
+
+	createSet := newNameSet.Difference(oldNameSet)
+	updateSet := newNameSet.Intersection(oldNameSet)
+	deleteSet := oldNameSet.Difference(newNameSet)
+
+	var (
+		assistantVertices []*model.ObjectVertex
+		workloadVertices  []*model.ObjectVertex
+	)
+	findAndAppend := func(vertex *model.ObjectVertex) {
+		switch vertex.Obj.(type) {
+		case *corev1.Service, *corev1.ConfigMap, *corev1.Secret, *corev1.PersistentVolumeClaim:
+			assistantVertices = append(assistantVertices, vertex)
+		default:
+			workloadVertices = append(workloadVertices, vertex)
+		}
+	}
+	createNewObjects := func() {
+		for name := range createSet {
+			v := newVertex(nil, newSnapshot[name], model.ActionCreatePtr())
+			findAndAppend(v)
+		}
+	}
+	updateObjects := func() {
+		for name := range updateSet {
+			oldObj := oldSnapshot[name]
+			newObj := newSnapshot[name]
+			if !reflect.DeepEqual(oldObj, newObj) {
+				v := newVertex(oldObj, newObj, model.ActionUpdatePtr())
+				findAndAppend(v)
+			}
+		}
+	}
+	deleteOrphanObjects := func() {
+		for name := range deleteSet {
+			v := newVertex(nil, oldSnapshot[name], model.ActionDeletePtr())
+			findAndAppend(v)
+		}
+	}
+	handleDependencies := func() {
+		vertices = append(vertices, workloadVertices...)
+		vertices = append(vertices, assistantVertices...)
+	}
+
+	// objects to be created
+	createNewObjects()
+	// objects to be updated
+	updateObjects()
+	// objects to be deleted
+	deleteOrphanObjects()
+	// handle object dependencies
+	handleDependencies()
+	return vertices
 }
 
 // Plan implementation
 
 func (p *Plan) Execute() error {
-	return p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
+	var err error
+	for i := len(p.vertices) - 1; i >= 0; i-- {
+		if err = p.walkFunc(p.vertices[i]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Do the real works
@@ -195,7 +284,7 @@ func (b *PlanBuilder) statusObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 // NewPlanBuilder returns a PlanBuilder
-func NewPlanBuilder(ctx context.Context, cli client.Client, recorder record.EventRecorder, logger logr.Logger) graph.PlanBuilder {
+func NewPlanBuilder(ctx context.Context, cli client.Client, currentTree, desiredTree *ObjectTree, recorder record.EventRecorder, logger logr.Logger) graph.PlanBuilder {
 	return &PlanBuilder{
 		transCtx: &transformContext{
 			ctx:      ctx,
@@ -203,6 +292,8 @@ func NewPlanBuilder(ctx context.Context, cli client.Client, recorder record.Even
 			recorder: recorder,
 			logger:   logger,
 		},
-		cli: cli,
+		cli:         cli,
+		currentTree: currentTree,
+		desiredTree: desiredTree,
 	}
 }

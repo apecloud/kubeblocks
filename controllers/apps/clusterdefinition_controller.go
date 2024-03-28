@@ -233,14 +233,14 @@ func (r *ClusterDefinitionReconciler) validateTopologyOrders(topology appsv1alph
 		return slices.Equal(items, comps)
 	}
 
-	if !validate(topology.Orders.StartupOrder) {
-		return fmt.Errorf("the components in startup order are different from those from definition")
+	if !validate(topology.Orders.Provision) {
+		return fmt.Errorf("the components in provision orders are different from those in definition")
 	}
-	if !validate(topology.Orders.ShutdownOrder) {
-		return fmt.Errorf("the components in shutdown order are different from those from definition")
+	if !validate(topology.Orders.Terminate) {
+		return fmt.Errorf("the components in terminate orders are different from those in definition")
 	}
-	if !validate(topology.Orders.UpdateOrder) {
-		return fmt.Errorf("the components in update order are different from those from definition")
+	if !validate(topology.Orders.Update) {
+		return fmt.Errorf("the components in update orders are different from those in definition")
 	}
 	return nil
 }

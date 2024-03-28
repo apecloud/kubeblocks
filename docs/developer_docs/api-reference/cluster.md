@@ -2543,6 +2543,20 @@ Note that this restore operation will roll back cluster services.</p>
 </tr>
 <tr>
 <td>
+<code>rebuildFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">
+[]RebuildInstance
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the instances that require re-creation.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>customSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.CustomOpsSpec">
@@ -6194,40 +6208,40 @@ Cannot be updated.</p>
 <tbody>
 <tr>
 <td>
-<code>startupOrder</code><br/>
+<code>provision</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>StartupOrder defines the order in which components should be started in the cluster.
+<p>Provision defines the order in which components should be provisioned in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>shutdownOrder</code><br/>
+<code>terminate</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ShutdownOrder defines the order in which components should be shut down in the cluster.
+<p>Terminate defines the order in which components should be terminated in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>updateOrder</code><br/>
+<code>update</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>UpdateOrder defines the order in which components should be updated in the cluster.
+<p>Update defines the order in which components should be updated in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
@@ -7710,7 +7724,7 @@ LifecycleActionHandler
 </tr>
 <tr>
 <td>
-<code>dataPopulate</code><br/>
+<code>dataDump</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
 LifecycleActionHandler
@@ -7719,7 +7733,7 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the method to populate the data to create new replicas.
+<p>Defines the method to dump the data from a replica.
 This action is typically used when a new replica needs to be constructed, such as:</p>
 <ul>
 <li>scale-out</li>
@@ -7732,7 +7746,7 @@ This field cannot be updated.</p>
 </tr>
 <tr>
 <td>
-<code>dataAssemble</code><br/>
+<code>dataLoad</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
 LifecycleActionHandler
@@ -7741,14 +7755,14 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the method to assemble data synchronized from external before starting the service for a new replica.
+<p>Defines the method to load data into a replica.
 This action is typically used when creating a new replica, such as:</p>
 <ul>
 <li>scale-out</li>
 <li>rebuild</li>
 <li>clone</li>
 </ul>
-<p>The data will be streamed in via stdin. If any error occurs during the assembly process,
+<p>The data will be streamed in via stdin. If any error occurs during the process,
 the action must be able to guarantee idempotence to allow for retries from the beginning.
 This field cannot be updated.</p>
 </td>
@@ -7799,7 +7813,7 @@ This field cannot be updated.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentOps">ComponentOps
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Expose">Expose</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Expose">Expose</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 <p>ComponentOps represents the common variables required for operations within the scope of a component.</p>
@@ -13136,6 +13150,20 @@ Note that this restore operation will roll back cluster services.</p>
 </tr>
 <tr>
 <td>
+<code>rebuildFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">
+[]RebuildInstance
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the instances that require re-creation.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>customSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.CustomOpsSpec">
@@ -13548,13 +13576,16 @@ More info: <a href="https://kubernetes.io/docs/concepts/services-networking/serv
 <td><p>DataScriptType the data script operation will execute the data script against the cluster.</p>
 </td>
 </tr><tr><td><p>&#34;Custom&#34;</p></td>
-<td></td>
+<td><p>RebuildInstance rebuilding an instance is very useful when a node is offline or an instance is unrecoverable.</p>
+</td>
 </tr><tr><td><p>&#34;DataScript&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Expose&#34;</p></td>
 <td><p>StartType the start operation will start the pods which is deleted in stop operation.</p>
 </td>
 </tr><tr><td><p>&#34;HorizontalScaling&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;RebuildInstance&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Reconfiguring&#34;</p></td>
 <td></td>
@@ -15076,6 +15107,79 @@ MemberUpdateStrategy
 <li><code>BestEffortParallel</code>: Updates Members in parallel to ensure minimum component write downtime.</li>
 <li><code>Parallel</code>: Forces parallel updates.</li>
 </ul>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ComponentOps</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
+ComponentOps
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentOps</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceNames</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Defines the names of the instances that need to be rebuilt. These are essentially the names of the pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backupName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the name of the backup from which to recover. Currently, only a full physical backup is supported
+unless your component only has one replica. Such as &lsquo;xtrabackup&rsquo; is full physical backup for mysql and &lsquo;mysqldump&rsquo; is not.
+And if no specified backupName, the instance will be recreated with empty &lsquo;PersistentVolumes&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>envForRestore</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to set in the container for restore. These will be
+merged with the env of Backup and ActionSet.</p>
+<p>The priority of merging is as follows: <code>Restore env &gt; Backup env &gt; ActionSet env</code>.</p>
 </td>
 </tr>
 </tbody>
@@ -17618,6 +17722,57 @@ bool
 Specifies two ways of controller to reload the parameter:
 - set to &lsquo;True&rsquo;, execute the reload action in sync mode, wait for the completion of reload
 - set to &lsquo;False&rsquo;, execute the reload action in async mode, just update the &lsquo;Configmap&rsquo;, no need to wait</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>batchReload</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to reconfigure dynamic parameters individually or in a batch.
+- Set to &lsquo;True&rsquo; to execute the reload action in a batch, incorporating all parameter changes.
+- Set to &lsquo;False&rsquo; to execute the reload action for each parameter change individually.
+The default value is &lsquo;False&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>batchInputTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>When <code>batchReload</code> is set to &lsquo;True&rsquo;, this parameter allows for the optional specification
+of the batch input format that is passed into the STDIN of the script.
+The format should be provided as a Go template string.
+In the template, the updated parameters&rsquo; key-value map can be referenced using the dollar sign (&lsquo;$&rsquo;) variable.
+Here&rsquo;s an example of an input template:</p>
+<pre><code class="language-yaml">
+batchInputTemplate: |-
+&#123;&#123;- range $pKey, $pValue := $ &#125;&#125;
+&#123;&#123; printf &quot;%s:%s&quot; $pKey $pValue &#125;&#125;
+&#123;&#123;- end &#125;&#125;
+</code></pre>
+<p>In this example, each updated parameter is iterated over in a sorted order by keys to generate the batch input data as follows:</p>
+<pre><code>
+key1:value1
+key2:value2
+key3:value3
+</code></pre>
+<p>If this parameter is not specified, the default format used for STDIN is as follows:
+Each updated parameter generates a line that concatenates the parameter&rsquo;s key and value with a equal sign (&lsquo;=&rsquo;).
+These lines are then sorted by their keys and inserted accordingly. Here&rsquo;s an example of the batch input data using the default template:</p>
+<pre><code>
+key1=value1
+key2=value2
+key3=value3
+</code></pre>
 </td>
 </tr>
 </tbody>

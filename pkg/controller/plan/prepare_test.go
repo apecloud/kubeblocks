@@ -76,6 +76,7 @@ var _ = Describe("Prepare Test", func() {
 		clusterVersionObj *appsv1alpha1.ClusterVersion
 		compDefObj        *appsv1alpha1.ComponentDefinition
 		cluster           *appsv1alpha1.Cluster
+		comp              *appsv1alpha1.Component
 		configSpecName    string
 	)
 
@@ -119,6 +120,9 @@ var _ = Describe("Prepare Test", func() {
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).
 				GetObject()
+
+			comp, _ = component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			comp.SetUID("test-uid")
 		})
 
 		It("render configuration should success", func() {
@@ -136,7 +140,7 @@ var _ = Describe("Prepare Test", func() {
 				ClusterName:   synthesizeComp.ClusterName,
 				ComponentName: synthesizeComp.Name,
 			}
-			err = RenderConfigNScriptFiles(resCtx, cluster, synthesizeComp, synthesizeComp.PodSpec, nil)
+			err = RenderConfigNScriptFiles(resCtx, cluster, comp, synthesizeComp, synthesizeComp.PodSpec, nil)
 			Expect(err).Should(Succeed())
 			Expect(configuration.CheckEnvFrom(&synthesizeComp.PodSpec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, synthesizeComp.Name, configSpecName)))).Should(BeFalse())
 			// TODO(xingran): add more test cases

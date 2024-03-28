@@ -81,7 +81,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	var parent client.Object
-	rb := factory.BuildRoleBinding(transCtx.Cluster, serviceAccount.Name)
+	rb := buildRoleBinding(transCtx.Cluster, serviceAccount.Name)
 	graphCli.Create(dag, rb, inDataContext())
 	parent = rb
 	if needCRB {
@@ -248,6 +248,7 @@ func getDefaultBackupPolicyTemplate(transCtx *componentTransformContext, cluster
 	return &backupPolicyTPLs.Items[0], nil
 }
 
+// buildServiceAccount builds the service account for the component and returns serviceAccount, needCRB(need create ClusterRoleBinding), error.
 func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAccount, bool, error) {
 	var (
 		cluster = transCtx.Cluster
@@ -280,8 +281,14 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 		}
 	}
 
+	buildSa := factory.BuildServiceAccount(cluster, serviceAccountName)
 	// if volume protection is enabled, the service account needs to be bound to the clusterRoleBinding.
-	return factory.BuildServiceAccount(cluster, serviceAccountName), volumeProtectionEnable, nil
+	return buildSa, volumeProtectionEnable, nil
+}
+
+func buildRoleBinding(cluster *appsv1alpha1.Cluster, serviceAccountName string) *rbacv1.RoleBinding {
+	roleBinding := factory.BuildRoleBinding(cluster, serviceAccountName)
+	return roleBinding
 }
 
 func createServiceAccount(serviceAccount *corev1.ServiceAccount, graphCli model.GraphClient, dag *graph.DAG, parent client.Object) {

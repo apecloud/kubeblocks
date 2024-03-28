@@ -6208,40 +6208,40 @@ Cannot be updated.</p>
 <tbody>
 <tr>
 <td>
-<code>startupOrder</code><br/>
+<code>provision</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>StartupOrder defines the order in which components should be started in the cluster.
+<p>Provision defines the order in which components should be provisioned in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>shutdownOrder</code><br/>
+<code>terminate</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ShutdownOrder defines the order in which components should be shut down in the cluster.
+<p>Terminate defines the order in which components should be terminated in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>updateOrder</code><br/>
+<code>update</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>UpdateOrder defines the order in which components should be updated in the cluster.
+<p>Update defines the order in which components should be updated in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
@@ -17722,6 +17722,57 @@ bool
 Specifies two ways of controller to reload the parameter:
 - set to &lsquo;True&rsquo;, execute the reload action in sync mode, wait for the completion of reload
 - set to &lsquo;False&rsquo;, execute the reload action in async mode, just update the &lsquo;Configmap&rsquo;, no need to wait</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>batchReload</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to reconfigure dynamic parameters individually or in a batch.
+- Set to &lsquo;True&rsquo; to execute the reload action in a batch, incorporating all parameter changes.
+- Set to &lsquo;False&rsquo; to execute the reload action for each parameter change individually.
+The default value is &lsquo;False&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>batchInputTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>When <code>batchReload</code> is set to &lsquo;True&rsquo;, this parameter allows for the optional specification
+of the batch input format that is passed into the STDIN of the script.
+The format should be provided as a Go template string.
+In the template, the updated parameters&rsquo; key-value map can be referenced using the dollar sign (&lsquo;$&rsquo;) variable.
+Here&rsquo;s an example of an input template:</p>
+<pre><code class="language-yaml">
+batchInputTemplate: |-
+&#123;&#123;- range $pKey, $pValue := $ &#125;&#125;
+&#123;&#123; printf &quot;%s:%s&quot; $pKey $pValue &#125;&#125;
+&#123;&#123;- end &#125;&#125;
+</code></pre>
+<p>In this example, each updated parameter is iterated over in a sorted order by keys to generate the batch input data as follows:</p>
+<pre><code>
+key1:value1
+key2:value2
+key3:value3
+</code></pre>
+<p>If this parameter is not specified, the default format used for STDIN is as follows:
+Each updated parameter generates a line that concatenates the parameter&rsquo;s key and value with a equal sign (&lsquo;=&rsquo;).
+These lines are then sorted by their keys and inserted accordingly. Here&rsquo;s an example of the batch input data using the default template:</p>
+<pre><code>
+key1=value1
+key2=value2
+key3=value3
+</code></pre>
 </td>
 </tr>
 </tbody>

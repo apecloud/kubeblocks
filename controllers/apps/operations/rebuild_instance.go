@@ -59,6 +59,7 @@ type instanceHelper struct {
 	targetPod *corev1.Pod
 	backup    *dpv1alpha1.Backup
 	actionSet *dpv1alpha1.ActionSet
+	instance  appsv1alpha1.Instance
 	// key: source pvc name, value: the tmp pvc which using to rebuild
 	pvcMap          map[string]*corev1.PersistentVolumeClaim
 	synthesizedComp *component.SynthesizedComponent
@@ -102,17 +103,17 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 		if err != nil {
 			return err
 		}
-		for _, podName := range v.InstanceNames {
+		for _, ins := range v.Instances {
 			targetPod := &corev1.Pod{}
-			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: podName, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
+			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 				return err
 			}
-			isAvailable, err := r.instanceIsAvailable(synthesizedComp, targetPod)
+			isAvailable, err := r.instanceIsAvailable(reqCtx, cli, opsRes, synthesizedComp, targetPod)
 			if err != nil {
 				return err
 			}
 			if isAvailable {
-				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is availabled, can not rebuild it`, podName))
+				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is availabled, can not rebuild it`, ins.Name))
 			}
 		}
 	}
@@ -123,13 +124,13 @@ func (r rebuildInstanceOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Requ
 	return nil
 }
 
-func (r rebuildInstanceOpsHandler) getInstanceProgressDetail(compStatus appsv1alpha1.OpsRequestComponentStatus, instance string) *appsv1alpha1.ProgressStatusDetail {
+func (r rebuildInstanceOpsHandler) getInstanceProgressDetail(compStatus appsv1alpha1.OpsRequestComponentStatus, instance string) appsv1alpha1.ProgressStatusDetail {
 	objectKey := getProgressObjectKey(constant.PodKind, instance)
 	progressDetail := findStatusProgressDetail(compStatus.ProgressDetails, objectKey)
 	if progressDetail != nil {
-		return progressDetail
+		return *progressDetail
 	}
-	return &appsv1alpha1.ProgressStatusDetail{
+	return appsv1alpha1.ProgressStatusDetail{
 		ObjectKey: objectKey,
 		Status:    appsv1alpha1.ProcessingProgressStatus,
 		Message:   fmt.Sprintf("Start to rebuild pod %s", instance),
@@ -152,9 +153,9 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 	for _, v := range opsRes.OpsRequest.Spec.RebuildFrom {
 		compStatus := opsRes.OpsRequest.Status.Components[v.ComponentName]
 		comp := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
-		for i, instance := range v.InstanceNames {
+		for i, instance := range v.Instances {
 			expectCount += 1
-			progressDetail := r.getInstanceProgressDetail(compStatus, instance)
+			progressDetail := r.getInstanceProgressDetail(compStatus, instance.Name)
 			if isCompletedProgressStatus(progressDetail.Status) {
 				completedCount += 1
 				if progressDetail.Status == appsv1alpha1.FailedProgressStatus {
@@ -163,11 +164,11 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 				continue
 			}
 			// rebuild instance
-			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.EnvForRestore, progressDetail, instance, v.BackupName, i)
+			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.EnvForRestore, &progressDetail, instance, v.BackupName, i)
 			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				// If a fatal error occurs, this instance rebuilds failed.
 				progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, err.Error())
-				setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, *progressDetail)
+				setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 				continue
 			}
 			if err != nil {
@@ -176,9 +177,9 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 			if completed {
 				// if the pod has been rebuilt, set progressDetail phase to Succeed.
 				progressDetail.SetStatusAndMessage(appsv1alpha1.SucceedProgressStatus,
-					fmt.Sprintf("Rebuild pod %s successfully", instance))
+					fmt.Sprintf("Rebuild pod %s successfully", instance.Name))
 			}
-			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, *progressDetail)
+			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 		}
 		opsRes.OpsRequest.Status.Components[v.ComponentName] = compStatus
 	}
@@ -202,10 +203,10 @@ func (r rebuildInstanceOpsHandler) rebuildInstance(reqCtx intctrlutil.RequestCtx
 	comp *appsv1alpha1.ClusterComponentSpec,
 	envForRestore []corev1.EnvVar,
 	progressDetail *appsv1alpha1.ProgressStatusDetail,
-	targetPodName,
+	instance appsv1alpha1.Instance,
 	backupName string,
 	index int) (bool, error) {
-	insHelper, err := r.prepareInstanceHelper(reqCtx, cli, opsRes, comp, envForRestore, targetPodName, backupName, index)
+	insHelper, err := r.prepareInstanceHelper(reqCtx, cli, opsRes, comp, envForRestore, instance, backupName, index)
 	if err != nil {
 		return false, err
 	}
@@ -220,7 +221,7 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 	opsRes *OpsResource,
 	comp *appsv1alpha1.ClusterComponentSpec,
 	envForRestore []corev1.EnvVar,
-	targetPodName,
+	instance appsv1alpha1.Instance,
 	backupName string,
 	index int) (*instanceHelper, error) {
 	var (
@@ -249,7 +250,7 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 		}
 	}
 	targetPod := &corev1.Pod{}
-	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: targetPodName, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
+	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instance.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 		return nil, err
 	}
 	synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, comp)
@@ -265,6 +266,7 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 		index:           index,
 		comp:            comp,
 		backup:          backup,
+		instance:        instance,
 		actionSet:       actionSet,
 		synthesizedComp: synthesizedComp,
 		pvcMap:          pvcMap,
@@ -326,15 +328,15 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 				if err != nil || !available {
 					return false, err
 				}
-				progressDetail.Message = fmt.Sprintf(`Waiting for Restore "%s" to be completed`, restoreName)
 				return false, r.createPostReadyRestore(reqCtx, cli, opsRes.OpsRequest, insHelper, restoreName)
 			}
 			return false, r.createPrepareDataRestore(reqCtx, cli, opsRes.OpsRequest, insHelper, restoreName)
 		}
-		if restore.Status.Phase == dpv1alpha1.RestorePhaseFailed {
-			return false, intctrlutil.NewFatalError(fmt.Sprintf(`pod "%s" rebuild failed, due to the Restore "%s" is Failed`, insHelper.targetPod.Name, restoreName))
+		if restore.Status.Phase != dpv1alpha1.RestorePhaseCompleted {
+			progressDetail.Message = fmt.Sprintf(`Waiting for Restore "%s" to be completed`, restoreName)
+			return false, nil
 		}
-		return restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted, nil
+		return true, nil
 	}
 
 	var (
@@ -484,6 +486,17 @@ func (r rebuildInstanceOpsHandler) createPrepareDataRestore(reqCtx intctrlutil.R
 		}
 		volumeClaims = append(volumeClaims, volumeClaim)
 	}
+
+	schedulePolicy := dpv1alpha1.SchedulingSpec{
+		Tolerations:               insHelper.targetPod.Spec.Tolerations,
+		Affinity:                  insHelper.targetPod.Spec.Affinity,
+		TopologySpreadConstraints: insHelper.targetPod.Spec.TopologySpreadConstraints,
+	}
+	if insHelper.instance.TargetNodeName != "" {
+		schedulePolicy.NodeSelector = map[string]string{
+			corev1.LabelHostname: insHelper.instance.TargetNodeName,
+		}
+	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.buildRestoreMetaObject(opsRequest, restoreName),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -493,11 +506,7 @@ func (r rebuildInstanceOpsHandler) createPrepareDataRestore(reqCtx intctrlutil.R
 			},
 			Env: insHelper.envForRestore,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				SchedulingSpec: dpv1alpha1.SchedulingSpec{
-					Tolerations:               insHelper.targetPod.Spec.Tolerations,
-					Affinity:                  insHelper.targetPod.Spec.Affinity,
-					TopologySpreadConstraints: insHelper.targetPod.Spec.TopologySpreadConstraints,
-				},
+				SchedulingSpec:           schedulePolicy,
 				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
 				RestoreVolumeClaims:      volumeClaims,
 			},
@@ -567,14 +576,20 @@ func (r rebuildInstanceOpsHandler) createTmpPVCsAndPod(reqCtx intctrlutil.Reques
 		VolumeMounts:    insHelper.volumeMounts,
 	}
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
-	rebuildPod := builder.NewPodBuilder(insHelper.targetPod.Namespace, tmpPodName).AddTolerations(insHelper.targetPod.Spec.Tolerations...).
+	rebuildPodBuilder := builder.NewPodBuilder(insHelper.targetPod.Namespace, tmpPodName).AddTolerations(insHelper.targetPod.Spec.Tolerations...).
 		AddContainer(*container).
 		AddVolumes(insHelper.volumes...).
 		SetRestartPolicy(corev1.RestartPolicyNever).
 		AddLabels(constant.OpsRequestNameLabelKey, opsRequest.Name).
 		AddLabels(constant.OpsRequestNamespaceLabelKey, opsRequest.Namespace).
 		SetTopologySpreadConstraints(insHelper.targetPod.Spec.TopologySpreadConstraints).
-		SetAffinity(insHelper.targetPod.Spec.Affinity).GetObject()
+		SetAffinity(insHelper.targetPod.Spec.Affinity)
+	if insHelper.instance.TargetNodeName != "" {
+		rebuildPodBuilder.SetNodeSelector(map[string]string{
+			corev1.LabelHostname: insHelper.instance.TargetNodeName,
+		})
+	}
+	rebuildPod := rebuildPodBuilder.GetObject()
 	_ = intctrlutil.SetControllerReference(opsRequest, rebuildPod)
 	return client.IgnoreAlreadyExists(cli.Create(reqCtx.Ctx, rebuildPod))
 }
@@ -751,7 +766,7 @@ func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 	}
 	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(targetPod)
 	if isFailed && isTimeout {
-		return false, intctrlutil.NewFatalError(fmt.Sprintf(`create pod "%s" failed`, targetPod.Name))
+		return false, intctrlutil.NewFatalError(fmt.Sprintf(`the new instance "%s" is failed, please check it`, targetPod.Name))
 	}
 	minReadySeconds, err := component.GetComponentWorkloadMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, synthesizedComp.WorkloadType, synthesizedComp.ClusterName)
 	if err != nil {

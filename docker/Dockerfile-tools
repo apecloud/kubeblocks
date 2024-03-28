@@ -80,7 +80,7 @@ RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13  GOOS=${TARGETOS} GOARCH=${TARGETARCH} && 
 
 
 # Use alpine with tag 20230329 is corresponding to "edge" tag (latest release to date is 3.18) as of 20230625
-FROM docker.io/alpine:edge as dist
+FROM docker.io/alpine:3.19.1 as dist
 ARG APK_MIRROR
 
 # install tools via apk

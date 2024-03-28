@@ -10061,22 +10061,22 @@ spec:
                       description: Orders defines the orders of components within
                         the topology.
                       properties:
-                        shutdownOrder:
-                          description: ShutdownOrder defines the order in which components
-                            should be shut down in the cluster. Components with the
+                        provision:
+                          description: Provision defines the order in which components
+                            should be provisioned in the cluster. Components with
+                            the same order can be listed together, separated by commas.
+                          items:
+                            type: string
+                          type: array
+                        terminate:
+                          description: Terminate defines the order in which components
+                            should be terminated in the cluster. Components with the
                             same order can be listed together, separated by commas.
                           items:
                             type: string
                           type: array
-                        startupOrder:
-                          description: StartupOrder defines the order in which components
-                            should be started in the cluster. Components with the
-                            same order can be listed together, separated by commas.
-                          items:
-                            type: string
-                          type: array
-                        updateOrder:
-                          description: UpdateOrder defines the order in which components
+                        update:
+                          description: Update defines the order in which components
                             should be updated in the cluster. Components with the
                             same order can be listed together, separated by commas.
                           items:

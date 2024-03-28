@@ -6208,40 +6208,40 @@ Cannot be updated.</p>
 <tbody>
 <tr>
 <td>
-<code>startupOrder</code><br/>
+<code>provision</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>StartupOrder defines the order in which components should be started in the cluster.
+<p>Provision defines the order in which components should be provisioned in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>shutdownOrder</code><br/>
+<code>terminate</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ShutdownOrder defines the order in which components should be shut down in the cluster.
+<p>Terminate defines the order in which components should be terminated in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>updateOrder</code><br/>
+<code>update</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>UpdateOrder defines the order in which components should be updated in the cluster.
+<p>Update defines the order in which components should be updated in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>

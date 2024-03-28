@@ -54,7 +54,7 @@ spec:
                     description: Enables providers to verify user configurations using
                       the CUE language.
                     type: string
-                  schemaInJson:
+                  schemaInJSON:
                     description: Transforms the schema from CUE to json for further
                       OpenAPI validation
                     x-kubernetes-preserve-unknown-fields: true

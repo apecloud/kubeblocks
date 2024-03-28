@@ -27,7 +27,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -50,7 +50,7 @@ type configCueValidator struct {
 
 	// cue describes configuration template
 	cueScript string
-	cfgType   v1.CfgFileFormat
+	cfgType   appsv1.CfgFileFormat
 }
 
 func (s *cmKeySelector) filter(key string) bool {
@@ -86,7 +86,7 @@ type schemaValidator struct {
 
 	typeName string
 	schema   *apiext.JSONSchemaProps
-	cfgType  v1.CfgFileFormat
+	cfgType  appsv1.CfgFileFormat
 }
 
 func (s *schemaValidator) Validate(data map[string]string) error {
@@ -125,7 +125,7 @@ func WithKeySelector(keys []string) ValidatorOptions {
 	}
 }
 
-func NewConfigValidator(configConstraint *v1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
+func NewConfigValidator(configConstraint *appsv1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
 	var (
 		validator    ConfigValidator
 		configSchema = configConstraint.ConfigSchema

@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -51,7 +51,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
-	var configConstraint *v1.ConfigConstraint
+	var configConstraint *appsv1.ConfigConstraint
 	var configurationObj *appsv1alpha1.Configuration
 	var k8sMockClient *testutil.K8sClientMockHelper
 
@@ -115,13 +115,13 @@ max_connections = '1000'
 			ClusterRef(clusterName).
 			Component(mysqlCompName).
 			GetObject()
-		configConstraint = &v1.ConfigConstraint{
+		configConstraint = &appsv1.ConfigConstraint{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: mysqlConfigConstraintName,
 			},
-			Spec: v1.ConfigConstraintSpec{
-				FormatterConfig: &v1.FormatterConfig{
-					Format: v1.Properties,
+			Spec: appsv1.ConfigConstraintSpec{
+				FormatterConfig: &appsv1.FormatterConfig{
+					Format: appsv1.Properties,
 				},
 			}}
 	})
@@ -166,7 +166,7 @@ max_connections = '1000'
 
 			err := createPipeline.Prepare().
 				UpdateConfiguration(). // reconcile Configuration
-				Configuration(). // sync Configuration
+				Configuration().       // sync Configuration
 				CreateConfigTemplate().
 				UpdatePodVolumes().
 				BuildConfigManagerSidecar().

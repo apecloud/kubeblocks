@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -52,7 +52,7 @@ const configSpecName = "mysql-config-tpl"
 const configVolumeName = "mysql-config"
 const cmName = "mysql-tree-node-template-8.0"
 
-func mockConfigResource() (*corev1.ConfigMap, *v1.ConfigConstraint) {
+func mockConfigResource() (*corev1.ConfigMap, *appsv1.ConfigConstraint) {
 	By("Create a config template obj")
 	configmap := testapps.CreateCustomizedObj(&testCtx,
 		"resources/mysql-config-template.yaml", &corev1.ConfigMap{},
@@ -74,10 +74,10 @@ func mockConfigResource() (*corev1.ConfigMap, *v1.ConfigConstraint) {
 	By("Create a config constraint obj")
 	constraint := testapps.CreateCustomizedObj(&testCtx,
 		"resources/mysql-config-constraint.yaml",
-		&v1.ConfigConstraint{})
+		&appsv1.ConfigConstraint{})
 
 	By("check config constraint")
-	Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint), func(g Gomega, tpl *v1.ConfigConstraint) {
+	Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint), func(g Gomega, tpl *appsv1.ConfigConstraint) {
 		g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.AvailablePhase))
 	})).Should(Succeed())
 
@@ -101,7 +101,7 @@ func mockConfigResource() (*corev1.ConfigMap, *v1.ConfigConstraint) {
 	return configmap, constraint
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *v1.ConfigConstraint, *appsv1alpha1.Cluster, *appsv1alpha1.Component, *component.SynthesizedComponent) {
+func mockReconcileResource() (*corev1.ConfigMap, *appsv1.ConfigConstraint, *appsv1alpha1.Cluster, *appsv1alpha1.Component, *component.SynthesizedComponent) {
 	configmap, constraint := mockConfigResource()
 
 	By("Create a clusterDefinition obj")
@@ -177,7 +177,7 @@ func initConfiguration(resourceCtx *configctrl.ResourceCtx,
 	}).
 		Prepare().
 		UpdateConfiguration(). // reconcile Configuration
-		Configuration(). // sync Configuration
+		Configuration().       // sync Configuration
 		CreateConfigTemplate().
 		UpdateConfigRelatedObject().
 		UpdateConfigurationStatus().

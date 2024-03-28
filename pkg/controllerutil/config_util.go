@@ -28,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -51,7 +51,7 @@ type Result struct {
 }
 
 // MergeAndValidateConfigs merges and validates configuration files
-func MergeAndValidateConfigs(configConstraint v1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []core.ParamPairs) (map[string]string, error) {
+func MergeAndValidateConfigs(configConstraint appsv1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []core.ParamPairs) (map[string]string, error) {
 	var (
 		err error
 		fc  = configConstraint.FormatterConfig

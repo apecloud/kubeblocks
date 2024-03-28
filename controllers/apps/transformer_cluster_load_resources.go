@@ -76,7 +76,7 @@ func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1alpha1
 		return nil
 	}
 	return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d, legacy comps: %d, simplified API: %v",
-		cluster.Spec.ClusterDefRef, cluster.Spec.Topology, clusterCompCnt(cluster), clusterLegacyCompCnt(cluster), withClusterSimplifiedAPI(cluster))
+		cluster.Spec.ClusterDefRef, cluster.Spec.Topology, clusterCompCnt(cluster), legacyClusterCompCnt(cluster), withClusterSimplifiedAPI(cluster))
 }
 
 func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
@@ -143,15 +143,16 @@ func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCt
 }
 
 func withClusterTopology(cluster *appsv1alpha1.Cluster) bool {
-	return len(cluster.Spec.ClusterDefRef) > 0 && clusterLegacyCompCnt(cluster) == 0
+	return len(cluster.Spec.ClusterDefRef) > 0 && legacyClusterCompCnt(cluster) == 0 && !compatibleUserDefinedInNewAPI(cluster)
 }
 
 func withClusterUserDefined(cluster *appsv1alpha1.Cluster) bool {
-	return len(cluster.Spec.ClusterDefRef) == 0 && len(cluster.Spec.Topology) == 0 && clusterLegacyCompCnt(cluster) == 0
+	return (len(cluster.Spec.ClusterDefRef) == 0 && len(cluster.Spec.Topology) == 0 && legacyClusterCompCnt(cluster) == 0) ||
+		compatibleUserDefinedInNewAPI(cluster)
 }
 
 func withClusterLegacyDefinition(cluster *appsv1alpha1.Cluster) bool {
-	return len(cluster.Spec.ClusterDefRef) > 0 && len(cluster.Spec.Topology) == 0 && clusterCompCnt(cluster) == clusterLegacyCompCnt(cluster)
+	return len(cluster.Spec.ClusterDefRef) > 0 && len(cluster.Spec.Topology) == 0 && clusterCompCnt(cluster) == legacyClusterCompCnt(cluster)
 }
 
 func withClusterSimplifiedAPI(cluster *appsv1alpha1.Cluster) bool {
@@ -162,11 +163,18 @@ func clusterCompCnt(cluster *appsv1alpha1.Cluster) int {
 	return clusterCompCntWithFunc(cluster, func(spec appsv1alpha1.ClusterComponentSpec) bool { return true })
 }
 
-func clusterLegacyCompCnt(cluster *appsv1alpha1.Cluster) int {
+func legacyClusterCompCnt(cluster *appsv1alpha1.Cluster) int {
 	isLegacyComp := func(spec appsv1alpha1.ClusterComponentSpec) bool {
 		return len(spec.ComponentDefRef) != 0 && len(spec.ComponentDef) == 0
 	}
 	return clusterCompCntWithFunc(cluster, isLegacyComp)
+}
+
+func hasLegacyClusterCompSet(cluster *appsv1alpha1.Cluster) bool {
+	hasLegacyCompSet := func(spec appsv1alpha1.ClusterComponentSpec) bool {
+		return len(spec.ComponentDefRef) != 0
+	}
+	return clusterCompCntWithFunc(cluster, hasLegacyCompSet) > 0
 }
 
 func clusterCompCntWithFunc(cluster *appsv1alpha1.Cluster, match func(spec appsv1alpha1.ClusterComponentSpec) bool) int {
@@ -177,4 +185,9 @@ func clusterCompCntWithFunc(cluster *appsv1alpha1.Cluster, match func(spec appsv
 		}
 	}
 	return cnt
+}
+
+func compatibleUserDefinedInNewAPI(cluster *appsv1alpha1.Cluster) bool {
+	// clusterDefinitionRef = xxxxx, componentDefRef = abc, componentDef = xyz
+	return len(cluster.Spec.ClusterDefRef) > 0 && len(cluster.Spec.Topology) == 0 && legacyClusterCompCnt(cluster) == 0 && hasLegacyClusterCompSet(cluster)
 }

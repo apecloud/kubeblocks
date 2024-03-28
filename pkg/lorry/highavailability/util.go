@@ -36,7 +36,7 @@ func IsHAAvailable(characterType, workloadType string) bool {
 	case models.MongoDB:
 		return true
 	case models.MySQL:
-		return true
+		return false
 	case models.WeSQL:
 		return true
 	case models.PostgreSQL:

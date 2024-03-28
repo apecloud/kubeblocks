@@ -23,6 +23,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
@@ -32,6 +33,9 @@ import (
 func TestManager_GetRole(t *testing.T) {
 	ctx := context.TODO()
 	manager, _, _ := mockDatabase(t)
+	ctrl := gomock.NewController(t)
+	mockDCSStore = dcs.NewMockDCS(ctrl)
+	dcs.SetStore(mockDCSStore)
 
 	t.Run("cluster not found", func(t *testing.T) {
 		role, err := manager.GetReplicaRole(ctx, nil)
@@ -43,6 +47,7 @@ func TestManager_GetRole(t *testing.T) {
 	t.Run("cluster has no leader lease", func(t *testing.T) {
 		cluster := &dcs.Cluster{}
 
+		mockDCSStore.EXPECT().GetLeader().Return(nil, nil)
 		role, err := manager.GetReplicaRole(ctx, cluster)
 		assert.Equal(t, role, models.SECONDARY)
 		assert.Nil(t, err)
@@ -54,6 +59,7 @@ func TestManager_GetRole(t *testing.T) {
 
 		for i, leaderName := range leaderNames {
 			cluster := &dcs.Cluster{Leader: &dcs.Leader{Name: leaderName}}
+			mockDCSStore.EXPECT().GetLeader().Return(cluster.Leader, nil)
 			role, err := manager.GetReplicaRole(ctx, cluster)
 			assert.Nil(t, err)
 			assert.Equal(t, expectedRoles[i], role)

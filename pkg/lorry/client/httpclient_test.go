@@ -160,11 +160,13 @@ var _ = Describe("Lorry HTTP Client", func() {
 		It("success", func() {
 			role := "leader"
 			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return(role, nil)
+			mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{})
 			Expect(lorryClient.GetRole(context.TODO())).Should(Equal(role))
 		})
 
 		It("not implemented", func() {
 			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return(string(""), fmt.Errorf(msg))
+			mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{})
 			role, err := lorryClient.GetRole(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
@@ -818,6 +820,40 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 	})
 
+	Context("rebuild", func() {
+		var lorryClient *HTTPClient
+		var cluster *dcs.Cluster
+		podName := "pod-test"
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+			cluster = &dcs.Cluster{
+				Members: []dcs.Member{{Name: podName}},
+			}
+			os.Unsetenv(constant.KBEnvPodFQDN)
+			os.Unsetenv(constant.KBEnvServicePort)
+			os.Unsetenv(constant.KBEnvServiceUser)
+			os.Unsetenv(constant.KBEnvServicePassword)
+		})
+
+		It("not implemented", func() {
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName)
+			mockDCSStore.EXPECT().GetClusterFromCache().Return(cluster)
+			err := lorryClient.Rebuild(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("there is no syncer yet"))
+		})
+
+		It("request failed", func() {
+			cluster.Members[0].SyncerPort = "63601"
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName)
+			mockDCSStore.EXPECT().GetClusterFromCache().Return(cluster)
+			err := lorryClient.Rebuild(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("request syncer failed"))
+		})
+	})
 })
 
 func newHTTPServer(resp []byte) (*httptest.Server, int) {

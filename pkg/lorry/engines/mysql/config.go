@@ -155,6 +155,9 @@ func (config *Config) GetLocalDBConn() (*sql.DB, error) {
 	}
 	mysqlConfig.User = config.Username
 	mysqlConfig.Passwd = config.Password
+	mysqlConfig.Timeout = time.Second * 5
+	mysqlConfig.ReadTimeout = time.Second * 5
+	mysqlConfig.WriteTimeout = time.Second * 5
 	if config.port != "" {
 		mysqlConfig.Addr = "127.0.0.1:" + config.port
 	}
@@ -173,6 +176,9 @@ func (config *Config) GetDBConnWithAddr(addr string) (*sql.DB, error) {
 	}
 	mysqlConfig.User = config.Username
 	mysqlConfig.Passwd = config.Password
+	mysqlConfig.Timeout = time.Second * 5
+	mysqlConfig.ReadTimeout = time.Second * 5
+	mysqlConfig.WriteTimeout = time.Second * 5
 	mysqlConfig.Addr = addr
 	db, err := GetDBConnection(mysqlConfig.FormatDSN())
 	if err != nil {

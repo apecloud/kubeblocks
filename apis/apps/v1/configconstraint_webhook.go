@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
+	"text/template/parse"
+
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -47,15 +50,39 @@ var _ webhook.Validator = &ConfigConstraint{}
 func (r *ConfigConstraint) ValidateCreate() (admission.Warnings, error) {
 	configconstraintlog.Info("validate create", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object creation.
+	if err := r.validateShellTrigger(); err != nil {
+		return nil, err
+	}
 	return nil, nil
+}
+
+func (r *ConfigConstraint) validateShellTrigger() error {
+	if !r.Spec.ShellTrigger() {
+		return nil
+	}
+	if r.Spec.BatchReload() {
+		return validateBatchParametersTemplate(r.Spec.DynamicReloadAction.ShellTrigger.BatchParametersTemplate)
+	}
+	return nil
+}
+
+func validateBatchParametersTemplate(template string) error {
+	if template == "" {
+		return field.Invalid(field.NewPath("spec.dynamicReloadAction.shellTrigger.batchParametersTemplate"), nil, "batchParametersTemplate is empty")
+	}
+
+	tr := parse.New(template)
+	_, err := tr.Parse(template, "", "", make(map[string]*parse.Tree))
+	return err
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *ConfigConstraint) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	configconstraintlog.Info("validate update", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object update.
+	if err := r.validateShellTrigger(); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 

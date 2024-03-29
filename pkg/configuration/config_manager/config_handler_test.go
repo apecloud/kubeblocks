@@ -36,7 +36,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1"
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"

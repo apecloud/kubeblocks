@@ -27,7 +27,7 @@ import (
 	"github.com/StudioSol/set"
 	"github.com/spf13/cast"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1"
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )

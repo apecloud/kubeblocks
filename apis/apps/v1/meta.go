@@ -33,6 +33,16 @@ func (in *ConfigConstraintSpec) DynamicParametersPolicy() DynamicParameterSelect
 	return SelectedDynamicParameters
 }
 
+func (in *ConfigConstraintSpec) ShellTrigger() bool {
+	return in.DynamicReloadAction != nil && in.DynamicReloadAction.ShellTrigger != nil
+}
+
+func (in *ConfigConstraintSpec) BatchReload() bool {
+	return in.ShellTrigger() &&
+		in.DynamicReloadAction.ShellTrigger.BatchReload != nil &&
+		*in.DynamicReloadAction.ShellTrigger.BatchReload
+}
+
 func (cs *ConfigConstraintStatus) ConfigConstraintTerminalPhases() bool {
 	return cs.Phase == CCAvailablePhase
 }

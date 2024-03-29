@@ -159,6 +159,7 @@ func (ha *Ha) RunCycle() {
 					_ = ha.dcs.ReleaseLease()
 					break
 				}
+				ha.logger.Info("The cluster has no other helathy members!")
 
 			} else if cluster.Switchover.Candidate == "" || cluster.Switchover.Candidate == ha.dbManager.GetCurrentMemberName() {
 				if !ha.dbManager.IsPromoted(ha.ctx) {
@@ -353,11 +354,11 @@ func (ha *Ha) HasOtherHealthyMember(cluster *dcs3.Cluster) bool {
 			otherMembers = append(otherMembers, cluster.GetMemberWithName(candidate))
 		}
 	} else {
-		for _, member := range cluster.Members {
+		for i, member := range cluster.Members {
 			if member.Name == ha.dbManager.GetCurrentMemberName() {
 				continue
 			}
-			otherMembers = append(otherMembers, &member)
+			otherMembers = append(otherMembers, &cluster.Members[i])
 		}
 	}
 

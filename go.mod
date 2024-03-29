@@ -28,7 +28,7 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/vault/sdk v0.9.2
-	github.com/jackc/pgx/v5 v5.4.3
+	github.com/jackc/pgx/v5 v5.5.4
 	github.com/klauspost/compress v1.16.6
 	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0
@@ -36,7 +36,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.1-0.20220423185008-bf980b35cac4
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.27.10
-	github.com/opencontainers/image-spec v1.1.0
 	github.com/pashagolub/pgxmock/v2 v2.11.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.18.0
@@ -245,6 +244,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect

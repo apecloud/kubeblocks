@@ -341,14 +341,14 @@ func (mgr *Manager) GetReplSetConfig(ctx context.Context) (*RSConfig, error) {
 func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
 	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
-		mgr.Logger.Error(err, "Get replSet client failed")
+		mgr.Logger.Info("Get replSet client failed", err.Error())
 		return nil
 	}
 	defer client.Disconnect(ctx) //nolint:errcheck
 
 	rsConfig, err := GetReplSetConfig(ctx, client)
 	if rsConfig == nil {
-		mgr.Logger.Error(err, "Get replSet config failed")
+		mgr.Logger.Info("Get replSet config failed", err.Error())
 		return nil
 	}
 

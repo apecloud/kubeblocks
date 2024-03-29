@@ -99,6 +99,9 @@ type nameWithTemplate struct {
 // 3. An error is raised if no matching instance is found.
 // The newly constructed instances undergo validation, and an error is raised if they are invalid.
 func buildInstances(clusterName string, componentSpec appsv1alpha1.ClusterComponentSpec, horizontalScaling appsv1alpha1.HorizontalScaling) ([]appsv1alpha1.InstanceTemplate, error) {
+	if componentSpec.Instances == nil && horizontalScaling.InstancesToAdd == nil && horizontalScaling.InstancesToUpdate == nil && horizontalScaling.InstancesToDelete == nil {
+		return nil, nil
+	}
 	getTotalReplicas := func(instances []appsv1alpha1.InstanceTemplate) (totalReplicas int32) {
 		for _, instance := range instances {
 			replicas := int32(1)
@@ -141,10 +144,10 @@ func rebuildInstanceTemplates(name2TemplateMap map[string]nameWithTemplate) []ap
 	}
 	var (
 		instances         []appsv1alpha1.InstanceTemplate
-		nameWithTemplates []*nameWithTemplate
+		nameWithTemplates []nameWithTemplate
 	)
 	for _, template := range name2TemplateMap {
-		nameWithTemplates = append(nameWithTemplates, &template)
+		nameWithTemplates = append(nameWithTemplates, template)
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
 		return rsm2.ParseParentNameAndOrdinal(nameWithTemplates[i].instanceName)
@@ -155,7 +158,15 @@ func rebuildInstanceTemplates(name2TemplateMap map[string]nameWithTemplate) []ap
 			*instances[len(instances)-1].Replicas++
 			continue
 		}
-		instances = append(instances, *newInstanceTemplate(nameWithTemplates[i]))
+		instances = append(instances, *newInstanceTemplate(&nameWithTemplates[i]))
+	}
+	end := len(instances) - 1
+	defaultInstance := appsv1alpha1.InstanceTemplate{Replicas: instances[end].Replicas}
+	if reflect.DeepEqual(defaultInstance, instances[end]) {
+		instances = instances[:end]
+	}
+	if len(instances) == 0 {
+		instances = nil
 	}
 	return instances
 }
@@ -187,7 +198,7 @@ func newInstanceTemplate(nameWithTemplate *nameWithTemplate) *appsv1alpha1.Insta
 	}
 }
 
-func isHomogeneousInstance(nameWithTemplates []*nameWithTemplate, i, j int) bool {
+func isHomogeneousInstance(nameWithTemplates []nameWithTemplate, i, j int) bool {
 	if i < 0 || j < 0 {
 		return false
 	}
@@ -312,7 +323,8 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 		copyReplicas := v.Replicas
 		var copyInstances *[]appsv1alpha1.InstanceTemplate
 		if len(v.Instances) > 0 {
-			instances := append(*copyInstances, v.Instances...)
+			var instances []appsv1alpha1.InstanceTemplate
+			instances = append(instances, v.Instances...)
 			copyInstances = &instances
 		}
 		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{

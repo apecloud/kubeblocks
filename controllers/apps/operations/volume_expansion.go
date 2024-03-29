@@ -51,9 +51,9 @@ const (
 func init() {
 	// the volume expansion operation only supports online expansion now
 	volumeExpansionBehaviour := OpsBehaviour{
-		OpsHandler: volumeExpansionOpsHandler{},
+		OpsHandler:  volumeExpansionOpsHandler{},
+		QueueBySelf: true,
 	}
-
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(appsv1alpha1.VolumeExpansionType, volumeExpansionBehaviour)
 }

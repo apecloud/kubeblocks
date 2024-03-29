@@ -17,31 +17,29 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package constant
+package controllerutil
 
-const (
-	PostgreSQLCharacterType = "postgresql"
-	MySQLCharacterType      = "mysql"
-	RedisCharacterType      = "redis"
-	MongoDBCharacterType    = "mongodb"
-	ETCDCharacterType       = "etcd"
-	PolarDBXCharacterType   = "polardbx"
+import (
+	"context"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-// action keys
-const (
-	RoleProbeAction     = "roleProbe"
-	RebuildAction       = "rebuild"
-	HealthyCheckAction  = "healthyCheck"
-	MemberJoinAction    = "memberJoin"
-	MemberLeaveAction   = "memberLeave"
-	ReadonlyAction      = "readonly"
-	ReadWriteAction     = "readwrite"
-	PostProvisionAction = "postProvision"
-	PreTerminateAction  = "preTerminate"
-	DataDumpAction      = "dataDump"
-	DataLoadAction      = "dataLoad"
-)
-
-// action envs
-const ()
+// GetPodListByRSM gets rsm pod list.
+func GetPodListByRSM(ctx context.Context, cli client.Client, rsm *workloads.ReplicatedStateMachine) ([]corev1.Pod, error) {
+	selector, err := metav1.LabelSelectorAsMap(rsm.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList,
+		&client.ListOptions{Namespace: rsm.Namespace},
+		client.MatchingLabels(selector)); err != nil {
+		return nil, err
+	}
+	return podList.Items, nil
+}

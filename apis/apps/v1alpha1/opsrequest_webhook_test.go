@@ -337,10 +337,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		patch := client.MergeFrom(opsRequest.DeepCopy())
 		opsRequest.Status.Phase = OpsRunningPhase
 		Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).ShouldNot(HaveOccurred())
-		// create another ops
-		opsRequest1 := createTestOpsRequest(clusterName, opsRequestName+"1", VolumeExpansionType)
-		opsRequest1.Spec.VolumeExpansionList = getSingleVolumeExpansionList(componentName, defaultVCTName, "3Gi")
-		Expect(testCtx.CreateObj(ctx, opsRequest1).Error()).Should(ContainSubstring("existing other VolumeExpansion OpsRequest"))
 	}
 
 	testHorizontalScaling := func(clusterDef *ClusterDefinition, _ *Cluster) {

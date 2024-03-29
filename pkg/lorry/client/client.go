@@ -249,6 +249,16 @@ func (cli *lorryClient) Rebuild(ctx context.Context) error {
 	return err
 }
 
+func (cli *lorryClient) DataDump(ctx context.Context) error {
+	_, err := cli.Request(ctx, string(DataDumpOperation), http.MethodPost, nil)
+	return err
+}
+
+func (cli *lorryClient) DataLoad(ctx context.Context) error {
+	_, err := cli.Request(ctx, string(DataLoadOperation), http.MethodPost, nil)
+	return err
+}
+
 func (cli *lorryClient) Request(ctx context.Context, operation, method string, req map[string]any) (map[string]any, error) {
 	if cli.requester == nil {
 		return nil, errors.New("lorry client's requester must be set")

@@ -22,8 +22,10 @@ package component
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -121,14 +123,21 @@ var _ = Describe("vars", func() {
 		Expect(envVarMapping).Should(HaveKeyWithValue(envName, envValue))
 	}
 
-	checkEnvVarWithValueFrom := func(envVars []corev1.EnvVar, envName string, envValue corev1.EnvVarSource) {
+	checkEnvVarWithValueFrom := func(envVars []corev1.EnvVar, envName string, envValue *corev1.EnvVarSource) {
 		envVarMapping := map[string]corev1.EnvVarSource{}
+		nilEnvVarMapping := map[string]bool{}
 		for _, env := range envVars {
 			if env.ValueFrom != nil {
 				envVarMapping[env.Name] = *env.ValueFrom
+			} else {
+				nilEnvVarMapping[env.Name] = true
 			}
 		}
-		Expect(envVarMapping).Should(HaveKeyWithValue(envName, envValue))
+		if envValue != nil {
+			Expect(envVarMapping).Should(HaveKeyWithValue(envName, *envValue))
+		} else {
+			Expect(nilEnvVarMapping).Should(HaveKey(envName))
+		}
 	}
 
 	Context("vars test", func() {
@@ -369,7 +378,7 @@ var _ = Describe("vars", func() {
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).ShouldNot(HaveKeyWithValue("secret-var", "secret-var-value"))
-			checkEnvVarWithValueFrom(envVars, "secret-var", corev1.EnvVarSource{
+			checkEnvVarWithValueFrom(envVars, "secret-var", &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: "secret",
@@ -554,15 +563,14 @@ var _ = Describe("vars", func() {
 			checkEnvVarWithValue(envVars, "service-port", strconv.Itoa(svcPort))
 			checkEnvVarWithValue(envVars, "service-port-wo-name", strconv.Itoa(svcPort+1))
 
-			By("service var ref with pod ordinal")
-			svcNameRefPrefix := "service-node-port"
+			By("pod service")
 			vars = []appsv1alpha1.EnvVar{
 				{
 					Name: "service-node-port",
 					ValueFrom: &appsv1alpha1.VarSource{
 						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								Name:     svcNameRefPrefix,
+								Name:     "service-node-port",
 								Optional: required(),
 							},
 							ServiceVars: appsv1alpha1.ServiceVars{
@@ -616,10 +624,6 @@ var _ = Describe("vars", func() {
 				},
 			}
 			synthesizedComp.Replicas = 2
-			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("the name and compDef of ServiceVarRef is required"))
-			vars[0].ValueFrom.ServiceVarRef.ClusterObjectReference.CompDef = synthesizedComp.CompDefName
 			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			checkEnvVarWithValue(envVars, "service-node-port_0", "300001")
@@ -719,20 +723,20 @@ var _ = Describe("vars", func() {
 			Expect(err).Should(Succeed())
 			Expect(templateVars).ShouldNot(HaveKey("credential-username"))
 			Expect(templateVars).ShouldNot(HaveKey("credential-password"))
-			checkEnvVarWithValueFrom(envVars, "credential-username", corev1.EnvVarSource{
+			checkEnvVarWithValueFrom(envVars, "credential-username", &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: reader.objs[0].GetName(),
 					},
-					Key: "username",
+					Key: constant.AccountNameForSecret,
 				},
 			})
-			checkEnvVarWithValueFrom(envVars, "credential-password", corev1.EnvVarSource{
+			checkEnvVarWithValueFrom(envVars, "credential-password", &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: reader.objs[0].GetName(),
 					},
-					Key: "password",
+					Key: constant.AccountPasswdForSecret,
 				},
 			})
 		})
@@ -881,7 +885,7 @@ var _ = Describe("vars", func() {
 			checkEnvVarWithValue(envVars, "serviceref-password", "password")
 		})
 
-		It("referent component", func() {
+		It("resolve component", func() {
 			By("component not found w/ optional")
 			vars := []appsv1alpha1.EnvVar{
 				{
@@ -926,39 +930,14 @@ var _ = Describe("vars", func() {
 			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
 
-			By("more than one component found")
+			By("default component")
 			vars = []appsv1alpha1.EnvVar{
 				{
 					Name: "service-host",
 					ValueFrom: &appsv1alpha1.VarSource{
 						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								CompDef:  synthesizedComp.CompDefName,
-								Name:     "service",
-								Optional: required(),
-							},
-							ServiceVars: appsv1alpha1.ServiceVars{
-								Host: &appsv1alpha1.VarRequired,
-							},
-						},
-					},
-				},
-			}
-			synthesizedComp.Comp2CompDefs = map[string]string{
-				synthesizedComp.Name: synthesizedComp.CompDefName,
-				"other-comp":         synthesizedComp.CompDefName,
-			}
-			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
-			Expect(err).ShouldNot(Succeed())
-
-			By("ok")
-			vars = []appsv1alpha1.EnvVar{
-				{
-					Name: "service-host",
-					ValueFrom: &appsv1alpha1.VarSource{
-						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								CompDef:  synthesizedComp.CompDefName,
+								// don't specify the comp def, it will match self by default
 								Name:     "service",
 								Optional: required(),
 							},
@@ -992,6 +971,369 @@ var _ = Describe("vars", func() {
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName))
 			checkEnvVarWithValue(envVars, "service-host", svcName)
+		})
+
+		It("multiple components", func() {
+			var (
+				compName1             = synthesizedComp.Name
+				compName2             = synthesizedComp.Name + "-other"
+				compName3             = synthesizedComp.Name + "-other-not-exist"
+				svcName1              = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName1, "service")
+				svcName2              = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName2, "service")
+				credentialSecretName1 = constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName1, "credential")
+				credentialSecretName2 = constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName2, "credential")
+
+				compVarName = func(compName, envName string) string {
+					return fmt.Sprintf("%s_%s", envName, strings.ToUpper(strings.ReplaceAll(compName, "-", "_")))
+				}
+				compSvcVarName1        = compVarName(compName1, "service-host")
+				compSvcVarName2        = compVarName(compName2, "service-host")
+				compSvcVarName3        = compVarName(compName3, "service-host")
+				compCredentialVarName1 = compVarName(compName1, "credential-username")
+				compCredentialVarName2 = compVarName(compName2, "credential-username")
+
+				combinedSvcVarValue          = fmt.Sprintf("%s:%s,%s:%s", compName1, svcName1, compName2, svcName2)
+				combinedSvcVarValueWithComp3 = fmt.Sprintf("%s:%s,%s:%s,%s:", compName1, svcName1, compName2, svcName2, compName3)
+
+				newVarSuffix          = "suffix"
+				newCombinedSvcVarName = fmt.Sprintf("%s_%s", "service-host", newVarSuffix)
+
+				reader = &mockReader{
+					cli: testCtx.Cli,
+					objs: []client.Object{
+						&corev1.Service{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      svcName1,
+							},
+							Spec: corev1.ServiceSpec{
+								Ports: []corev1.ServicePort{
+									{
+										Port: int32(3306),
+									},
+								},
+							},
+						},
+						&corev1.Service{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      svcName2,
+							},
+							Spec: corev1.ServiceSpec{
+								Ports: []corev1.ServicePort{
+									{
+										Port: int32(3306),
+									},
+								},
+							},
+						},
+						&corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      credentialSecretName1,
+							},
+							Data: map[string][]byte{
+								constant.AccountNameForSecret: []byte("username"),
+							},
+						},
+						&corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      credentialSecretName2,
+							},
+							Data: map[string][]byte{
+								constant.AccountNameForSecret: []byte("username"),
+							},
+						},
+					},
+				}
+			)
+			synthesizedComp.Comp2CompDefs = map[string]string{
+				compName1:       synthesizedComp.CompDefName,
+				compName2:       synthesizedComp.CompDefName,
+				"comp-other-01": "abc" + synthesizedComp.CompDefName,
+				"comp-other-02": "abc" + synthesizedComp.CompDefName,
+			}
+
+			By("w/o option - ref self")
+			vars := []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName, // same as synthesizedComp
+								Name:     "service",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName1))
+			checkEnvVarWithValue(envVars, "service-host", svcName1)
+
+			By("w/ option - ref others")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  "abc" + synthesizedComp.CompDefName, // different with synthesizedComp
+								Name:     "service",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("more than one referent component found"))
+
+			By("individual")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: required(),
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
+								},
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
+					Name: "credential-username",
+					ValueFrom: &appsv1alpha1.VarSource{
+						CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "credential",
+								Optional: required(),
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
+								},
+							},
+							CredentialVars: appsv1alpha1.CredentialVars{
+								Username: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			// the defined var will have empty values.
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName1, svcName1))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName2, svcName2))
+			// the defined var will have empty values.
+			checkEnvVarWithValue(envVars, "service-host", "")
+			checkEnvVarWithValue(envVars, compSvcVarName1, svcName1)
+			checkEnvVarWithValue(envVars, compSvcVarName2, svcName2)
+			// the defined var will have empty values.
+			checkEnvVarWithValueFrom(envVars, "credential-username", nil)
+			checkEnvVarWithValueFrom(envVars, compCredentialVarName1, &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: credentialSecretName1,
+					},
+					Key: constant.AccountNameForSecret,
+				},
+			})
+			checkEnvVarWithValueFrom(envVars, compCredentialVarName2, &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: credentialSecretName2,
+					},
+					Key: constant.AccountNameForSecret,
+				},
+			})
+
+			By("combined - reuse")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: required(),
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
+								},
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValue))
+			// check that per-component vars not been created.
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName1))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName2))
+			checkEnvVarWithValue(envVars, "service-host", combinedSvcVarValue)
+			// check that per-component vars not been created.
+			checkEnvVarNotExist(envVars, compSvcVarName1)
+			checkEnvVarNotExist(envVars, compSvcVarName2)
+
+			By("combined - new")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: required(),
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
+									CombinedOption: &appsv1alpha1.MultipleClusterObjectCombinedOption{
+										NewVarSuffix: &newVarSuffix,
+									},
+								},
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			// the defined var will have empty values.
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
+			Expect(templateVars).Should(HaveKeyWithValue(newCombinedSvcVarName, combinedSvcVarValue))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName1))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName2))
+			// the defined var will have empty values.
+			checkEnvVarWithValue(envVars, "service-host", "")
+			checkEnvVarWithValue(envVars, newCombinedSvcVarName, combinedSvcVarValue)
+			checkEnvVarNotExist(envVars, compSvcVarName1)
+			checkEnvVarNotExist(envVars, compSvcVarName2)
+
+			By("combined - value from error")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "credential-username",
+					ValueFrom: &appsv1alpha1.VarSource{
+						CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "credential",
+								Optional: required(),
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
+								},
+							},
+							CredentialVars: appsv1alpha1.CredentialVars{
+								Username: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("combined strategy doesn't support vars with valueFrom values"))
+
+			By("individual - partial objects")
+			synthesizedComp.Comp2CompDefs = map[string]string{
+				compName1: synthesizedComp.CompDefName,
+				compName2: synthesizedComp.CompDefName,
+				compName3: synthesizedComp.CompDefName, // there is no service object for comp3.
+			}
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: required(),
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
+								},
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName1, svcName1))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName2, svcName2))
+			// the new var for comp3 will still be created, but its values will be empty.
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName3, ""))
+			checkEnvVarWithValue(envVars, "service-host", "")
+			checkEnvVarWithValue(envVars, compSvcVarName1, svcName1)
+			checkEnvVarWithValue(envVars, compSvcVarName2, svcName2)
+			// the new var for comp3 will still be created, but its values will be empty.
+			checkEnvVarWithValue(envVars, compSvcVarName3, "")
+
+			By("combined - partial objects")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: required(),
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
+								},
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			// the combined value will have comp3 in it, but its value will be empty: "comp1:val1,comp2:val2,comp3:"
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValueWithComp3))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName1))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName2))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName3))
+			// the combined value will have comp3 in it, but its value will be empty: "comp1:val1,comp2:val2,comp3:"
+			checkEnvVarWithValue(envVars, "service-host", combinedSvcVarValueWithComp3)
+			checkEnvVarNotExist(envVars, compSvcVarName1)
+			checkEnvVarNotExist(envVars, compSvcVarName2)
+			checkEnvVarNotExist(envVars, compSvcVarName3)
 		})
 
 		It("vars reference and escaping", func() {
@@ -1082,7 +1424,7 @@ var _ = Describe("vars", func() {
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("cb", "$(credential-username)"))
-			checkEnvVarWithValueFrom(envVars, "cb", corev1.EnvVarSource{
+			checkEnvVarWithValueFrom(envVars, "cb", &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: reader.objs[0].GetName(),

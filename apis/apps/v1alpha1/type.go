@@ -1137,9 +1137,10 @@ type ServiceRefVarSelector struct {
 	ServiceRefVars `json:",inline"`
 }
 
-// ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.
+// ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.
 type ClusterObjectReference struct {
 	// CompDef specifies the definition used by the component that the referent object resident in.
+	// If not specified, the component itself will be used.
 	// +optional
 	CompDef string `json:"compDef,omitempty"`
 
@@ -1150,4 +1151,83 @@ type ClusterObjectReference struct {
 	// Specify whether the object must be defined.
 	// +optional
 	Optional *bool `json:"optional,omitempty"`
+
+	// This option defines the behavior when multiple component objects match the specified @CompDef.
+	// If not provided, an error will be raised when handling multiple matches.
+	//
+	// +optional
+	MultipleClusterObjectOption *MultipleClusterObjectOption `json:"multipleClusterObjectOption,omitempty"`
+}
+
+// MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.
+type MultipleClusterObjectOption struct {
+	// Define the strategy for handling multiple cluster objects.
+	// +required
+	Strategy MultipleClusterObjectStrategy `json:"strategy"`
+
+	// Define the options for handling combined variables.
+	// Valid only when the strategy is set to "combined".
+	//
+	// +optional
+	CombinedOption *MultipleClusterObjectCombinedOption `json:"combinedOption,omitempty"`
+}
+
+// MultipleClusterObjectStrategy defines the strategy for handling multiple cluster objects.
+// +enum
+// +kubebuilder:validation:Enum={individual,combined}
+type MultipleClusterObjectStrategy string
+
+const (
+	// MultipleClusterObjectStrategyIndividual - each matched component will have its individual variable with its name
+	// as the suffix.
+	// This is required when referencing credential variables that cannot be passed by values.
+	MultipleClusterObjectStrategyIndividual MultipleClusterObjectStrategy = "individual"
+
+	// MultipleClusterObjectStrategyCombined - the values from all matched components will be combined into a single
+	// variable using the specified option.
+	MultipleClusterObjectStrategyCombined MultipleClusterObjectStrategy = "combined"
+)
+
+// MultipleClusterObjectCombinedOption defines options for handling combined variables.
+type MultipleClusterObjectCombinedOption struct {
+	// If set, the existing variable will be kept, and a new variable will be defined with the specified suffix
+	// in pattern: <var.name>_<suffix>.
+	// The new variable will be auto-created and placed behind the existing one.
+	// If not set, the existing variable will be reused with the value format defined below.
+	//
+	// +optional
+	NewVarSuffix *string `json:"newVarSuffix,omitempty"`
+
+	// The format of the value that the operator will use to compose values from multiple components.
+	//
+	// +kubebuilder:default="Flatten"
+	// +optional
+	ValueFormat MultipleClusterObjectValueFormat `json:"valueFormat,omitempty"`
+
+	// The flatten format, default is: <comp-name-1>:value,<comp-name-2>:value.
+	//
+	// +optional
+	FlattenFormat *MultipleClusterObjectValueFormatFlatten `json:"flattenFormat,omitempty"`
+}
+
+// MultipleClusterObjectValueFormat defines the format details for the value.
+type MultipleClusterObjectValueFormat string
+
+const (
+	FlattenFormat MultipleClusterObjectValueFormat = "Flatten"
+)
+
+// MultipleClusterObjectValueFormatFlatten defines the flatten format for the value.
+type MultipleClusterObjectValueFormatFlatten struct {
+	// Pair delimiter.
+	//
+	// +kubebuilder:default=","
+	// +required
+	Delimiter string `json:"delimiter"`
+
+	// Key-value delimiter.
+	//
+	// +kubebuilder:default=":"
+	// +required
+	KeyValueDelimiter string `json:"keyValueDelimiter"`
 }

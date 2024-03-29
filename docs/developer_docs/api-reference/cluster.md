@@ -5417,7 +5417,7 @@ bool
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
-<p>ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.</p>
+<p>ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.</p>
 </div>
 <table>
 <thead>
@@ -5436,7 +5436,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>CompDef specifies the definition used by the component that the referent object resident in.</p>
+<p>CompDef specifies the definition used by the component that the referent object resident in.
+If not specified, the component itself will be used.</p>
 </td>
 </tr>
 <tr>
@@ -5461,6 +5462,21 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specify whether the object must be defined.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>multipleClusterObjectOption</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectOption">
+MultipleClusterObjectOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>This option defines the behavior when multiple component objects match the specified @CompDef.
+If not provided, an error will be raised when handling multiple matches.</p>
 </td>
 </tr>
 </tbody>
@@ -6208,40 +6224,40 @@ Cannot be updated.</p>
 <tbody>
 <tr>
 <td>
-<code>startupOrder</code><br/>
+<code>provision</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>StartupOrder defines the order in which components should be started in the cluster.
+<p>Provision defines the order in which components should be provisioned in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>shutdownOrder</code><br/>
+<code>terminate</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ShutdownOrder defines the order in which components should be shut down in the cluster.
+<p>Terminate defines the order in which components should be terminated in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>updateOrder</code><br/>
+<code>update</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>UpdateOrder defines the order in which components should be updated in the cluster.
+<p>Update defines the order in which components should be updated in the cluster.
 Components with the same order can be listed together, separated by commas.</p>
 </td>
 </tr>
@@ -7724,7 +7740,7 @@ LifecycleActionHandler
 </tr>
 <tr>
 <td>
-<code>dataPopulate</code><br/>
+<code>dataDump</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
 LifecycleActionHandler
@@ -7733,7 +7749,7 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the method to populate the data to create new replicas.
+<p>Defines the method to dump the data from a replica.
 This action is typically used when a new replica needs to be constructed, such as:</p>
 <ul>
 <li>scale-out</li>
@@ -7746,7 +7762,7 @@ This field cannot be updated.</p>
 </tr>
 <tr>
 <td>
-<code>dataAssemble</code><br/>
+<code>dataLoad</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
 LifecycleActionHandler
@@ -7755,14 +7771,14 @@ LifecycleActionHandler
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the method to assemble data synchronized from external before starting the service for a new replica.
+<p>Defines the method to load data into a replica.
 This action is typically used when creating a new replica, such as:</p>
 <ul>
 <li>scale-out</li>
 <li>rebuild</li>
 <li>clone</li>
 </ul>
-<p>The data will be streamed in via stdin. If any error occurs during the assembly process,
+<p>The data will be streamed in via stdin. If any error occurs during the process,
 the action must be able to guarantee idempotence to allow for retries from the beginning.
 This field cannot be updated.</p>
 </td>
@@ -11412,6 +11428,47 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.Instance">Instance
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Pod name of the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetNodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+If not set, it will rebuild on a random node.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
@@ -12217,6 +12274,198 @@ ExporterConfig
 <em>(Optional)</em>
 <p>Provided by the provider and contains the necessary information for the Time Series Database.
 This field is only valid when BuiltIn is set to false.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectOption">MultipleClusterObjectOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectCombinedOption defines options for handling combined variables.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>newVarSuffix</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If set, the existing variable will be kept, and a new variable will be defined with the specified suffix
+in pattern: <var.name>_<suffix>.
+The new variable will be auto-created and placed behind the existing one.
+If not set, the existing variable will be reused with the value format defined below.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>valueFormat</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectValueFormat">
+MultipleClusterObjectValueFormat
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The format of the value that the operator will use to compose values from multiple components.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>flattenFormat</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectValueFormatFlatten">
+MultipleClusterObjectValueFormatFlatten
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The flatten format, default is: <comp-name-1>:value,<comp-name-2>:value.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectOption">MultipleClusterObjectOption
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference</a>)
+</p>
+<div>
+<p>MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>strategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectStrategy">
+MultipleClusterObjectStrategy
+</a>
+</em>
+</td>
+<td>
+<p>Define the strategy for handling multiple cluster objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>combinedOption</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">
+MultipleClusterObjectCombinedOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Define the options for handling combined variables.
+Valid only when the strategy is set to &ldquo;combined&rdquo;.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectStrategy">MultipleClusterObjectStrategy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectOption">MultipleClusterObjectOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectStrategy defines the strategy for handling multiple cluster objects.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;combined&#34;</p></td>
+<td><p>MultipleClusterObjectStrategyCombined - the values from all matched components will be combined into a single
+variable using the specified option.</p>
+</td>
+</tr><tr><td><p>&#34;individual&#34;</p></td>
+<td><p>MultipleClusterObjectStrategyIndividual - each matched component will have its individual variable with its name
+as the suffix.
+This is required when referencing credential variables that cannot be passed by values.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectValueFormat">MultipleClusterObjectValueFormat
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectValueFormat defines the format details for the value.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Flatten&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectValueFormatFlatten">MultipleClusterObjectValueFormatFlatten
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectValueFormatFlatten defines the flatten format for the value.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>delimiter</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Pair delimiter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>keyValueDelimiter</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Key-value delimiter.</p>
 </td>
 </tr>
 </tbody>
@@ -15143,13 +15392,15 @@ ComponentOps
 </tr>
 <tr>
 <td>
-<code>instanceNames</code><br/>
+<code>instances</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.Instance">
+[]Instance
+</a>
 </em>
 </td>
 <td>
-<p>Defines the names of the instances that need to be rebuilt. These are essentially the names of the pods.</p>
+<p>Defines the instances that need to be rebuilt.</p>
 </td>
 </tr>
 <tr>
@@ -17722,6 +17973,57 @@ bool
 Specifies two ways of controller to reload the parameter:
 - set to &lsquo;True&rsquo;, execute the reload action in sync mode, wait for the completion of reload
 - set to &lsquo;False&rsquo;, execute the reload action in async mode, just update the &lsquo;Configmap&rsquo;, no need to wait</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>batchReload</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to reconfigure dynamic parameters individually or in a batch.
+- Set to &lsquo;True&rsquo; to execute the reload action in a batch, incorporating all parameter changes.
+- Set to &lsquo;False&rsquo; to execute the reload action for each parameter change individually.
+The default value is &lsquo;False&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>batchInputTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>When <code>batchReload</code> is set to &lsquo;True&rsquo;, this parameter allows for the optional specification
+of the batch input format that is passed into the STDIN of the script.
+The format should be provided as a Go template string.
+In the template, the updated parameters&rsquo; key-value map can be referenced using the dollar sign (&lsquo;$&rsquo;) variable.
+Here&rsquo;s an example of an input template:</p>
+<pre><code class="language-yaml">
+batchInputTemplate: |-
+&#123;&#123;- range $pKey, $pValue := $ &#125;&#125;
+&#123;&#123; printf &quot;%s:%s&quot; $pKey $pValue &#125;&#125;
+&#123;&#123;- end &#125;&#125;
+</code></pre>
+<p>In this example, each updated parameter is iterated over in a sorted order by keys to generate the batch input data as follows:</p>
+<pre><code>
+key1:value1
+key2:value2
+key3:value3
+</code></pre>
+<p>If this parameter is not specified, the default format used for STDIN is as follows:
+Each updated parameter generates a line that concatenates the parameter&rsquo;s key and value with a equal sign (&lsquo;=&rsquo;).
+These lines are then sorted by their keys and inserted accordingly. Here&rsquo;s an example of the batch input data using the default template:</p>
+<pre><code>
+key1=value1
+key2=value2
+key3=value3
+</code></pre>
 </td>
 </tr>
 </tbody>

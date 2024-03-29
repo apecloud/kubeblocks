@@ -226,8 +226,8 @@ var _ = Describe("ClusterDefinition Controller", func() {
 					},
 				},
 				Orders: &appsv1alpha1.ClusterTopologyOrders{
-					StartupOrder: []string{"storage", "server", "proxy"},
-					UpdateOrder:  []string{"storage", "server", "proxy"},
+					Provision: []string{"storage", "server", "proxy"},
+					Update:    []string{"storage", "server", "proxy"},
 				},
 			}
 		)
@@ -329,9 +329,9 @@ var _ = Describe("ClusterDefinition Controller", func() {
 					}
 					topology := cd.Spec.Topologies[i]
 					if topology.Orders != nil {
-						cd.Spec.Topologies[i].Orders.StartupOrder = update(topology.Orders.StartupOrder)
-						cd.Spec.Topologies[i].Orders.ShutdownOrder = update(topology.Orders.ShutdownOrder)
-						cd.Spec.Topologies[i].Orders.UpdateOrder = update(topology.Orders.UpdateOrder)
+						cd.Spec.Topologies[i].Orders.Provision = update(topology.Orders.Provision)
+						cd.Spec.Topologies[i].Orders.Terminate = update(topology.Orders.Terminate)
+						cd.Spec.Topologies[i].Orders.Update = update(topology.Orders.Update)
 					}
 				}
 			})()).Should(Succeed())
@@ -339,7 +339,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
 				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
-				g.Expect(cd.Status.Message).Should(MatchRegexp("the components in startup|shutdown|update order are different from those from definition"))
+				g.Expect(cd.Status.Message).Should(MatchRegexp("the components in provision|terminate|update orders are different from those in definition"))
 			})).Should(Succeed())
 		})
 

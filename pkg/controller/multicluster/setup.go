@@ -25,17 +25,19 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
-func Setup(scheme *runtime.Scheme, cli client.Client, kubeContexts string) (Manager, error) {
-	if len(kubeContexts) == 0 {
+func Setup(scheme *runtime.Scheme, cli client.Client, kubeConfig, contexts string) (Manager, error) {
+	if len(contexts) == 0 {
 		return nil, nil
 	}
-	clients, caches, err := newClientsNCaches(scheme, kubeContexts)
+	clients, caches, err := newClientsNCaches(scheme, kubeConfig, contexts)
 	if err != nil {
 		return nil, err
 	}
@@ -45,49 +47,67 @@ func Setup(scheme *runtime.Scheme, cli client.Client, kubeContexts string) (Mana
 	}, nil
 }
 
-func newClientsNCaches(scheme *runtime.Scheme, kubeContexts string) (map[string]client.Client, map[string]cache.Cache, error) {
+func newClientsNCaches(scheme *runtime.Scheme, kubeConfig, contexts string) (map[string]client.Client, map[string]cache.Cache, error) {
 	clients := make(map[string]client.Client)
 	caches := make(map[string]cache.Cache)
-	for _, ctx := range strings.Split(kubeContexts, ",") {
-		cli, cache, err := newClientNCache4Context(scheme, ctx)
+	for _, context := range strings.Split(contexts, ",") {
+		cli, cache, err := newClientNCache4Context(scheme, kubeConfig, context)
 		if err != nil {
 			return nil, nil, err
 		}
 		if cli != nil && cache != nil {
-			clients[ctx] = cli
-			caches[ctx] = cache
+			clients[context] = cli
+			caches[context] = cache
 		}
 	}
 	return clients, caches, nil
 }
 
-func newClientNCache4Context(scheme *runtime.Scheme, ctx string) (client.Client, cache.Cache, error) {
-	if len(ctx) == 0 {
+func newClientNCache4Context(scheme *runtime.Scheme, kubeConfig, context string) (client.Client, cache.Cache, error) {
+	if len(context) == 0 {
 		return nil, nil, nil
 	}
 
-	config, err := config.GetConfigWithContext(ctx)
+	config, err := getConfigWithContext(kubeConfig, context)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to get kubeconfig for context %s: %s", ctx, err.Error())
+		return nil, nil, fmt.Errorf("unable to get kubeconfig for context %s: %s", context, err.Error())
 	}
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 
-	clientOpts, err := clientOptions(scheme, ctx, config)
+	clientOpts, err := clientOptions(scheme, context, config)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	cli, err := client.New(config, clientOpts)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create Client for context %s: %s", ctx, err.Error())
+		return nil, nil, fmt.Errorf("unable to create Client for context %s: %s", context, err.Error())
 	}
 	cache, err := cache.New(config, cacheOptions(clientOpts))
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create Cache for context %s: %s", ctx, err.Error())
+		return nil, nil, fmt.Errorf("unable to create Cache for context %s: %s", context, err.Error())
 	}
 	return cli, cache, nil
+}
+
+func getConfigWithContext(kubeConfig, context string) (*rest.Config, error) {
+	if len(kubeConfig) == 0 {
+		return config.GetConfigWithContext(context)
+	}
+	return getConfigWithContextFromSpecified(kubeConfig, context)
+}
+
+func getConfigWithContextFromSpecified(kubeConfig, context string) (*rest.Config, error) {
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfig},
+		&clientcmd.ConfigOverrides{
+			ClusterInfo: clientcmdapi.Cluster{
+				Server: "",
+			},
+			CurrentContext: context,
+		}).ClientConfig()
 }
 
 func clientOptions(scheme *runtime.Scheme, ctx string, config *rest.Config) (client.Options, error) {

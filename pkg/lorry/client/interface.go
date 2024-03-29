@@ -48,4 +48,6 @@ type Client interface {
 
 	// local rebuild slave
 	Rebuild(ctx context.Context) error
+	DataDump(ctx context.Context) error
+	DataLoad(ctx context.Context) error
 }

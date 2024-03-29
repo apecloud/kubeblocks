@@ -83,7 +83,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		if err != nil {
 			derr := client.Disconnect(ctx)
 			if derr != nil {
-				logger.Error(err, "failed to disconnect")
+				logger.Info("failed to disconnect", "error", derr.Error())
 			}
 		}
 	}()
@@ -126,7 +126,7 @@ func (mgr *Manager) InitiateReplSet(ctx context.Context, cluster *dcs.Cluster) e
 	}
 	client, err := NewLocalUnauthClient(ctx)
 	if err != nil {
-		mgr.Logger.Error(err, "Get local unauth client failed")
+		mgr.Logger.Info("Get local unauth client failed", "error", err.Error())
 		return err
 	}
 	defer client.Disconnect(context.TODO()) //nolint:errcheck
@@ -284,7 +284,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 func (mgr *Manager) GetMemberState(ctx context.Context) (string, error) {
 	status, err := mgr.GetReplSetStatus(ctx)
 	if err != nil {
-		mgr.Logger.Error(err, "rs.status() error")
+		mgr.Logger.Info("rs.status() error", "error", err.Error())
 		return "", err
 	}
 
@@ -302,7 +302,7 @@ func (mgr *Manager) GetReplSetStatus(ctx context.Context) (*ReplSetStatus, error
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, dcsMember *dcs.Member) (bool, error) {
 	status, err := mgr.GetReplSetStatus(ctx)
 	if err != nil {
-		mgr.Logger.Error(err, "rs.status() error")
+		mgr.Logger.Info("rs.status() error", "error", err.Error())
 		return false, err
 	}
 	for _, member := range status.Members {
@@ -385,7 +385,7 @@ func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (
 func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []string) (*mongo.Client, error) {
 	if len(hosts) == 0 {
 		err := errors.New("Get replset client without hosts")
-		mgr.Logger.Error(err, "Get replset client without hosts")
+		mgr.Logger.Info("Get replset client without hosts", "error", err.Error())
 		return nil, err
 	}
 
@@ -410,14 +410,14 @@ func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []strin
 func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
 	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
-		mgr.Logger.Error(err, "Get replSet client failed")
+		mgr.Logger.Info("Get replSet client failed", "error", err.Error())
 		return true
 	}
 	defer client.Disconnect(ctx) //nolint:errcheck
 
 	rsConfig, err := GetReplSetConfig(ctx, client)
 	if rsConfig == nil {
-		mgr.Logger.Error(err, "Get replSet config failed")
+		mgr.Logger.Info("Get replSet config failed", "error", err.Error())
 		//
 		return true
 	}
@@ -480,7 +480,7 @@ func (mgr *Manager) UpdateCurrentMemberHost(ctx context.Context, cluster *dcs.Cl
 	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
 	rsConfig, err := GetReplSetConfig(ctx, client)
 	if rsConfig == nil {
-		mgr.Logger.Error(err, "Get replSet config failed")
+		mgr.Logger.Info("Get replSet config failed", "error", err.Error())
 		return err
 	}
 
@@ -522,7 +522,7 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
 	rsConfig, err := GetReplSetConfig(ctx, client)
 	if rsConfig == nil {
-		mgr.Logger.Error(err, "Get replSet config failed")
+		mgr.Logger.Info("Get replSet config failed", "error", err.Error())
 		return err
 	}
 
@@ -551,7 +551,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 
 	rsConfig, err := GetReplSetConfig(ctx, client)
 	if rsConfig == nil {
-		mgr.Logger.Error(err, "Get replSet config failed")
+		mgr.Logger.Info("Get replSet config failed", "error", err.Error())
 		return err
 	}
 
@@ -578,7 +578,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
-		mgr.Logger.Error(err, "Get leader client failed")
+		mgr.Logger.Info("Get leader client failed", "error", err.Error())
 		return false
 	}
 	defer client.Disconnect(ctx) //nolint:errcheck
@@ -598,13 +598,13 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 func (mgr *Manager) IsPromoted(ctx context.Context) bool {
 	isLeader, err := mgr.IsLeader(ctx, nil)
 	if err != nil || !isLeader {
-		mgr.Logger.Error(err, "Is leader check failed")
+		mgr.Logger.Info("Is leader check failed", "error", err.Error())
 		return false
 	}
 
 	rsConfig, err := mgr.GetReplSetConfig(ctx)
 	if rsConfig == nil {
-		mgr.Logger.Error(err, "Get replSet config failed")
+		mgr.Logger.Info("Get replSet config failed", "error", err.Error())
 		return false
 	}
 	for i := range rsConfig.Members {
@@ -621,7 +621,7 @@ func (mgr *Manager) IsPromoted(ctx context.Context) bool {
 func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	rsConfig, err := mgr.GetReplSetConfig(ctx)
 	if rsConfig == nil {
-		mgr.Logger.Error(err, "Get replSet config failed")
+		mgr.Logger.Info("Get replSet config failed", "error", err.Error())
 		return err
 	}
 
@@ -726,7 +726,7 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 
 	rsConfig, err := mgr.GetReplSetConfig(ctx)
 	if rsConfig == nil {
-		mgr.Logger.Error(err, "Get replSet config failed")
+		mgr.Logger.Info("Get replSet config failed", "error", err.Error())
 		return nil
 	}
 
@@ -786,7 +786,7 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 
 	response := mgr.Client.Database("admin").RunCommand(ctx, m)
 	if response.Err() != nil {
-		mgr.Logger.Error(response.Err(), fmt.Sprintf("Lock db (%s) failed", reason))
+		mgr.Logger.Info(fmt.Sprintf("Lock db (%s) failed", reason), "error", response.Err().Error())
 		return response.Err()
 	}
 	if err := response.Decode(&lockResp); err != nil {
@@ -809,7 +809,7 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 	unlockResp := LockResp{}
 	response := mgr.Client.Database("admin").RunCommand(ctx, m)
 	if response.Err() != nil {
-		mgr.Logger.Error(response.Err(), "Unlock db failed")
+		mgr.Logger.Info("Unlock db failed", "error", response.Err().Error())
 		return response.Err()
 	}
 	if err := response.Decode(&unlockResp); err != nil {
@@ -824,7 +824,7 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 	for unlockResp.LockCount > 0 {
 		response = mgr.Client.Database("admin").RunCommand(ctx, m)
 		if response.Err() != nil {
-			mgr.Logger.Error(response.Err(), "Unlock db failed")
+			mgr.Logger.Info("Unlock db failed", "error", response.Err().Error())
 			return response.Err()
 		}
 		if err := response.Decode(&unlockResp); err != nil {

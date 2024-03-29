@@ -181,7 +181,7 @@ type shellCommandHandler struct {
 	batchInputTemplate string
 }
 
-func generateBatchStdinData(updatedParams map[string]string, batchInputTemplate string, ctx context.Context) (string, error) {
+func generateBatchStdinData(ctx context.Context, updatedParams map[string]string, batchInputTemplate string) (string, error) {
 	tplValues := gotemplate.TplValues{}
 	for k, v := range updatedParams {
 		tplValues[k] = v
@@ -201,7 +201,7 @@ func (s *shellCommandHandler) OnlineUpdate(ctx context.Context, name string, upd
 
 func doBatchReloadAction(ctx context.Context, updatedParams map[string]string, fn ActionCallback, batchInputTemplate string, commandName string, args ...string) error {
 	// If there are any errors, try to check them before all steps.
-	batchStdinStr, err := generateBatchStdinData(updatedParams, batchInputTemplate, ctx)
+	batchStdinStr, err := generateBatchStdinData(ctx, updatedParams, batchInputTemplate)
 	if err != nil {
 		logger.Error(err, "cannot generate batch stdin data")
 		return err

@@ -485,7 +485,7 @@ var _ = Describe("Config Handler Test", func() {
 			batchInputTemplate := `{{- range $pKey, $pValue := $ }}
 {{ printf "%s:%s" $pKey $pValue }}
 {{- end }}`
-			stdinStr, err := generateBatchStdinData(updatedParams, batchInputTemplate, context.TODO())
+			stdinStr, err := generateBatchStdinData(context.TODO(), updatedParams, batchInputTemplate)
 			By("checking there's no error", func() {
 				Expect(err).Should(Succeed())
 			})

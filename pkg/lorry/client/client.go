@@ -243,6 +243,12 @@ func (cli *lorryClient) PreTerminate(ctx context.Context) error {
 	return err
 }
 
+// Rebuild sends a slave rebuild request to Lorry.
+func (cli *lorryClient) Rebuild(ctx context.Context) error {
+	_, err := cli.Request(ctx, "rebuild", http.MethodPost, nil)
+	return err
+}
+
 func (cli *lorryClient) DataDump(ctx context.Context) error {
 	_, err := cli.Request(ctx, string(DataDumpOperation), http.MethodPost, nil)
 	return err

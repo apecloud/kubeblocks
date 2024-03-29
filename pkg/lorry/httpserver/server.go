@@ -146,6 +146,9 @@ func (s *server) getRouter(endpoints []Endpoint) *fasthttprouter.Router {
 			router.Handle(e.Method, path, e.Handler)
 		}
 	}
+	for method, path := range router.List() {
+		logger.Info("API route path", "method", method, "path", path)
+	}
 
 	return router
 }

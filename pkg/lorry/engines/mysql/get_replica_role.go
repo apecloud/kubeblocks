@@ -33,6 +33,11 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 		return "", errors.New("cluster not found")
 	}
 
+	leader, err := dcs.GetStore().GetLeader()
+	if err != nil {
+		mgr.Logger.Info("get leader failed", "error", err.Error())
+	}
+	cluster.Leader = leader
 	if !cluster.IsLocked() {
 		mgr.Logger.Info("cluster has no leader lease")
 		return models.SECONDARY, nil

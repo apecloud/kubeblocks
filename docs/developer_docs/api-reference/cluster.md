@@ -12232,6 +12232,55 @@ Kubernetes core/v1.ServiceType
 More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a>.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>ipFamilies</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#ipfamily-v1-core">
+[]Kubernetes core/v1.IPFamily
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>IPFamilies is a list of IP families (e.g. IPv4, IPv6) assigned to this
+service. This field is usually assigned automatically based on cluster
+configuration and the ipFamilyPolicy field. If this field is specified
+manually, the requested family is available in the cluster,
+and ipFamilyPolicy allows it, it will be used; otherwise creation of
+the service will fail. This field is conditionally mutable: it allows
+for adding or removing a secondary IP family, but it does not allow
+changing the primary IP family of the Service. Valid values are &ldquo;IPv4&rdquo;
+and &ldquo;IPv6&rdquo;.  This field only applies to Services of types ClusterIP,
+NodePort, and LoadBalancer, and does apply to &ldquo;headless&rdquo; services.
+This field will be wiped when updating a Service to type ExternalName.</p>
+<p>This field may hold a maximum of two entries (dual-stack families, in
+either order).  These families must correspond to the values of the
+clusterIPs field, if specified. Both clusterIPs and ipFamilies are
+governed by the ipFamilyPolicy field.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ipFamilyPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#ipfamilypolicy-v1-core">
+Kubernetes core/v1.IPFamilyPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>IPFamilyPolicy represents the dual-stack-ness requested or required by
+this Service. If there is no value provided, then this field will be set
+to SingleStack. Services can be &ldquo;SingleStack&rdquo; (a single IP family),
+&ldquo;PreferDualStack&rdquo; (two IP families on dual-stack configured clusters or
+a single IP family on single-stack clusters), or &ldquo;RequireDualStack&rdquo;
+(two IP families on dual-stack configured clusters, otherwise fail). The
+ipFamilies and clusterIPs fields depend on the value of this field. This
+field will be wiped when updating a service to type ExternalName.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsType">OpsType

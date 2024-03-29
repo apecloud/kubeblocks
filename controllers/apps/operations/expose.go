@@ -425,6 +425,16 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			clusterService.Spec.Ports = defaultServicePorts
 		}
 
+		// set ip family policy
+		if exposeService.IPFamilyPolicy != nil {
+			clusterService.Spec.IPFamilyPolicy = exposeService.IPFamilyPolicy
+		}
+
+		// set ip families
+		if len(exposeService.IPFamilies) > 0 {
+			clusterService.Spec.IPFamilies = exposeService.IPFamilies
+		}
+
 		// set role selector
 		if len(exposeService.RoleSelector) != 0 {
 			clusterService.RoleSelector = exposeService.RoleSelector

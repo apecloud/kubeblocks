@@ -25,7 +25,7 @@
 		automatic_sp_privileges: string & "OFF" | "ON" | *"ON"
 
 		// [1~65535] default ON
-		auto_increment_increment: int & >=1 & <=65535 | *1
+		auto_increment_increment: int & >0 & <=65535 | *1
 
 		binlog_stmt_cache_size?: int & >=4096 & <=16777216 | *2097152
 		// [0|1|2] default: 2

@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package v1alpha1
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // MarshalJSON implements the Marshaler interface.
 func (c *Payload) MarshalJSON() ([]byte, error) {
@@ -52,20 +54,6 @@ func (c *Payload) DeepCopyInto(out *Payload) {
 		return // ignore
 	}
 	out.Data = clone
-}
-
-func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
-	if in.DynamicActionCanBeMerged != nil {
-		return !*in.DynamicActionCanBeMerged
-	}
-	return false
-}
-
-func (in *ConfigConstraintSpec) DynamicParametersPolicy() DynamicParameterSelectedPolicy {
-	if in.DynamicParameterSelectedPolicy != nil {
-		return *in.DynamicParameterSelectedPolicy
-	}
-	return SelectedDynamicParameters
 }
 
 func (configuration *ConfigurationSpec) GetConfigurationItem(name string) *ConfigurationItemDetail {

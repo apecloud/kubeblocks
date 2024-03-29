@@ -36,6 +36,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -49,6 +50,10 @@ var _ = Describe("Config Handler Test", func() {
 	const (
 		oldVersion = "[test]\na = 1\nb = 2\n"
 		newVersion = "[test]\na = 2\nb = 2\n\nc = 100"
+
+		defaultBatchInputTemplate string = `{{- range $pKey, $pValue := $ }}
+{{ printf "%s=%s" $pKey $pValue }}
+{{- end }}`
 	)
 
 	BeforeEach(func() {
@@ -74,32 +79,32 @@ var _ = Describe("Config Handler Test", func() {
 		}
 	}
 
-	newFormatter := func() appsv1alpha1.FormatterConfig {
-		return appsv1alpha1.FormatterConfig{
-			FormatterOptions: appsv1alpha1.FormatterOptions{
-				IniConfig: &appsv1alpha1.IniConfig{
+	newFormatter := func() v1.FormatterConfig {
+		return v1.FormatterConfig{
+			FormatterAction: v1.FormatterAction{
+				IniConfig: &v1.IniConfig{
 					SectionName: "test",
 				},
 			},
-			Format: appsv1alpha1.Ini,
+			Format: v1.Ini,
 		}
 	}
 
 	newUnixSignalConfig := func() ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadOptions: &appsv1alpha1.ReloadOptions{
-				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+			DynamicReloadAction: &v1.DynamicReloadAction{
+				UnixSignalTrigger: &v1.UnixSignalTrigger{
 					ProcessName: findCurrProcName(),
-					Signal:      appsv1alpha1.SIGHUP,
+					Signal:      v1.SIGHUP,
 				}},
-			ReloadType: appsv1alpha1.UnixSignalType,
+			ReloadType: v1.UnixSignalType,
 			MountPoint: "/tmp/test",
 			ConfigSpec: newConfigSpec(),
 		}
 	}
 
-	newDownwardAPIOptions := func() []appsv1alpha1.DownwardAPIOption {
-		return []appsv1alpha1.DownwardAPIOption{
+	newDownwardAPIOptions := func() []v1.DownwardAction {
+		return []v1.DownwardAction{
 			{
 				Name:       "labels",
 				MountPoint: filepath.Join(tmpWorkDir, "labels"),
@@ -115,12 +120,12 @@ var _ = Describe("Config Handler Test", func() {
 
 	newDownwardAPIConfig := func() ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadOptions: &appsv1alpha1.ReloadOptions{
-				ShellTrigger: &appsv1alpha1.ShellTrigger{
+			DynamicReloadAction: &v1.DynamicReloadAction{
+				ShellTrigger: &v1.ShellTrigger{
 					Command: []string{"sh", "-c", `echo "hello world" "$@"`},
 				},
 			},
-			ReloadType:         appsv1alpha1.ShellType,
+			ReloadType:         v1.ShellType,
 			MountPoint:         tmpWorkDir,
 			ConfigSpec:         newConfigSpec(),
 			FormatterConfig:    newFormatter(),
@@ -130,10 +135,10 @@ var _ = Describe("Config Handler Test", func() {
 
 	newTPLScriptsConfig := func(configPath string) ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadOptions: &appsv1alpha1.ReloadOptions{
-				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{},
+			DynamicReloadAction: &v1.DynamicReloadAction{
+				TPLScriptTrigger: &v1.TPLScriptTrigger{},
 			},
-			ReloadType:      appsv1alpha1.TPLScriptType,
+			ReloadType:      v1.TPLScriptType,
 			MountPoint:      "/tmp/test",
 			ConfigSpec:      newConfigSpec(),
 			FormatterConfig: newFormatter(),
@@ -162,7 +167,7 @@ var _ = Describe("Config Handler Test", func() {
 
 	Context("TestSimpleHandler", func() {
 		It("CreateSignalHandler", func() {
-			_, err := CreateSignalHandler(appsv1alpha1.SIGALRM, "test", "")
+			_, err := CreateSignalHandler(v1.SIGALRM, "test", "")
 			Expect(err).Should(Succeed())
 			_, err = CreateSignalHandler("NOSIGNAL", "test", "")
 			Expect(err.Error()).To(ContainSubstring("not supported unix signal: NOSIGNAL"))
@@ -268,11 +273,11 @@ var _ = Describe("Config Handler Test", func() {
 			})
 			It("should succeed on reload individually", func() {
 				configSpec := ConfigSpecInfo{
-					ReloadOptions: &appsv1alpha1.ReloadOptions{
-						ShellTrigger: &appsv1alpha1.ShellTrigger{
+					DynamicReloadAction: &v1.DynamicReloadAction{
+						ShellTrigger: &v1.ShellTrigger{
 							Command: []string{"sh", "-c", `echo "hello world" "$@"`, "sh"},
 						}},
-					ReloadType:      appsv1alpha1.ShellType,
+					ReloadType:      v1.ShellType,
 					MountPoint:      configPath,
 					ConfigSpec:      newConfigSpec(),
 					FormatterConfig: newFormatter(),
@@ -280,17 +285,17 @@ var _ = Describe("Config Handler Test", func() {
 				testShellHandlerCommon(configPath, configSpec)
 			})
 			Describe("Test reload in a batch", func() {
-				isBatchReload := true
 				It("should succeed on the default batch input format", func() {
 					configSpec := ConfigSpecInfo{
-						ReloadOptions: &appsv1alpha1.ReloadOptions{
-							ShellTrigger: &appsv1alpha1.ShellTrigger{
+						DynamicReloadAction: &v1.DynamicReloadAction{
+							ShellTrigger: &v1.ShellTrigger{
 								Command: []string{"sh", "-c",
 									`while IFS="=" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
 								},
-								BatchReload: &isBatchReload,
+								BatchReload:             util.ToPointer(true),
+								BatchParametersTemplate: defaultBatchInputTemplate,
 							}},
-						ReloadType:      appsv1alpha1.ShellType,
+						ReloadType:      v1.ShellType,
 						MountPoint:      configPath,
 						ConfigSpec:      newConfigSpec(),
 						FormatterConfig: newFormatter(),
@@ -302,15 +307,15 @@ var _ = Describe("Config Handler Test", func() {
 {{ printf "%s:%s" $pKey $pValue }}
 {{- end }}`
 					configSpec := ConfigSpecInfo{
-						ReloadOptions: &appsv1alpha1.ReloadOptions{
-							ShellTrigger: &appsv1alpha1.ShellTrigger{
+						DynamicReloadAction: &v1.DynamicReloadAction{
+							ShellTrigger: &v1.ShellTrigger{
 								Command: []string{"sh", "-c",
 									`while IFS=":" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
 								},
-								BatchReload:        &isBatchReload,
-								BatchInputTemplate: customBatchInputTemplate,
+								BatchReload:             util.ToPointer(true),
+								BatchParametersTemplate: customBatchInputTemplate,
 							}},
-						ReloadType:      appsv1alpha1.ShellType,
+						ReloadType:      v1.ShellType,
 						MountPoint:      configPath,
 						ConfigSpec:      newConfigSpec(),
 						FormatterConfig: newFormatter(),
@@ -399,8 +404,11 @@ var _ = Describe("Config Handler Test", func() {
 				err     error
 			)
 			BeforeEach(func() {
-				stdouts, err = execWithSeparateReload(context.TODO(),
+				err = doReloadAction(context.TODO(),
 					updatedParams,
+					func(output string, _ error) {
+						stdouts = append(stdouts, output)
+					},
 					"echo",
 					"hello",
 				)
@@ -432,8 +440,11 @@ var _ = Describe("Config Handler Test", func() {
 				err    error
 			)
 			BeforeEach(func() {
-				stdout, err = execWithBatchReload(context.TODO(),
+				err = doBatchReloadAction(context.TODO(),
 					updatedParams,
+					func(out string, err error) {
+						stdout = out
+					},
 					defaultBatchInputTemplate,
 					"/bin/sh",
 					"-c",
@@ -474,7 +485,7 @@ var _ = Describe("Config Handler Test", func() {
 			batchInputTemplate := `{{- range $pKey, $pValue := $ }}
 {{ printf "%s:%s" $pKey $pValue }}
 {{- end }}`
-			stdinStr, err := generateBatchStdinData(updatedParams, batchInputTemplate)
+			stdinStr, err := generateBatchStdinData(context.TODO(), updatedParams, batchInputTemplate)
 			By("checking there's no error", func() {
 				Expect(err).Should(Succeed())
 			})

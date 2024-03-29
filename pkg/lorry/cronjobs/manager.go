@@ -24,8 +24,9 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type Manager struct {

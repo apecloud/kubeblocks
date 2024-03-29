@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -46,7 +47,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
 	var scriptsObj *corev1.ConfigMap
-	var configConstraint *appsv1alpha1.ConfigConstraint
+	var configConstraint *v1.ConfigConstraint
 	var configurationObj *appsv1alpha1.Configuration
 	var k8sMockClient *testutil.K8sClientMockHelper
 
@@ -81,21 +82,21 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			ClusterRef(clusterName).
 			Component(mysqlCompName).
 			GetObject()
-		configConstraint = &appsv1alpha1.ConfigConstraint{
+		configConstraint = &v1.ConfigConstraint{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: mysqlConfigConstraintName,
 			},
-			Spec: appsv1alpha1.ConfigConstraintSpec{
-				ReloadOptions: &appsv1alpha1.ReloadOptions{
-					ShellTrigger: &appsv1alpha1.ShellTrigger{
+			Spec: v1.ConfigConstraintSpec{
+				DynamicReloadAction: &v1.DynamicReloadAction{
+					ShellTrigger: &v1.ShellTrigger{
 						Command: []string{"echo", "hello"},
 						Sync:    cfgutil.ToPointer(true),
 					},
 				},
-				FormatterConfig: &appsv1alpha1.FormatterConfig{
-					Format: appsv1alpha1.Ini,
-					FormatterOptions: appsv1alpha1.FormatterOptions{
-						IniConfig: &appsv1alpha1.IniConfig{
+				FormatterConfig: &v1.FormatterConfig{
+					Format: v1.Ini,
+					FormatterAction: v1.FormatterAction{
+						IniConfig: &v1.IniConfig{
 							SectionName: "mysqld",
 						},
 					},

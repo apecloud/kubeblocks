@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -163,7 +164,7 @@ func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item *appsv1alpha1.Config
 
 func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
 	var newData map[string]string
-	var configConstraint *appsv1alpha1.ConfigConstraint
+	var configConstraint *v1.ConfigConstraint
 
 	if item == nil || len(item.ConfigFileParams) == 0 {
 		return
@@ -374,11 +375,11 @@ func renderConfigMapTemplate(
 	return renderedData, nil
 }
 
-func fetchConfigConstraint(ccName string, ctx context.Context, cli client.Client) (*appsv1alpha1.ConfigConstraint, error) {
+func fetchConfigConstraint(ccName string, ctx context.Context, cli client.Client) (*v1.ConfigConstraint, error) {
 	ccKey := client.ObjectKey{
 		Name: ccName,
 	}
-	configConstraint := &appsv1alpha1.ConfigConstraint{}
+	configConstraint := &v1.ConfigConstraint{}
 	if err := cli.Get(ctx, ccKey, configConstraint); err != nil {
 		return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%s]", ccName)
 	}
@@ -401,7 +402,7 @@ func validateRenderedData(
 	return validateRawData(renderedData, configSpec, &configConstraint.Spec)
 }
 
-func validateRawData(renderedData map[string]string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec) error {
+func validateRawData(renderedData map[string]string, configSpec appsv1alpha1.ComponentConfigSpec, cc *v1.ConfigConstraintSpec) error {
 	configChecker := validate.NewConfigValidator(cc, validate.WithKeySelector(configSpec.Keys))
 	// NOTE: It is necessary to verify the correctness of the data
 	if err := configChecker.Validate(renderedData); err != nil {

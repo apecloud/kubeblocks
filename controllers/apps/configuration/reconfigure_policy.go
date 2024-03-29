@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	configmanager "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
@@ -87,7 +88,7 @@ type reconfigureParams struct {
 	ConfigMap *corev1.ConfigMap
 
 	// ConfigConstraint pointer
-	ConfigConstraint *appsv1alpha1.ConfigConstraintSpec
+	ConfigConstraint *v1.ConfigConstraintSpec
 
 	// For grpc factory
 	ReconfigureClientFactory createReconfigureClient
@@ -213,7 +214,7 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(appsv1alpha1.AsyncDynamicReloadPolicy)
 }
 
-func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
+func NewReconfigurePolicy(cc *v1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
 	if cfgPatch != nil && !cfgPatch.IsModify {
 		// not walk here
 		return nil, core.MakeError("cfg not modify. [%v]", cfgPatch)
@@ -229,9 +230,9 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.
 		// make decision
 		switch {
 		case !dynamicUpdate: // static parameters update
-		case configmanager.IsAutoReload(cc.ReloadOptions): // if core support hot update, don't need to do anything
+		case configmanager.IsAutoReload(cc.DynamicReloadAction): // if core support hot update, don't need to do anything
 			policy = appsv1alpha1.AsyncDynamicReloadPolicy
-		case enableSyncTrigger(cc.ReloadOptions): // sync config-manager exec hot update
+		case enableSyncTrigger(cc.DynamicReloadAction): // sync config-manager exec hot update
 			policy = appsv1alpha1.SyncDynamicReloadPolicy
 		default: // config-manager auto trigger to hot update
 			policy = appsv1alpha1.AsyncDynamicReloadPolicy
@@ -241,7 +242,7 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.
 	// if not specify policy, or cannot decision policy, use default policy.
 	if policy == appsv1alpha1.NonePolicy {
 		policy = appsv1alpha1.NormalPolicy
-		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.ReloadOptions) {
+		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.DynamicReloadAction) {
 			policy = appsv1alpha1.DynamicReloadAndRestartPolicy
 		}
 	}
@@ -256,7 +257,7 @@ func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
 	return !restart && policy == appsv1alpha1.NonePolicy
 }
 
-func enableSyncTrigger(options *appsv1alpha1.ReloadOptions) bool {
+func enableSyncTrigger(options *v1.DynamicReloadAction) bool {
 	if options == nil {
 		return false
 	}

@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 func TestXMLFormat(t *testing.T) {
@@ -47,7 +47,7 @@ func TestXMLFormat(t *testing.T) {
     </web>
 </profiles>
 `
-	xmlConfigObj, err := LoadConfig("xml_test", xmlContext, appsv1alpha1.XML)
+	xmlConfigObj, err := LoadConfig("xml_test", xmlContext, appsv1.XML)
 	assert.Nil(t, err)
 
 	assert.EqualValues(t, xmlConfigObj.Get("profiles.default.max_threads"), 8)
@@ -64,7 +64,7 @@ func TestXMLFormat(t *testing.T) {
 
 	dumpContext, err := xmlConfigObj.Marshal()
 	assert.Nil(t, err)
-	newObj, err := LoadConfig("xml_test", dumpContext, appsv1alpha1.XML)
+	newObj, err := LoadConfig("xml_test", dumpContext, appsv1.XML)
 	assert.Nil(t, err)
 	assert.EqualValues(t, newObj.GetAllParameters(), xmlConfigObj.GetAllParameters())
 

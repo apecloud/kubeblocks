@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -84,7 +84,7 @@ func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *Config
 
 func TestIsUpdateDynamicParameters(t *testing.T) {
 	type args struct {
-		ccSpec *appsv1alpha1.ConfigConstraintSpec
+		ccSpec *v1.ConfigConstraintSpec
 		diff   *ConfigPatchInfo
 	}
 	tests := []struct {
@@ -96,7 +96,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// null
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{},
+			ccSpec: &v1.ConfigConstraintSpec{},
 			diff:   newCfgDiffMeta(`null`, nil, nil),
 		},
 		want:    true,
@@ -105,7 +105,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// error
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{},
+			ccSpec: &v1.ConfigConstraintSpec{},
 			diff:   newCfgDiffMeta(`invalid json formatter`, nil, nil),
 		},
 		want:    false,
@@ -114,7 +114,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// add/delete config file
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{},
+			ccSpec: &v1.ConfigConstraintSpec{},
 			diff:   newCfgDiffMeta(`{}`, map[string]interface{}{"a": "b"}, nil),
 		},
 		want:    false,
@@ -123,7 +123,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// not set static or dynamic parameters
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{},
+			ccSpec: &v1.ConfigConstraintSpec{},
 			diff:   newCfgDiffMeta(`{"a":"b"}`, nil, nil),
 		},
 		want:    false,
@@ -132,7 +132,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// static parameters contains
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &v1.ConfigConstraintSpec{
 				StaticParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param3":"b"}`, nil, nil),
@@ -143,7 +143,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// static parameters not contains
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &v1.ConfigConstraintSpec{
 				StaticParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param4":"b"}`, nil, nil),
@@ -154,7 +154,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// dynamic parameters contains
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &v1.ConfigConstraintSpec{
 				DynamicParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param1":"b", "param3": 20}`, nil, nil),
@@ -165,7 +165,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// dynamic parameters not contains
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &v1.ConfigConstraintSpec{
 				DynamicParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param1":"b", "param4": 20}`, nil, nil),
@@ -176,7 +176,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// dynamic/static parameters not contains
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &v1.ConfigConstraintSpec{
 				DynamicParameters: []string{"dparam1", "dparam2", "dparam3"},
 				StaticParameters:  []string{"sparam1", "sparam2", "sparam3"},
 			},
@@ -188,7 +188,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "empty-test",
 		// dynamic/static parameters not contains
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &v1.ConfigConstraintSpec{
 				DynamicParameters: []string{},
 				StaticParameters:  []string{},
 			},
@@ -288,7 +288,7 @@ func TestSetParametersUpdateSource(t *testing.T) {
 func TestValidateConfigPatch(t *testing.T) {
 	type args struct {
 		patch     *ConfigPatchInfo
-		formatCfg *appsv1alpha1.FormatterConfig
+		formatCfg *v1.FormatterConfig
 	}
 	tests := []struct {
 		name    string
@@ -298,7 +298,7 @@ func TestValidateConfigPatch(t *testing.T) {
 		name: "test",
 		args: args{
 			patch:     &ConfigPatchInfo{},
-			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+			formatCfg: &v1.FormatterConfig{Format: v1.YAML},
 		},
 		wantErr: false,
 	}, {
@@ -310,7 +310,7 @@ func TestValidateConfigPatch(t *testing.T) {
 					"file1": []byte(`{"a":"b"}`),
 				},
 			},
-			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+			formatCfg: &v1.FormatterConfig{Format: v1.YAML},
 		},
 		wantErr: false,
 	}, {
@@ -322,7 +322,7 @@ func TestValidateConfigPatch(t *testing.T) {
 					"file1": []byte(`{"a":null}`),
 				},
 			},
-			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+			formatCfg: &v1.FormatterConfig{Format: v1.YAML},
 		},
 		wantErr: true,
 	}}
@@ -338,7 +338,7 @@ func TestValidateConfigPatch(t *testing.T) {
 func TestIsDynamicParameter(t *testing.T) {
 	type args struct {
 		paramName string
-		ccSpec    *appsv1alpha1.ConfigConstraintSpec
+		ccSpec    *v1.ConfigConstraintSpec
 	}
 	tests := []struct {
 		name string
@@ -349,14 +349,14 @@ func TestIsDynamicParameter(t *testing.T) {
 		// null
 		args: args{
 			paramName: "test",
-			ccSpec:    &appsv1alpha1.ConfigConstraintSpec{},
+			ccSpec:    &v1.ConfigConstraintSpec{},
 		},
 		want: false,
 	}, {
 		name: "test",
 		// static parameters contains
 		args: args{
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &v1.ConfigConstraintSpec{
 				StaticParameters: []string{"param1", "param2", "param3"},
 			},
 			paramName: "param3",
@@ -367,7 +367,7 @@ func TestIsDynamicParameter(t *testing.T) {
 		// static parameters not contains
 		args: args{
 			paramName: "param4",
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &v1.ConfigConstraintSpec{
 				StaticParameters: []string{"param1", "param2", "param3"},
 			},
 		},
@@ -377,7 +377,7 @@ func TestIsDynamicParameter(t *testing.T) {
 		// dynamic parameters contains
 		args: args{
 			paramName: "param1",
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &v1.ConfigConstraintSpec{
 				DynamicParameters: []string{"param1", "param2", "param3"},
 			},
 		},
@@ -387,7 +387,7 @@ func TestIsDynamicParameter(t *testing.T) {
 		// dynamic/static parameters not contains
 		args: args{
 			paramName: "test",
-			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &v1.ConfigConstraintSpec{
 				DynamicParameters: []string{"dparam1", "dparam2", "dparam3"},
 				StaticParameters:  []string{"sparam1", "sparam2", "sparam3"},
 			},

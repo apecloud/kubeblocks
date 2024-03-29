@@ -155,11 +155,11 @@ spec:
           volumeMounts:
             - mountPath: /etc/kubeblocks
               name: manager-config
-          {{- if .Values.admissionWebhooks.enabled }}
-          - mountPath: /tmp/k8s-webhook-server/serving-certs
-            name: cert
-            readOnly: true
-          {{- end }}
+            {{- if .Values.admissionWebhooks.enabled }}
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: cert
+              readOnly: true
+            {{- end }}
       {{- if .Values.hostNetwork }}
       hostNetwork: {{ .Values.hostNetwork }}
       {{- end }}

@@ -22,7 +22,7 @@ package configuration
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -44,7 +44,7 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 	}
 
 	// construct config manager tools volume
-	toolContainers := make([]appsv1alpha1.ToolConfig, 0)
+	toolContainers := make([]appsv1.ToolConfig, 0)
 	toolsMap := make(map[string]cfgcm.ConfigSpecMeta)
 	for _, buildParam := range cfgManagerParams.ConfigSpecsBuildParams {
 		if buildParam.ToolsImageSpec == nil {
@@ -73,7 +73,7 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 	return err
 }
 
-func checkAndInstallToolsImageVolume(toolContainers []appsv1alpha1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta) []appsv1alpha1.ToolConfig {
+func checkAndInstallToolsImageVolume(toolContainers []appsv1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta) []appsv1.ToolConfig {
 	for _, buildParam := range buildParams {
 		if buildParam.ToolsImageSpec != nil && buildParam.ConfigSpec.LegacyRenderedConfigSpec != nil {
 			// auto install config_render tool
@@ -83,14 +83,14 @@ func checkAndInstallToolsImageVolume(toolContainers []appsv1alpha1.ToolConfig, b
 	return toolContainers
 }
 
-func checkAndCreateRenderedInitContainer(toolContainers []appsv1alpha1.ToolConfig, mountPoint string) []appsv1alpha1.ToolConfig {
+func checkAndCreateRenderedInitContainer(toolContainers []appsv1.ToolConfig, mountPoint string) []appsv1.ToolConfig {
 	kbToolsImage := viper.GetString(constant.KBToolsImage)
 	for _, container := range toolContainers {
 		if container.Name == initSecRenderedToolContainerName {
 			return nil
 		}
 	}
-	toolContainers = append(toolContainers, appsv1alpha1.ToolConfig{
+	toolContainers = append(toolContainers, appsv1.ToolConfig{
 		Name:    initSecRenderedToolContainerName,
 		Image:   kbToolsImage,
 		Command: []string{"cp", tplRenderToolPath, mountPoint},
@@ -98,7 +98,7 @@ func checkAndCreateRenderedInitContainer(toolContainers []appsv1alpha1.ToolConfi
 	return toolContainers
 }
 
-func replaceToolsImageHolder(toolConfig *appsv1alpha1.ToolConfig, podSpec *corev1.PodSpec, volumeName string) {
+func replaceToolsImageHolder(toolConfig *appsv1.ToolConfig, podSpec *corev1.PodSpec, volumeName string) {
 	switch {
 	case toolConfig.Image == constant.KBToolsImagePlaceHolder:
 		toolConfig.Image = viper.GetString(constant.KBToolsImage)

@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	mock_proto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
@@ -64,7 +65,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}),
 				withMockRSM(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigConstraintSpec(&appsv1alpha1.FormatterConfig{Format: appsv1alpha1.RedisCfg}),
+				withConfigConstraintSpec(&v1.FormatterConfig{Format: v1.RedisCfg}),
 				withConfigPatch(map[string]string{
 					"a": "c b e f",
 				}),
@@ -121,7 +122,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}),
 				withMockRSM(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigConstraintSpec(&appsv1alpha1.FormatterConfig{Format: appsv1alpha1.RedisCfg}),
+				withConfigConstraintSpec(&v1.FormatterConfig{Format: v1.RedisCfg}),
 				withConfigPatch(map[string]string{
 					"a": "c b e f",
 				}),
@@ -134,7 +135,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}}))
 
 			// add selector
-			mockParam.ConfigConstraint.Selector = &metav1.LabelSelector{
+			mockParam.ConfigConstraint.DynamicReloadSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"primary": "true",
 				},

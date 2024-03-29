@@ -37,6 +37,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -52,7 +53,7 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 	type args struct {
 		newVersion string
 		oldVersion string
-		formatCfg  *appsv1alpha1.FormatterConfig
+		formatCfg  *v1.FormatterConfig
 	}
 	tests := []struct {
 		name    string
@@ -64,9 +65,9 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 		args: args{
 			newVersion: filepath.Join(rootPath, "currentVersion"),
 			oldVersion: filepath.Join(rootPath, "lastVersion"),
-			formatCfg: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.Ini,
-				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
+			formatCfg: &v1.FormatterConfig{
+				Format: v1.Ini,
+				FormatterAction: v1.FormatterAction{IniConfig: &v1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			}},
@@ -138,7 +139,7 @@ func TestOnlineUpdateParamsHandle(t *testing.T) {
 
 	type args struct {
 		tplScriptPath string
-		formatConfig  *appsv1alpha1.FormatterConfig
+		formatConfig  *v1.FormatterConfig
 		dataType      string
 		dsn           string
 	}
@@ -151,8 +152,8 @@ func TestOnlineUpdateParamsHandle(t *testing.T) {
 		name: "online_update_params_handle_test",
 		args: args{
 			tplScriptPath: filepath.Join(tmpTestData, partroniPath),
-			formatConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.Properties,
+			formatConfig: &v1.FormatterConfig{
+				Format: v1.Properties,
 			},
 			dsn:      server.URL,
 			dataType: "patroni",
@@ -237,13 +238,13 @@ var _ = Describe("ReloadUtil Test", func() {
 	AfterEach(func() {
 	})
 
-	createIniFormatter := func(sectionName string) *appsv1alpha1.FormatterConfig {
-		return &appsv1alpha1.FormatterConfig{
-			FormatterOptions: appsv1alpha1.FormatterOptions{
-				IniConfig: &appsv1alpha1.IniConfig{
+	createIniFormatter := func(sectionName string) *v1.FormatterConfig {
+		return &v1.FormatterConfig{
+			FormatterAction: v1.FormatterAction{
+				IniConfig: &v1.IniConfig{
 					SectionName: sectionName,
 				}},
-			Format: appsv1alpha1.Ini,
+			Format: v1.Ini,
 		}
 	}
 
@@ -353,7 +354,7 @@ var _ = Describe("ReloadUtil Test", func() {
 							},
 							ConfigConstraintRef: "cc2",
 						},
-						ReloadType: appsv1alpha1.ShellType,
+						ReloadType: v1.ShellType,
 					},
 				}, {
 					ConfigSpecInfo: ConfigSpecInfo{
@@ -364,7 +365,7 @@ var _ = Describe("ReloadUtil Test", func() {
 							},
 							ConfigConstraintRef: "cc3",
 						},
-						ReloadType: appsv1alpha1.TPLScriptType,
+						ReloadType: v1.TPLScriptType,
 					}}},
 				want: false,
 			}, {
@@ -378,7 +379,7 @@ var _ = Describe("ReloadUtil Test", func() {
 							},
 							ConfigConstraintRef: "cc1",
 						},
-						ReloadType: appsv1alpha1.UnixSignalType,
+						ReloadType: v1.UnixSignalType,
 					},
 				}, {
 					ConfigSpecInfo: ConfigSpecInfo{
@@ -389,7 +390,7 @@ var _ = Describe("ReloadUtil Test", func() {
 							},
 							ConfigConstraintRef: "cc3",
 						},
-						ReloadType: appsv1alpha1.TPLScriptType,
+						ReloadType: v1.TPLScriptType,
 					}}},
 				want: true,
 			}}

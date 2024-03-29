@@ -25,13 +25,13 @@ import (
 	"github.com/StudioSol/set"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
 
 // CreateConfigPatch creates a patch for configuration files with different version.
-func CreateConfigPatch(oldVersion, newVersion map[string]string, format appsv1alpha1.CfgFileFormat, keys []string, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
+func CreateConfigPatch(oldVersion, newVersion map[string]string, format v1.CfgFileFormat, keys []string, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
 	var hasFilesUpdated = false
 
 	if comparableAllFiles && len(keys) > 0 {
@@ -67,7 +67,7 @@ func checkExcludeConfigDifference(oldVersion map[string]string, newVersion map[s
 	return false
 }
 
-func LoadRawConfigObject(data map[string]string, formatConfig *appsv1alpha1.FormatterConfig, keys []string) (map[string]unstructured.ConfigObject, error) {
+func LoadRawConfigObject(data map[string]string, formatConfig *v1.FormatterConfig, keys []string) (map[string]unstructured.ConfigObject, error) {
 	r := make(map[string]unstructured.ConfigObject)
 	cmKeySet := FromCMKeysSelector(keys)
 	for key, val := range data {
@@ -83,7 +83,7 @@ func LoadRawConfigObject(data map[string]string, formatConfig *appsv1alpha1.Form
 	return r, nil
 }
 
-func FromConfigObject(name, config string, formatConfig *appsv1alpha1.FormatterConfig) (unstructured.ConfigObject, error) {
+func FromConfigObject(name, config string, formatConfig *v1.FormatterConfig) (unstructured.ConfigObject, error) {
 	configObject, err := unstructured.LoadConfig(name, config, formatConfig.Format)
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func FromConfigObject(name, config string, formatConfig *appsv1alpha1.FormatterC
 // TransformConfigFileToKeyValueMap transforms a config file in appsv1alpha1.CfgFileFormat format to a map in which the key is config name and the value is config value
 // sectionName means the desired section of config file, such as [mysqld] section.
 // If config file has no section structure, sectionName should be default to get all values in this config file.
-func TransformConfigFileToKeyValueMap(fileName string, formatterConfig *appsv1alpha1.FormatterConfig, configData []byte) (map[string]string, error) {
+func TransformConfigFileToKeyValueMap(fileName string, formatterConfig *v1.FormatterConfig, configData []byte) (map[string]string, error) {
 	oldData := map[string]string{
 		fileName: "",
 	}

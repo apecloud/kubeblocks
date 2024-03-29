@@ -27,7 +27,7 @@ import (
 	"github.com/StudioSol/set"
 	"github.com/spf13/cast"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
@@ -229,9 +229,9 @@ func NewCfgOptions(filename string, options ...Option) CfgOpOption {
 	return context
 }
 
-func WithFormatterConfig(formatConfig *appsv1alpha1.FormatterConfig) Option {
+func WithFormatterConfig(formatConfig *v1.FormatterConfig) Option {
 	return func(ctx *CfgOpOption) {
-		if formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
+		if formatConfig.Format == v1.Ini && formatConfig.IniConfig != nil {
 			ctx.IniContext = &IniContext{
 				SectionName: formatConfig.IniConfig.SectionName,
 			}
@@ -239,8 +239,8 @@ func WithFormatterConfig(formatConfig *appsv1alpha1.FormatterConfig) Option {
 	}
 }
 
-func NestedPrefixField(formatConfig *appsv1alpha1.FormatterConfig) string {
-	if formatConfig != nil && formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
+func NestedPrefixField(formatConfig *v1.FormatterConfig) string {
+	if formatConfig != nil && formatConfig.Format == v1.Ini && formatConfig.IniConfig != nil {
 		return formatConfig.IniConfig.SectionName
 	}
 	return ""
@@ -304,7 +304,7 @@ func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
 	return cmKeySet
 }
 
-func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig, sets *set.LinkedHashSetString) []VisualizedParam {
+func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *v1.FormatterConfig, sets *set.LinkedHashSetString) []VisualizedParam {
 	if !configPatch.IsModify {
 		return nil
 	}

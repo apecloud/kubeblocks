@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package core
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 )
 
@@ -90,7 +90,7 @@ func difference(base *cfgWrapper, target *cfgWrapper) (*ConfigPatchInfo, error) 
 	return reconfigureInfo, nil
 }
 
-func TransformConfigPatchFromData(data map[string]string, format appsv1alpha1.CfgFileFormat, keys []string) (*ConfigPatchInfo, error) {
+func TransformConfigPatchFromData(data map[string]string, format appsv1.CfgFileFormat, keys []string) (*ConfigPatchInfo, error) {
 	emptyData := func(m map[string]string) map[string]string {
 		r := make(map[string]string, len(m))
 		for key := range m {

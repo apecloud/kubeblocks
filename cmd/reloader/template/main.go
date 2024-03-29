@@ -32,7 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -124,7 +124,7 @@ func main() {
 	}
 
 	mergePolicy, err := configuration.NewTemplateMerger(configRenderMeta.LegacyRenderedConfigSpec.ConfigTemplateExtension,
-		context.TODO(), nil, nil, *configRenderMeta.ComponentConfigSpec, &appsv1alpha1.ConfigConstraintSpec{
+		context.TODO(), nil, nil, *configRenderMeta.ComponentConfigSpec, &appsv1.ConfigConstraintSpec{
 			FormatterConfig: &configRenderMeta.FormatterConfig,
 		})
 	if err != nil {

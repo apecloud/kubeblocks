@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // GetParameterFromConfiguration gets configure parameter
@@ -42,7 +42,7 @@ func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, f
 	wrapCfg, err := NewConfigLoader(CfgOption{
 		Type:           CfgCmType,
 		Log:            log.FromContext(context.Background()),
-		CfgType:        appsv1alpha1.Ini,
+		CfgType:        appsv1.Ini,
 		ConfigResource: FromConfigData(configMap.Data, nil),
 	})
 	if err != nil {

@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -78,7 +78,7 @@ func trimNestedField(updatedParams any, trimField string) (any, error) {
 }
 
 // ValidateConfigPatch Verifies if the changed parameters have been removed
-func ValidateConfigPatch(patch *ConfigPatchInfo, formatCfg *appsv1alpha1.FormatterConfig) error {
+func ValidateConfigPatch(patch *ConfigPatchInfo, formatCfg *appsv1.FormatterConfig) error {
 	if !patch.IsModify || len(patch.UpdateConfig) == 0 {
 		return nil
 	}
@@ -95,7 +95,7 @@ func ValidateConfigPatch(patch *ConfigPatchInfo, formatCfg *appsv1alpha1.Formatt
 }
 
 // IsUpdateDynamicParameters checks if the changed parameters require a restart
-func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *ConfigPatchInfo) (bool, error) {
+func IsUpdateDynamicParameters(cc *appsv1.ConfigConstraintSpec, cfg *ConfigPatchInfo) (bool, error) {
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil
 	}
@@ -135,7 +135,7 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 }
 
 // IsDynamicParameter checks if the parameter supports hot update
-func IsDynamicParameter(paramName string, cc *appsv1alpha1.ConfigConstraintSpec) bool {
+func IsDynamicParameter(paramName string, cc *appsv1.ConfigConstraintSpec) bool {
 	if len(cc.DynamicParameters) != 0 {
 		return slices.Contains(cc.DynamicParameters, paramName)
 	}

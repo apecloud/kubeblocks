@@ -28,7 +28,8 @@
               "type": "integer",
               "default": 1,
               "maximum": 65535,
-              "minimum": 1
+              "minimum": 0,
+              "exclusiveMinimum": true
             },
             "automatic_sp_privileges": {
               "description": "[OFF|ON] default ON",

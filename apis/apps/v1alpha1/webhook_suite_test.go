@@ -28,10 +28,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	// +kubebuilder:scaffold:imports
 	"go.uber.org/zap/zapcore"
@@ -129,19 +130,25 @@ var _ = BeforeSuite(func() {
 	// start webhook server using Manager
 	webhookInstallOptions := &testEnv.WebhookInstallOptions
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme,
-		Host:               webhookInstallOptions.LocalServingHost,
-		Port:               webhookInstallOptions.LocalServingPort,
-		CertDir:            webhookInstallOptions.LocalServingCertDir,
-		LeaderElection:     false,
-		MetricsBindAddress: "0",
-		ClientDisableCacheFor: []client.Object{
-			&storagev1.StorageClass{},
-			&ClusterDefinition{},
-			&Cluster{},
-			&ClusterVersion{},
-			&OpsRequest{},
-			&appsv1.ConfigConstraint{},
+		Scheme:         scheme,
+		LeaderElection: false,
+		Metrics:        server.Options{BindAddress: "0"},
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Host:    webhookInstallOptions.LocalServingHost,
+			Port:    webhookInstallOptions.LocalServingPort,
+			CertDir: webhookInstallOptions.LocalServingCertDir,
+		}),
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{
+					&storagev1.StorageClass{},
+					&ClusterDefinition{},
+					&Cluster{},
+					&ClusterVersion{},
+					&OpsRequest{},
+					&appsv1.ConfigConstraint{},
+				},
+			},
 		},
 	})
 	Expect(err).NotTo(HaveOccurred())

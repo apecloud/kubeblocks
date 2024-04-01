@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
@@ -635,8 +636,8 @@ var _ = Describe("Addon controller", func() {
 		It("Do controller SetupWithManager init. flow", func() {
 			By("check SetupWithManager")
 			k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-				Scheme:             scheme.Scheme,
-				MetricsBindAddress: "0",
+				Scheme:  scheme.Scheme,
+				Metrics: server.Options{BindAddress: "0"},
 			})
 			Expect(err).ToNot(HaveOccurred())
 			reconciler := &AddonReconciler{

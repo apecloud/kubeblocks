@@ -31,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func Setup(scheme *runtime.Scheme, cli client.Client, kubeConfig, contexts string) (Manager, error) {
@@ -127,7 +129,7 @@ func clientOptions(scheme *runtime.Scheme, ctx string, config *rest.Config) (cli
 		Mapper:     mapper,
 		Cache: &client.CacheOptions{
 			Unstructured: false,
-			DisableFor:   []client.Object{},
+			DisableFor:   intctrlutil.GetUncachedObjects(),
 		},
 	}, nil
 }

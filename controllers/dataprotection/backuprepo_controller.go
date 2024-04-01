@@ -65,6 +65,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -740,6 +741,7 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 	job.Name = reconCtx.preCheckResourceName()
 	job.Namespace = namespace
 	_, err = createObjectIfNotExist(reconCtx.Ctx, r.Client, job, func() error {
+		runAsUser := int64(0)
 		job.Spec = batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
@@ -755,6 +757,10 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 							Name:      "backup-pvc",
 							MountPath: "/backup",
 						}},
+						SecurityContext: &corev1.SecurityContext{
+							AllowPrivilegeEscalation: boolptr.False(),
+							RunAsUser:                &runAsUser,
+						},
 					}},
 					Volumes: []corev1.Volume{{
 						Name: "backup-pvc",
@@ -814,6 +820,7 @@ func (r *BackupRepoReconciler) runPreCheckJobForTool(reconCtx *reconcileContext,
 	job.Name = reconCtx.preCheckResourceName()
 	job.Namespace = namespace
 	_, err = createObjectIfNotExist(reconCtx.Ctx, r.Client, job, func() error {
+		runAsUser := int64(0)
 		job.Spec = batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
@@ -828,6 +835,10 @@ func (r *BackupRepoReconciler) runPreCheckJobForTool(reconCtx *reconcileContext,
 set -ex
 export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
 echo "pre-check" | datasafed push - %s`, precheckFilePath),
+						},
+						SecurityContext: &corev1.SecurityContext{
+							AllowPrivilegeEscalation: boolptr.False(),
+							RunAsUser:                &runAsUser,
 						},
 					}},
 					ServiceAccountName: saName,

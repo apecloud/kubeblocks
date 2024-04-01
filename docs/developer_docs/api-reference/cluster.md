@@ -5656,6 +5656,19 @@ map[string]string
 More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer">https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer</a>.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>podService</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether to generate individual services for each pod.
+If set to true, a separate service will be created for each pod in the cluster.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec
@@ -5871,7 +5884,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>Services expose endpoints that can be accessed by clients.</p>
+<p>Services overrides services defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -9348,6 +9361,19 @@ port: 80
 targetPort: 8080
 </code></pre>
 <p>Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>autoProvision</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the service should be automatically provisioned.
+If not specified, the default behavior is to automatically provision the service.</p>
 </td>
 </tr>
 </tbody>
@@ -18223,8 +18249,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
-if GeneratePodOrdinalService sets to true, RoleSelector will be ignored.</p>
+<p>RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.</p>
 </td>
 </tr>
 </tbody>
@@ -18823,35 +18848,6 @@ ServiceVars
 <p>
 (Members of <code>ServiceVars</code> are embedded into this type.)
 </p>
-</td>
-</tr>
-<tr>
-<td>
-<code>generatePodOrdinalServiceVar</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.
-If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.
-They can be referred to by adding the PodOrdinal to the defined name template with named pattern <code>$(Vars[x].Name)_$(PodOrdinal)</code>.
-For example, a ServiceVarRef might be defined as follows:</p>
-<pre><code class="language-yaml">
-name: MY_SERVICE_PORT
-valueFrom:
-serviceVarRef:
-compDef: my-component-definition
-name: my-service
-optional: true
-generatePodOrdinalServiceVar: true
-port:
-name: redis-sentinel
-</code></pre>
-<p>Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,
-and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
-It should be used in conjunction with Service.GeneratePodOrdinalService.</p>
 </td>
 </tr>
 </tbody>

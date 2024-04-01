@@ -11700,14 +11700,19 @@ spec:
                       description: 'If ServiceType is LoadBalancer, cloud provider
                         related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                       type: object
+                    autoProvision:
+                      description: Indicates whether the service should be automatically
+                        provisioned. If not specified, the default behavior is to
+                        automatically provision the service.
+                      type: boolean
                     generatePodOrdinalService:
                       default: false
-                      description: "GeneratePodOrdinalService indicates whether to
-                        create a corresponding Service for each Pod of the selected
-                        Component. If sets to true, a set of Service will be automatically
-                        generated for each Pod. And Service.RoleSelector will be ignored.
-                        They can be referred to by adding the PodOrdinal to the defined
-                        ServiceName with named pattern `$(Service.ServiceName)-$(PodOrdinal)`.
+                      description: "TODO: delete GeneratePodOrdinalService indicates
+                        whether to create a corresponding Service for each Pod of
+                        the selected Component. If sets to true, a set of Service
+                        will be automatically generated for each Pod. And Service.RoleSelector
+                        will be ignored. They can be referred to by adding the PodOrdinal
+                        to the defined ServiceName with named pattern `$(Service.ServiceName)-$(PodOrdinal)`.
                         And the Service.Name will also be generated with named pattern
                         `$(Service.Name)-$(PodOrdinal)`. The PodOrdinal is zero-based,
                         and the number of generated Services is equal to the number
@@ -11728,8 +11733,6 @@ spec:
                     roleSelector:
                       description: RoleSelector extends the ServiceSpec.Selector by
                         allowing you to specify defined role as selector for the service.
-                        if GeneratePodOrdinalService sets to true, RoleSelector will
-                        be ignored.
                       type: string
                     serviceName:
                       description: "ServiceName defines the name of the underlying
@@ -12521,26 +12524,6 @@ spec:
                                 the component that the referent object resident in.
                                 If not specified, the component itself will be used.
                               type: string
-                            generatePodOrdinalServiceVar:
-                              default: false
-                              description: "GeneratePodOrdinalServiceVar indicates
-                                whether to create a corresponding ServiceVars reference
-                                variable for each Pod. If set to true, a set of ServiceVars
-                                that can be referenced will be automatically generated
-                                for each Pod Ordinal. They can be referred to by adding
-                                the PodOrdinal to the defined name template with named
-                                pattern `$(Vars[x].Name)_$(PodOrdinal)`. For example,
-                                a ServiceVarRef might be defined as follows: \n ```yaml
-                                \n name: MY_SERVICE_PORT valueFrom: serviceVarRef:
-                                compDef: my-component-definition name: my-service
-                                optional: true generatePodOrdinalServiceVar: true
-                                port: name: redis-sentinel \n ``` \n Assuming that
-                                the Component has 3 replicas, then you can reference
-                                the port of existing services named my-service-0,
-                                my-service-1, and my-service-2 with $MY_SERVICE_PORT_0,
-                                $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
-                                It should be used in conjunction with Service.GeneratePodOrdinalService."
-                              type: boolean
                             host:
                               description: VarOption defines whether a variable is
                                 required or optional.

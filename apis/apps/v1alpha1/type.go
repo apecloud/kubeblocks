@@ -785,6 +785,7 @@ type ClusterService struct {
 type ComponentService struct {
 	Service `json:",inline"`
 
+	// TODO: delete
 	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
 	// If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.
 	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern `$(Service.ServiceName)-$(PodOrdinal)`.
@@ -809,6 +810,12 @@ type ComponentService struct {
 	// +kubebuilder:default=false
 	// +optional
 	GeneratePodOrdinalService bool `json:"generatePodOrdinalService,omitempty"`
+
+	// Indicates whether the service should be automatically provisioned.
+	// If not specified, the default behavior is to automatically provision the service.
+	//
+	// +optional
+	AutoProvision *bool `json:"autoProvision,omitempty"`
 }
 
 type Service struct {
@@ -842,7 +849,6 @@ type Service struct {
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 
 	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
-	// if GeneratePodOrdinalService sets to true, RoleSelector will be ignored.
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
 }
@@ -1001,32 +1007,6 @@ type ServiceVarSelector struct {
 	ClusterObjectReference `json:",inline"`
 
 	ServiceVars `json:",inline"`
-
-	// GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.
-	// If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.
-	// They can be referred to by adding the PodOrdinal to the defined name template with named pattern `$(Vars[x].Name)_$(PodOrdinal)`.
-	// For example, a ServiceVarRef might be defined as follows:
-	//
-	// ```yaml
-	//
-	// name: MY_SERVICE_PORT
-	// valueFrom:
-	//   serviceVarRef:
-	//     compDef: my-component-definition
-	//     name: my-service
-	//     optional: true
-	//     generatePodOrdinalServiceVar: true
-	//     port:
-	//       name: redis-sentinel
-	//
-	// ```
-	//
-	// Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,
-	// and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
-	// It should be used in conjunction with Service.GeneratePodOrdinalService.
-	// +kubebuilder:default=false
-	// +optional
-	GeneratePodOrdinalServiceVar bool `json:"generatePodOrdinalServiceVar,omitempty"`
 }
 
 // CredentialVarSelector selects a var from a Credential (SystemAccount).

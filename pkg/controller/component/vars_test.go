@@ -32,6 +32,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -45,6 +46,7 @@ type mockReader struct {
 }
 
 func (r *mockReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+
 	for _, o := range r.objs {
 		// ignore the GVK check
 		if client.ObjectKeyFromObject(o) == key {
@@ -56,6 +58,28 @@ func (r *mockReader) Get(ctx context.Context, key client.ObjectKey, obj client.O
 }
 
 func (r *mockReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	items := reflect.ValueOf(list).Elem().FieldByName("Items")
+	if !items.IsValid() {
+		return fmt.Errorf("ObjectList has no Items field: %s", list.GetObjectKind().GroupVersionKind().String())
+	}
+	objects := reflect.MakeSlice(items.Type(), 0, 0)
+
+	listOpts := &client.ListOptions{}
+	for _, opt := range opts {
+		opt.ApplyToList(listOpts)
+	}
+	for i, o := range r.objs {
+		// ignore the GVK check
+		if listOpts.LabelSelector != nil {
+			if listOpts.LabelSelector.Matches(labels.Set(o.GetLabels())) {
+				objects = reflect.Append(objects, reflect.ValueOf(r.objs[i]).Elem())
+			}
+		}
+	}
+	if objects.Len() != 0 {
+		items.Set(objects)
+		return nil
+	}
 	return r.cli.List(ctx, list, opts...)
 }
 
@@ -566,11 +590,25 @@ var _ = Describe("vars", func() {
 			By("pod service")
 			vars = []appsv1alpha1.EnvVar{
 				{
-					Name: "service-node-port",
+					Name: "pod-service-endpoint",
 					ValueFrom: &appsv1alpha1.VarSource{
 						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								Name:     "service-node-port",
+								Name:     "pod-service",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
+					Name: "pod-service-port",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "pod-service",
 								Optional: required(),
 							},
 							ServiceVars: appsv1alpha1.ServiceVars{
@@ -579,13 +617,12 @@ var _ = Describe("vars", func() {
 									Option: &appsv1alpha1.VarRequired,
 								},
 							},
-							GeneratePodOrdinalServiceVar: true,
 						},
 					},
 				},
 			}
-			svcName0 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "service-node-port-0")
-			svcName1 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "service-node-port-1")
+			svcName0 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "pod-service-0")
+			svcName1 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "pod-service-1")
 			reader = &mockReader{
 				cli: testCtx.Cli,
 				objs: []client.Object{
@@ -593,6 +630,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      svcName0,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeNodePort,
@@ -609,6 +647,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      svcName1,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeNodePort,
@@ -623,11 +662,10 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-			synthesizedComp.Replicas = 2
 			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
-			checkEnvVarWithValue(envVars, "service-node-port_0", "300001")
-			checkEnvVarWithValue(envVars, "service-node-port_1", "300002")
+			checkEnvVarWithValue(envVars, "pod-service-endpoint", strings.Join([]string{svcName0, svcName1}, ","))
+			checkEnvVarWithValue(envVars, "pod-service-port", strings.Join([]string{"300001", "300002"}, ","))
 		})
 
 		It("credential vars", func() {

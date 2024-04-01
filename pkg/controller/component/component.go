@@ -90,7 +90,6 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetMonitor(compSpec.Monitor).
 		SetServiceAccountName(compSpec.ServiceAccountName).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
-		SetServices(compSpec.Services).
 		SetEnabledLogs(compSpec.EnabledLogs).
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetClassRef(compSpec.ClassDefRef).
@@ -101,6 +100,9 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 	}
 	if annotations != nil {
 		compBuilder.AddAnnotationsInMap(annotations)
+	}
+	if !IsGenerated(compBuilder.GetObject()) {
+		compBuilder.SetServices(compSpec.Services)
 	}
 	return compBuilder.GetObject(), nil
 }

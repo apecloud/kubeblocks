@@ -129,7 +129,7 @@ func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()
 
-	if len(service.RoleSelector) > 0 {
+	if len(service.RoleSelector) > 0 && (service.PodService == nil || !*service.PodService) {
 		if err := t.checkRoleSelector(synthesizeComp, service.Name, service.RoleSelector); err != nil {
 			return nil, err
 		}

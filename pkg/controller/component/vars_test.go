@@ -46,7 +46,6 @@ type mockReader struct {
 }
 
 func (r *mockReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-
 	for _, o := range r.objs {
 		// ignore the GVK check
 		if client.ObjectKeyFromObject(o) == key {

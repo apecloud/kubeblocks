@@ -407,8 +407,6 @@ func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv
 			if svc.DisableAutoProvision != nil {
 				svc.DisableAutoProvision = func() *bool { b := false; return &b }()
 			}
-		} else if svc.DisableAutoProvision != nil {
-			svc.DisableAutoProvision = func() *bool { b := true; return &b }()
 		}
 	}
 	for i := range synthesizeComp.ComponentServices {

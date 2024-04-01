@@ -78,7 +78,7 @@ var _ = Describe("Config Builder Test", func() {
 				Name:      "pg_config",
 			}}
 	}
-	newReloadOptions := func(t appsv1beta1.CfgReloadType, sync *bool) *appsv1beta1.DynamicReloadAction {
+	newReloadOptions := func(t appsv1beta1.DynamicReloadType, sync *bool) *appsv1beta1.DynamicReloadAction {
 		signalHandle := &appsv1beta1.UnixSignalTrigger{
 			ProcessName: "postgres",
 			Signal:      appsv1beta1.SIGHUP,

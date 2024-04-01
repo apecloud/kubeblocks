@@ -42,7 +42,7 @@ type configVolumeHandleMeta struct {
 	ConfigHandler
 
 	mountPoint []string
-	reloadType appsv1beta1.CfgReloadType
+	reloadType appsv1beta1.DynamicReloadType
 	configSpec appsv1alpha1.ComponentTemplateSpec
 
 	formatterConfig *appsv1beta1.FormatterConfig
@@ -346,7 +346,7 @@ func (s *shellCommandHandler) isDownwardAPITrigger() bool {
 	return s.downwardAPITrigger
 }
 
-func createConfigVolumeMeta(configSpecName string, reloadType appsv1beta1.CfgReloadType, mountPoint []string, formatterConfig *appsv1beta1.FormatterConfig) configVolumeHandleMeta {
+func createConfigVolumeMeta(configSpecName string, reloadType appsv1beta1.DynamicReloadType, mountPoint []string, formatterConfig *appsv1beta1.FormatterConfig) configVolumeHandleMeta {
 	return configVolumeHandleMeta{
 		reloadType: reloadType,
 		mountPoint: mountPoint,

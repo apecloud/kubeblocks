@@ -77,29 +77,29 @@ func IsAutoReload(reload *appsv1beta1.DynamicReloadAction) bool {
 	return reload != nil && reload.AutoTrigger != nil
 }
 
-func FromReloadTypeConfig(reloadOptions *appsv1beta1.DynamicReloadAction) appsv1beta1.CfgReloadType {
+func FromReloadTypeConfig(reloadAction *appsv1beta1.DynamicReloadAction) appsv1beta1.DynamicReloadType {
 	switch {
-	case reloadOptions.UnixSignalTrigger != nil:
+	case reloadAction.UnixSignalTrigger != nil:
 		return appsv1beta1.UnixSignalType
-	case reloadOptions.ShellTrigger != nil:
+	case reloadAction.ShellTrigger != nil:
 		return appsv1beta1.ShellType
-	case reloadOptions.TPLScriptTrigger != nil:
+	case reloadAction.TPLScriptTrigger != nil:
 		return appsv1beta1.TPLScriptType
-	case reloadOptions.AutoTrigger != nil:
+	case reloadAction.AutoTrigger != nil:
 		return appsv1beta1.AutoType
 	}
 	return ""
 }
 
-func ValidateReloadOptions(reloadOptions *appsv1beta1.DynamicReloadAction, cli client.Client, ctx context.Context) error {
+func ValidateReloadOptions(reloadAction *appsv1beta1.DynamicReloadAction, cli client.Client, ctx context.Context) error {
 	switch {
-	case reloadOptions.UnixSignalTrigger != nil:
-		return checkSignalTrigger(reloadOptions.UnixSignalTrigger)
-	case reloadOptions.ShellTrigger != nil:
-		return checkShellTrigger(reloadOptions.ShellTrigger)
-	case reloadOptions.TPLScriptTrigger != nil:
-		return checkTPLScriptTrigger(reloadOptions.TPLScriptTrigger, cli, ctx)
-	case reloadOptions.AutoTrigger != nil:
+	case reloadAction.UnixSignalTrigger != nil:
+		return checkSignalTrigger(reloadAction.UnixSignalTrigger)
+	case reloadAction.ShellTrigger != nil:
+		return checkShellTrigger(reloadAction.ShellTrigger)
+	case reloadAction.TPLScriptTrigger != nil:
+		return checkTPLScriptTrigger(reloadAction.TPLScriptTrigger, cli, ctx)
+	case reloadAction.AutoTrigger != nil:
 		return nil
 	}
 	return core.MakeError("require special reload type!")

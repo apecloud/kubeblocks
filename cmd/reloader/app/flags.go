@@ -47,7 +47,7 @@ const (
 	localhostAddress         = "127.0.0.1"
 )
 
-var allNotifyType = map[NotifyEventType]appsv1beta1.CfgReloadType{
+var allNotifyType = map[NotifyEventType]appsv1beta1.DynamicReloadType{
 	UnixSignal: appsv1beta1.UnixSignalType,
 	ShellTool:  appsv1beta1.ShellType,
 	TPLScript:  appsv1beta1.TPLScriptType,

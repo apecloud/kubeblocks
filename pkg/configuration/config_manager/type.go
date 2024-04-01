@@ -37,7 +37,7 @@ type ConfigHandler interface {
 type ConfigSpecInfo struct {
 	*appsv1beta1.DynamicReloadAction `json:",inline"`
 
-	ReloadType      appsv1beta1.CfgReloadType        `json:"reloadType"`
+	ReloadType      appsv1beta1.DynamicReloadType    `json:"reloadType"`
 	ConfigSpec      appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
 	FormatterConfig appsv1beta1.FormatterConfig      `json:"formatterConfig"`
 

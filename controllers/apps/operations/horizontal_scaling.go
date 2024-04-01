@@ -70,13 +70,13 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		if horizontalScaling, ok = horizontalScalingMap[component.Name]; !ok {
 			continue
 		}
-		r := horizontalScaling.Replicas
-		opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
 		instances, err := buildInstances(opsRes.Cluster.Name, opsRes.Cluster.Spec.ComponentSpecs[index], horizontalScaling)
 		if err != nil {
 			return nil
 		}
 		opsRes.Cluster.Spec.ComponentSpecs[index].Instances = instances
+		r := horizontalScaling.Replicas
+		opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }

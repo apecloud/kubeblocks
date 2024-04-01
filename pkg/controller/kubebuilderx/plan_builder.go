@@ -107,20 +107,13 @@ func (b *PlanBuilder) Build() (graph.Plan, error) {
 
 func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*model.ObjectVertex {
 	var vertices []*model.ObjectVertex
-	newVertex := func(oldObj, newObj client.Object, action *model.Action) *model.ObjectVertex {
-		return &model.ObjectVertex{
-			Obj:    newObj,
-			OriObj: oldObj,
-			Action: action,
-		}
-	}
 
 	// handle root object
 	if desiredTree.GetRoot() == nil {
-		root := newVertex(currentTree.GetRoot(), currentTree.GetRoot(), model.ActionDeletePtr())
+		root := model.NewObjectVertex(currentTree.GetRoot(), currentTree.GetRoot(), model.ActionDeletePtr())
 		vertices = append(vertices, root)
 	} else {
-		root := newVertex(currentTree.GetRoot(), desiredTree.GetRoot(), model.ActionStatusPtr())
+		root := model.NewObjectVertex(currentTree.GetRoot(), desiredTree.GetRoot(), model.ActionStatusPtr())
 		vertices = append(vertices, root)
 		// if annotations, labels or finalizers updated, do both meta patch and status update.
 		if !reflect.DeepEqual(currentTree.GetRoot().GetAnnotations(), desiredTree.GetRoot().GetAnnotations()) ||
@@ -128,7 +121,7 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 			!reflect.DeepEqual(currentTree.GetRoot().GetFinalizers(), desiredTree.GetRoot().GetFinalizers()) {
 			currentRoot, _ := currentTree.GetRoot().DeepCopyObject().(client.Object)
 			desiredRoot, _ := desiredTree.GetRoot().DeepCopyObject().(client.Object)
-			patchRoot := newVertex(currentRoot, desiredRoot, model.ActionPatchPtr())
+			patchRoot := model.NewObjectVertex(currentRoot, desiredRoot, model.ActionPatchPtr())
 			vertices = append(vertices, patchRoot)
 		}
 	}
@@ -159,7 +152,7 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 	}
 	createNewObjects := func() {
 		for name := range createSet {
-			v := newVertex(nil, newSnapshot[name], model.ActionCreatePtr())
+			v := model.NewObjectVertex(nil, newSnapshot[name], model.ActionCreatePtr(), inDataContext())
 			findAndAppend(v)
 		}
 	}
@@ -168,14 +161,14 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 			oldObj := oldSnapshot[name]
 			newObj := newSnapshot[name]
 			if !reflect.DeepEqual(oldObj, newObj) {
-				v := newVertex(oldObj, newObj, model.ActionUpdatePtr())
+				v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext())
 				findAndAppend(v)
 			}
 		}
 	}
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
-			v := newVertex(nil, oldSnapshot[name], model.ActionDeletePtr())
+			v := model.NewObjectVertex(nil, oldSnapshot[name], model.ActionDeletePtr(), inDataContext())
 			findAndAppend(v)
 		}
 	}

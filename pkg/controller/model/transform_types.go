@@ -80,6 +80,19 @@ func (v *ObjectVertex) String() string {
 	return fmt.Sprintf("{obj:%T, name: %s, action: %v}", v.Obj, v.Obj.GetName(), *v.Action)
 }
 
+func NewObjectVertex(oldObj, newObj client.Object, action *Action, opts ...GraphOption) *ObjectVertex {
+	graphOpts := &GraphOptions{}
+	for _, opt := range opts {
+		opt.ApplyTo(graphOpts)
+	}
+	return &ObjectVertex{
+		Obj:       newObj,
+		OriObj:    oldObj,
+		Action:    action,
+		ClientOpt: graphOpts.clientOpt,
+	}
+}
+
 type ObjectSnapshot map[GVKNObjKey]client.Object
 
 type RequeueError interface {

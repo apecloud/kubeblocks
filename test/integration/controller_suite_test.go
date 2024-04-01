@@ -43,8 +43,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	dpctrl "github.com/apecloud/kubeblocks/controllers/dataprotection"
@@ -160,7 +160,7 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 	By("Create a constraint obj")
 	constraint := testapps.CreateCustomizedObj(&testCtx,
 		mysqlConfigConstraintPath,
-		&v1.ConfigConstraint{})
+		&appsv1beta1.ConfigConstraint{})
 
 	mysqlVolumeMounts := []corev1.VolumeMount{
 		{
@@ -257,7 +257,7 @@ var _ = BeforeSuite(func() {
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = v1.AddToScheme(scheme.Scheme)
+	err = appsv1beta1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = dpv1alpha1.AddToScheme(scheme.Scheme)

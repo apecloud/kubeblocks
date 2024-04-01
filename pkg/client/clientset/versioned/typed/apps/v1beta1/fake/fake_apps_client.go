@@ -19,22 +19,22 @@ limitations under the License.
 package fake
 
 import (
-	v1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1"
+	v1beta1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1beta1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeAppsV1 struct {
+type FakeAppsV1beta1 struct {
 	*testing.Fake
 }
 
-func (c *FakeAppsV1) ConfigConstraints() v1.ConfigConstraintInterface {
+func (c *FakeAppsV1beta1) ConfigConstraints() v1beta1.ConfigConstraintInterface {
 	return &FakeConfigConstraints{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAppsV1) RESTClient() rest.Interface {
+func (c *FakeAppsV1beta1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

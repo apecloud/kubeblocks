@@ -34,8 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -121,9 +121,9 @@ func withConfigSpec(configSpecName string, data map[string]string) ParamsOps {
 	}
 }
 
-func withConfigConstraintSpec(formatter *v1.FormatterConfig) ParamsOps {
+func withConfigConstraintSpec(formatter *appsv1beta1.FormatterConfig) ParamsOps {
 	return func(params *reconfigureParams) {
-		params.ConfigConstraint = &v1.ConfigConstraintSpec{
+		params.ConfigConstraint = &appsv1beta1.ConfigConstraintSpec{
 			FormatterConfig: formatter,
 		}
 	}

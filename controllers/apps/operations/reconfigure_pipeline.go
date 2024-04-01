@@ -22,8 +22,8 @@ package operations
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
@@ -51,7 +51,7 @@ type pipeline struct {
 	isFileUpdated     bool
 
 	updatedObject    *appsv1alpha1.Configuration
-	configConstraint *v1.ConfigConstraint
+	configConstraint *appsv1beta1.ConfigConstraint
 	configSpec       *appsv1alpha1.ComponentConfigSpec
 
 	reconfigureContext
@@ -108,7 +108,7 @@ func (p *pipeline) ConfigConstraints() *pipeline {
 		ccKey := client.ObjectKey{
 			Name: p.configSpec.ConfigConstraintRef,
 		}
-		p.configConstraint = &v1.ConfigConstraint{}
+		p.configConstraint = &appsv1beta1.ConfigConstraint{}
 		return p.cli.Get(p.reqCtx.Ctx, ccKey, p.configConstraint)
 	}
 

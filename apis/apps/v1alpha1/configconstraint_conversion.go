@@ -27,14 +27,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 )
 
 var logger = logf.Log.WithName("application-resource")
 
 func (cc *ConfigConstraint) ConvertTo(dstRaw conversion.Hub) error {
 	logger.Info("Conversion Webhook: From v1alpha1 to v1")
-	ccv1, ok := dstRaw.(*appsv1.ConfigConstraint)
+	ccv1, ok := dstRaw.(*appsv1beta1.ConfigConstraint)
 	if !ok {
 		return errors.New("invalid destination object")
 	}
@@ -43,14 +43,14 @@ func (cc *ConfigConstraint) ConvertTo(dstRaw conversion.Hub) error {
 
 func (cc *ConfigConstraint) ConvertFrom(srcRaw conversion.Hub) error {
 	logger.Info("Conversion Webhook: From v1 to v1beta1")
-	ccv1, ok := srcRaw.(*appsv1.ConfigConstraint)
+	ccv1, ok := srcRaw.(*appsv1beta1.ConfigConstraint)
 	if !ok {
 		return errors.New("invalid source object")
 	}
 	return convertFromImpl(ccv1, cc)
 }
 
-func convertToImpl(cc *ConfigConstraint, ccv1 *appsv1.ConfigConstraint) error {
+func convertToImpl(cc *ConfigConstraint, ccv1 *appsv1beta1.ConfigConstraint) error {
 	convertObjectMeta(cc.ObjectMeta, ccv1)
 	convertToConstraintSpec(&cc.Spec, &ccv1.Spec)
 	return nil
@@ -61,7 +61,7 @@ func convertObjectMeta(src metav1.ObjectMeta, dst client.Object) {
 	dst.SetAnnotations(src.GetAnnotations())
 }
 
-func convertToConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1.ConfigConstraintSpec) {
+func convertToConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1beta1.ConfigConstraintSpec) {
 	ccv1.DynamicActionCanBeMerged = cc.DynamicActionCanBeMerged
 	ccv1.DynamicParameterSelectedPolicy = cc.DynamicParameterSelectedPolicy
 	ccv1.ReloadToolsImage = cc.ToolsImageSpec
@@ -77,22 +77,22 @@ func convertToConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1.ConfigConstr
 	convertSchema(cc.ConfigurationSchema, ccv1)
 }
 
-func convertSchema(schema *CustomParametersValidation, ccv1 *appsv1.ConfigConstraintSpec) {
+func convertSchema(schema *CustomParametersValidation, ccv1 *appsv1beta1.ConfigConstraintSpec) {
 	if schema != nil {
 		return
 	}
 
-	ccv1.ConfigSchema = &appsv1.ConfigSchema{
+	ccv1.ConfigSchema = &appsv1beta1.ConfigSchema{
 		CUE:          schema.CUE,
 		SchemaInJSON: schema.Schema,
 	}
 }
 
-func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1.ConfigConstraintSpec) {
+func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1beta1.ConfigConstraintSpec) {
 	if options != nil {
 		return
 	}
-	ccv1.DynamicReloadAction = &appsv1.DynamicReloadAction{
+	ccv1.DynamicReloadAction = &appsv1beta1.DynamicReloadAction{
 		UnixSignalTrigger: options.UnixSignalTrigger,
 		ShellTrigger:      options.ShellTrigger,
 		TPLScriptTrigger:  options.TPLScriptTrigger,
@@ -100,13 +100,13 @@ func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1.ConfigConst
 	}
 }
 
-func convertFromImpl(ccv1 *appsv1.ConfigConstraint, cc *ConfigConstraint) error {
+func convertFromImpl(ccv1 *appsv1beta1.ConfigConstraint, cc *ConfigConstraint) error {
 	convertObjectMeta(ccv1.ObjectMeta, cc)
 	convertFromConstraintSpec(&ccv1.Spec, &cc.Spec)
 	return nil
 }
 
-func convertFromConstraintSpec(ccv1 *appsv1.ConfigConstraintSpec, cc *ConfigConstraintSpec) {
+func convertFromConstraintSpec(ccv1 *appsv1beta1.ConfigConstraintSpec, cc *ConfigConstraintSpec) {
 	cc.DynamicActionCanBeMerged = ccv1.DynamicActionCanBeMerged
 	cc.DynamicParameterSelectedPolicy = ccv1.DynamicParameterSelectedPolicy
 	cc.ToolsImageSpec = ccv1.ReloadToolsImage

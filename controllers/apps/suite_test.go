@@ -40,6 +40,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -118,6 +119,10 @@ var _ = BeforeSuite(func() {
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(appsv1alpha1.AddToScheme)
+
+	err = appsv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	model.AddScheme(appsv1.AddToScheme)
 
 	err = dpv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())

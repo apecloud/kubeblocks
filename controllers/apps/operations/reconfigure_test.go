@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -79,12 +80,12 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	}
 
-	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
+	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *v1.ConfigConstraint) {
 		By("Assuring an cm obj")
 		cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
 			&corev1.ConfigMap{}, testapps.WithNamespacedName(cmName, ns))
 		cfgTpl := testapps.NewCustomizedObj("operations_config/config-constraint.yaml",
-			&appsv1alpha1.ConfigConstraint{}, testapps.WithNamespacedName(tplName, ns))
+			&v1.ConfigConstraint{}, testapps.WithNamespacedName(tplName, ns))
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
 

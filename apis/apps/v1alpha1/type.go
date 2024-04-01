@@ -261,28 +261,6 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
-// ConfigConstraintPhase defines the ConfigConstraint  CR .status.phase
-// +enum
-// +kubebuilder:validation:Enum={Available,Unavailable, Deleting}
-type ConfigConstraintPhase string
-
-const (
-	CCAvailablePhase   ConfigConstraintPhase = "Available"
-	CCUnavailablePhase ConfigConstraintPhase = "Unavailable"
-	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
-)
-
-// DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions
-//
-// +enum
-// +kubebuilder:validation:Enum={all,dynamic}
-type DynamicParameterSelectedPolicy string
-
-const (
-	SelectedAllParameters     DynamicParameterSelectedPolicy = "all"
-	SelectedDynamicParameters DynamicParameterSelectedPolicy = "dynamic"
-)
-
 // OpsPhase defines opsRequest phase.
 // +enum
 // +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
@@ -653,24 +631,6 @@ type webhookManager struct {
 	client client.Client
 }
 
-// CfgFileFormat defines formatter of configuration files.
-// +enum
-// +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties,redis,props-plus}
-type CfgFileFormat string
-
-const (
-	Ini            CfgFileFormat = "ini"
-	YAML           CfgFileFormat = "yaml"
-	JSON           CfgFileFormat = "json"
-	XML            CfgFileFormat = "xml"
-	HCL            CfgFileFormat = "hcl"
-	Dotenv         CfgFileFormat = "dotenv"
-	TOML           CfgFileFormat = "toml"
-	Properties     CfgFileFormat = "properties"
-	RedisCfg       CfgFileFormat = "redis"
-	PropertiesPlus CfgFileFormat = "props-plus"
-)
-
 // UpgradePolicy defines the policy of reconfiguring.
 // +enum
 // +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate,dynamicReloadBeginRestart}
@@ -684,58 +644,6 @@ const (
 	AsyncDynamicReloadPolicy      UpgradePolicy = "autoReload"
 	SyncDynamicReloadPolicy       UpgradePolicy = "operatorSyncUpdate"
 	DynamicReloadAndRestartPolicy UpgradePolicy = "dynamicReloadBeginRestart"
-)
-
-// CfgReloadType defines reload method.
-// +enum
-type CfgReloadType string
-
-const (
-	UnixSignalType CfgReloadType = "signal"
-	SQLType        CfgReloadType = "sql"
-	ShellType      CfgReloadType = "exec"
-	HTTPType       CfgReloadType = "http"
-	TPLScriptType  CfgReloadType = "tpl"
-	AutoType       CfgReloadType = "auto"
-)
-
-// SignalType defines which signals are valid.
-// +enum
-// +kubebuilder:validation:Enum={SIGHUP,SIGINT,SIGQUIT,SIGILL,SIGTRAP,SIGABRT,SIGBUS,SIGFPE,SIGKILL,SIGUSR1,SIGSEGV,SIGUSR2,SIGPIPE,SIGALRM,SIGTERM,SIGSTKFLT,SIGCHLD,SIGCONT,SIGSTOP,SIGTSTP,SIGTTIN,SIGTTOU,SIGURG,SIGXCPU,SIGXFSZ,SIGVTALRM,SIGPROF,SIGWINCH,SIGIO,SIGPWR,SIGSYS}
-type SignalType string
-
-const (
-	SIGHUP    SignalType = "SIGHUP"
-	SIGINT    SignalType = "SIGINT"
-	SIGQUIT   SignalType = "SIGQUIT"
-	SIGILL    SignalType = "SIGILL"
-	SIGTRAP   SignalType = "SIGTRAP"
-	SIGABRT   SignalType = "SIGABRT"
-	SIGBUS    SignalType = "SIGBUS"
-	SIGFPE    SignalType = "SIGFPE"
-	SIGKILL   SignalType = "SIGKILL"
-	SIGUSR1   SignalType = "SIGUSR1"
-	SIGSEGV   SignalType = "SIGSEGV"
-	SIGUSR2   SignalType = "SIGUSR2"
-	SIGPIPE   SignalType = "SIGPIPE"
-	SIGALRM   SignalType = "SIGALRM"
-	SIGTERM   SignalType = "SIGTERM"
-	SIGSTKFLT SignalType = "SIGSTKFLT"
-	SIGCHLD   SignalType = "SIGCHLD"
-	SIGCONT   SignalType = "SIGCONT"
-	SIGSTOP   SignalType = "SIGSTOP"
-	SIGTSTP   SignalType = "SIGTSTP"
-	SIGTTIN   SignalType = "SIGTTIN"
-	SIGTTOU   SignalType = "SIGTTOU"
-	SIGURG    SignalType = "SIGURG"
-	SIGXCPU   SignalType = "SIGXCPU"
-	SIGXFSZ   SignalType = "SIGXFSZ"
-	SIGVTALRM SignalType = "SIGVTALRM"
-	SIGPROF   SignalType = "SIGPROF"
-	SIGWINCH  SignalType = "SIGWINCH"
-	SIGIO     SignalType = "SIGIO"
-	SIGPWR    SignalType = "SIGPWR"
-	SIGSYS    SignalType = "SIGSYS"
 )
 
 // IssuerName defines the name of the TLS certificates issuer.
@@ -1137,9 +1045,10 @@ type ServiceRefVarSelector struct {
 	ServiceRefVars `json:",inline"`
 }
 
-// ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.
+// ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.
 type ClusterObjectReference struct {
 	// CompDef specifies the definition used by the component that the referent object resident in.
+	// If not specified, the component itself will be used.
 	// +optional
 	CompDef string `json:"compDef,omitempty"`
 
@@ -1150,4 +1059,83 @@ type ClusterObjectReference struct {
 	// Specify whether the object must be defined.
 	// +optional
 	Optional *bool `json:"optional,omitempty"`
+
+	// This option defines the behavior when multiple component objects match the specified @CompDef.
+	// If not provided, an error will be raised when handling multiple matches.
+	//
+	// +optional
+	MultipleClusterObjectOption *MultipleClusterObjectOption `json:"multipleClusterObjectOption,omitempty"`
+}
+
+// MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.
+type MultipleClusterObjectOption struct {
+	// Define the strategy for handling multiple cluster objects.
+	// +required
+	Strategy MultipleClusterObjectStrategy `json:"strategy"`
+
+	// Define the options for handling combined variables.
+	// Valid only when the strategy is set to "combined".
+	//
+	// +optional
+	CombinedOption *MultipleClusterObjectCombinedOption `json:"combinedOption,omitempty"`
+}
+
+// MultipleClusterObjectStrategy defines the strategy for handling multiple cluster objects.
+// +enum
+// +kubebuilder:validation:Enum={individual,combined}
+type MultipleClusterObjectStrategy string
+
+const (
+	// MultipleClusterObjectStrategyIndividual - each matched component will have its individual variable with its name
+	// as the suffix.
+	// This is required when referencing credential variables that cannot be passed by values.
+	MultipleClusterObjectStrategyIndividual MultipleClusterObjectStrategy = "individual"
+
+	// MultipleClusterObjectStrategyCombined - the values from all matched components will be combined into a single
+	// variable using the specified option.
+	MultipleClusterObjectStrategyCombined MultipleClusterObjectStrategy = "combined"
+)
+
+// MultipleClusterObjectCombinedOption defines options for handling combined variables.
+type MultipleClusterObjectCombinedOption struct {
+	// If set, the existing variable will be kept, and a new variable will be defined with the specified suffix
+	// in pattern: <var.name>_<suffix>.
+	// The new variable will be auto-created and placed behind the existing one.
+	// If not set, the existing variable will be reused with the value format defined below.
+	//
+	// +optional
+	NewVarSuffix *string `json:"newVarSuffix,omitempty"`
+
+	// The format of the value that the operator will use to compose values from multiple components.
+	//
+	// +kubebuilder:default="Flatten"
+	// +optional
+	ValueFormat MultipleClusterObjectValueFormat `json:"valueFormat,omitempty"`
+
+	// The flatten format, default is: <comp-name-1>:value,<comp-name-2>:value.
+	//
+	// +optional
+	FlattenFormat *MultipleClusterObjectValueFormatFlatten `json:"flattenFormat,omitempty"`
+}
+
+// MultipleClusterObjectValueFormat defines the format details for the value.
+type MultipleClusterObjectValueFormat string
+
+const (
+	FlattenFormat MultipleClusterObjectValueFormat = "Flatten"
+)
+
+// MultipleClusterObjectValueFormatFlatten defines the flatten format for the value.
+type MultipleClusterObjectValueFormatFlatten struct {
+	// Pair delimiter.
+	//
+	// +kubebuilder:default=","
+	// +required
+	Delimiter string `json:"delimiter"`
+
+	// Key-value delimiter.
+	//
+	// +kubebuilder:default=":"
+	// +required
+	KeyValueDelimiter string `json:"keyValueDelimiter"`
 }

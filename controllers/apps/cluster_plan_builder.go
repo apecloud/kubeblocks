@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
@@ -121,6 +122,7 @@ func init() {
 	model.AddScheme(extensionsv1alpha1.AddToScheme)
 	model.AddScheme(workloadsv1alpha1.AddToScheme)
 	model.AddScheme(storagev1alpha1.AddToScheme)
+	model.AddScheme(v1.AddToScheme)
 }
 
 // PlanBuilder implementation

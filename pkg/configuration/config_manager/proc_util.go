@@ -25,7 +25,7 @@ import (
 
 	"github.com/shirou/gopsutil/v3/process"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -71,7 +71,7 @@ func findParentPIDByProcessName(processName string, ctx ...context.Context) (PID
 	return InvalidPID, cfgcore.MakeError("cannot find pid of process name: [%s]", processName)
 }
 
-func IsValidUnixSignal(sig appsv1alpha1.SignalType) bool {
+func IsValidUnixSignal(sig appsv1.SignalType) bool {
 	_, ok := allUnixSignals[sig]
 	return ok
 }

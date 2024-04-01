@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -78,12 +79,12 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 	return nil
 }
 
-func getConfigConstraint(template appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (*appsv1alpha1.ConfigConstraintSpec, error) {
+func getConfigConstraint(template appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (*v1.ConfigConstraintSpec, error) {
 	ccKey := client.ObjectKey{
 		Namespace: "",
 		Name:      template.ConfigConstraintRef,
 	}
-	cc := &appsv1alpha1.ConfigConstraint{}
+	cc := &v1.ConfigConstraint{}
 	if err := cli.Get(ctx, ccKey, cc); err != nil {
 		return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 	}
@@ -93,7 +94,7 @@ func getConfigConstraint(template appsv1alpha1.ComponentConfigSpec, cli client.C
 	return &cc.Spec, nil
 }
 
-func fromConfigmapFiles(keys []string, cm *corev1.ConfigMap, formatter *appsv1alpha1.FormatterConfig) (map[string]string, error) {
+func fromConfigmapFiles(keys []string, cm *corev1.ConfigMap, formatter *v1.FormatterConfig) (map[string]string, error) {
 	mergeMap := func(dst, src map[string]string) {
 		for key, val := range src {
 			dst[key] = val
@@ -176,7 +177,7 @@ func injectEnvFrom(containers []corev1.Container, asEnvFrom []string, cmName str
 	}
 }
 
-func fromFileContent(format *appsv1alpha1.FormatterConfig, configContext string) (map[string]string, error) {
+func fromFileContent(format *v1.FormatterConfig, configContext string) (map[string]string, error) {
 	keyValue, err := validate.LoadConfigObjectFromContent(format.Format, configContext)
 	if err != nil {
 		return nil, err
@@ -196,7 +197,7 @@ func fromConfigSpec(configSpec appsv1alpha1.ComponentConfigSpec, cm *corev1.Conf
 	return keys
 }
 
-func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1alpha1.ConfigConstraintSpec, cli client.Client, ctx context.Context) error {
+func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *v1.ConfigConstraintSpec, cli client.Client, ctx context.Context) error {
 	if len(configSpec.AsEnvFrom) == 0 || cc == nil || cc.FormatterConfig == nil {
 		return nil
 	}

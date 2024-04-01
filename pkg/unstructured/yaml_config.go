@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cast"
 	"gopkg.in/yaml.v2"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type yamlConfig struct {
@@ -35,7 +35,7 @@ type yamlConfig struct {
 }
 
 func init() {
-	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.YAML, func(name string) ConfigObject {
+	CfgObjectRegistry().RegisterConfigCreator(appsv1.YAML, func(name string) ConfigObject {
 		return &yamlConfig{name: name}
 	})
 }

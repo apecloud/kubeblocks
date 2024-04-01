@@ -12231,7 +12231,61 @@ spec:
                             compDef:
                               description: CompDef specifies the definition used by
                                 the component that the referent object resident in.
+                                If not specified, the component itself will be used.
                               type: string
+                            multipleClusterObjectOption:
+                              description: This option defines the behavior when multiple
+                                component objects match the specified @CompDef. If
+                                not provided, an error will be raised when handling
+                                multiple matches.
+                              properties:
+                                combinedOption:
+                                  description: Define the options for handling combined
+                                    variables. Valid only when the strategy is set
+                                    to "combined".
+                                  properties:
+                                    flattenFormat:
+                                      description: 'The flatten format, default is:
+                                        <comp-name-1>:value,<comp-name-2>:value.'
+                                      properties:
+                                        delimiter:
+                                          default: ','
+                                          description: Pair delimiter.
+                                          type: string
+                                        keyValueDelimiter:
+                                          default: ':'
+                                          description: Key-value delimiter.
+                                          type: string
+                                      required:
+                                      - delimiter
+                                      - keyValueDelimiter
+                                      type: object
+                                    newVarSuffix:
+                                      description: 'If set, the existing variable
+                                        will be kept, and a new variable will be defined
+                                        with the specified suffix in pattern: <var.name>_<suffix>.
+                                        The new variable will be auto-created and
+                                        placed behind the existing one. If not set,
+                                        the existing variable will be reused with
+                                        the value format defined below.'
+                                      type: string
+                                    valueFormat:
+                                      default: Flatten
+                                      description: The format of the value that the
+                                        operator will use to compose values from multiple
+                                        components.
+                                      type: string
+                                  type: object
+                                strategy:
+                                  description: Define the strategy for handling multiple
+                                    cluster objects.
+                                  enum:
+                                  - individual
+                                  - combined
+                                  type: string
+                              required:
+                              - strategy
+                              type: object
                             name:
                               description: Name of the referent object.
                               type: string
@@ -12259,6 +12313,7 @@ spec:
                             compDef:
                               description: CompDef specifies the definition used by
                                 the component that the referent object resident in.
+                                If not specified, the component itself will be used.
                               type: string
                             container:
                               description: ContainerVars defines the vars can be referenced
@@ -12282,6 +12337,59 @@ spec:
                                   type: object
                               required:
                               - name
+                              type: object
+                            multipleClusterObjectOption:
+                              description: This option defines the behavior when multiple
+                                component objects match the specified @CompDef. If
+                                not provided, an error will be raised when handling
+                                multiple matches.
+                              properties:
+                                combinedOption:
+                                  description: Define the options for handling combined
+                                    variables. Valid only when the strategy is set
+                                    to "combined".
+                                  properties:
+                                    flattenFormat:
+                                      description: 'The flatten format, default is:
+                                        <comp-name-1>:value,<comp-name-2>:value.'
+                                      properties:
+                                        delimiter:
+                                          default: ','
+                                          description: Pair delimiter.
+                                          type: string
+                                        keyValueDelimiter:
+                                          default: ':'
+                                          description: Key-value delimiter.
+                                          type: string
+                                      required:
+                                      - delimiter
+                                      - keyValueDelimiter
+                                      type: object
+                                    newVarSuffix:
+                                      description: 'If set, the existing variable
+                                        will be kept, and a new variable will be defined
+                                        with the specified suffix in pattern: <var.name>_<suffix>.
+                                        The new variable will be auto-created and
+                                        placed behind the existing one. If not set,
+                                        the existing variable will be reused with
+                                        the value format defined below.'
+                                      type: string
+                                    valueFormat:
+                                      default: Flatten
+                                      description: The format of the value that the
+                                        operator will use to compose values from multiple
+                                        components.
+                                      type: string
+                                  type: object
+                                strategy:
+                                  description: Define the strategy for handling multiple
+                                    cluster objects.
+                                  enum:
+                                  - individual
+                                  - combined
+                                  type: string
+                              required:
+                              - strategy
                               type: object
                             name:
                               description: Name of the referent object.
@@ -12315,6 +12423,7 @@ spec:
                             compDef:
                               description: CompDef specifies the definition used by
                                 the component that the referent object resident in.
+                                If not specified, the component itself will be used.
                               type: string
                             endpoint:
                               description: VarOption defines whether a variable is
@@ -12323,6 +12432,59 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            multipleClusterObjectOption:
+                              description: This option defines the behavior when multiple
+                                component objects match the specified @CompDef. If
+                                not provided, an error will be raised when handling
+                                multiple matches.
+                              properties:
+                                combinedOption:
+                                  description: Define the options for handling combined
+                                    variables. Valid only when the strategy is set
+                                    to "combined".
+                                  properties:
+                                    flattenFormat:
+                                      description: 'The flatten format, default is:
+                                        <comp-name-1>:value,<comp-name-2>:value.'
+                                      properties:
+                                        delimiter:
+                                          default: ','
+                                          description: Pair delimiter.
+                                          type: string
+                                        keyValueDelimiter:
+                                          default: ':'
+                                          description: Key-value delimiter.
+                                          type: string
+                                      required:
+                                      - delimiter
+                                      - keyValueDelimiter
+                                      type: object
+                                    newVarSuffix:
+                                      description: 'If set, the existing variable
+                                        will be kept, and a new variable will be defined
+                                        with the specified suffix in pattern: <var.name>_<suffix>.
+                                        The new variable will be auto-created and
+                                        placed behind the existing one. If not set,
+                                        the existing variable will be reused with
+                                        the value format defined below.'
+                                      type: string
+                                    valueFormat:
+                                      default: Flatten
+                                      description: The format of the value that the
+                                        operator will use to compose values from multiple
+                                        components.
+                                      type: string
+                                  type: object
+                                strategy:
+                                  description: Define the strategy for handling multiple
+                                    cluster objects.
+                                  enum:
+                                  - individual
+                                  - combined
+                                  type: string
+                              required:
+                              - strategy
+                              type: object
                             name:
                               description: Name of the referent object.
                               type: string
@@ -12357,6 +12519,7 @@ spec:
                             compDef:
                               description: CompDef specifies the definition used by
                                 the component that the referent object resident in.
+                                If not specified, the component itself will be used.
                               type: string
                             generatePodOrdinalServiceVar:
                               default: false
@@ -12385,6 +12548,59 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            multipleClusterObjectOption:
+                              description: This option defines the behavior when multiple
+                                component objects match the specified @CompDef. If
+                                not provided, an error will be raised when handling
+                                multiple matches.
+                              properties:
+                                combinedOption:
+                                  description: Define the options for handling combined
+                                    variables. Valid only when the strategy is set
+                                    to "combined".
+                                  properties:
+                                    flattenFormat:
+                                      description: 'The flatten format, default is:
+                                        <comp-name-1>:value,<comp-name-2>:value.'
+                                      properties:
+                                        delimiter:
+                                          default: ','
+                                          description: Pair delimiter.
+                                          type: string
+                                        keyValueDelimiter:
+                                          default: ':'
+                                          description: Key-value delimiter.
+                                          type: string
+                                      required:
+                                      - delimiter
+                                      - keyValueDelimiter
+                                      type: object
+                                    newVarSuffix:
+                                      description: 'If set, the existing variable
+                                        will be kept, and a new variable will be defined
+                                        with the specified suffix in pattern: <var.name>_<suffix>.
+                                        The new variable will be auto-created and
+                                        placed behind the existing one. If not set,
+                                        the existing variable will be reused with
+                                        the value format defined below.'
+                                      type: string
+                                    valueFormat:
+                                      default: Flatten
+                                      description: The format of the value that the
+                                        operator will use to compose values from multiple
+                                        components.
+                                      type: string
+                                  type: object
+                                strategy:
+                                  description: Define the strategy for handling multiple
+                                    cluster objects.
+                                  enum:
+                                  - individual
+                                  - combined
+                                  type: string
+                              required:
+                              - strategy
+                              type: object
                             name:
                               description: Name of the referent object.
                               type: string

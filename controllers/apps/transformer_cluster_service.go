@@ -110,6 +110,11 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 
 // convertLegacyClusterCompSpecServices converts legacy services defined in Cluster.Spec.ComponentSpecs[x].Services to Cluster.Spec.Services.
 func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.ClusterService, error) {
+	// don't convert services if the cluster has defined in new API
+	if withClusterTopology(cluster) || withClusterUserDefined(cluster) {
+		return nil, nil
+	}
+
 	convertedServices := make([]appsv1alpha1.ClusterService, 0)
 	for _, compSpec := range transCtx.ComponentSpecs {
 		if len(compSpec.Services) == 0 {

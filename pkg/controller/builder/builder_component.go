@@ -114,6 +114,25 @@ func (builder *ComponentBuilder) SetVolumeClaimTemplates(volumeClaimTemplates []
 	return builder
 }
 
+func (builder *ComponentBuilder) SetServices(services []appsv1alpha1.ClusterComponentService) *ComponentBuilder {
+	toCompService := func(svc appsv1alpha1.ClusterComponentService) appsv1alpha1.ComponentService {
+		return appsv1alpha1.ComponentService{
+			Service: appsv1alpha1.Service{
+				Name:        svc.Name,
+				Annotations: svc.Annotations,
+				Spec: corev1.ServiceSpec{
+					Type: svc.ServiceType,
+				},
+			},
+			PodService: svc.PodService,
+		}
+	}
+	for _, svc := range services {
+		builder.get().Spec.Services = append(builder.get().Spec.Services, toCompService(svc))
+	}
+	return builder
+}
+
 func (builder *ComponentBuilder) SetServiceRefs(serviceRefs []appsv1alpha1.ServiceRef) *ComponentBuilder {
 	builder.get().Spec.ServiceRefs = serviceRefs
 	return builder

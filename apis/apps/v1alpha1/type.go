@@ -785,37 +785,19 @@ type ClusterService struct {
 type ComponentService struct {
 	Service `json:",inline"`
 
-	// TODO: delete
-	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
-	// If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.
-	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern `$(Service.ServiceName)-$(PodOrdinal)`.
-	// And the Service.Name will also be generated with named pattern `$(Service.Name)-$(PodOrdinal)`.
-	// The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.
-	// For example, a Service might be defined as follows:
+	// Indicates whether to generate individual services for each pod.
+	// If set to true, a separate service will be created for each pod in the component.
 	//
-	// ```yaml
-	// name: my-service
-	// serviceName: my-service
-	// generatePodOrdinalService: true
-	// spec:
-	//   type: NodePort
-	//   ports:
-	//   - name: http
-	//     port: 80
-	//     targetPort: 8080
-	// ```
-	//
-	// Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.
-	//
-	// +kubebuilder:default=false
 	// +optional
-	GeneratePodOrdinalService bool `json:"generatePodOrdinalService,omitempty"`
+	PodService *bool `json:"podService,omitempty"`
 
-	// Indicates whether the service should be automatically provisioned.
-	// If not specified, the default behavior is to automatically provision the service.
+	// Indicates whether the automatic provisioning of the service should be disabled.
+	//
+	// If set to true, the service will not be automatically created at the component provisioning.
+	// Instead, you can enable the creation of this service by specifying it explicitly in the cluster API.
 	//
 	// +optional
-	AutoProvision *bool `json:"autoProvision,omitempty"`
+	DisableAutoProvision *bool `json:"disableAutoProvision,omitempty"`
 }
 
 type Service struct {

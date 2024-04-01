@@ -66,6 +66,11 @@ type ComponentSpec struct {
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// To override services defined in referenced ComponentDefinition.
+	//
+	// +optional
+	Services []ComponentService `json:"services,omitempty"`
+
 	// Specifies the desired number of replicas for the component's workload.
 	//
 	// +kubebuilder:validation:Required

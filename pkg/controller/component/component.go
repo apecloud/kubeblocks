@@ -58,6 +58,11 @@ func GetClusterUID(comp *appsv1alpha1.Component) (string, error) {
 	return getCompLabelValue(comp, constant.KBAppClusterUIDLabelKey)
 }
 
+// IsGenerated checks if the component is generated from legacy cluster definitions.
+func IsGenerated(comp *appsv1alpha1.Component) bool {
+	return len(comp.Spec.CompDef) == 0
+}
+
 // BuildComponent builds a new Component object from cluster component spec and definition.
 func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec,
 	labels, annotations map[string]string) (*appsv1alpha1.Component, error) {
@@ -85,6 +90,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetMonitor(compSpec.Monitor).
 		SetServiceAccountName(compSpec.ServiceAccountName).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
+		SetServices(compSpec.Services).
 		SetEnabledLogs(compSpec.EnabledLogs).
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetClassRef(compSpec.ClassDefRef).

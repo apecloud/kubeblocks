@@ -2209,6 +2209,20 @@ Kubernetes core/v1.ResourceRequirements
 </tr>
 <tr>
 <td>
+<code>services</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
+[]ComponentService
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>To override services defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -9308,7 +9322,7 @@ In KB 0.8.0 and later versions, ComponentDefRef is the name of ComponentDefiniti
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentService">ComponentService
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
 </div>
@@ -9337,43 +9351,29 @@ Service
 </tr>
 <tr>
 <td>
-<code>generatePodOrdinalService</code><br/>
+<code>podService</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
-If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.
-They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <code>$(Service.ServiceName)-$(PodOrdinal)</code>.
-And the Service.Name will also be generated with named pattern <code>$(Service.Name)-$(PodOrdinal)</code>.
-The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.
-For example, a Service might be defined as follows:</p>
-<pre><code class="language-yaml">name: my-service
-serviceName: my-service
-generatePodOrdinalService: true
-spec:
-type: NodePort
-ports:
-- name: http
-port: 80
-targetPort: 8080
-</code></pre>
-<p>Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.</p>
+<p>Indicates whether to generate individual services for each pod.
+If set to true, a separate service will be created for each pod in the component.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>autoProvision</code><br/>
+<code>disableAutoProvision</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates whether the service should be automatically provisioned.
-If not specified, the default behavior is to automatically provision the service.</p>
+<p>Indicates whether the automatic provisioning of the service should be disabled.</p>
+<p>If set to true, the service will not be automatically created at the component provisioning.
+Instead, you can enable the creation of this service by specifying it explicitly in the cluster API.</p>
 </td>
 </tr>
 </tbody>
@@ -9476,6 +9476,20 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <em>(Optional)</em>
 <p>Information for statefulset.spec.volumeClaimTemplates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>services</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
+[]ComponentService
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>To override services defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>

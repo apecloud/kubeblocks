@@ -322,6 +322,7 @@ dataPlane:
 ## @param admissionWebhooks.ignoreReplicasCheck
 admissionWebhooks:
   enabled: false
+  conversionEnabled: true
   createSelfSignedCert: true
   ignoreReplicasCheck: false
 

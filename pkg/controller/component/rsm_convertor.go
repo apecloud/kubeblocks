@@ -141,8 +141,8 @@ func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *wo
 	return &workloads.InstanceTemplate{
 		Replicas:             instance.Replicas,
 		Name:                 instance.Name,
-		GenerateName:         instance.GenerateName,
 		OrdinalStart:         instance.OrdinalStart,
+		Offline:              instance.Offline,
 		Annotations:          instance.Annotations,
 		Labels:               instance.Labels,
 		Image:                instance.Image,

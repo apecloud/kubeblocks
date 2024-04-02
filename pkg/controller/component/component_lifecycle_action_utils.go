@@ -59,11 +59,19 @@ const (
 	kbLifecycleActionClusterPodHostNameList = "KB_CLUSTER_POD_HOST_NAME_LIST"
 	kbLifecycleActionClusterPodHostIPList   = "KB_CLUSTER_POD_HOST_IP_LIST"
 
-	kbLifecycleActionClusterCompList            = "KB_CLUSTER_COMPONENT_LIST"
 	kbLifecycleActionClusterCompPodNameList     = "KB_CLUSTER_COMPONENT_POD_NAME_LIST"
 	kbLifecycleActionClusterCompPodIPList       = "KB_CLUSTER_COMPONENT_POD_IP_LIST"
 	kbLifecycleActionClusterCompPodHostNameList = "KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST"
 	kbLifecycleActionClusterCompPodHostIPList   = "KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST"
+
+	// kbLifecycleActionClusterCompIsScalingIn indicates whether current component is scaling in
+	kbLifecycleActionClusterCompIsScalingIn = "KB_CLUSTER_COMPONENT_IS_SCALING_IN"
+	// kbLifecycleActionClusterCompList indicates all the components of the cluster
+	kbLifecycleActionClusterCompList = "KB_CLUSTER_COMPONENT_LIST"
+	// kbLifecycleActionClusterCompDeletingList indicates the components list which are deleting
+	kbLifecycleActionClusterCompDeletingList = "KB_CLUSTER_COMPONENT_DELETING_LIST"
+	// kbLifecycleActionClusterCompUndeletedList indicates the components list which are not deleted
+	kbLifecycleActionClusterCompUndeletedList = "KB_CLUSTER_COMPONENT_UNDELETED_LIST"
 )
 
 // createActionJobIfNotExist creates a job to execute component-level custom lifecycle action command, each component only has a corresponding job.
@@ -207,7 +215,7 @@ func renderActionCmdJob(ctx context.Context,
 		return job, nil
 	}
 
-	envs, envFroms, err := buildLifecycleActionEnvs(ctx, cli, cluster, action, pods, &tplPod)
+	envs, envFroms, err := buildLifecycleActionEnvs(ctx, cli, cluster, synthesizeComp, action, pods, &tplPod)
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +232,7 @@ func renderActionCmdJob(ctx context.Context,
 func buildLifecycleActionEnvs(ctx context.Context,
 	cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
+	synthesizeComp *SynthesizedComponent,
 	action *appsv1alpha1.Action,
 	pods []corev1.Pod,
 	tplPod *corev1.Pod) ([]corev1.EnvVar, []corev1.EnvFromSource, error) {
@@ -241,7 +250,7 @@ func buildLifecycleActionEnvs(ctx context.Context,
 		workloadEnvFroms = append(workloadEnvFroms, tplPod.Spec.Containers[0].EnvFrom...)
 	}
 
-	genEnvs, err := genClusterNComponentEnvs(ctx, cli, cluster, pods)
+	genEnvs, err := genClusterNComponentEnvs(ctx, cli, cluster, synthesizeComp, pods)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -253,33 +262,32 @@ func buildLifecycleActionEnvs(ctx context.Context,
 }
 
 // genClusterNComponentEnvs generates the cluster and component relative envs.
-func genClusterNComponentEnvs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, pods []corev1.Pod) ([]corev1.EnvVar, error) {
+func genClusterNComponentEnvs(ctx context.Context,
+	cli client.Reader,
+	cluster *appsv1alpha1.Cluster,
+	synthesizeComp *SynthesizedComponent,
+	pods []corev1.Pod) ([]corev1.EnvVar, error) {
 	if cluster == nil || (cluster.Spec.ComponentSpecs == nil && cluster.Spec.ShardingSpecs == nil) {
 		return nil, nil
 	}
 
-	compList := make([]string, 0)
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		compList = append(compList, compSpec.Name)
-	}
-
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		undeletedShardingCompNames, deletingShardingCompNames, err := intctrlutil.ListShardingCompNames(ctx, cli, cluster, &shardingSpec)
-		if err != nil {
-			return nil, err
-		}
-		compList = append(compList, undeletedShardingCompNames...)
-		compList = append(compList, deletingShardingCompNames...)
-	}
-
 	envs := make([]corev1.EnvVar, 0)
-	compEnvs, err := genComponentEnvs(pods)
+	podEnvs, err := genComponentPodEnvs(pods)
+	if err != nil {
+		return nil, err
+	}
+	envs = append(envs, podEnvs...)
+
+	compList, err := ListClusterComponents(ctx, cli, cluster)
+	if err != nil {
+		return nil, err
+	}
+	compEnvs, err := genComponentEnvs(synthesizeComp, compList)
 	if err != nil {
 		return nil, err
 	}
 	envs = append(envs, compEnvs...)
 
-	// TODO(xingran): need to differentiate undeleted comps and deleting comps?
 	clusterEnvs, err := genClusterEnvs(ctx, cli, cluster, compList)
 	if err != nil {
 		return nil, err
@@ -289,8 +297,25 @@ func genClusterNComponentEnvs(ctx context.Context, cli client.Reader, cluster *a
 	return envs, nil
 }
 
-// genComponentEnvs generates the current component scope relative envs.
-func genComponentEnvs(compPods []corev1.Pod) ([]corev1.EnvVar, error) {
+// genComponentEnvs generates the component relative envs.
+func genComponentEnvs(synthesizeComp *SynthesizedComponent, components []appsv1alpha1.Component) ([]corev1.EnvVar, error) {
+	compEnvs := make([]corev1.EnvVar, 0)
+	for _, comp := range components {
+		if comp.Name == synthesizeComp.Name {
+			scaleInVal, ok := comp.Annotations[constant.ComponentScaleInAnnotationKey]
+			if ok {
+				compEnvs = append(compEnvs, corev1.EnvVar{
+					Name:  kbLifecycleActionClusterCompIsScalingIn,
+					Value: scaleInVal,
+				})
+			}
+		}
+	}
+	return compEnvs, nil
+}
+
+// genComponentPodEnvs generates the component pod relative envs.
+func genComponentPodEnvs(compPods []corev1.Pod) ([]corev1.EnvVar, error) {
 	compEnvs := make([]corev1.EnvVar, 0)
 	compPodNameList := make([]string, 0, len(compPods))
 	compPodIPList := make([]string, 0, len(compPods))
@@ -325,10 +350,17 @@ func genComponentEnvs(compPods []corev1.Pod) ([]corev1.EnvVar, error) {
 }
 
 // genClusterEnvs generates the cluster scope relative envs.
-func genClusterEnvs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, clusterComps []string) ([]corev1.EnvVar, error) {
+func genClusterEnvs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, components []appsv1alpha1.Component) ([]corev1.EnvVar, error) {
 	clusterPods := make([]corev1.Pod, 0)
-	for _, compName := range clusterComps {
-		compPodList, err := GetComponentPodList(ctx, cli, *cluster, compName)
+	compNames := make([]string, len(components))
+	deletingCompNames := make([]string, len(components))
+	undeletedCompNames := make([]string, len(components))
+	for _, comp := range components {
+		compShortName, err := ShortName(cluster.Name, comp.Name)
+		if err != nil {
+			return nil, err
+		}
+		compPodList, err := GetComponentPodList(ctx, cli, *cluster, compShortName)
 		if err != nil {
 			return nil, err
 		}
@@ -336,6 +368,12 @@ func genClusterEnvs(ctx context.Context, cli client.Reader, cluster *appsv1alpha
 			continue
 		}
 		clusterPods = append(clusterPods, compPodList.Items...)
+		compNames = append(compNames, compShortName)
+		if model.IsObjectDeleting(&comp) {
+			deletingCompNames = append(deletingCompNames, compShortName)
+		} else {
+			undeletedCompNames = append(undeletedCompNames, compShortName)
+		}
 	}
 	clusterEnvs := make([]corev1.EnvVar, 0)
 	clusterPodNameList := make([]string, 0, len(clusterPods))
@@ -349,10 +387,20 @@ func genClusterEnvs(ctx context.Context, cli client.Reader, cluster *appsv1alpha
 		clusterPodHostNameList = append(clusterPodHostNameList, pod.Spec.NodeName)
 		clusterPodHostIPList = append(clusterPodHostIPList, pod.Status.HostIP)
 	}
-	clusterEnvs = append(clusterEnvs, corev1.EnvVar{
-		Name:  kbLifecycleActionClusterCompList,
-		Value: strings.Join(clusterComps, ","),
-	})
+	clusterEnvs = append(clusterEnvs, []corev1.EnvVar{
+		{
+			Name:  kbLifecycleActionClusterCompList,
+			Value: strings.Join(compNames, ","),
+		},
+		{
+			Name:  kbLifecycleActionClusterCompDeletingList,
+			Value: strings.Join(deletingCompNames, ","),
+		},
+		{
+			Name:  kbLifecycleActionClusterCompUndeletedList,
+			Value: strings.Join(undeletedCompNames, ","),
+		},
+	}...)
 	clusterEnvs = append(clusterEnvs, []corev1.EnvVar{
 		{
 			Name:  kbLifecycleActionClusterPodNameList,

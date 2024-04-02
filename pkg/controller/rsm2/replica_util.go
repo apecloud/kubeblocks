@@ -241,6 +241,8 @@ func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *w
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddControllerRevisionHashLabel(revision).
+		// HACK: add the pod name to the labels for the pod to be selected by pod service.
+		AddLabelsInMap(map[string]string{constant.StatefulSetPodNameLabelKey: name}).
 		SetPodSpec(*template.Spec.DeepCopy()).
 		GetObject()
 	// Set these immutable fields only on initial Pod creation, not updates.

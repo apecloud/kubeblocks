@@ -97,7 +97,7 @@ func (b *PlanBuilder) AddParallelTransformer(_ ...graph.Transformer) graph.PlanB
 }
 
 func (b *PlanBuilder) Build() (graph.Plan, error) {
-	vertices := buildOrderedVertices(b.currentTree, b.desiredTree)
+	vertices := buildOrderedVertices(b.transCtx.GetContext(), b.currentTree, b.desiredTree)
 	plan := &Plan{
 		walkFunc: b.rsmWalkFunc,
 		vertices: vertices,
@@ -105,7 +105,7 @@ func (b *PlanBuilder) Build() (graph.Plan, error) {
 	return plan, nil
 }
 
-func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*model.ObjectVertex {
+func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredTree *ObjectTree) []*model.ObjectVertex {
 	var vertices []*model.ObjectVertex
 
 	// handle root object
@@ -152,7 +152,7 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 	}
 	createNewObjects := func() {
 		for name := range createSet {
-			v := model.NewObjectVertex(nil, newSnapshot[name], model.ActionCreatePtr(), inDataContext())
+			v := model.NewObjectVertex(nil, assign(ctx, newSnapshot[name]), model.ActionCreatePtr(), inDataContext())
 			findAndAppend(v)
 		}
 	}
@@ -161,14 +161,14 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 			oldObj := oldSnapshot[name]
 			newObj := newSnapshot[name]
 			if !reflect.DeepEqual(oldObj, newObj) {
-				v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext())
+				v := model.NewObjectVertex(oldObj, assign(ctx, newObj), model.ActionUpdatePtr(), inDataContext())
 				findAndAppend(v)
 			}
 		}
 	}
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
-			v := model.NewObjectVertex(nil, oldSnapshot[name], model.ActionDeletePtr(), inDataContext())
+			v := model.NewObjectVertex(nil, assign(ctx, oldSnapshot[name]), model.ActionDeletePtr(), inDataContext())
 			findAndAppend(v)
 		}
 	}

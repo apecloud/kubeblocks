@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 // componentVarsTransformer resolves and builds vars for template and Env.
@@ -164,7 +165,7 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data
 		}
 	)
 	envObj := &corev1.ConfigMap{}
-	err := transCtx.Client.Get(transCtx.Context, envKey, envObj)
+	err := transCtx.Client.Get(transCtx.Context, envKey, envObj, multicluster.InDataContext())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -175,11 +176,11 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data
 			AddLabelsInMap(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 			SetData(data).
 			GetObject()
-		graphCli.Create(dag, obj)
+		graphCli.Create(dag, obj, inDataContext())
 	} else if !reflect.DeepEqual(envObj.Data, data) {
 		envObjCopy := envObj.DeepCopy()
 		envObjCopy.Data = data
-		graphCli.Update(dag, envObj, envObjCopy)
+		graphCli.Update(dag, envObj, envObjCopy, inDataContext())
 	}
 	return nil
 }

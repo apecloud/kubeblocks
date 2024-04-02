@@ -23,7 +23,10 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -90,10 +93,41 @@ func getMatchLabels(root client.Object, labelKeys []string) client.MatchingLabel
 }
 
 func placement(obj client.Object) string {
-	if obj.GetAnnotations() == nil {
+	if obj == nil || obj.GetAnnotations() == nil {
 		return ""
 	}
 	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
+}
+
+func assign(ctx context.Context, obj client.Object) client.Object {
+	switch obj.(type) {
+	// only handle Pod and PersistentVolumeClaim
+	case *corev1.Pod, *corev1.PersistentVolumeClaim:
+		break
+	default:
+		return obj
+	}
+
+	if obj.GetAnnotations() != nil && obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey] != "" {
+		return obj
+	}
+
+	p, err := multicluster.FromContext(ctx)
+	if err != nil {
+		panic(fmt.Sprintf("no placement was present in context: %v", err))
+	}
+	contexts := strings.Split(p, ",")
+
+	subs := strings.Split(obj.GetName(), "-")
+	ordinal, _ := strconv.Atoi(subs[len(subs)-1])
+	context := contexts[ordinal%len(contexts)]
+	if obj.GetAnnotations() == nil {
+		obj.SetAnnotations(map[string]string{constant.KBAppMultiClusterPlacementKey: context})
+	} else {
+		obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey] = context
+	}
+
+	return obj
 }
 
 func inDataContext() model.GraphOption {

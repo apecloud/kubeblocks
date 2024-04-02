@@ -96,7 +96,7 @@ func mergeMap(dst, src map[string]string) {
 }
 
 func placement(obj client.Object) string {
-	if obj.GetAnnotations() == nil {
+	if obj == nil || obj.GetAnnotations() == nil {
 		return ""
 	}
 	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]

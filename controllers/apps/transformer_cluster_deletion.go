@@ -104,7 +104,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	// add namespaced objects deletion vertex
 	namespacedObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, cluster.Namespace, ml, toDeleteNamespacedKinds)
 	if err != nil {
-		// TODO(leon)
+		// TODO(leon): PDB or CRDs that not present in data-plane clusters
 		if !strings.Contains(err.Error(), "the server could not find the requested resource") {
 			return err
 		}
@@ -114,7 +114,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	// add non-namespaced objects deletion vertex
 	nonNamespacedObjs, err := getOwningNonNamespacedObjects(transCtx.Context, transCtx.Client, ml, toDeleteNonNamespacedKinds)
 	if err != nil {
-		// TODO(leon)
+		// TODO(leon): PDB or CRDs that not present in data-plane clusters
 		if !strings.Contains(err.Error(), "the server could not find the requested resource") {
 			return err
 		}

@@ -107,8 +107,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	createNewObjects := func() {
 		for name := range createSet {
-			obj := newSnapshot[name]
-			cli.Create(dag, obj)
+			cli.Create(dag, newSnapshot[name])
 		}
 	}
 	updateObjects := func() {

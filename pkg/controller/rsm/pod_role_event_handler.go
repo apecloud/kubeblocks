@@ -135,9 +135,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 			}
 		}
 
-		// TODO(leon): sts name
-		// name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
-		name := strings.Join([]string{pod.Labels[constant.AppInstanceLabelKey], pod.Labels[constant.KBAppComponentLabelKey]}, "-")
+		name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
 		rsm := &workloads.ReplicatedStateMachine{}
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
 			return "", err
@@ -221,6 +219,6 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 		pod.Annotations = map[string]string{}
 	}
 	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	// TODO(placement): optimize
+	// TODO(leon): optimize the lookup
 	return cli.Patch(ctx, pod, patch, multicluster.InDataContextUnspecified())
 }

@@ -27,46 +27,17 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/go-logr/logr"
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
-
-type testTransCtx struct {
-	context.Context
-	model.GraphClient
-}
-
-var _ graph.TransformContext = &testTransCtx{}
-
-func (t *testTransCtx) GetContext() context.Context {
-	return t.Context
-}
-
-func (t *testTransCtx) GetClient() client.Reader {
-	return t.GraphClient
-}
-
-func (t *testTransCtx) GetRecorder() record.EventRecorder {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (t *testTransCtx) GetLogger() logr.Logger {
-	// TODO implement me
-	panic("implement me")
-}
 
 var _ = Describe("utils test", func() {
 	var priorityMap map[string]int

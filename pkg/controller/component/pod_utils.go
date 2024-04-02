@@ -21,18 +21,17 @@ package component
 
 import (
 	"context"
-	"slices"
 	"strconv"
-	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
-	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -84,25 +83,22 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 
 	// TODO(leon): sts
 	// check whether the underlying workload(sts) has sent the latest template to pods
-	sts := rsmcore.ConvertRSMToSTS(rsm)
-	// sts := &appsv1.StatefulSet{}
-	// if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
-	//	if apierrors.IsNotFound(err) {
-	//		return true, nil
-	//	}
-	//	return false, err
-	// }
+	sts := &appsv1.StatefulSet{}
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
 	if sts.Status.ObservedGeneration != sts.Generation {
 		return false, nil
 	}
-	updateRevisions := strings.Split(sts.Status.UpdateRevision, ",")
-
 	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels, multicluster.InDataContext())
 	if err != nil {
 		return false, err
 	}
 	for _, pod := range pods {
-		if !slices.Contains(updateRevisions, intctrlutil.GetPodRevision(pod)) {
+		if intctrlutil.GetPodRevision(pod) != sts.Status.UpdateRevision {
 			return false, nil
 		}
 	}

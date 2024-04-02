@@ -57,14 +57,9 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	transCtx.Cluster = cluster
 
 	if isGeneratedComponent(transCtx.ComponentOrig) {
-		err = t.transformForGeneratedComponent(transCtx)
-	} else {
-		err = t.transformForNativeComponent(transCtx)
+		return t.transformForGeneratedComponent(transCtx)
 	}
-	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
-	return nil
+	return t.transformForNativeComponent(transCtx)
 }
 
 func (t *componentLoadResourcesTransformer) transformForGeneratedComponent(transCtx *componentTransformContext) error {

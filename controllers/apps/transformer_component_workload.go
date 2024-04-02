@@ -622,8 +622,7 @@ func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.Persi
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
 			Namespace: r.cluster.Namespace,
-			// TODO(leon): sts name
-			Name: fmt.Sprintf("%s-%s-%d-%d", vctName, r.runningRSM.Name, i, 0),
+			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.runningRSM.Name, i),
 		}
 		pvcNotFound := false
 		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, multicluster.InDataContext()); err != nil {

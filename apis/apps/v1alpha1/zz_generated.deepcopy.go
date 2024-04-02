@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	apisappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -2639,24 +2639,24 @@ func (in *ConfigConstraintSpec) DeepCopyInto(out *ConfigConstraintSpec) {
 	}
 	if in.DynamicParameterSelectedPolicy != nil {
 		in, out := &in.DynamicParameterSelectedPolicy, &out.DynamicParameterSelectedPolicy
-		*out = new(apisappsv1.DynamicParameterSelectedPolicy)
+		*out = new(v1beta1.DynamicParameterSelectedPolicy)
 		**out = **in
 	}
 	if in.ToolsImageSpec != nil {
 		in, out := &in.ToolsImageSpec, &out.ToolsImageSpec
-		*out = new(apisappsv1.ReloadToolsImage)
+		*out = new(v1beta1.ReloadToolsImage)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.DownwardAPIOptions != nil {
 		in, out := &in.DownwardAPIOptions, &out.DownwardAPIOptions
-		*out = make([]apisappsv1.DownwardAction, len(*in))
+		*out = make([]v1beta1.DownwardAction, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.ScriptConfigs != nil {
 		in, out := &in.ScriptConfigs, &out.ScriptConfigs
-		*out = make([]apisappsv1.ScriptConfig, len(*in))
+		*out = make([]v1beta1.ScriptConfig, len(*in))
 		copy(*out, *in)
 	}
 	if in.ConfigurationSchema != nil {
@@ -2686,7 +2686,7 @@ func (in *ConfigConstraintSpec) DeepCopyInto(out *ConfigConstraintSpec) {
 	}
 	if in.FormatterConfig != nil {
 		in, out := &in.FormatterConfig, &out.FormatterConfig
-		*out = new(apisappsv1.FormatterConfig)
+		*out = new(v1beta1.FormatterConfig)
 		(*in).DeepCopyInto(*out)
 	}
 }
@@ -5107,22 +5107,22 @@ func (in *ReloadOptions) DeepCopyInto(out *ReloadOptions) {
 	*out = *in
 	if in.UnixSignalTrigger != nil {
 		in, out := &in.UnixSignalTrigger, &out.UnixSignalTrigger
-		*out = new(apisappsv1.UnixSignalTrigger)
+		*out = new(v1beta1.UnixSignalTrigger)
 		**out = **in
 	}
 	if in.ShellTrigger != nil {
 		in, out := &in.ShellTrigger, &out.ShellTrigger
-		*out = new(apisappsv1.ShellTrigger)
+		*out = new(v1beta1.ShellTrigger)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.TPLScriptTrigger != nil {
 		in, out := &in.TPLScriptTrigger, &out.TPLScriptTrigger
-		*out = new(apisappsv1.TPLScriptTrigger)
+		*out = new(v1beta1.TPLScriptTrigger)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.AutoTrigger != nil {
 		in, out := &in.AutoTrigger, &out.AutoTrigger
-		*out = new(apisappsv1.AutoTrigger)
+		*out = new(v1beta1.AutoTrigger)
 		**out = **in
 	}
 }

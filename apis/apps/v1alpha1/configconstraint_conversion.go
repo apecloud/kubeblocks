@@ -22,19 +22,18 @@ package v1alpha1
 import (
 	"errors"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var logger = logf.Log.WithName("application-resource")
 
 func (cc *ConfigConstraint) ConvertTo(dstRaw conversion.Hub) error {
-	logger.Info("Conversion Webhook: From v1alpha1 to v1")
-	ccv1, ok := dstRaw.(*appsv1.ConfigConstraint)
+	logger.Info("Conversion Webhook: from v1alpha1 to v1", "name", cc.Name)
+	ccv1, ok := dstRaw.(*appsv1beta1.ConfigConstraint)
 	if !ok {
 		return errors.New("invalid destination object")
 	}
@@ -42,26 +41,26 @@ func (cc *ConfigConstraint) ConvertTo(dstRaw conversion.Hub) error {
 }
 
 func (cc *ConfigConstraint) ConvertFrom(srcRaw conversion.Hub) error {
-	logger.Info("Conversion Webhook: From v1 to v1beta1")
-	ccv1, ok := srcRaw.(*appsv1.ConfigConstraint)
+	ccv1, ok := srcRaw.(*appsv1beta1.ConfigConstraint)
 	if !ok {
 		return errors.New("invalid source object")
 	}
+	logger.Info("Conversion Webhook: from v1 to v1alpha1", "name", ccv1.Name)
 	return convertFromImpl(ccv1, cc)
 }
 
-func convertToImpl(cc *ConfigConstraint, ccv1 *appsv1.ConfigConstraint) error {
-	convertObjectMeta(cc.ObjectMeta, ccv1)
+func convertToImpl(cc *ConfigConstraint, ccv1 *appsv1beta1.ConfigConstraint) error {
+	ccv1.ObjectMeta = cc.ObjectMeta
+	if ccv1.Annotations == nil {
+		ccv1.Annotations = make(map[string]string)
+	}
+	ccv1.Annotations[constant.KubeblocksAPIConversionTypeAnnotationName] = constant.MigratedAPIVersion
+	ccv1.Annotations[constant.SourceAPIVersionAnnotationName] = GroupVersion.Version
 	convertToConstraintSpec(&cc.Spec, &ccv1.Spec)
 	return nil
 }
 
-func convertObjectMeta(src metav1.ObjectMeta, dst client.Object) {
-	dst.SetLabels(src.GetLabels())
-	dst.SetAnnotations(src.GetAnnotations())
-}
-
-func convertToConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1.ConfigConstraintSpec) {
+func convertToConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1beta1.ConfigConstraintSpec) {
 	ccv1.DynamicActionCanBeMerged = cc.DynamicActionCanBeMerged
 	ccv1.DynamicParameterSelectedPolicy = cc.DynamicParameterSelectedPolicy
 	ccv1.ReloadToolsImage = cc.ToolsImageSpec
@@ -77,22 +76,21 @@ func convertToConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1.ConfigConstr
 	convertSchema(cc.ConfigurationSchema, ccv1)
 }
 
-func convertSchema(schema *CustomParametersValidation, ccv1 *appsv1.ConfigConstraintSpec) {
-	if schema != nil {
+func convertSchema(schema *CustomParametersValidation, ccv1 *appsv1beta1.ConfigConstraintSpec) {
+	if schema == nil {
 		return
 	}
-
-	ccv1.ConfigSchema = &appsv1.ConfigSchema{
+	ccv1.ConfigSchema = &appsv1beta1.ConfigSchema{
 		CUE:          schema.CUE,
 		SchemaInJSON: schema.Schema,
 	}
 }
 
-func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1.ConfigConstraintSpec) {
-	if options != nil {
+func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1beta1.ConfigConstraintSpec) {
+	if options == nil {
 		return
 	}
-	ccv1.DynamicReloadAction = &appsv1.DynamicReloadAction{
+	ccv1.DynamicReloadAction = &appsv1beta1.DynamicReloadAction{
 		UnixSignalTrigger: options.UnixSignalTrigger,
 		ShellTrigger:      options.ShellTrigger,
 		TPLScriptTrigger:  options.TPLScriptTrigger,
@@ -100,13 +98,24 @@ func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1.ConfigConst
 	}
 }
 
-func convertFromImpl(ccv1 *appsv1.ConfigConstraint, cc *ConfigConstraint) error {
-	convertObjectMeta(ccv1.ObjectMeta, cc)
+func convertFromImpl(ccv1 *appsv1beta1.ConfigConstraint, cc *ConfigConstraint) error {
+	cc.ObjectMeta = ccv1.ObjectMeta
+	if cc.Annotations == nil {
+		cc.Annotations = make(map[string]string)
+	}
+
+	vType, ok := ccv1.Annotations[constant.KubeblocksAPIConversionTypeAnnotationName]
+	if ok && vType == constant.MigratedAPIVersion && ccv1.Annotations[constant.SourceAPIVersionAnnotationName] == GroupVersion.Version {
+		cc.Annotations[constant.KubeblocksAPIConversionTypeAnnotationName] = constant.SourceAPIVersion
+	} else {
+		cc.Annotations[constant.KubeblocksAPIConversionTypeAnnotationName] = constant.ReviewAPIVersion
+	}
+
 	convertFromConstraintSpec(&ccv1.Spec, &cc.Spec)
 	return nil
 }
 
-func convertFromConstraintSpec(ccv1 *appsv1.ConfigConstraintSpec, cc *ConfigConstraintSpec) {
+func convertFromConstraintSpec(ccv1 *appsv1beta1.ConfigConstraintSpec, cc *ConfigConstraintSpec) {
 	cc.DynamicActionCanBeMerged = ccv1.DynamicActionCanBeMerged
 	cc.DynamicParameterSelectedPolicy = ccv1.DynamicParameterSelectedPolicy
 	cc.ToolsImageSpec = ccv1.ReloadToolsImage

@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 )
 
@@ -72,7 +72,7 @@ func TestConfigMapConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: v1.Ini,
+		CfgType: appsv1beta1.Ini,
 		ConfigResource: &ConfigResource{
 			CfgKey: client.ObjectKey{
 				Name:      "xxxx",    // set cm name
@@ -153,7 +153,7 @@ func TestConfigMapConfig(t *testing.T) {
 func TestGenerateVisualizedParamsList(t *testing.T) {
 	type args struct {
 		configPatch  *ConfigPatchInfo
-		formatConfig *v1.FormatterConfig
+		formatConfig *appsv1beta1.FormatterConfig
 		sets         *set.LinkedHashSetString
 	}
 
@@ -204,9 +204,9 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 			configPatch: &ConfigPatchInfo{
 				IsModify:     true,
 				UpdateConfig: map[string][]byte{"key": testUpdatedParams}},
-			formatConfig: &v1.FormatterConfig{
-				Format: v1.Ini,
-				FormatterAction: v1.FormatterAction{IniConfig: &v1.IniConfig{
+			formatConfig: &appsv1beta1.FormatterConfig{
+				Format: appsv1beta1.Ini,
+				FormatterAction: appsv1beta1.FormatterAction{IniConfig: &appsv1beta1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			},
@@ -233,9 +233,9 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				IsModify:  true,
 				AddConfig: map[string]interface{}{"key": testJSON},
 			},
-			formatConfig: &v1.FormatterConfig{
-				Format: v1.Ini,
-				FormatterAction: v1.FormatterAction{IniConfig: &v1.IniConfig{
+			formatConfig: &appsv1beta1.FormatterConfig{
+				Format: appsv1beta1.Ini,
+				FormatterAction: appsv1beta1.FormatterAction{IniConfig: &appsv1beta1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			},
@@ -259,9 +259,9 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				IsModify:     true,
 				DeleteConfig: map[string]interface{}{"key": testJSON},
 			},
-			formatConfig: &v1.FormatterConfig{
-				Format: v1.Ini,
-				FormatterAction: v1.FormatterAction{IniConfig: &v1.IniConfig{
+			formatConfig: &appsv1beta1.FormatterConfig{
+				Format: appsv1beta1.Ini,
+				FormatterAction: appsv1beta1.FormatterAction{IniConfig: &appsv1beta1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			},

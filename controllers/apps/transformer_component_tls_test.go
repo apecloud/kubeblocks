@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
@@ -91,7 +91,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 			configConstraintObj := testapps.CheckedCreateCustomizedObj(&testCtx,
 				"resources/mysql-config-constraint.yaml",
-				&v1.ConfigConstraint{})
+				&appsv1beta1.ConfigConstraint{})
 
 			By("Create a clusterDef obj")
 			testapps.NewClusterDefFactory(clusterDefName).

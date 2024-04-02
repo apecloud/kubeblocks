@@ -248,7 +248,7 @@ resources:
   domain: kubeblocks.io
   group: apps
   kind: ConfigConstraint
-  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  path: github.com/apecloud/kubeblocks/apis/apps/v1beta1
   version: v1
   webhooks:
     conversion: true

@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -128,7 +128,7 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
 }
 
-func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *v1.ConfigConstraintSpec) map[string]string {
+func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1beta1.ConfigConstraintSpec) map[string]string {
 	r := make(map[string]string)
 	dynamicAction := cc.NeedDynamicReloadAction()
 	selectedPolicy := cc.DynamicParametersPolicy()
@@ -136,7 +136,7 @@ func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *v1.ConfigConst
 	for _, key := range parameters {
 		if key.UpdateType == core.UpdatedType {
 			for _, p := range key.Parameters {
-				if dynamicAction && selectedPolicy == v1.SelectedDynamicParameters && !core.IsDynamicParameter(p.Key, cc) {
+				if dynamicAction && selectedPolicy == appsv1beta1.SelectedDynamicParameters && !core.IsDynamicParameter(p.Key, cc) {
 					continue
 				}
 				if p.Value != nil {

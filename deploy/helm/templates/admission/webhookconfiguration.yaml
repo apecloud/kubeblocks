@@ -260,7 +260,7 @@ webhooks:
     - apiGroups:
         - apps.kubeblocks.io
       apiVersions:
-        - v1
+        - v1beta1
       operations:
         - CREATE
         - UPDATE

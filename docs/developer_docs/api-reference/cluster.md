@@ -9,1370 +9,15 @@ sidebar_label: Cluster
 <p>Packages:</p>
 <ul>
 <li>
-<a href="#apps.kubeblocks.io%2fv1">apps.kubeblocks.io/v1</a>
+<a href="#apps.kubeblocks.io%2fv1alpha1">apps.kubeblocks.io/v1alpha1</a>
 </li>
 <li>
-<a href="#apps.kubeblocks.io%2fv1alpha1">apps.kubeblocks.io/v1alpha1</a>
+<a href="#apps.kubeblocks.io%2fv1beta1">apps.kubeblocks.io/v1beta1</a>
 </li>
 <li>
 <a href="#workloads.kubeblocks.io%2fv1alpha1">workloads.kubeblocks.io/v1alpha1</a>
 </li>
 </ul>
-<h2 id="apps.kubeblocks.io/v1">apps.kubeblocks.io/v1</h2>
-<div>
-</div>
-Resource Types:
-<ul><li>
-<a href="#apps.kubeblocks.io/v1.ConfigConstraint">ConfigConstraint</a>
-</li></ul>
-<h3 id="apps.kubeblocks.io/v1.ConfigConstraint">ConfigConstraint
-</h3>
-<div>
-<p>ConfigConstraint is the Schema for the configconstraint API</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>apiVersion</code><br/>
-string</td>
-<td>
-<code>apps.kubeblocks.io/v1</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-string
-</td>
-<td><code>ConfigConstraint</code></td>
-</tr>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ConfigConstraintSpec">
-ConfigConstraintSpec
-</a>
-</em>
-</td>
-<td>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>dynamicReloadAction</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.DynamicReloadAction">
-DynamicReloadAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the dynamic reload actions supported by the engine. If set, the controller call the scripts defined in the actions for a dynamic parameter upgrade.
-The actions are called only when the modified parameter is defined in dynamicParameters part &amp;&amp; DynamicReloadAction != nil</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dynamicActionCanBeMerged</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates the dynamic reload action and restart action can be merged to a restart action.</p>
-<p>When a batch of parameters updates incur both restart &amp; dynamic reload, it works as:
-- set to true, the two actions merged to only one restart action
-- set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dynamicParameterSelectedPolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.DynamicParameterSelectedPolicy">
-DynamicParameterSelectedPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the policy for selecting the parameters of dynamic reload actions.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reloadToolsImage</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ReloadToolsImage">
-ReloadToolsImage
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Tools used by the dynamic reload actions.
-Usually it is referenced by the &lsquo;init container&rsquo; for &lsquo;cp&rsquo; it to a binary volume.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>downwardActions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.DownwardAction">
-[]DownwardAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A set of actions for regenerating local configs.</p>
-<p>It works when:
-- different engine roles have different config, such as redis primary &amp; secondary
-- after a role switch, the local config will be regenerated with the help of DownwardActions</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptConfigs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ScriptConfig">
-[]ScriptConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of ScriptConfig used by the actions defined in dynamic reload and downward actions.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configSchemaTopLevelKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Top level key used to get the cue rules to validate the config file.
-It must exist in &lsquo;ConfigSchema&rsquo;</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configSchema</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ConfigSchema">
-ConfigSchema
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>List constraints rules for each config parameters.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>staticParameters</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of StaticParameter. Modifications of static parameters trigger a process restart.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dynamicParameters</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of DynamicParameter. Modifications of dynamic parameters trigger a reload action without process restart.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>immutableParameters</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Describes parameters that are prohibited to do any modifications.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dynamicReloadSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to match labels on the pod to do a dynamic reload</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>formatterConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.FormatterConfig">
-FormatterConfig
-</a>
-</em>
-</td>
-<td>
-<p>Describes the format of the config file.
-The controller works as follows:
-1. Parse the config file
-2. Get the modified parameters
-3. Trigger the corresponding action</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ConfigConstraintStatus">
-ConfigConstraintStatus
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.AutoTrigger">AutoTrigger
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.DynamicReloadAction">DynamicReloadAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>processName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The name of the process.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.CfgFileFormat">CfgFileFormat
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.FormatterConfig">FormatterConfig</a>)
-</p>
-<div>
-<p>CfgFileFormat defines formatter of configuration files.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;dotenv&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;hcl&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;ini&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;json&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;properties&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;props-plus&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;redis&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;toml&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;xml&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;yaml&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.CfgReloadType">CfgReloadType
-(<code>string</code> alias)</h3>
-<div>
-<p>CfgReloadType defines reload method.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;auto&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;http&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;sql&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;exec&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;tpl&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;signal&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ConfigConstraintPhase">ConfigConstraintPhase
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigConstraintStatus">ConfigConstraintStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintStatus">ConfigConstraintStatus</a>)
-</p>
-<div>
-<p>ConfigConstraintPhase defines the ConfigConstraint  CR .status.phase</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Available&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Deleting&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Unavailable&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ConfigConstraintSpec">ConfigConstraintSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigConstraint">ConfigConstraint</a>)
-</p>
-<div>
-<p>ConfigConstraintSpec defines the desired state of ConfigConstraint</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>dynamicReloadAction</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.DynamicReloadAction">
-DynamicReloadAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the dynamic reload actions supported by the engine. If set, the controller call the scripts defined in the actions for a dynamic parameter upgrade.
-The actions are called only when the modified parameter is defined in dynamicParameters part &amp;&amp; DynamicReloadAction != nil</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dynamicActionCanBeMerged</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates the dynamic reload action and restart action can be merged to a restart action.</p>
-<p>When a batch of parameters updates incur both restart &amp; dynamic reload, it works as:
-- set to true, the two actions merged to only one restart action
-- set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dynamicParameterSelectedPolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.DynamicParameterSelectedPolicy">
-DynamicParameterSelectedPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the policy for selecting the parameters of dynamic reload actions.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reloadToolsImage</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ReloadToolsImage">
-ReloadToolsImage
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Tools used by the dynamic reload actions.
-Usually it is referenced by the &lsquo;init container&rsquo; for &lsquo;cp&rsquo; it to a binary volume.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>downwardActions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.DownwardAction">
-[]DownwardAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A set of actions for regenerating local configs.</p>
-<p>It works when:
-- different engine roles have different config, such as redis primary &amp; secondary
-- after a role switch, the local config will be regenerated with the help of DownwardActions</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptConfigs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ScriptConfig">
-[]ScriptConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of ScriptConfig used by the actions defined in dynamic reload and downward actions.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configSchemaTopLevelKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Top level key used to get the cue rules to validate the config file.
-It must exist in &lsquo;ConfigSchema&rsquo;</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configSchema</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ConfigSchema">
-ConfigSchema
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>List constraints rules for each config parameters.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>staticParameters</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of StaticParameter. Modifications of static parameters trigger a process restart.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dynamicParameters</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of DynamicParameter. Modifications of dynamic parameters trigger a reload action without process restart.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>immutableParameters</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Describes parameters that are prohibited to do any modifications.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dynamicReloadSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to match labels on the pod to do a dynamic reload</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>formatterConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.FormatterConfig">
-FormatterConfig
-</a>
-</em>
-</td>
-<td>
-<p>Describes the format of the config file.
-The controller works as follows:
-1. Parse the config file
-2. Get the modified parameters
-3. Trigger the corresponding action</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ConfigConstraintStatus">ConfigConstraintStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigConstraint">ConfigConstraint</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>phase</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ConfigConstraintPhase">
-ConfigConstraintPhase
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the status of the configuration template.
-When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>message</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides descriptions for abnormal states.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>observedGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the most recent generation observed for this ConfigConstraint. This value is updated by the API Server.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ConfigSchema">ConfigSchema
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>schemaInJSON</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
-Kubernetes api extensions v1.JSONSchemaProps
-</a>
-</em>
-</td>
-<td>
-<p>Transforms the schema from CUE to json for further OpenAPI validation</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>cue</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Enables providers to verify user configurations using the CUE language.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.DownwardAction">DownwardAction
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the field. It must be a string of maximum length 63.
-The name should match the regex pattern <code>^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>mountPoint</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the mount point of the scripts file.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>items</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#downwardapivolumefile-v1-core">
-[]Kubernetes core/v1.DownwardAPIVolumeFile
-</a>
-</em>
-</td>
-<td>
-<p>Represents a list of downward API volume files.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>command</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The command used to execute for the downward API.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.DynamicParameterSelectedPolicy">DynamicParameterSelectedPolicy
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-<p>DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;all&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;dynamic&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.DynamicReloadAction">DynamicReloadAction
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>unixSignalTrigger</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.UnixSignalTrigger">
-UnixSignalTrigger
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to trigger a reload by sending a Unix signal to the process.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>shellTrigger</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ShellTrigger">
-ShellTrigger
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to perform the reload command in shell script.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>tplScriptTrigger</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.TPLScriptTrigger">
-TPLScriptTrigger
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to perform the reload command by Go template script.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>autoTrigger</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.AutoTrigger">
-AutoTrigger
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to automatically perform the reload command when conditions are met.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.FormatterAction">FormatterAction
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.FormatterConfig">FormatterConfig</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>iniConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.IniConfig">
-IniConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A pointer to an IniConfig struct that holds the ini options.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.FormatterConfig">FormatterConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>FormatterAction</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.FormatterAction">
-FormatterAction
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>FormatterAction</code> are embedded into this type.)
-</p>
-<em>(Optional)</em>
-<p>Represents the additional actions for formatting the config file.
-If not specified, the default options will be applied.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>format</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.CfgFileFormat">
-CfgFileFormat
-</a>
-</em>
-</td>
-<td>
-<p>The config file format. Valid values are <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>,
-<code>hcl</code>, <code>dotenv</code>, <code>properties</code> and <code>toml</code>. Each format has its own characteristics and use cases.</p>
-<ul>
-<li>ini: is a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a></li>
-<li>xml: refers to wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a></li>
-<li>yaml: supports for complex data types and structures.</li>
-<li>json: refers to wiki: <a href="https://en.wikipedia.org/wiki/JSON">https://en.wikipedia.org/wiki/JSON</a></li>
-<li>hcl: The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: <a href="https://www.linode.com/docs/guides/introduction-to-hcl/">https://www.linode.com/docs/guides/introduction-to-hcl/</a></li>
-<li>dotenv: is a plain text file with simple key–value pairs, reference wiki: <a href="https://en.wikipedia.org/wiki/Configuration_file#MS-DOS">https://en.wikipedia.org/wiki/Configuration_file#MS-DOS</a></li>
-<li>properties: a file extension mainly used in Java, reference wiki: <a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a></li>
-<li>toml: refers to wiki: <a href="https://en.wikipedia.org/wiki/TOML">https://en.wikipedia.org/wiki/TOML</a></li>
-<li>props-plus: a file extension mainly used in Java, supports CamelCase(e.g: brokerMaxConnectionsPerIp)</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.IniConfig">IniConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.FormatterAction">FormatterAction</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>sectionName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A string that describes the name of the ini section.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ReloadToolsImage">ReloadToolsImage
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>mountPoint</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Represents the point where the scripts file will be mounted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>toolConfigs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ToolConfig">
-[]ToolConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to configure the initialization container.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ScriptConfig">ScriptConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1.TPLScriptTrigger">TPLScriptTrigger</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>scriptConfigMapRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the reference to the ConfigMap that contains the script to be executed for reload.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the namespace where the referenced tpl script ConfigMap in.
-If left empty, by default in the &ldquo;default&rdquo; namespace.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ShellTrigger">ShellTrigger
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.DynamicReloadAction">DynamicReloadAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>command</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<p>Specifies the list of commands for reload.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>sync</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether to synchronize updates parameters to the config manager.
-Specifies two ways of controller to reload the parameter:
-- set to &lsquo;True&rsquo;, execute the reload action in sync mode, wait for the completion of reload
-- set to &lsquo;False&rsquo;, execute the reload action in async mode, just update the &lsquo;Configmap&rsquo;, no need to wait</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>batchReload</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether to reconfigure dynamic parameters individually or in a batch.
-- Set to &lsquo;True&rsquo; to execute the reload action in a batch, incorporating all parameter changes.
-- Set to &lsquo;False&rsquo; to execute the reload action for each parameter change individually.
-The default value is &lsquo;False&rsquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>batchParametersTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>When <code>batchReload</code> is set to &lsquo;True&rsquo;, this parameter allows for the optional specification
-of the batch input format that is passed into the STDIN of the script.
-The format should be provided as a Go template string.
-In the template, the updated parameters&rsquo; key-value map can be referenced using the dollar sign (&lsquo;$&rsquo;) variable.
-Here&rsquo;s an example of an input template:</p>
-<pre><code class="language-yaml">
-batchParametersTemplate: |-
-&#123;&#123;- range $pKey, $pValue := $ &#125;&#125;
-&#123;&#123; printf &quot;%s:%s&quot; $pKey $pValue &#125;&#125;
-&#123;&#123;- end &#125;&#125;
-</code></pre>
-<p>In this example, each updated parameter is iterated over in a sorted order by keys to generate the batch input data as follows:</p>
-<pre><code>
-key1:value1
-key2:value2
-key3:value3
-</code></pre>
-<p>If this parameter is not specified, the default format used for STDIN is as follows:
-Each updated parameter generates a line that concatenates the parameter&rsquo;s key and value with a equal sign (&lsquo;=&rsquo;).
-These lines are then sorted by their keys and inserted accordingly. Here&rsquo;s an example of the batch input data using the default template:</p>
-<pre><code>
-key1=value1
-key2=value2
-key3=value3
-</code></pre>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.SignalType">SignalType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UnixSignalTrigger">UnixSignalTrigger</a>)
-</p>
-<div>
-<p>SignalType defines which signals are valid.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;SIGABRT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGALRM&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGBUS&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGCHLD&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGCONT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGFPE&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGHUP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGILL&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGINT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGIO&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGKILL&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGPIPE&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGPROF&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGPWR&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGQUIT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSEGV&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSTKFLT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSTOP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSYS&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTERM&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTRAP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTSTP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTTIN&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTTOU&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGURG&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGUSR1&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGUSR2&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGVTALRM&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGWINCH&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGXCPU&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGXFSZ&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.TPLScriptTrigger">TPLScriptTrigger
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.DynamicReloadAction">DynamicReloadAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ScriptConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ScriptConfig">
-ScriptConfig
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ScriptConfig</code> are embedded into this type.)
-</p>
-<p>Config for the script.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>sync</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether to synchronize updates parameters to the config manager.
-Specifies two ways of controller to reload the parameter:
-- set to &lsquo;True&rsquo;, execute the reload action in sync mode, wait for the completion of reload
-- set to &lsquo;False&rsquo;, execute the reload action in async mode, just update the &lsquo;Configmap&rsquo;, no need to wait</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ToolConfig">ToolConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ReloadToolsImage">ReloadToolsImage</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the initContainer.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the url of the tool container image.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>command</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<p>Commands to be executed when init containers.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.UnixSignalTrigger">UnixSignalTrigger
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.DynamicReloadAction">DynamicReloadAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>signal</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.SignalType">
-SignalType
-</a>
-</em>
-</td>
-<td>
-<p>Represents a valid Unix signal.
-Refer to the following URL for a list of all Unix signals: ../../pkg/configuration/configmap/handler.go:allUnixSignals</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>processName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Represents the name of the process that the Unix signal sent to.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<hr/>
 <h2 id="apps.kubeblocks.io/v1alpha1">apps.kubeblocks.io/v1alpha1</h2>
 <div>
 </div>
@@ -3164,7 +1809,7 @@ bool
 <td>
 <code>dynamicParameterSelectedPolicy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.DynamicParameterSelectedPolicy">
+<a href="#apps.kubeblocks.io/v1beta1.DynamicParameterSelectedPolicy">
 DynamicParameterSelectedPolicy
 </a>
 </em>
@@ -3178,7 +1823,7 @@ DynamicParameterSelectedPolicy
 <td>
 <code>toolsImageSpec</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReloadToolsImage">
+<a href="#apps.kubeblocks.io/v1beta1.ReloadToolsImage">
 ReloadToolsImage
 </a>
 </em>
@@ -3193,7 +1838,7 @@ Usually it is referenced by the &lsquo;init container&rsquo; for &lsquo;cp&rsquo
 <td>
 <code>downwardAPIOptions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.DownwardAction">
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAction">
 []DownwardAction
 </a>
 </em>
@@ -3210,7 +1855,7 @@ Usually it is referenced by the &lsquo;init container&rsquo; for &lsquo;cp&rsquo
 <td>
 <code>scriptConfigs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ScriptConfig">
+<a href="#apps.kubeblocks.io/v1beta1.ScriptConfig">
 []ScriptConfig
 </a>
 </em>
@@ -3301,7 +1946,7 @@ Kubernetes meta/v1.LabelSelector
 <td>
 <code>formatterConfig</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.FormatterConfig">
+<a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">
 FormatterConfig
 </a>
 </em>
@@ -10246,7 +8891,7 @@ bool
 <td>
 <code>dynamicParameterSelectedPolicy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.DynamicParameterSelectedPolicy">
+<a href="#apps.kubeblocks.io/v1beta1.DynamicParameterSelectedPolicy">
 DynamicParameterSelectedPolicy
 </a>
 </em>
@@ -10260,7 +8905,7 @@ DynamicParameterSelectedPolicy
 <td>
 <code>toolsImageSpec</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReloadToolsImage">
+<a href="#apps.kubeblocks.io/v1beta1.ReloadToolsImage">
 ReloadToolsImage
 </a>
 </em>
@@ -10275,7 +8920,7 @@ Usually it is referenced by the &lsquo;init container&rsquo; for &lsquo;cp&rsquo
 <td>
 <code>downwardAPIOptions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.DownwardAction">
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAction">
 []DownwardAction
 </a>
 </em>
@@ -10292,7 +8937,7 @@ Usually it is referenced by the &lsquo;init container&rsquo; for &lsquo;cp&rsquo
 <td>
 <code>scriptConfigs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ScriptConfig">
+<a href="#apps.kubeblocks.io/v1beta1.ScriptConfig">
 []ScriptConfig
 </a>
 </em>
@@ -10383,7 +9028,7 @@ Kubernetes meta/v1.LabelSelector
 <td>
 <code>formatterConfig</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.FormatterConfig">
+<a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">
 FormatterConfig
 </a>
 </em>
@@ -10417,7 +9062,7 @@ The controller works as follows:
 <td>
 <code>phase</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ConfigConstraintPhase">
+<a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintPhase">
 ConfigConstraintPhase
 </a>
 </em>
@@ -16762,7 +15407,7 @@ string
 <td>
 <code>unixSignalTrigger</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UnixSignalTrigger">
+<a href="#apps.kubeblocks.io/v1beta1.UnixSignalTrigger">
 UnixSignalTrigger
 </a>
 </em>
@@ -16776,7 +15421,7 @@ UnixSignalTrigger
 <td>
 <code>shellTrigger</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ShellTrigger">
+<a href="#apps.kubeblocks.io/v1beta1.ShellTrigger">
 ShellTrigger
 </a>
 </em>
@@ -16790,7 +15435,7 @@ ShellTrigger
 <td>
 <code>tplScriptTrigger</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.TPLScriptTrigger">
+<a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">
 TPLScriptTrigger
 </a>
 </em>
@@ -16804,7 +15449,7 @@ TPLScriptTrigger
 <td>
 <code>autoTrigger</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.AutoTrigger">
+<a href="#apps.kubeblocks.io/v1beta1.AutoTrigger">
 AutoTrigger
 </a>
 </em>
@@ -20628,6 +19273,1361 @@ and fault tolerance.</p>
 <td><p>Stateless represents a workload type where components do not maintain state, and instances are interchangeable.</p>
 </td>
 </tr></tbody>
+</table>
+<hr/>
+<h2 id="apps.kubeblocks.io/v1beta1">apps.kubeblocks.io/v1beta1</h2>
+<div>
+</div>
+Resource Types:
+<ul><li>
+<a href="#apps.kubeblocks.io/v1beta1.ConfigConstraint">ConfigConstraint</a>
+</li></ul>
+<h3 id="apps.kubeblocks.io/v1beta1.ConfigConstraint">ConfigConstraint
+</h3>
+<div>
+<p>ConfigConstraint is the Schema for the configconstraint API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1beta1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ConfigConstraint</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">
+ConfigConstraintSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>dynamicReloadAction</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">
+DynamicReloadAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the dynamic reload actions supported by the engine. If set, the controller call the scripts defined in the actions for a dynamic parameter upgrade.
+The actions are called only when the modified parameter is defined in dynamicParameters part &amp;&amp; DynamicReloadAction != nil</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicActionCanBeMerged</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the dynamic reload action and restart action can be merged to a restart action.</p>
+<p>When a batch of parameters updates incur both restart &amp; dynamic reload, it works as:
+- set to true, the two actions merged to only one restart action
+- set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicParameterSelectedPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.DynamicParameterSelectedPolicy">
+DynamicParameterSelectedPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for selecting the parameters of dynamic reload actions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reloadToolsImage</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ReloadToolsImage">
+ReloadToolsImage
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Tools used by the dynamic reload actions.
+Usually it is referenced by the &lsquo;init container&rsquo; for &lsquo;cp&rsquo; it to a binary volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>downwardActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAction">
+[]DownwardAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A set of actions for regenerating local configs.</p>
+<p>It works when:
+- different engine roles have different config, such as redis primary &amp; secondary
+- after a role switch, the local config will be regenerated with the help of DownwardActions</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scriptConfigs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ScriptConfig">
+[]ScriptConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of ScriptConfig used by the actions defined in dynamic reload and downward actions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configSchemaTopLevelKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Top level key used to get the cue rules to validate the config file.
+It must exist in &lsquo;ConfigSchema&rsquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configSchema</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ConfigSchema">
+ConfigSchema
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List constraints rules for each config parameters.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>staticParameters</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of StaticParameter. Modifications of static parameters trigger a process restart.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicParameters</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of DynamicParameter. Modifications of dynamic parameters trigger a reload action without process restart.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>immutableParameters</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes parameters that are prohibited to do any modifications.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicReloadSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used to match labels on the pod to do a dynamic reload</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>formatterConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">
+FormatterConfig
+</a>
+</em>
+</td>
+<td>
+<p>Describes the format of the config file.
+The controller works as follows:
+1. Parse the config file
+2. Get the modified parameters
+3. Trigger the corresponding action</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintStatus">
+ConfigConstraintStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.AutoTrigger">AutoTrigger
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">DynamicReloadAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>processName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the process.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.CfgFileFormat">CfgFileFormat
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">FormatterConfig</a>)
+</p>
+<div>
+<p>CfgFileFormat defines formatter of configuration files.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;dotenv&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;hcl&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ini&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;json&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;properties&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;props-plus&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;redis&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;toml&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;xml&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;yaml&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.ConfigConstraintPhase">ConfigConstraintPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintStatus">ConfigConstraintStatus</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintStatus">ConfigConstraintStatus</a>)
+</p>
+<div>
+<p>ConfigConstraintPhase defines the ConfigConstraint  CR .status.phase</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Available&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Deleting&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Unavailable&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraint">ConfigConstraint</a>)
+</p>
+<div>
+<p>ConfigConstraintSpec defines the desired state of ConfigConstraint</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>dynamicReloadAction</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">
+DynamicReloadAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the dynamic reload actions supported by the engine. If set, the controller call the scripts defined in the actions for a dynamic parameter upgrade.
+The actions are called only when the modified parameter is defined in dynamicParameters part &amp;&amp; DynamicReloadAction != nil</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicActionCanBeMerged</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the dynamic reload action and restart action can be merged to a restart action.</p>
+<p>When a batch of parameters updates incur both restart &amp; dynamic reload, it works as:
+- set to true, the two actions merged to only one restart action
+- set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicParameterSelectedPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.DynamicParameterSelectedPolicy">
+DynamicParameterSelectedPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for selecting the parameters of dynamic reload actions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reloadToolsImage</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ReloadToolsImage">
+ReloadToolsImage
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Tools used by the dynamic reload actions.
+Usually it is referenced by the &lsquo;init container&rsquo; for &lsquo;cp&rsquo; it to a binary volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>downwardActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAction">
+[]DownwardAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A set of actions for regenerating local configs.</p>
+<p>It works when:
+- different engine roles have different config, such as redis primary &amp; secondary
+- after a role switch, the local config will be regenerated with the help of DownwardActions</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scriptConfigs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ScriptConfig">
+[]ScriptConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of ScriptConfig used by the actions defined in dynamic reload and downward actions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configSchemaTopLevelKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Top level key used to get the cue rules to validate the config file.
+It must exist in &lsquo;ConfigSchema&rsquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configSchema</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ConfigSchema">
+ConfigSchema
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List constraints rules for each config parameters.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>staticParameters</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of StaticParameter. Modifications of static parameters trigger a process restart.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicParameters</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of DynamicParameter. Modifications of dynamic parameters trigger a reload action without process restart.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>immutableParameters</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes parameters that are prohibited to do any modifications.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dynamicReloadSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used to match labels on the pod to do a dynamic reload</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>formatterConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">
+FormatterConfig
+</a>
+</em>
+</td>
+<td>
+<p>Describes the format of the config file.
+The controller works as follows:
+1. Parse the config file
+2. Get the modified parameters
+3. Trigger the corresponding action</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.ConfigConstraintStatus">ConfigConstraintStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraint">ConfigConstraint</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintPhase">
+ConfigConstraintPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the status of the configuration template.
+When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides descriptions for abnormal states.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the most recent generation observed for this ConfigConstraint. This value is updated by the API Server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.ConfigSchema">ConfigSchema
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>schemaInJSON</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
+Kubernetes api extensions v1.JSONSchemaProps
+</a>
+</em>
+</td>
+<td>
+<p>Transforms the schema from CUE to json for further OpenAPI validation</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>cue</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Enables providers to verify user configurations using the CUE language.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.DownwardAction">DownwardAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the field. It must be a string of maximum length 63.
+The name should match the regex pattern <code>^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>mountPoint</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the mount point of the scripts file.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>items</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#downwardapivolumefile-v1-core">
+[]Kubernetes core/v1.DownwardAPIVolumeFile
+</a>
+</em>
+</td>
+<td>
+<p>Represents a list of downward API volume files.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>command</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The command used to execute for the downward API.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.DynamicParameterSelectedPolicy">DynamicParameterSelectedPolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+<p>DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;all&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;dynamic&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.DynamicReloadAction">DynamicReloadAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>unixSignalTrigger</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.UnixSignalTrigger">
+UnixSignalTrigger
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used to trigger a reload by sending a Unix signal to the process.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shellTrigger</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ShellTrigger">
+ShellTrigger
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used to perform the reload command in shell script.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tplScriptTrigger</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">
+TPLScriptTrigger
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used to perform the reload command by Go template script.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>autoTrigger</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.AutoTrigger">
+AutoTrigger
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used to automatically perform the reload command when conditions are met.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.DynamicReloadType">DynamicReloadType
+(<code>string</code> alias)</h3>
+<div>
+<p>DynamicReloadType defines reload method.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;auto&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;http&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;sql&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;exec&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;tpl&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;signal&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.FormatterAction">FormatterAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">FormatterConfig</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>iniConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.IniConfig">
+IniConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A pointer to an IniConfig struct that holds the ini options.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.FormatterConfig">FormatterConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>FormatterAction</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.FormatterAction">
+FormatterAction
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>FormatterAction</code> are embedded into this type.)
+</p>
+<em>(Optional)</em>
+<p>Represents the additional actions for formatting the config file.
+If not specified, the default options will be applied.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>format</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.CfgFileFormat">
+CfgFileFormat
+</a>
+</em>
+</td>
+<td>
+<p>The config file format. Valid values are <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>,
+<code>hcl</code>, <code>dotenv</code>, <code>properties</code> and <code>toml</code>. Each format has its own characteristics and use cases.</p>
+<ul>
+<li>ini: is a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a></li>
+<li>xml: refers to wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a></li>
+<li>yaml: supports for complex data types and structures.</li>
+<li>json: refers to wiki: <a href="https://en.wikipedia.org/wiki/JSON">https://en.wikipedia.org/wiki/JSON</a></li>
+<li>hcl: The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: <a href="https://www.linode.com/docs/guides/introduction-to-hcl/">https://www.linode.com/docs/guides/introduction-to-hcl/</a></li>
+<li>dotenv: is a plain text file with simple key–value pairs, reference wiki: <a href="https://en.wikipedia.org/wiki/Configuration_file#MS-DOS">https://en.wikipedia.org/wiki/Configuration_file#MS-DOS</a></li>
+<li>properties: a file extension mainly used in Java, reference wiki: <a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a></li>
+<li>toml: refers to wiki: <a href="https://en.wikipedia.org/wiki/TOML">https://en.wikipedia.org/wiki/TOML</a></li>
+<li>props-plus: a file extension mainly used in Java, supports CamelCase(e.g: brokerMaxConnectionsPerIp)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.IniConfig">IniConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.FormatterAction">FormatterAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>sectionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A string that describes the name of the ini section.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.ReloadToolsImage">ReloadToolsImage
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>mountPoint</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the point where the scripts file will be mounted.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>toolConfigs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ToolConfig">
+[]ToolConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used to configure the initialization container.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.ScriptConfig">ScriptConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>scriptConfigMapRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the reference to the ConfigMap that contains the script to be executed for reload.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the namespace where the referenced tpl script ConfigMap in.
+If left empty, by default in the &ldquo;default&rdquo; namespace.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.ShellTrigger">ShellTrigger
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">DynamicReloadAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>command</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Specifies the list of commands for reload.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sync</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to synchronize updates parameters to the config manager.
+Specifies two ways of controller to reload the parameter:
+- set to &lsquo;True&rsquo;, execute the reload action in sync mode, wait for the completion of reload
+- set to &lsquo;False&rsquo;, execute the reload action in async mode, just update the &lsquo;Configmap&rsquo;, no need to wait</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>batchReload</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to reconfigure dynamic parameters individually or in a batch.
+- Set to &lsquo;True&rsquo; to execute the reload action in a batch, incorporating all parameter changes.
+- Set to &lsquo;False&rsquo; to execute the reload action for each parameter change individually.
+The default value is &lsquo;False&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>batchParametersTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>When <code>batchReload</code> is set to &lsquo;True&rsquo;, this parameter allows for the optional specification
+of the batch input format that is passed into the STDIN of the script.
+The format should be provided as a Go template string.
+In the template, the updated parameters&rsquo; key-value map can be referenced using the dollar sign (&lsquo;$&rsquo;) variable.
+Here&rsquo;s an example of an input template:</p>
+<pre><code class="language-yaml">
+batchParametersTemplate: |-
+&#123;&#123;- range $pKey, $pValue := $ &#125;&#125;
+&#123;&#123; printf &quot;%s:%s&quot; $pKey $pValue &#125;&#125;
+&#123;&#123;- end &#125;&#125;
+</code></pre>
+<p>In this example, each updated parameter is iterated over in a sorted order by keys to generate the batch input data as follows:</p>
+<pre><code>
+key1:value1
+key2:value2
+key3:value3
+</code></pre>
+<p>If this parameter is not specified, the default format used for STDIN is as follows:
+Each updated parameter generates a line that concatenates the parameter&rsquo;s key and value with a equal sign (&lsquo;=&rsquo;).
+These lines are then sorted by their keys and inserted accordingly. Here&rsquo;s an example of the batch input data using the default template:</p>
+<pre><code>
+key1=value1
+key2=value2
+key3=value3
+</code></pre>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.SignalType">SignalType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.UnixSignalTrigger">UnixSignalTrigger</a>)
+</p>
+<div>
+<p>SignalType defines which signals are valid.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;SIGABRT&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGALRM&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGBUS&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGCHLD&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGCONT&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGFPE&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGHUP&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGILL&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGINT&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGIO&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGKILL&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGPIPE&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGPROF&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGPWR&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGQUIT&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGSEGV&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGSTKFLT&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGSTOP&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGSYS&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGTERM&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGTRAP&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGTSTP&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGTTIN&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGTTOU&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGURG&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGUSR1&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGUSR2&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGVTALRM&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGWINCH&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGXCPU&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;SIGXFSZ&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">DynamicReloadAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ScriptConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ScriptConfig">
+ScriptConfig
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ScriptConfig</code> are embedded into this type.)
+</p>
+<p>Config for the script.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sync</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to synchronize updates parameters to the config manager.
+Specifies two ways of controller to reload the parameter:
+- set to &lsquo;True&rsquo;, execute the reload action in sync mode, wait for the completion of reload
+- set to &lsquo;False&rsquo;, execute the reload action in async mode, just update the &lsquo;Configmap&rsquo;, no need to wait</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.ToolConfig">ToolConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ReloadToolsImage">ReloadToolsImage</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the initContainer.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the url of the tool container image.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>command</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Commands to be executed when init containers.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.UnixSignalTrigger">UnixSignalTrigger
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">DynamicReloadAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>signal</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.SignalType">
+SignalType
+</a>
+</em>
+</td>
+<td>
+<p>Represents a valid Unix signal.
+Refer to the following URL for a list of all Unix signals: ../../pkg/configuration/configmap/handler.go:allUnixSignals</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>processName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the name of the process that the Unix signal sent to.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <hr/>
 <h2 id="workloads.kubeblocks.io/v1alpha1">workloads.kubeblocks.io/v1alpha1</h2>

@@ -31,8 +31,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -51,7 +51,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
-	var configConstraint *appsv1.ConfigConstraint
+	var configConstraint *appsv1beta1.ConfigConstraint
 	var configurationObj *appsv1alpha1.Configuration
 	var k8sMockClient *testutil.K8sClientMockHelper
 
@@ -115,13 +115,13 @@ max_connections = '1000'
 			ClusterRef(clusterName).
 			Component(mysqlCompName).
 			GetObject()
-		configConstraint = &appsv1.ConfigConstraint{
+		configConstraint = &appsv1beta1.ConfigConstraint{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: mysqlConfigConstraintName,
 			},
-			Spec: appsv1.ConfigConstraintSpec{
-				FormatterConfig: &appsv1.FormatterConfig{
-					Format: appsv1.Properties,
+			Spec: appsv1beta1.ConfigConstraintSpec{
+				FormatterConfig: &appsv1beta1.FormatterConfig{
+					Format: appsv1beta1.Properties,
 				},
 			}}
 	})

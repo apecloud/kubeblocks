@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 )
 
@@ -37,7 +37,7 @@ func TestConfigPatch(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgRawType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: appsv1.Ini,
+		CfgType: appsv1beta1.Ini,
 		RawData: []byte(iniConfig),
 	})
 
@@ -113,7 +113,7 @@ net:
 
 	patchOption := CfgOption{
 		Type:    CfgTplType,
-		CfgType: appsv1.YAML,
+		CfgType: appsv1beta1.YAML,
 	}
 	patch, err := CreateMergePatch(&ConfigResource{ConfigData: map[string]string{"test": ""}}, &ConfigResource{ConfigData: map[string]string{"test": yamlContext}}, patchOption)
 	require.Nil(t, err)
@@ -130,7 +130,7 @@ func TestTransformConfigPatchFromData(t *testing.T) {
 	testData := "[mysqld]\nmax_connections = 2000\ngeneral_log = OFF"
 
 	t.Run("testConfigPatch", func(t *testing.T) {
-		got, err := TransformConfigPatchFromData(map[string]string{configFile: testData}, appsv1.Ini, nil)
+		got, err := TransformConfigPatchFromData(map[string]string{configFile: testData}, appsv1beta1.Ini, nil)
 		require.Nil(t, err)
 		require.True(t, got.IsModify)
 		require.NotNil(t, got.UpdateConfig[configFile])

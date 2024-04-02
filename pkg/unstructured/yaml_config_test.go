@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
@@ -44,7 +44,7 @@ spec:
       name: postgresql-configuration
 `
 
-	yamlConfigObj, err := LoadConfig("yaml_test", yamlContext, appsv1.YAML)
+	yamlConfigObj, err := LoadConfig("yaml_test", yamlContext, appsv1beta1.YAML)
 	assert.Nil(t, err)
 
 	assert.EqualValues(t, yamlConfigObj.Get("spec.clusterRef"), "pg")
@@ -65,7 +65,7 @@ func TestYAMLFormatForBadCase(t *testing.T) {
 	b, err := testdata.GetTestDataFileContent("config_encoding/prometheus.yaml")
 	assert.Nil(t, err)
 
-	yamlConfigObj, err := LoadConfig("yaml_test", string(b), appsv1.YAML)
+	yamlConfigObj, err := LoadConfig("yaml_test", string(b), appsv1beta1.YAML)
 	assert.Nil(t, err)
 	assert.NotNil(t, yamlConfigObj)
 	yamlConfigObj.GetAllParameters()

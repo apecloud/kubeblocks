@@ -31,8 +31,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -303,21 +303,21 @@ var _ = Describe("config_util", func() {
 	Context("MergeAndValidateConfigs", func() {
 		It("Should succeed with no error", func() {
 			type args struct {
-				configConstraint appsv1.ConfigConstraintSpec
+				configConstraint appsv1beta1.ConfigConstraintSpec
 				baseCfg          map[string]string
 				updatedParams    []core.ParamPairs
 				cmKeys           []string
 			}
 
 			configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
-				&appsv1.ConfigConstraint{}, func(cc *appsv1.ConfigConstraint) {
+				&appsv1beta1.ConfigConstraint{}, func(cc *appsv1beta1.ConfigConstraint) {
 					if ccContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.cue"); err == nil {
-						cc.Spec.ConfigSchema = &appsv1.ConfigSchema{
+						cc.Spec.ConfigSchema = &appsv1beta1.ConfigSchema{
 							CUE: string(ccContext),
 						}
 					}
-					cc.Spec.FormatterConfig = &appsv1.FormatterConfig{
-						Format: appsv1.Properties,
+					cc.Spec.FormatterConfig = &appsv1beta1.FormatterConfig{
+						Format: appsv1beta1.Properties,
 					}
 				})
 

@@ -28,7 +28,7 @@ import (
 	"github.com/StudioSol/set"
 	"github.com/spf13/cast"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 )
 
 type redisConfig struct {
@@ -39,7 +39,7 @@ type redisConfig struct {
 }
 
 func init() {
-	CfgObjectRegistry().RegisterConfigCreator(appsv1.RedisCfg, func(name string) ConfigObject {
+	CfgObjectRegistry().RegisterConfigCreator(appsv1beta1.RedisCfg, func(name string) ConfigObject {
 		return &redisConfig{name: name}
 	})
 }

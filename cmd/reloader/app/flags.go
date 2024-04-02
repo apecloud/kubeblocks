@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/container"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -47,10 +47,10 @@ const (
 	localhostAddress         = "127.0.0.1"
 )
 
-var allNotifyType = map[NotifyEventType]appsv1.CfgReloadType{
-	UnixSignal: appsv1.UnixSignalType,
-	ShellTool:  appsv1.ShellType,
-	TPLScript:  appsv1.TPLScriptType,
+var allNotifyType = map[NotifyEventType]appsv1beta1.DynamicReloadType{
+	UnixSignal: appsv1beta1.UnixSignalType,
+	ShellTool:  appsv1beta1.ShellType,
+	TPLScript:  appsv1beta1.TPLScriptType,
 }
 
 func init() {

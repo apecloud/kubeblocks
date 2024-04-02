@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -63,7 +63,7 @@ type ResourceFetcher[T any] struct {
 
 	ConfigMapObj        *corev1.ConfigMap
 	ConfigurationObj    *appsv1alpha1.Configuration
-	ConfigConstraintObj *v1.ConfigConstraint
+	ConfigConstraintObj *appsv1beta1.ConfigConstraint
 }
 
 func (r *ResourceFetcher[T]) Init(ctx *ResourceCtx, object *T) *T {
@@ -194,7 +194,7 @@ func (r *ResourceFetcher[T]) ConfigMap(configSpec string) *T {
 func (r *ResourceFetcher[T]) ConfigConstraints(ccName string) *T {
 	return r.Wrap(func() error {
 		if ccName != "" {
-			r.ConfigConstraintObj = &v1.ConfigConstraint{}
+			r.ConfigConstraintObj = &appsv1beta1.ConfigConstraint{}
 			return r.Client.Get(r.Context, client.ObjectKey{Name: ccName}, r.ConfigConstraintObj)
 		}
 		return nil

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1
+package v1beta1
 
 import (
 	"context"
@@ -32,7 +32,10 @@ import (
 	. "github.com/onsi/gomega"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	//+kubebuilder:scaffold:imports
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	// +kubebuilder:scaffold:imports
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -84,7 +87,7 @@ var _ = BeforeSuite(func() {
 	err = admissionv1beta1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).NotTo(HaveOccurred())
@@ -93,19 +96,21 @@ var _ = BeforeSuite(func() {
 	// start webhook server using Manager
 	webhookInstallOptions := &testEnv.WebhookInstallOptions
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme,
-		Host:               webhookInstallOptions.LocalServingHost,
-		Port:               webhookInstallOptions.LocalServingPort,
-		CertDir:            webhookInstallOptions.LocalServingCertDir,
-		LeaderElection:     false,
-		MetricsBindAddress: "0",
+		Scheme:         scheme,
+		LeaderElection: false,
+		Metrics:        server.Options{BindAddress: "0"},
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Host:    webhookInstallOptions.LocalServingHost,
+			Port:    webhookInstallOptions.LocalServingPort,
+			CertDir: webhookInstallOptions.LocalServingCertDir,
+		}),
 	})
 	Expect(err).NotTo(HaveOccurred())
 
 	err = (&ConfigConstraint{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:webhook
+	// +kubebuilder:scaffold:webhook
 
 	go func() {
 		defer GinkgoRecover()

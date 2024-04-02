@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
@@ -107,7 +107,7 @@ var OpsDefinitionSignature = func(_ appsv1alpha1.OpsDefinition, _ *appsv1alpha1.
 }
 var OpsRequestSignature = func(_ appsv1alpha1.OpsRequest, _ *appsv1alpha1.OpsRequest, _ appsv1alpha1.OpsRequestList, _ *appsv1alpha1.OpsRequestList) {
 }
-var ConfigConstraintSignature = func(_ v1.ConfigConstraint, _ *v1.ConfigConstraint, _ v1.ConfigConstraintList, _ *v1.ConfigConstraintList) {
+var ConfigConstraintSignature = func(_ appsv1beta1.ConfigConstraint, _ *appsv1beta1.ConfigConstraint, _ appsv1beta1.ConfigConstraintList, _ *appsv1beta1.ConfigConstraintList) {
 }
 
 var BackupPolicyTemplateSignature = func(_ appsv1alpha1.BackupPolicyTemplate, _ *appsv1alpha1.BackupPolicyTemplate, _ appsv1alpha1.BackupPolicyTemplateList, _ *appsv1alpha1.BackupPolicyTemplateList) {

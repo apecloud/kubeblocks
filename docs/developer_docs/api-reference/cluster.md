@@ -19604,32 +19604,6 @@ string
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1beta1.CfgReloadType">CfgReloadType
-(<code>string</code> alias)</h3>
-<div>
-<p>CfgReloadType defines reload method.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;auto&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;http&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;sql&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;exec&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;tpl&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;signal&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1beta1.ConfigConstraintPhase">ConfigConstraintPhase
 (<code>string</code> alias)</h3>
 <p>
@@ -20111,6 +20085,32 @@ AutoTrigger
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.DynamicReloadType">DynamicReloadType
+(<code>string</code> alias)</h3>
+<div>
+<p>DynamicReloadType defines reload method.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;auto&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;http&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;sql&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;exec&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;tpl&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;signal&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1beta1.FormatterAction">FormatterAction
 </h3>

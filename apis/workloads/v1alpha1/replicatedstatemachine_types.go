@@ -70,7 +70,6 @@ type InstanceTemplate struct {
 	//   [OrdinalStart, OrdinalStart + Replicas).
 	// If unset, defaults to 0. Instance indices will be in the range:
 	//   [0, Replicas).
-	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	OrdinalStart *int32 `json:"ordinalStart,omitempty"`

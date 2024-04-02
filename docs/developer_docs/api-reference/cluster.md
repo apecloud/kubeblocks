@@ -11988,7 +11988,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>If set, the existing variable will be kept, and a new variable will be defined with the specified suffix
-in pattern: <var.name>_<suffix>.
+in pattern: $(var.name)_$(suffix).
 The new variable will be auto-created and placed behind the existing one.
 If not set, the existing variable will be reused with the value format defined below.</p>
 </td>
@@ -12018,7 +12018,7 @@ MultipleClusterObjectValueFormatFlatten
 </td>
 <td>
 <em>(Optional)</em>
-<p>The flatten format, default is: <comp-name-1>:value,<comp-name-2>:value.</p>
+<p>The flatten format, default is: $(comp-name-1):value,$(comp-name-2):value.</p>
 </td>
 </tr>
 </tbody>

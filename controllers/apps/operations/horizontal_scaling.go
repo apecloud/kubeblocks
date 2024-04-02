@@ -234,12 +234,12 @@ func buildNameTemplateMap(componentName string, replicas int32, instances []apps
 	// 2. build instance name to instance template map
 	var allNameList []string
 	allNameTemplateMap := make(map[string]nameWithTemplate, replicas)
-	for _, templates := range instanceTemplateGroups {
+	for groupName, templates := range instanceTemplateGroups {
 		var templateGroup []rsm2.InstanceTemplateMeta
 		for _, template := range templates {
 			templateGroup = append(templateGroup, template)
 		}
-		instanceNames, nameTemplateMap := rsm2.GenerateInstanceNamesFromGroup(templateGroup, false)
+		instanceNames, nameTemplateMap := rsm2.GenerateInstanceNamesFromGroup(groupName, templateGroup, false)
 		allNameList = append(allNameList, instanceNames...)
 		for name, meta := range nameTemplateMap {
 			template := meta.(*workloads.InstanceTemplate)

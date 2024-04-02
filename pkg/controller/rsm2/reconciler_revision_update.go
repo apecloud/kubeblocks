@@ -61,12 +61,12 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 
 	// build replica revision list by template groups
 	var instanceRevisionList []instanceRevision
-	for _, templateList := range replicaTemplateGroups {
+	for groupName, templateList := range replicaTemplateGroups {
 		var templateGroup []InstanceTemplateMeta
 		for _, template := range templateList {
 			templateGroup = append(templateGroup, template)
 		}
-		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(templateGroup, true)
+		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(groupName, templateGroup, true)
 		templateRevisionMap, err := buildTemplateRevisionMap(templateList, rsm)
 		if err != nil {
 			return nil, err

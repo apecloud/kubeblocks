@@ -388,20 +388,21 @@ var _ = Describe("replica util test", func() {
 	// So the final 6 instance names are: 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', 'foo-101'.
 	Context("generateInstanceNames", func() {
 		It("should work well", func() {
+			groupName := "foo"
 			templates := []*instanceTemplateExt{
 				{
 					Replicas:     2,
-					Name:         "foo",
+					Name:         groupName,
 					OrdinalStart: -1,
 				},
 				{
 					Replicas:     2,
-					Name:         "foo",
+					Name:         groupName,
 					OrdinalStart: 100,
 				},
 				{
 					Replicas:     2,
-					Name:         "foo",
+					Name:         groupName,
 					OrdinalStart: -1,
 				},
 			}
@@ -410,7 +411,7 @@ var _ = Describe("replica util test", func() {
 			for _, template := range templates {
 				templateGroup = append(templateGroup, template)
 			}
-			instanceNames, _ := GenerateInstanceNamesFromGroup(templateGroup, true)
+			instanceNames, _ := GenerateInstanceNamesFromGroup(groupName, templateGroup, true)
 			getNameNOrdinalFunc := func(i int) (string, int) {
 				return ParseParentNameAndOrdinal(instanceNames[i])
 			}

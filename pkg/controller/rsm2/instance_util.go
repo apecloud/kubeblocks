@@ -218,12 +218,12 @@ func buildInstanceName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *
 	}
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
-	for _, templateList := range instanceTemplateExtGroups {
+	for groupName, templateList := range instanceTemplateExtGroups {
 		var templateGroup []InstanceTemplateMeta
 		for _, template := range templateList {
 			templateGroup = append(templateGroup, template)
 		}
-		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(templateGroup, true)
+		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(groupName, templateGroup, true)
 		instanceNameList = append(instanceNameList, instanceNames...)
 		for name, template := range nameTemplateMap {
 			allNameTemplateMap[name] = template.(*instanceTemplateExt)
@@ -240,7 +240,7 @@ func buildInstanceName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *
 	return allNameTemplateMap, nil
 }
 
-func GenerateInstanceNamesFromGroup(templateGroup []InstanceTemplateMeta, onlineOnly bool) ([]string, map[string]InstanceTemplateMeta) {
+func GenerateInstanceNamesFromGroup(groupName string, templateGroup []InstanceTemplateMeta, onlineOnly bool) ([]string, map[string]InstanceTemplateMeta) {
 	var (
 		allNameList     []string
 		nameTemplateMap = make(map[string]InstanceTemplateMeta)
@@ -254,7 +254,7 @@ func GenerateInstanceNamesFromGroup(templateGroup []InstanceTemplateMeta, online
 		if template.GetOrdinalStart() < 0 {
 			continue
 		}
-		instanceNames, _ = generateInstanceNames(template.GetName(), template.GetReplicas(), template.GetOrdinalStart(), sets.New[string]())
+		instanceNames, _ = generateInstanceNames(groupName, template.GetReplicas(), template.GetOrdinalStart(), sets.New[string]())
 		if !onlineOnly || !template.IsOffline() {
 			for _, name := range instanceNames {
 				nameTemplateMap[name] = template
@@ -269,7 +269,7 @@ func GenerateInstanceNamesFromGroup(templateGroup []InstanceTemplateMeta, online
 		if template.GetOrdinalStart() >= 0 {
 			continue
 		}
-		instanceNames, ordinal = generateInstanceNames(template.GetName(), template.GetReplicas(), ordinal, usedNames)
+		instanceNames, ordinal = generateInstanceNames(groupName, template.GetReplicas(), ordinal, usedNames)
 		if !onlineOnly || !template.IsOffline() {
 			for _, name := range instanceNames {
 				nameTemplateMap[name] = template

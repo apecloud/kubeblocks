@@ -105,11 +105,6 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.GenerateName != nil {
-		in, out := &in.GenerateName, &out.GenerateName
-		*out = new(string)
-		**out = **in
-	}
 	if in.OrdinalStart != nil {
 		in, out := &in.OrdinalStart, &out.OrdinalStart
 		*out = new(int32)

@@ -3537,13 +3537,6 @@ func (in *HorizontalScaling) DeepCopyInto(out *HorizontalScaling) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.InstancesToUpdate != nil {
-		in, out := &in.InstancesToUpdate, &out.InstancesToUpdate
-		*out = make([]InstanceTemplate, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	if in.InstancesToDelete != nil {
 		in, out := &in.InstancesToDelete, &out.InstancesToDelete
 		*out = make([]InstanceTemplate, len(*in))
@@ -3635,11 +3628,6 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
-		*out = new(string)
-		**out = **in
-	}
-	if in.GenerateName != nil {
-		in, out := &in.GenerateName, &out.GenerateName
 		*out = new(string)
 		**out = **in
 	}

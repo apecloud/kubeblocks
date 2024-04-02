@@ -36,28 +36,17 @@ type InstanceTemplate struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// Defines the name of the instance.
-	// Only applied when Replicas is 1.
+	// Specifies the name of the template.
+	// Each instance of the template derives its name from the template's Name and the instance's ordinal.
+	// The constructed instance name follows the pattern $(name)-$(ordinal).
+	// The ordinal is determined by the OrdinalStart field, which defaults to 0.
 	//
-	// +kubebuilder:validation:MaxLength=64
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	Name *string `json:"name,omitempty"`
-
-	// GenerateName is an optional prefix, used by the server, to generate a unique
-	// name ONLY IF the Name field has not been provided.
-	// If this field is used, the name returned to the client will be different
-	// than the name passed. This value will also be combined with a unique suffix.
-	// The provided value has the same validation rules as the Name field,
-	// and may be truncated by the length of the suffix required to make the value
-	// unique on the server.
-	//
-	// Applied only if Name is not specified.
+	// If not specified, it defaults to the name of the RSM.
 	//
 	// +kubebuilder:validation:MaxLength=54
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
-	GenerateName *string `json:"generateName,omitempty"`
+	Name *string `json:"name,omitempty"`
 
 	// OrdinalStart controls the numbering of instance(replica) indices in a RSM. The
 	// default ordinals behavior assigns a "0" index to the first instance and

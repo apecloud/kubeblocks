@@ -301,7 +301,7 @@ func genClusterNComponentEnvs(ctx context.Context,
 func genComponentEnvs(synthesizeComp *SynthesizedComponent, components []appsv1alpha1.Component) ([]corev1.EnvVar, error) {
 	compEnvs := make([]corev1.EnvVar, 0)
 	for _, comp := range components {
-		if comp.Name == synthesizeComp.Name {
+		if comp.Name == synthesizeComp.FullCompName {
 			scaleInVal, ok := comp.Annotations[constant.ComponentScaleInAnnotationKey]
 			if ok {
 				compEnvs = append(compEnvs, corev1.EnvVar{

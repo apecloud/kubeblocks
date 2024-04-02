@@ -489,7 +489,6 @@ var _ = Describe("Component Definition Convertor", func() {
 				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
 				Expect(ok).Should(BeTrue())
 				Expect(hostNetwork.ContainerPorts).Should(HaveLen(0))
-				Expect(hostNetwork.DNSPolicy).Should(BeNil())
 			})
 
 			It("no dynamic ports", func() {
@@ -504,7 +503,6 @@ var _ = Describe("Component Definition Convertor", func() {
 				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
 				Expect(ok).Should(BeTrue())
 				Expect(hostNetwork.ContainerPorts).Should(HaveLen(0))
-				Expect(hostNetwork.DNSPolicy).Should(BeNil())
 			})
 
 			It("part dynamic ports", func() {
@@ -524,37 +522,6 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(hostNetwork.ContainerPorts[0].Container).Should(Equal(container.Name))
 				Expect(hostNetwork.ContainerPorts[0].Ports).Should(HaveLen(1))
 				Expect(hostNetwork.ContainerPorts[0].Ports[0]).Should(Equal(container.Ports[0].Name))
-				Expect(hostNetwork.DNSPolicy).Should(BeNil())
-			})
-
-			It("w/ dns policy ClusterFirst", func() {
-				clusterCompDef.PodSpec.HostNetwork = true
-				clusterCompDef.PodSpec.DNSPolicy = corev1.DNSClusterFirst
-
-				convertor := &compDefHostNetworkConvertor{}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-				Expect(res).ShouldNot(BeNil())
-
-				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
-				Expect(ok).Should(BeTrue())
-				Expect(hostNetwork.DNSPolicy).ShouldNot(BeNil())
-				Expect(*hostNetwork.DNSPolicy).Should(Equal(corev1.DNSClusterFirst))
-			})
-
-			It("w/ dns policy non-ClusterFirst", func() {
-				clusterCompDef.PodSpec.HostNetwork = true
-				clusterCompDef.PodSpec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
-
-				convertor := &compDefHostNetworkConvertor{}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-				Expect(res).ShouldNot(BeNil())
-
-				hostNetwork, ok := res.(*appsv1alpha1.HostNetwork)
-				Expect(ok).Should(BeTrue())
-				Expect(hostNetwork.DNSPolicy).ShouldNot(BeNil())
-				Expect(*hostNetwork.DNSPolicy).Should(Equal(corev1.DNSClusterFirstWithHostNet))
 			})
 		})
 

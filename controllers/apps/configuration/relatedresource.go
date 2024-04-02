@@ -26,8 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -42,12 +42,12 @@ type reconfigureRelatedResource struct {
 	componentName string
 
 	configMapObj        *corev1.ConfigMap
-	configConstraintObj *v1.ConfigConstraint
+	configConstraintObj *appsv1beta1.ConfigConstraint
 }
 
 func prepareRelatedResource(reqCtx intctrlutil.RequestCtx, client client.Client, cm *corev1.ConfigMap) (*reconfigureRelatedResource, error) {
 	configResources := reconfigureRelatedResource{
-		configConstraintObj: &v1.ConfigConstraint{},
+		configConstraintObj: &appsv1beta1.ConfigConstraint{},
 		configMapObj:        cm,
 		ctx:                 reqCtx.Ctx,
 		client:              client,

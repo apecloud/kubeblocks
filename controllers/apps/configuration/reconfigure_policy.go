@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	configmanager "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -88,7 +88,7 @@ type reconfigureParams struct {
 	ConfigMap *corev1.ConfigMap
 
 	// ConfigConstraint pointer
-	ConfigConstraint *v1.ConfigConstraintSpec
+	ConfigConstraint *appsv1beta1.ConfigConstraintSpec
 
 	// For grpc factory
 	ReconfigureClientFactory createReconfigureClient
@@ -214,7 +214,7 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(appsv1alpha1.AsyncDynamicReloadPolicy)
 }
 
-func NewReconfigurePolicy(cc *v1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
+func NewReconfigurePolicy(cc *appsv1beta1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
 	if cfgPatch != nil && !cfgPatch.IsModify {
 		// not walk here
 		return nil, core.MakeError("cfg not modify. [%v]", cfgPatch)
@@ -257,7 +257,7 @@ func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
 	return !restart && policy == appsv1alpha1.NonePolicy
 }
 
-func enableSyncTrigger(options *v1.DynamicReloadAction) bool {
+func enableSyncTrigger(options *appsv1beta1.DynamicReloadAction) bool {
 	if options == nil {
 		return false
 	}

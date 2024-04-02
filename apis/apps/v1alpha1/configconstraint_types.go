@@ -20,7 +20,7 @@ import (
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 )
 
 // ConfigConstraintSpec defines the desired state of ConfigConstraint
@@ -43,13 +43,13 @@ type ConfigConstraintSpec struct {
 	// Specifies the policy for selecting the parameters of dynamic reload actions.
 	//
 	// +optional
-	DynamicParameterSelectedPolicy *v1.DynamicParameterSelectedPolicy `json:"dynamicParameterSelectedPolicy,omitempty"`
+	DynamicParameterSelectedPolicy *appsv1beta1.DynamicParameterSelectedPolicy `json:"dynamicParameterSelectedPolicy,omitempty"`
 
 	// Tools used by the dynamic reload actions.
 	// Usually it is referenced by the 'init container' for 'cp' it to a binary volume.
 	//
 	// +optional
-	ToolsImageSpec *v1.ReloadToolsImage `json:"toolsImageSpec,omitempty"`
+	ToolsImageSpec *appsv1beta1.ReloadToolsImage `json:"toolsImageSpec,omitempty"`
 
 	// A set of actions for regenerating local configs.
 	//
@@ -58,7 +58,7 @@ type ConfigConstraintSpec struct {
 	// - after a role switch, the local config will be regenerated with the help of DownwardActions
 	//
 	// +optional
-	DownwardAPIOptions []v1.DownwardAction `json:"downwardAPIOptions,omitempty"`
+	DownwardAPIOptions []appsv1beta1.DownwardAction `json:"downwardAPIOptions,omitempty"`
 
 	// A list of ScriptConfig used by the actions defined in dynamic reload and downward actions.
 	//
@@ -67,7 +67,7 @@ type ConfigConstraintSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=scriptConfigMapRef
-	ScriptConfigs []v1.ScriptConfig `json:"scriptConfigs,omitempty"`
+	ScriptConfigs []appsv1beta1.ScriptConfig `json:"scriptConfigs,omitempty"`
 
 	// Top level key used to get the cue rules to validate the config file.
 	// It must exist in 'ConfigSchema'
@@ -110,7 +110,7 @@ type ConfigConstraintSpec struct {
 	// 3. Trigger the corresponding action
 	//
 	// +kubebuilder:validation:Required
-	FormatterConfig *v1.FormatterConfig `json:"formatterConfig"`
+	FormatterConfig *appsv1beta1.FormatterConfig `json:"formatterConfig"`
 }
 
 // Represents the observed state of a ConfigConstraint.
@@ -121,7 +121,7 @@ type ConfigConstraintStatus struct {
 	// When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.
 	//
 	// +optional
-	Phase v1.ConfigConstraintPhase `json:"phase,omitempty"`
+	Phase appsv1beta1.ConfigConstraintPhase `json:"phase,omitempty"`
 
 	// Provides descriptions for abnormal states.
 	//
@@ -155,22 +155,22 @@ type ReloadOptions struct {
 	// Used to trigger a reload by sending a Unix signal to the process.
 	//
 	// +optional
-	UnixSignalTrigger *v1.UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
+	UnixSignalTrigger *appsv1beta1.UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
 
 	// Used to perform the reload command in shell script.
 	//
 	// +optional
-	ShellTrigger *v1.ShellTrigger `json:"shellTrigger,omitempty"`
+	ShellTrigger *appsv1beta1.ShellTrigger `json:"shellTrigger,omitempty"`
 
 	// Used to perform the reload command by Go template script.
 	//
 	// +optional
-	TPLScriptTrigger *v1.TPLScriptTrigger `json:"tplScriptTrigger"`
+	TPLScriptTrigger *appsv1beta1.TPLScriptTrigger `json:"tplScriptTrigger"`
 
 	// Used to automatically perform the reload command when conditions are met.
 	//
 	// +optional
-	AutoTrigger *v1.AutoTrigger `json:"autoTrigger,omitempty"`
+	AutoTrigger *appsv1beta1.AutoTrigger `json:"autoTrigger,omitempty"`
 }
 
 // +genclient

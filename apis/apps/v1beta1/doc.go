@@ -20,4 +20,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // +k8s:deepcopy-gen=package,register
 // +k8s:openapi-gen=true
 // +groupName=apps.kubeblocks.io
-package v1
+package v1beta1

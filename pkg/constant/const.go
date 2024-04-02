@@ -322,3 +322,12 @@ const (
 const (
 	KBGeneratedVirtualCompDefPrefix = "KB_GENERATED_VIRTUAL_COMP_DEF"
 )
+
+const (
+	KubeblocksAPIConversionTypeAnnotationName = "api.kubeblocks.io/converted"
+	SourceAPIVersionAnnotationName            = "api.kubeblocks.io/source"
+
+	SourceAPIVersion   = "source"
+	MigratedAPIVersion = "migrated"
+	ReviewAPIVersion   = "reviewer"
+)

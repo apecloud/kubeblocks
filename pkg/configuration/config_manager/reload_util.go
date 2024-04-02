@@ -31,7 +31,7 @@ import (
 	"strings"
 	"text/template/parse"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
@@ -51,7 +51,7 @@ const (
 // for testing
 var newCommandChannel = NewCommandChannel
 
-func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *v1.FormatterConfig, dataType, dsn string) (DynamicUpdater, error) {
+func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *appsv1beta1.FormatterConfig, dataType, dsn string) (DynamicUpdater, error) {
 	tplContent, err := os.ReadFile(tplScriptPath)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func checkTPLScript(tplName string, tplContent string) error {
 	return err
 }
 
-func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent string, updatedParams map[string]string, formatConfig *v1.FormatterConfig, dataType string, dsn string) error {
+func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent string, updatedParams map[string]string, formatConfig *appsv1beta1.FormatterConfig, dataType string, dsn string) error {
 	var (
 		err            error
 		commandChannel DynamicParamUpdater
@@ -103,7 +103,7 @@ func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent str
 	return err
 }
 
-func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, formatConfig *v1.FormatterConfig) *gotemplate.BuiltInObjectsFunc {
+func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, formatConfig *appsv1beta1.FormatterConfig) *gotemplate.BuiltInObjectsFunc {
 	return &gotemplate.BuiltInObjectsFunc{
 		builtInExecFunctionName: func(command string, args ...string) (string, error) {
 			execCommand := exec.CommandContext(ctx, command, args...)
@@ -137,7 +137,7 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 	}
 }
 
-func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCfg *v1.FormatterConfig) (map[string]string, error) {
+func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCfg *appsv1beta1.FormatterConfig) (map[string]string, error) {
 	patchOption := core.CfgOption{
 		Type:    core.CfgTplType,
 		CfgType: formatCfg.Format,
@@ -305,7 +305,7 @@ func NeedSharedProcessNamespace(configSpecs []ConfigSpecMeta) bool {
 		if configSpec.ConfigSpec.ConfigConstraintRef == "" {
 			continue
 		}
-		if configSpec.ReloadType == v1.UnixSignalType {
+		if configSpec.ReloadType == appsv1beta1.UnixSignalType {
 			return true
 		}
 	}

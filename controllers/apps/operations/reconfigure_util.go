@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -41,7 +41,7 @@ type reconfiguringResult struct {
 	err                  error
 }
 
-func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.ParamPairs, orinalData map[string]string, formatter *v1.FormatterConfig) {
+func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.ParamPairs, orinalData map[string]string, formatter *appsv1beta1.FormatterConfig) {
 	var maxLabelCount = 16
 	updateLabel := func(param map[string]interface{}) {
 		if obj.Labels == nil {
@@ -83,7 +83,7 @@ func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.P
 	}
 }
 
-func fetchOriginalValue(keyFile, data string, params map[string]interface{}, formatter *v1.FormatterConfig) (string, error) {
+func fetchOriginalValue(keyFile, data string, params map[string]interface{}, formatter *appsv1beta1.FormatterConfig) (string, error) {
 	baseConfigObj, err := core.FromConfigObject(keyFile, data, formatter)
 	if err != nil {
 		return "", err

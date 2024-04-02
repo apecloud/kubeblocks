@@ -25,7 +25,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -37,12 +37,12 @@ var fromTestData = func(fileName string) string {
 	return string(content)
 }
 
-var newFakeConfConstraint = func(cueFile string, cfgFormatter appsv1.CfgFileFormat) *appsv1.ConfigConstraintSpec {
-	return &appsv1.ConfigConstraintSpec{
-		ConfigSchema: &appsv1.ConfigSchema{
+var newFakeConfConstraint = func(cueFile string, cfgFormatter appsv1beta1.CfgFileFormat) *appsv1beta1.ConfigConstraintSpec {
+	return &appsv1beta1.ConfigConstraintSpec{
+		ConfigSchema: &appsv1beta1.ConfigSchema{
 			CUE: fromTestData(cueFile),
 		},
-		FormatterConfig: &appsv1.FormatterConfig{
+		FormatterConfig: &appsv1beta1.FormatterConfig{
 			Format: cfgFormatter,
 		},
 	}
@@ -52,7 +52,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 	type args struct {
 		cueFile    string
 		configFile string
-		format     appsv1.CfgFileFormat
+		format     appsv1beta1.CfgFileFormat
 		options    []ValidatorOptions
 	}
 	tests := []struct {
@@ -64,7 +64,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mongod.cue",
 			configFile: "cue_testdata/mongod.conf",
-			format:     appsv1.YAML,
+			format:     appsv1beta1.YAML,
 		},
 		err: nil,
 	}, {
@@ -72,7 +72,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/wesql.cue",
 			configFile: "cue_testdata/wesql.cnf",
-			format:     appsv1.Ini,
+			format:     appsv1beta1.Ini,
 		},
 		err: nil,
 	}, {
@@ -80,7 +80,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/pg14.cue",
 			configFile: "cue_testdata/pg14.conf",
-			format:     appsv1.Properties,
+			format:     appsv1beta1.Properties,
 		},
 		err: nil,
 	}, {
@@ -88,7 +88,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/clickhouse.cue",
 			configFile: "cue_testdata/clickhouse.xml",
-			format:     appsv1.XML,
+			format:     appsv1beta1.XML,
 		},
 		err: nil,
 	}, {
@@ -96,7 +96,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql.cnf",
-			format:     appsv1.Ini,
+			format:     appsv1beta1.Ini,
 		},
 		err: nil,
 	}, {
@@ -104,7 +104,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql_err.cnf",
-			format:     appsv1.Ini,
+			format:     appsv1beta1.Ini,
 		},
 		err: errors.New(`failed to render cue template configure: [mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction:
 mysqld.innodb_autoinc_lock_mode: conflicting values 0 and 100:
@@ -118,7 +118,7 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql_err.cnf",
-			format:     appsv1.Ini,
+			format:     appsv1beta1.Ini,
 			options:    []ValidatorOptions{WithKeySelector([]string{"key2", "key3"})},
 		},
 	}}
@@ -136,7 +136,7 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 }
 
 func TestSchemaValidatorWithSelector(t *testing.T) {
-	validator := NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1.Ini))
+	validator := NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1beta1.Ini))
 	require.NotNil(t, validator)
 	require.ErrorContains(t, validator.Validate(
 		map[string]string{
@@ -144,7 +144,7 @@ func TestSchemaValidatorWithSelector(t *testing.T) {
 			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
 		}), "[mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction")
 
-	validator = NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1.Ini), WithKeySelector([]string{}))
+	validator = NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1beta1.Ini), WithKeySelector([]string{}))
 	require.NotNil(t, validator)
 	require.ErrorContains(t, validator.Validate(
 		map[string]string{
@@ -152,7 +152,7 @@ func TestSchemaValidatorWithSelector(t *testing.T) {
 			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
 		}), "[mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction")
 
-	validator = NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1.Ini), WithKeySelector([]string{"normal_key"}))
+	validator = NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1beta1.Ini), WithKeySelector([]string{"normal_key"}))
 	require.NotNil(t, validator)
 	require.Nil(t, validator.Validate(
 		map[string]string{
@@ -165,7 +165,7 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 	type args struct {
 		cueFile        string
 		configFile     string
-		format         appsv1.CfgFileFormat
+		format         appsv1beta1.CfgFileFormat
 		SchemaTypeName string
 	}
 	tests := []struct {
@@ -177,7 +177,7 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql.cnf",
-			format:     appsv1.Ini,
+			format:     appsv1beta1.Ini,
 		},
 		err: nil,
 	}}

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1
+package v1beta1
 
 // ConfigConstraintPhase defines the ConfigConstraint  CR .status.phase
 // +enum
@@ -59,17 +59,17 @@ const (
 	PropertiesPlus CfgFileFormat = "props-plus"
 )
 
-// CfgReloadType defines reload method.
+// DynamicReloadType defines reload method.
 // +enum
-type CfgReloadType string
+type DynamicReloadType string
 
 const (
-	UnixSignalType CfgReloadType = "signal"
-	SQLType        CfgReloadType = "sql"
-	ShellType      CfgReloadType = "exec"
-	HTTPType       CfgReloadType = "http"
-	TPLScriptType  CfgReloadType = "tpl"
-	AutoType       CfgReloadType = "auto"
+	UnixSignalType DynamicReloadType = "signal"
+	SQLType        DynamicReloadType = "sql"
+	ShellType      DynamicReloadType = "exec"
+	HTTPType       DynamicReloadType = "http"
+	TPLScriptType  DynamicReloadType = "tpl"
+	AutoType       DynamicReloadType = "auto"
 )
 
 // SignalType defines which signals are valid.

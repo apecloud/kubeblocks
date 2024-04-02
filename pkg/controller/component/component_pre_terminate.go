@@ -109,7 +109,7 @@ func reconcileCompPreTerminate(ctx context.Context,
 		return err
 	}
 
-	return nil
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for job %s to be cleaned.", job.Name)
 }
 
 func needDoPreTerminate(ctx context.Context, cli client.Reader,

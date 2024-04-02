@@ -39,7 +39,7 @@ import (
 )
 
 var _ = Describe("utils test", func() {
-	Context("MergeList", func() {
+	Context("mergeList", func() {
 		It("should work well", func() {
 			src := []corev1.Volume{
 				{
@@ -77,7 +77,7 @@ var _ = Describe("utils test", func() {
 					},
 				},
 			}
-			MergeList(&src, &dst, func(v corev1.Volume) func(corev1.Volume) bool {
+			mergeList(&src, &dst, func(v corev1.Volume) func(corev1.Volume) bool {
 				return func(volume corev1.Volume) bool {
 					return v.Name == volume.Name
 				}
@@ -95,7 +95,7 @@ var _ = Describe("utils test", func() {
 		})
 	})
 
-	Context("MergeMap", func() {
+	Context("mergeMap", func() {
 		It("should work well", func() {
 			src := map[string]string{
 				"foo1": "bar1",
@@ -105,7 +105,7 @@ var _ = Describe("utils test", func() {
 				"foo0": "bar0",
 				"foo1": "bar",
 			}
-			MergeMap(&src, &dst)
+			mergeMap(&src, &dst)
 
 			Expect(dst).Should(HaveLen(3))
 			Expect(dst).Should(HaveKey("foo0"))

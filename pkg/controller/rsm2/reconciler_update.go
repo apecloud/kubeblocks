@@ -60,7 +60,7 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 	// 1. build desired name to template map
-	nameToTemplateMap, err := buildReplicaName2TemplateMap(rsm, tree)
+	nameToTemplateMap, err := buildInstanceName2TemplateMap(rsm, tree)
 	if err != nil {
 		return nil, err
 	}

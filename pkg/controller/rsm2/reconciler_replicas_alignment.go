@@ -57,7 +57,7 @@ func (r *replicasAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 	// 1. build desired name to template map
-	nameToTemplateMap, err := buildReplicaName2TemplateMap(rsm, tree)
+	nameToTemplateMap, err := buildInstanceName2TemplateMap(rsm, tree)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if shouldReady && predecessor != nil && !isHealthy(predecessor) {
 			break
 		}
-		replica, err := buildReplicaByTemplate(name, nameToTemplateMap[name], rsm)
+		replica, err := buildInstanceByTemplate(name, nameToTemplateMap[name], rsm)
 		if err != nil {
 			return nil, err
 		}

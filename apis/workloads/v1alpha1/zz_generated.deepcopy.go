@@ -110,6 +110,11 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Offline != nil {
+		in, out := &in.Offline, &out.Offline
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Annotations != nil {
 		in, out := &in.Annotations, &out.Annotations
 		*out = make(map[string]string, len(*in))

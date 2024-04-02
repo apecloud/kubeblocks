@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
+	"unsafe"
+
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -28,7 +30,7 @@ import (
 // revisionUpdateReconciler is responsible for updating the expected replica names and their corresponding revisions in the status when there are changes in the spec.
 type revisionUpdateReconciler struct{}
 
-type replicaRevision struct {
+type instanceRevision struct {
 	name     string
 	revision string
 }
@@ -52,37 +54,43 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 
 	// 1. build all templates by applying instance template overrides to default pod template
-	replicaTemplateGroups, err := buildReplicaTemplateGroups(rsm, tree)
+	replicaTemplateGroups, err := buildInstanceTemplateExtGroups(rsm, tree)
 	if err != nil {
 		return nil, err
 	}
 
 	// build replica revision list by template groups
-	var replicaRevisionList []replicaRevision
+	var instanceRevisionList []instanceRevision
 	for _, templateList := range replicaTemplateGroups {
-		var (
-			replicas []replicaRevision
-			ordinal  int
-			err      error
-		)
+		var templateGroup []InstanceTemplateMeta
 		for _, template := range templateList {
-			replicas, ordinal, err = buildReplicaRevisions(template, ordinal, rsm)
-			if err != nil {
-				return nil, err
+			templateGroup = append(templateGroup, template)
+		}
+		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(templateGroup, true)
+		templateRevisionMap, err := buildTemplateRevisionMap(templateList, rsm)
+		if err != nil {
+			return nil, err
+		}
+		for _, name := range instanceNames {
+			revision := ""
+			meta, ok := nameTemplateMap[name]
+			if ok {
+				template := meta.(*instanceTemplateExt)
+				revision = templateRevisionMap[uintptr(unsafe.Pointer(template))]
 			}
-			replicaRevisionList = append(replicaRevisionList, replicas...)
+			instanceRevisionList = append(instanceRevisionList, instanceRevision{name: name, revision: revision})
 		}
 	}
 	// validate duplicate pod names
-	getNameFunc := func(r replicaRevision) string {
+	getNameFunc := func(r instanceRevision) string {
 		return r.name
 	}
-	if err := validateDupReplicaNames(replicaRevisionList, getNameFunc); err != nil {
+	if err := ValidateDupInstanceNames(instanceRevisionList, getNameFunc); err != nil {
 		return nil, err
 	}
 
-	updatedRevisions := make(map[string]string, len(replicaRevisionList))
-	for _, r := range replicaRevisionList {
+	updatedRevisions := make(map[string]string, len(instanceRevisionList))
+	for _, r := range instanceRevisionList {
 		updatedRevisions[r.name] = r.revision
 	}
 
@@ -93,8 +101,8 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	}
 	rsm.Status.UpdateRevisions = revisions
 	updateRevision := ""
-	if len(replicaRevisionList) > 0 {
-		updateRevision = replicaRevisionList[len(replicaRevisionList)-1].revision
+	if len(instanceRevisionList) > 0 {
+		updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision
 	}
 	rsm.Status.UpdateRevision = updateRevision
 	// The 'ObservedGeneration' field is used to indicate whether the revisions have been updated.
@@ -105,18 +113,16 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	return tree, nil
 }
 
-func buildReplicaRevisions(template *podTemplateSpecExt, ordinal int, parent *workloads.ReplicatedStateMachine) ([]replicaRevision, int, error) {
-	revision, err := buildPodTemplateRevision(template, parent)
-	if err != nil {
-		return nil, ordinal, err
+func buildTemplateRevisionMap(templateGroup []*instanceTemplateExt, parent *workloads.ReplicatedStateMachine) (map[uintptr]string, error) {
+	templateRevisionMap := make(map[uintptr]string)
+	for _, template := range templateGroup {
+		revision, err := buildInstanceTemplateRevision(template, parent)
+		if err != nil {
+			return nil, err
+		}
+		templateRevisionMap[uintptr(unsafe.Pointer(template))] = revision
 	}
-	var replicaList []replicaRevision
-	var name string
-	for i := 0; i < int(template.Replicas); i++ {
-		name, ordinal = GeneratePodName(template.Name, template.GenerateName, ordinal, int(template.OrdinalStart), i)
-		replicaList = append(replicaList, replicaRevision{name: name, revision: revision})
-	}
-	return replicaList, ordinal, nil
+	return templateRevisionMap, nil
 }
 
 var _ kubebuilderx.Reconciler = &revisionUpdateReconciler{}

@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -45,19 +46,25 @@ import (
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-type podTemplateSpecExt struct {
+type InstanceTemplateMeta interface {
+	GetName() string
+	GetReplicas() int32
+	GetOrdinalStart() int32
+	IsOffline() bool
+}
+
+type instanceTemplateExt struct {
+	Name         string
 	Replicas     int32
 	OrdinalStart int32
+	Offline      bool
 	corev1.PodTemplateSpec
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 }
 
-type replica struct {
-	pod  *corev1.Pod
-	pvcs []*corev1.PersistentVolumeClaim
-}
+var instanceNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
-var replicaNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+var _ InstanceTemplateMeta = &instanceTemplateExt{}
 
 var (
 	reader *zstd.Decoder
@@ -72,12 +79,33 @@ func init() {
 	runtime.Must(err)
 }
 
-// ParseParentNameAndOrdinal parses parent (instance template) GenerateName and ordinal from the give instance name.
+func (t *instanceTemplateExt) GetName() string {
+	return t.Name
+}
+
+func (t *instanceTemplateExt) GetReplicas() int32 {
+	return t.Replicas
+}
+
+func (t *instanceTemplateExt) GetOrdinalStart() int32 {
+	return t.OrdinalStart
+}
+
+func (t *instanceTemplateExt) IsOffline() bool {
+	return t.Offline
+}
+
+type replica struct {
+	pod  *corev1.Pod
+	pvcs []*corev1.PersistentVolumeClaim
+}
+
+// ParseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
 // -1 will be returned if no numeric suffix contained.
 func ParseParentNameAndOrdinal(s string) (string, int) {
 	parent := s
 	ordinal := -1
-	subMatches := replicaNameRegex.FindStringSubmatch(s)
+	subMatches := instanceNameRegex.FindStringSubmatch(s)
 	if len(subMatches) < 3 {
 		return parent, ordinal
 	}
@@ -159,20 +187,20 @@ func getPodRevision(pod *corev1.Pod) string {
 	return pod.Labels[appsv1.ControllerRevisionHashLabelKey]
 }
 
-func validateDupReplicaNames[T any](replicas []T, getNameFunc func(item T) string) error {
-	podNameCount := make(map[string]int)
-	for _, r := range replicas {
+func ValidateDupInstanceNames[T any](instances []T, getNameFunc func(item T) string) error {
+	instanceNameCount := make(map[string]int)
+	for _, r := range instances {
 		name := getNameFunc(r)
-		count, exist := podNameCount[name]
+		count, exist := instanceNameCount[name]
 		if exist {
 			count++
 		} else {
 			count = 1
 		}
-		podNameCount[name] = count
+		instanceNameCount[name] = count
 	}
 	dupNames := ""
-	for name, count := range podNameCount {
+	for name, count := range instanceNameCount {
 		if count > 1 {
 			dupNames = fmt.Sprintf("%s%s,", dupNames, name)
 		}
@@ -183,96 +211,113 @@ func validateDupReplicaNames[T any](replicas []T, getNameFunc func(item T) strin
 	return nil
 }
 
-func buildReplicaName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (map[string]*podTemplateSpecExt, error) {
-	replicaTemplateGroups, err := buildReplicaTemplateGroups(rsm, tree)
+func buildInstanceName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (map[string]*instanceTemplateExt, error) {
+	instanceTemplateExtGroups, err := buildInstanceTemplateExtGroups(rsm, tree)
 	if err != nil {
 		return nil, err
 	}
-	nameTemplateMap := make(map[string]*podTemplateSpecExt)
-	var (
-		replicaNameList []string
-		replicaNames    []string
-		ordinal         int
-	)
-	for _, templateList := range replicaTemplateGroups {
-		ordinal = 0
+	allNameTemplateMap := make(map[string]*instanceTemplateExt)
+	var instanceNameList []string
+	for _, templateList := range instanceTemplateExtGroups {
+		var templateGroup []InstanceTemplateMeta
 		for _, template := range templateList {
-			replicaNames, ordinal, err = buildReplicaNames(template, ordinal)
-			if err != nil {
-				return nil, err
-			}
-			for _, name := range replicaNames {
-				nameTemplateMap[name] = template
-			}
-			replicaNameList = append(replicaNameList, replicaNames...)
+			templateGroup = append(templateGroup, template)
+		}
+		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(templateGroup, true)
+		instanceNameList = append(instanceNameList, instanceNames...)
+		for name, template := range nameTemplateMap {
+			allNameTemplateMap[name] = template.(*instanceTemplateExt)
 		}
 	}
 	// validate duplicate pod names
 	getNameFunc := func(n string) string {
 		return n
 	}
-	if err = validateDupReplicaNames(replicaNameList, getNameFunc); err != nil {
+	if err = ValidateDupInstanceNames(instanceNameList, getNameFunc); err != nil {
 		return nil, err
 	}
 
-	return nameTemplateMap, nil
+	return allNameTemplateMap, nil
 }
 
-func buildReplicaNames(template *podTemplateSpecExt, ordinal int) ([]string, int, error) {
-	var replicaNameList []string
-	var name string
-	for i := 0; i < int(template.Replicas); i++ {
-		name, ordinal = GeneratePodName(template.Name, template.GenerateName, ordinal, int(template.OrdinalStart), i)
-		replicaNameList = append(replicaNameList, name)
+func GenerateInstanceNamesFromGroup(templateGroup []InstanceTemplateMeta, onlineOnly bool) ([]string, map[string]InstanceTemplateMeta) {
+	var (
+		allNameList     []string
+		nameTemplateMap = make(map[string]InstanceTemplateMeta)
+
+		instanceNames []string
+		ordinal       int32
+		usedNames     = sets.New[string]()
+	)
+	// generate names from template with OrdinalStart
+	for _, template := range templateGroup {
+		if template.GetOrdinalStart() < 0 {
+			continue
+		}
+		instanceNames, _ = generateInstanceNames(template.GetName(), template.GetReplicas(), template.GetOrdinalStart(), sets.New[string]())
+		if !onlineOnly || !template.IsOffline() {
+			for _, name := range instanceNames {
+				nameTemplateMap[name] = template
+			}
+		}
+		allNameList = append(allNameList, instanceNames...)
+		usedNames.Insert(instanceNames...)
 	}
-	return replicaNameList, ordinal, nil
+	// generate names from template without OrdinalStart
+	ordinal = 0
+	for _, template := range templateGroup {
+		if template.GetOrdinalStart() >= 0 {
+			continue
+		}
+		instanceNames, ordinal = generateInstanceNames(template.GetName(), template.GetReplicas(), ordinal, usedNames)
+		if !onlineOnly || !template.IsOffline() {
+			for _, name := range instanceNames {
+				nameTemplateMap[name] = template
+			}
+		}
+		allNameList = append(allNameList, instanceNames...)
+	}
+
+	return allNameList, nameTemplateMap
 }
 
-// GeneratePodName generates a pod name based on certain rules:
-// 1. If a 'name' is provided in the InstanceTemplate, it is used directly.
-// 2. If an 'ordinalStart' is provided in the InstanceTemplate, the pods are indexed using a separate ordinal range,
-// i.e., [ordinalStart, ordinalStart+Replicas). In this function, the ordinal will be 'ordinalStart'+'index'.
-// 3. All other InstanceTemplates with the same generateName will be indexed using a shared ordinal range, which we refer to as the default ordinal range.
+// generateInstanceNames generates instance names based on certain rules:
+// 1. If an 'ordinalStart' is provided in the InstanceTemplate, the instances are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
+// 2. All other InstanceTemplates without 'ordinalStart' will be indexed using a shared ordinal range, which we refer to as the default ordinal range.
 //
 // For example:
-// Let's consider a template group with 4 InstanceTemplates:
-//   - name: ""
-//     generateName: "foo"
+// Let's consider a template group with 3 InstanceTemplates:
+//   - name: "foo"
 //     replicas: 2
-//     ordinalStart: 0
-//   - name: ""
-//     generateName: "foo"
+//     ordinalStart: -1
+//   - name: "foo"
 //     replicas: 2
 //     ordinalStart: 100
 //   - name: "foo"
-//     generateName: ""
-//     ordinalStart: 0
-//   - name: ""
-//     generateName: "foo"
 //     replicas: 2
-//     ordinalStart: 0
+//     ordinalStart: -1
 //
-// According to rule #1, we generate a pod name 'foo' from template #3.
-// According to rule #2, we generate 2 pod names 'foo-100' and 'foo-101' from template #2.
-// According to rule #3, template #1 and #4 share the same ordinal range starting from 0. We generate 4 pod names 'foo-0', 'foo-1', 'foo-2', and 'foo-3'.
-// Hence, the final 7 pod names are: 'foo', 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', and 'foo-101'.
-func GeneratePodName(name, generateName string, defaultOrdinal, ordinalStart, index int) (podName string, updatedDefaultOrdinal int) {
-	switch {
-	case len(name) > 0:
-		podName = name
-		updatedDefaultOrdinal = defaultOrdinal
-	case ordinalStart > 0:
-		podName = fmt.Sprintf("%s-%d", generateName, ordinalStart+index)
-		updatedDefaultOrdinal = defaultOrdinal
-	default:
-		podName = fmt.Sprintf("%s-%d", generateName, defaultOrdinal)
-		updatedDefaultOrdinal = defaultOrdinal + 1
+// According to rule #1, we generate 2 pod names 'foo-100' and 'foo-101' from template #2.
+// According to rule #3, template #1 and #3 share the same ordinal range starting from 0. We generate 4 pod names 'foo-0', 'foo-1', 'foo-2', and 'foo-3'.
+// Hence, the final 6 pod names are: 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', and 'foo-101'.
+func generateInstanceNames(parentName string, replicas int32, ordinal int32, usedNames sets.Set[string]) ([]string, int32) {
+	var replicaNameList []string
+	var name string
+	for i := int32(0); i < replicas; i++ {
+		for {
+			name = fmt.Sprintf("%s-%d", parentName, ordinal)
+			ordinal++
+			if !usedNames.Has(name) {
+				replicaNameList = append(replicaNameList, name)
+				break
+			}
+		}
 	}
-	return
+	return replicaNameList, ordinal
 }
 
-func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *workloads.ReplicatedStateMachine) (*replica, error) {
-	revision, err := buildPodTemplateRevision(template, parent)
+func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.ReplicatedStateMachine) (*replica, error) {
+	revision, err := buildInstanceTemplateRevision(template, parent)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +357,7 @@ func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *w
 			}).GetObject()
 		volumeList = append(volumeList, *volume)
 	}
-	MergeList(&volumeList, &pod.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
+	mergeList(&volumeList, &pod.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
 		return func(v corev1.Volume) bool {
 			return v.Name == item.Name
 		}
@@ -417,39 +462,30 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 func validateSpec(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) error {
 	replicasInTemplates := int32(0)
-	var names string
 	template, err := findTemplate(rsm, tree)
 	if err != nil {
 		return err
 	}
 	instanceTemplates := getInstanceTemplates(rsm.Spec.Instances, template)
 	for _, instance := range instanceTemplates {
+		if instance.Offline != nil && *instance.Offline {
+			continue
+		}
 		replicas := int32(1)
 		if instance.Replicas != nil {
 			replicas = *instance.Replicas
 		}
 		replicasInTemplates += replicas
-
-		if instance.Name != nil {
-			if instance.Replicas != nil && *instance.Replicas > 1 {
-				names = fmt.Sprintf("%s%s,", names, *instance.Name)
-			}
-		}
 	}
 	// sum of spec.templates[*].replicas should not greater than spec.replicas
 	if replicasInTemplates > *rsm.Spec.Replicas {
 		return fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *rsm.Spec.Replicas)
 	}
 
-	// instance.replicas should be nil or 1 if instance.name set
-	if len(names) > 0 {
-		return fmt.Errorf("replicas should be empty or no more than 1 if name set, instance names: %s", names)
-	}
-
 	return nil
 }
 
-func buildPodTemplateRevision(template *podTemplateSpecExt, parent *workloads.ReplicatedStateMachine) (string, error) {
+func buildInstanceTemplateRevision(template *instanceTemplateExt, parent *workloads.ReplicatedStateMachine) (string, error) {
 	// try to generate the same revision as if generated by sts controller
 	rsm := builder.NewReplicatedStateMachineBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
@@ -465,16 +501,15 @@ func buildPodTemplateRevision(template *podTemplateSpecExt, parent *workloads.Re
 	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
-func buildReplicaTemplateGroups(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (map[string][]*podTemplateSpecExt, error) {
+func buildInstanceTemplateExtGroups(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (map[string][]*instanceTemplateExt, error) {
 	envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
 	defaultTemplate := rsm1.BuildPodTemplate(rsm, envConfigName)
-	buildPodTemplateExt := func(replicas int32) *podTemplateSpecExt {
+	makeInstanceTemplateExt := func() *instanceTemplateExt {
 		var claims []corev1.PersistentVolumeClaim
 		for _, template := range rsm.Spec.VolumeClaimTemplates {
 			claims = append(claims, *template.DeepCopy())
 		}
-		return &podTemplateSpecExt{
-			Replicas:             replicas,
+		return &instanceTemplateExt{
 			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
 			VolumeClaimTemplates: claims,
 		}
@@ -485,19 +520,12 @@ func buildReplicaTemplateGroups(rsm *workloads.ReplicatedStateMachine, tree *kub
 	}
 
 	instanceTemplateGroups := BuildInstanceTemplateGroups(rsm.Name, *rsm.Spec.Replicas, rsm.Spec.Instances, instancesCompressed)
-	replicaTemplateGroups := make(map[string][]*podTemplateSpecExt)
+	replicaTemplateGroups := make(map[string][]*instanceTemplateExt)
 	for name, instanceTemplates := range instanceTemplateGroups {
-		var podTemplates []*podTemplateSpecExt
+		var podTemplates []*instanceTemplateExt
 		for _, instance := range instanceTemplates {
-			replicas := int32(1)
-			if instance.Replicas != nil {
-				replicas = *instance.Replicas
-			}
-			template := buildPodTemplateExt(replicas)
-			applyInstanceTemplate(*instance, template)
-			if template.GenerateName == "" {
-				template.GenerateName = rsm.Name
-			}
+			template := makeInstanceTemplateExt()
+			buildInstanceTemplateExt(rsm.Name, *instance, template)
 			podTemplates = append(podTemplates, template)
 		}
 		replicaTemplateGroups[name] = podTemplates
@@ -528,7 +556,7 @@ func BuildInstanceTemplateGroups(parentName string, totalReplicas int32, instanc
 	// group the pod templates by template.Name if set or by template.GenerateName
 	instanceTemplateGroups := make(map[string][]*workloads.InstanceTemplate)
 	for _, template := range instanceTemplateList {
-		name := GetGroupName(parentName, template.Name, template.GenerateName)
+		name := GetGroupName(parentName, template.Name)
 		templates := instanceTemplateGroups[name]
 		templates = append(templates, template)
 		instanceTemplateGroups[name] = templates
@@ -537,15 +565,11 @@ func BuildInstanceTemplateGroups(parentName string, totalReplicas int32, instanc
 	return instanceTemplateGroups
 }
 
-func GetGroupName(parentName string, instanceName, generateName *string) string {
-	switch {
-	case instanceName != nil:
-		return *instanceName
-	case generateName != nil:
-		return *generateName
-	default:
-		return parentName
+func GetGroupName(parentName string, name *string) string {
+	if name != nil {
+		return *name
 	}
+	return parentName
 }
 
 func getInstanceTemplateMap(annotations map[string]string) (map[string]string, error) {
@@ -611,50 +635,54 @@ func findTemplate(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.Obje
 	return nil, nil
 }
 
-func applyInstanceTemplate(instance workloads.InstanceTemplate, template *podTemplateSpecExt) {
+func buildInstanceTemplateExt(parentName string, template workloads.InstanceTemplate, templateExt *instanceTemplateExt) {
 	replicas := int32(1)
-	if instance.Replicas != nil {
-		replicas = *instance.Replicas
+	if template.Replicas != nil {
+		replicas = *template.Replicas
 	}
-	template.Replicas = replicas
-	if instance.Name != nil {
-		template.Name = *instance.Name
+	templateExt.Replicas = replicas
+	name := parentName
+	if template.Name != nil {
+		name = *template.Name
 	}
-	if instance.GenerateName != nil {
-		template.GenerateName = *instance.GenerateName
+	templateExt.Name = name
+	ordinalStart := int32(-1)
+	if template.OrdinalStart != nil {
+		ordinalStart = *template.OrdinalStart
 	}
-	ordinalStart := int32(0)
-	if instance.OrdinalStart != nil {
-		ordinalStart = *instance.OrdinalStart
+	templateExt.OrdinalStart = ordinalStart
+	offline := false
+	if template.Offline != nil {
+		offline = *template.Offline
 	}
-	template.OrdinalStart = ordinalStart
-	if instance.NodeName != nil {
-		template.Spec.NodeName = *instance.NodeName
+	templateExt.Offline = offline
+	if template.NodeName != nil {
+		templateExt.Spec.NodeName = *template.NodeName
 	}
-	MergeMap(&instance.Annotations, &template.Annotations)
-	MergeMap(&instance.Labels, &template.Labels)
-	MergeMap(&instance.NodeSelector, &template.Spec.NodeSelector)
-	if len(template.Spec.Containers) > 0 {
-		if instance.Image != nil {
-			template.Spec.Containers[0].Image = *instance.Image
+	mergeMap(&template.Annotations, &templateExt.Annotations)
+	mergeMap(&template.Labels, &templateExt.Labels)
+	mergeMap(&template.NodeSelector, &templateExt.Spec.NodeSelector)
+	if len(templateExt.Spec.Containers) > 0 {
+		if template.Image != nil {
+			templateExt.Spec.Containers[0].Image = *template.Image
 		}
-		if instance.Resources != nil {
-			template.Spec.Containers[0].Resources = *instance.Resources
+		if template.Resources != nil {
+			templateExt.Spec.Containers[0].Resources = *template.Resources
 		}
 	}
-	MergeList(&instance.Volumes, &template.Spec.Volumes,
+	mergeList(&template.Volumes, &templateExt.Spec.Volumes,
 		func(item corev1.Volume) func(corev1.Volume) bool {
 			return func(v corev1.Volume) bool {
 				return v.Name == item.Name
 			}
 		})
-	MergeList(&instance.VolumeMounts, &template.Spec.Containers[0].VolumeMounts,
+	mergeList(&template.VolumeMounts, &templateExt.Spec.Containers[0].VolumeMounts,
 		func(item corev1.VolumeMount) func(corev1.VolumeMount) bool {
 			return func(vm corev1.VolumeMount) bool {
 				return vm.Name == item.Name
 			}
 		})
-	MergeList(&instance.VolumeClaimTemplates, &template.VolumeClaimTemplates,
+	mergeList(&template.VolumeClaimTemplates, &templateExt.VolumeClaimTemplates,
 		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
 			return func(claim corev1.PersistentVolumeClaim) bool {
 				return claim.Name == item.Name

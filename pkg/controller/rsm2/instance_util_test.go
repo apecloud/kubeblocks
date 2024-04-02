@@ -28,7 +28,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -100,25 +99,25 @@ var _ = Describe("replica util test", func() {
 		})
 	})
 
-	Context("validateDupReplicaNames", func() {
+	Context("ValidateDupInstanceNames", func() {
 		It("should work well", func() {
 			By("build name list without duplication")
 			replicas := []string{"pod-0", "pod-1"}
-			Expect(validateDupReplicaNames(replicas, func(item string) string {
+			Expect(ValidateDupInstanceNames(replicas, func(item string) string {
 				return item
 			})).Should(Succeed())
 
 			By("add a duplicate name")
 			replicas = append(replicas, "pod-0")
-			Expect(validateDupReplicaNames(replicas, func(item string) string {
+			Expect(ValidateDupInstanceNames(replicas, func(item string) string {
 				return item
 			})).ShouldNot(Succeed())
 		})
 	})
 
-	Context("buildReplicaName2TemplateMap", func() {
+	Context("buildInstanceName2TemplateMap", func() {
 		It("build a rsm with default template only", func() {
-			nameTemplate, err := buildReplicaName2TemplateMap(rsm, nil)
+			nameTemplate, err := buildInstanceName2TemplateMap(rsm, nil)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name0 := rsm.Name + "-0"
@@ -132,7 +131,7 @@ var _ = Describe("replica util test", func() {
 		})
 
 		It("build a rsm with one instance template override", func() {
-			nameOverride0 := "name-o-0"
+			nameOverride0 := "name-override"
 			annotationOverride := map[string]string{
 				"foo": "bar",
 			}
@@ -147,7 +146,7 @@ var _ = Describe("replica util test", func() {
 				Image:       &imageOverride,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instance)
-			nameTemplate, err := buildReplicaName2TemplateMap(rsm, nil)
+			nameTemplate, err := buildInstanceName2TemplateMap(rsm, nil)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name0 := rsm.Name + "-0"
@@ -166,15 +165,15 @@ var _ = Describe("replica util test", func() {
 		})
 	})
 
-	Context("buildReplicaByTemplate", func() {
+	Context("buildInstanceByTemplate", func() {
 		It("should work well", func() {
-			nameTemplate, err := buildReplicaName2TemplateMap(rsm, nil)
+			nameTemplate, err := buildInstanceName2TemplateMap(rsm, nil)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
 			template := nameTemplate[name]
-			replica, err := buildReplicaByTemplate(name, template, rsm)
+			replica, err := buildInstanceByTemplate(name, template, rsm)
 			Expect(err).Should(BeNil())
 			Expect(replica.pod).ShouldNot(BeNil())
 			Expect(replica.pvcs).ShouldNot(BeNil())
@@ -202,29 +201,16 @@ var _ = Describe("replica util test", func() {
 			By("a valid spec")
 			Expect(validateSpec(rsm, nil)).Should(Succeed())
 
-			By("instance.replicas exceeds 1 when name set")
-			rsm1 := rsm.DeepCopy()
-			name := "name-override-0"
-			replicas := int32(2)
-			instance := workloads.InstanceTemplate{
-				Name:     &name,
-				Replicas: &replicas,
-			}
-			rsm1.Spec.Instances = append(rsm1.Spec.Instances, instance)
-			err := validateSpec(rsm1, nil)
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("replicas should be empty or no more than 1 if name set"))
-
 			By("sum of replicas in instance exceeds spec.replicas")
 			rsm2 := rsm.DeepCopy()
-			replicas = 4
-			generateName := "barrrrr"
-			instance = workloads.InstanceTemplate{
-				Replicas:     &replicas,
-				GenerateName: &generateName,
+			replicas := int32(4)
+			name := "barrrrr"
+			instance := workloads.InstanceTemplate{
+				Replicas: &replicas,
+				Name:     &name,
 			}
 			rsm2.Spec.Instances = append(rsm2.Spec.Instances, instance)
-			err = validateSpec(rsm2, nil)
+			err := validateSpec(rsm2, nil)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("should not greater than replicas in spec"))
 		})
@@ -350,8 +336,8 @@ var _ = Describe("replica util test", func() {
 			Expect(err).Should(BeNil())
 			instances := []workloads.InstanceTemplate{
 				{
-					Replicas:     func() *int32 { r := int32(2); return &r }(),
-					GenerateName: func() *string { n := "hello"; return &n }(),
+					Replicas: func() *int32 { r := int32(2); return &r }(),
+					Name:     func() *string { n := "hello"; return &n }(),
 				},
 				{
 					Replicas: func() *int32 { r := int32(1); return &r }(),
@@ -373,8 +359,8 @@ var _ = Describe("replica util test", func() {
 			// append templates from mock function
 			instances = append(instances, []workloads.InstanceTemplate{
 				{
-					Replicas:     func() *int32 { r := int32(2); return &r }(),
-					GenerateName: func() *string { n := "foo"; return &n }(),
+					Replicas: func() *int32 { r := int32(2); return &r }(),
+					Name:     func() *string { n := "foo"; return &n }(),
 				},
 				{
 					Replicas: func() *int32 { r := int32(1); return &r }(),
@@ -386,88 +372,50 @@ var _ = Describe("replica util test", func() {
 		})
 	})
 
-	// - name: ""
-	//   generateName: "foo"
+	// - name: "foo"
 	//   replicas: 2
-	//   ordinalStart: 0
-	// - name: ""
-	//   generateName: "foo"
+	//   ordinalStart: -1
+	// - name: "foo"
 	//   replicas: 2
 	//   ordinalStart: 100
 	// - name: "foo"
-	//   generateName: ""
-	//   ordinalStart: 0
-	// - name: ""
-	//   generateName: "foo"
 	//   replicas: 2
-	//   ordinalStart: 0
+	//   ordinalStart: -1
 	//
-	// Based on rule #1, we generate a pod name 'foo' from template #3.
-	// Based on rule #2, we generate 2 pod names 'foo-100', 'foo-101' from template #2.
-	// Based on rule #3, template #1 and #4 share the same ordinal range and start from 0, we generate 4 pod names 'foo-0','foo-1','foo-2','foo-3'.
-	// So the final 7 pod names are: 'foo', 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', 'foo-101'.
-	Context("GeneratePodName", func() {
+	// Based on rule #1, we generate 2 instance names 'foo-100', 'foo-101' from template #1.
+	// Based on rule #2, template #1 and #3 share the same ordinal range and start from 0, we generate 4 instance names 'foo-0','foo-1','foo-2','foo-3'.
+	// So the final 6 instance names are: 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', 'foo-101'.
+	Context("generateInstanceNames", func() {
 		It("should work well", func() {
-			templates := []podTemplateSpecExt{
+			templates := []*instanceTemplateExt{
 				{
 					Replicas:     2,
-					OrdinalStart: 0,
-					PodTemplateSpec: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:         "",
-							GenerateName: "foo",
-						},
-					},
+					Name:         "foo",
+					OrdinalStart: -1,
 				},
 				{
 					Replicas:     2,
+					Name:         "foo",
 					OrdinalStart: 100,
-					PodTemplateSpec: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:         "",
-							GenerateName: "foo",
-						},
-					},
-				},
-				{
-					Replicas:     1,
-					OrdinalStart: 0,
-					PodTemplateSpec: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:         "foo",
-							GenerateName: "",
-						},
-					},
 				},
 				{
 					Replicas:     2,
-					OrdinalStart: 0,
-					PodTemplateSpec: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:         "",
-							GenerateName: "foo",
-						},
-					},
+					Name:         "foo",
+					OrdinalStart: -1,
 				},
 			}
-			var (
-				podNames []string
-				ordinal  = 0
-				podName  string
-			)
 
+			var templateGroup []InstanceTemplateMeta
 			for _, template := range templates {
-				for i := 0; i < int(template.Replicas); i++ {
-					podName, ordinal = GeneratePodName(template.Name, template.GenerateName, ordinal, int(template.OrdinalStart), i)
-					podNames = append(podNames, podName)
-				}
+				templateGroup = append(templateGroup, template)
 			}
+			instanceNames, _ := GenerateInstanceNamesFromGroup(templateGroup, true)
 			getNameNOrdinalFunc := func(i int) (string, int) {
-				return ParseParentNameAndOrdinal(podNames[i])
+				return ParseParentNameAndOrdinal(instanceNames[i])
 			}
-			BaseSort(podNames, getNameNOrdinalFunc, nil, false)
-			podNamesExpected := []string{"foo", "foo-0", "foo-1", "foo-2", "foo-3", "foo-100", "foo-101"}
-			Expect(podNames).Should(Equal(podNamesExpected))
+			BaseSort(instanceNames, getNameNOrdinalFunc, nil, false)
+			podNamesExpected := []string{"foo-0", "foo-1", "foo-2", "foo-3", "foo-100", "foo-101"}
+			Expect(instanceNames).Should(Equal(podNamesExpected))
 		})
 	})
 })

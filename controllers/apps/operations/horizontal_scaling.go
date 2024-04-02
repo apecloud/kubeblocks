@@ -25,7 +25,6 @@ import (
 	"reflect"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -86,20 +85,17 @@ type nameWithTemplate struct {
 	workloads.InstanceTemplate
 }
 
-// buildInstances constructs a new instances specification based on the current instances in ClusterComponentSpec and the instances to be updated (added/updated/deleted) in HorizontalScaling.
+// buildInstances constructs a new instances specification based on the current instances in ClusterComponentSpec and the instances to be added and/or deleted in HorizontalScaling.
 // For instances to be added:
 // 1. The new instances are appended to the current instances.
-// For instances to be updated:
-// 1. A matching instance is searched for in the current instances based on the provided Name or GenerateName.
-// 2. If a matching instance is found, it is updated. If necessary, the matching instance (template) is split.
-// 3. An error is raised if no matching instance is found.
+// 2. An error is raised if duplicate instance name(s) found.
 // For instances to be deleted:
-// 1. A matching instance is searched for in the current instances based on the provided Name or GenerateName.
+// 1. A matching instance is searched for in the current instances based on the provided instance.
 // 2. If a matching instance is found, it is deleted. If necessary, the matching instance (template) is split.
 // 3. An error is raised if no matching instance is found.
 // The newly constructed instances undergo validation, and an error is raised if they are invalid.
 func buildInstances(clusterName string, componentSpec appsv1alpha1.ClusterComponentSpec, horizontalScaling appsv1alpha1.HorizontalScaling) ([]appsv1alpha1.InstanceTemplate, error) {
-	if componentSpec.Instances == nil && horizontalScaling.InstancesToAdd == nil && horizontalScaling.InstancesToUpdate == nil && horizontalScaling.InstancesToDelete == nil {
+	if componentSpec.Instances == nil && horizontalScaling.Instances == nil {
 		return nil, nil
 	}
 	getTotalReplicas := func(instances []appsv1alpha1.InstanceTemplate) (totalReplicas int32) {
@@ -112,41 +108,46 @@ func buildInstances(clusterName string, componentSpec appsv1alpha1.ClusterCompon
 		}
 		return
 	}
-	componentName := intctrlcomp.FullName(clusterName, componentSpec.Name)
-	name2TemplateMap := buildName2TemplateMap(componentName, componentSpec.Replicas, componentSpec.Instances)
-	addedMap := buildName2TemplateMap(componentName, getTotalReplicas(horizontalScaling.InstancesToAdd), horizontalScaling.InstancesToAdd)
-	for name, template := range addedMap {
-		name2TemplateMap[name] = template
-	}
-	updatedMap := buildName2TemplateMap(componentName, getTotalReplicas(horizontalScaling.InstancesToUpdate), horizontalScaling.InstancesToUpdate)
-	for name, template := range updatedMap {
-		oldTemplate, ok := name2TemplateMap[name]
-		if !ok {
-			return nil, fmt.Errorf("no template for instance %s found to update", name)
+	var (
+		instanceToAdd    []appsv1alpha1.InstanceTemplate
+		instanceToDelete []appsv1alpha1.InstanceTemplate
+	)
+	for _, instance := range horizontalScaling.Instances {
+		if instance.Offline != nil && *instance.Offline {
+			instanceToDelete = append(instanceToDelete, instance)
+		} else {
+			instanceToAdd = append(instanceToAdd, instance)
 		}
-		name2TemplateMap[name] = mergeInstance(template, oldTemplate)
 	}
-	deletedMap := buildName2TemplateMap(componentName, getTotalReplicas(horizontalScaling.InstancesToDelete), horizontalScaling.InstancesToDelete)
-	for name := range deletedMap {
-		_, ok := name2TemplateMap[name]
+	componentName := intctrlcomp.FullName(clusterName, componentSpec.Name)
+	nameTemplateMap, err := buildNameTemplateMap(componentName, componentSpec.Replicas, append(componentSpec.Instances, instanceToAdd...))
+	if err != nil {
+		return nil, err
+	}
+	toBeDeletedMap, err := buildNameTemplateMap(componentName, getTotalReplicas(instanceToDelete), instanceToDelete)
+	if err != nil {
+		return nil, err
+	}
+	for name := range toBeDeletedMap {
+		_, ok := nameTemplateMap[name]
 		if !ok {
 			return nil, fmt.Errorf("no template for instance %s found to delete", name)
 		}
-		delete(name2TemplateMap, name)
+		nameTemplateMap[name] = toBeDeletedMap[name]
 	}
 
-	return rebuildInstanceTemplates(name2TemplateMap), nil
+	return rebuildInstanceTemplates(nameTemplateMap), nil
 }
 
-func rebuildInstanceTemplates(name2TemplateMap map[string]nameWithTemplate) []appsv1alpha1.InstanceTemplate {
-	if len(name2TemplateMap) == 0 {
+func rebuildInstanceTemplates(nameTemplateMap map[string]nameWithTemplate) []appsv1alpha1.InstanceTemplate {
+	if len(nameTemplateMap) == 0 {
 		return nil
 	}
 	var (
 		instances         []appsv1alpha1.InstanceTemplate
 		nameWithTemplates []nameWithTemplate
 	)
-	for _, template := range name2TemplateMap {
+	for _, template := range nameTemplateMap {
 		nameWithTemplates = append(nameWithTemplates, template)
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
@@ -183,8 +184,8 @@ func newInstanceTemplate(nameWithTemplate *nameWithTemplate) *appsv1alpha1.Insta
 	return &appsv1alpha1.InstanceTemplate{
 		Replicas:             &replicas,
 		Name:                 instance.Name,
-		GenerateName:         instance.GenerateName,
 		OrdinalStart:         ordinalStart,
+		Offline:              instance.Offline,
 		Annotations:          instance.Annotations,
 		Labels:               instance.Labels,
 		Image:                instance.Image,
@@ -213,7 +214,6 @@ func isHomogeneousInstance(nameWithTemplates []nameWithTemplate, i, j int) bool 
 	setNilNameFields := func(t *workloads.InstanceTemplate) {
 		t.Replicas = nil
 		t.Name = nil
-		t.GenerateName = nil
 		t.OrdinalStart = nil
 	}
 	ti := nameWithTemplates[i].InstanceTemplate
@@ -223,38 +223,7 @@ func isHomogeneousInstance(nameWithTemplates []nameWithTemplate, i, j int) bool 
 	return reflect.DeepEqual(ti, tj)
 }
 
-func mergeInstance(src, dst nameWithTemplate) nameWithTemplate {
-	if src.NodeName != nil {
-		dst.NodeName = src.NodeName
-	}
-	rsm2.MergeMap(&src.Annotations, &dst.Annotations)
-	rsm2.MergeMap(&src.Labels, &dst.Labels)
-	rsm2.MergeMap(&src.NodeSelector, &dst.NodeSelector)
-	if src.Image != nil {
-		dst.Image = src.Image
-	}
-	rsm2.MergeList(&src.Volumes, &dst.Volumes,
-		func(item corev1.Volume) func(corev1.Volume) bool {
-			return func(v corev1.Volume) bool {
-				return v.Name == item.Name
-			}
-		})
-	rsm2.MergeList(&src.VolumeMounts, &dst.VolumeMounts,
-		func(item corev1.VolumeMount) func(corev1.VolumeMount) bool {
-			return func(vm corev1.VolumeMount) bool {
-				return vm.Name == item.Name
-			}
-		})
-	rsm2.MergeList(&src.VolumeClaimTemplates, &dst.VolumeClaimTemplates,
-		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
-			return func(claim corev1.PersistentVolumeClaim) bool {
-				return claim.Name == item.Name
-			}
-		})
-	return dst
-}
-
-func buildName2TemplateMap(componentName string, replicas int32, instances []appsv1alpha1.InstanceTemplate) map[string]nameWithTemplate {
+func buildNameTemplateMap(componentName string, replicas int32, instances []appsv1alpha1.InstanceTemplate) (map[string]nameWithTemplate, error) {
 	// 1. build instance template groups
 	var workloadsInstances []workloads.InstanceTemplate
 	for _, instance := range instances {
@@ -263,37 +232,28 @@ func buildName2TemplateMap(componentName string, replicas int32, instances []app
 	instanceTemplateGroups := rsm2.BuildInstanceTemplateGroups(componentName, replicas, workloadsInstances, nil)
 
 	// 2. build instance name to instance template map
-	name2TemplateMap := make(map[string]nameWithTemplate, replicas)
-	for parentName, templates := range instanceTemplateGroups {
-		ordinal := 0
+	var allNameList []string
+	allNameTemplateMap := make(map[string]nameWithTemplate, replicas)
+	for _, templates := range instanceTemplateGroups {
+		var templateGroup []rsm2.InstanceTemplateMeta
 		for _, template := range templates {
-			templateName := ""
-			if template.Name != nil {
-				templateName = *template.Name
-			}
-			generateName := parentName
-			if template.GenerateName != nil {
-				generateName = *template.GenerateName
-			}
-			ordinalStart := 0
-			if template.OrdinalStart != nil {
-				ordinalStart = int(*template.OrdinalStart)
-			}
-			replicas := 1
-			if template.Replicas != nil {
-				replicas = int(*template.Replicas)
-			}
-			name := ""
-			for i := 0; i < replicas; i++ {
-				name, ordinal = rsm2.GeneratePodName(templateName, generateName, ordinal, ordinalStart, i)
-				name2TemplateMap[name] = nameWithTemplate{
-					instanceName:     name,
-					InstanceTemplate: *template,
-				}
+			templateGroup = append(templateGroup, template)
+		}
+		instanceNames, nameTemplateMap := rsm2.GenerateInstanceNamesFromGroup(templateGroup, false)
+		allNameList = append(allNameList, instanceNames...)
+		for name, meta := range nameTemplateMap {
+			template := meta.(*workloads.InstanceTemplate)
+			allNameTemplateMap[name] = nameWithTemplate{
+				instanceName:     name,
+				InstanceTemplate: *template,
 			}
 		}
 	}
-	return name2TemplateMap
+	getNameFunc := func(name string) string { return name }
+	if err := rsm2.ValidateDupInstanceNames(allNameList, getNameFunc); err != nil {
+		return nil, err
+	}
+	return allNameTemplateMap, nil
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.

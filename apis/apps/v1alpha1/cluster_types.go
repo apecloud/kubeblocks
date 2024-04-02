@@ -341,6 +341,11 @@ type InstanceTemplate struct {
 	// +optional
 	OrdinalStart *int32 `json:"ordinalStart,omitempty"`
 
+	// Specified instances built from this template should be offline.
+	//
+	// +optional
+	Offline *bool `json:"offline,omitempty"`
+
 	// Defines annotations to override.
 	// Add new or override existing annotations.
 	// +optional
@@ -617,34 +622,24 @@ type ClusterComponentSpec struct {
 	// The InstanceTemplate provides a way to override values in the default template,
 	// allowing the component to manage instances from different templates.
 	//
-	// The instance name (hence the pod name) is generated from Name, GenerateName, Replicas and OrdinalStart provided in the InstanceTemplates.
+	// The instance name (hence the pod name) is generated from Name, Replicas and OrdinalStart provided in the InstanceTemplates.
 	// The rules are:
-	// 1. For each InstanceTemplate, if a 'name' is provided, it is used directly.
-	// 2. If an 'ordinalStart' is provided, the instance names are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
-	// 3. All InstanceTemplates with the same generateName will be indexed using a shared ordinal range, which we refer to as the default ordinal range.
+	// 1. If an OrdinalStart is provided in the InstanceTemplate, the instances are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
+	// 2. All other InstanceTemplates without OrdinalStart will be indexed using a shared ordinal range, which we refer to as the default ordinal range.
 	//
 	// For example:
-	// Let's consider the following 4 InstanceTemplates:
-	//   - name: ""
-	//     generateName: "foo"
+	// Let's consider a template group with 3 InstanceTemplates:
+	//   - name: "foo"
 	//     replicas: 2
-	//     ordinalStart: 0
-	//   - name: ""
-	//     generateName: "foo"
+	//   - name: "foo"
 	//     replicas: 2
 	//     ordinalStart: 100
 	//   - name: "foo"
-	//     generateName: ""
-	//     ordinalStart: 0
-	//   - name: ""
-	//     generateName: "foo"
 	//     replicas: 2
-	//     ordinalStart: 0
 	//
-	// According to rule #1, we generate a pod name 'foo' from template #3.
-	// According to rule #2, we generate 2 pod names 'foo-100' and 'foo-101' from template #2.
-	// According to rule #3, template #1 and #4 share the same ordinal range starting from 0. We generate 4 pod names 'foo-0', 'foo-1', 'foo-2', and 'foo-3'.
-	// Hence, the final 7 pod names are: 'foo', 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', and 'foo-101'.
+	// According to rule #1, we generate 2 pod names 'foo-100' and 'foo-101' from template #2.
+	// According to rule #3, template #1 and #3 share the same ordinal range starting from 0. We generate 4 pod names 'foo-0', 'foo-1', 'foo-2', and 'foo-3'.
+	// Hence, the final 6 pod names are: 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', and 'foo-101'.
 	//
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`

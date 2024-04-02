@@ -3530,15 +3530,8 @@ func (in *HorizontalScalePolicy) DeepCopy() *HorizontalScalePolicy {
 func (in *HorizontalScaling) DeepCopyInto(out *HorizontalScaling) {
 	*out = *in
 	out.ComponentOps = in.ComponentOps
-	if in.InstancesToAdd != nil {
-		in, out := &in.InstancesToAdd, &out.InstancesToAdd
-		*out = make([]InstanceTemplate, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
-	if in.InstancesToDelete != nil {
-		in, out := &in.InstancesToDelete, &out.InstancesToDelete
+	if in.Instances != nil {
+		in, out := &in.Instances, &out.Instances
 		*out = make([]InstanceTemplate, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
@@ -3634,6 +3627,11 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 	if in.OrdinalStart != nil {
 		in, out := &in.OrdinalStart, &out.OrdinalStart
 		*out = new(int32)
+		**out = **in
+	}
+	if in.Offline != nil {
+		in, out := &in.Offline, &out.Offline
+		*out = new(bool)
 		**out = **in
 	}
 	if in.Annotations != nil {

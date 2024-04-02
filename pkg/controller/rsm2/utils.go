@@ -30,7 +30,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func MergeMap(src, dst *map[string]string) {
+func mergeMap(src, dst *map[string]string) {
 	if *src == nil {
 		return
 	}
@@ -42,7 +42,7 @@ func MergeMap(src, dst *map[string]string) {
 	}
 }
 
-func MergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
+func mergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 	if len(*src) == 0 {
 		return
 	}

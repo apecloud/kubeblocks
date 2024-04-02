@@ -4706,6 +4706,22 @@ A component manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the component to manage instances from different templates.</p>
+<p>The instance name (hence the pod name) is generated from Name, Replicas and OrdinalStart provided in the InstanceTemplates.
+The rules are:
+1. If an OrdinalStart is provided in the InstanceTemplate, the instances are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
+2. All other InstanceTemplates without OrdinalStart will be indexed using a shared ordinal range, which we refer to as the default ordinal range.</p>
+<p>For example:
+Let&rsquo;s consider a template group with 3 InstanceTemplates:
+- name: &ldquo;foo&rdquo;
+replicas: 2
+- name: &ldquo;foo&rdquo;
+replicas: 2
+ordinalStart: 100
+- name: &ldquo;foo&rdquo;
+replicas: 2</p>
+<p>According to rule #1, we generate 2 pod names &lsquo;foo-100&rsquo; and &lsquo;foo-101&rsquo; from template #2.
+According to rule #3, template #1 and #3 share the same ordinal range starting from 0. We generate 4 pod names &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, and &lsquo;foo-3&rsquo;.
+Hence, the final 6 pod names are: &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, &lsquo;foo-3&rsquo;, &lsquo;foo-100&rsquo;, and &lsquo;foo-101&rsquo;.</p>
 </td>
 </tr>
 </tbody>
@@ -11292,6 +11308,20 @@ int32
 <p>Specifies the number of replicas for the workloads.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be added and/or deleted for the workloads.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork
@@ -11415,7 +11445,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>)
 </p>
 <div>
 <p>InstanceTemplate defines values to override in pod template.</p>
@@ -11450,27 +11480,45 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the name of the instance.
-Only applied when Replicas is 1.</p>
+<p>Specifies the name of the template.
+Each instance of the template derives its name from the template&rsquo;s Name and the instance&rsquo;s ordinal.
+The constructed instance name follows the pattern $(name)-$(ordinal).
+The ordinal is determined by the OrdinalStart field, which defaults to 0.</p>
+<p>If not specified, it defaults to the name of the Component.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>generateName</code><br/>
+<code>ordinalStart</code><br/>
 <em>
-string
+int32
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>GenerateName is an optional prefix, used by the server, to generate a unique
-name ONLY IF the Name field has not been provided.
-If this field is used, the name returned to the client will be different
-than the name passed. This value will also be combined with a unique suffix.
-The provided value has the same validation rules as the Name field,
-and may be truncated by the length of the suffix required to make the value
-unique on the server.</p>
-<p>Applied only if Name is not specified.</p>
+<p>OrdinalStart controls the numbering of instance(replica) indices in a Component. The
+default ordinals behavior assigns a &ldquo;0&rdquo; index to the first instance and
+increments the index by one for each additional instance requested.
+OrdinalStart is the number representing the first instance&rsquo;s index. It may be used
+to number instances from an alternate index (eg: 1-indexed) over the default
+0-indexed names, or to orchestrate progressive movement of instances from
+one Component to another.
+If set, instance indices will be in the range:
+[OrdinalStart, OrdinalStart + Replicas).
+If unset, defaults to 0. Instance indices will be in the range:
+[0, Replicas).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offline</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specified instances built from this template should be offline.</p>
 </td>
 </tr>
 <tr>
@@ -11845,6 +11893,20 @@ map[github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ComponentResourceKey][]str
 <em>(Optional)</em>
 <p>Records the information about the target resources affected by the component.
 The resource key is in the list of [pods].</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
+InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the last instances of the component.</p>
 </td>
 </tr>
 </tbody>
@@ -19818,6 +19880,22 @@ A RSM manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the RSM to manage instances from different templates.</p>
+<p>The instance name (hence the pod name) is generated from Name, Replicas and OrdinalStart provided in the InstanceTemplates.
+The rules are:
+1. If an OrdinalStart is provided in the InstanceTemplate, the instances are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
+2. All other InstanceTemplates without OrdinalStart will be indexed using a shared ordinal range, which we refer to as the default ordinal range.</p>
+<p>For example:
+Let&rsquo;s consider a template group with 3 InstanceTemplates:
+- name: &ldquo;foo&rdquo;
+replicas: 2
+- name: &ldquo;foo&rdquo;
+replicas: 2
+ordinalStart: 100
+- name: &ldquo;foo&rdquo;
+replicas: 2</p>
+<p>According to rule #1, we generate 2 pod names &lsquo;foo-100&rsquo; and &lsquo;foo-101&rsquo; from template #2.
+According to rule #3, template #1 and #3 share the same ordinal range starting from 0. We generate 4 pod names &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, and &lsquo;foo-3&rsquo;.
+Hence, the final 6 pod names are: &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, &lsquo;foo-3&rsquo;, &lsquo;foo-100&rsquo;, and &lsquo;foo-101&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -20184,27 +20262,45 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the name of the instance.
-Only applied when Replicas is 1.</p>
+<p>Specifies the name of the template.
+Each instance of the template derives its name from the template&rsquo;s Name and the instance&rsquo;s ordinal.
+The constructed instance name follows the pattern $(name)-$(ordinal).
+The ordinal is determined by the OrdinalStart field, which defaults to 0.</p>
+<p>If not specified, it defaults to the name of the RSM.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>generateName</code><br/>
+<code>ordinalStart</code><br/>
 <em>
-string
+int32
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>GenerateName is an optional prefix, used by the server, to generate a unique
-name ONLY IF the Name field has not been provided.
-If this field is used, the name returned to the client will be different
-than the name passed. This value will also be combined with a unique suffix.
-The provided value has the same validation rules as the Name field,
-and may be truncated by the length of the suffix required to make the value
-unique on the server.</p>
-<p>Applied only if Name is not specified.</p>
+<p>OrdinalStart controls the numbering of instance(replica) indices in a RSM. The
+default ordinals behavior assigns a &ldquo;0&rdquo; index to the first instance and
+increments the index by one for each additional instance requested.
+OrdinalStart is the number representing the first instance&rsquo;s index. It may be used
+to number instances from an alternate index (eg: 1-indexed) over the default
+0-indexed names, or to orchestrate progressive movement of instances from
+one RSM to another.
+If set, instance indices will be in the range:
+[OrdinalStart, OrdinalStart + Replicas).
+If unset, defaults to 0. Instance indices will be in the range:
+[0, Replicas).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offline</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specified instances built from this template should be offline.</p>
 </td>
 </tr>
 <tr>
@@ -20732,6 +20828,22 @@ A RSM manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the RSM to manage instances from different templates.</p>
+<p>The instance name (hence the pod name) is generated from Name, Replicas and OrdinalStart provided in the InstanceTemplates.
+The rules are:
+1. If an OrdinalStart is provided in the InstanceTemplate, the instances are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
+2. All other InstanceTemplates without OrdinalStart will be indexed using a shared ordinal range, which we refer to as the default ordinal range.</p>
+<p>For example:
+Let&rsquo;s consider a template group with 3 InstanceTemplates:
+- name: &ldquo;foo&rdquo;
+replicas: 2
+- name: &ldquo;foo&rdquo;
+replicas: 2
+ordinalStart: 100
+- name: &ldquo;foo&rdquo;
+replicas: 2</p>
+<p>According to rule #1, we generate 2 pod names &lsquo;foo-100&rsquo; and &lsquo;foo-101&rsquo; from template #2.
+According to rule #3, template #1 and #3 share the same ordinal range starting from 0. We generate 4 pod names &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, and &lsquo;foo-3&rsquo;.
+Hence, the final 6 pod names are: &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, &lsquo;foo-3&rsquo;, &lsquo;foo-100&rsquo;, and &lsquo;foo-101&rsquo;.</p>
 </td>
 </tr>
 <tr>

@@ -97,8 +97,8 @@ func (c *clientReader) List(ctx context.Context, list client.ObjectList, opts ..
 	}
 
 	objects := reflect.MakeSlice(items.Type(), 0, 0)
-	request := func(cli client.Client) error {
-		if err := cli.List(ctx, list, opts...); err != nil {
+	request := func(cc contextCli, _ client.Object) error {
+		if err := cc.cli.List(ctx, list, opts...); err != nil {
 			return err
 		}
 		objs := reflect.ValueOf(list).Elem().FieldByName("Items")
@@ -123,48 +123,49 @@ type clientWriter struct {
 var _ client.Writer = &clientWriter{}
 
 func (c *clientWriter) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
-	request := func(cli client.Client) error {
-		o, ok := obj.DeepCopyObject().(client.Object)
+	request := func(cc contextCli, lobj client.Object) error {
+		o, ok := lobj.DeepCopyObject().(client.Object)
 		if !ok {
 			return fmt.Errorf("not client object: %T", obj)
 		}
-		return cli.Create(ctx, o, opts...)
+		setPlacementKey(o, cc.context)
+		return cc.cli.Create(ctx, o, opts...)
 	}
 	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
 func (c *clientWriter) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
-	request := func(cli client.Client) error {
-		return cli.Delete(ctx, obj, opts...)
+	request := func(cc contextCli, _ client.Object) error {
+		return cc.cli.Delete(ctx, obj, opts...)
 	}
 	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
 func (c *clientWriter) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	request := func(cli client.Client) error {
-		o, ok := obj.DeepCopyObject().(client.Object)
+	request := func(cc contextCli, lobj client.Object) error {
+		o, ok := lobj.DeepCopyObject().(client.Object)
 		if !ok {
 			return fmt.Errorf("not client object: %T", obj)
 		}
-		return cli.Update(ctx, o, opts...)
+		return cc.cli.Update(ctx, o, opts...)
 	}
 	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
 func (c *clientWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	request := func(cli client.Client) error {
-		o, ok := obj.DeepCopyObject().(client.Object)
+	request := func(cc contextCli, lobj client.Object) error {
+		o, ok := lobj.DeepCopyObject().(client.Object)
 		if !ok {
 			return fmt.Errorf("not client object: %T", obj)
 		}
-		return cli.Patch(ctx, o, patch, opts...)
+		return cc.cli.Patch(ctx, o, patch, opts...)
 	}
 	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
 func (c *clientWriter) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
-	request := func(cli client.Client) error {
-		return cli.DeleteAllOf(ctx, obj, opts...)
+	request := func(cc contextCli, _ client.Object) error {
+		return cc.cli.DeleteAllOf(ctx, obj, opts...)
 	}
 	return allOf(c.mctx, ctx, obj, request, opts)
 }
@@ -227,42 +228,42 @@ type subResourceWriter struct {
 var _ client.SubResourceWriter = &subResourceWriter{}
 
 func (c *subResourceWriter) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
-	request := func(cli client.Client) error {
-		o, ok := obj.DeepCopyObject().(client.Object)
+	request := func(cc contextCli, lobj client.Object) error {
+		o, ok := lobj.DeepCopyObject().(client.Object)
 		if !ok {
 			return fmt.Errorf("not client object: %T", obj)
 		}
-		return cli.Status().Create(ctx, o, subResource, opts...)
+		return cc.cli.Status().Create(ctx, o, subResource, opts...)
 	}
 	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
 func (c *subResourceWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-	request := func(cli client.Client) error {
-		o, ok := obj.DeepCopyObject().(client.Object)
+	request := func(cc contextCli, lobj client.Object) error {
+		o, ok := lobj.DeepCopyObject().(client.Object)
 		if !ok {
 			return fmt.Errorf("not client object: %T", obj)
 		}
-		return cli.Status().Update(ctx, o, opts...)
+		return cc.cli.Status().Update(ctx, o, opts...)
 	}
 	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
 func (c *subResourceWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
-	request := func(cli client.Client) error {
-		o, ok := obj.DeepCopyObject().(client.Object)
+	request := func(cc contextCli, lobj client.Object) error {
+		o, ok := lobj.DeepCopyObject().(client.Object)
 		if !ok {
 			return fmt.Errorf("not client object: %T", obj)
 		}
-		return cli.Status().Patch(ctx, o, patch, opts...)
+		return cc.cli.Status().Patch(ctx, o, patch, opts...)
 	}
 	return allOf(c.mctx, ctx, obj, request, opts)
 }
 
-func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(cli client.Client) error, opts any) error {
+func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
 	var err error
-	for _, cli := range targetClients(mctx, ctx, obj, opts) {
-		if e := request(cli); e != nil {
+	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
+		if e := request(cc, obj); e != nil {
 			if err == nil {
 				err = e
 			}
@@ -271,37 +272,42 @@ func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(c
 	return err
 }
 
-func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(cli client.Client) error, opts any) error {
+func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(client.Client) error, opts any) error {
 	var err error
-	for _, cli := range targetClients(mctx, ctx, obj, opts) {
-		if err = request(cli); err == nil {
+	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
+		if err = request(cc.cli); err == nil {
 			return nil
 		}
 	}
 	return err
 }
 
-func targetClients(mctx mcontext, ctx context.Context, obj client.Object, opts any) []client.Client {
+type contextCli struct {
+	context string
+	cli     client.Client
+}
+
+func resolvedClients(mctx mcontext, ctx context.Context, obj client.Object, opts any) []contextCli {
 	// has no data-plane k8s clusters
 	if len(mctx.workers) == 0 {
-		return []client.Client{mctx.control}
+		return []contextCli{{"", mctx.control}}
 	}
 
 	o := hasClientOption(opts)
 	if o == nil {
-		return []client.Client{mctx.control}
+		return []contextCli{{"", mctx.control}}
 	}
 
 	if o.control {
-		return []client.Client{mctx.control}
+		return []contextCli{{"", mctx.control}}
 	}
 
 	if o.unspecified {
-		return maps.Values(mctx.workers)
+		return dataClients(mctx, maps.Keys(mctx.workers))
 	}
 
 	if o.universal {
-		return append([]client.Client{mctx.control}, workerClients(mctx, fromContext(ctx))...)
+		return append([]contextCli{{"", mctx.control}}, dataClients(mctx, fromContext(ctx))...)
 	}
 
 	if o.oneshot {
@@ -309,10 +315,10 @@ func targetClients(mctx mcontext, ctx context.Context, obj client.Object, opts a
 		if len(workers) > 0 {
 			workers = workers[:1] // always to use first worker k8s cluster
 		}
-		return workerClients(mctx, workers)
+		return dataClients(mctx, workers)
 	}
 
-	return workerClients(mctx, fromContextNObject(ctx, obj))
+	return dataClients(mctx, fromContextNObject(ctx, obj))
 }
 
 func hasClientOption(opts any) *ClientOption {
@@ -328,11 +334,11 @@ func hasClientOption(opts any) *ClientOption {
 	return nil
 }
 
-func workerClients(mctx mcontext, workers []string) []client.Client {
-	l := make([]client.Client, 0)
+func dataClients(mctx mcontext, workers []string) []contextCli {
+	l := make([]contextCli, 0)
 	for _, c := range workers {
 		if cli, ok := mctx.workers[c]; ok {
-			l = append(l, cli)
+			l = append(l, contextCli{c, cli})
 		}
 	}
 	return l

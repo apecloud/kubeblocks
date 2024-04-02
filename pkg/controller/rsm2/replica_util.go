@@ -241,7 +241,7 @@ func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *w
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddControllerRevisionHashLabel(revision).
-		// HACK: add the pod name to the labels for the pod to be selected by pod service.
+		// HACK: add the pod name to labels for that the pod can be selected by pod-services.
 		AddLabelsInMap(map[string]string{constant.StatefulSetPodNameLabelKey: name}).
 		SetPodSpec(*template.Spec.DeepCopy()).
 		GetObject()

@@ -103,31 +103,15 @@ func assign(ctx context.Context, obj client.Object) client.Object {
 	switch obj.(type) {
 	// only handle Pod and PersistentVolumeClaim
 	case *corev1.Pod, *corev1.PersistentVolumeClaim:
-		break
+		ordinal := func() int {
+			subs := strings.Split(obj.GetName(), "-")
+			o, _ := strconv.Atoi(subs[len(subs)-1])
+			return o
+		}
+		return multicluster.Assign(ctx, obj, ordinal)
 	default:
 		return obj
 	}
-
-	if obj.GetAnnotations() != nil && obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey] != "" {
-		return obj
-	}
-
-	p, err := multicluster.FromContext(ctx)
-	if err != nil {
-		panic(fmt.Sprintf("no placement was present in context: %v", err))
-	}
-	contexts := strings.Split(p, ",")
-
-	subs := strings.Split(obj.GetName(), "-")
-	ordinal, _ := strconv.Atoi(subs[len(subs)-1])
-	context := contexts[ordinal%len(contexts)]
-	if obj.GetAnnotations() == nil {
-		obj.SetAnnotations(map[string]string{constant.KBAppMultiClusterPlacementKey: context})
-	} else {
-		obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey] = context
-	}
-
-	return obj
 }
 
 func inDataContext() model.GraphOption {

@@ -191,12 +191,12 @@ func IsReconciliationPaused(object client.Object) bool {
 }
 
 // ReadCacheSnapshot reads all objects owned by our cluster
-func ReadCacheSnapshot(ctx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (ObjectSnapshot, error) {
+func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (ObjectSnapshot, error) {
 	// list what kinds of object cluster owns
 	snapshot := make(ObjectSnapshot)
 	inNS := client.InNamespace(root.GetNamespace())
 	for _, list := range kinds {
-		if err := ctx.GetClient().List(ctx.GetContext(), list, inNS, ml); err != nil {
+		if err := transCtx.GetClient().List(transCtx.GetContext(), list, inNS, ml); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items
@@ -212,6 +212,7 @@ func ReadCacheSnapshot(ctx graph.TransformContext, root client.Object, ml client
 			snapshot[*name] = object
 		}
 	}
+
 	return snapshot, nil
 }
 

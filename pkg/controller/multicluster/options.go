@@ -45,12 +45,6 @@ func InUniversalContext() *ClientOption {
 	}
 }
 
-func InDataContextOneshot() *ClientOption {
-	return &ClientOption{
-		oneshot: true,
-	}
-}
-
 type ClientOption struct {
 	control     bool // control plane
 	universal   bool // both control and data planes

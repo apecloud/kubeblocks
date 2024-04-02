@@ -21,6 +21,7 @@ package multicluster
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,6 +39,44 @@ func FromContext(ctx context.Context) (string, error) {
 		return v, nil
 	}
 	return "", placementNotFoundError{}
+}
+
+func Assign(ctx context.Context, obj client.Object, ordinal func() int) client.Object {
+	// has been set
+	if obj.GetAnnotations() != nil && obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey] != "" {
+		return obj
+	}
+
+	placement, err := FromContext(ctx)
+	if err != nil {
+		panic(fmt.Sprintf("no placement was present in context: %v", err))
+	}
+	contexts := strings.Split(placement, ",")
+	context := contexts[ordinal()%len(contexts)]
+
+	if obj.GetAnnotations() == nil {
+		obj.SetAnnotations(map[string]string{constant.KBAppMultiClusterPlacementKey: context})
+	} else {
+		obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey] = context
+	}
+
+	return obj
+}
+
+func setPlacementKey(obj client.Object, context string) {
+	// has been set
+	if obj.GetAnnotations() != nil && obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey] != "" {
+		return
+	}
+	// the context is empty
+	if len(context) == 0 {
+		return
+	}
+	if obj.GetAnnotations() == nil {
+		obj.SetAnnotations(map[string]string{constant.KBAppMultiClusterPlacementKey: context})
+	} else {
+		obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey] = context
+	}
 }
 
 type placementKey struct{}

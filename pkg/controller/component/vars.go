@@ -40,6 +40,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -478,7 +479,7 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 	}
 
 	objKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: objName}
-	if err := cli.Get(ctx, objKey, obj); err != nil {
+	if err := cli.Get(ctx, objKey, obj, multicluster.InDataContext()); err != nil {
 		if apierrors.IsNotFound(err) && _optional() {
 			return nil, nil, nil
 		}
@@ -793,7 +794,7 @@ func resolvePodVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp
 					Name:      constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, compName),
 				}
 				rsm := &workloads.ReplicatedStateMachine{}
-				err := cli.Get(ctx, key, rsm)
+				err := cli.Get(ctx, key, rsm, multicluster.InDataContext())
 				if err != nil {
 					return nil, err
 				}
@@ -818,7 +819,7 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 				Name:      svcName,
 			}
 			obj := &corev1.Service{}
-			err := cli.Get(ctx, key, obj)
+			err := cli.Get(ctx, key, obj, multicluster.InDataContext())
 			return obj, err
 		}
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
@@ -835,7 +836,7 @@ func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesi
 				Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name),
 			}
 			obj := &corev1.Secret{}
-			err := cli.Get(ctx, key, obj)
+			err := cli.Get(ctx, key, obj, multicluster.InDataContext())
 			return obj, err
 		}
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)

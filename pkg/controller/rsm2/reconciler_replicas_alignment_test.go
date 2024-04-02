@@ -54,7 +54,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
 			By("prepare current tree")
-			// desired: hello, foo-0, foo-1, bar-0, bar-1, bar-2, bar-3
+			// desired: hello-0, foo-0, foo-1, bar-0, bar-1, bar-2, bar-3
 			// current: foo-0, bar-1
 			replicas := int32(7)
 			rsm.Spec.Replicas = &replicas
@@ -63,11 +63,11 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				Name: &nameHello,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceHello)
-			generateNameFoo := "foo"
+			nameFoo := "foo"
 			replicasFoo := int32(2)
 			instanceFoo := workloads.InstanceTemplate{
-				GenerateName: &generateNameFoo,
-				Replicas:     &replicasFoo,
+				Name:     &nameFoo,
+				Replicas: &replicasFoo,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceFoo)
 			podFoo0 := builder.NewPodBuilder(namespace, "foo-0").GetObject()
@@ -109,7 +109,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			parallelRsm.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			newTree, err = reconciler.Reconcile(parallelTree)
 			Expect(err).Should(BeNil())
-			// desired: hello, foo-0, foo-1, bar-0, bar-1, bar-2, bar-3
+			// desired: hello-0, foo-0, foo-1, bar-0, bar-1, bar-2, bar-3
 			pods = newTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(7))
 			currentPodSnapshot = make(model.ObjectSnapshot)
@@ -119,7 +119,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				currentPodSnapshot[*name] = object
 			}
 
-			podHello := builder.NewPodBuilder(namespace, "hello").GetObject()
+			podHello := builder.NewPodBuilder(namespace, "hello-0").GetObject()
 			podFoo1 := builder.NewPodBuilder(namespace, "foo-1").GetObject()
 			podBar2 := builder.NewPodBuilder(namespace, "bar-2").GetObject()
 			podBar3 := builder.NewPodBuilder(namespace, "bar-3").GetObject()

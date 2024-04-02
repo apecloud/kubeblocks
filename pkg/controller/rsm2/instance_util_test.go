@@ -131,7 +131,8 @@ var _ = Describe("replica util test", func() {
 		})
 
 		It("build a rsm with one instance template override", func() {
-			nameOverride0 := "name-override"
+			nameOverride := "name-override"
+			nameOverride0 := nameOverride + "-0"
 			annotationOverride := map[string]string{
 				"foo": "bar",
 			}
@@ -140,7 +141,7 @@ var _ = Describe("replica util test", func() {
 			}
 			imageOverride := "foo:latest"
 			instance := workloads.InstanceTemplate{
-				Name:        &nameOverride0,
+				Name:        &nameOverride,
 				Annotations: annotationOverride,
 				Labels:      labelOverride,
 				Image:       &imageOverride,

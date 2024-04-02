@@ -124,8 +124,8 @@ func init() {
 func mockCompressedInstanceTemplates(ns, name string) (*corev1.ConfigMap, string, error) {
 	instances := []workloads.InstanceTemplate{
 		{
-			Replicas:     func() *int32 { r := int32(2); return &r }(),
-			GenerateName: func() *string { n := "foo"; return &n }(),
+			Replicas: func() *int32 { r := int32(2); return &r }(),
+			Name:     func() *string { n := "foo"; return &n }(),
 		},
 		{
 			Replicas: func() *int32 { r := int32(1); return &r }(),

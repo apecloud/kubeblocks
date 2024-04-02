@@ -72,8 +72,8 @@ var _ = Describe("update reconciler test", func() {
 			generateNameFoo := "foo"
 			replicasFoo := int32(2)
 			instanceFoo := workloads.InstanceTemplate{
-				GenerateName: &generateNameFoo,
-				Replicas:     &replicasFoo,
+				Name:     &generateNameFoo,
+				Replicas: &replicasFoo,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceFoo)
 

@@ -77,6 +77,9 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 			// waiting for the preTerminate action to be done, and watch the action finish event to trigger the next reconcile
 			return nil
 		}
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
+			return newRequeueError(time.Second*1, "request to requeue the component pre-terminate action")
+		}
 		return err
 	}
 

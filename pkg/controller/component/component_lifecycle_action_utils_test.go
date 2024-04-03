@@ -159,8 +159,10 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 			renderJob, err := renderActionCmdJob(testCtx.Ctx, testCtx.Cli, cluster, synthesizeComp, PreTerminateAction)
 			Expect(err).Should(Succeed())
 			Expect(renderJob).ShouldNot(BeNil())
-			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 9).Should(BeTrue())
+			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 11).Should(BeTrue())
 			compListExist := false
+			deletingCompListExist := false
+			undeletedCompListExist := false
 			compPodNameListExist := false
 			compPodIPListExist := false
 			compPodHostNameListExist := false
@@ -173,6 +175,10 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 				switch env.Name {
 				case kbLifecycleActionClusterCompList:
 					compListExist = true
+				case kbLifecycleActionClusterCompDeletingList:
+					deletingCompListExist = true
+				case kbLifecycleActionClusterCompUndeletedList:
+					undeletedCompListExist = true
 				case kbLifecycleActionClusterCompPodHostIPList:
 					compPodHostIPListExist = true
 				case kbLifecycleActionClusterCompPodHostNameList:
@@ -192,6 +198,8 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 				}
 			}
 			Expect(compListExist).Should(BeTrue())
+			Expect(deletingCompListExist).Should(BeTrue())
+			Expect(undeletedCompListExist).Should(BeTrue())
 			Expect(compPodNameListExist).Should(BeTrue())
 			Expect(compPodIPListExist).Should(BeTrue())
 			Expect(compPodHostNameListExist).Should(BeTrue())

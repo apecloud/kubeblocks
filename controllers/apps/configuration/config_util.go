@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
@@ -43,7 +43,7 @@ import (
 )
 
 type ValidateConfigMap func(configTpl, ns string) (*corev1.ConfigMap, error)
-type ValidateConfigSchema func(tpl *v1.ConfigSchema) (bool, error)
+type ValidateConfigSchema func(tpl *appsv1beta1.ConfigSchema) (bool, error)
 
 func checkConfigLabels(object client.Object, requiredLabs []string) bool {
 	labels := object.GetLabels()
@@ -82,9 +82,9 @@ func getConfigMapByTemplateName(cli client.Client, ctx intctrlutil.RequestCtx, t
 	return configObj, nil
 }
 
-func checkConfigConstraint(ctx intctrlutil.RequestCtx, configConstraint *v1.ConfigConstraint) (bool, error) {
+func checkConfigConstraint(ctx intctrlutil.RequestCtx, configConstraint *appsv1beta1.ConfigConstraint) (bool, error) {
 	// validate configuration template
-	validateConfigSchema := func(ccSchema *v1.ConfigSchema) (bool, error) {
+	validateConfigSchema := func(ccSchema *appsv1beta1.ConfigSchema) (bool, error) {
 		if ccSchema == nil || len(ccSchema.CUE) == 0 {
 			return true, nil
 		}
@@ -321,7 +321,7 @@ func updateLabelsByConfigSpec[T generics.Object, PT generics.PObject[T]](cli cli
 
 func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 	// validate ConfigTemplate
-	foundAndCheckConfigSpec := func(configSpec appsv1alpha1.ComponentConfigSpec, logger logr.Logger) (*v1.ConfigConstraint, error) {
+	foundAndCheckConfigSpec := func(configSpec appsv1alpha1.ComponentConfigSpec, logger logr.Logger) (*appsv1beta1.ConfigConstraint, error) {
 		if _, err := getConfigMapByTemplateName(cli, ctx, configSpec.TemplateRef, configSpec.Namespace); err != nil {
 			logger.Error(err, "failed to get config template cm object!")
 			return nil, err
@@ -336,7 +336,7 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 			Namespace: "",
 			Name:      configSpec.ConfigConstraintRef,
 		}
-		configObj := &v1.ConfigConstraint{}
+		configObj := &appsv1beta1.ConfigConstraint{}
 		if err := cli.Get(ctx.Ctx, configKey, configObj); err != nil {
 			logger.Error(err, "failed to get template cm object!")
 			return nil, err
@@ -366,18 +366,18 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 	return true, nil
 }
 
-func validateConfigConstraintStatus(ccStatus v1.ConfigConstraintStatus) bool {
-	return ccStatus.Phase == v1.CCAvailablePhase
+func validateConfigConstraintStatus(ccStatus appsv1beta1.ConfigConstraintStatus) bool {
+	return ccStatus.Phase == appsv1beta1.CCAvailablePhase
 }
 
-func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx, configConstraint *v1.ConfigConstraint, phase v1.ConfigConstraintPhase) error {
+func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx, configConstraint *appsv1beta1.ConfigConstraint, phase appsv1beta1.ConfigConstraintPhase) error {
 	patch := client.MergeFrom(configConstraint.DeepCopy())
 	configConstraint.Status.Phase = phase
 	configConstraint.Status.ObservedGeneration = configConstraint.Generation
 	return cli.Status().Patch(ctx.Ctx, configConstraint, patch)
 }
 
-func createConfigPatch(cfg *corev1.ConfigMap, formatter *v1.FormatterConfig, cmKeys []string) (*core.ConfigPatchInfo, bool, error) {
+func createConfigPatch(cfg *corev1.ConfigMap, formatter *appsv1beta1.FormatterConfig, cmKeys []string) (*core.ConfigPatchInfo, bool, error) {
 	// support full update
 	if formatter == nil {
 		return nil, true, nil
@@ -390,7 +390,7 @@ func createConfigPatch(cfg *corev1.ConfigMap, formatter *v1.FormatterConfig, cmK
 	return core.CreateConfigPatch(lastConfig, cfg.Data, formatter.Format, cmKeys, true)
 }
 
-func updateConfigSchema(cc *v1.ConfigConstraint, cli client.Client, ctx context.Context) error {
+func updateConfigSchema(cc *appsv1beta1.ConfigConstraint, cli client.Client, ctx context.Context) error {
 	schema := cc.Spec.ConfigSchema
 	if schema == nil || schema.CUE == "" {
 		return nil

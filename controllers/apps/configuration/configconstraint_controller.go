@@ -30,8 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -47,6 +47,8 @@ type ConfigConstraintReconciler struct {
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configconstraints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configconstraints/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configconstraints/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -65,7 +67,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Recorder: r.Recorder,
 	}
 
-	configConstraint := &v1.ConfigConstraint{}
+	configConstraint := &appsv1beta1.ConfigConstraint{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configConstraint); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -75,8 +77,8 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			r.Recorder.Event(configConstraint, corev1.EventTypeWarning, "ExistsReferencedResources",
 				"cannot be deleted because of existing referencing of ClusterDefinition or ClusterVersion.")
 		}
-		if configConstraint.Status.Phase != v1.CCDeletingPhase {
-			err := updateConfigConstraintStatus(r.Client, reqCtx, configConstraint, v1.CCDeletingPhase)
+		if configConstraint.Status.Phase != appsv1beta1.CCDeletingPhase {
+			err := updateConfigConstraintStatus(r.Client, reqCtx, configConstraint, appsv1beta1.CCDeletingPhase)
 			// if fail to update ConfigConstraint status, return error,
 			// so that it can be retried
 			if err != nil {
@@ -108,7 +110,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate openAPISchema")
 	}
 
-	err = updateConfigConstraintStatus(r.Client, reqCtx, configConstraint, v1.CCAvailablePhase)
+	err = updateConfigConstraintStatus(r.Client, reqCtx, configConstraint, appsv1beta1.CCAvailablePhase)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -119,7 +121,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 // SetupWithManager sets up the controller with the Manager.
 func (r *ConfigConstraintReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&v1.ConfigConstraint{}).
+		For(&appsv1beta1.ConfigConstraint{}).
 		// for other resource
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)

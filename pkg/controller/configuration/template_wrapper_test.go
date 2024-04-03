@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -125,13 +125,13 @@ var _ = Describe("TemplateWrapperTest", func() {
 						"test-config-spec-new": "test-config-spec-update",
 					},
 				},
-				&v1.ConfigConstraint{
+				&appsv1beta1.ConfigConstraint{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: configSpecName,
 					},
-					Spec: v1.ConfigConstraintSpec{
-						FormatterConfig: &v1.FormatterConfig{
-							Format: v1.Ini,
+					Spec: appsv1beta1.ConfigConstraintSpec{
+						FormatterConfig: &appsv1beta1.FormatterConfig{
+							Format: appsv1beta1.Ini,
 						},
 					},
 				},

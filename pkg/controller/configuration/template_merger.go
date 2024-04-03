@@ -24,8 +24,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -41,7 +41,7 @@ type TemplateMerger interface {
 type mergeContext struct {
 	template   appsv1alpha1.ConfigTemplateExtension
 	configSpec appsv1alpha1.ComponentConfigSpec
-	ccSpec     *v1.ConfigConstraintSpec
+	ccSpec     *appsv1beta1.ConfigConstraintSpec
 
 	builder *configTemplateBuilder
 	ctx     context.Context
@@ -119,7 +119,7 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 	return nil, core.MakeError("not implemented")
 }
 
-func NewTemplateMerger(template appsv1alpha1.ConfigTemplateExtension, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1alpha1.ComponentConfigSpec, ccSpec *v1.ConfigConstraintSpec) (TemplateMerger, error) {
+func NewTemplateMerger(template appsv1alpha1.ConfigTemplateExtension, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1alpha1.ComponentConfigSpec, ccSpec *appsv1beta1.ConfigConstraintSpec) (TemplateMerger, error) {
 	templateData := &mergeContext{
 		configSpec: configSpec,
 		template:   template,
@@ -153,7 +153,7 @@ func mergerConfigTemplate(template *appsv1alpha1.LegacyRenderedTemplateSpec,
 	if configSpec.ConfigConstraintRef == "" {
 		return nil, core.MakeError("ConfigConstraintRef require not empty, configSpec[%v]", configSpec.Name)
 	}
-	ccObj := &v1.ConfigConstraint{}
+	ccObj := &appsv1beta1.ConfigConstraint{}
 	ccKey := client.ObjectKey{
 		Namespace: "",
 		Name:      configSpec.ConfigConstraintRef,

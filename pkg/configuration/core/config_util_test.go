@@ -29,8 +29,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -51,10 +51,10 @@ var _ = Describe("config_util", func() {
 
 	Context("common funcs test", func() {
 		It("GetReloadOptions Should success without error", func() {
-			mockTpl := v1.ConfigConstraint{
-				Spec: v1.ConfigConstraintSpec{
-					DynamicReloadAction: &v1.DynamicReloadAction{
-						UnixSignalTrigger: &v1.UnixSignalTrigger{
+			mockTpl := appsv1beta1.ConfigConstraint{
+				Spec: appsv1beta1.ConfigConstraintSpec{
+					DynamicReloadAction: &appsv1beta1.DynamicReloadAction{
+						UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{
 							Signal:      "HUB",
 							ProcessName: "for_test",
 						},
@@ -64,7 +64,7 @@ var _ = Describe("config_util", func() {
 			tests := []struct {
 				name    string
 				tpls    []v1alpha1.ComponentConfigSpec
-				want    *v1.DynamicReloadAction
+				want    *appsv1beta1.DynamicReloadAction
 				wantErr bool
 			}{{
 				// empty config templates
@@ -191,7 +191,7 @@ func TestApplyConfigPatch(t *testing.T) {
 	type args struct {
 		baseCfg           []byte
 		updatedParameters map[string]string
-		formatConfig      *v1.FormatterConfig
+		formatConfig      *appsv1beta1.FormatterConfig
 	}
 	tests := []struct {
 		name    string
@@ -207,10 +207,10 @@ test=test`),
 				"a":               "b",
 				"max_connections": "600",
 			},
-			formatConfig: &v1.FormatterConfig{
-				Format: v1.Ini,
-				FormatterAction: v1.FormatterAction{
-					IniConfig: &v1.IniConfig{
+			formatConfig: &appsv1beta1.FormatterConfig{
+				Format: appsv1beta1.Ini,
+				FormatterAction: appsv1beta1.FormatterAction{
+					IniConfig: &appsv1beta1.IniConfig{
 						SectionName: "test",
 					}}},
 		},
@@ -228,8 +228,8 @@ test=test
 				"a": "b",
 				"c": "d e f g",
 			},
-			formatConfig: &v1.FormatterConfig{
-				Format: v1.RedisCfg,
+			formatConfig: &appsv1beta1.FormatterConfig{
+				Format: appsv1beta1.RedisCfg,
 			},
 		},
 		want:    "a b\nc d e f g",
@@ -242,8 +242,8 @@ test=test
 				"ENABLE_MODULES":     "true",
 				"HUGGINGFACE_APIKEY": "kssdlsdjskwssl",
 			},
-			formatConfig: &v1.FormatterConfig{
-				Format: v1.Dotenv,
+			formatConfig: &appsv1beta1.FormatterConfig{
+				Format: appsv1beta1.Dotenv,
 			},
 		},
 		// fix begin

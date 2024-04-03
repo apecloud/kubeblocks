@@ -585,47 +585,6 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    monitor:
-                      description: Specify the config that how to monitor the component.
-                      properties:
-                        builtIn:
-                          default: false
-                          description: "Determines whether built-in monitoring is
-                            enabled. When true, monitoring metrics are automatically
-                            scraped. If set to false, configuration via `exporterConfig`
-                            is required to manage metrics scraping. \n Note: This
-                            field has no effect and will be deprecated soon."
-                          type: boolean
-                        exporterConfig:
-                          description: "Specifies the settings for an external Time
-                            Series Database exporter, including the scrape path and
-                            port. This configuration is necessary for the Time Series
-                            Database to scrape metrics from the specified exporter.
-                            \n This field is valid when `builtIn` is set to false."
-                          properties:
-                            scrapePath:
-                              default: /metrics
-                              description: Specifies the URL path at which the exporter
-                                serves metrics data for scraping by the Time Series
-                                Database. The path should be configured on the exporter
-                                to respond with metrics in a compatible format. This
-                                field is optional and defaults to "/metrics" if not
-                                specified, with a maximum length of 128 characters.
-                              maxLength: 128
-                              type: string
-                            scrapePort:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              description: "Specifies the port on which the exporter
-                                listens for the Time Series Database to scrape metrics.
-                                \n It is a required field and accepts either an integer
-                                value or a string representation of the port number."
-                              x-kubernetes-int-or-string: true
-                          required:
-                          - scrapePort
-                          type: object
-                      type: object
                     name:
                       description: This name could be used as default name of `cluster.spec.componentSpecs.name`,
                         and needs to conform with same validation rules as `cluster.spec.componentSpecs.name`,

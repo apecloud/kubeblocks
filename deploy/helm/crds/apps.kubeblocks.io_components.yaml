@@ -2742,10 +2742,6 @@ spec:
                   - name
                   type: object
                 type: array
-              monitor:
-                default: false
-                description: Indicates whether monitoring is enabled.
-                type: boolean
               offlineInstances:
                 description: "Specifies the names of instances to be transitioned
                   to offline status. \n Marking an instance as offline results in

@@ -3020,10 +3020,6 @@ spec:
                       required:
                       - name
                       type: object
-                    monitor:
-                      default: false
-                      description: Indicates whether monitoring is enabled.
-                      type: boolean
                     name:
                       description: "Specifies the name of the Component. This name
                         is also part of the Service DNS name and must comply with
@@ -9554,10 +9550,6 @@ spec:
                           required:
                           - name
                           type: object
-                        monitor:
-                          default: false
-                          description: Indicates whether monitoring is enabled.
-                          type: boolean
                         name:
                           description: "Specifies the name of the Component. This
                             name is also part of the Service DNS name and must comply

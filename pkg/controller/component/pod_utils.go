@@ -81,7 +81,7 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 		return false, nil
 	}
 
-	// TODO(leon): sts
+	// TODO: depends on the workload (RSM)
 	// check whether the underlying workload(sts) has sent the latest template to pods
 	sts := &appsv1.StatefulSet{}
 	if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {

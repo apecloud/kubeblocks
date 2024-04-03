@@ -140,7 +140,6 @@ func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountNa
 		Name:      serviceAccountName,
 	}
 	sa := &corev1.ServiceAccount{}
-	// TODO(leon): all should be existed
 	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa, multicluster.InDataContext()); err != nil {
 		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
 		// the rolebinding is not already present.
@@ -161,7 +160,6 @@ func isClusterRoleBindingExist(transCtx *componentTransformContext, serviceAccou
 		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName),
 	}
 	crb := &rbacv1.ClusterRoleBinding{}
-	// TODO(leon): all should be existed
 	if err := transCtx.Client.Get(transCtx.Context, namespaceName, crb, multicluster.InDataContext()); err != nil {
 		// KubeBlocks will create a cluster role binding only if it has RBAC access priority and
 		// the cluster role binding is not already present.
@@ -200,7 +198,6 @@ func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName 
 		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName),
 	}
 	rb := &rbacv1.RoleBinding{}
-	// TODO(leon): all should be existed
 	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb, multicluster.InDataContext()); err != nil {
 		// KubeBlocks will create a role binding only if it has RBAC access priority and
 		// the role binding is not already present.

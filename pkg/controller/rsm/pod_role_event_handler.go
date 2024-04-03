@@ -219,6 +219,5 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 		pod.Annotations = map[string]string{}
 	}
 	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	// TODO(leon): optimize the lookup
-	return cli.Patch(ctx, pod, patch, multicluster.InDataContextUnspecified())
+	return cli.Patch(ctx, pod, patch, multicluster.InDataContext())
 }

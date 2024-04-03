@@ -652,7 +652,7 @@ var _ = Describe("vars", func() {
 							Type: corev1.ServiceTypeNodePort,
 							Ports: []corev1.ServicePort{
 								{
-									Name:     "default",
+									// Name:     "default",  // don't set the port name
 									Port:     int32(svcPort + 1),
 									NodePort: 300002,
 								},
@@ -664,7 +664,7 @@ var _ = Describe("vars", func() {
 			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			checkEnvVarWithValue(envVars, "pod-service-endpoint", strings.Join([]string{svcName0, svcName1}, ","))
-			checkEnvVarWithValue(envVars, "pod-service-port", strings.Join([]string{"300001", "300002"}, ","))
+			checkEnvVarWithValue(envVars, "pod-service-port", strings.Join([]string{fmt.Sprintf("%s:300001", svcName0), fmt.Sprintf("%s:300002", svcName1)}, ","))
 		})
 
 		It("credential vars", func() {

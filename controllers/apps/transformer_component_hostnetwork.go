@@ -123,9 +123,8 @@ func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *com
 
 func updateObjectsWithAllocatedPorts(synthesizedComp *component.SynthesizedComponent, ports map[string]map[string]int32) error {
 	synthesizedComp.PodSpec.HostNetwork = true
-	if synthesizedComp.HostNetwork != nil && synthesizedComp.HostNetwork.DNSPolicy != nil {
-		synthesizedComp.PodSpec.DNSPolicy = *synthesizedComp.HostNetwork.DNSPolicy
-	}
+	synthesizedComp.PodSpec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
+
 	for i, c := range synthesizedComp.PodSpec.Containers {
 		containerPorts, ok := ports[c.Name]
 		if ok {

@@ -127,6 +127,8 @@ type ComponentDefinitionSpec struct {
 
 	// Defines the host-network capability and resources.
 	//
+	// If set, the DNS policy will be automatically set to "ClusterFirstWithHostNet".
+	//
 	// +optional
 	HostNetwork *HostNetwork `json:"hostNetwork,omitempty"`
 

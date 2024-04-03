@@ -21,7 +21,6 @@ package multicluster
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -49,7 +48,7 @@ func Assign(ctx context.Context, obj client.Object, ordinal func() int) client.O
 
 	placement, err := FromContext(ctx)
 	if err != nil {
-		panic(fmt.Sprintf("no placement was present in context: %v", err))
+		return obj
 	}
 	contexts := strings.Split(placement, ",")
 	context := contexts[ordinal()%len(contexts)]

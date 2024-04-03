@@ -300,7 +300,7 @@ type ComponentDefinitionSpec struct {
 	// This field is immutable.
 	//
 	// +optional
-	Monitor *MonitorConfig `json:"monitor,omitempty"`
+	// Monitor *MonitorConfig `json:"monitor,omitempty"`
 
 	// Specifies groups of scripts (each group of scripts provided as a single ConfigMap) to be mounted as volumes and
 	// can be invoked in the container's startup command or action's command.

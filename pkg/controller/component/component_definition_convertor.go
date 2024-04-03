@@ -52,7 +52,6 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"services":               &compDefServicesConvertor{},
 		"configs":                &compDefConfigsConvertor{},
 		"logconfigs":             &compDefLogConfigsConvertor{},
-		"monitor":                &compDefMonitorConvertor{},
 		"scripts":                &compDefScriptsConvertor{},
 		"policyrules":            &compDefPolicyRulesConvertor{},
 		"labels":                 &compDefLabelsConvertor{},
@@ -336,14 +335,6 @@ type compDefLogConfigsConvertor struct{}
 func (c *compDefLogConfigsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
 	return clusterCompDef.LogConfigs, nil
-}
-
-// compDefMonitorConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Monitor.
-type compDefMonitorConvertor struct{}
-
-func (c *compDefMonitorConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Monitor, nil
 }
 
 // compDefScriptsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Scripts.

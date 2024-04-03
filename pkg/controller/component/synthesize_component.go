@@ -211,7 +211,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	buildComponentServices(synthesizeComp, compDefObj, comp)
 
 	// build monitor
-	buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
+	// buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
 
 	// build serviceAccountName
 	buildServiceAccountName(synthesizeComp)

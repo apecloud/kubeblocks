@@ -657,12 +657,6 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
-	// Indicates whether monitoring is enabled.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	Monitor bool `json:"monitor,omitempty"`
-
 	// Specifies which types of logs should be collected for the Cluster.
 	// The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.
 	//

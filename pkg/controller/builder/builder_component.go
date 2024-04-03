@@ -70,10 +70,10 @@ func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBui
 	return builder
 }
 
-func (builder *ComponentBuilder) SetMonitor(monitor bool) *ComponentBuilder {
-	builder.get().Spec.Monitor = monitor
-	return builder
-}
+// func (builder *ComponentBuilder) SetMonitor(monitor bool) *ComponentBuilder {
+// 	builder.get().Spec.Monitor = monitor
+// 	return builder
+// }
 
 func (builder *ComponentBuilder) SetTLSConfig(enable bool, issuer *appsv1alpha1.Issuer) *ComponentBuilder {
 	if enable {

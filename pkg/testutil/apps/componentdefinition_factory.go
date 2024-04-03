@@ -25,7 +25,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -206,16 +205,16 @@ func (f *MockComponentDefinitionFactory) AddLogConfig(name, filePathPattern stri
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetMonitor(builtIn bool, scrapePort intstr.IntOrString, scrapePath string) *MockComponentDefinitionFactory {
-	f.Get().Spec.Monitor = &appsv1alpha1.MonitorConfig{
-		BuiltIn: builtIn,
-		Exporter: &appsv1alpha1.ExporterConfig{
-			ScrapePort: scrapePort,
-			ScrapePath: scrapePath,
-		},
-	}
-	return f
-}
+// func (f *MockComponentDefinitionFactory) SetMonitor(builtIn bool, scrapePort intstr.IntOrString, scrapePath string) *MockComponentDefinitionFactory {
+// 	f.Get().Spec.Monitor = &appsv1alpha1.MonitorConfig{
+// 		BuiltIn: builtIn,
+// 		Exporter: &appsv1alpha1.ExporterConfig{
+// 			ScrapePort: scrapePort,
+// 			ScrapePath: scrapePath,
+// 		},
+// 	}
+// 	return f
+// }
 
 func (f *MockComponentDefinitionFactory) AddScriptTemplate(name, configTemplateRef, namespace, volumeName string,
 	mode *int32) *MockComponentDefinitionFactory {

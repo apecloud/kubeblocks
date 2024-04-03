@@ -366,45 +366,6 @@ func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
 	return []Phase{AvailablePhase}
 }
 
-type ExporterConfig struct {
-	// Specifies the port on which the exporter listens for the Time Series Database to scrape metrics.
-	//
-	// It is a required field and accepts either an integer value or a string representation of the port number.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XIntOrString
-	ScrapePort intstr.IntOrString `json:"scrapePort"`
-
-	// Specifies the URL path at which the exporter serves metrics data for scraping by the Time Series Database.
-	// The path should be configured on the exporter to respond with metrics in a compatible format.
-	// This field is optional and defaults to "/metrics" if not specified, with a maximum length of 128 characters.
-	//
-	// +kubebuilder:validation:MaxLength=128
-	// +kubebuilder:default="/metrics"
-	// +optional
-	ScrapePath string `json:"scrapePath,omitempty"`
-}
-
-type MonitorConfig struct {
-	// Determines whether built-in monitoring is enabled.
-	// When true, monitoring metrics are automatically scraped.
-	// If set to false, configuration via `exporterConfig` is required to manage metrics scraping.
-	//
-	// Note: This field has no effect and will be deprecated soon.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	BuiltIn bool `json:"builtIn,omitempty"`
-
-	// Specifies the settings for an external Time Series Database exporter, including the scrape path and port.
-	// This configuration is necessary for the Time Series Database to scrape metrics from the specified exporter.
-	//
-	// This field is valid when `builtIn` is set to false.
-	//
-	// +optional
-	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
-}
-
 type LogConfig struct {
 	// Specifies a descriptive label for the log type, such as 'slow' for a MySQL slow log file.
 	// It provides a clear identification of the log's purpose and content.
@@ -582,11 +543,6 @@ type ClusterComponentDefinition struct {
 	//
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
-
-	// Specify the config that how to monitor the component.
-	//
-	// +optional
-	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
 	// Specify the logging files which can be observed and configured by cluster users.
 	//

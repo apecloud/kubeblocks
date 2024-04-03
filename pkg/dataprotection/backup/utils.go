@@ -173,12 +173,28 @@ func generateUniqueNameWithBackupSchedule(backupSchedule *dpv1alpha1.BackupSched
 	return uniqueName
 }
 
-// BuildBackupPath builds the path to storage backup data in backup repository.
-func BuildBackupPath(backup *dpv1alpha1.Backup, repoPathPrefix, pathPrefix string) string {
+// BuildBaseBackupPath builds the path to storage backup data in backup repository.
+func BuildBaseBackupPath(backup *dpv1alpha1.Backup, repoPathPrefix, pathPrefix string) string {
 	repoPathPrefix = strings.Trim(repoPathPrefix, "/")
 	pathPrefix = strings.Trim(pathPrefix, "/")
 	// pattern: ${repoPathPrefix}/${namespace}/${pathPrefix}/${backupName}
 	return filepath.Join("/", repoPathPrefix, backup.Namespace, pathPrefix, backup.Name)
+}
+
+// BuildBackupPathByTarget builds the backup by target.name and podSelectionStrategy.
+func BuildBackupPathByTarget(backup *dpv1alpha1.Backup,
+	target *dpv1alpha1.BackupTarget,
+	repoPathPrefix,
+	pathPrefix,
+	targetPodName string) string {
+	baseBackupPath := BuildBaseBackupPath(backup, repoPathPrefix, pathPrefix)
+	if target.Name != "" {
+		baseBackupPath = filepath.Join("/", baseBackupPath, target.Name)
+	}
+	if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAll {
+		baseBackupPath = filepath.Join("/", baseBackupPath, targetPodName)
+	}
+	return baseBackupPath
 }
 
 // BuildKopiaRepoPath builds the path of kopia repository.

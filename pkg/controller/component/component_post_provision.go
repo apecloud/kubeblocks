@@ -50,7 +50,7 @@ func ReconcileCompPostProvision(ctx context.Context,
 	comp *appsv1alpha1.Component,
 	synthesizeComp *SynthesizedComponent,
 	dag *graph.DAG) error {
-	needPostProvision, err := needDoPostProvision(ctx, cli, cluster, comp, synthesizeComp)
+	needPostProvision, err := NeedDoPostProvision(ctx, cli, cluster, comp, synthesizeComp)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func ReconcileCompPostProvision(ctx context.Context,
 	return nil
 }
 
-func needDoPostProvision(ctx context.Context, cli client.Reader,
+func NeedDoPostProvision(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) (bool, error) {
 	// if the component does not have a custom postProvision, skip it
 	actionExist, _ := checkLifeCycleAction(synthesizeComp, PostProvisionAction)

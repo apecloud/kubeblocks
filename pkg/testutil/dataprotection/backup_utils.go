@@ -270,3 +270,33 @@ func MockBackupStatusMethod(backup *dpv1alpha1.Backup, backupMethodName, targetV
 		},
 	}
 }
+
+func MockBackupStatusTarget(backup *dpv1alpha1.Backup) {
+	backup.Status.Target = &dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{
+			PodSelector: &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						constant.AppInstanceLabelKey:    ClusterName,
+						constant.KBAppComponentLabelKey: ComponentName,
+						constant.RoleLabelKey:           constant.Leader,
+					},
+				},
+			},
+		},
+	}
+}
+
+func MockBackupVSStatusActions(backup *dpv1alpha1.Backup) {
+	backup.Status.Actions = []dpv1alpha1.ActionStatus{
+		{
+			Name: "create-volumesnapshot",
+			VolumeSnapshots: []dpv1alpha1.VolumeSnapshotStatus{
+				{
+					Name:       "test-volumesnapshot",
+					VolumeName: DataVolumeName,
+				},
+			},
+		},
+	}
+}

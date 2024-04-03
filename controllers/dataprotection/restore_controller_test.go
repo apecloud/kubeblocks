@@ -398,14 +398,16 @@ func mockBackupForRestore(actionSetName, repoName, backupPVCName string, mockBac
 
 	if mockBackupCompleted {
 		// then mock backup to completed
-		backupMethodName := testdp.BackupMethodName
-		if useVolumeSnapshotBackup {
-			backupMethodName = testdp.VSBackupMethodName
-		}
 		Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+			backupMethodName := testdp.BackupMethodName
+			if useVolumeSnapshotBackup {
+				backupMethodName = testdp.VSBackupMethodName
+				testdp.MockBackupVSStatusActions(backup)
+			}
 			backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 			backup.Status.BackupRepoName = repoName
 			backup.Status.PersistentVolumeClaimName = backupPVCName
+			testdp.MockBackupStatusTarget(backup)
 			testdp.MockBackupStatusMethod(backup, backupMethodName, testdp.DataVolumeName, actionSetName)
 		})).Should(Succeed())
 	}

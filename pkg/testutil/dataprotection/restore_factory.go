@@ -166,8 +166,10 @@ func (f *MockRestoreFactory) SetJobActionConfig(matchLabels map[string]string) *
 	f.initReadyConfig()
 	f.Get().Spec.ReadyConfig.JobAction = &dpv1alpha1.JobAction{
 		Target: dpv1alpha1.JobActionTarget{
-			PodSelector: metav1.LabelSelector{
-				MatchLabels: matchLabels,
+			PodSelector: dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: matchLabels,
+				},
 			},
 			VolumeMounts: []corev1.VolumeMount{
 				{

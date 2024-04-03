@@ -129,6 +129,7 @@ var _ = Describe("Request Test", func() {
 				request.BackupPolicy = backupPolicy
 				request.BackupMethod = &backupPolicy.Spec.BackupMethods[0]
 				request.BackupRepo = backupRepo
+				request.Target = backupPolicy.Spec.Target
 				_, err := request.BuildActions()
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -139,7 +140,7 @@ var _ = Describe("Request Test", func() {
 					Name:            testdp.VSBackupMethodName,
 					SnapshotVolumes: boolptr.True(),
 				}
-				_, err := request.buildCreateVolumeSnapshotAction(targetPod, "CreateVolumeSnapshot")
+				_, err := request.buildCreateVolumeSnapshotAction(targetPod, "CreateVolumeSnapshot", 0)
 				Expect(err).Should(HaveOccurred())
 			})
 

@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -175,6 +176,7 @@ func compOwnedKinds() []client.ObjectList {
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
 		&batchv1.JobList{},
+		&dpv1alpha1.RestoreList{},
 	}
 }
 

@@ -21,8 +21,10 @@ package dataprotection
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,13 +83,42 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.Status().Patch(ctx, backupPolicy, patch)
 	}
 
-	// TODO(ldm): validate backup policy
-
+	if err = r.validateBackupPolicy(backupPolicy); err != nil {
+		if err = patchStatus(dpv1alpha1.UnavailablePhase, err.Error()); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		return intctrlutil.Reconciled()
+	}
 	if err = patchStatus(dpv1alpha1.AvailablePhase, ""); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, backupPolicy)
 	return ctrl.Result{}, nil
+}
+
+func (r *BackupPolicyReconciler) validateBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy) error {
+	checkTarget := func(targets []dpv1alpha1.BackupTarget) error {
+		tMap := map[string]sets.Empty{}
+		for _, v := range targets {
+			if v.Name == "" {
+				return fmt.Errorf(`target name can not be empty when using "targets" field`)
+			}
+			if _, ok := tMap[v.Name]; ok {
+				return fmt.Errorf(`the target name can not be duplicated when using "targets" field`)
+			}
+			tMap[v.Name] = sets.Empty{}
+		}
+		return nil
+	}
+	if err := checkTarget(backupPolicy.Spec.Targets); err != nil {
+		return err
+	}
+	for i := range backupPolicy.Spec.BackupMethods {
+		if err := checkTarget(backupPolicy.Spec.BackupMethods[i].Targets); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -71,7 +71,7 @@ KubeBlocks 提供了一个名为 `victoria-metrics-agent` 的引擎，可以将�
 
     ```bash
     # Basic Auth 方式
-    kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite.basicAuth.username=<your username>,remoteWrite.basicAuth.password=<your password>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
+    kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite\.basicAuth\.username=<your username>,extraArgs.remoteWrite\.basicAuth\.password=<your password>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
     ```
 
     ```bash
@@ -81,7 +81,7 @@ KubeBlocks 提供了一个名为 `victoria-metrics-agent` 的引擎，可以将�
 
     ```bash
     # AWS SigV4 方式
-    kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite.aws.region=<your AMP region>,extraArgs.remoteWrite.aws.accessKey=<your accessKey>,extraArgs.remoteWrite.aws.secretKey=<your secretKey>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
+    kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite\.aws\.region=<your AMP region>,extraArgs.remoteWrite\.aws\.accessKey=<your accessKey>,extraArgs.remoteWrite\.aws\.secretKey=<your secretKey>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
     ```
 
 2. （可选）水平扩容 `victoria-metrics-agent`。

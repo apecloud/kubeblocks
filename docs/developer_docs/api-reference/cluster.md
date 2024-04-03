@@ -1274,6 +1274,7 @@ HostNetwork
 <td>
 <em>(Optional)</em>
 <p>Defines the host-network capability and resources.</p>
+<p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -7120,6 +7121,7 @@ HostNetwork
 <td>
 <em>(Optional)</em>
 <p>Defines the host-network capability and resources.</p>
+<p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -11090,24 +11092,6 @@ int32
 <td>
 <em>(Optional)</em>
 <p>The list of container ports that are required by the component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dnsPolicy</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#dnspolicy-v1-core">
-Kubernetes core/v1.DNSPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Set DNS policy for the component.
-Defaults to &ldquo;ClusterFirst&rdquo;.
-Valid values are &lsquo;ClusterFirstWithHostNet&rsquo;, &lsquo;ClusterFirst&rsquo;, &lsquo;Default&rsquo; or &lsquo;None&rsquo;.
-DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
-To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to &lsquo;ClusterFirstWithHostNet&rsquo;.</p>
 </td>
 </tr>
 </tbody>

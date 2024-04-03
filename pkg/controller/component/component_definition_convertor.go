@@ -230,12 +230,6 @@ func convertHostNetwork(clusterCompDef *appsv1alpha1.ClusterComponentDefinition)
 			hostNetwork.ContainerPorts = append(hostNetwork.ContainerPorts, cp)
 		}
 	}
-	if len(clusterCompDef.PodSpec.DNSPolicy) > 0 {
-		hostNetwork.DNSPolicy = func() *corev1.DNSPolicy {
-			policy := clusterCompDef.PodSpec.DNSPolicy
-			return &policy
-		}()
-	}
 	return hostNetwork, nil
 }
 

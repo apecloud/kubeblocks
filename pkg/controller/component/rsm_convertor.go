@@ -139,8 +139,8 @@ func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *wo
 		return nil
 	}
 	return &workloads.InstanceTemplate{
-		Replicas:             instance.Replicas,
 		Name:                 instance.Name,
+		Replicas:             instance.Replicas,
 		OrdinalStart:         instance.OrdinalStart,
 		Offline:              instance.Offline,
 		Annotations:          instance.Annotations,
@@ -150,6 +150,7 @@ func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *wo
 		NodeSelector:         instance.NodeSelector,
 		Tolerations:          instance.Tolerations,
 		Resources:            instance.Resources,
+		Env:                  instance.Env,
 		Volumes:              instance.Volumes,
 		VolumeMounts:         instance.VolumeMounts,
 		VolumeClaimTemplates: instance.VolumeClaimTemplates,

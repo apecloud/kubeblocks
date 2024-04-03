@@ -213,7 +213,6 @@ func isHomogeneousInstance(nameWithTemplates []nameWithTemplate, i, j int) bool 
 	// same values
 	setNilNameFields := func(t *workloads.InstanceTemplate) {
 		t.Replicas = nil
-		t.Name = nil
 		t.OrdinalStart = nil
 	}
 	ti := nameWithTemplates[i].InstanceTemplate
@@ -229,17 +228,17 @@ func buildNameTemplateMap(componentName string, replicas int32, instances []apps
 	for _, instance := range instances {
 		workloadsInstances = append(workloadsInstances, *intctrlcomp.AppsInstanceToWorkloadInstance(&instance))
 	}
-	instanceTemplateGroups := rsm2.BuildInstanceTemplateGroups(componentName, replicas, workloadsInstances, nil)
+	instanceTemplateGroups := rsm2.BuildInstanceTemplateGroups(replicas, workloadsInstances, nil)
 
 	// 2. build instance name to instance template map
 	var allNameList []string
 	allNameTemplateMap := make(map[string]nameWithTemplate, replicas)
-	for groupName, templates := range instanceTemplateGroups {
+	for templateName, templates := range instanceTemplateGroups {
 		var templateGroup []rsm2.InstanceTemplateMeta
 		for _, template := range templates {
 			templateGroup = append(templateGroup, template)
 		}
-		instanceNames, nameTemplateMap := rsm2.GenerateInstanceNamesFromGroup(groupName, templateGroup, false)
+		instanceNames, nameTemplateMap := rsm2.GenerateInstanceNamesFromGroup(componentName, templateName, templateGroup, false)
 		allNameList = append(allNameList, instanceNames...)
 		for name, meta := range nameTemplateMap {
 			template := meta.(*workloads.InstanceTemplate)

@@ -132,7 +132,7 @@ var _ = Describe("replica util test", func() {
 
 		It("build a rsm with one instance template override", func() {
 			nameOverride := "name-override"
-			nameOverride0 := nameOverride + "-0"
+			nameOverride0 := rsm.Name + "-" + nameOverride + "-0"
 			annotationOverride := map[string]string{
 				"foo": "bar",
 			}
@@ -141,7 +141,7 @@ var _ = Describe("replica util test", func() {
 			}
 			imageOverride := "foo:latest"
 			instance := workloads.InstanceTemplate{
-				Name:        &nameOverride,
+				Name:        nameOverride,
 				Annotations: annotationOverride,
 				Labels:      labelOverride,
 				Image:       &imageOverride,
@@ -207,8 +207,8 @@ var _ = Describe("replica util test", func() {
 			replicas := int32(4)
 			name := "barrrrr"
 			instance := workloads.InstanceTemplate{
+				Name:     name,
 				Replicas: &replicas,
-				Name:     &name,
 			}
 			rsm2.Spec.Instances = append(rsm2.Spec.Instances, instance)
 			err := validateSpec(rsm2, nil)
@@ -337,12 +337,12 @@ var _ = Describe("replica util test", func() {
 			Expect(err).Should(BeNil())
 			instances := []workloads.InstanceTemplate{
 				{
+					Name:     "hello",
 					Replicas: func() *int32 { r := int32(2); return &r }(),
-					Name:     func() *string { n := "hello"; return &n }(),
 				},
 				{
+					Name:     "world",
 					Replicas: func() *int32 { r := int32(1); return &r }(),
-					Name:     func() *string { n := "world"; return &n }(),
 				},
 			}
 			rsm := builder.NewReplicatedStateMachineBuilder(namespace, name).
@@ -360,12 +360,12 @@ var _ = Describe("replica util test", func() {
 			// append templates from mock function
 			instances = append(instances, []workloads.InstanceTemplate{
 				{
+					Name:     "foo",
 					Replicas: func() *int32 { r := int32(2); return &r }(),
-					Name:     func() *string { n := "foo"; return &n }(),
 				},
 				{
+					Name:     "bar0",
 					Replicas: func() *int32 { r := int32(1); return &r }(),
-					Name:     func() *string { n := "bar-0-1"; return &n }(),
 					Image:    func() *string { i := "busybox"; return &i }(),
 				},
 			}...)
@@ -373,36 +373,24 @@ var _ = Describe("replica util test", func() {
 		})
 	})
 
-	// - name: "foo"
-	//   replicas: 2
-	//   ordinalStart: -1
-	// - name: "foo"
-	//   replicas: 2
-	//   ordinalStart: 100
-	// - name: "foo"
-	//   replicas: 2
-	//   ordinalStart: -1
-	//
-	// Based on rule #1, we generate 2 instance names 'foo-100', 'foo-101' from template #1.
-	// Based on rule #2, template #1 and #3 share the same ordinal range and start from 0, we generate 4 instance names 'foo-0','foo-1','foo-2','foo-3'.
-	// So the final 6 instance names are: 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', 'foo-101'.
 	Context("generateInstanceNames", func() {
 		It("should work well", func() {
-			groupName := "foo"
+			parentName := "foo"
+			templateName := "bar"
 			templates := []*instanceTemplateExt{
 				{
 					Replicas:     2,
-					Name:         groupName,
+					Name:         templateName,
 					OrdinalStart: -1,
 				},
 				{
 					Replicas:     2,
-					Name:         groupName,
+					Name:         templateName,
 					OrdinalStart: 100,
 				},
 				{
 					Replicas:     2,
-					Name:         groupName,
+					Name:         templateName,
 					OrdinalStart: -1,
 				},
 			}
@@ -411,12 +399,12 @@ var _ = Describe("replica util test", func() {
 			for _, template := range templates {
 				templateGroup = append(templateGroup, template)
 			}
-			instanceNames, _ := GenerateInstanceNamesFromGroup(groupName, templateGroup, true)
+			instanceNames, _ := GenerateInstanceNamesFromGroup(parentName, templateName, templateGroup, true)
 			getNameNOrdinalFunc := func(i int) (string, int) {
 				return ParseParentNameAndOrdinal(instanceNames[i])
 			}
 			BaseSort(instanceNames, getNameNOrdinalFunc, nil, false)
-			podNamesExpected := []string{"foo-0", "foo-1", "foo-2", "foo-3", "foo-100", "foo-101"}
+			podNamesExpected := []string{"foo-bar-0", "foo-bar-1", "foo-bar-2", "foo-bar-3", "foo-bar-100", "foo-bar-101"}
 			Expect(instanceNames).Should(Equal(podNamesExpected))
 		})
 	})

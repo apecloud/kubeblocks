@@ -162,12 +162,12 @@ var _ = Describe("replicated_state_machine builder", func() {
 		}
 		instances := []workloads.InstanceTemplate{
 			{
+				Name:     "hello",
 				Replicas: func() *int32 { r := int32(2); return &r }(),
-				Name:     func() *string { n := "hello"; return &n }(),
 			},
 			{
+				Name:     "world",
 				Replicas: func() *int32 { r := int32(1); return &r }(),
-				Name:     func() *string { n := "world"; return &n }(),
 			},
 		}
 		rsm := NewReplicatedStateMachineBuilder(ns, name).

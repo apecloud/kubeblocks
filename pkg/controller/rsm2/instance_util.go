@@ -218,12 +218,12 @@ func buildInstanceName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *
 	}
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
-	for groupName, templateList := range instanceTemplateExtGroups {
+	for templateName, templateList := range instanceTemplateExtGroups {
 		var templateGroup []InstanceTemplateMeta
 		for _, template := range templateList {
 			templateGroup = append(templateGroup, template)
 		}
-		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(groupName, templateGroup, true)
+		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(rsm.Name, templateName, templateGroup, true)
 		instanceNameList = append(instanceNameList, instanceNames...)
 		for name, template := range nameTemplateMap {
 			allNameTemplateMap[name] = template.(*instanceTemplateExt)
@@ -240,7 +240,7 @@ func buildInstanceName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *
 	return allNameTemplateMap, nil
 }
 
-func GenerateInstanceNamesFromGroup(groupName string, templateGroup []InstanceTemplateMeta, onlineOnly bool) ([]string, map[string]InstanceTemplateMeta) {
+func GenerateInstanceNamesFromGroup(parentName, templateName string, templateGroup []InstanceTemplateMeta, onlineOnly bool) ([]string, map[string]InstanceTemplateMeta) {
 	var (
 		allNameList     []string
 		nameTemplateMap = make(map[string]InstanceTemplateMeta)
@@ -254,7 +254,7 @@ func GenerateInstanceNamesFromGroup(groupName string, templateGroup []InstanceTe
 		if template.GetOrdinalStart() < 0 {
 			continue
 		}
-		instanceNames, _ = generateInstanceNames(groupName, template.GetReplicas(), template.GetOrdinalStart(), sets.New[string]())
+		instanceNames, _ = generateInstanceNames(parentName, templateName, template.GetReplicas(), template.GetOrdinalStart(), sets.New[string]())
 		if !onlineOnly || !template.IsOffline() {
 			for _, name := range instanceNames {
 				nameTemplateMap[name] = template
@@ -269,7 +269,7 @@ func GenerateInstanceNamesFromGroup(groupName string, templateGroup []InstanceTe
 		if template.GetOrdinalStart() >= 0 {
 			continue
 		}
-		instanceNames, ordinal = generateInstanceNames(groupName, template.GetReplicas(), ordinal, usedNames)
+		instanceNames, ordinal = generateInstanceNames(parentName, templateName, template.GetReplicas(), ordinal, usedNames)
 		if !onlineOnly || !template.IsOffline() {
 			for _, name := range instanceNames {
 				nameTemplateMap[name] = template
@@ -282,30 +282,18 @@ func GenerateInstanceNamesFromGroup(groupName string, templateGroup []InstanceTe
 }
 
 // generateInstanceNames generates instance names based on certain rules:
-// 1. If an 'ordinalStart' is provided in the InstanceTemplate, the instances are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
-// 2. All other InstanceTemplates without 'ordinalStart' will be indexed using a shared ordinal range, which we refer to as the default ordinal range.
-//
-// For example:
-// Let's consider a template group with 3 InstanceTemplates:
-//   - name: "foo"
-//     replicas: 2
-//     ordinalStart: -1
-//   - name: "foo"
-//     replicas: 2
-//     ordinalStart: 100
-//   - name: "foo"
-//     replicas: 2
-//     ordinalStart: -1
-//
-// According to rule #1, we generate 2 pod names 'foo-100' and 'foo-101' from template #2.
-// According to rule #3, template #1 and #3 share the same ordinal range starting from 0. We generate 4 pod names 'foo-0', 'foo-1', 'foo-2', and 'foo-3'.
-// Hence, the final 6 pod names are: 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', and 'foo-101'.
-func generateInstanceNames(parentName string, replicas int32, ordinal int32, usedNames sets.Set[string]) ([]string, int32) {
+// The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
+// The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
+func generateInstanceNames(parentName, templateName string, replicas int32, ordinal int32, usedNames sets.Set[string]) ([]string, int32) {
 	var replicaNameList []string
 	var name string
 	for i := int32(0); i < replicas; i++ {
 		for {
-			name = fmt.Sprintf("%s-%d", parentName, ordinal)
+			if len(templateName) == 0 {
+				name = fmt.Sprintf("%s-%d", parentName, ordinal)
+			} else {
+				name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
+			}
 			ordinal++
 			if !usedNames.Has(name) {
 				replicaNameList = append(replicaNameList, name)
@@ -519,13 +507,13 @@ func buildInstanceTemplateExtGroups(rsm *workloads.ReplicatedStateMachine, tree 
 		return nil, err
 	}
 
-	instanceTemplateGroups := BuildInstanceTemplateGroups(rsm.Name, *rsm.Spec.Replicas, rsm.Spec.Instances, instancesCompressed)
+	instanceTemplateGroups := BuildInstanceTemplateGroups(*rsm.Spec.Replicas, rsm.Spec.Instances, instancesCompressed)
 	replicaTemplateGroups := make(map[string][]*instanceTemplateExt)
 	for name, instanceTemplates := range instanceTemplateGroups {
 		var podTemplates []*instanceTemplateExt
 		for _, instance := range instanceTemplates {
 			template := makeInstanceTemplateExt()
-			buildInstanceTemplateExt(rsm.Name, *instance, template)
+			buildInstanceTemplateExt(*instance, template)
 			podTemplates = append(podTemplates, template)
 		}
 		replicaTemplateGroups[name] = podTemplates
@@ -534,7 +522,7 @@ func buildInstanceTemplateExtGroups(rsm *workloads.ReplicatedStateMachine, tree 
 	return replicaTemplateGroups, nil
 }
 
-func BuildInstanceTemplateGroups(parentName string, totalReplicas int32, instances []workloads.InstanceTemplate, instancesCompressed *corev1.ConfigMap) map[string][]*workloads.InstanceTemplate {
+func BuildInstanceTemplateGroups(totalReplicas int32, instances []workloads.InstanceTemplate, instancesCompressed *corev1.ConfigMap) map[string][]*workloads.InstanceTemplate {
 	var instanceTemplateList []*workloads.InstanceTemplate
 	var replicasInTemplates int32
 	instanceTemplates := getInstanceTemplates(instances, instancesCompressed)
@@ -553,23 +541,15 @@ func BuildInstanceTemplateGroups(parentName string, totalReplicas int32, instanc
 		instanceTemplateList = append(instanceTemplateList, instance)
 	}
 
-	// group the pod templates by template.Name if set or by template.GenerateName
+	// group the pod templates by template.Name
 	instanceTemplateGroups := make(map[string][]*workloads.InstanceTemplate)
 	for _, template := range instanceTemplateList {
-		name := GetGroupName(parentName, template.Name)
-		templates := instanceTemplateGroups[name]
+		templates := instanceTemplateGroups[template.Name]
 		templates = append(templates, template)
-		instanceTemplateGroups[name] = templates
+		instanceTemplateGroups[template.Name] = templates
 	}
 
 	return instanceTemplateGroups
-}
-
-func GetGroupName(parentName string, name *string) string {
-	if name != nil {
-		return *name
-	}
-	return parentName
 }
 
 func getInstanceTemplateMap(annotations map[string]string) (map[string]string, error) {
@@ -635,17 +615,13 @@ func findTemplate(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.Obje
 	return nil, nil
 }
 
-func buildInstanceTemplateExt(parentName string, template workloads.InstanceTemplate, templateExt *instanceTemplateExt) {
+func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *instanceTemplateExt) {
+	templateExt.Name = template.Name
 	replicas := int32(1)
 	if template.Replicas != nil {
 		replicas = *template.Replicas
 	}
 	templateExt.Replicas = replicas
-	name := parentName
-	if template.Name != nil {
-		name = *template.Name
-	}
-	templateExt.Name = name
 	ordinalStart := int32(-1)
 	if template.OrdinalStart != nil {
 		ordinalStart = *template.OrdinalStart
@@ -668,6 +644,14 @@ func buildInstanceTemplateExt(parentName string, template workloads.InstanceTemp
 		}
 		if template.Resources != nil {
 			templateExt.Spec.Containers[0].Resources = *template.Resources
+		}
+		if template.Env != nil {
+			mergeList(&template.Env, &templateExt.Spec.Containers[0].Env,
+				func(item corev1.EnvVar) func(corev1.EnvVar) bool {
+					return func(env corev1.EnvVar) bool {
+						return env.Name == item.Name
+					}
+				})
 		}
 	}
 	mergeList(&template.Volumes, &templateExt.Spec.Volumes,

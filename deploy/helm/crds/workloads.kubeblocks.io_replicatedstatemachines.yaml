@@ -825,21 +825,16 @@ spec:
                   A RSM manages instances with a total count of Replicas, and by default,
                   all these instances are generated from the same template. The InstanceTemplate
                   provides a way to override values in the default template, allowing
-                  the RSM to manage instances from different templates. \n The instance
-                  name (hence the pod name) is generated from Name, Replicas and OrdinalStart
-                  provided in the InstanceTemplates. The rules are: 1. If an OrdinalStart
-                  is provided in the InstanceTemplate, the instances are indexed using
-                  a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
-                  2. All other InstanceTemplates without OrdinalStart will be indexed
-                  using a shared ordinal range, which we refer to as the default ordinal
-                  range. \n For example: Let's consider a template group with 3 InstanceTemplates:
-                  - name: \"foo\" replicas: 2 - name: \"foo\" replicas: 2 ordinalStart:
-                  100 - name: \"foo\" replicas: 2 \n According to rule #1, we generate
-                  2 pod names 'foo-100' and 'foo-101' from template #2. According
-                  to rule #3, template #1 and #3 share the same ordinal range starting
-                  from 0. We generate 4 pod names 'foo-0', 'foo-1', 'foo-2', and 'foo-3'.
-                  Hence, the final 6 pod names are: 'foo-0', 'foo-1', 'foo-2', 'foo-3',
-                  'foo-100', and 'foo-101'."
+                  the RSM to manage instances from different templates. \n The naming
+                  convention for instances (pods) based on the RSM Name, InstanceTemplate
+                  Name, and ordinal. The constructed instance name follows the pattern:
+                  $(rsm.name)-$(template.name)-$(ordinal). By default, the ordinal
+                  starts from 0 for each InstanceTemplate. It is important to ensure
+                  that the Name of each InstanceTemplate is unique. \n The sum of
+                  replicas across all InstanceTemplates should not exceed the total
+                  number of Replicas specified for the RSM. Any remaining replicas
+                  will be generated using the default template and will follow the
+                  default naming rules."
                 items:
                   properties:
                     annotations:
@@ -848,6 +843,125 @@ spec:
                       description: Defines annotations to override. Add new or override
                         existing annotations.
                       type: object
+                    env:
+                      description: Defines Env to override. Add new or override existing
+                        envs.
+                      items:
+                        description: EnvVar represents an environment variable present
+                          in a Container.
+                        properties:
+                          name:
+                            description: Name of the environment variable. Must be
+                              a C_IDENTIFIER.
+                            type: string
+                          value:
+                            description: 'Variable references $(VAR_NAME) are expanded
+                              using the previously defined environment variables in
+                              the container and any service environment variables.
+                              If a variable cannot be resolved, the reference in the
+                              input string will be unchanged. Double $$ are reduced
+                              to a single $, which allows for escaping the $(VAR_NAME)
+                              syntax: i.e. "$$(VAR_NAME)" will produce the string
+                              literal "$(VAR_NAME)". Escaped references will never
+                              be expanded, regardless of whether the variable exists
+                              or not. Defaults to "".'
+                            type: string
+                          valueFrom:
+                            description: Source for the environment variable's value.
+                              Cannot be used if value is not empty.
+                            properties:
+                              configMapKeyRef:
+                                description: Selects a key of a ConfigMap.
+                                properties:
+                                  key:
+                                    description: The key to select.
+                                    type: string
+                                  name:
+                                    description: 'Name of the referent. More info:
+                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                      TODO: Add other useful fields. apiVersion, kind,
+                                      uid?'
+                                    type: string
+                                  optional:
+                                    description: Specify whether the ConfigMap or
+                                      its key must be defined
+                                    type: boolean
+                                required:
+                                - key
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              fieldRef:
+                                description: 'Selects a field of the pod: supports
+                                  metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
+                                  `metadata.annotations[''<KEY>'']`, spec.nodeName,
+                                  spec.serviceAccountName, status.hostIP, status.podIP,
+                                  status.podIPs.'
+                                properties:
+                                  apiVersion:
+                                    description: Version of the schema the FieldPath
+                                      is written in terms of, defaults to "v1".
+                                    type: string
+                                  fieldPath:
+                                    description: Path of the field to select in the
+                                      specified API version.
+                                    type: string
+                                required:
+                                - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              resourceFieldRef:
+                                description: 'Selects a resource of the container:
+                                  only resources limits and requests (limits.cpu,
+                                  limits.memory, limits.ephemeral-storage, requests.cpu,
+                                  requests.memory and requests.ephemeral-storage)
+                                  are currently supported.'
+                                properties:
+                                  containerName:
+                                    description: 'Container name: required for volumes,
+                                      optional for env vars'
+                                    type: string
+                                  divisor:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: Specifies the output format of the
+                                      exposed resources, defaults to "1"
+                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                    x-kubernetes-int-or-string: true
+                                  resource:
+                                    description: 'Required: resource to select'
+                                    type: string
+                                required:
+                                - resource
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              secretKeyRef:
+                                description: Selects a key of a secret in the pod's
+                                  namespace
+                                properties:
+                                  key:
+                                    description: The key of the secret to select from.  Must
+                                      be a valid secret key.
+                                    type: string
+                                  name:
+                                    description: 'Name of the referent. More info:
+                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                      TODO: Add other useful fields. apiVersion, kind,
+                                      uid?'
+                                    type: string
+                                  optional:
+                                    description: Specify whether the Secret or its
+                                      key must be defined
+                                    type: boolean
+                                required:
+                                - key
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            type: object
+                        required:
+                        - name
+                        type: object
+                      type: array
                     image:
                       description: Defines image to override. Will override the first
                         container's image of the pod.
@@ -859,13 +973,13 @@ spec:
                         existing labels.
                       type: object
                     name:
-                      description: "Specifies the name of the template. Each instance
-                        of the template derives its name from the template's Name
-                        and the instance's ordinal. The constructed instance name
-                        follows the pattern $(name)-$(ordinal). The ordinal is determined
-                        by the OrdinalStart field, which defaults to 0. \n If not
-                        specified, it defaults to the name of the RSM."
+                      description: Specifies the name of the template. Each instance
+                        of the template derives its name from the RSM's Name, the
+                        template's Name and the instance's ordinal. The constructed
+                        instance name follows the pattern $(rsm.name)-$(template.name)-$(ordinal).
+                        The ordinal starts from 0 by default.
                       maxLength: 54
+                      minLength: 1
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     nodeName:
@@ -3137,6 +3251,8 @@ spec:
                         - name
                         type: object
                       type: array
+                  required:
+                  - name
                   type: object
                 type: array
               memberUpdateStrategy:

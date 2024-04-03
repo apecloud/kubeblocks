@@ -29,24 +29,23 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 type InstanceTemplate struct {
+	// Specifies the name of the template.
+	// Each instance of the template derives its name from the RSM's Name, the template's Name and the instance's ordinal.
+	// The constructed instance name follows the pattern $(rsm.name)-$(template.name)-$(ordinal).
+	// The ordinal starts from 0 by default.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=54
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
 	// Number of replicas of this template.
 	// Default is 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
-
-	// Specifies the name of the template.
-	// Each instance of the template derives its name from the template's Name and the instance's ordinal.
-	// The constructed instance name follows the pattern $(name)-$(ordinal).
-	// The ordinal is determined by the OrdinalStart field, which defaults to 0.
-	//
-	// If not specified, it defaults to the name of the RSM.
-	//
-	// +kubebuilder:validation:MaxLength=54
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	Name *string `json:"name,omitempty"`
 
 	// OrdinalStart controls the numbering of instance(replica) indices in a RSM. The
 	// default ordinals behavior assigns a "0" index to the first instance and
@@ -102,6 +101,11 @@ type InstanceTemplate struct {
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// Defines Env to override.
+	// Add new or override existing envs.
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
 	// Defines Volumes to override.
 	// Add new or override existing volumes.
 	// +optional
@@ -119,10 +123,7 @@ type InstanceTemplate struct {
 }
 
 func (t *InstanceTemplate) GetName() string {
-	if t.Name == nil {
-		return ""
-	}
-	return *t.Name
+	return t.Name
 }
 
 func (t *InstanceTemplate) GetReplicas() int32 {
@@ -197,24 +198,13 @@ type ReplicatedStateMachineSpec struct {
 	// The InstanceTemplate provides a way to override values in the default template,
 	// allowing the RSM to manage instances from different templates.
 	//
-	// The instance name (hence the pod name) is generated from Name, Replicas and OrdinalStart provided in the InstanceTemplates.
-	// The rules are:
-	// 1. If an OrdinalStart is provided in the InstanceTemplate, the instances are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
-	// 2. All other InstanceTemplates without OrdinalStart will be indexed using a shared ordinal range, which we refer to as the default ordinal range.
+	// The naming convention for instances (pods) based on the RSM Name, InstanceTemplate Name, and ordinal.
+	// The constructed instance name follows the pattern: $(rsm.name)-$(template.name)-$(ordinal).
+	// By default, the ordinal starts from 0 for each InstanceTemplate.
+	// It is important to ensure that the Name of each InstanceTemplate is unique.
 	//
-	// For example:
-	// Let's consider a template group with 3 InstanceTemplates:
-	//   - name: "foo"
-	//     replicas: 2
-	//   - name: "foo"
-	//     replicas: 2
-	//     ordinalStart: 100
-	//   - name: "foo"
-	//     replicas: 2
-	//
-	// According to rule #1, we generate 2 pod names 'foo-100' and 'foo-101' from template #2.
-	// According to rule #3, template #1 and #3 share the same ordinal range starting from 0. We generate 4 pod names 'foo-0', 'foo-1', 'foo-2', and 'foo-3'.
-	// Hence, the final 6 pod names are: 'foo-0', 'foo-1', 'foo-2', 'foo-3', 'foo-100', and 'foo-101'.
+	// The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the RSM.
+	// Any remaining replicas will be generated using the default template and will follow the default naming rules.
 	//
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`

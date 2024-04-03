@@ -4706,22 +4706,12 @@ A component manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the component to manage instances from different templates.</p>
-<p>The instance name (hence the pod name) is generated from Name, Replicas and OrdinalStart provided in the InstanceTemplates.
-The rules are:
-1. If an OrdinalStart is provided in the InstanceTemplate, the instances are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
-2. All other InstanceTemplates without OrdinalStart will be indexed using a shared ordinal range, which we refer to as the default ordinal range.</p>
-<p>For example:
-Let&rsquo;s consider a template group with 3 InstanceTemplates:
-- name: &ldquo;foo&rdquo;
-replicas: 2
-- name: &ldquo;foo&rdquo;
-replicas: 2
-ordinalStart: 100
-- name: &ldquo;foo&rdquo;
-replicas: 2</p>
-<p>According to rule #1, we generate 2 pod names &lsquo;foo-100&rsquo; and &lsquo;foo-101&rsquo; from template #2.
-According to rule #3, template #1 and #3 share the same ordinal range starting from 0. We generate 4 pod names &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, and &lsquo;foo-3&rsquo;.
-Hence, the final 6 pod names are: &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, &lsquo;foo-3&rsquo;, &lsquo;foo-100&rsquo;, and &lsquo;foo-101&rsquo;.</p>
+<p>The naming convention for instances (pods) based on the Component Name, InstanceTemplate Name, and ordinal.
+The constructed instance name follows the pattern: $(component.name)-$(template.name)-$(ordinal).
+By default, the ordinal starts from 0 for each InstanceTemplate.
+It is important to ensure that the Name of each InstanceTemplate is unique.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the Component.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
 </td>
 </tr>
 </tbody>
@@ -11460,6 +11450,20 @@ string
 <tbody>
 <tr>
 <td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the template.
+Each instance of the template derives its name from the Component&rsquo;s Name, the template&rsquo;s Name and the instance&rsquo;s ordinal.
+The constructed instance name follows the pattern $(component.name)-$(template.name)-$(ordinal).
+The ordinal starts from 0 by default.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -11469,22 +11473,6 @@ int32
 <em>(Optional)</em>
 <p>Number of replicas of this template.
 Default is 1.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the template.
-Each instance of the template derives its name from the template&rsquo;s Name and the instance&rsquo;s ordinal.
-The constructed instance name follows the pattern $(name)-$(ordinal).
-The ordinal is determined by the OrdinalStart field, which defaults to 0.</p>
-<p>If not specified, it defaults to the name of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -11612,6 +11600,21 @@ Kubernetes core/v1.ResourceRequirements
 <em>(Optional)</em>
 <p>Defines Resources to override.
 Will override the first container&rsquo;s resources of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Env to override.
+Add new or override existing envs.</p>
 </td>
 </tr>
 <tr>
@@ -19880,22 +19883,12 @@ A RSM manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the RSM to manage instances from different templates.</p>
-<p>The instance name (hence the pod name) is generated from Name, Replicas and OrdinalStart provided in the InstanceTemplates.
-The rules are:
-1. If an OrdinalStart is provided in the InstanceTemplate, the instances are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
-2. All other InstanceTemplates without OrdinalStart will be indexed using a shared ordinal range, which we refer to as the default ordinal range.</p>
-<p>For example:
-Let&rsquo;s consider a template group with 3 InstanceTemplates:
-- name: &ldquo;foo&rdquo;
-replicas: 2
-- name: &ldquo;foo&rdquo;
-replicas: 2
-ordinalStart: 100
-- name: &ldquo;foo&rdquo;
-replicas: 2</p>
-<p>According to rule #1, we generate 2 pod names &lsquo;foo-100&rsquo; and &lsquo;foo-101&rsquo; from template #2.
-According to rule #3, template #1 and #3 share the same ordinal range starting from 0. We generate 4 pod names &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, and &lsquo;foo-3&rsquo;.
-Hence, the final 6 pod names are: &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, &lsquo;foo-3&rsquo;, &lsquo;foo-100&rsquo;, and &lsquo;foo-101&rsquo;.</p>
+<p>The naming convention for instances (pods) based on the RSM Name, InstanceTemplate Name, and ordinal.
+The constructed instance name follows the pattern: $(rsm.name)-$(template.name)-$(ordinal).
+By default, the ordinal starts from 0 for each InstanceTemplate.
+It is important to ensure that the Name of each InstanceTemplate is unique.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the RSM.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
 </td>
 </tr>
 <tr>
@@ -20242,6 +20235,20 @@ Kubernetes core/v1.EnvVarSource
 <tbody>
 <tr>
 <td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the template.
+Each instance of the template derives its name from the RSM&rsquo;s Name, the template&rsquo;s Name and the instance&rsquo;s ordinal.
+The constructed instance name follows the pattern $(rsm.name)-$(template.name)-$(ordinal).
+The ordinal starts from 0 by default.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -20251,22 +20258,6 @@ int32
 <em>(Optional)</em>
 <p>Number of replicas of this template.
 Default is 1.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the template.
-Each instance of the template derives its name from the template&rsquo;s Name and the instance&rsquo;s ordinal.
-The constructed instance name follows the pattern $(name)-$(ordinal).
-The ordinal is determined by the OrdinalStart field, which defaults to 0.</p>
-<p>If not specified, it defaults to the name of the RSM.</p>
 </td>
 </tr>
 <tr>
@@ -20394,6 +20385,21 @@ Kubernetes core/v1.ResourceRequirements
 <em>(Optional)</em>
 <p>Defines Resources to override.
 Will override the first container&rsquo;s resources of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Env to override.
+Add new or override existing envs.</p>
 </td>
 </tr>
 <tr>
@@ -20828,22 +20834,12 @@ A RSM manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the RSM to manage instances from different templates.</p>
-<p>The instance name (hence the pod name) is generated from Name, Replicas and OrdinalStart provided in the InstanceTemplates.
-The rules are:
-1. If an OrdinalStart is provided in the InstanceTemplate, the instances are indexed using a separate ordinal range, i.e., [ordinalStart, ordinalStart+Replicas).
-2. All other InstanceTemplates without OrdinalStart will be indexed using a shared ordinal range, which we refer to as the default ordinal range.</p>
-<p>For example:
-Let&rsquo;s consider a template group with 3 InstanceTemplates:
-- name: &ldquo;foo&rdquo;
-replicas: 2
-- name: &ldquo;foo&rdquo;
-replicas: 2
-ordinalStart: 100
-- name: &ldquo;foo&rdquo;
-replicas: 2</p>
-<p>According to rule #1, we generate 2 pod names &lsquo;foo-100&rsquo; and &lsquo;foo-101&rsquo; from template #2.
-According to rule #3, template #1 and #3 share the same ordinal range starting from 0. We generate 4 pod names &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, and &lsquo;foo-3&rsquo;.
-Hence, the final 6 pod names are: &lsquo;foo-0&rsquo;, &lsquo;foo-1&rsquo;, &lsquo;foo-2&rsquo;, &lsquo;foo-3&rsquo;, &lsquo;foo-100&rsquo;, and &lsquo;foo-101&rsquo;.</p>
+<p>The naming convention for instances (pods) based on the RSM Name, InstanceTemplate Name, and ordinal.
+The constructed instance name follows the pattern: $(rsm.name)-$(template.name)-$(ordinal).
+By default, the ordinal starts from 0 for each InstanceTemplate.
+It is important to ensure that the Name of each InstanceTemplate is unique.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the RSM.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
 </td>
 </tr>
 <tr>

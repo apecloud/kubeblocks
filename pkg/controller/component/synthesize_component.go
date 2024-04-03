@@ -387,10 +387,8 @@ func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli client.Reader,
 
 func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) {
 	services := map[string]appsv1alpha1.ComponentService{}
-	if !IsGenerated(comp) {
-		for i, svc := range comp.Spec.Services {
-			services[svc.Name] = comp.Spec.Services[i]
-		}
+	for i, svc := range comp.Spec.Services {
+		services[svc.Name] = comp.Spec.Services[i]
 	}
 
 	synthesizeComp.ComponentServices = compDef.Spec.Services

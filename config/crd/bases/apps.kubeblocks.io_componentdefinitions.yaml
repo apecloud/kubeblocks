@@ -12300,8 +12300,8 @@ spec:
                                 If not specified, the component itself will be used.
                               type: string
                             container:
-                              description: ContainerVars defines the vars can be referenced
-                                from a Container.
+                              description: ContainerVars defines the vars that can
+                                be referenced from a Container.
                               properties:
                                 name:
                                   description: The name of the container.
@@ -12569,6 +12569,11 @@ spec:
                               description: Name of the referent object.
                               type: string
                             nodePort:
+                              description: "NodePort references a node-port defined
+                                in the service. \n If the referenced service is a
+                                pod-service, there will be multiple service objects
+                                matched, and the value will be presented in the following
+                                format: service1.name:nodePort1,service2.name:nodePort2..."
                               properties:
                                 name:
                                   type: string
@@ -12584,6 +12589,11 @@ spec:
                               description: Specify whether the object must be defined.
                               type: boolean
                             port:
+                              description: "Port references a port defined in the
+                                service. \n If the referenced service is a pod-service,
+                                there will be multiple service objects matched, and
+                                the value will be presented in the following format:
+                                service1.name:port1,service2.name:port2..."
                               properties:
                                 name:
                                   type: string

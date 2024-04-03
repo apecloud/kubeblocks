@@ -10065,7 +10065,7 @@ ConsensusMember
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVars">PodVars</a>)
 </p>
 <div>
-<p>ContainerVars defines the vars can be referenced from a Container.</p>
+<p>ContainerVars defines the vars that can be referenced from a Container.</p>
 </div>
 <table>
 <thead>
@@ -10208,7 +10208,7 @@ CredentialVars
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>)
 </p>
 <div>
-<p>CredentialVars defines the vars can be referenced from a Credential (SystemAccount).
+<p>CredentialVars defines the vars that can be referenced from a Credential (SystemAccount).
 !!!!! CredentialVars will only be used as environment variables for Pods &amp; Actions, and will not be used to render the templates.</p>
 </div>
 <table>
@@ -14362,7 +14362,7 @@ PodVars
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>)
 </p>
 <div>
-<p>PodVars defines the vars can be referenced from a Pod.</p>
+<p>PodVars defines the vars that can be referenced from a Pod.</p>
 </div>
 <table>
 <thead>
@@ -17360,7 +17360,7 @@ ServiceRefVars
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>)
 </p>
 <div>
-<p>ServiceRefVars defines the vars can be referenced from a ServiceRef.</p>
+<p>ServiceRefVars defines the vars that can be referenced from a ServiceRef.</p>
 </div>
 <table>
 <thead>
@@ -17501,7 +17501,7 @@ ServiceVars
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
-<p>ServiceVars defines the vars can be referenced from a Service.</p>
+<p>ServiceVars defines the vars that can be referenced from a Service.</p>
 </div>
 <table>
 <thead>
@@ -17535,6 +17535,9 @@ NamedVar
 </td>
 <td>
 <em>(Optional)</em>
+<p>Port references a port defined in the service.</p>
+<p>If the referenced service is a pod-service, there will be multiple service objects matched,
+and the value will be presented in the following format: service1.name:port1,service2.name:port2&hellip;</p>
 </td>
 </tr>
 <tr>
@@ -17548,6 +17551,9 @@ NamedVar
 </td>
 <td>
 <em>(Optional)</em>
+<p>NodePort references a node-port defined in the service.</p>
+<p>If the referenced service is a pod-service, there will be multiple service objects matched,
+and the value will be presented in the following format: service1.name:nodePort1,service2.name:nodePort2&hellip;</p>
 </td>
 </tr>
 </tbody>

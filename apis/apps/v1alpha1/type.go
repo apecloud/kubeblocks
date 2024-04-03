@@ -915,13 +915,13 @@ type NamedVar struct {
 	Option *VarOption `json:"option,omitempty"`
 }
 
-// PodVars defines the vars can be referenced from a Pod.
+// PodVars defines the vars that can be referenced from a Pod.
 type PodVars struct {
 	// +optional
 	Container *ContainerVars `json:"container,omitempty"`
 }
 
-// ContainerVars defines the vars can be referenced from a Container.
+// ContainerVars defines the vars that can be referenced from a Container.
 type ContainerVars struct {
 	// The name of the container.
 	// +required
@@ -932,19 +932,29 @@ type ContainerVars struct {
 	Port *NamedVar `json:"port,omitempty"`
 }
 
-// ServiceVars defines the vars can be referenced from a Service.
+// ServiceVars defines the vars that can be referenced from a Service.
 type ServiceVars struct {
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
 
+	// Port references a port defined in the service.
+	//
+	// If the referenced service is a pod-service, there will be multiple service objects matched,
+	// and the value will be presented in the following format: service1.name:port1,service2.name:port2...
+	//
 	// +optional
 	Port *NamedVar `json:"port,omitempty"`
 
+	// NodePort references a node-port defined in the service.
+	//
+	// If the referenced service is a pod-service, there will be multiple service objects matched,
+	// and the value will be presented in the following format: service1.name:nodePort1,service2.name:nodePort2...
+	//
 	// +optional
 	NodePort *NamedVar `json:"nodePort,omitempty"`
 }
 
-// CredentialVars defines the vars can be referenced from a Credential (SystemAccount).
+// CredentialVars defines the vars that can be referenced from a Credential (SystemAccount).
 // !!!!! CredentialVars will only be used as environment variables for Pods & Actions, and will not be used to render the templates.
 type CredentialVars struct {
 	// +optional
@@ -954,7 +964,7 @@ type CredentialVars struct {
 	Password *VarOption `json:"password,omitempty"`
 }
 
-// ServiceRefVars defines the vars can be referenced from a ServiceRef.
+// ServiceRefVars defines the vars that can be referenced from a ServiceRef.
 type ServiceRefVars struct {
 	// +optional
 	Endpoint *VarOption `json:"endpoint,omitempty"`

@@ -2888,8 +2888,8 @@ spec:
                       maxLength: 32
                       type: string
                     services:
-                      description: Services expose endpoints that can be accessed
-                        by clients.
+                      description: Services overrides services defined in referenced
+                        ComponentDefinition.
                       items:
                         properties:
                           annotations:
@@ -2902,6 +2902,11 @@ spec:
                             description: The name of the service.
                             maxLength: 15
                             type: string
+                          podService:
+                            description: Indicates whether to generate individual
+                              services for each pod. If set to true, a separate service
+                              will be created for each pod in the cluster.
+                            type: boolean
                           serviceType:
                             default: ClusterIP
                             description: "Determines how the Service is exposed. Valid
@@ -3403,8 +3408,6 @@ spec:
                     roleSelector:
                       description: RoleSelector extends the ServiceSpec.Selector by
                         allowing you to specify defined role as selector for the service.
-                        if GeneratePodOrdinalService sets to true, RoleSelector will
-                        be ignored.
                       type: string
                     serviceName:
                       description: "ServiceName defines the name of the underlying
@@ -6682,8 +6685,8 @@ spec:
                           maxLength: 32
                           type: string
                         services:
-                          description: Services expose endpoints that can be accessed
-                            by clients.
+                          description: Services overrides services defined in referenced
+                            ComponentDefinition.
                           items:
                             properties:
                               annotations:
@@ -6697,6 +6700,11 @@ spec:
                                 description: The name of the service.
                                 maxLength: 15
                                 type: string
+                              podService:
+                                description: Indicates whether to generate individual
+                                  services for each pod. If set to true, a separate
+                                  service will be created for each pod in the cluster.
+                                type: boolean
                               serviceType:
                                 default: ClusterIP
                                 description: "Determines how the Service is exposed.

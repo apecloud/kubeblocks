@@ -275,7 +275,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 		}
 		defaultServiceName := rsmObj.Name
 		for _, svc := range synthesizeComp.ComponentServices {
-			if svc.GeneratePodOrdinalService {
+			if svc.PodService != nil && *svc.PodService || svc.DisableAutoProvision != nil && *svc.DisableAutoProvision {
 				continue
 			}
 			serviceName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, svc.ServiceName)

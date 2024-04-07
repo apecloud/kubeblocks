@@ -162,7 +162,7 @@ fmt: ## Run go fmt against code.
 	$(GOFMT) -l -w -s $$(git ls-files --exclude-standard | grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG))
 
 .PHONY: vet
-vet: ## Run go vet against code.
+vet: test-go-generate ## Run go vet against code.
 	GOOS=$(GOOS) $(GO) vet -mod=mod ./...
 
 .PHONY: cue-fmt

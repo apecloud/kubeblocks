@@ -48,7 +48,7 @@ func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil // do nothing
 	}
 
-	if t.done(transCtx) {
+	if t.assigned(transCtx) {
 		transCtx.Context = multicluster.IntoContext(transCtx.Context, placement(transCtx.OrigCluster))
 		return nil
 	}
@@ -71,34 +71,38 @@ func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag 
 	return nil
 }
 
-func (t *clusterPlacementTransformer) done(transCtx *clusterTransformContext) bool {
+func (t *clusterPlacementTransformer) assigned(transCtx *clusterTransformContext) bool {
 	cluster := transCtx.OrigCluster
 	if cluster.Annotations == nil {
 		return false
 	}
 
-	placement, ok := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
-	if !ok || len(strings.TrimSpace(placement)) == 0 {
+	p, ok := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
+	if !ok || len(strings.TrimSpace(p)) == 0 {
 		return false
 	}
 
-	p := strings.Split(strings.TrimSpace(placement), ",")
-	return len(p) == t.maxReplicas(transCtx)
+	contexts := strings.Split(strings.TrimSpace(p), ",")
+	return len(contexts) == 1 || len(contexts) >= t.maxReplicas(transCtx)
 }
 
 func (t *clusterPlacementTransformer) assign(transCtx *clusterTransformContext) ([]string, error) {
 	replicas := t.maxReplicas(transCtx)
-	clusters := t.multiClusterMgr.GetContexts()
-	if len(clusters) < replicas {
-		return nil, fmt.Errorf("not supported placement")
+	contexts := t.multiClusterMgr.GetContexts()
+	if len(contexts) > 1 && len(contexts) < replicas {
+		return nil, fmt.Errorf("not supported placement, replicas: %d, contexts: %s", replicas, contexts)
 	}
 
-	slices.Sort(clusters)
-	for i := len(clusters) - 1; i > 0; i-- {
-		j := rand.Intn(i + 1)
-		clusters[i], clusters[j] = clusters[j], clusters[i]
+	if len(contexts) == 1 {
+		return contexts, nil
 	}
-	return clusters[:replicas], nil
+
+	slices.Sort(contexts)
+	for i := len(contexts) - 1; i > 0; i-- {
+		j := rand.Intn(i + 1)
+		contexts[i], contexts[j] = contexts[j], contexts[i]
+	}
+	return contexts[:replicas], nil
 }
 
 func (t *clusterPlacementTransformer) maxReplicas(transCtx *clusterTransformContext) int {

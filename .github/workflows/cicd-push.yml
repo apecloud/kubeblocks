@@ -282,7 +282,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: check license-header
         run: |
-          check_lh_ret=$(make check-license-header | grep 'FAIL')
+          check_lh_ret=$(make check-license-header | (grep 'FAIL' || true) )
           if [[ -n "$check_lh_ret" ]]; then
             echo "$check_lh_ret"
             echo "check license-header FAIL"

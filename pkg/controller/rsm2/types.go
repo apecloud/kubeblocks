@@ -41,7 +41,6 @@ const (
 
 	templateRefAnnotationKey = "kubeblocks.io/template-ref"
 	templateRefDataKey       = "instances"
-	revisionsZSTDKey         = "zstd"
 
 	OfflineInstancesAnnotationKey = "kubeblocks.io/offline-instances"
 )

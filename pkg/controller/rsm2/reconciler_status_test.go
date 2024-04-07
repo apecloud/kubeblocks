@@ -32,6 +32,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 )
 
 var _ = Describe("status reconciler test", func() {
@@ -133,7 +134,7 @@ var _ = Describe("status reconciler test", func() {
 			Expect(rsm.Status.CurrentGeneration).Should(BeEquivalentTo(rsm.Generation))
 
 			By("make all pods available with latest revision")
-			updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+			updateRevisions, err := rsmcommon.GetUpdateRevisions(rsm.Status.UpdateRevisions)
 			Expect(err).Should(BeNil())
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)

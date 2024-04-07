@@ -26,6 +26,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 )
 
 // statusReconciler computes the current status
@@ -66,7 +67,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	// patch updated revision to the outdated pod as a label
 	//
 	// proposal 1 is used currently.
-	updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+	updateRevisions, err := rsmcommon.GetUpdateRevisions(rsm.Status.UpdateRevisions)
 	if err != nil {
 		return nil, err
 	}

@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 )
 
 // updateReconciler handles the updates of instances based on the UpdateStrategy.
@@ -119,7 +120,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	}
 	updateCount := len(podsToBeUpdated)
 
-	updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+	updateRevisions, err := rsmcommon.GetUpdateRevisions(rsm.Status.UpdateRevisions)
 	if err != nil {
 		return nil, err
 	}

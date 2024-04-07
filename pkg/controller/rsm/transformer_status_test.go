@@ -118,7 +118,7 @@ var _ = Describe("object status transformer test.", func() {
 			pod2 := builder.NewPodBuilder(namespace, getPodName(name, 2)).
 				AddLabels(RoleLabelKey, "follower").
 				GetObject()
-			makePodUpdateReady(newRevision, pod0, pod1, pod2)
+			makePodUpdateReady(newRevision, true, pod0, pod1, pod2)
 			k8sMock.EXPECT().
 				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {

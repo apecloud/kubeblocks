@@ -854,6 +854,20 @@ Kubernetes core/v1.ResourceRequirements
 </tr>
 <tr>
 <td>
+<code>services</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
+[]ComponentService
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>To override services defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -4302,6 +4316,19 @@ map[string]string
 More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer">https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer</a>.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>podService</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether to generate individual services for each pod.
+If set to true, a separate service will be created for each pod in the cluster.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec
@@ -4517,7 +4544,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>Services expose endpoints that can be accessed by clients.</p>
+<p>Services overrides services defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -7942,7 +7969,7 @@ In KB 0.8.0 and later versions, ComponentDefRef is the name of ComponentDefiniti
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentService">ComponentService
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
 </div>
@@ -7971,30 +7998,29 @@ Service
 </tr>
 <tr>
 <td>
-<code>generatePodOrdinalService</code><br/>
+<code>podService</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
-If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.
-They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <code>$(Service.ServiceName)-$(PodOrdinal)</code>.
-And the Service.Name will also be generated with named pattern <code>$(Service.Name)-$(PodOrdinal)</code>.
-The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.
-For example, a Service might be defined as follows:</p>
-<pre><code class="language-yaml">name: my-service
-serviceName: my-service
-generatePodOrdinalService: true
-spec:
-type: NodePort
-ports:
-- name: http
-port: 80
-targetPort: 8080
-</code></pre>
-<p>Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.</p>
+<p>Indicates whether to generate individual services for each pod.
+If set to true, a separate service will be created for each pod in the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>disableAutoProvision</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the automatic provisioning of the service should be disabled.</p>
+<p>If set to true, the service will not be automatically created at the component provisioning.
+Instead, you can enable the creation of this service by specifying it explicitly in the cluster API.</p>
 </td>
 </tr>
 </tbody>
@@ -8097,6 +8123,20 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <em>(Optional)</em>
 <p>Information for statefulset.spec.volumeClaimTemplates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>services</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
+[]ComponentService
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>To override services defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -10025,7 +10065,7 @@ ConsensusMember
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVars">PodVars</a>)
 </p>
 <div>
-<p>ContainerVars defines the vars can be referenced from a Container.</p>
+<p>ContainerVars defines the vars that can be referenced from a Container.</p>
 </div>
 <table>
 <thead>
@@ -10168,7 +10208,7 @@ CredentialVars
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>)
 </p>
 <div>
-<p>CredentialVars defines the vars can be referenced from a Credential (SystemAccount).
+<p>CredentialVars defines the vars that can be referenced from a Credential (SystemAccount).
 !!!!! CredentialVars will only be used as environment variables for Pods &amp; Actions, and will not be used to render the templates.</p>
 </div>
 <table>
@@ -14322,7 +14362,7 @@ PodVars
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>)
 </p>
 <div>
-<p>PodVars defines the vars can be referenced from a Pod.</p>
+<p>PodVars defines the vars that can be referenced from a Pod.</p>
 </div>
 <table>
 <thead>
@@ -16852,8 +16892,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
-if GeneratePodOrdinalService sets to true, RoleSelector will be ignored.</p>
+<p>RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.</p>
 </td>
 </tr>
 </tbody>
@@ -17321,7 +17360,7 @@ ServiceRefVars
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>)
 </p>
 <div>
-<p>ServiceRefVars defines the vars can be referenced from a ServiceRef.</p>
+<p>ServiceRefVars defines the vars that can be referenced from a ServiceRef.</p>
 </div>
 <table>
 <thead>
@@ -17454,35 +17493,6 @@ ServiceVars
 </p>
 </td>
 </tr>
-<tr>
-<td>
-<code>generatePodOrdinalServiceVar</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.
-If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.
-They can be referred to by adding the PodOrdinal to the defined name template with named pattern <code>$(Vars[x].Name)_$(PodOrdinal)</code>.
-For example, a ServiceVarRef might be defined as follows:</p>
-<pre><code class="language-yaml">
-name: MY_SERVICE_PORT
-valueFrom:
-serviceVarRef:
-compDef: my-component-definition
-name: my-service
-optional: true
-generatePodOrdinalServiceVar: true
-port:
-name: redis-sentinel
-</code></pre>
-<p>Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,
-and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
-It should be used in conjunction with Service.GeneratePodOrdinalService.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars
@@ -17491,7 +17501,7 @@ It should be used in conjunction with Service.GeneratePodOrdinalService.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
-<p>ServiceVars defines the vars can be referenced from a Service.</p>
+<p>ServiceVars defines the vars that can be referenced from a Service.</p>
 </div>
 <table>
 <thead>
@@ -17525,6 +17535,9 @@ NamedVar
 </td>
 <td>
 <em>(Optional)</em>
+<p>Port references a port defined in the service.</p>
+<p>If the referenced service is a pod-service, there will be multiple service objects matched,
+and the value will be presented in the following format: service1.name:port1,service2.name:port2&hellip;</p>
 </td>
 </tr>
 <tr>
@@ -17538,6 +17551,9 @@ NamedVar
 </td>
 <td>
 <em>(Optional)</em>
+<p>NodePort references a node-port defined in the service.</p>
+<p>If the referenced service is a pod-service, there will be multiple service objects matched,
+and the value will be presented in the following format: service1.name:nodePort1,service2.name:nodePort2&hellip;</p>
 </td>
 </tr>
 </tbody>

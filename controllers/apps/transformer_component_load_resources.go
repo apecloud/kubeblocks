@@ -56,7 +56,7 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	}
 	transCtx.Cluster = cluster
 
-	if isGeneratedComponent(transCtx.ComponentOrig) {
+	if component.IsGenerated(transCtx.ComponentOrig) {
 		return t.transformForGeneratedComponent(transCtx)
 	}
 	return t.transformForNativeComponent(transCtx)
@@ -109,9 +109,4 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	transCtx.SynthesizeComponent = synthesizedComp
 
 	return nil
-}
-
-// isGeneratedComponent checks if the component is generated from legacy cluster definitions.
-func isGeneratedComponent(comp *appsv1alpha1.Component) bool {
-	return len(comp.Spec.CompDef) == 0
 }

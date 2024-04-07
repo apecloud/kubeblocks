@@ -618,11 +618,18 @@ type ComponentLifecycleActions struct {
 	// The PostProvision Action will be executed only once.
 	// The following dedicated environment variables are available for the action:
 	//
+	// - KB_CLUSTER_POD_IP_LIST: Lists the IP addresses of each pod in the cluster, joined by ',' (e.g., "podIp1,podIp2").
+	// - KB_CLUSTER_POD_NAME_LIST: Lists all pod names in the cluster, joined by ',' (e.g., "pod1,pod2").
+	// - KB_CLUSTER_POD_HOST_NAME_LIST: Lists the host names where each pod resides in the cluster, corresponding one-to-one with each pod in the KB_CLUSTER_POD_NAME_LIST. Joined by ',' (e.g., "hostName1,hostName2").
+	// - KB_CLUSTER_POD_HOST_IP_LIST: Lists the host IP addresses where each pod resides in the cluster, corresponding one-to-one with each pod in the KB_CLUSTER_POD_NAME_LIST. Joined by ',' (e.g., "hostIp1,hostIp2").
 	// - KB_CLUSTER_COMPONENT_LIST: Lists all components in the cluster, joined by ',' (e.g., "comp1,comp2").
 	// - KB_CLUSTER_COMPONENT_POD_NAME_LIST: Lists all pod names in this component, joined by ',' (e.g., "pod1,pod2").
 	// - KB_CLUSTER_COMPONENT_POD_IP_LIST: Lists the IP addresses of each pod in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "podIp1,podIp2").
 	// - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Lists the host names where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "hostName1,hostName2").
 	// - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Lists the host IP addresses where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "hostIp1,hostIp2").
+	// - KB_CLUSTER_COMPONENT_LIST: Lists all components in the cluster, joined by ',' (e.g., "comp1,comp2").
+	// - KB_CLUSTER_COMPONENT_DELETING_LIST: Lists all components that are being deleted, joined by ',' (e.g., "comp1,comp2").
+	// - KB_CLUSTER_COMPONENT_UNDELETED_LIST: Lists all components that are not being deleted, joined by ',' (e.g., "comp1,comp2").
 	//
 	// This field cannot be updated.
 	//
@@ -630,8 +637,23 @@ type ComponentLifecycleActions struct {
 	PostProvision *LifecycleActionHandler `json:"postProvision,omitempty"`
 
 	// Defines the actions to be executed when a component is terminated due to an API request.
-	// The PreTerminate Action will be executed only once. Upon receiving a scale-down command for the Component, it is executed immediately.
+	// The PreTerminate Action will be executed only once. Upon receiving a scale-in or deleting command for the Component, it is executed immediately.
 	// The destruction of the Component and its underlying resources proceeds only after the preTerminate action is successfully executed.
+	// The following dedicated environment variables are available for the action:
+	//
+	// - KB_CLUSTER_POD_IP_LIST: Lists the IP addresses of each pod in the cluster, joined by ',' (e.g., "podIp1,podIp2").
+	// - KB_CLUSTER_POD_NAME_LIST: Lists all pod names in the cluster, joined by ',' (e.g., "pod1,pod2").
+	// - KB_CLUSTER_POD_HOST_NAME_LIST: Lists the host names where each pod resides in the cluster, corresponding one-to-one with each pod in the KB_CLUSTER_POD_NAME_LIST. Joined by ',' (e.g., "hostName1,hostName2").
+	// - KB_CLUSTER_POD_HOST_IP_LIST: Lists the host IP addresses where each pod resides in the cluster, corresponding one-to-one with each pod in the KB_CLUSTER_POD_NAME_LIST. Joined by ',' (e.g., "hostIp1,hostIp2").
+	// - KB_CLUSTER_COMPONENT_POD_NAME_LIST: Lists all pod names in this component, joined by ',' (e.g., "pod1,pod2").
+	// - KB_CLUSTER_COMPONENT_POD_IP_LIST: Lists the IP addresses of each pod in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "podIp1,podIp2").
+	// - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Lists the host names where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "hostName1,hostName2").
+	// - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Lists the host IP addresses where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "hostIp1,hostIp2").
+	// - KB_CLUSTER_COMPONENT_LIST: Lists all components in the cluster, joined by ',' (e.g., "comp1,comp2").
+	// - KB_CLUSTER_COMPONENT_DELETING_LIST: Lists all components that are being deleted, joined by ',' (e.g., "comp1,comp2").
+	// - KB_CLUSTER_COMPONENT_UNDELETED_LIST: Lists all components that are not being deleted, joined by ',' (e.g., "comp1,comp2").
+	// - KB_CLUSTER_COMPONENT_IS_SCALING_IN: If exists and sets to "true", it indicates that the component is scaling in.
+	//
 	// This field cannot be updated.
 	//
 	// +optional

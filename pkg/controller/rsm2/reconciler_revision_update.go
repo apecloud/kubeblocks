@@ -50,9 +50,13 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
+	rsmExt, err := buildRSMExt(rsm, tree)
+	if err != nil {
+		return nil, err
+	}
 
 	// 1. build all templates by applying instance template overrides to default pod template
-	instanceTemplateList, err := buildInstanceTemplateExts(rsm, tree)
+	instanceTemplateList, err := buildInstanceTemplateExts(rsmExt)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +64,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	// build instance revision list from instance templates
 	var instanceRevisionList []instanceRevision
 	for _, template := range instanceTemplateList {
-		instanceNames, err := GenerateInstanceNamesFromTemplate(rsm.Name, template.Name, template.Replicas, rsm.Annotations)
+		instanceNames, err := GenerateInstanceNamesFromTemplate(rsm.Name, template.Name, template.Replicas, rsmExt.offlineInstances)
 		if err != nil {
 			return nil, err
 		}

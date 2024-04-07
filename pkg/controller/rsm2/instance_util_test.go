@@ -117,7 +117,9 @@ var _ = Describe("instance util test", func() {
 
 	Context("buildInstanceName2TemplateMap", func() {
 		It("build a rsm with default template only", func() {
-			nameTemplate, err := buildInstanceName2TemplateMap(rsm, nil)
+			rsmExt, err := buildRSMExt(rsm, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := buildInstanceName2TemplateMap(rsmExt)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name0 := rsm.Name + "-0"
@@ -147,7 +149,9 @@ var _ = Describe("instance util test", func() {
 				Image:       &imageOverride,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instance)
-			nameTemplate, err := buildInstanceName2TemplateMap(rsm, nil)
+			rsmExt, err := buildRSMExt(rsm, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := buildInstanceName2TemplateMap(rsmExt)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name0 := rsm.Name + "-0"
@@ -168,7 +172,9 @@ var _ = Describe("instance util test", func() {
 
 	Context("buildInstanceByTemplate", func() {
 		It("should work well", func() {
-			nameTemplate, err := buildInstanceName2TemplateMap(rsm, nil)
+			rsmExt, err := buildRSMExt(rsm, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := buildInstanceName2TemplateMap(rsmExt)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"
@@ -387,13 +393,11 @@ var _ = Describe("instance util test", func() {
 					Name:     templateName,
 				},
 			}
-			annotations := map[string]string{
-				OfflineInstancesAnnotationKey: "[\"foo-bar-1\", \"foo-0\"]",
-			}
+			offlineInstances := []string{"foo-bar-1", "foo-0"}
 
 			var instanceNameList []string
 			for _, template := range templates {
-				instanceNames, err := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, annotations)
+				instanceNames, err := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, offlineInstances)
 				Expect(err).Should(BeNil())
 				instanceNameList = append(instanceNameList, instanceNames...)
 			}

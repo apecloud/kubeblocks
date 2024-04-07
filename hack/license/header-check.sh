@@ -24,7 +24,7 @@ set -e -o pipefail
 # Initialize vars
 ERR=false
 FAIL=false
-EXCLUDES_DIRS="vendor/\|apis/\|tools/\|externalapis/\|pkg/lorry/engines/\|pkg/lorry/util/\|pkg/cli/cmd/plugin/download\|pkg\/common"
+EXCLUDES_DIRS="vendor/\|apis/\|tools/\|externalapis/\|pkg/cli/cmd/plugin/download\|pkg\/common"
 APACHE2_DIRS="apis/\|externalapis/"
 
 for file in $(git ls-files | grep '\.cue\|\.go$' | grep -v ${EXCLUDES_DIRS}); do

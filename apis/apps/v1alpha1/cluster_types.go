@@ -565,9 +565,8 @@ type ClusterComponentSpec struct {
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Services expose endpoints that can be accessed by clients.
+	// Services overrides services defined in referenced ComponentDefinition.
 	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0, consider using the $.Spec.ClusterService instead"
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
@@ -833,6 +832,12 @@ type ClusterComponentService struct {
 	//
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Indicates whether to generate individual services for each pod.
+	// If set to true, a separate service will be created for each pod in the cluster.
+	//
+	// +optional
+	PodService *bool `json:"podService,omitempty"`
 }
 
 type ClassDefRef struct {

@@ -1322,6 +1322,11 @@ spec:
                                 description: The name of the service.
                                 maxLength: 15
                                 type: string
+                              podService:
+                                description: Indicates whether to generate individual
+                                  services for each pod. If set to true, a separate
+                                  service will be created for each pod in the cluster.
+                                type: boolean
                               serviceType:
                                 default: ClusterIP
                                 description: "Determines how the Service is exposed.
@@ -1677,6 +1682,11 @@ spec:
                                 description: The name of the service.
                                 maxLength: 15
                                 type: string
+                              podService:
+                                description: Indicates whether to generate individual
+                                  services for each pod. If set to true, a separate
+                                  service will be created for each pod in the cluster.
+                                type: boolean
                               serviceType:
                                 default: ClusterIP
                                 description: "Determines how the Service is exposed.

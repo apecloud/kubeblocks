@@ -202,7 +202,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	limitSharedMemoryVolumeSize(synthesizeComp, comp)
 
 	// build componentService
-	buildComponentServices(synthesizeComp, compDefObj)
+	buildComponentServices(synthesizeComp, compDefObj, comp)
 
 	// build monitor
 	buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
@@ -385,10 +385,30 @@ func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli client.Reader,
 	return resolveServiceReferences(reqCtx.Ctx, cli, synthesizeComp)
 }
 
-// buildComponentRef builds componentServices for component.
-func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition) {
-	if len(compDef.Spec.Services) > 0 {
-		synthesizeComp.ComponentServices = compDef.Spec.Services
+func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) {
+	services := map[string]appsv1alpha1.ComponentService{}
+	for i, svc := range comp.Spec.Services {
+		services[svc.Name] = comp.Spec.Services[i]
+	}
+
+	synthesizeComp.ComponentServices = compDef.Spec.Services
+	if len(synthesizeComp.ComponentServices) == 0 || len(services) == 0 {
+		return
+	}
+
+	override := func(svc *appsv1alpha1.ComponentService) {
+		svc1, ok := services[svc.Name]
+		if ok {
+			svc.Spec.Type = svc1.Spec.Type
+			svc.Annotations = svc1.Annotations
+			svc.PodService = svc1.PodService
+			if svc.DisableAutoProvision != nil {
+				svc.DisableAutoProvision = func() *bool { b := false; return &b }()
+			}
+		}
+	}
+	for i := range synthesizeComp.ComponentServices {
+		override(&synthesizeComp.ComponentServices[i])
 	}
 }
 

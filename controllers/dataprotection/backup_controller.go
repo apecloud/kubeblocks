@@ -415,7 +415,12 @@ func (r *BackupReconciler) handleRunningPhase(
 		if err != nil {
 			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 		}
-		request.Status.Actions[i] = mergeActionStatus(&request.Status.Actions[i], status)
+		if i >= len(request.Status.Actions) {
+			// if continuous backup is failed during "New" phase, status.actions maybe empty.
+			request.Status.Actions = append(request.Status.Actions, *status)
+		} else {
+			request.Status.Actions[i] = mergeActionStatus(&request.Status.Actions[i], status)
+		}
 
 		switch status.Phase {
 		case dpv1alpha1.ActionPhaseCompleted:

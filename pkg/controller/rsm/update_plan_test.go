@@ -100,10 +100,10 @@ var _ = Describe("update plan test.", func() {
 			return set1.Equal(set2)
 		}
 
-		checkPlan := func(expectedPlan [][]*corev1.Pod) {
+		checkPlan := func(expectedPlan [][]*corev1.Pod, roleful bool) {
 			for i, expectedPods := range expectedPlan {
 				if i > 0 {
-					makePodUpdateReady(newRevision, expectedPlan[i-1]...)
+					makePodUpdateReady(newRevision, roleful, expectedPlan[i-1]...)
 				}
 				pods := buildPodList()
 				plan := newUpdatePlan(*rsm, pods)
@@ -132,7 +132,7 @@ var _ = Describe("update plan test.", func() {
 				{pod0},
 				{pod5},
 			}
-			checkPlan(expectedPlan)
+			checkPlan(expectedPlan, true)
 		})
 
 		It("should work well in a parallel plan", func() {
@@ -142,7 +142,7 @@ var _ = Describe("update plan test.", func() {
 			expectedPlan := [][]*corev1.Pod{
 				{pod0, pod1, pod2, pod3, pod4, pod5, pod6},
 			}
-			checkPlan(expectedPlan)
+			checkPlan(expectedPlan, true)
 		})
 
 		It("should work well in a best effort parallel", func() {
@@ -155,7 +155,32 @@ var _ = Describe("update plan test.", func() {
 				{pod0},
 				{pod5},
 			}
-			checkPlan(expectedPlan)
+			checkPlan(expectedPlan, true)
+		})
+
+		It("should work well with role-less and heterogeneous pods", func() {
+			By("build a serial plan with role-less and heterogeneous pods")
+			strategy := workloads.SerialUpdateStrategy
+			rsm.Spec.MemberUpdateStrategy = &strategy
+			rsm.Spec.Roles = nil
+			for _, pod := range []*corev1.Pod{pod0, pod1, pod2, pod3, pod4, pod5, pod6} {
+				labels := pod.Labels
+				if len(labels) == 0 {
+					continue
+				}
+				delete(labels, RoleLabelKey)
+				pod.Labels = labels
+			}
+			expectedPlan := [][]*corev1.Pod{
+				{pod0},
+				{pod1},
+				{pod2},
+				{pod3},
+				{pod4},
+				{pod5},
+				{pod6},
+			}
+			checkPlan(expectedPlan, false)
 		})
 	})
 })

@@ -1742,13 +1742,12 @@ spec:
                       Joined by ',' (e.g., \"hostName1,hostName2\"). - KB_CLUSTER_POD_HOST_IP_LIST:
                       Lists the host IP addresses where each pod resides in the cluster,
                       corresponding one-to-one with each pod in the KB_CLUSTER_POD_NAME_LIST.
-                      Joined by ',' (e.g., \"hostIp1,hostIp2\"). - KB_CLUSTER_COMPONENT_LIST:
-                      Lists all components in the cluster, joined by ',' (e.g., \"comp1,comp2\").
-                      - KB_CLUSTER_COMPONENT_POD_NAME_LIST: Lists all pod names in
-                      this component, joined by ',' (e.g., \"pod1,pod2\"). - KB_CLUSTER_COMPONENT_POD_IP_LIST:
-                      Lists the IP addresses of each pod in this component, corresponding
-                      one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST.
-                      Joined by ',' (e.g., \"podIp1,podIp2\"). - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST:
+                      Joined by ',' (e.g., \"hostIp1,hostIp2\"). - KB_CLUSTER_COMPONENT_POD_NAME_LIST:
+                      Lists all pod names in this component, joined by ',' (e.g.,
+                      \"pod1,pod2\"). - KB_CLUSTER_COMPONENT_POD_IP_LIST: Lists the
+                      IP addresses of each pod in this component, corresponding one-to-one
+                      with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined
+                      by ',' (e.g., \"podIp1,podIp2\"). - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST:
                       Lists the host names where each pod resides in this component,
                       corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST.
                       Joined by ',' (e.g., \"hostName1,hostName2\"). - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST:

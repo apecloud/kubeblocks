@@ -34,6 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -882,8 +883,13 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 				return nil, err
 			}
 			objs := make([]*corev1.Service, 0)
+			objNames := sets.Set[string]{}
 			for i, svc := range svcList.Items {
 				if strings.HasPrefix(svc.Name, svcName) {
+					if objNames.Has(svc.Name) {
+						continue
+					}
+					objNames.Insert(svc.Name)
 					objs = append(objs, &svcList.Items[i])
 				}
 			}

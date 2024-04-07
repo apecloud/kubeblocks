@@ -312,7 +312,6 @@ type InstanceTemplate struct {
 	// The constructed instance name follows the pattern $(component.name)-$(template.name)-$(ordinal).
 	// The ordinal starts from 0 by default.
 	//
-	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=54
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:Required

@@ -979,7 +979,6 @@ spec:
                         instance name follows the pattern $(rsm.name)-$(template.name)-$(ordinal).
                         The ordinal starts from 0 by default.
                       maxLength: 54
-                      minLength: 1
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     nodeName:
@@ -990,25 +989,6 @@ spec:
                         type: string
                       description: Defines NodeSelector to override.
                       type: object
-                    offline:
-                      description: Specified instances built from this template should
-                        be offline.
-                      type: boolean
-                    ordinalStart:
-                      description: 'OrdinalStart controls the numbering of instance(replica)
-                        indices in a RSM. The default ordinals behavior assigns a
-                        "0" index to the first instance and increments the index by
-                        one for each additional instance requested. OrdinalStart is
-                        the number representing the first instance''s index. It may
-                        be used to number instances from an alternate index (eg: 1-indexed)
-                        over the default 0-indexed names, or to orchestrate progressive
-                        movement of instances from one RSM to another. If set, instance
-                        indices will be in the range: [OrdinalStart, OrdinalStart
-                        + Replicas). If unset, defaults to 0. Instance indices will
-                        be in the range: [0, Replicas).'
-                      format: int32
-                      minimum: 0
-                      type: integer
                     replicas:
                       default: 1
                       description: Number of replicas of this template. Default is

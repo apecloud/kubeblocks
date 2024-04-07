@@ -11309,7 +11309,22 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies instances to be added and/or deleted for the workloads.</p>
+<p>Specifies instances to be added and/or deleted for the workloads.
+Name and Replicas should be provided. Other fields will simply be ignored.
+The Replicas will be overridden if an existing InstanceTemplate is matched by Name.
+Or the InstanceTemplate will be added as a new one.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be deleted with dedicated names in the list.</p>
 </td>
 </tr>
 </tbody>
@@ -11473,40 +11488,6 @@ int32
 <em>(Optional)</em>
 <p>Number of replicas of this template.
 Default is 1.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ordinalStart</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>OrdinalStart controls the numbering of instance(replica) indices in a Component. The
-default ordinals behavior assigns a &ldquo;0&rdquo; index to the first instance and
-increments the index by one for each additional instance requested.
-OrdinalStart is the number representing the first instance&rsquo;s index. It may be used
-to number instances from an alternate index (eg: 1-indexed) over the default
-0-indexed names, or to orchestrate progressive movement of instances from
-one Component to another.
-If set, instance indices will be in the range:
-[OrdinalStart, OrdinalStart + Replicas).
-If unset, defaults to 0. Instance indices will be in the range:
-[0, Replicas).</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>offline</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specified instances built from this template should be offline.</p>
 </td>
 </tr>
 <tr>
@@ -20258,40 +20239,6 @@ int32
 <em>(Optional)</em>
 <p>Number of replicas of this template.
 Default is 1.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ordinalStart</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>OrdinalStart controls the numbering of instance(replica) indices in a RSM. The
-default ordinals behavior assigns a &ldquo;0&rdquo; index to the first instance and
-increments the index by one for each additional instance requested.
-OrdinalStart is the number representing the first instance&rsquo;s index. It may be used
-to number instances from an alternate index (eg: 1-indexed) over the default
-0-indexed names, or to orchestrate progressive movement of instances from
-one RSM to another.
-If set, instance indices will be in the range:
-[OrdinalStart, OrdinalStart + Replicas).
-If unset, defaults to 0. Instance indices will be in the range:
-[0, Replicas).</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>offline</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specified instances built from this template should be offline.</p>
 </td>
 </tr>
 <tr>

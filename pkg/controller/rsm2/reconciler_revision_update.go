@@ -25,7 +25,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// revisionUpdateReconciler is responsible for updating the expected replica names and their corresponding revisions in the status when there are changes in the spec.
+// revisionUpdateReconciler is responsible for updating the expected instance names and their corresponding revisions in the status when there are changes in the spec.
 type revisionUpdateReconciler struct{}
 
 type instanceRevision struct {

@@ -37,7 +37,7 @@ import (
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-var _ = Describe("replica util test", func() {
+var _ = Describe("instance util test", func() {
 	BeforeEach(func() {
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 			SetService(&corev1.Service{}).

@@ -68,7 +68,7 @@ func init() {
 	runtime.Must(err)
 }
 
-type replica struct {
+type instance struct {
 	pod  *corev1.Pod
 	pvcs []*corev1.PersistentVolumeClaim
 }
@@ -239,7 +239,7 @@ func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas
 // The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
 // The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
 func generateInstanceNames(parentName, templateName string, replicas int32, ordinal int32, usedNames sets.Set[string]) ([]string, int32) {
-	var replicaNameList []string
+	var instanceNameList []string
 	var name string
 	for i := int32(0); i < replicas; i++ {
 		for {
@@ -250,15 +250,15 @@ func generateInstanceNames(parentName, templateName string, replicas int32, ordi
 			}
 			ordinal++
 			if usedNames == nil || !usedNames.Has(name) {
-				replicaNameList = append(replicaNameList, name)
+				instanceNameList = append(instanceNameList, name)
 				break
 			}
 		}
 	}
-	return replicaNameList, ordinal
+	return instanceNameList, ordinal
 }
 
-func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.ReplicatedStateMachine) (*replica, error) {
+func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.ReplicatedStateMachine) (*instance, error) {
 	revision, err := buildInstanceTemplateRevision(template, parent)
 	if err != nil {
 		return nil, err
@@ -308,11 +308,11 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	if err = controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
-	replica := &replica{
+	inst := &instance{
 		pod:  pod,
 		pvcs: pvcs,
 	}
-	return replica, nil
+	return inst, nil
 }
 
 // copyAndMerge merges two objects for updating:

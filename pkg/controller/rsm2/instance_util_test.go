@@ -21,7 +21,6 @@ package rsm2
 
 import (
 	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -379,19 +378,12 @@ var _ = Describe("replica util test", func() {
 			templateName := "bar"
 			templates := []*instanceTemplateExt{
 				{
+					Name:         "",
 					Replicas:     2,
-					Name:         templateName,
-					OrdinalStart: -1,
 				},
 				{
 					Replicas:     2,
 					Name:         templateName,
-					OrdinalStart: 100,
-				},
-				{
-					Replicas:     2,
-					Name:         templateName,
-					OrdinalStart: -1,
 				},
 			}
 
@@ -399,12 +391,12 @@ var _ = Describe("replica util test", func() {
 			for _, template := range templates {
 				templateGroup = append(templateGroup, template)
 			}
-			instanceNames, _ := GenerateInstanceNamesFromGroup(parentName, templateName, templateGroup, true)
+			instanceNames, _ := GenerateInstanceNamesFromGroup(parentName, templateName, templateGroup, nil)
 			getNameNOrdinalFunc := func(i int) (string, int) {
 				return ParseParentNameAndOrdinal(instanceNames[i])
 			}
 			BaseSort(instanceNames, getNameNOrdinalFunc, nil, false)
-			podNamesExpected := []string{"foo-bar-0", "foo-bar-1", "foo-bar-2", "foo-bar-3", "foo-bar-100", "foo-bar-101"}
+			podNamesExpected := []string{"foo-bar-0", "foo-bar-1", "foo-0", "foo-1"}
 			Expect(instanceNames).Should(Equal(podNamesExpected))
 		})
 	})

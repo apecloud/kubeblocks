@@ -35,7 +35,8 @@ const (
 
 	defaultReplicaProvider = PodProvider
 
-	templateRefAnnotationKey = "kubeblocks.io/template-ref"
-	templateRefDataKey       = "instances"
-	revisionsZSTDKey         = "zstd"
+	templateRefAnnotationKey      = "kubeblocks.io/template-ref"
+	templateRefDataKey            = "instances"
+	revisionsZSTDKey              = "zstd"
+	offlineInstancesAnnotationKey = "kubeblocks.io/offline-instances"
 )

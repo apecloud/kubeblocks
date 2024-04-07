@@ -49,15 +49,11 @@ import (
 type InstanceTemplateMeta interface {
 	GetName() string
 	GetReplicas() int32
-	GetOrdinalStart() int32
-	IsOffline() bool
 }
 
 type instanceTemplateExt struct {
 	Name         string
 	Replicas     int32
-	OrdinalStart int32
-	Offline      bool
 	corev1.PodTemplateSpec
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 }
@@ -85,14 +81,6 @@ func (t *instanceTemplateExt) GetName() string {
 
 func (t *instanceTemplateExt) GetReplicas() int32 {
 	return t.Replicas
-}
-
-func (t *instanceTemplateExt) GetOrdinalStart() int32 {
-	return t.OrdinalStart
-}
-
-func (t *instanceTemplateExt) IsOffline() bool {
-	return t.Offline
 }
 
 type replica struct {
@@ -216,6 +204,10 @@ func buildInstanceName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *
 	if err != nil {
 		return nil, err
 	}
+	offlineInstances, err := parseOfflineInstances(rsm.Annotations)
+	if err != nil {
+		return nil, err
+	}
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
 	for templateName, templateList := range instanceTemplateExtGroups {
@@ -223,7 +215,7 @@ func buildInstanceName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *
 		for _, template := range templateList {
 			templateGroup = append(templateGroup, template)
 		}
-		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(rsm.Name, templateName, templateGroup, true)
+		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(rsm.Name, templateName, templateGroup, sets.New(offlineInstances...))
 		instanceNameList = append(instanceNameList, instanceNames...)
 		for name, template := range nameTemplateMap {
 			allNameTemplateMap[name] = template.(*instanceTemplateExt)
@@ -240,40 +232,28 @@ func buildInstanceName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *
 	return allNameTemplateMap, nil
 }
 
-func GenerateInstanceNamesFromGroup(parentName, templateName string, templateGroup []InstanceTemplateMeta, onlineOnly bool) ([]string, map[string]InstanceTemplateMeta) {
+func parseOfflineInstances(annotations map[string]string) (offlineInstances []string, err error) {
+	if len(annotations) == 0 {
+		return
+	}
+	offlineInstancesStr, ok := annotations[offlineInstancesAnnotationKey]
+	if !ok {
+		return
+	}
+	offlineInstances = make([]string, 0)
+	err = json.Unmarshal([]byte(offlineInstancesStr), &offlineInstances)
+	return
+}
+
+func GenerateInstanceNamesFromGroup(parentName, templateName string, templateGroup []InstanceTemplateMeta, usedNames sets.Set[string]) ([]string, map[string]InstanceTemplateMeta) {
 	var (
 		allNameList     []string
 		nameTemplateMap = make(map[string]InstanceTemplateMeta)
-
-		instanceNames []string
-		ordinal       int32
-		usedNames     = sets.New[string]()
 	)
-	// generate names from template with OrdinalStart
 	for _, template := range templateGroup {
-		if template.GetOrdinalStart() < 0 {
-			continue
-		}
-		instanceNames, _ = generateInstanceNames(parentName, templateName, template.GetReplicas(), template.GetOrdinalStart(), sets.New[string]())
-		if !onlineOnly || !template.IsOffline() {
-			for _, name := range instanceNames {
-				nameTemplateMap[name] = template
-			}
-		}
-		allNameList = append(allNameList, instanceNames...)
-		usedNames.Insert(instanceNames...)
-	}
-	// generate names from template without OrdinalStart
-	ordinal = 0
-	for _, template := range templateGroup {
-		if template.GetOrdinalStart() >= 0 {
-			continue
-		}
-		instanceNames, ordinal = generateInstanceNames(parentName, templateName, template.GetReplicas(), ordinal, usedNames)
-		if !onlineOnly || !template.IsOffline() {
-			for _, name := range instanceNames {
-				nameTemplateMap[name] = template
-			}
+		instanceNames, _ := generateInstanceNames(parentName, templateName, template.GetReplicas(), 0, usedNames)
+		for _, name := range instanceNames {
+			nameTemplateMap[name] = template
 		}
 		allNameList = append(allNameList, instanceNames...)
 	}
@@ -295,7 +275,7 @@ func generateInstanceNames(parentName, templateName string, replicas int32, ordi
 				name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
 			}
 			ordinal++
-			if !usedNames.Has(name) {
+			if usedNames == nil || !usedNames.Has(name) {
 				replicaNameList = append(replicaNameList, name)
 				break
 			}
@@ -455,15 +435,17 @@ func validateSpec(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.Obje
 		return err
 	}
 	instanceTemplates := getInstanceTemplates(rsm.Spec.Instances, template)
+	templateNames := sets.New[string]()
 	for _, instance := range instanceTemplates {
-		if instance.Offline != nil && *instance.Offline {
-			continue
-		}
 		replicas := int32(1)
 		if instance.Replicas != nil {
 			replicas = *instance.Replicas
 		}
 		replicasInTemplates += replicas
+		if templateNames.Has(instance.Name) {
+			return fmt.Errorf("duplicate instance template name: %s", instance.Name)
+		}
+		templateNames.Insert(template.Name)
 	}
 	// sum of spec.templates[*].replicas should not greater than spec.replicas
 	if replicasInTemplates > *rsm.Spec.Replicas {
@@ -622,16 +604,6 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		replicas = *template.Replicas
 	}
 	templateExt.Replicas = replicas
-	ordinalStart := int32(-1)
-	if template.OrdinalStart != nil {
-		ordinalStart = *template.OrdinalStart
-	}
-	templateExt.OrdinalStart = ordinalStart
-	offline := false
-	if template.Offline != nil {
-		offline = *template.Offline
-	}
-	templateExt.Offline = offline
 	if template.NodeName != nil {
 		templateExt.Spec.NodeName = *template.NodeName
 	}

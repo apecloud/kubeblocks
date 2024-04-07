@@ -325,27 +325,6 @@ type InstanceTemplate struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// OrdinalStart controls the numbering of instance(replica) indices in a Component. The
-	// default ordinals behavior assigns a "0" index to the first instance and
-	// increments the index by one for each additional instance requested.
-	// OrdinalStart is the number representing the first instance's index. It may be used
-	// to number instances from an alternate index (eg: 1-indexed) over the default
-	// 0-indexed names, or to orchestrate progressive movement of instances from
-	// one Component to another.
-	// If set, instance indices will be in the range:
-	//   [OrdinalStart, OrdinalStart + Replicas).
-	// If unset, defaults to 0. Instance indices will be in the range:
-	//   [0, Replicas).
-	//
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	OrdinalStart *int32 `json:"ordinalStart,omitempty"`
-
-	// Specified instances built from this template should be offline.
-	//
-	// +optional
-	Offline *bool `json:"offline,omitempty"`
-
 	// Defines annotations to override.
 	// Add new or override existing annotations.
 	// +optional

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
+	"encoding/json"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -29,18 +30,18 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// replicasAlignmentReconciler is responsible for aligning the actual replicas(i.e. number of pods) with the desired replicas specified in the spec,
+// instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
 // including horizontal scaling and recovering from unintended pod deletions etc.
-// only handle replica count, don't care replica revision.
+// only handle instance count, don't care instance revision.
 //
 // TODO(free6om): support membership reconfiguration
-type replicasAlignmentReconciler struct{}
+type instanceAlignmentReconciler struct{}
 
 func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
-	return &replicasAlignmentReconciler{}
+	return &instanceAlignmentReconciler{}
 }
 
-func (r *replicasAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
@@ -54,7 +55,7 @@ func (r *replicasAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 	return kubebuilderx.ResultSatisfied
 }
 
-func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 	// 1. build desired name to template map
 	nameToTemplateMap, err := buildInstanceName2TemplateMap(rsm, tree)
@@ -158,6 +159,9 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err := tree.Delete(pod); err != nil {
 			return nil, err
 		}
+		if err := updateOfflineInstanceAnnotation(rsm, pod.Name); err != nil {
+			return nil, err
+		}
 		// TODO(free6om): handle pvc management policy
 		// Retain by default.
 		deleteCount--
@@ -166,4 +170,29 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	return tree, nil
 }
 
-var _ kubebuilderx.Reconciler = &replicasAlignmentReconciler{}
+func updateOfflineInstanceAnnotation(rsm *workloads.ReplicatedStateMachine, name string) error {
+	offlineInstances, err := parseOfflineInstances(rsm.Annotations)
+	if err != nil {
+		return err
+	}
+	if len(offlineInstances) == 0 {
+		return nil
+	}
+	for i, instance := range offlineInstances {
+		if instance == name {
+			offlineInstances = append(offlineInstances[:i], offlineInstances[i+1:]...)
+			break
+		}
+	}
+	if len(offlineInstances) == 0 {
+		return nil
+	}
+	offlineInstancesByte, err := json.Marshal(offlineInstances)
+	if err != nil {
+		return err
+	}
+	rsm.Annotations[offlineInstancesAnnotationKey] = string(offlineInstancesByte)
+	return nil
+}
+
+var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}

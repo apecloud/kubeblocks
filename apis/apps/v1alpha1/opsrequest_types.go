@@ -268,9 +268,22 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
 
+	// Specifies instances to be added for the workloads.
+	// The InstanceTemplate Name must match an existing one.
+	// The Replicas must be greater than the existing one.
+
 	// Specifies instances to be added and/or deleted for the workloads.
+	// Name and Replicas should be provided. Other fields will simply be ignored.
+	// The Replicas will be overridden if an existing InstanceTemplate is matched by Name.
+	// Or the InstanceTemplate will be added as a new one.
+	//
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
+
+	// Specifies instances to be deleted with dedicated names in the list.
+	//
+	// +optional
+	OfflineInstances []string `json:"offlineInstances,omitempty"`
 }
 
 // Reconfigure represents the variables required for updating a configuration.

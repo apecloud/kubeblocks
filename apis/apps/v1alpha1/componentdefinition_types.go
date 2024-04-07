@@ -58,6 +58,28 @@ func init() {
 	SchemeBuilder.Register(&ComponentDefinition{}, &ComponentDefinitionList{})
 }
 
+type SidecarKind string
+
+type PrometheusConfig struct {
+	MetricsPath string `json:"metricsPath"`
+}
+
+type MonitorSource struct {
+	SidecarKind SidecarKind `json:"kind"`
+
+	PrometheusConfig *PrometheusConfig `json:"prometheus`
+}
+
+type SidecarContainerSource struct {
+	MonitorSource *MonitorSource `json:"monitorSource,omitempty"`
+}
+
+type SidecarContainerSpec struct {
+	SidecarContainerSources *SidecarContainerSource `json:",inline"`
+
+	corev1.Container `json:",inline"`
+}
+
 // ComponentDefinitionSpec defines the desired state of ComponentDefinition.
 type ComponentDefinitionSpec struct {
 	// Specifies the name of the component provider, typically the vendor or developer name.
@@ -172,6 +194,11 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
+
+	// Defines the sidecar containers that will be attached to the component's main container.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	SidecarContainerSpec []SidecarContainerSpec `json:"sidecarSpecs,omitempty"`
 
 	// Represents user-defined variables that can be used as environment variables for Pods and Actions,
 	// or to render templates of config and script.

@@ -833,6 +833,11 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
+
+	// Defines the sidecar containers that will be attached to the component's main container.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	Sidecars []string `json:"sidecars"`
 }
 
 type ComponentMessageMap map[string]string

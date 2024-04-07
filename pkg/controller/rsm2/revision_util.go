@@ -23,7 +23,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	"hash"
 	"hash/fnv"
 	"strconv"
@@ -38,6 +37,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ControllerRevisionHashLabel is the label used to indicate the hash value of a ControllerRevision's Data.

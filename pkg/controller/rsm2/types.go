@@ -39,9 +39,9 @@ const (
 	// All revisions will be compressed if exceeding this value.
 	MaxPlainRevisionCount = "MAX_PLAIN_REVISION_COUNT"
 
-	templateRefAnnotationKey      = "kubeblocks.io/template-ref"
-	templateRefDataKey            = "instances"
-	revisionsZSTDKey              = "zstd"
+	templateRefAnnotationKey = "kubeblocks.io/template-ref"
+	templateRefDataKey       = "instances"
+	revisionsZSTDKey         = "zstd"
 
 	OfflineInstancesAnnotationKey = "kubeblocks.io/offline-instances"
 )

@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -196,7 +196,7 @@ max_connections=666
 	type args struct {
 		oldVersion        map[string]string
 		newVersion        map[string]string
-		format            v1alpha1.CfgFileFormat
+		format            appsv1beta1.CfgFileFormat
 		keys              []string
 		enableExcludeDiff bool
 	}
@@ -215,7 +215,7 @@ max_connections=666
 			newVersion: map[string]string{
 				"my.cnf": v2,
 			},
-			format:            v1alpha1.Ini,
+			format:            appsv1beta1.Ini,
 			enableExcludeDiff: true,
 		},
 		want:        &ConfigPatchInfo{IsModify: true},
@@ -231,7 +231,7 @@ max_connections=666
 				"my.cnf":    v2,
 				"other.cnf": "context",
 			},
-			format:            v1alpha1.Ini,
+			format:            appsv1beta1.Ini,
 			enableExcludeDiff: true,
 		},
 		want:        &ConfigPatchInfo{IsModify: true},
@@ -249,7 +249,7 @@ max_connections=666
 				"other.cnf": "context",
 			},
 			keys:              []string{"my.cnf"},
-			format:            v1alpha1.Ini,
+			format:            appsv1beta1.Ini,
 			enableExcludeDiff: true,
 		},
 		want:        &ConfigPatchInfo{IsModify: true},
@@ -266,7 +266,7 @@ max_connections=666
 				"other.cnf": "context difference",
 			},
 			keys:              []string{"my.cnf"},
-			format:            v1alpha1.Ini,
+			format:            appsv1beta1.Ini,
 			enableExcludeDiff: true,
 		},
 		want:        &ConfigPatchInfo{IsModify: false},
@@ -283,7 +283,7 @@ max_connections=666
 				"other.cnf": "context difference",
 			},
 			keys:              []string{"my.cnf"},
-			format:            v1alpha1.Ini,
+			format:            appsv1beta1.Ini,
 			enableExcludeDiff: false,
 		},
 		want:        &ConfigPatchInfo{IsModify: true},
@@ -314,7 +314,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 
 	type args struct {
 		data         map[string]string
-		formatConfig *v1alpha1.FormatterConfig
+		formatConfig *appsv1beta1.FormatterConfig
 		keys         []string
 	}
 	tests := []struct {
@@ -325,10 +325,10 @@ func TestLoadRawConfigObject(t *testing.T) {
 		name: "test",
 		args: args{
 			data: map[string]string{"key": getFileContentFn("cue_testdata/mysql.cnf")},
-			formatConfig: &v1alpha1.FormatterConfig{
-				Format: v1alpha1.Ini,
-				FormatterOptions: v1alpha1.FormatterOptions{
-					IniConfig: &v1alpha1.IniConfig{
+			formatConfig: &appsv1beta1.FormatterConfig{
+				Format: appsv1beta1.Ini,
+				FormatterAction: appsv1beta1.FormatterAction{
+					IniConfig: &appsv1beta1.IniConfig{
 						SectionName: "mysqld",
 					}},
 			}},
@@ -337,8 +337,8 @@ func TestLoadRawConfigObject(t *testing.T) {
 		name: "test",
 		args: args{
 			data: map[string]string{"key": getFileContentFn("cue_testdata/pg14.conf")},
-			formatConfig: &v1alpha1.FormatterConfig{
-				Format: v1alpha1.Properties,
+			formatConfig: &appsv1beta1.FormatterConfig{
+				Format: appsv1beta1.Properties,
 			}},
 		wantErr: false,
 	}, {
@@ -349,8 +349,8 @@ func TestLoadRawConfigObject(t *testing.T) {
 				"key2": getFileContentFn("cue_testdata/mysql.cnf"),
 			},
 			keys: []string{"key"},
-			formatConfig: &v1alpha1.FormatterConfig{
-				Format: v1alpha1.Properties,
+			formatConfig: &appsv1beta1.FormatterConfig{
+				Format: appsv1beta1.Properties,
 			}},
 		wantErr: false,
 	}, {
@@ -360,8 +360,8 @@ func TestLoadRawConfigObject(t *testing.T) {
 				"key": getFileContentFn("cue_testdata/pg14.conf"),
 			},
 			keys: []string{"key"},
-			formatConfig: &v1alpha1.FormatterConfig{
-				Format: v1alpha1.XML,
+			formatConfig: &appsv1beta1.FormatterConfig{
+				Format: appsv1beta1.XML,
 			}},
 		wantErr: true,
 	}}
@@ -391,16 +391,16 @@ systemLog:
 	tests := []struct {
 		name         string
 		fileName     string
-		formatConfig *v1alpha1.FormatterConfig
+		formatConfig *appsv1beta1.FormatterConfig
 		configData   []byte
 		expected     map[string]string
 	}{{
 		name:     "mysql-test",
 		fileName: "my.cnf",
-		formatConfig: &v1alpha1.FormatterConfig{
-			Format: v1alpha1.Ini,
-			FormatterOptions: v1alpha1.FormatterOptions{
-				IniConfig: &v1alpha1.IniConfig{
+		formatConfig: &appsv1beta1.FormatterConfig{
+			Format: appsv1beta1.Ini,
+			FormatterAction: appsv1beta1.FormatterAction{
+				IniConfig: &appsv1beta1.IniConfig{
 					SectionName: "mysqld",
 				},
 			},
@@ -413,10 +413,10 @@ systemLog:
 	}, {
 		name:     "mongodb-test",
 		fileName: "mongodb.conf",
-		formatConfig: &v1alpha1.FormatterConfig{
-			Format: v1alpha1.YAML,
-			FormatterOptions: v1alpha1.FormatterOptions{
-				IniConfig: &v1alpha1.IniConfig{
+		formatConfig: &appsv1beta1.FormatterConfig{
+			Format: appsv1beta1.YAML,
+			FormatterAction: appsv1beta1.FormatterAction{
+				IniConfig: &appsv1beta1.IniConfig{
 					SectionName: "default",
 				},
 			},

@@ -86,13 +86,8 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	if opsRes == nil {
 		return "", 0, nil
 	}
-	opsRequestPhase := appsv1alpha1.OpsRunningPhase
-	clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli,
-		opsRes.Cluster.Spec.ClusterDefRef)
-	if err != nil {
-		return opsRequestPhase, 0, err
-	}
 	var (
+		opsRequestPhase          = appsv1alpha1.OpsRunningPhase
 		opsRequest               = opsRes.OpsRequest
 		isFailed                 bool
 		ok                       bool
@@ -100,7 +95,14 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		completedProgressCount   int32
 		checkAllClusterComponent bool
 		requeueTimeAfterFailed   time.Duration
+		err                      error
+		clusterDef               *appsv1alpha1.ClusterDefinition
 	)
+	if opsRes.Cluster.Spec.ClusterDefRef != "" {
+		if clusterDef, err = getClusterDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Spec.ClusterDefRef); err != nil {
+			return opsRequestPhase, 0, err
+		}
+	}
 	componentNameMap := opsRequest.GetComponentNameSet()
 	// if no specified components, we should check the all components phase of cluster.
 	if len(componentNameMap) == 0 {
@@ -143,11 +145,19 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 			compStatus.LastFailedTime = lastFailedTime
 		}
 		clusterComponent := opsRes.Cluster.Spec.GetComponentByName(k)
+		var componentDefinition *appsv1alpha1.ComponentDefinition
+		if clusterComponent.ComponentDef != "" {
+			componentDefinition, err = intctrlcomp.GetCompDefinition(reqCtx, cli, opsRes.Cluster, k)
+			if err != nil {
+				return opsRequestPhase, 0, err
+			}
+		}
 		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, progressResource{
-			opsMessageKey:       opsMessageKey,
-			clusterComponent:    clusterComponent,
-			clusterComponentDef: clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef),
-			opsIsCompleted:      opsIsCompleted,
+			opsMessageKey:    opsMessageKey,
+			clusterComponent: clusterComponent,
+			clusterDef:       clusterDef,
+			componentDef:     componentDefinition,
+			opsIsCompleted:   opsIsCompleted,
 		}, &compStatus)
 		if err != nil {
 			if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {

@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -51,7 +52,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 
 		k8sMockClient    *testutil.K8sClientMockHelper
 		origCMObject     *corev1.ConfigMap
-		configConstraint *appsv1alpha1.ConfigConstraint
+		configConstraint *appsv1beta1.ConfigConstraint
 	)
 
 	BeforeEach(func() {
@@ -61,7 +62,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			testCtx.UseDefaultNamespace())
 
 		configConstraint = testapps.NewCustomizedObj("config/envfrom-constraint.yaml",
-			&appsv1alpha1.ConfigConstraint{})
+			&appsv1beta1.ConfigConstraint{})
 
 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).

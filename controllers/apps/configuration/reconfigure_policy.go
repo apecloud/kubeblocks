@@ -24,12 +24,12 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	configmanager "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -88,7 +88,7 @@ type reconfigureParams struct {
 	ConfigMap *corev1.ConfigMap
 
 	// ConfigConstraint pointer
-	ConfigConstraint *appsv1alpha1.ConfigConstraintSpec
+	ConfigConstraint *appsv1beta1.ConfigConstraintSpec
 
 	// For grpc factory
 	ReconfigureClientFactory createReconfigureClient
@@ -111,12 +111,8 @@ type reconfigureParams struct {
 	// TODO(xingran): remove this field when test case is refactored.
 	Component *appsv1alpha1.ClusterComponentDefinition
 
-	// List of StatefulSets using this config template.
-	ComponentUnits []appsv1.StatefulSet
-	// List of Deployment using this config template.
-	DeploymentUnits []appsv1.Deployment
 	// List of ReplicatedStateMachine using this config template.
-	RSMList []workloads.ReplicatedStateMachine
+	RSMUnits []workloads.ReplicatedStateMachine
 }
 
 var (
@@ -168,7 +164,7 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	}
 
 	var maxUnavailable *intstr.IntOrString
-	for _, rsm := range param.RSMList {
+	for _, rsm := range param.RSMUnits {
 		if rsm.Spec.UpdateStrategy.RollingUpdate != nil {
 			maxUnavailable = rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
 		}
@@ -218,7 +214,7 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(appsv1alpha1.AsyncDynamicReloadPolicy)
 }
 
-func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
+func NewReconfigurePolicy(cc *appsv1beta1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
 	if cfgPatch != nil && !cfgPatch.IsModify {
 		// not walk here
 		return nil, core.MakeError("cfg not modify. [%v]", cfgPatch)
@@ -234,9 +230,9 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.
 		// make decision
 		switch {
 		case !dynamicUpdate: // static parameters update
-		case configmanager.IsAutoReload(cc.ReloadOptions): // if core support hot update, don't need to do anything
+		case configmanager.IsAutoReload(cc.DynamicReloadAction): // if core support hot update, don't need to do anything
 			policy = appsv1alpha1.AsyncDynamicReloadPolicy
-		case enableSyncTrigger(cc.ReloadOptions): // sync config-manager exec hot update
+		case enableSyncTrigger(cc.DynamicReloadAction): // sync config-manager exec hot update
 			policy = appsv1alpha1.SyncDynamicReloadPolicy
 		default: // config-manager auto trigger to hot update
 			policy = appsv1alpha1.AsyncDynamicReloadPolicy
@@ -246,7 +242,7 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.
 	// if not specify policy, or cannot decision policy, use default policy.
 	if policy == appsv1alpha1.NonePolicy {
 		policy = appsv1alpha1.NormalPolicy
-		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.ReloadOptions) {
+		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.DynamicReloadAction) {
 			policy = appsv1alpha1.DynamicReloadAndRestartPolicy
 		}
 	}
@@ -261,7 +257,7 @@ func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
 	return !restart && policy == appsv1alpha1.NonePolicy
 }
 
-func enableSyncTrigger(options *appsv1alpha1.ReloadOptions) bool {
+func enableSyncTrigger(options *appsv1beta1.DynamicReloadAction) bool {
 	if options == nil {
 		return false
 	}
@@ -302,17 +298,7 @@ func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) 
 
 func fromWorkloadObjects(params reconfigureParams) []client.Object {
 	r := make([]client.Object, 0)
-	for _, unit := range params.RSMList {
-		r = append(r, &unit)
-	}
-	// migrated workload
-	if len(r) != 0 {
-		return r
-	}
-	for _, unit := range params.ComponentUnits {
-		r = append(r, &unit)
-	}
-	for _, unit := range params.DeploymentUnits {
+	for _, unit := range params.RSMUnits {
 		r = append(r, &unit)
 	}
 	return r

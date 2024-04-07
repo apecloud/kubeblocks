@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -42,7 +43,7 @@ const (
 
 type RawConfig struct {
 	// formatter
-	Type appsv1alpha1.CfgFileFormat
+	Type appsv1beta1.CfgFileFormat
 
 	RawData string
 }
@@ -123,7 +124,7 @@ type CfgOption struct {
 	Log  logr.Logger
 
 	// formatter
-	CfgType appsv1alpha1.CfgFileFormat
+	CfgType appsv1beta1.CfgFileFormat
 
 	// Path for CfgLocalType test
 	Path    string

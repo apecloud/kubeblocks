@@ -214,6 +214,7 @@ type Member struct {
 	PodIP     string
 	DBPort    string
 	LorryPort string
+	HAPort    string
 	UID       string
 	UseIP     bool
 	resource  any

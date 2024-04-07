@@ -40,9 +40,13 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	// +kubebuilder:scaffold:imports
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -80,7 +84,8 @@ const (
 	extensionsFlagKey flagName = "extensions"
 	workloadsFlagKey  flagName = "workloads"
 
-	kubeContextsFlagKey flagName = "kube-contexts"
+	multiClusterKubeConfigFlagKey flagName = "multi-cluster-kubeconfig"
+	multiClusterContextsFlagKey   flagName = "multi-cluster-contexts"
 )
 
 var (
@@ -98,6 +103,7 @@ func init() {
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -160,7 +166,8 @@ func setupFlags() {
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager.")
 
-	flag.String(kubeContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
+	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
+	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
@@ -241,7 +248,8 @@ func main() {
 		probeAddr              string
 		enableLeaderElection   bool
 		enableLeaderElectionID string
-		kubeContexts           string
+		multiClusterKubeConfig string
+		multiClusterContexts   string
 		err                    error
 	)
 
@@ -272,12 +280,16 @@ func main() {
 	probeAddr = viper.GetString(probeAddrFlagKey.viperName())
 	enableLeaderElection = viper.GetBool(leaderElectFlagKey.viperName())
 	enableLeaderElectionID = viper.GetString(leaderElectIDFlagKey.viperName())
-	kubeContexts = viper.GetString(kubeContextsFlagKey.viperName())
+	multiClusterKubeConfig = viper.GetString(multiClusterKubeConfigFlagKey.viperName())
+	multiClusterContexts = viper.GetString(multiClusterContextsFlagKey.viperName())
 
+	setupLog.Info("golang runtime metrics.", "featureGate", constant.EnabledRuntimeMetrics())
 	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress:   metricsAddr,
+			ExtraHandlers: metrics.RuntimeMetric(),
+		},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		// NOTES:
@@ -299,16 +311,23 @@ func main() {
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
 
-		CertDir:               viper.GetString("cert_dir"),
-		ClientDisableCacheFor: intctrlutil.GetUncachedObjects(),
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port:    9443,
+			CertDir: viper.GetString("cert_dir"),
+		}),
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: intctrlutil.GetUncachedObjects(),
+			},
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	// multi-cluster manager for all worker k8s
-	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetClient(), kubeContexts)
+	// multi-cluster manager for all data-plane k8s
+	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetClient(), multiClusterKubeConfig, multiClusterContexts)
 	if err != nil {
 		setupLog.Error(err, "unable to setup multi-cluster manager")
 		os.Exit(1)
@@ -541,6 +560,11 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceDescriptor")
 			os.Exit(1)
 		}
+
+		if err = (&appsv1beta1.ConfigConstraint{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ConfigConstraint")
+			os.Exit(1)
+		}
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -564,9 +588,6 @@ func main() {
 		os.Exit(1)
 	}
 	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
-
-	setupLog.Info("golang runtime metrics.", "featureGate", constant.EnabledRuntimeMetrics())
-	metrics.RegisterRuntimeMetric(mgr)
 
 	setupLog.Info("starting manager")
 	if multiClusterMgr != nil {

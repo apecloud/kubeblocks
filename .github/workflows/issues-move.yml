@@ -105,6 +105,7 @@ jobs:
         if: |
           github.event.action == 'published'
         run: |
+          RELEASE_BODY=$(echo "${{ github.event.release.body }}")
           cd ${{ github.workspace }}
           bash ${{ github.workspace }}/.github/utils/issue_prerelease.sh \
             ${{ env.GITHUB_TOKEN }} \
@@ -113,4 +114,4 @@ jobs:
             $PROJECT_ID \
             $STATUS_FIELD_ID \
             ${{ env.TODO_OPTION_ID }} \
-            "${{ github.event.release.body }}"
+            "${RELEASE_BODY}"

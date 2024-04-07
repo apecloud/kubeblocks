@@ -188,7 +188,8 @@ spec:
                 maxLength: 256
                 type: string
               hostNetwork:
-                description: Defines the host-network capability and resources.
+                description: "Defines the host-network capability and resources. \n
+                  If set, the DNS policy will be automatically set to \"ClusterFirstWithHostNet\"."
                 properties:
                   containerPorts:
                     description: The list of container ports that are required by
@@ -212,14 +213,6 @@ spec:
                       - ports
                       type: object
                     type: array
-                  dnsPolicy:
-                    description: Set DNS policy for the component. Defaults to "ClusterFirst".
-                      Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst',
-                      'Default' or 'None'. DNS parameters given in DNSConfig will
-                      be merged with the policy selected with DNSPolicy. To have DNS
-                      options set along with hostNetwork, you have to specify DNS
-                      policy explicitly to 'ClusterFirstWithHostNet'.
-                    type: string
                 type: object
               labels:
                 additionalProperties:
@@ -524,14 +517,12 @@ spec:
                             type: integer
                         type: object
                     type: object
-                  dataAssemble:
-                    description: "Defines the method to assemble data synchronized
-                      from external before starting the service for a new replica.
-                      This action is typically used when creating a new replica, such
-                      as: \n - scale-out - rebuild - clone \n The data will be streamed
-                      in via stdin. If any error occurs during the assembly process,
-                      the action must be able to guarantee idempotence to allow for
-                      retries from the beginning. This field cannot be updated."
+                  dataDump:
+                    description: "Defines the method to dump the data from a replica.
+                      This action is typically used when a new replica needs to be
+                      constructed, such as: \n - scale-out - rebuild - clone \n It
+                      should write the valid data to stdout without including any
+                      extraneous information. This field cannot be updated."
                     properties:
                       builtinHandler:
                         description: BuiltinHandler specifies the builtin action handler
@@ -819,12 +810,13 @@ spec:
                             type: integer
                         type: object
                     type: object
-                  dataPopulate:
-                    description: "Defines the method to populate the data to create
-                      new replicas. This action is typically used when a new replica
-                      needs to be constructed, such as: \n - scale-out - rebuild -
-                      clone \n It should write the valid data to stdout without including
-                      any extraneous information. This field cannot be updated."
+                  dataLoad:
+                    description: "Defines the method to load data into a replica.
+                      This action is typically used when creating a new replica, such
+                      as: \n - scale-out - rebuild - clone \n The data will be streamed
+                      in via stdin. If any error occurs during the process, the action
+                      must be able to guarantee idempotence to allow for retries from
+                      the beginning. This field cannot be updated."
                     properties:
                       builtinHandler:
                         description: BuiltinHandler specifies the builtin action handler
@@ -11701,24 +11693,12 @@ spec:
                       description: 'If ServiceType is LoadBalancer, cloud provider
                         related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                       type: object
-                    generatePodOrdinalService:
-                      default: false
-                      description: "GeneratePodOrdinalService indicates whether to
-                        create a corresponding Service for each Pod of the selected
-                        Component. If sets to true, a set of Service will be automatically
-                        generated for each Pod. And Service.RoleSelector will be ignored.
-                        They can be referred to by adding the PodOrdinal to the defined
-                        ServiceName with named pattern `$(Service.ServiceName)-$(PodOrdinal)`.
-                        And the Service.Name will also be generated with named pattern
-                        `$(Service.Name)-$(PodOrdinal)`. The PodOrdinal is zero-based,
-                        and the number of generated Services is equal to the number
-                        of replicas of the Component. For example, a Service might
-                        be defined as follows: \n ```yaml name: my-service serviceName:
-                        my-service generatePodOrdinalService: true spec: type: NodePort
-                        ports: - name: http port: 80 targetPort: 8080 ``` \n Assuming
-                        that the Component has 3 replicas, then three services would
-                        be generated: my-service-0, my-service-1, and my-service-2,
-                        each pointing to its respective Pod."
+                    disableAutoProvision:
+                      description: "Indicates whether the automatic provisioning of
+                        the service should be disabled. \n If set to true, the service
+                        will not be automatically created at the component provisioning.
+                        Instead, you can enable the creation of this service by specifying
+                        it explicitly in the cluster API."
                       type: boolean
                     name:
                       description: Name defines the name of the service. otherwise,
@@ -11726,11 +11706,14 @@ spec:
                         this service by its name. (e.g., connection credential) Cannot
                         be updated.
                       type: string
+                    podService:
+                      description: Indicates whether to generate individual services
+                        for each pod. If set to true, a separate service will be created
+                        for each pod in the component.
+                      type: boolean
                     roleSelector:
                       description: RoleSelector extends the ServiceSpec.Selector by
                         allowing you to specify defined role as selector for the service.
-                        if GeneratePodOrdinalService sets to true, RoleSelector will
-                        be ignored.
                       type: string
                     serviceName:
                       description: "ServiceName defines the name of the underlying
@@ -12232,7 +12215,61 @@ spec:
                             compDef:
                               description: CompDef specifies the definition used by
                                 the component that the referent object resident in.
+                                If not specified, the component itself will be used.
                               type: string
+                            multipleClusterObjectOption:
+                              description: This option defines the behavior when multiple
+                                component objects match the specified @CompDef. If
+                                not provided, an error will be raised when handling
+                                multiple matches.
+                              properties:
+                                combinedOption:
+                                  description: Define the options for handling combined
+                                    variables. Valid only when the strategy is set
+                                    to "combined".
+                                  properties:
+                                    flattenFormat:
+                                      description: 'The flatten format, default is:
+                                        $(comp-name-1):value,$(comp-name-2):value.'
+                                      properties:
+                                        delimiter:
+                                          default: ','
+                                          description: Pair delimiter.
+                                          type: string
+                                        keyValueDelimiter:
+                                          default: ':'
+                                          description: Key-value delimiter.
+                                          type: string
+                                      required:
+                                      - delimiter
+                                      - keyValueDelimiter
+                                      type: object
+                                    newVarSuffix:
+                                      description: 'If set, the existing variable
+                                        will be kept, and a new variable will be defined
+                                        with the specified suffix in pattern: $(var.name)_$(suffix).
+                                        The new variable will be auto-created and
+                                        placed behind the existing one. If not set,
+                                        the existing variable will be reused with
+                                        the value format defined below.'
+                                      type: string
+                                    valueFormat:
+                                      default: Flatten
+                                      description: The format of the value that the
+                                        operator will use to compose values from multiple
+                                        components.
+                                      type: string
+                                  type: object
+                                strategy:
+                                  description: Define the strategy for handling multiple
+                                    cluster objects.
+                                  enum:
+                                  - individual
+                                  - combined
+                                  type: string
+                              required:
+                              - strategy
+                              type: object
                             name:
                               description: Name of the referent object.
                               type: string
@@ -12260,10 +12297,11 @@ spec:
                             compDef:
                               description: CompDef specifies the definition used by
                                 the component that the referent object resident in.
+                                If not specified, the component itself will be used.
                               type: string
                             container:
-                              description: ContainerVars defines the vars can be referenced
-                                from a Container.
+                              description: ContainerVars defines the vars that can
+                                be referenced from a Container.
                               properties:
                                 name:
                                   description: The name of the container.
@@ -12283,6 +12321,59 @@ spec:
                                   type: object
                               required:
                               - name
+                              type: object
+                            multipleClusterObjectOption:
+                              description: This option defines the behavior when multiple
+                                component objects match the specified @CompDef. If
+                                not provided, an error will be raised when handling
+                                multiple matches.
+                              properties:
+                                combinedOption:
+                                  description: Define the options for handling combined
+                                    variables. Valid only when the strategy is set
+                                    to "combined".
+                                  properties:
+                                    flattenFormat:
+                                      description: 'The flatten format, default is:
+                                        $(comp-name-1):value,$(comp-name-2):value.'
+                                      properties:
+                                        delimiter:
+                                          default: ','
+                                          description: Pair delimiter.
+                                          type: string
+                                        keyValueDelimiter:
+                                          default: ':'
+                                          description: Key-value delimiter.
+                                          type: string
+                                      required:
+                                      - delimiter
+                                      - keyValueDelimiter
+                                      type: object
+                                    newVarSuffix:
+                                      description: 'If set, the existing variable
+                                        will be kept, and a new variable will be defined
+                                        with the specified suffix in pattern: $(var.name)_$(suffix).
+                                        The new variable will be auto-created and
+                                        placed behind the existing one. If not set,
+                                        the existing variable will be reused with
+                                        the value format defined below.'
+                                      type: string
+                                    valueFormat:
+                                      default: Flatten
+                                      description: The format of the value that the
+                                        operator will use to compose values from multiple
+                                        components.
+                                      type: string
+                                  type: object
+                                strategy:
+                                  description: Define the strategy for handling multiple
+                                    cluster objects.
+                                  enum:
+                                  - individual
+                                  - combined
+                                  type: string
+                              required:
+                              - strategy
                               type: object
                             name:
                               description: Name of the referent object.
@@ -12316,6 +12407,7 @@ spec:
                             compDef:
                               description: CompDef specifies the definition used by
                                 the component that the referent object resident in.
+                                If not specified, the component itself will be used.
                               type: string
                             endpoint:
                               description: VarOption defines whether a variable is
@@ -12324,6 +12416,59 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            multipleClusterObjectOption:
+                              description: This option defines the behavior when multiple
+                                component objects match the specified @CompDef. If
+                                not provided, an error will be raised when handling
+                                multiple matches.
+                              properties:
+                                combinedOption:
+                                  description: Define the options for handling combined
+                                    variables. Valid only when the strategy is set
+                                    to "combined".
+                                  properties:
+                                    flattenFormat:
+                                      description: 'The flatten format, default is:
+                                        $(comp-name-1):value,$(comp-name-2):value.'
+                                      properties:
+                                        delimiter:
+                                          default: ','
+                                          description: Pair delimiter.
+                                          type: string
+                                        keyValueDelimiter:
+                                          default: ':'
+                                          description: Key-value delimiter.
+                                          type: string
+                                      required:
+                                      - delimiter
+                                      - keyValueDelimiter
+                                      type: object
+                                    newVarSuffix:
+                                      description: 'If set, the existing variable
+                                        will be kept, and a new variable will be defined
+                                        with the specified suffix in pattern: $(var.name)_$(suffix).
+                                        The new variable will be auto-created and
+                                        placed behind the existing one. If not set,
+                                        the existing variable will be reused with
+                                        the value format defined below.'
+                                      type: string
+                                    valueFormat:
+                                      default: Flatten
+                                      description: The format of the value that the
+                                        operator will use to compose values from multiple
+                                        components.
+                                      type: string
+                                  type: object
+                                strategy:
+                                  description: Define the strategy for handling multiple
+                                    cluster objects.
+                                  enum:
+                                  - individual
+                                  - combined
+                                  type: string
+                              required:
+                              - strategy
+                              type: object
                             name:
                               description: Name of the referent object.
                               type: string
@@ -12358,27 +12503,8 @@ spec:
                             compDef:
                               description: CompDef specifies the definition used by
                                 the component that the referent object resident in.
+                                If not specified, the component itself will be used.
                               type: string
-                            generatePodOrdinalServiceVar:
-                              default: false
-                              description: "GeneratePodOrdinalServiceVar indicates
-                                whether to create a corresponding ServiceVars reference
-                                variable for each Pod. If set to true, a set of ServiceVars
-                                that can be referenced will be automatically generated
-                                for each Pod Ordinal. They can be referred to by adding
-                                the PodOrdinal to the defined name template with named
-                                pattern `$(Vars[x].Name)_$(PodOrdinal)`. For example,
-                                a ServiceVarRef might be defined as follows: \n ```yaml
-                                \n name: MY_SERVICE_PORT valueFrom: serviceVarRef:
-                                compDef: my-component-definition name: my-service
-                                optional: true generatePodOrdinalServiceVar: true
-                                port: name: redis-sentinel \n ``` \n Assuming that
-                                the Component has 3 replicas, then you can reference
-                                the port of existing services named my-service-0,
-                                my-service-1, and my-service-2 with $MY_SERVICE_PORT_0,
-                                $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
-                                It should be used in conjunction with Service.GeneratePodOrdinalService."
-                              type: boolean
                             host:
                               description: VarOption defines whether a variable is
                                 required or optional.
@@ -12386,10 +12512,68 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            multipleClusterObjectOption:
+                              description: This option defines the behavior when multiple
+                                component objects match the specified @CompDef. If
+                                not provided, an error will be raised when handling
+                                multiple matches.
+                              properties:
+                                combinedOption:
+                                  description: Define the options for handling combined
+                                    variables. Valid only when the strategy is set
+                                    to "combined".
+                                  properties:
+                                    flattenFormat:
+                                      description: 'The flatten format, default is:
+                                        $(comp-name-1):value,$(comp-name-2):value.'
+                                      properties:
+                                        delimiter:
+                                          default: ','
+                                          description: Pair delimiter.
+                                          type: string
+                                        keyValueDelimiter:
+                                          default: ':'
+                                          description: Key-value delimiter.
+                                          type: string
+                                      required:
+                                      - delimiter
+                                      - keyValueDelimiter
+                                      type: object
+                                    newVarSuffix:
+                                      description: 'If set, the existing variable
+                                        will be kept, and a new variable will be defined
+                                        with the specified suffix in pattern: $(var.name)_$(suffix).
+                                        The new variable will be auto-created and
+                                        placed behind the existing one. If not set,
+                                        the existing variable will be reused with
+                                        the value format defined below.'
+                                      type: string
+                                    valueFormat:
+                                      default: Flatten
+                                      description: The format of the value that the
+                                        operator will use to compose values from multiple
+                                        components.
+                                      type: string
+                                  type: object
+                                strategy:
+                                  description: Define the strategy for handling multiple
+                                    cluster objects.
+                                  enum:
+                                  - individual
+                                  - combined
+                                  type: string
+                              required:
+                              - strategy
+                              type: object
                             name:
                               description: Name of the referent object.
                               type: string
                             nodePort:
+                              description: "NodePort references a node-port defined
+                                in the service. \n If the referenced service is a
+                                pod-service, there will be multiple service objects
+                                matched, and the value will be presented in the following
+                                format: service1.name:nodePort1,service2.name:nodePort2..."
                               properties:
                                 name:
                                   type: string
@@ -12405,6 +12589,11 @@ spec:
                               description: Specify whether the object must be defined.
                               type: boolean
                             port:
+                              description: "Port references a port defined in the
+                                service. \n If the referenced service is a pod-service,
+                                there will be multiple service objects matched, and
+                                the value will be presented in the following format:
+                                service1.name:port1,service2.name:port2..."
                               properties:
                                 name:
                                   type: string

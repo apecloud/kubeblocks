@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -20,21 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package metrics
 
 import (
+	"net/http"
 	"regexp"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const metricsPath = "/metrics/runtime"
 
-func RegisterRuntimeMetric(manager manager.Manager) {
+func RuntimeMetric() map[string]http.Handler {
 	if !constant.EnabledRuntimeMetrics() {
-		return
+		return nil
 	}
 
 	reg := prometheus.NewRegistry()
@@ -44,11 +44,12 @@ func RegisterRuntimeMetric(manager manager.Manager) {
 			collectors.GoRuntimeMetricsRule{Matcher: regexp.MustCompile("/.*")}),
 	))
 
-	// Expose the registered metrics via HTTP.
-	_ = manager.AddMetricsExtraHandler(metricsPath, promhttp.HandlerFor(
-		reg,
-		promhttp.HandlerOpts{
-			EnableOpenMetrics: true,
-		},
-	))
+	return map[string]http.Handler{
+		metricsPath: promhttp.HandlerFor(
+			reg,
+			promhttp.HandlerOpts{
+				EnableOpenMetrics: true,
+			},
+		),
+	}
 }

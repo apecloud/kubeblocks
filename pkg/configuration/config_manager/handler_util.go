@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -61,50 +62,50 @@ type CfgManagerBuildParams struct {
 	ContainerPort int32 `json:"containerPort"`
 }
 
-func IsSupportReload(reload *appsv1alpha1.ReloadOptions) bool {
+func IsSupportReload(reload *appsv1beta1.DynamicReloadAction) bool {
 	return reload != nil && isValidReloadPolicy(*reload)
 }
 
-func isValidReloadPolicy(reload appsv1alpha1.ReloadOptions) bool {
+func isValidReloadPolicy(reload appsv1beta1.DynamicReloadAction) bool {
 	return reload.AutoTrigger != nil ||
 		reload.ShellTrigger != nil ||
 		reload.TPLScriptTrigger != nil ||
 		reload.UnixSignalTrigger != nil
 }
 
-func IsAutoReload(reload *appsv1alpha1.ReloadOptions) bool {
+func IsAutoReload(reload *appsv1beta1.DynamicReloadAction) bool {
 	return reload != nil && reload.AutoTrigger != nil
 }
 
-func FromReloadTypeConfig(reloadOptions *appsv1alpha1.ReloadOptions) appsv1alpha1.CfgReloadType {
+func FromReloadTypeConfig(reloadAction *appsv1beta1.DynamicReloadAction) appsv1beta1.DynamicReloadType {
 	switch {
-	case reloadOptions.UnixSignalTrigger != nil:
-		return appsv1alpha1.UnixSignalType
-	case reloadOptions.ShellTrigger != nil:
-		return appsv1alpha1.ShellType
-	case reloadOptions.TPLScriptTrigger != nil:
-		return appsv1alpha1.TPLScriptType
-	case reloadOptions.AutoTrigger != nil:
-		return appsv1alpha1.AutoType
+	case reloadAction.UnixSignalTrigger != nil:
+		return appsv1beta1.UnixSignalType
+	case reloadAction.ShellTrigger != nil:
+		return appsv1beta1.ShellType
+	case reloadAction.TPLScriptTrigger != nil:
+		return appsv1beta1.TPLScriptType
+	case reloadAction.AutoTrigger != nil:
+		return appsv1beta1.AutoType
 	}
 	return ""
 }
 
-func ValidateReloadOptions(reloadOptions *appsv1alpha1.ReloadOptions, cli client.Client, ctx context.Context) error {
+func ValidateReloadOptions(reloadAction *appsv1beta1.DynamicReloadAction, cli client.Client, ctx context.Context) error {
 	switch {
-	case reloadOptions.UnixSignalTrigger != nil:
-		return checkSignalTrigger(reloadOptions.UnixSignalTrigger)
-	case reloadOptions.ShellTrigger != nil:
-		return checkShellTrigger(reloadOptions.ShellTrigger)
-	case reloadOptions.TPLScriptTrigger != nil:
-		return checkTPLScriptTrigger(reloadOptions.TPLScriptTrigger, cli, ctx)
-	case reloadOptions.AutoTrigger != nil:
+	case reloadAction.UnixSignalTrigger != nil:
+		return checkSignalTrigger(reloadAction.UnixSignalTrigger)
+	case reloadAction.ShellTrigger != nil:
+		return checkShellTrigger(reloadAction.ShellTrigger)
+	case reloadAction.TPLScriptTrigger != nil:
+		return checkTPLScriptTrigger(reloadAction.TPLScriptTrigger, cli, ctx)
+	case reloadAction.AutoTrigger != nil:
 		return nil
 	}
 	return core.MakeError("require special reload type!")
 }
 
-func checkTPLScriptTrigger(options *appsv1alpha1.TPLScriptTrigger, cli client.Client, ctx context.Context) error {
+func checkTPLScriptTrigger(options *appsv1beta1.TPLScriptTrigger, cli client.Client, ctx context.Context) error {
 	cm := corev1.ConfigMap{}
 	return cli.Get(ctx, client.ObjectKey{
 		Namespace: options.Namespace,
@@ -112,14 +113,14 @@ func checkTPLScriptTrigger(options *appsv1alpha1.TPLScriptTrigger, cli client.Cl
 	}, &cm)
 }
 
-func checkShellTrigger(options *appsv1alpha1.ShellTrigger) error {
+func checkShellTrigger(options *appsv1beta1.ShellTrigger) error {
 	if len(options.Command) == 0 {
 		return core.MakeError("required shell trigger")
 	}
 	return nil
 }
 
-func checkSignalTrigger(options *appsv1alpha1.UnixSignalTrigger) error {
+func checkSignalTrigger(options *appsv1beta1.UnixSignalTrigger) error {
 	signal := options.Signal
 	if !IsValidUnixSignal(signal) {
 		return core.MakeError("this special signal [%s] is not supported now.", signal)
@@ -162,23 +163,23 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 			Namespace: "",
 			Name:      configSpec.ConfigConstraintRef,
 		}
-		cc := &appsv1alpha1.ConfigConstraint{}
+		cc := &appsv1beta1.ConfigConstraint{}
 		if err := cli.Get(ctx, ccKey, cc); err != nil {
 			return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 		}
-		reloadOptions := cc.Spec.ReloadOptions
+		reloadOptions := cc.Spec.DynamicReloadAction
 		if !IsSupportReload(reloadOptions) || IsAutoReload(reloadOptions) {
 			continue
 		}
 		reloadConfigSpecMeta = append(reloadConfigSpecMeta, ConfigSpecMeta{
-			ToolsImageSpec: cc.Spec.ToolsImageSpec,
+			ToolsImageSpec: cc.Spec.ReloadToolsImage,
 			ScriptConfig:   cc.Spec.ScriptConfigs,
 			ConfigSpecInfo: ConfigSpecInfo{
-				ReloadOptions:      cc.Spec.ReloadOptions,
-				ConfigSpec:         configSpec,
-				ReloadType:         FromReloadTypeConfig(reloadOptions),
-				DownwardAPIOptions: cc.Spec.DownwardAPIOptions,
-				FormatterConfig:    *cc.Spec.FormatterConfig,
+				DynamicReloadAction: cc.Spec.DynamicReloadAction,
+				ConfigSpec:          configSpec,
+				ReloadType:          FromReloadTypeConfig(reloadOptions),
+				DownwardAPIOptions:  cc.Spec.DownwardActions,
+				FormatterConfig:     *cc.Spec.FormatterConfig,
 			},
 		})
 	}
@@ -189,7 +190,7 @@ func FilterSubPathVolumeMount(metas []ConfigSpecMeta, volumes []corev1.VolumeMou
 	var filtered []ConfigSpecMeta
 	for _, meta := range metas {
 		v := FindVolumeMount(volumes, meta.ConfigSpec.VolumeName)
-		if v == nil || v.SubPath == "" || meta.ReloadType == appsv1alpha1.TPLScriptType {
+		if v == nil || v.SubPath == "" || meta.ReloadType == appsv1beta1.TPLScriptType {
 			filtered = append(filtered, meta)
 		}
 	}

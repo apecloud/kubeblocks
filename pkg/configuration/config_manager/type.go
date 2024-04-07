@@ -25,6 +25,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 )
 
 type ConfigHandler interface {
@@ -34,13 +35,13 @@ type ConfigHandler interface {
 }
 
 type ConfigSpecInfo struct {
-	*appsv1alpha1.ReloadOptions `json:",inline"`
+	*appsv1beta1.DynamicReloadAction `json:",inline"`
 
-	ReloadType      appsv1alpha1.CfgReloadType       `json:"reloadType"`
+	ReloadType      appsv1beta1.DynamicReloadType    `json:"reloadType"`
 	ConfigSpec      appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
-	FormatterConfig appsv1alpha1.FormatterConfig     `json:"formatterConfig"`
+	FormatterConfig appsv1beta1.FormatterConfig      `json:"formatterConfig"`
 
-	DownwardAPIOptions []appsv1alpha1.DownwardAPIOption `json:"downwardAPIOptions"`
+	DownwardAPIOptions []appsv1beta1.DownwardAction `json:"downwardAPIOptions"`
 
 	// config volume mount path
 	MountPoint string `json:"mountPoint"`
@@ -50,8 +51,8 @@ type ConfigSpecInfo struct {
 type ConfigSpecMeta struct {
 	ConfigSpecInfo `json:",inline"`
 
-	ScriptConfig   []appsv1alpha1.ScriptConfig
-	ToolsImageSpec *appsv1alpha1.ToolsImageSpec
+	ScriptConfig   []appsv1beta1.ScriptConfig
+	ToolsImageSpec *appsv1beta1.ReloadToolsImage
 }
 
 type TPLScriptConfig struct {
@@ -60,13 +61,13 @@ type TPLScriptConfig struct {
 	DataType  string `json:"dataType"`
 	DSN       string `json:"dsn"`
 
-	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
+	FormatterConfig appsv1beta1.FormatterConfig `json:"formatterConfig"`
 }
 
 type ConfigLazyRenderedMeta struct {
 	*appsv1alpha1.ComponentConfigSpec `json:",inline"`
 
 	// secondary template path
-	Templates       []string                     `json:"templates"`
-	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
+	Templates       []string                    `json:"templates"`
+	FormatterConfig appsv1beta1.FormatterConfig `json:"formatterConfig"`
 }

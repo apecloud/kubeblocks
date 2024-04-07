@@ -20,14 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
-	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -40,10 +38,8 @@ type configReconcileContext struct {
 	ConfigMap        *corev1.ConfigMap
 	BuiltinComponent *component.SynthesizedComponent
 
-	Containers   []string
-	StatefulSets []appv1.StatefulSet
-	RSMList      []workloads.ReplicatedStateMachine
-	Deployments  []appv1.Deployment
+	Containers []string
+	RSMList    []workloads.ReplicatedStateMachine
 
 	reqCtx intctrlutil.RequestCtx
 }
@@ -81,19 +77,6 @@ func (c *configReconcileContext) RSM() *configReconcileContext {
 			client.ObjectKeyFromObject(c.ConfigMap),
 			client.InNamespace(c.Namespace),
 			c.MatchingLabels)
-		if err != nil {
-			return
-		}
-
-		// fix uid mismatch bug: convert rsm to sts
-		// NODE: all components use the StatefulSet
-		for _, rsm := range c.RSMList {
-			var stsObject appv1.StatefulSet
-			if err = c.Client.Get(c.Context, client.ObjectKeyFromObject(rsmcore.ConvertRSMToSTS(&rsm)), &stsObject); err != nil {
-				return
-			}
-			c.StatefulSets = append(c.StatefulSets, stsObject)
-		}
 		return
 	}
 	return c.Wrap(stsFn)

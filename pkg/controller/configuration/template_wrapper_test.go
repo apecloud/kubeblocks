@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -124,13 +125,13 @@ var _ = Describe("TemplateWrapperTest", func() {
 						"test-config-spec-new": "test-config-spec-update",
 					},
 				},
-				&appsv1alpha1.ConfigConstraint{
+				&appsv1beta1.ConfigConstraint{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: configSpecName,
 					},
-					Spec: appsv1alpha1.ConfigConstraintSpec{
-						FormatterConfig: &appsv1alpha1.FormatterConfig{
-							Format: appsv1alpha1.Ini,
+					Spec: appsv1beta1.ConfigConstraintSpec{
+						FormatterConfig: &appsv1beta1.FormatterConfig{
+							Format: appsv1beta1.Ini,
 						},
 					},
 				},

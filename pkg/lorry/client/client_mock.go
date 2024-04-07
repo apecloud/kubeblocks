@@ -69,6 +69,34 @@ func (mr *MockClientMockRecorder) CreateUser(arg0, arg1, arg2, arg3 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockClient)(nil).CreateUser), arg0, arg1, arg2, arg3)
 }
 
+// DataDump mocks base method.
+func (m *MockClient) DataDump(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DataDump", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DataDump indicates an expected call of DataDump.
+func (mr *MockClientMockRecorder) DataDump(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DataDump", reflect.TypeOf((*MockClient)(nil).DataDump), arg0)
+}
+
+// DataLoad mocks base method.
+func (m *MockClient) DataLoad(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DataLoad", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DataLoad indicates an expected call of DataLoad.
+func (mr *MockClientMockRecorder) DataLoad(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DataLoad", reflect.TypeOf((*MockClient)(nil).DataLoad), arg0)
+}
+
 // DeleteUser mocks base method.
 func (m *MockClient) DeleteUser(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
@@ -225,6 +253,20 @@ func (m *MockClient) PreTerminate(arg0 context.Context) error {
 func (mr *MockClientMockRecorder) PreTerminate(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PreTerminate", reflect.TypeOf((*MockClient)(nil).PreTerminate), arg0)
+}
+
+// Rebuild mocks base method.
+func (m *MockClient) Rebuild(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Rebuild", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Rebuild indicates an expected call of Rebuild.
+func (mr *MockClientMockRecorder) Rebuild(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Rebuild", reflect.TypeOf((*MockClient)(nil).Rebuild), arg0)
 }
 
 // RevokeUserRole mocks base method.

@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -419,7 +420,7 @@ var _ = Describe("builder", func() {
 				Cluster:                   cluster,
 				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 			}
-			toolContainers := []appsv1alpha1.ToolConfig{
+			toolContainers := []appsv1beta1.ToolConfig{
 				{Name: "test-tool", Image: "test-image", Command: []string{"sh"}},
 			}
 

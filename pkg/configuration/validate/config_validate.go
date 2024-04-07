@@ -27,7 +27,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -50,7 +50,7 @@ type configCueValidator struct {
 
 	// cue describes configuration template
 	cueScript string
-	cfgType   appsv1alpha1.CfgFileFormat
+	cfgType   appsv1beta1.CfgFileFormat
 }
 
 func (s *cmKeySelector) filter(key string) bool {
@@ -86,7 +86,7 @@ type schemaValidator struct {
 
 	typeName string
 	schema   *apiext.JSONSchemaProps
-	cfgType  appsv1alpha1.CfgFileFormat
+	cfgType  appsv1beta1.CfgFileFormat
 }
 
 func (s *schemaValidator) Validate(data map[string]string) error {
@@ -125,10 +125,10 @@ func WithKeySelector(keys []string) ValidatorOptions {
 	}
 }
 
-func NewConfigValidator(configConstraint *appsv1alpha1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
+func NewConfigValidator(configConstraint *appsv1beta1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
 	var (
 		validator    ConfigValidator
-		configSchema = configConstraint.ConfigurationSchema
+		configSchema = configConstraint.ConfigSchema
 	)
 
 	switch {
@@ -142,14 +142,14 @@ func NewConfigValidator(configConstraint *appsv1alpha1.ConfigConstraintSpec, opt
 			cfgType:   configConstraint.FormatterConfig.Format,
 			cueScript: configSchema.CUE,
 		}
-	case configSchema.Schema != nil:
+	case configSchema.SchemaInJSON != nil:
 		validator = &schemaValidator{
 			cmKeySelector: cmKeySelector{
 				keySelector: options,
 			},
-			typeName: configConstraint.CfgSchemaTopLevelName,
+			typeName: configConstraint.ConfigSchemaTopLevelKey,
 			cfgType:  configConstraint.FormatterConfig.Format,
-			schema:   configSchema.Schema,
+			schema:   configSchema.SchemaInJSON,
 		}
 	default:
 		validator = &emptyValidator{}

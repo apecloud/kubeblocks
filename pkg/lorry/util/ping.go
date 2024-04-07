@@ -36,7 +36,7 @@ var pingerLogger = ctlruntime.Log.WithName("pinger")
 // we can't rely on ICMP protocol to detect DNS resolution.
 // Instead, we directly depend on TCP for port detection.
 func IsDNSReady(dns string) (bool, error) {
-	// get the port where the Syncer HTTP service is listening
+	// get the port where the Lorry HTTP service is listening
 	port := viper.GetString("port")
 	address := net.JoinHostPort(dns, port)
 	timeout := 2 * time.Second

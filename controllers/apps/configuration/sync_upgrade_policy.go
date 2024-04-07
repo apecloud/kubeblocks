@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -89,14 +90,14 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		versionHash = params.getTargetVersionHash()
 	)
 
-	if params.ConfigConstraint.Selector != nil {
-		pods, err = matchLabel(pods, params.ConfigConstraint.Selector)
+	if params.ConfigConstraint.DynamicReloadSelector != nil {
+		pods, err = matchLabel(pods, params.ConfigConstraint.DynamicReloadSelector)
 	}
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 	if len(pods) == 0 {
-		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %s", params.ConfigConstraint.Selector.String()))
+		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %s", params.ConfigConstraint.DynamicReloadSelector.String()))
 		return makeReturnedStatus(ESRetry), nil
 	}
 
@@ -127,7 +128,7 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
 }
 
-func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) map[string]string {
+func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1beta1.ConfigConstraintSpec) map[string]string {
 	r := make(map[string]string)
 	dynamicAction := cc.NeedDynamicReloadAction()
 	selectedPolicy := cc.DynamicParametersPolicy()
@@ -135,7 +136,7 @@ func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1alpha1.C
 	for _, key := range parameters {
 		if key.UpdateType == core.UpdatedType {
 			for _, p := range key.Parameters {
-				if dynamicAction && selectedPolicy == appsv1alpha1.SelectedDynamicParameters && !core.IsDynamicParameter(p.Key, cc) {
+				if dynamicAction && selectedPolicy == appsv1beta1.SelectedDynamicParameters && !core.IsDynamicParameter(p.Key, cc) {
 					continue
 				}
 				if p.Value != nil {

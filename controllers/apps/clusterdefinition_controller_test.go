@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
@@ -90,9 +91,9 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			testCtx.UseDefaultNamespace())
 
 		cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
-			&appsv1alpha1.ConfigConstraint{})
+			&appsv1beta1.ConfigConstraint{})
 		Expect(testapps.ChangeObjStatus(&testCtx, cfgTpl, func() {
-			cfgTpl.Status.Phase = appsv1alpha1.CCAvailablePhase
+			cfgTpl.Status.Phase = appsv1beta1.CCAvailablePhase
 		})).Should(Succeed())
 		return cm
 	}
@@ -226,8 +227,8 @@ var _ = Describe("ClusterDefinition Controller", func() {
 					},
 				},
 				Orders: &appsv1alpha1.ClusterTopologyOrders{
-					StartupOrder: []string{"storage", "server", "proxy"},
-					UpdateOrder:  []string{"storage", "server", "proxy"},
+					Provision: []string{"storage", "server", "proxy"},
+					Update:    []string{"storage", "server", "proxy"},
 				},
 			}
 		)
@@ -329,9 +330,9 @@ var _ = Describe("ClusterDefinition Controller", func() {
 					}
 					topology := cd.Spec.Topologies[i]
 					if topology.Orders != nil {
-						cd.Spec.Topologies[i].Orders.StartupOrder = update(topology.Orders.StartupOrder)
-						cd.Spec.Topologies[i].Orders.ShutdownOrder = update(topology.Orders.ShutdownOrder)
-						cd.Spec.Topologies[i].Orders.UpdateOrder = update(topology.Orders.UpdateOrder)
+						cd.Spec.Topologies[i].Orders.Provision = update(topology.Orders.Provision)
+						cd.Spec.Topologies[i].Orders.Terminate = update(topology.Orders.Terminate)
+						cd.Spec.Topologies[i].Orders.Update = update(topology.Orders.Update)
 					}
 				}
 			})()).Should(Succeed())
@@ -339,7 +340,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
 				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
-				g.Expect(cd.Status.Message).Should(MatchRegexp("the components in startup|shutdown|update order are different from those from definition"))
+				g.Expect(cd.Status.Message).Should(MatchRegexp("the components in provision|terminate|update orders are different from those in definition"))
 			})).Should(Succeed())
 		})
 

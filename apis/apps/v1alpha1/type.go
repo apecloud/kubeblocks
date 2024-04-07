@@ -261,28 +261,6 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
-// ConfigConstraintPhase defines the ConfigConstraint  CR .status.phase
-// +enum
-// +kubebuilder:validation:Enum={Available,Unavailable, Deleting}
-type ConfigConstraintPhase string
-
-const (
-	CCAvailablePhase   ConfigConstraintPhase = "Available"
-	CCUnavailablePhase ConfigConstraintPhase = "Unavailable"
-	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
-)
-
-// DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions
-//
-// +enum
-// +kubebuilder:validation:Enum={all,dynamic}
-type DynamicParameterSelectedPolicy string
-
-const (
-	SelectedAllParameters     DynamicParameterSelectedPolicy = "all"
-	SelectedDynamicParameters DynamicParameterSelectedPolicy = "dynamic"
-)
-
 // OpsPhase defines opsRequest phase.
 // +enum
 // +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
@@ -653,24 +631,6 @@ type webhookManager struct {
 	client client.Client
 }
 
-// CfgFileFormat defines formatter of configuration files.
-// +enum
-// +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties,redis,props-plus}
-type CfgFileFormat string
-
-const (
-	Ini            CfgFileFormat = "ini"
-	YAML           CfgFileFormat = "yaml"
-	JSON           CfgFileFormat = "json"
-	XML            CfgFileFormat = "xml"
-	HCL            CfgFileFormat = "hcl"
-	Dotenv         CfgFileFormat = "dotenv"
-	TOML           CfgFileFormat = "toml"
-	Properties     CfgFileFormat = "properties"
-	RedisCfg       CfgFileFormat = "redis"
-	PropertiesPlus CfgFileFormat = "props-plus"
-)
-
 // UpgradePolicy defines the policy of reconfiguring.
 // +enum
 // +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate,dynamicReloadBeginRestart}
@@ -684,58 +644,6 @@ const (
 	AsyncDynamicReloadPolicy      UpgradePolicy = "autoReload"
 	SyncDynamicReloadPolicy       UpgradePolicy = "operatorSyncUpdate"
 	DynamicReloadAndRestartPolicy UpgradePolicy = "dynamicReloadBeginRestart"
-)
-
-// CfgReloadType defines reload method.
-// +enum
-type CfgReloadType string
-
-const (
-	UnixSignalType CfgReloadType = "signal"
-	SQLType        CfgReloadType = "sql"
-	ShellType      CfgReloadType = "exec"
-	HTTPType       CfgReloadType = "http"
-	TPLScriptType  CfgReloadType = "tpl"
-	AutoType       CfgReloadType = "auto"
-)
-
-// SignalType defines which signals are valid.
-// +enum
-// +kubebuilder:validation:Enum={SIGHUP,SIGINT,SIGQUIT,SIGILL,SIGTRAP,SIGABRT,SIGBUS,SIGFPE,SIGKILL,SIGUSR1,SIGSEGV,SIGUSR2,SIGPIPE,SIGALRM,SIGTERM,SIGSTKFLT,SIGCHLD,SIGCONT,SIGSTOP,SIGTSTP,SIGTTIN,SIGTTOU,SIGURG,SIGXCPU,SIGXFSZ,SIGVTALRM,SIGPROF,SIGWINCH,SIGIO,SIGPWR,SIGSYS}
-type SignalType string
-
-const (
-	SIGHUP    SignalType = "SIGHUP"
-	SIGINT    SignalType = "SIGINT"
-	SIGQUIT   SignalType = "SIGQUIT"
-	SIGILL    SignalType = "SIGILL"
-	SIGTRAP   SignalType = "SIGTRAP"
-	SIGABRT   SignalType = "SIGABRT"
-	SIGBUS    SignalType = "SIGBUS"
-	SIGFPE    SignalType = "SIGFPE"
-	SIGKILL   SignalType = "SIGKILL"
-	SIGUSR1   SignalType = "SIGUSR1"
-	SIGSEGV   SignalType = "SIGSEGV"
-	SIGUSR2   SignalType = "SIGUSR2"
-	SIGPIPE   SignalType = "SIGPIPE"
-	SIGALRM   SignalType = "SIGALRM"
-	SIGTERM   SignalType = "SIGTERM"
-	SIGSTKFLT SignalType = "SIGSTKFLT"
-	SIGCHLD   SignalType = "SIGCHLD"
-	SIGCONT   SignalType = "SIGCONT"
-	SIGSTOP   SignalType = "SIGSTOP"
-	SIGTSTP   SignalType = "SIGTSTP"
-	SIGTTIN   SignalType = "SIGTTIN"
-	SIGTTOU   SignalType = "SIGTTOU"
-	SIGURG    SignalType = "SIGURG"
-	SIGXCPU   SignalType = "SIGXCPU"
-	SIGXFSZ   SignalType = "SIGXFSZ"
-	SIGVTALRM SignalType = "SIGVTALRM"
-	SIGPROF   SignalType = "SIGPROF"
-	SIGWINCH  SignalType = "SIGWINCH"
-	SIGIO     SignalType = "SIGIO"
-	SIGPWR    SignalType = "SIGPWR"
-	SIGSYS    SignalType = "SIGSYS"
 )
 
 // IssuerName defines the name of the TLS certificates issuer.
@@ -831,15 +739,6 @@ type HostNetwork struct {
 	//
 	// +optional
 	ContainerPorts []HostNetworkContainerPort `json:"containerPorts,omitempty"`
-
-	// Set DNS policy for the component.
-	// Defaults to "ClusterFirst".
-	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
-	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
-	// To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.
-	//
-	// +optional
-	DNSPolicy *corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
 }
 
 type HostNetworkContainerPort struct {
@@ -877,30 +776,19 @@ type ClusterService struct {
 type ComponentService struct {
 	Service `json:",inline"`
 
-	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
-	// If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.
-	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern `$(Service.ServiceName)-$(PodOrdinal)`.
-	// And the Service.Name will also be generated with named pattern `$(Service.Name)-$(PodOrdinal)`.
-	// The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.
-	// For example, a Service might be defined as follows:
+	// Indicates whether to generate individual services for each pod.
+	// If set to true, a separate service will be created for each pod in the component.
 	//
-	// ```yaml
-	// name: my-service
-	// serviceName: my-service
-	// generatePodOrdinalService: true
-	// spec:
-	//   type: NodePort
-	//   ports:
-	//   - name: http
-	//     port: 80
-	//     targetPort: 8080
-	// ```
-	//
-	// Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.
-	//
-	// +kubebuilder:default=false
 	// +optional
-	GeneratePodOrdinalService bool `json:"generatePodOrdinalService,omitempty"`
+	PodService *bool `json:"podService,omitempty"`
+
+	// Indicates whether the automatic provisioning of the service should be disabled.
+	//
+	// If set to true, the service will not be automatically created at the component provisioning.
+	// Instead, you can enable the creation of this service by specifying it explicitly in the cluster API.
+	//
+	// +optional
+	DisableAutoProvision *bool `json:"disableAutoProvision,omitempty"`
 }
 
 type Service struct {
@@ -934,7 +822,6 @@ type Service struct {
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 
 	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
-	// if GeneratePodOrdinalService sets to true, RoleSelector will be ignored.
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
 }
@@ -1028,13 +915,13 @@ type NamedVar struct {
 	Option *VarOption `json:"option,omitempty"`
 }
 
-// PodVars defines the vars can be referenced from a Pod.
+// PodVars defines the vars that can be referenced from a Pod.
 type PodVars struct {
 	// +optional
 	Container *ContainerVars `json:"container,omitempty"`
 }
 
-// ContainerVars defines the vars can be referenced from a Container.
+// ContainerVars defines the vars that can be referenced from a Container.
 type ContainerVars struct {
 	// The name of the container.
 	// +required
@@ -1045,19 +932,29 @@ type ContainerVars struct {
 	Port *NamedVar `json:"port,omitempty"`
 }
 
-// ServiceVars defines the vars can be referenced from a Service.
+// ServiceVars defines the vars that can be referenced from a Service.
 type ServiceVars struct {
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
 
+	// Port references a port defined in the service.
+	//
+	// If the referenced service is a pod-service, there will be multiple service objects matched,
+	// and the value will be presented in the following format: service1.name:port1,service2.name:port2...
+	//
 	// +optional
 	Port *NamedVar `json:"port,omitempty"`
 
+	// NodePort references a node-port defined in the service.
+	//
+	// If the referenced service is a pod-service, there will be multiple service objects matched,
+	// and the value will be presented in the following format: service1.name:nodePort1,service2.name:nodePort2...
+	//
 	// +optional
 	NodePort *NamedVar `json:"nodePort,omitempty"`
 }
 
-// CredentialVars defines the vars can be referenced from a Credential (SystemAccount).
+// CredentialVars defines the vars that can be referenced from a Credential (SystemAccount).
 // !!!!! CredentialVars will only be used as environment variables for Pods & Actions, and will not be used to render the templates.
 type CredentialVars struct {
 	// +optional
@@ -1067,7 +964,7 @@ type CredentialVars struct {
 	Password *VarOption `json:"password,omitempty"`
 }
 
-// ServiceRefVars defines the vars can be referenced from a ServiceRef.
+// ServiceRefVars defines the vars that can be referenced from a ServiceRef.
 type ServiceRefVars struct {
 	// +optional
 	Endpoint *VarOption `json:"endpoint,omitempty"`
@@ -1093,32 +990,6 @@ type ServiceVarSelector struct {
 	ClusterObjectReference `json:",inline"`
 
 	ServiceVars `json:",inline"`
-
-	// GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.
-	// If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.
-	// They can be referred to by adding the PodOrdinal to the defined name template with named pattern `$(Vars[x].Name)_$(PodOrdinal)`.
-	// For example, a ServiceVarRef might be defined as follows:
-	//
-	// ```yaml
-	//
-	// name: MY_SERVICE_PORT
-	// valueFrom:
-	//   serviceVarRef:
-	//     compDef: my-component-definition
-	//     name: my-service
-	//     optional: true
-	//     generatePodOrdinalServiceVar: true
-	//     port:
-	//       name: redis-sentinel
-	//
-	// ```
-	//
-	// Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,
-	// and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
-	// It should be used in conjunction with Service.GeneratePodOrdinalService.
-	// +kubebuilder:default=false
-	// +optional
-	GeneratePodOrdinalServiceVar bool `json:"generatePodOrdinalServiceVar,omitempty"`
 }
 
 // CredentialVarSelector selects a var from a Credential (SystemAccount).
@@ -1137,9 +1008,10 @@ type ServiceRefVarSelector struct {
 	ServiceRefVars `json:",inline"`
 }
 
-// ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.
+// ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.
 type ClusterObjectReference struct {
 	// CompDef specifies the definition used by the component that the referent object resident in.
+	// If not specified, the component itself will be used.
 	// +optional
 	CompDef string `json:"compDef,omitempty"`
 
@@ -1150,4 +1022,83 @@ type ClusterObjectReference struct {
 	// Specify whether the object must be defined.
 	// +optional
 	Optional *bool `json:"optional,omitempty"`
+
+	// This option defines the behavior when multiple component objects match the specified @CompDef.
+	// If not provided, an error will be raised when handling multiple matches.
+	//
+	// +optional
+	MultipleClusterObjectOption *MultipleClusterObjectOption `json:"multipleClusterObjectOption,omitempty"`
+}
+
+// MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.
+type MultipleClusterObjectOption struct {
+	// Define the strategy for handling multiple cluster objects.
+	// +required
+	Strategy MultipleClusterObjectStrategy `json:"strategy"`
+
+	// Define the options for handling combined variables.
+	// Valid only when the strategy is set to "combined".
+	//
+	// +optional
+	CombinedOption *MultipleClusterObjectCombinedOption `json:"combinedOption,omitempty"`
+}
+
+// MultipleClusterObjectStrategy defines the strategy for handling multiple cluster objects.
+// +enum
+// +kubebuilder:validation:Enum={individual,combined}
+type MultipleClusterObjectStrategy string
+
+const (
+	// MultipleClusterObjectStrategyIndividual - each matched component will have its individual variable with its name
+	// as the suffix.
+	// This is required when referencing credential variables that cannot be passed by values.
+	MultipleClusterObjectStrategyIndividual MultipleClusterObjectStrategy = "individual"
+
+	// MultipleClusterObjectStrategyCombined - the values from all matched components will be combined into a single
+	// variable using the specified option.
+	MultipleClusterObjectStrategyCombined MultipleClusterObjectStrategy = "combined"
+)
+
+// MultipleClusterObjectCombinedOption defines options for handling combined variables.
+type MultipleClusterObjectCombinedOption struct {
+	// If set, the existing variable will be kept, and a new variable will be defined with the specified suffix
+	// in pattern: $(var.name)_$(suffix).
+	// The new variable will be auto-created and placed behind the existing one.
+	// If not set, the existing variable will be reused with the value format defined below.
+	//
+	// +optional
+	NewVarSuffix *string `json:"newVarSuffix,omitempty"`
+
+	// The format of the value that the operator will use to compose values from multiple components.
+	//
+	// +kubebuilder:default="Flatten"
+	// +optional
+	ValueFormat MultipleClusterObjectValueFormat `json:"valueFormat,omitempty"`
+
+	// The flatten format, default is: $(comp-name-1):value,$(comp-name-2):value.
+	//
+	// +optional
+	FlattenFormat *MultipleClusterObjectValueFormatFlatten `json:"flattenFormat,omitempty"`
+}
+
+// MultipleClusterObjectValueFormat defines the format details for the value.
+type MultipleClusterObjectValueFormat string
+
+const (
+	FlattenFormat MultipleClusterObjectValueFormat = "Flatten"
+)
+
+// MultipleClusterObjectValueFormatFlatten defines the flatten format for the value.
+type MultipleClusterObjectValueFormatFlatten struct {
+	// Pair delimiter.
+	//
+	// +kubebuilder:default=","
+	// +required
+	Delimiter string `json:"delimiter"`
+
+	// Key-value delimiter.
+	//
+	// +kubebuilder:default=":"
+	// +required
+	KeyValueDelimiter string `json:"keyValueDelimiter"`
 }

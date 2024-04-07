@@ -22,26 +22,30 @@ package configmanager
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/pkg/errors"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 )
 
 type configVolumeHandleMeta struct {
 	ConfigHandler
 
 	mountPoint []string
-	reloadType appsv1alpha1.CfgReloadType
+	reloadType appsv1beta1.DynamicReloadType
 	configSpec appsv1alpha1.ComponentTemplateSpec
 
-	formatterConfig *appsv1alpha1.FormatterConfig
+	formatterConfig *appsv1beta1.FormatterConfig
 }
 
 func (s *configVolumeHandleMeta) OnlineUpdate(_ context.Context, _ string, _ map[string]string) error {
@@ -143,7 +147,7 @@ func (u *unixSignalHandler) MountPoint() []string {
 	return []string{u.mountPoint}
 }
 
-func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string, mountPoint string) (ConfigHandler, error) {
+func CreateSignalHandler(sig appsv1beta1.SignalType, processName string, mountPoint string) (ConfigHandler, error) {
 	signal, ok := allUnixSignals[sig]
 	if !ok {
 		err := cfgcore.MakeError("not supported unix signal: %s", sig)
@@ -172,20 +176,78 @@ type shellCommandHandler struct {
 	backupPath string
 	configMeta *ConfigSpecInfo
 	filter     regexFilter
+
+	isBatchReload      bool
+	batchInputTemplate string
+}
+
+func generateBatchStdinData(ctx context.Context, updatedParams map[string]string, batchInputTemplate string) (string, error) {
+	tplValues := gotemplate.TplValues{}
+	for k, v := range updatedParams {
+		tplValues[k] = v
+	}
+	engine := gotemplate.NewTplEngine(&tplValues, nil, "render-batch-input-parameters", nil, ctx)
+	stdinStr, err := engine.Render(batchInputTemplate)
+	return strings.TrimSpace(stdinStr) + "\n", err
 }
 
 func (s *shellCommandHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
 	logger.V(1).Info(fmt.Sprintf("online update[%v]", updatedParams))
 	logger.Info(fmt.Sprintf("updated parameters: %v", updatedParams))
 	args := make([]string, len(s.arg))
-	return s.execHandler(ctx, updatedParams, args)
+	copy(args, s.arg)
+	return s.execHandler(ctx, updatedParams, args...)
 }
 
-func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map[string]string, args []string) error {
+func doBatchReloadAction(ctx context.Context, updatedParams map[string]string, fn ActionCallback, batchInputTemplate string, commandName string, args ...string) error {
+	// If there are any errors, try to check them before all steps.
+	batchStdinStr, err := generateBatchStdinData(ctx, updatedParams, batchInputTemplate)
+	if err != nil {
+		logger.Error(err, "cannot generate batch stdin data")
+		return err
+	}
+
+	command := exec.CommandContext(ctx, commandName, args...)
+	stdin, err := command.StdinPipe()
+	if err != nil {
+		return errors.Wrap(err, "cannot create a pipe connecting to the STDIN of the command")
+	}
+
+	go func() {
+		defer stdin.Close()
+		if _, err := io.WriteString(stdin, batchStdinStr); err != nil {
+			logger.Error(err, "cannot write batch stdin data into STDIN stream")
+		}
+	}()
+
+	stdout, err := cfgutil.ExecShellCommand(command)
+	if fn != nil {
+		fn(stdout, err)
+	}
+	logger.Info("do batch reload action",
+		"command", command.String(),
+		"stdin", batchStdinStr,
+		"stdout", stdout,
+		"error", err,
+	)
+	return err
+}
+
+// ActionCallback is a callback function for testcase.
+type ActionCallback func(output string, err error)
+
+func doReloadAction(ctx context.Context, updatedParams map[string]string, fn ActionCallback, commandName string, args ...string) error {
 	commonHandle := func(args []string) error {
-		command := exec.CommandContext(ctx, s.command, args...)
+		command := exec.CommandContext(ctx, commandName, args...)
 		stdout, err := cfgutil.ExecShellCommand(command)
-		logger.Info(fmt.Sprintf("exec: [%s], stdout: [%s], stderr:%v", command.String(), stdout, err))
+		if fn != nil {
+			fn(stdout, err)
+		}
+		logger.Info("do reload action",
+			"command", command.String(),
+			"stdout", stdout,
+			"err", err,
+		)
 		return err
 	}
 	volumeHandle := func(baseCMD []string, paramName, paramValue string) error {
@@ -200,6 +262,13 @@ func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map
 		}
 	}
 	return nil
+}
+
+func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map[string]string, args ...string) error {
+	if s.isBatchReload && s.batchInputTemplate != "" {
+		return doBatchReloadAction(ctx, updatedParams, nil, s.batchInputTemplate, s.command, args...)
+	}
+	return doReloadAction(ctx, updatedParams, nil, s.command, args...)
 }
 
 func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
@@ -232,7 +301,7 @@ func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.E
 	}
 
 	logger.Info(fmt.Sprintf("updated parameters: %v", updatedParams))
-	if err := s.execHandler(ctx, updatedParams, args); err != nil {
+	if err := s.execHandler(ctx, updatedParams, args...); err != nil {
 		return err
 	}
 	if len(files) != 0 {
@@ -277,7 +346,7 @@ func (s *shellCommandHandler) isDownwardAPITrigger() bool {
 	return s.downwardAPITrigger
 }
 
-func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgReloadType, mountPoint []string, formatterConfig *appsv1alpha1.FormatterConfig) configVolumeHandleMeta {
+func createConfigVolumeMeta(configSpecName string, reloadType appsv1beta1.DynamicReloadType, mountPoint []string, formatterConfig *appsv1beta1.FormatterConfig) configVolumeHandleMeta {
 	return configVolumeHandleMeta{
 		reloadType: reloadType,
 		mountPoint: mountPoint,
@@ -286,6 +355,36 @@ func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgRe
 		},
 		formatterConfig: formatterConfig,
 	}
+}
+
+func isShellCommand(configMeta *ConfigSpecInfo) bool {
+	return configMeta != nil &&
+		configMeta.DynamicReloadAction != nil &&
+		configMeta.DynamicReloadAction.ShellTrigger != nil
+}
+
+func isBatchReloadMode(shellAction *appsv1beta1.ShellTrigger) bool {
+	return shellAction.BatchReload != nil && *shellAction.BatchReload
+}
+
+func isValidBatchReload(shellAction *appsv1beta1.ShellTrigger) bool {
+	return isBatchReloadMode(shellAction) && len(shellAction.BatchParametersTemplate) > 0
+}
+
+func isBatchReload(configMeta *ConfigSpecInfo) bool {
+	return isShellCommand(configMeta) && isBatchReloadMode(configMeta.DynamicReloadAction.ShellTrigger)
+}
+
+func getBatchInputTemplate(configMeta *ConfigSpecInfo) string {
+	if !isShellCommand(configMeta) {
+		return ""
+	}
+
+	shellAction := configMeta.DynamicReloadAction.ShellTrigger
+	if isValidBatchReload(shellAction) {
+		return shellAction.BatchParametersTemplate
+	}
+	return ""
 }
 
 func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSpecInfo, backupPath string) (ConfigHandler, error) {
@@ -297,8 +396,8 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		return nil, err
 	}
 
-	var formatterConfig *appsv1alpha1.FormatterConfig
-	if backupPath != "" && configMeta != nil && configMeta.ReloadOptions != nil {
+	var formatterConfig *appsv1beta1.FormatterConfig
+	if backupPath != "" && configMeta != nil && configMeta.DynamicReloadAction != nil {
 		if err := backupConfigFiles([]string{configMeta.MountPoint}, filter, backupPath); err != nil {
 			return nil, err
 		}
@@ -318,7 +417,9 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		// for downward api watch
 		downwardAPIMountPoint:  cfgutil.ToSet(handler).AsSlice(),
 		downwardAPIHandler:     handler,
-		configVolumeHandleMeta: createConfigVolumeMeta(configMeta.ConfigSpec.Name, appsv1alpha1.ShellType, []string{mountPoint}, formatterConfig),
+		configVolumeHandleMeta: createConfigVolumeMeta(configMeta.ConfigSpec.Name, appsv1beta1.ShellType, []string{mountPoint}, formatterConfig),
+		isBatchReload:          isBatchReload(configMeta),
+		batchInputTemplate:     getBatchInputTemplate(configMeta),
 	}
 	return shellTrigger, nil
 }
@@ -422,7 +523,7 @@ func CreateTPLScriptHandler(name, configPath string, dirs []string, backupPath s
 		return nil, err
 	}
 	tplHandler := &tplScriptHandler{
-		configVolumeHandleMeta: createConfigVolumeMeta(name, appsv1alpha1.TPLScriptType, dirs, &tplConfig.FormatterConfig),
+		configVolumeHandleMeta: createConfigVolumeMeta(name, appsv1beta1.TPLScriptType, dirs, &tplConfig.FormatterConfig),
 		tplContent:             string(tplContent),
 		tplScripts:             tplScripts,
 		fileFilter:             filter,
@@ -441,13 +542,13 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		shellTrigger := configMeta.ShellTrigger
 		return CreateExecHandler(shellTrigger.Command, configMeta.MountPoint, &configMeta, filepath.Join(backupPath, configMeta.ConfigSpec.Name))
 	}
-	signalHandler := func(signalTrigger *appsv1alpha1.UnixSignalTrigger, mountPoint string) (ConfigHandler, error) {
+	signalHandler := func(signalTrigger *appsv1beta1.UnixSignalTrigger, mountPoint string) (ConfigHandler, error) {
 		if signalTrigger == nil {
 			return nil, cfgcore.MakeError("signal trigger is nil")
 		}
 		return CreateSignalHandler(signalTrigger.Signal, signalTrigger.ProcessName, mountPoint)
 	}
-	tplHandler := func(tplTrigger *appsv1alpha1.TPLScriptTrigger, configMeta ConfigSpecInfo, backupPath string) (ConfigHandler, error) {
+	tplHandler := func(tplTrigger *appsv1beta1.TPLScriptTrigger, configMeta ConfigSpecInfo, backupPath string) (ConfigHandler, error) {
 		if tplTrigger == nil {
 			return nil, cfgcore.MakeError("tpl trigger is nil")
 		}
@@ -477,12 +578,12 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		switch configMeta.ReloadType {
 		default:
 			return nil, fmt.Errorf("not support reload type: %s", configMeta.ReloadType)
-		case appsv1alpha1.ShellType:
+		case appsv1beta1.ShellType:
 			h, err = shellHandler(configMeta, tmpPath)
-		case appsv1alpha1.UnixSignalType:
-			h, err = signalHandler(configMeta.ReloadOptions.UnixSignalTrigger, configMeta.MountPoint)
-		case appsv1alpha1.TPLScriptType:
-			h, err = tplHandler(configMeta.ReloadOptions.TPLScriptTrigger, configMeta, tmpPath)
+		case appsv1beta1.UnixSignalType:
+			h, err = signalHandler(configMeta.DynamicReloadAction.UnixSignalTrigger, configMeta.MountPoint)
+		case appsv1beta1.TPLScriptType:
+			h, err = tplHandler(configMeta.DynamicReloadAction.TPLScriptTrigger, configMeta, tmpPath)
 		}
 		if err != nil {
 			return nil, err

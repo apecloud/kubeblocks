@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	v1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
@@ -83,6 +84,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().OpsRequests().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("servicedescriptors"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ServiceDescriptors().Informer()}, nil
+
+		// Group=apps.kubeblocks.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("configconstraints"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ConfigConstraints().Informer()}, nil
 
 		// Group=dataprotection.kubeblocks.io, Version=v1alpha1
 	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("actionsets"):

@@ -187,7 +187,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return intctrlutil.Reconciled()
 	}
 
-	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.RSMList) == 0 {
+	if len(reconcileContext.RSMList) == 0 {
 		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
 		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotUsingMessage)
@@ -202,12 +202,10 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		Ctx:                      reqCtx,
 		Cluster:                  reconcileContext.ClusterObj,
 		ContainerNames:           reconcileContext.Containers,
-		ComponentUnits:           reconcileContext.StatefulSets,
-		DeploymentUnits:          reconcileContext.Deployments,
-		RSMList:                  reconcileContext.RSMList,
+		RSMUnits:                 reconcileContext.RSMList,
 		ClusterComponent:         reconcileContext.ClusterComObj,
 		SynthesizedComponent:     reconcileContext.BuiltinComponent,
-		Restart:                  forceRestart || !cfgcm.IsSupportReload(resources.configConstraintObj.Spec.ReloadOptions),
+		Restart:                  forceRestart || !cfgcm.IsSupportReload(resources.configConstraintObj.Spec.DynamicReloadAction),
 		ReconfigureClientFactory: GetClientFactory(),
 	})
 }

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	mock_proto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -62,9 +63,9 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
 					return reconfigureClient, nil
 				}),
-				withMockStatefulSet(3, nil),
+				withMockRSM(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigConstraintSpec(&appsv1alpha1.FormatterConfig{Format: appsv1alpha1.RedisCfg}),
+				withConfigConstraintSpec(&appsv1beta1.FormatterConfig{Format: appsv1beta1.RedisCfg}),
 				withConfigPatch(map[string]string{
 					"a": "c b e f",
 				}),
@@ -79,9 +80,9 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
-					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 3,
+					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3,
 						withReadyPod(0, 1))),
-					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 3,
+					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3,
 						withReadyPod(0, 3))),
 				}),
 				testutil.WithAnyTimes()))
@@ -119,9 +120,9 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
 					return reconfigureClient, nil
 				}),
-				withMockStatefulSet(3, nil),
+				withMockRSM(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigConstraintSpec(&appsv1alpha1.FormatterConfig{Format: appsv1alpha1.RedisCfg}),
+				withConfigConstraintSpec(&appsv1beta1.FormatterConfig{Format: appsv1beta1.RedisCfg}),
 				withConfigPatch(map[string]string{
 					"a": "c b e f",
 				}),
@@ -134,7 +135,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}}))
 
 			// add selector
-			mockParam.ConfigConstraint.Selector = &metav1.LabelSelector{
+			mockParam.ConfigConstraint.DynamicReloadSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"primary": "true",
 				},
@@ -143,7 +144,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(
-					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 3,
+					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3,
 						withReadyPod(0, 1), func(pod *corev1.Pod, index int) {
 							if index == 0 {
 								if pod.Labels == nil {

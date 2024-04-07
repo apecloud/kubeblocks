@@ -230,12 +230,6 @@ func convertHostNetwork(clusterCompDef *appsv1alpha1.ClusterComponentDefinition)
 			hostNetwork.ContainerPorts = append(hostNetwork.ContainerPorts, cp)
 		}
 	}
-	if len(clusterCompDef.PodSpec.DNSPolicy) > 0 {
-		hostNetwork.DNSPolicy = func() *corev1.DNSPolicy {
-			policy := clusterCompDef.PodSpec.DNSPolicy
-			return &policy
-		}()
-	}
 	return hostNetwork, nil
 }
 
@@ -580,8 +574,8 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	lifecycleActions.MemberLeave = nil
 	lifecycleActions.Readonly = nil
 	lifecycleActions.Readwrite = nil
-	lifecycleActions.DataPopulate = nil
-	lifecycleActions.DataAssemble = nil
+	lifecycleActions.DataDump = nil
+	lifecycleActions.DataLoad = nil
 	lifecycleActions.Reconfigure = nil
 	lifecycleActions.AccountProvision = nil
 

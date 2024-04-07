@@ -197,17 +197,17 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 
 	leader, err := store.GetLeader()
 	if err != nil {
-		store.logger.Info("get leader failed", "error", err)
+		store.logger.Info("get leader failed", "error", err.Error())
 	}
 
 	switchover, err := store.GetSwitchover()
 	if err != nil {
-		store.logger.Info("get switchover failed", "error", err)
+		store.logger.Info("get switchover failed", "error", err.Error())
 	}
 
 	haConfig, err := store.GetHaConfig()
 	if err != nil {
-		store.logger.Info("get HaConfig failed", "error", err)
+		store.logger.Info("get HaConfig failed", "error", err.Error())
 	}
 
 	cluster := &Cluster{
@@ -251,6 +251,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.LorryPort = getLorryPort(&pod)
+		member.HAPort = getHAPort(&pod)
 		member.UID = string(pod.UID)
 		if pod.Spec.HostNetwork {
 			member.UseIP = true
@@ -673,6 +674,17 @@ func getLorryPort(pod *corev1.Pod) string {
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
 			if port.Name == constant.LorryHTTPPortName {
+				return strconv.Itoa(int(port.ContainerPort))
+			}
+		}
+	}
+	return ""
+}
+
+func getHAPort(pod *corev1.Pod) string {
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			if port.Name == "ha" {
 				return strconv.Itoa(int(port.ContainerPort))
 			}
 		}

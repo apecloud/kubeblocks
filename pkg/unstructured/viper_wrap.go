@@ -29,24 +29,24 @@ import (
 	oviper "github.com/spf13/viper"
 	"gopkg.in/ini.v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 )
 
 type viperWrap struct {
 	*oviper.Viper
 
 	name   string
-	format appsv1alpha1.CfgFileFormat
+	format appsv1beta1.CfgFileFormat
 }
 
 func init() {
-	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.Ini, createViper(appsv1alpha1.Ini))
-	// CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.YAML, createViper(appsv1alpha1.YAML))
-	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.JSON, createViper(appsv1alpha1.JSON))
-	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.Dotenv, createViper(appsv1alpha1.Dotenv))
-	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.HCL, createViper(appsv1alpha1.HCL))
-	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.TOML, createViper(appsv1alpha1.TOML))
-	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.Properties, createViper(appsv1alpha1.Properties))
+	CfgObjectRegistry().RegisterConfigCreator(appsv1beta1.Ini, createViper(appsv1beta1.Ini))
+	// CfgObjectRegistry().RegisterConfigCreator(appsv1beta1.YAML, createViper(appsv1beta1.YAML))
+	CfgObjectRegistry().RegisterConfigCreator(appsv1beta1.JSON, createViper(appsv1beta1.JSON))
+	CfgObjectRegistry().RegisterConfigCreator(appsv1beta1.Dotenv, createViper(appsv1beta1.Dotenv))
+	CfgObjectRegistry().RegisterConfigCreator(appsv1beta1.HCL, createViper(appsv1beta1.HCL))
+	CfgObjectRegistry().RegisterConfigCreator(appsv1beta1.TOML, createViper(appsv1beta1.TOML))
+	CfgObjectRegistry().RegisterConfigCreator(appsv1beta1.Properties, createViper(appsv1beta1.Properties))
 }
 
 func (v *viperWrap) GetString(key string) (string, error) {
@@ -95,9 +95,9 @@ func (v viperWrap) Unmarshal(str string) error {
 	return v.ReadConfig(bytes.NewReader([]byte(str)))
 }
 
-func newCfgViper(cfgType appsv1alpha1.CfgFileFormat) *oviper.Viper {
+func newCfgViper(cfgType appsv1beta1.CfgFileFormat) *oviper.Viper {
 	defaultKeySep := DelimiterDot
-	if cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.Dotenv {
+	if cfgType == appsv1beta1.Properties || cfgType == appsv1beta1.Dotenv {
 		defaultKeySep = CfgDelimiterPlaceholder
 	}
 	// TODO config constraint support LoadOptions
@@ -109,7 +109,7 @@ func newCfgViper(cfgType appsv1alpha1.CfgFileFormat) *oviper.Viper {
 	return v
 }
 
-func createViper(format appsv1alpha1.CfgFileFormat) ConfigObjectCreator {
+func createViper(format appsv1beta1.CfgFileFormat) ConfigObjectCreator {
 	return func(name string) ConfigObject {
 		return &viperWrap{
 			name:   name,

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2023 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -53,7 +53,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 			Expect(upgradePolicyMap[appsv1alpha1.DynamicReloadAndRestartPolicy]).ShouldNot(BeNil())
 
 			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
-				withMockStatefulSet(2, nil),
+				withMockRSM(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
@@ -77,7 +77,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 			}
 
 			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
-				withMockStatefulSet(2, nil),
+				withMockRSM(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),

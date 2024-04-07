@@ -31,6 +31,7 @@ const (
 // action keys
 const (
 	RoleProbeAction     = "roleProbe"
+	RebuildAction       = "rebuild"
 	HealthyCheckAction  = "healthyCheck"
 	MemberJoinAction    = "memberJoin"
 	MemberLeaveAction   = "memberLeave"
@@ -38,6 +39,8 @@ const (
 	ReadWriteAction     = "readwrite"
 	PostProvisionAction = "postProvision"
 	PreTerminateAction  = "preTerminate"
+	DataDumpAction      = "dataDump"
+	DataLoadAction      = "dataLoad"
 )
 
 // action envs

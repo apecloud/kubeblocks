@@ -82,6 +82,8 @@ func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 		children[key] = childCopied
 	}
 	out.children = children
+	out.EventRecorder = t.EventRecorder
+	out.Logger = t.Logger
 	return out, nil
 }
 

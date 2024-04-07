@@ -23,7 +23,6 @@ import (
 	"context"
 	"reflect"
 
-	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -59,48 +58,18 @@ func GetObjectListByComponentName(ctx context.Context, cli client.Reader, cluste
 	return cli.List(ctx, objectList, client.MatchingLabels(matchLabels), inNamespace)
 }
 
-// GetComponentDeployMinReadySeconds gets the deployment minReadySeconds of the component.
-func GetComponentDeployMinReadySeconds(ctx context.Context,
+// GetComponentRSMMinReadySeconds gets the statefulSet minReadySeconds of the component.
+func GetComponentRSMMinReadySeconds(ctx context.Context,
 	cli client.Client,
 	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {
-	deployList := &appsv1.DeploymentList{}
-	if err = GetObjectListByComponentName(ctx, cli, cluster, deployList, componentName); err != nil {
+	rsmList := &workloads.ReplicatedStateMachineList{}
+	if err = GetObjectListByComponentName(ctx, cli, cluster, rsmList, componentName); err != nil {
 		return
 	}
-	if len(deployList.Items) > 0 {
-		minReadySeconds = deployList.Items[0].Spec.MinReadySeconds
+	if len(rsmList.Items) > 0 {
+		minReadySeconds = rsmList.Items[0].Spec.MinReadySeconds
 		return
 	}
 	return minReadySeconds, err
-}
-
-// GetComponentStsMinReadySeconds gets the statefulSet minReadySeconds of the component.
-func GetComponentStsMinReadySeconds(ctx context.Context,
-	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	componentName string) (minReadySeconds int32, err error) {
-	stsList := &appsv1.StatefulSetList{}
-	if err = GetObjectListByComponentName(ctx, cli, cluster, stsList, componentName); err != nil {
-		return
-	}
-	if len(stsList.Items) > 0 {
-		minReadySeconds = stsList.Items[0].Spec.MinReadySeconds
-		return
-	}
-	return minReadySeconds, err
-}
-
-// GetComponentWorkloadMinReadySeconds gets the workload minReadySeconds of the component.
-func GetComponentWorkloadMinReadySeconds(ctx context.Context,
-	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	workloadType appsv1alpha1.WorkloadType,
-	componentName string) (minReadySeconds int32, err error) {
-	switch workloadType {
-	case appsv1alpha1.Stateless:
-		return GetComponentDeployMinReadySeconds(ctx, cli, cluster, componentName)
-	default:
-		return GetComponentStsMinReadySeconds(ctx, cli, cluster, componentName)
-	}
 }

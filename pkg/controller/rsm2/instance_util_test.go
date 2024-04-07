@@ -397,8 +397,7 @@ var _ = Describe("instance util test", func() {
 
 			var instanceNameList []string
 			for _, template := range templates {
-				instanceNames, err := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, offlineInstances)
-				Expect(err).Should(BeNil())
+				instanceNames := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, nil, offlineInstances)
 				instanceNameList = append(instanceNameList, instanceNames...)
 			}
 			getNameNOrdinalFunc := func(i int) (string, int) {

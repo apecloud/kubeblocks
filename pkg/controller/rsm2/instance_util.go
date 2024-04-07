@@ -55,8 +55,9 @@ type instanceTemplateExt struct {
 
 type rsmExt struct {
 	rsm               *workloads.ReplicatedStateMachine
-	offlineInstances  []string
 	instanceTemplates []*workloads.InstanceTemplate
+	currentInstances  []string
+	offlineInstances  []string
 }
 
 var instanceNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
@@ -198,10 +199,7 @@ func buildInstanceName2TemplateMap(rsmExt *rsmExt) (map[string]*instanceTemplate
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
 	for _, template := range instanceTemplateList {
-		instanceNames, err := GenerateInstanceNamesFromTemplate(rsmExt.rsm.Name, template.Name, template.Replicas, rsmExt.offlineInstances)
-		if err != nil {
-			return nil, err
-		}
+		instanceNames := GenerateInstanceNamesFromTemplate(rsmExt.rsm.Name, template.Name, template.Replicas, rsmExt.currentInstances, rsmExt.offlineInstances)
 		instanceNameList = append(instanceNameList, instanceNames...)
 		for _, name := range instanceNames {
 			allNameTemplateMap[name] = template
@@ -231,19 +229,41 @@ func ParseOfflineInstances(annotations map[string]string) (offlineInstances []st
 	return
 }
 
-func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string) ([]string, error) {
-	usedNames := sets.New(offlineInstances...)
-	instanceNames, _ := generateInstanceNames(parentName, templateName, replicas, 0, usedNames)
-	return instanceNames, nil
+func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32,
+	currentInstances []string, offlineInstances []string) []string {
+	instanceNames, _ := generateInstanceNames(parentName, templateName, replicas, 0, currentInstances, offlineInstances)
+	return instanceNames
 }
 
 // generateInstanceNames generates instance names based on certain rules:
 // The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
 // The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
-func generateInstanceNames(parentName, templateName string, replicas int32, ordinal int32, usedNames sets.Set[string]) ([]string, int32) {
+func generateInstanceNames(parentName, templateName string,
+	replicas int32, ordinal int32,
+	currentInstances []string, offlineInstances []string) ([]string, int32) {
+	// 1. keep existing instances
+	parseTemplateName := func(instanceName string) string {
+		parent, _ := ParseParentNameAndOrdinal(instanceName)
+		name, _ := strings.CutPrefix(parent, parentName)
+		return name
+	}
 	var instanceNameList []string
-	var name string
-	for i := int32(0); i < replicas; i++ {
+	count := int32(0)
+	usedNames := sets.New(offlineInstances...)
+	for _, instance := range currentInstances {
+		if count >= replicas {
+			break
+		}
+		if templateName == parseTemplateName(instance) && !usedNames.Has(instance) {
+			instanceNameList = append(instanceNameList, instance)
+			count++
+		}
+	}
+
+	// 2. build new ones if not enough
+	usedNames.Insert(instanceNameList...)
+	for ; count < replicas; count++ {
+		var name string
 		for {
 			if len(templateName) == 0 {
 				name = fmt.Sprintf("%s-%d", parentName, ordinal)
@@ -251,7 +271,7 @@ func generateInstanceNames(parentName, templateName string, replicas int32, ordi
 				name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
 			}
 			ordinal++
-			if usedNames == nil || !usedNames.Has(name) {
+			if !usedNames.Has(name) {
 				instanceNameList = append(instanceNameList, name)
 				break
 			}
@@ -612,6 +632,16 @@ func buildRSMExt(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.Objec
 
 	instanceTemplateList := BuildInstanceTemplates(*rsm.Spec.Replicas, rsm.Spec.Instances, instancesCompressed)
 
+	var currentInstances []string
+	if tree != nil {
+		objects := tree.List(&corev1.Pod{})
+		for _, object := range objects {
+			currentInstances = append(currentInstances, object.GetName())
+		}
+		getNameNOrdinalFunc := func(i int) (string, int) { return ParseParentNameAndOrdinal(currentInstances[i]) }
+		BaseSort(currentInstances, getNameNOrdinalFunc, nil, false)
+	}
+
 	offlineInstances, err := ParseOfflineInstances(rsm.Annotations)
 	if err != nil {
 		return nil, err
@@ -620,6 +650,7 @@ func buildRSMExt(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.Objec
 	return &rsmExt{
 		rsm:               rsm,
 		instanceTemplates: instanceTemplateList,
+		currentInstances:  currentInstances,
 		offlineInstances:  offlineInstances,
 	}, nil
 }

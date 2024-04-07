@@ -279,7 +279,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	pvcNameMap := make(map[string]string)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
 		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, pod.GetName())
-		pvc := builder.NewPVCBuilder(template.Namespace, pvcName).
+		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
 			AddLabelsInMap(template.Labels).
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).

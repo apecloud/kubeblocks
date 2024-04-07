@@ -172,7 +172,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 }
 
 func updateOfflineInstanceAnnotation(rsm *workloads.ReplicatedStateMachine, name string) error {
-	offlineInstances, err := parseOfflineInstances(rsm.Annotations)
+	offlineInstances, err := ParseOfflineInstances(rsm.Annotations)
 	if err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func updateOfflineInstanceAnnotation(rsm *workloads.ReplicatedStateMachine, name
 	if err != nil {
 		return err
 	}
-	rsm.Annotations[offlineInstancesAnnotationKey] = string(offlineInstancesByte)
+	rsm.Annotations[OfflineInstancesAnnotationKey] = string(offlineInstancesByte)
 	return nil
 }
 

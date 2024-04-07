@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"fmt"
-	"math"
+	"encoding/json"
+	"golang.org/x/exp/slices"
 	"reflect"
 	"time"
 
@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -69,190 +68,72 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		if horizontalScaling, ok = horizontalScalingMap[component.Name]; !ok {
 			continue
 		}
-		instances, err := buildInstances(opsRes.Cluster.Name, opsRes.Cluster.Spec.ComponentSpecs[index], horizontalScaling)
-		if err != nil {
-			return nil
-		}
+
+		instances := buildInstances(opsRes.Cluster.Spec.ComponentSpecs[index], horizontalScaling)
 		opsRes.Cluster.Spec.ComponentSpecs[index].Instances = instances
+
+		offlineInstances, err := buildOfflineInstances(opsRes.Cluster.Annotations, horizontalScaling)
+		if err != nil {
+			return err
+		}
+		if offlineInstances != nil {
+			rsm2.MergeMap(&map[string]string{rsm2.OfflineInstancesAnnotationKey: *offlineInstances}, &opsRes.Cluster.Annotations)
+		}
+
 		r := horizontalScaling.Replicas
 		opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
-type nameWithTemplate struct {
-	instanceName string
-	workloads.InstanceTemplate
-}
-
-// buildInstances constructs a new instances specification based on the current instances in ClusterComponentSpec and the instances to be added and/or deleted in HorizontalScaling.
-// For instances to be added:
-// 1. The new instances are appended to the current instances.
-// 2. An error is raised if duplicate instance name(s) found.
-// For instances to be deleted:
-// 1. A matching instance is searched for in the current instances based on the provided instance.
-// 2. If a matching instance is found, it is deleted. If necessary, the matching instance (template) is split.
-// 3. An error is raised if no matching instance is found.
-// The newly constructed instances undergo validation, and an error is raised if they are invalid.
-func buildInstances(clusterName string, componentSpec appsv1alpha1.ClusterComponentSpec, horizontalScaling appsv1alpha1.HorizontalScaling) ([]appsv1alpha1.InstanceTemplate, error) {
-	if componentSpec.Instances == nil && horizontalScaling.Instances == nil {
+func buildOfflineInstances(annotations map[string]string, horizontalScaling appsv1alpha1.HorizontalScaling) (*string, error) {
+	// no need to override
+	if len(horizontalScaling.OfflineInstances) == 0 {
 		return nil, nil
 	}
-	getTotalReplicas := func(instances []appsv1alpha1.InstanceTemplate) (totalReplicas int32) {
-		for _, instance := range instances {
-			replicas := int32(1)
-			if instance.Replicas != nil {
-				replicas = *instance.Replicas
-			}
-			totalReplicas += replicas
-		}
-		return
-	}
-	var (
-		instanceToAdd    []appsv1alpha1.InstanceTemplate
-		instanceToDelete []appsv1alpha1.InstanceTemplate
-	)
-	for _, instance := range horizontalScaling.Instances {
-		if instance.Offline != nil && *instance.Offline {
-			instanceToDelete = append(instanceToDelete, instance)
-		} else {
-			instanceToAdd = append(instanceToAdd, instance)
-		}
-	}
-	componentName := intctrlcomp.FullName(clusterName, componentSpec.Name)
-	nameTemplateMap, err := buildNameTemplateMap(componentName, componentSpec.Replicas, append(componentSpec.Instances, instanceToAdd...))
+
+	offlineInstances, err := rsm2.ParseOfflineInstances(annotations)
 	if err != nil {
 		return nil, err
 	}
-	toBeDeletedMap, err := buildNameTemplateMap(componentName, getTotalReplicas(instanceToDelete), instanceToDelete)
-	if err != nil {
-		return nil, err
-	}
-	for name := range toBeDeletedMap {
-		_, ok := nameTemplateMap[name]
-		if !ok {
-			return nil, fmt.Errorf("no template for instance %s found to delete", name)
-		}
-		nameTemplateMap[name] = toBeDeletedMap[name]
-	}
 
-	return rebuildInstanceTemplates(nameTemplateMap), nil
-}
-
-func rebuildInstanceTemplates(nameTemplateMap map[string]nameWithTemplate) []appsv1alpha1.InstanceTemplate {
-	if len(nameTemplateMap) == 0 {
-		return nil
-	}
-	var (
-		instances         []appsv1alpha1.InstanceTemplate
-		nameWithTemplates []nameWithTemplate
-	)
-	for _, template := range nameTemplateMap {
-		nameWithTemplates = append(nameWithTemplates, template)
-	}
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return rsm2.ParseParentNameAndOrdinal(nameWithTemplates[i].instanceName)
-	}
-	rsm2.BaseSort(nameWithTemplates, getNameNOrdinalFunc, nil, false)
-	for i := range nameWithTemplates {
-		if isHomogeneousInstance(nameWithTemplates, i-1, i) {
-			*instances[len(instances)-1].Replicas++
+	var newOfflineInstances []string
+	newOfflineInstances = append(newOfflineInstances, offlineInstances...)
+	for _, newInstance := range horizontalScaling.OfflineInstances {
+		if slices.IndexFunc(newOfflineInstances, func(i string) bool {
+			return i == newInstance
+		}) >= 0 {
 			continue
 		}
-		instances = append(instances, *newInstanceTemplate(&nameWithTemplates[i]))
+		newOfflineInstances = append(newOfflineInstances, newInstance)
 	}
-	end := len(instances) - 1
-	defaultInstance := appsv1alpha1.InstanceTemplate{Replicas: instances[end].Replicas}
-	if reflect.DeepEqual(defaultInstance, instances[end]) {
-		instances = instances[:end]
+	if reflect.DeepEqual(newOfflineInstances, offlineInstances) {
+		return nil, nil
 	}
-	if len(instances) == 0 {
-		instances = nil
-	}
-	return instances
+	data, err := json.Marshal(newOfflineInstances)
+	result := string(data)
+	return &result, err
 }
 
-func newInstanceTemplate(nameWithTemplate *nameWithTemplate) *appsv1alpha1.InstanceTemplate {
-	instance := nameWithTemplate.InstanceTemplate
-	replicas := int32(1)
-	_, ordinal := rsm2.ParseParentNameAndOrdinal(nameWithTemplate.instanceName)
-	var ordinalStart *int32
-	if ordinal > 0 {
-		ordinal32 := int32(ordinal)
-		ordinalStart = &ordinal32
+func buildInstances(componentSpec appsv1alpha1.ClusterComponentSpec, horizontalScaling appsv1alpha1.HorizontalScaling) []appsv1alpha1.InstanceTemplate {
+	if componentSpec.Instances == nil && horizontalScaling.Instances == nil {
+		return nil
 	}
-	return &appsv1alpha1.InstanceTemplate{
-		Replicas:             &replicas,
-		Name:                 instance.Name,
-		OrdinalStart:         ordinalStart,
-		Offline:              instance.Offline,
-		Annotations:          instance.Annotations,
-		Labels:               instance.Labels,
-		Image:                instance.Image,
-		NodeName:             instance.NodeName,
-		NodeSelector:         instance.NodeSelector,
-		Tolerations:          instance.Tolerations,
-		Resources:            instance.Resources,
-		Volumes:              instance.Volumes,
-		VolumeMounts:         instance.VolumeMounts,
-		VolumeClaimTemplates: instance.VolumeClaimTemplates,
-	}
-}
-
-func isHomogeneousInstance(nameWithTemplates []nameWithTemplate, i, j int) bool {
-	if i < 0 || j < 0 {
-		return false
-	}
-	// two instance names should be adjacent.
-	pi, oi := rsm2.ParseParentNameAndOrdinal(nameWithTemplates[i].instanceName)
-	pj, oj := rsm2.ParseParentNameAndOrdinal(nameWithTemplates[j].instanceName)
-	if pi != pj || math.Abs(float64(oi-oj)) != 1 {
-		return false
-	}
-
-	// same values
-	setNilNameFields := func(t *workloads.InstanceTemplate) {
-		t.Replicas = nil
-		t.OrdinalStart = nil
-	}
-	ti := nameWithTemplates[i].InstanceTemplate
-	tj := nameWithTemplates[j].InstanceTemplate
-	setNilNameFields(&ti)
-	setNilNameFields(&tj)
-	return reflect.DeepEqual(ti, tj)
-}
-
-func buildNameTemplateMap(componentName string, replicas int32, instances []appsv1alpha1.InstanceTemplate) (map[string]nameWithTemplate, error) {
-	// 1. build instance template groups
-	var workloadsInstances []workloads.InstanceTemplate
-	for _, instance := range instances {
-		workloadsInstances = append(workloadsInstances, *intctrlcomp.AppsInstanceToWorkloadInstance(&instance))
-	}
-	instanceTemplateGroups := rsm2.BuildInstanceTemplates(replicas, workloadsInstances, nil)
-
-	// 2. build instance name to instance template map
-	var allNameList []string
-	allNameTemplateMap := make(map[string]nameWithTemplate, replicas)
-	for templateName, templates := range instanceTemplateGroups {
-		var templateGroup []rsm2.InstanceTemplateMeta
-		for _, template := range templates {
-			templateGroup = append(templateGroup, template)
-		}
-		instanceNames, nameTemplateMap := rsm2.GenerateInstanceNamesFromTemplate(componentName, templateName, templateGroup, false)
-		allNameList = append(allNameList, instanceNames...)
-		for name, meta := range nameTemplateMap {
-			template := meta.(*workloads.InstanceTemplate)
-			allNameTemplateMap[name] = nameWithTemplate{
-				instanceName:     name,
-				InstanceTemplate: *template,
+	templates := componentSpec.Instances
+	for _, instance := range horizontalScaling.Instances {
+		found := false
+		for i := range templates {
+			if templates[i].Name != instance.Name {
+				continue
 			}
+			templates[i].Replicas = instance.Replicas
+			found = true
+		}
+		if !found {
+			templates = append(templates, instance)
 		}
 	}
-	getNameFunc := func(name string) string { return name }
-	if err := rsm2.ValidateDupInstanceNames(allNameList, getNameFunc); err != nil {
-		return nil, err
-	}
-	return allNameTemplateMap, nil
+	return templates
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -280,15 +161,25 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 			continue
 		}
 		copyReplicas := v.Replicas
-		var copyInstances *[]appsv1alpha1.InstanceTemplate
+		var (
+			copyInstances        *[]appsv1alpha1.InstanceTemplate
+			copyOfflineInstances *string
+		)
 		if len(v.Instances) > 0 {
 			var instances []appsv1alpha1.InstanceTemplate
 			instances = append(instances, v.Instances...)
 			copyInstances = &instances
 		}
+		if len(opsRes.Cluster.Annotations) > 0 {
+			offlineInstances, ok := opsRes.Cluster.Annotations[rsm2.OfflineInstancesAnnotationKey]
+			if ok {
+				copyOfflineInstances = &offlineInstances
+			}
+		}
 		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
-			Replicas:  &copyReplicas,
-			Instances: copyInstances,
+			Replicas:         &copyReplicas,
+			Instances:        copyInstances,
+			OfflineInstances: copyOfflineInstances,
 		}
 		if hsInfo.Replicas < copyReplicas {
 			podNames, err := getCompPodNamesBeforeScaleDownReplicas(reqCtx, cli, *opsRes.Cluster, v.Name)
@@ -354,6 +245,14 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 		comp.Replicas = *lastConfig.Replicas
 		if lastConfig.Instances != nil {
 			comp.Instances = *lastConfig.Instances
+		}
+		if lastConfig.OfflineInstances != nil {
+			annotations := opsRes.Cluster.Annotations
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+			annotations[rsm2.OfflineInstancesAnnotationKey] = *lastConfig.OfflineInstances
+			opsRes.Cluster.Annotations = annotations
 		}
 		return nil
 	})

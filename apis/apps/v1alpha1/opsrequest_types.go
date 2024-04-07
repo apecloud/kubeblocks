@@ -268,10 +268,6 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
 
-	// Specifies instances to be added for the workloads.
-	// The InstanceTemplate Name must match an existing one.
-	// The Replicas must be greater than the existing one.
-
 	// Specifies instances to be added and/or deleted for the workloads.
 	// Name and Replicas should be provided. Other fields will simply be ignored.
 	// The Replicas will be overridden if an existing InstanceTemplate is matched by Name.
@@ -792,6 +788,10 @@ type LastComponentConfiguration struct {
 	// Records the last instances of the component.
 	// +optional
 	Instances *[]InstanceTemplate `json:"instances,omitempty"`
+
+	// Records the last offline instances of the component.
+	// +optional
+	OfflineInstances *string `json:"offlineInstances,omitempty"`
 }
 
 type LastConfiguration struct {

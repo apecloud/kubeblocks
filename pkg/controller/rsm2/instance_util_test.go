@@ -388,7 +388,7 @@ var _ = Describe("replica util test", func() {
 				},
 			}
 			annotations := map[string]string{
-				offlineInstancesAnnotationKey: "[\"foo-bar-1\", \"foo-0\"]",
+				OfflineInstancesAnnotationKey: "[\"foo-bar-1\", \"foo-0\"]",
 			}
 
 			var instanceNameList []string

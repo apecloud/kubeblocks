@@ -212,11 +212,11 @@ func buildInstanceName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *
 	return allNameTemplateMap, nil
 }
 
-func parseOfflineInstances(annotations map[string]string) (offlineInstances []string, err error) {
+func ParseOfflineInstances(annotations map[string]string) (offlineInstances []string, err error) {
 	if len(annotations) == 0 {
 		return
 	}
-	offlineInstancesStr, ok := annotations[offlineInstancesAnnotationKey]
+	offlineInstancesStr, ok := annotations[OfflineInstancesAnnotationKey]
 	if !ok {
 		return
 	}
@@ -226,7 +226,7 @@ func parseOfflineInstances(annotations map[string]string) (offlineInstances []st
 }
 
 func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, annotations map[string]string) ([]string, error) {
-	offlineInstances, err := parseOfflineInstances(annotations)
+	offlineInstances, err := ParseOfflineInstances(annotations)
 	if err != nil {
 		return nil, err
 	}
@@ -569,9 +569,9 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 	if template.NodeName != nil {
 		templateExt.Spec.NodeName = *template.NodeName
 	}
-	mergeMap(&template.Annotations, &templateExt.Annotations)
-	mergeMap(&template.Labels, &templateExt.Labels)
-	mergeMap(&template.NodeSelector, &templateExt.Spec.NodeSelector)
+	MergeMap(&template.Annotations, &templateExt.Annotations)
+	MergeMap(&template.Labels, &templateExt.Labels)
+	MergeMap(&template.NodeSelector, &templateExt.Spec.NodeSelector)
 	if len(templateExt.Spec.Containers) > 0 {
 		if template.Image != nil {
 			templateExt.Spec.Containers[0].Image = *template.Image

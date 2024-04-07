@@ -95,7 +95,7 @@ var _ = Describe("utils test", func() {
 		})
 	})
 
-	Context("mergeMap", func() {
+	Context("MergeMap", func() {
 		It("should work well", func() {
 			src := map[string]string{
 				"foo1": "bar1",
@@ -105,7 +105,7 @@ var _ = Describe("utils test", func() {
 				"foo0": "bar0",
 				"foo1": "bar",
 			}
-			mergeMap(&src, &dst)
+			MergeMap(&src, &dst)
 
 			Expect(dst).Should(HaveLen(3))
 			Expect(dst).Should(HaveKey("foo0"))

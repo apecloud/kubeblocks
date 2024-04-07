@@ -165,7 +165,7 @@ func getUpdateRevisions(revisions map[string]string) (map[string]string, error) 
 	}
 	revisionsStr, ok := revisions[revisionsZSTDKey]
 	if !ok {
-		return nil, nil
+		return revisions, nil
 	}
 	revisionsData, err := base64.StdEncoding.DecodeString(revisionsStr)
 	if err != nil {

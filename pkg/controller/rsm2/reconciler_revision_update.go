@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
-	"unsafe"
-
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -54,30 +52,23 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 
 	// 1. build all templates by applying instance template overrides to default pod template
-	replicaTemplateGroups, err := buildInstanceTemplateExtGroups(rsm, tree)
+	instanceTemplateList, err := buildInstanceTemplateExts(rsm, tree)
 	if err != nil {
 		return nil, err
 	}
 
-	// build replica revision list by template groups
+	// build instance revision list from instance templates
 	var instanceRevisionList []instanceRevision
-	for templateName, templateList := range replicaTemplateGroups {
-		var templateGroup []InstanceTemplateMeta
-		for _, template := range templateList {
-			templateGroup = append(templateGroup, template)
+	for _, template := range instanceTemplateList {
+		instanceNames, err := GenerateInstanceNamesFromTemplate(rsm.Name, template.Name, template.Replicas, rsm.Annotations)
+		if err != nil {
+			return nil, err
 		}
-		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(rsm.Name, templateName, templateGroup, true)
-		templateRevisionMap, err := buildTemplateRevisionMap(templateList, rsm)
+		revision, err := buildInstanceTemplateRevision(template, rsm)
 		if err != nil {
 			return nil, err
 		}
 		for _, name := range instanceNames {
-			revision := ""
-			meta, ok := nameTemplateMap[name]
-			if ok {
-				template := meta.(*instanceTemplateExt)
-				revision = templateRevisionMap[uintptr(unsafe.Pointer(template))]
-			}
 			instanceRevisionList = append(instanceRevisionList, instanceRevision{name: name, revision: revision})
 		}
 	}
@@ -111,18 +102,6 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	rsm.Status.ObservedGeneration = rsm.Generation
 
 	return tree, nil
-}
-
-func buildTemplateRevisionMap(templateGroup []*instanceTemplateExt, parent *workloads.ReplicatedStateMachine) (map[uintptr]string, error) {
-	templateRevisionMap := make(map[uintptr]string)
-	for _, template := range templateGroup {
-		revision, err := buildInstanceTemplateRevision(template, parent)
-		if err != nil {
-			return nil, err
-		}
-		templateRevisionMap[uintptr(unsafe.Pointer(template))] = revision
-	}
-	return templateRevisionMap, nil
 }
 
 var _ kubebuilderx.Reconciler = &revisionUpdateReconciler{}

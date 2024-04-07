@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	"hash"
 	"hash/fnv"
 	"strconv"
@@ -182,6 +183,10 @@ func getUpdateRevisions(revisions map[string]string) (map[string]string, error) 
 }
 
 func buildUpdateRevisions(updateRevisions map[string]string) (map[string]string, error) {
+	maxPlainRevisionCount := viper.GetInt(MaxPlainRevisionCount)
+	if len(updateRevisions) <= maxPlainRevisionCount {
+		return updateRevisions, nil
+	}
 	revisionsJSON, err := json.Marshal(updateRevisions)
 	if err != nil {
 		return nil, err

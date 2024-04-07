@@ -100,17 +100,6 @@ type InstanceTemplate struct {
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 }
 
-func (t *InstanceTemplate) GetName() string {
-	return t.Name
-}
-
-func (t *InstanceTemplate) GetReplicas() int32 {
-	if t.Replicas == nil {
-		return 1
-	}
-	return *t.Replicas
-}
-
 // ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine
 type ReplicatedStateMachineSpec struct {
 	// Specifies the desired number of replicas of the given Template.

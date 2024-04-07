@@ -35,6 +35,10 @@ const (
 
 	defaultReplicaProvider = PodProvider
 
+	// MaxPlainRevisionCount specified max number of plain revision stored in rsm.status.updateRevisions.
+	// All revisions will be compressed if exceeding this value.
+	MaxPlainRevisionCount = "MAX_PLAIN_REVISION_COUNT"
+
 	templateRefAnnotationKey      = "kubeblocks.io/template-ref"
 	templateRefDataKey            = "instances"
 	revisionsZSTDKey              = "zstd"

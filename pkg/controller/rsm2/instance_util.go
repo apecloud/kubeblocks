@@ -46,21 +46,14 @@ import (
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-type InstanceTemplateMeta interface {
-	GetName() string
-	GetReplicas() int32
-}
-
 type instanceTemplateExt struct {
-	Name         string
-	Replicas     int32
+	Name     string
+	Replicas int32
 	corev1.PodTemplateSpec
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 }
 
 var instanceNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
-
-var _ InstanceTemplateMeta = &instanceTemplateExt{}
 
 var (
 	reader *zstd.Decoder
@@ -73,14 +66,6 @@ func init() {
 	runtime.Must(err)
 	writer, err = zstd.NewWriter(nil)
 	runtime.Must(err)
-}
-
-func (t *instanceTemplateExt) GetName() string {
-	return t.Name
-}
-
-func (t *instanceTemplateExt) GetReplicas() int32 {
-	return t.Replicas
 }
 
 type replica struct {
@@ -200,25 +185,20 @@ func ValidateDupInstanceNames[T any](instances []T, getNameFunc func(item T) str
 }
 
 func buildInstanceName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (map[string]*instanceTemplateExt, error) {
-	instanceTemplateExtGroups, err := buildInstanceTemplateExtGroups(rsm, tree)
-	if err != nil {
-		return nil, err
-	}
-	offlineInstances, err := parseOfflineInstances(rsm.Annotations)
+	instanceTemplateList, err := buildInstanceTemplateExts(rsm, tree)
 	if err != nil {
 		return nil, err
 	}
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
-	for templateName, templateList := range instanceTemplateExtGroups {
-		var templateGroup []InstanceTemplateMeta
-		for _, template := range templateList {
-			templateGroup = append(templateGroup, template)
+	for _, template := range instanceTemplateList {
+		instanceNames, err := GenerateInstanceNamesFromTemplate(rsm.Name, template.Name, template.Replicas, rsm.Annotations)
+		if err != nil {
+			return nil, err
 		}
-		instanceNames, nameTemplateMap := GenerateInstanceNamesFromGroup(rsm.Name, templateName, templateGroup, sets.New(offlineInstances...))
 		instanceNameList = append(instanceNameList, instanceNames...)
-		for name, template := range nameTemplateMap {
-			allNameTemplateMap[name] = template.(*instanceTemplateExt)
+		for _, name := range instanceNames {
+			allNameTemplateMap[name] = template
 		}
 	}
 	// validate duplicate pod names
@@ -245,20 +225,14 @@ func parseOfflineInstances(annotations map[string]string) (offlineInstances []st
 	return
 }
 
-func GenerateInstanceNamesFromGroup(parentName, templateName string, templateGroup []InstanceTemplateMeta, usedNames sets.Set[string]) ([]string, map[string]InstanceTemplateMeta) {
-	var (
-		allNameList     []string
-		nameTemplateMap = make(map[string]InstanceTemplateMeta)
-	)
-	for _, template := range templateGroup {
-		instanceNames, _ := generateInstanceNames(parentName, templateName, template.GetReplicas(), 0, usedNames)
-		for _, name := range instanceNames {
-			nameTemplateMap[name] = template
-		}
-		allNameList = append(allNameList, instanceNames...)
+func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, annotations map[string]string) ([]string, error) {
+	offlineInstances, err := parseOfflineInstances(annotations)
+	if err != nil {
+		return nil, err
 	}
-
-	return allNameList, nameTemplateMap
+	usedNames := sets.New(offlineInstances...)
+	instanceNames, _ := generateInstanceNames(parentName, templateName, replicas, 0, usedNames)
+	return instanceNames, nil
 }
 
 // generateInstanceNames generates instance names based on certain rules:
@@ -430,20 +404,20 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 func validateSpec(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) error {
 	replicasInTemplates := int32(0)
-	template, err := findTemplate(rsm, tree)
+	templateObj, err := findTemplateObject(rsm, tree)
 	if err != nil {
 		return err
 	}
-	instanceTemplates := getInstanceTemplates(rsm.Spec.Instances, template)
+	instanceTemplates := getInstanceTemplates(rsm.Spec.Instances, templateObj)
 	templateNames := sets.New[string]()
-	for _, instance := range instanceTemplates {
+	for _, template := range instanceTemplates {
 		replicas := int32(1)
-		if instance.Replicas != nil {
-			replicas = *instance.Replicas
+		if template.Replicas != nil {
+			replicas = *template.Replicas
 		}
 		replicasInTemplates += replicas
-		if templateNames.Has(instance.Name) {
-			return fmt.Errorf("duplicate instance template name: %s", instance.Name)
+		if templateNames.Has(template.Name) {
+			return fmt.Errorf("duplicate instance template name: %s", template.Name)
 		}
 		templateNames.Insert(template.Name)
 	}
@@ -471,7 +445,7 @@ func buildInstanceTemplateRevision(template *instanceTemplateExt, parent *worklo
 	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
-func buildInstanceTemplateExtGroups(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (map[string][]*instanceTemplateExt, error) {
+func buildInstanceTemplateExts(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) ([]*instanceTemplateExt, error) {
 	envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
 	defaultTemplate := rsm1.BuildPodTemplate(rsm, envConfigName)
 	makeInstanceTemplateExt := func() *instanceTemplateExt {
@@ -484,27 +458,23 @@ func buildInstanceTemplateExtGroups(rsm *workloads.ReplicatedStateMachine, tree 
 			VolumeClaimTemplates: claims,
 		}
 	}
-	instancesCompressed, err := findTemplate(rsm, tree)
+	instancesCompressed, err := findTemplateObject(rsm, tree)
 	if err != nil {
 		return nil, err
 	}
 
-	instanceTemplateGroups := BuildInstanceTemplateGroups(*rsm.Spec.Replicas, rsm.Spec.Instances, instancesCompressed)
-	replicaTemplateGroups := make(map[string][]*instanceTemplateExt)
-	for name, instanceTemplates := range instanceTemplateGroups {
-		var podTemplates []*instanceTemplateExt
-		for _, instance := range instanceTemplates {
-			template := makeInstanceTemplateExt()
-			buildInstanceTemplateExt(*instance, template)
-			podTemplates = append(podTemplates, template)
-		}
-		replicaTemplateGroups[name] = podTemplates
+	instanceTemplateList := BuildInstanceTemplates(*rsm.Spec.Replicas, rsm.Spec.Instances, instancesCompressed)
+	var instanceTemplateExtList []*instanceTemplateExt
+	for _, template := range instanceTemplateList {
+		templateExt := makeInstanceTemplateExt()
+		buildInstanceTemplateExt(*template, templateExt)
+		instanceTemplateExtList = append(instanceTemplateExtList, templateExt)
 	}
 
-	return replicaTemplateGroups, nil
+	return instanceTemplateExtList, nil
 }
 
-func BuildInstanceTemplateGroups(totalReplicas int32, instances []workloads.InstanceTemplate, instancesCompressed *corev1.ConfigMap) map[string][]*workloads.InstanceTemplate {
+func BuildInstanceTemplates(totalReplicas int32, instances []workloads.InstanceTemplate, instancesCompressed *corev1.ConfigMap) []*workloads.InstanceTemplate {
 	var instanceTemplateList []*workloads.InstanceTemplate
 	var replicasInTemplates int32
 	instanceTemplates := getInstanceTemplates(instances, instancesCompressed)
@@ -523,15 +493,7 @@ func BuildInstanceTemplateGroups(totalReplicas int32, instances []workloads.Inst
 		instanceTemplateList = append(instanceTemplateList, instance)
 	}
 
-	// group the pod templates by template.Name
-	instanceTemplateGroups := make(map[string][]*workloads.InstanceTemplate)
-	for _, template := range instanceTemplateList {
-		templates := instanceTemplateGroups[template.Name]
-		templates = append(templates, template)
-		instanceTemplateGroups[template.Name] = templates
-	}
-
-	return instanceTemplateGroups
+	return instanceTemplateList
 }
 
 func getInstanceTemplateMap(annotations map[string]string) (map[string]string, error) {
@@ -575,7 +537,7 @@ func getInstanceTemplates(instances []workloads.InstanceTemplate, template *core
 	return append(instances, extraTemplates...)
 }
 
-func findTemplate(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (*corev1.ConfigMap, error) {
+func findTemplateObject(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (*corev1.ConfigMap, error) {
 	templateMap, err := getInstanceTemplateMap(rsm.Annotations)
 	// error has been checked in prepare stage, there should be no error occurs
 	if err != nil {

@@ -21,6 +21,7 @@ package rsm2
 
 import (
 	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -353,7 +354,7 @@ var _ = Describe("replica util test", func() {
 			Expect(tree.Add(templateObj)).Should(Succeed())
 
 			By("parse instance templates")
-			template, err := findTemplate(rsm, tree)
+			template, err := findTemplateObject(rsm, tree)
 			Expect(err).Should(BeNil())
 			instanceTemplates := getInstanceTemplates(rsm.Spec.Instances, template)
 			// append templates from mock function
@@ -372,32 +373,36 @@ var _ = Describe("replica util test", func() {
 		})
 	})
 
-	Context("generateInstanceNames", func() {
+	Context("GenerateInstanceNamesFromTemplate", func() {
 		It("should work well", func() {
 			parentName := "foo"
 			templateName := "bar"
 			templates := []*instanceTemplateExt{
 				{
-					Name:         "",
-					Replicas:     2,
+					Name:     "",
+					Replicas: 2,
 				},
 				{
-					Replicas:     2,
-					Name:         templateName,
+					Replicas: 2,
+					Name:     templateName,
 				},
 			}
+			annotations := map[string]string{
+				offlineInstancesAnnotationKey: "[\"foo-bar-1\", \"foo-0\"]",
+			}
 
-			var templateGroup []InstanceTemplateMeta
+			var instanceNameList []string
 			for _, template := range templates {
-				templateGroup = append(templateGroup, template)
+				instanceNames, err := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, annotations)
+				Expect(err).Should(BeNil())
+				instanceNameList = append(instanceNameList, instanceNames...)
 			}
-			instanceNames, _ := GenerateInstanceNamesFromGroup(parentName, templateName, templateGroup, nil)
 			getNameNOrdinalFunc := func(i int) (string, int) {
-				return ParseParentNameAndOrdinal(instanceNames[i])
+				return ParseParentNameAndOrdinal(instanceNameList[i])
 			}
-			BaseSort(instanceNames, getNameNOrdinalFunc, nil, false)
-			podNamesExpected := []string{"foo-bar-0", "foo-bar-1", "foo-0", "foo-1"}
-			Expect(instanceNames).Should(Equal(podNamesExpected))
+			BaseSort(instanceNameList, getNameNOrdinalFunc, nil, false)
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
 	})
 })

@@ -22,8 +22,8 @@ package rsm2
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -129,6 +129,18 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				_, ok := currentPodSnapshot[*name]
 				Expect(ok).Should(BeTrue())
 			}
+		})
+	})
+
+	Context("updateOfflineInstanceAnnotation", func() {
+		It("should work well", func() {
+			annotations := map[string]string{
+				offlineInstancesAnnotationKey: "[\"bar-0\", \"bar-1\"]",
+			}
+			rsm.Annotations = annotations
+			Expect(updateOfflineInstanceAnnotation(rsm, "bar-1")).Should(Succeed())
+			Expect(rsm.Annotations).Should(HaveKey(offlineInstancesAnnotationKey))
+			Expect(rsm.Annotations[offlineInstancesAnnotationKey]).Should(Equal("[\"bar-0\"]"))
 		})
 	})
 })

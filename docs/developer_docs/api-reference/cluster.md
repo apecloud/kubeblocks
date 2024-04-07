@@ -11893,6 +11893,18 @@ InstanceTemplate
 <p>Records the last instances of the component.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the last offline instances of the component.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.LastConfiguration">LastConfiguration

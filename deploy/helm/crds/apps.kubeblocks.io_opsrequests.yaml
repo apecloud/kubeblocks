@@ -6510,6 +6510,9 @@ spec:
                           description: 'Limits describes the maximum amount of compute
                             resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
+                        offlineInstances:
+                          description: Records the last offline instances of the component.
+                          type: string
                         opsName:
                           description: Indicates the opsRequest name.
                           type: string
@@ -9571,6 +9574,9 @@ spec:
                           description: 'Limits describes the maximum amount of compute
                             resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
+                        offlineInstances:
+                          description: Records the last offline instances of the component.
+                          type: string
                         replicas:
                           description: Represents the last replicas of the component.
                           format: int32

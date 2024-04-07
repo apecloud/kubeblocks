@@ -183,7 +183,7 @@ var _ = Describe("update strategy transformer test.", func() {
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("update the second pod")
-			makePodUpdateReady(newRevision, pod0)
+			makePodUpdateReady(newRevision, true, pod0)
 			dagExpected = mockDAG()
 			graphCli.Delete(dagExpected, pod2)
 			k8sMock.EXPECT().
@@ -198,7 +198,7 @@ var _ = Describe("update strategy transformer test.", func() {
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("switchover")
-			makePodUpdateReady(newRevision, pod2)
+			makePodUpdateReady(newRevision, true, pod2)
 			dagExpected = mockDAG()
 			actionName := getActionName(rsm.Name, int(rsm.Generation), 1, jobTypeSwitchover)
 			action := builder.NewJobBuilder(name, actionName).GetObject()

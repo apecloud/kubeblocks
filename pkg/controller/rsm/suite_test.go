@@ -162,14 +162,14 @@ func less(v1, v2 graph.Vertex) bool {
 	return model.DefaultLess(v1, v2)
 }
 
-func makePodUpdateReady(newRevision string, pods ...*corev1.Pod) {
+func makePodUpdateReady(newRevision string, roleful bool, pods ...*corev1.Pod) {
 	readyCondition := corev1.PodCondition{
 		Type:   corev1.PodReady,
 		Status: corev1.ConditionTrue,
 	}
 	for _, pod := range pods {
 		pod.Labels[apps.StatefulSetRevisionLabel] = newRevision
-		if pod.Labels[RoleLabelKey] == "" {
+		if roleful && pod.Labels[RoleLabelKey] == "" {
 			pod.Labels[RoleLabelKey] = "learner"
 		}
 		pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)

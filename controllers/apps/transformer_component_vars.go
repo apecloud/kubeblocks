@@ -84,7 +84,7 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 // generatedComponent4LegacyCluster checks whether the cluster to which this component belongs was created before 0.8.
 func generatedComponent4LegacyCluster(transCtx *componentTransformContext) (bool, error) {
-	generated := isGeneratedComponent(transCtx.ComponentOrig)
+	generated := component.IsGenerated(transCtx.ComponentOrig)
 	if !generated {
 		return false, nil
 	}

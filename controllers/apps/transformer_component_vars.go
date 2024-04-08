@@ -214,21 +214,22 @@ func (r *varsReader) List(ctx context.Context, list client.ObjectList, opts ...c
 		return err
 	}
 
-	if objects := r.listFromGraph(items.Type(), opts...); objects.Len() > 0 {
-		names := sets.New[string]()
-		for i := 0; i < objects.Len(); i++ {
-			names.Insert(objects.Index(i).FieldByName("Name").String())
-		}
-		for i := 0; i < items.Len(); i++ {
-			obj := items.Index(i)
-			name := obj.FieldByName("Name").String()
-			if !names.Has(name) {
-				names.Insert(name)
-				objects = reflect.Append(objects, obj)
-			}
-		}
-		items.Set(objects)
+	objects := r.listFromGraph(items.Type(), opts...)
+
+	// remove duplicated items
+	names := sets.New[string]()
+	for i := 0; i < objects.Len(); i++ {
+		names.Insert(objects.Index(i).FieldByName("Name").String())
 	}
+	for i := 0; i < items.Len(); i++ {
+		obj := items.Index(i)
+		name := obj.FieldByName("Name").String()
+		if !names.Has(name) {
+			names.Insert(name)
+			objects = reflect.Append(objects, obj)
+		}
+	}
+	items.Set(objects)
 	return nil
 }
 

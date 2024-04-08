@@ -41,4 +41,6 @@ const (
 
 	templateRefAnnotationKey = "kubeblocks.io/template-ref"
 	templateRefDataKey       = "instances"
+
+	FeatureGateIgnorePodVerticalScaling = "IGNORE_POD_VERTICAL_SCALING"
 )

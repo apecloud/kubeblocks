@@ -105,3 +105,8 @@ func (builder *PodBuilder) SetTopologySpreadConstraints(topologySpreadConstraint
 	builder.get().Spec.TopologySpreadConstraints = topologySpreadConstraints
 	return builder
 }
+
+func (builder *PodBuilder) SetActiveDeadlineSeconds(activeDeadline *int64) *PodBuilder {
+	builder.get().Spec.ActiveDeadlineSeconds = activeDeadline
+	return builder
+}

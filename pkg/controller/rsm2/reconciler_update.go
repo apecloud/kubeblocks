@@ -125,12 +125,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		return nil, err
 	}
 
-	deletedPods := 0
+	updatingPods := 0
 	updatedPods := 0
 	priorities := rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
 	sortObjects(oldPodList, priorities, false)
 	for _, pod := range oldPodList {
-		if deletedPods >= updateCount || deletedPods >= unavailable {
+		if updatingPods >= updateCount || updatingPods >= unavailable {
 			break
 		}
 		if updatedPods >= partition {
@@ -141,14 +141,26 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			tree.Logger.Info(fmt.Sprintf("RSM %s/%s blocks on scale-in as the pod %s is not healthy", rsm.Namespace, rsm.Name, pod.Name))
 			break
 		}
-		newPodRevision := updateRevisions[pod.Name]
-		if getPodRevision(pod) != newPodRevision && !isTerminating(pod) {
-			if err = tree.Delete(pod); err != nil {
-				return nil, err
+		newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], rsm)
+		if err != nil {
+			return nil, err
+		}
+		updatePolicy, err := shouldDoPodUpdate(pod, newInstance.pod, updateRevisions)
+		if err != nil {
+			return nil, err
+		}
+		if updatePolicy != NoOpsPolicy && !isTerminating(pod) {
+			if updatePolicy == InPlaceUpdatePolicy {
+				newPod := copyAndMerge(pod, newInstance.pod)
+				if err = tree.Update(newPod); err != nil {
+					return nil, err
+				}
+			} else {
+				if err = tree.Delete(pod); err != nil {
+					return nil, err
+				}
 			}
-			// TODO(free6om): handle pvc management policy
-			// Retain by default.
-			deletedPods++
+			updatingPods++
 		}
 		updatedPods++
 	}

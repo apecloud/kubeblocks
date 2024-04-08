@@ -875,7 +875,8 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 
 			// fall-back to list services and find the matched prefix
 			svcList := &corev1.ServiceList{}
-			err = cli.List(ctx, svcList, client.MatchingLabels(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, compName)))
+			matchingLabels := client.MatchingLabels(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, compName))
+			err = cli.List(ctx, svcList, matchingLabels)
 			if err != nil {
 				return nil, err
 			}

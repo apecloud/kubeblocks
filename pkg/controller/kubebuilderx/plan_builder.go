@@ -152,7 +152,7 @@ func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredT
 	}
 	createNewObjects := func() {
 		for name := range createSet {
-			v := model.NewObjectVertex(nil, assign(ctx, newSnapshot[name]), model.ActionCreatePtr(), inDataContext())
+			v := model.NewObjectVertex(nil, assign(ctx, newSnapshot[name]), model.ActionCreatePtr(), inDataContext4G())
 			findAndAppend(v)
 		}
 	}
@@ -161,14 +161,14 @@ func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredT
 			oldObj := oldSnapshot[name]
 			newObj := newSnapshot[name]
 			if !reflect.DeepEqual(oldObj, newObj) {
-				v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext())
+				v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
 				findAndAppend(v)
 			}
 		}
 	}
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
-			v := model.NewObjectVertex(nil, oldSnapshot[name], model.ActionDeletePtr(), inDataContext())
+			v := model.NewObjectVertex(nil, oldSnapshot[name], model.ActionDeletePtr(), inDataContext4G())
 			findAndAppend(v)
 		}
 	}

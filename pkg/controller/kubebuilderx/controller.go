@@ -27,8 +27,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 // TODO(free6om): this is a new reconciler framework in the very early stage leaving the following tasks to do:
@@ -68,7 +66,7 @@ func (c *controller) Prepare(reader TreeLoader) Controller {
 	c.tree, c.err = c.oldTree.DeepCopy()
 
 	// init placement
-	c.ctx = multicluster.IntoContext(c.ctx, placement(c.oldTree.GetRoot()))
+	c.ctx = intoContext(c.ctx, placement(c.oldTree.GetRoot()))
 
 	return c
 }

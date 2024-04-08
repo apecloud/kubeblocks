@@ -45,7 +45,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -490,7 +489,7 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil)
 		}
 		for _, obj := range objs2 {
-			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil, inDataContext())
+			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil, inDataContext4G())
 		}
 		return nil
 	}
@@ -499,7 +498,7 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) error {
 	graphCli := model.NewGraphClient(r.cli)
 	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), multicluster.InDataContext())
+		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
 	if err != nil {
 		return err
 	}
@@ -509,14 +508,14 @@ func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) err
 			obj.Annotations = make(map[string]string)
 		}
 		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
-		graphCli.Update(r.dag, nil, obj, inDataContext())
+		graphCli.Update(r.dag, nil, obj, inDataContext4G())
 	}
 	return nil
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), multicluster.InDataContext())
+		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
 	if err != nil {
 		return err
 	}
@@ -606,14 +605,14 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) erro
 				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 			}
 			pvc := corev1.PersistentVolumeClaim{}
-			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, multicluster.InDataContext()); err != nil {
+			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
 				return err
 			}
 			// Since there are no order guarantee between updating STS and deleting PVCs, if there is any error occurred
 			// after updating STS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
-			graphCli.Delete(r.dag, &pvc, inDataContext())
+			graphCli.Delete(r.dag, &pvc, inDataContext4G())
 		}
 	}
 	return nil
@@ -627,7 +626,7 @@ func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.Persi
 			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.runningRSM.Name, i),
 		}
 		pvcNotFound := false
-		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, multicluster.InDataContext()); err != nil {
+		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, inDataContext4C()); err != nil {
 			if apierrors.IsNotFound(err) {
 				pvcNotFound = true
 			} else {
@@ -671,7 +670,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			constant.PVCNameLabelKey: pvcKey.Name,
 		}
 		pvList := corev1.PersistentVolumeList{}
-		if err := r.cli.List(r.reqCtx.Ctx, &pvList, ml, multicluster.InDataContext()); err != nil {
+		if err := r.cli.List(r.reqCtx.Ctx, &pvList, ml, inDataContext4C()); err != nil {
 			return err
 		}
 		for _, pv := range pvList.Items {
@@ -698,7 +697,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		Namespace: pvcKey.Namespace,
 		Name:      newPVC.Spec.VolumeName,
 	}
-	if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, multicluster.InDataContext()); err != nil {
+	if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
 		if apierrors.IsNotFound(err) {
 			pvNotFound = true
 		} else {
@@ -731,14 +730,14 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			}
 			retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
 			retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
-			return graphCli.Do(r.dag, pv, retainPV, model.ActionPatchPtr(), fromVertex, inDataContext())
+			return graphCli.Do(r.dag, pv, retainPV, model.ActionPatchPtr(), fromVertex, inDataContext4G())
 		},
 		deletePVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 2: delete pvc, this will not delete pv because policy is 'retain'
 			removeFinalizerPVC := pvc.DeepCopy()
 			removeFinalizerPVC.SetFinalizers([]string{})
-			removeFinalizerPVCVertex := graphCli.Do(r.dag, pvc, removeFinalizerPVC, model.ActionPatchPtr(), fromVertex, inDataContext())
-			return graphCli.Do(r.dag, nil, removeFinalizerPVC, model.ActionDeletePtr(), removeFinalizerPVCVertex, inDataContext())
+			removeFinalizerPVCVertex := graphCli.Do(r.dag, pvc, removeFinalizerPVC, model.ActionPatchPtr(), fromVertex, inDataContext4G())
+			return graphCli.Do(r.dag, nil, removeFinalizerPVC, model.ActionDeletePtr(), removeFinalizerPVCVertex, inDataContext4G())
 		},
 		removePVClaimRefStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 3: remove claimRef in pv
@@ -747,12 +746,12 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 				removeClaimRefPV.Spec.ClaimRef.UID = ""
 				removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
 			}
-			return graphCli.Do(r.dag, pv, removeClaimRefPV, model.ActionPatchPtr(), fromVertex, inDataContext())
+			return graphCli.Do(r.dag, pv, removeClaimRefPV, model.ActionPatchPtr(), fromVertex, inDataContext4G())
 		},
 		createPVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 4: create new pvc
 			newPVC.SetResourceVersion("")
-			return graphCli.Do(r.dag, nil, newPVC, model.ActionCreatePtr(), fromVertex, inDataContext())
+			return graphCli.Do(r.dag, nil, newPVC, model.ActionCreatePtr(), fromVertex, inDataContext4G())
 		},
 		pvRestorePolicyStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 5: restore to previous pv policy
@@ -762,7 +761,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 				policy = corev1.PersistentVolumeReclaimDelete
 			}
 			restorePV.Spec.PersistentVolumeReclaimPolicy = policy
-			return graphCli.Do(r.dag, pv, restorePV, model.ActionPatchPtr(), fromVertex, inDataContext())
+			return graphCli.Do(r.dag, pv, restorePV, model.ActionPatchPtr(), fromVertex, inDataContext4G())
 		},
 	}
 
@@ -797,7 +796,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 	}
 	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 		// use pvc's update without anything extra
-		graphCli.Update(r.dag, nil, newPVC, inDataContext())
+		graphCli.Update(r.dag, nil, newPVC, inDataContext4G())
 		return nil
 	}
 	// all the else means no need to update
@@ -822,7 +821,7 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
 		labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 		pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
-			generics.PersistentVolumeClaimSignature, rsmObj.Namespace, labels, multicluster.InDataContext())
+			generics.PersistentVolumeClaimSignature, rsmObj.Namespace, labels, inDataContext4C())
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil, nil

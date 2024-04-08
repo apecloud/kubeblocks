@@ -126,7 +126,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		if shouldSkipObjOwnedByComp(o, *cluster) || rsm.IsOwnedByRsm(o) {
 			continue
 		}
-		graphCli.Delete(dag, o, inUniversalContext())
+		graphCli.Delete(dag, o, inUniversalContext4G())
 	}
 	// set cluster action to noop until all the sub-resources deleted
 	if len(delObjs) == 0 {

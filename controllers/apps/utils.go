@@ -102,11 +102,27 @@ func placement(obj client.Object) string {
 	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
 }
 
-func inDataContext() model.GraphOption {
+func intoContext(ctx context.Context, placement string) context.Context {
+	return multicluster.IntoContext(ctx, placement)
+}
+
+func inDataContext4C() *multicluster.ClientOption {
+	return multicluster.InDataContext()
+}
+
+func inDataContextUnspecified4C() *multicluster.ClientOption {
+	return multicluster.InDataContextUnspecified()
+}
+
+func inUniversalContext4C() *multicluster.ClientOption {
+	return multicluster.InUniversalContext()
+}
+
+func inDataContext4G() model.GraphOption {
 	return model.WithClientOption(multicluster.InDataContext())
 }
 
-func inUniversalContext() model.GraphOption {
+func inUniversalContext4G() model.GraphOption {
 	return model.WithClientOption(multicluster.InUniversalContext())
 }
 

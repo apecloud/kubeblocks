@@ -40,7 +40,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -479,7 +478,7 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 	}
 
 	objKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: objName}
-	if err := cli.Get(ctx, objKey, obj, multicluster.InDataContext()); err != nil {
+	if err := cli.Get(ctx, objKey, obj, inDataContext()); err != nil {
 		if apierrors.IsNotFound(err) && _optional() {
 			return nil, nil, nil
 		}
@@ -835,7 +834,7 @@ func resolvePodVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp
 					Name:      constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, compName),
 				}
 				rsm := &workloads.ReplicatedStateMachine{}
-				err := cli.Get(ctx, key, rsm, multicluster.InDataContext())
+				err := cli.Get(ctx, key, rsm, inDataContext())
 				if err != nil {
 					return nil, err
 				}
@@ -866,7 +865,7 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 				Name:      svcName,
 			}
 			obj := &corev1.Service{}
-			err := cli.Get(ctx, key, obj, multicluster.InDataContext())
+			err := cli.Get(ctx, key, obj, inDataContext())
 			if err == nil {
 				return &resolvedServiceObj{service: obj}, nil
 			}
@@ -877,7 +876,7 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 			// fall-back to list services and find the matched prefix
 			svcList := &corev1.ServiceList{}
 			matchingLabels := client.MatchingLabels(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, compName))
-			err = cli.List(ctx, svcList, matchingLabels, multicluster.InDataContext())
+			err = cli.List(ctx, svcList, matchingLabels, inDataContext())
 			if err != nil {
 				return nil, err
 			}
@@ -909,7 +908,7 @@ func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesi
 				Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name),
 			}
 			obj := &corev1.Secret{}
-			err := cli.Get(ctx, key, obj, multicluster.InDataContext())
+			err := cli.Get(ctx, key, obj, inDataContext())
 			return obj, err
 		}
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)

@@ -34,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -122,7 +121,7 @@ func fetchConfigmap(localObjs []client.Object, cmName, namespace string, cli cli
 	if localObject != nil {
 		return localObject.(*corev1.ConfigMap), nil
 	}
-	if err := cli.Get(ctx, cmKey, cmObj, multicluster.InDataContext()); err != nil {
+	if err := cli.Get(ctx, cmKey, cmObj, inDataContext()); err != nil {
 		return nil, err
 	}
 	return cmObj, nil
@@ -134,7 +133,7 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 		Namespace: originKey.Namespace,
 	}
 	cm := &corev1.ConfigMap{}
-	err := cli.Get(ctx, cmKey, cm, multicluster.InDataContext())
+	err := cli.Get(ctx, cmKey, cm, inDataContext())
 	if err == nil {
 		return cm, nil
 	}
@@ -148,7 +147,7 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 	if err := intctrlutil.SetOwnerReference(cluster, cm); err != nil {
 		return nil, err
 	}
-	return cm, cli.Create(ctx, cm, multicluster.InDataContext())
+	return cm, cli.Create(ctx, cm, inDataContext())
 }
 
 func CheckEnvFrom(container *corev1.Container, cmName string) bool {

@@ -40,7 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -132,7 +131,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 
 	// get the component's underlying pods
 	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), multicluster.InDataContext())
+		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
 	if err != nil {
 		return err
 	}
@@ -311,7 +310,7 @@ func (r *componentStatusHandler) isAllConfigSynced() (bool, error) {
 			Namespace: r.cluster.Namespace,
 			Name:      cfgcore.GetComponentCfgName(r.cluster.Name, r.synthesizeComp.Name, configSpec.Name),
 		}
-		if err := r.cli.Get(r.reqCtx.Ctx, cmKey, cmObj, multicluster.InDataContext()); err != nil {
+		if err := r.cli.Get(r.reqCtx.Ctx, cmKey, cmObj, inDataContext4C()); err != nil {
 			return false, err
 		}
 		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != appsv1alpha1.CFinishedPhase {
@@ -386,7 +385,7 @@ func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx
 	rsmObj *workloads.ReplicatedStateMachine) ([]*corev1.PersistentVolumeClaim, error) {
 	labels := constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name)
 	pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
-		generics.PersistentVolumeClaimSignature, r.cluster.Namespace, labels, multicluster.InDataContext())
+		generics.PersistentVolumeClaimSignature, r.cluster.Namespace, labels, inDataContext4C())
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
@@ -494,7 +493,7 @@ func (r *componentStatusHandler) updatePrimaryIndex() error {
 		return nil
 	}
 	podList, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), multicluster.InDataContext())
+		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
 	if err != nil {
 		return err
 	}
@@ -539,7 +538,7 @@ func (r *componentStatusHandler) updatePrimaryIndex() error {
 		if !ok || pi != primaryPodName {
 			origPod := pod.DeepCopy()
 			pod.Annotations[constant.PrimaryAnnotationKey] = primaryPodName
-			graphCli.Do(r.dag, origPod, pod, model.ActionUpdatePtr(), nil, inDataContext())
+			graphCli.Do(r.dag, origPod, pod, model.ActionUpdatePtr(), nil, inDataContext4G())
 		}
 	}
 	return nil

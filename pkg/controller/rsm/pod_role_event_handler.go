@@ -89,7 +89,7 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 		event.Annotations = make(map[string]string, 0)
 	}
 	event.Annotations[roleChangedAnnotKey] = count
-	return cli.Patch(reqCtx.Ctx, event, patch, multicluster.InDataContextUnspecified())
+	return cli.Patch(reqCtx.Ctx, event, patch, inDataContextUnspecified())
 }
 
 // handleRoleChangedEvent handles role changed event and return role.
@@ -116,7 +116,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		}
 		// get pod
 		pod := &corev1.Pod{}
-		if err := cli.Get(reqCtx.Ctx, podName, pod, multicluster.InDataContextUnspecified()); err != nil {
+		if err := cli.Get(reqCtx.Ctx, podName, pod, inDataContextUnspecified()); err != nil {
 			return pair.RoleName, err
 		}
 		// event belongs to old pod with the same name, ignore it
@@ -219,5 +219,13 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 		pod.Annotations = map[string]string{}
 	}
 	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	return cli.Patch(ctx, pod, patch, multicluster.InDataContext())
+	return cli.Patch(ctx, pod, patch, inDataContext())
+}
+
+func inDataContext() *multicluster.ClientOption {
+	return multicluster.InDataContext()
+}
+
+func inDataContextUnspecified() *multicluster.ClientOption {
+	return multicluster.InDataContextUnspecified()
 }

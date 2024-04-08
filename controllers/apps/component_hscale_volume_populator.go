@@ -34,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -168,7 +167,7 @@ func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, []c
 
 func (d *baseDataClone) isPVCExists(pvcKey types.NamespacedName) (bool, error) {
 	pvc := corev1.PersistentVolumeClaim{}
-	if err := d.cli.Get(d.reqCtx.Ctx, pvcKey, &pvc, multicluster.InDataContext()); err != nil {
+	if err := d.cli.Get(d.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 	return true, nil
@@ -449,7 +448,7 @@ func isVolumeSnapshotEnabled(ctx context.Context, cli client.Client,
 		Name:      fmt.Sprintf("%s-%s-%d", vct.Name, sts.Name, 0),
 	}
 	pvc := corev1.PersistentVolumeClaim{}
-	if err := cli.Get(ctx, pvcKey, &pvc, multicluster.InDataContext()); err != nil {
+	if err := cli.Get(ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 

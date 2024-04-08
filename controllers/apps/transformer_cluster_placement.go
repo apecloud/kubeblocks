@@ -49,7 +49,7 @@ func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	if t.assigned(transCtx) {
-		transCtx.Context = multicluster.IntoContext(transCtx.Context, placement(transCtx.OrigCluster))
+		transCtx.Context = intoContext(transCtx.Context, placement(transCtx.OrigCluster))
 		return nil
 	}
 
@@ -63,7 +63,7 @@ func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag 
 		cluster.Annotations = make(map[string]string)
 	}
 	cluster.Annotations[constant.KBAppMultiClusterPlacementKey] = strings.Join(p, ",")
-	transCtx.Context = multicluster.IntoContext(transCtx.Context, placement(cluster))
+	transCtx.Context = intoContext(transCtx.Context, placement(cluster))
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	graphCli.Update(dag, transCtx.OrigCluster, cluster)

@@ -35,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	lorryModel "github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
@@ -209,7 +208,7 @@ func (t *componentAccountProvisionTransformer) componentPodsWithRole(transCtx *c
 	labels := constant.GetComponentWellKnownLabels(cluster.Name, compSpecName)
 	labels[constant.RoleLabelKey] = role
 	if err := transCtx.Client.List(transCtx.Context, podList,
-		client.InNamespace(cluster.Namespace), client.MatchingLabels(labels), multicluster.InDataContext()); err != nil {
+		client.InNamespace(cluster.Namespace), client.MatchingLabels(labels), inDataContext4C()); err != nil {
 		return nil, err
 	}
 	return podList, nil

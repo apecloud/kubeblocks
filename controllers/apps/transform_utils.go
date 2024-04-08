@@ -40,7 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -74,14 +73,14 @@ func getOwningNamespacedObjects(ctx context.Context,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (owningObjects, error) {
 	inNS := client.InNamespace(namespace)
-	return getOwningObjectsWithOptions(ctx, cli, kinds, inNS, labels, multicluster.InUniversalContext())
+	return getOwningObjectsWithOptions(ctx, cli, kinds, inNS, labels, inUniversalContext4C())
 }
 
 func getOwningNonNamespacedObjects(ctx context.Context,
 	cli client.Reader,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (owningObjects, error) {
-	return getOwningObjectsWithOptions(ctx, cli, kinds, labels, multicluster.InUniversalContext())
+	return getOwningObjectsWithOptions(ctx, cli, kinds, labels, inUniversalContext4C())
 }
 
 func getOwningObjectsWithOptions(ctx context.Context,

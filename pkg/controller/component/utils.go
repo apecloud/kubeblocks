@@ -17,26 +17,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package component
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
-type componentInitTransformer struct{}
-
-var _ graph.Transformer = &componentInitTransformer{}
-
-func (t *componentInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*componentTransformContext)
-
-	// init dag
-	rootVertex := &model.ObjectVertex{Obj: transCtx.Component, OriObj: transCtx.ComponentOrig, Action: model.ActionStatusPtr()}
-	dag.AddVertex(rootVertex)
-
-	// init placement
-	transCtx.Context = intoContext(transCtx.Context, placement(transCtx.Component))
-
-	return nil
+func inDataContext() *multicluster.ClientOption {
+	return multicluster.InDataContext()
 }

@@ -57,13 +57,13 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 	tree.SetRoot(root)
 
 	// init placement
-	ctx = multicluster.IntoContext(ctx, placement(root))
+	ctx = intoContext(ctx, placement(root))
 
 	// read child objects
 	ml := getMatchLabels(root, labelKeys)
 	inNS := client.InNamespace(req.Namespace)
 	for _, list := range kinds {
-		if err := reader.List(ctx, list, inNS, ml, multicluster.InDataContext()); err != nil {
+		if err := reader.List(ctx, list, inNS, ml, inDataContext4C()); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items
@@ -114,7 +114,15 @@ func assign(ctx context.Context, obj client.Object) client.Object {
 	}
 }
 
-func inDataContext() model.GraphOption {
+func intoContext(ctx context.Context, placement string) context.Context {
+	return multicluster.IntoContext(ctx, placement)
+}
+
+func inDataContext4C() *multicluster.ClientOption {
+	return multicluster.InDataContext()
+}
+
+func inDataContext4G() model.GraphOption {
 	return model.WithClientOption(multicluster.InDataContext())
 }
 

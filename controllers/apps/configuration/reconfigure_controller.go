@@ -96,7 +96,7 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	config := &corev1.ConfigMap{}
 	// TODO(leon): data or universal?
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config, multicluster.InDataContextUnspecified()); err != nil {
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config, inDataContextUnspecified()); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configmap")
 	}
 

@@ -39,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -87,7 +86,7 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 		}
 	}
 
-	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj, multicluster.InDataContext())
+	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj, inDataContext())
 	if cmErr != nil && !apierrors.IsNotFound(cmErr) {
 		// An unexpected error occurs
 		return nil, cmErr

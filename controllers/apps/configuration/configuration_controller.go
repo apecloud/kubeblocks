@@ -33,7 +33,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -207,8 +206,7 @@ func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager, multiCluste
 		Owns(&corev1.ConfigMap{})
 
 	if multiClusterMgr != nil {
-		eventHandler := handler.EnqueueRequestForOwner(r.Scheme, r.Client.RESTMapper(), &appsv1alpha1.Configuration{}, handler.OnlyControllerOwner())
-		multiClusterMgr.Watch(b, &corev1.ConfigMap{}, eventHandler)
+		multiClusterMgr.Own(b, &corev1.ConfigMap{}, &appsv1alpha1.Configuration{})
 	}
 
 	return b.Complete(r)

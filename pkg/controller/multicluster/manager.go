@@ -38,6 +38,8 @@ type Manager interface {
 
 	Bind(mgr ctrl.Manager) error
 
+	Own(b *builder.Builder, obj, owner client.Object) Manager
+
 	Watch(b *builder.Builder, obj client.Object, eventHandler handler.EventHandler) Manager
 }
 
@@ -63,6 +65,14 @@ func (m *manager) Bind(mgr ctrl.Manager) error {
 		}
 	}
 	return nil
+}
+
+func (m *manager) Own(b *builder.Builder, obj, owner client.Object) Manager {
+	handler := handler.EnqueueRequestForOwner(m.cli.Scheme(), m.cli.RESTMapper(), owner, handler.OnlyControllerOwner())
+	for k := range m.caches {
+		b.WatchesRawSource(source.Kind(m.caches[k], obj), handler)
+	}
+	return m
 }
 
 func (m *manager) Watch(b *builder.Builder, obj client.Object, eventHandler handler.EventHandler) Manager {

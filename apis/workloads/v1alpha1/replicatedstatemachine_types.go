@@ -157,7 +157,7 @@ type ReplicatedStateMachineSpec struct {
 	// Any remaining replicas will be generated using the default template and will follow the default naming rules.
 	//
 	// +optional
-	Instances []InstanceTemplate `json:"instances,omitempty"`
+	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies instances to be scaled in with dedicated names in the list.
 	//

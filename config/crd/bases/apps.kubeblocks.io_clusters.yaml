@@ -4504,6 +4504,12 @@ spec:
                         - name
                         type: object
                       type: array
+                    sidecars:
+                      description: Defines the sidecar containers that will be attached
+                        to the component's main container.
+                      items:
+                        type: string
+                      type: array
                     switchPolicy:
                       description: "Defines the strategy for switchover and failover
                         when workloadType is Replication. \n Deprecated since v0.9.
@@ -11122,6 +11128,12 @@ spec:
                             required:
                             - name
                             type: object
+                          type: array
+                        sidecars:
+                          description: Defines the sidecar containers that will be
+                            attached to the component's main container.
+                          items:
+                            type: string
                           type: array
                         switchPolicy:
                           description: "Defines the strategy for switchover and failover

@@ -485,6 +485,54 @@ type ServiceRefDeclarationSpec struct {
 	ServiceVersion string `json:"serviceVersion"`
 }
 
+type PrometheusConfig struct {
+	// Specifies the http/https url path to scrape for metrics.
+	// If empty, Prometheus uses the default value (e.g. `/metrics`).
+	//
+	// +kubebuilder:validation:default="/metrics"
+	// +optional
+	MetricsPath string `json:"metricsPath,omitempty"`
+
+	// The URL parameters to be used in the HTTP request.
+	//
+	// +optional
+	Params map[string][]string `json:"params,omitempty"`
+
+	// Specifies the schema to use for scraping.
+	// `http` and `https` are the expected values unless you rewrite the `__scheme__` label via relabeling.
+	// If empty, Prometheus uses the default value `http`.
+	//
+	// +kubebuilder:validation:default="http"
+	// +optional
+	Protocol PrometheusProtocol `json:"protocol,omitempty"`
+}
+
+type MonitorSource struct {
+	// Defines the kind of monitor, such as metrics or logs.
+	// +kubebuilder:validation:Required
+	SidecarKind MonitorKind `json:"kind"`
+
+	PrometheusConfig PrometheusConfig `json:"prometheusConfig,omitempty"`
+}
+
+type SidecarContainerSource struct {
+	// Defines the function or purpose of the container, such as the monitor type sidecar.
+	//
+	// +optional
+	Monitor *MonitorSource `json:"monitor,omitempty"`
+}
+
+type SidecarContainerSpec struct {
+	corev1.Container `json:",inline"`
+
+	// Define the function or purpose of the container, such as the monitor type sidecar.
+	// In order to allow prometheus to scrape metrics from the sidecar container, the schema, port, and url will be injected into the annotation of the service.
+	//
+	// +optional
+	SidecarContainerSources *SidecarContainerSource `json:",inline"`
+}
+
+
 // ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
 // has been replaced by ComponentDefinition.
 //
@@ -661,6 +709,18 @@ type ClusterComponentDefinition struct {
 	//
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
+
+	// Defines the sidecar containers that will be attached to the component's main container.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	// +optional
+	// +optional
+	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarSpecs,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {

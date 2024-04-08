@@ -1206,3 +1206,25 @@ type MultipleClusterObjectValueFormatFlatten struct {
 	// +required
 	KeyValueDelimiter string `json:"keyValueDelimiter"`
 }
+
+// PrometheusProtocol defines the protocol of prometheus scrape metrics.
+//
+// +enum
+// +kubebuilder:validation:Enum={http,https}
+type PrometheusProtocol string
+
+const (
+	HttpProtocol  = "http"
+	HttpsProtocol = "https"
+)
+
+// MonitorKind defines the kind of monitor.
+// +enum
+// +kubebuilder:validation:Enum={http,https}
+type MonitorKind string
+
+const (
+	MetricsKind = "metrics"
+	LogsKind    = "logs"
+	TracesKind  = "traces"
+)

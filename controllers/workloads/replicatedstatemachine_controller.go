@@ -227,9 +227,10 @@ func (r *ReplicatedStateMachineReconciler) setupWithMultiClusterManager(mgr ctrl
 	delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
 	ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
 	stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 	// pod owned by legacy StatefulSet
 	stsPodHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
+	// TODO: modify handler.getObjectFromKey to support running Job in data clusters
+	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 
 	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&workloads.ReplicatedStateMachine{}).
@@ -238,8 +239,8 @@ func (r *ReplicatedStateMachineReconciler) setupWithMultiClusterManager(mgr ctrl
 		})
 
 	multiClusterMgr.Watch(b, &appsv1.StatefulSet{}, stsHandler).
-		Watch(b, &batchv1.Job{}, jobHandler).
 		Watch(b, &corev1.Pod{}, stsPodHandler).
+		Watch(b, &batchv1.Job{}, jobHandler).
 		Own(b, &corev1.Pod{}, &workloads.ReplicatedStateMachine{}).
 		Own(b, &corev1.PersistentVolumeClaim{}, &workloads.ReplicatedStateMachine{})
 

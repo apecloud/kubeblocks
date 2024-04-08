@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 type FinderContext struct {
@@ -57,8 +56,7 @@ func getObjectFromKey(ctx *FinderContext, key *model.GVKNObjKey) client.Object {
 	if !ok {
 		return nil
 	}
-	// TODO(leon): optimize the lookup
-	if err = ctx.Reader.Get(ctx, key.ObjectKey, object, multicluster.InDataContextUnspecified()); err != nil {
+	if err = ctx.Reader.Get(ctx, key.ObjectKey, object); err != nil {
 		return nil
 	}
 	return object

@@ -68,7 +68,6 @@ func CurrentReplicaProvider(ctx context.Context, cli client.Reader, objectKey cl
 		}
 		return provider
 	}
-	// TODO(leon): should determine the provider through RSM object
 	sts := &appsv1.StatefulSet{}
 	switch err := cli.Get(ctx, objectKey, sts); {
 	case err == nil:

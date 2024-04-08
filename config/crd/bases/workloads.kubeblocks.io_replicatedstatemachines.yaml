@@ -3393,6 +3393,12 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              offlineInstances:
+                description: Specifies instances to be scaled in with dedicated names
+                  in the list.
+                items:
+                  type: string
+                type: array
               paused:
                 description: Indicates that the rsm is paused, meaning the reconciliation
                   of this rsm object will be paused.

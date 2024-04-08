@@ -2639,6 +2639,12 @@ spec:
                   level monitoring, which will scrape metrics auto or manually from
                   servers in component and export metrics to Time Series Database.
                 type: boolean
+              offlineInstances:
+                description: Specifies instances to be scaled in with dedicated names
+                  in the list.
+                items:
+                  type: string
+                type: array
               replicas:
                 default: 1
                 description: Specifies the desired number of replicas for the component's

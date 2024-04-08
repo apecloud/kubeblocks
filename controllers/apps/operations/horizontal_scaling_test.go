@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -33,7 +32,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -257,10 +255,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				}
 			}
 			Expect(targetSpec.Instances).Should(BeNil())
-			Expect(opsRes.Cluster.Annotations).Should(HaveKey(rsm2.OfflineInstancesAnnotationKey))
-			data, err := json.Marshal(offlineInstances)
-			Expect(err).Should(BeNil())
-			Expect(opsRes.Cluster.Annotations[rsm2.OfflineInstancesAnnotationKey]).Should(Equal(string(data)))
+			Expect(targetSpec.OfflineInstances).Should(HaveLen(1))
+			Expect(targetSpec.OfflineInstances).Should(Equal(offlineInstances))
 
 			By("mock specified pod (with ordinal 1) deleted")
 			pod := &podList[specifiedOrdinal]

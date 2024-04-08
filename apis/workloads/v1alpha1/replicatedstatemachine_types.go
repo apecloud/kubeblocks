@@ -159,6 +159,11 @@ type ReplicatedStateMachineSpec struct {
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
 
+	// Specifies instances to be scaled in with dedicated names in the list.
+	//
+	// +optional
+	OfflineInstances []string `json:"offlineInstances,omitempty"`
+
 	// Represents a list of claims that pods are allowed to reference.
 	// The ReplicatedStateMachine controller is responsible for mapping network identities to
 	// claims in a way that maintains the identity of a pod. Every claim in

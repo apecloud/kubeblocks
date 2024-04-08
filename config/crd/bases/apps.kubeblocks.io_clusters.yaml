@@ -2877,6 +2877,12 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    offlineInstances:
+                      description: Specifies instances to be scaled in with dedicated
+                        names in the list.
+                      items:
+                        type: string
+                      type: array
                     replicas:
                       default: 1
                       description: Specifies the number of component replicas.
@@ -6796,6 +6802,12 @@ spec:
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
+                        offlineInstances:
+                          description: Specifies instances to be scaled in with dedicated
+                            names in the list.
+                          items:
+                            type: string
+                          type: array
                         replicas:
                           default: 1
                           description: Specifies the number of component replicas.

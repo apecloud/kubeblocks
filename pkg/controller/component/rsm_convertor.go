@@ -49,6 +49,7 @@ func BuildRSMFrom(synthesizeComp *SynthesizedComponent, protoRSM *workloads.Repl
 		"podmanagementpolicy":       &rsmPodManagementPolicyConvertor{},
 		"updatestrategy":            &rsmUpdateStrategyConvertor{},
 		"instances":                 &rsmInstancesConvertor{},
+		"offlineinstances":          &rsmOfflineInstancesConvertor{},
 	}
 	if err := covertObject(convertors, &protoRSM.Spec, synthesizeComp); err != nil {
 		return nil, err
@@ -132,6 +133,20 @@ func (c *rsmInstancesConvertor) convert(args ...any) (any, error) {
 		instances = append(instances, *AppsInstanceToWorkloadInstance(&instance))
 	}
 	return instances, nil
+}
+
+// rsmOfflineInstancesConvertor converts component offlineInstances to rsm offlineInstances
+type rsmOfflineInstancesConvertor struct{}
+
+func (c *rsmOfflineInstancesConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseRSMConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var offlineInstances []string
+	offlineInstances = append(offlineInstances, synthesizedComp.OfflineInstances...)
+	return offlineInstances, nil
 }
 
 func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *workloads.InstanceTemplate {

@@ -2959,7 +2959,7 @@ spec:
                         type: object
                       type: array
                     offlineInstances:
-                      description: Specifies instances to be deleted with dedicated
+                      description: Specifies instances to be scaled in with dedicated
                         names in the list.
                       items:
                         type: string
@@ -6563,7 +6563,9 @@ spec:
                           type: object
                         offlineInstances:
                           description: Records the last offline instances of the component.
-                          type: string
+                          items:
+                            type: string
+                          type: array
                         opsName:
                           description: Indicates the opsRequest name.
                           type: string
@@ -9632,7 +9634,9 @@ spec:
                           type: object
                         offlineInstances:
                           description: Records the last offline instances of the component.
-                          type: string
+                          items:
+                            type: string
+                          type: array
                         replicas:
                           description: Represents the last replicas of the component.
                           format: int32

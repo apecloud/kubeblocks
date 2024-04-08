@@ -20,17 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"encoding/json"
-	"reflect"
 	"time"
 
-	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -71,48 +67,12 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 
 		instances := buildInstances(opsRes.Cluster.Spec.ComponentSpecs[index], horizontalScaling)
 		opsRes.Cluster.Spec.ComponentSpecs[index].Instances = instances
-
-		offlineInstances, err := buildOfflineInstances(opsRes.Cluster.Annotations, horizontalScaling)
-		if err != nil {
-			return err
+		if horizontalScaling.OfflineInstances != nil {
+			opsRes.Cluster.Spec.ComponentSpecs[index].OfflineInstances = horizontalScaling.OfflineInstances
 		}
-		if offlineInstances != nil {
-			rsm2.MergeMap(&map[string]string{rsm2.OfflineInstancesAnnotationKey: *offlineInstances}, &opsRes.Cluster.Annotations)
-		}
-
-		r := horizontalScaling.Replicas
-		opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
+		opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = horizontalScaling.Replicas
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
-}
-
-func buildOfflineInstances(annotations map[string]string, horizontalScaling appsv1alpha1.HorizontalScaling) (*string, error) {
-	// no need to override
-	if len(horizontalScaling.OfflineInstances) == 0 {
-		return nil, nil
-	}
-
-	offlineInstances, err := rsm2.ParseOfflineInstances(annotations)
-	if err != nil {
-		return nil, err
-	}
-
-	var newOfflineInstances []string
-	newOfflineInstances = append(newOfflineInstances, offlineInstances...)
-	for _, newInstance := range horizontalScaling.OfflineInstances {
-		if slices.IndexFunc(newOfflineInstances, func(i string) bool {
-			return i == newInstance
-		}) >= 0 {
-			continue
-		}
-		newOfflineInstances = append(newOfflineInstances, newInstance)
-	}
-	if reflect.DeepEqual(newOfflineInstances, offlineInstances) {
-		return nil, nil
-	}
-	data, err := json.Marshal(newOfflineInstances)
-	result := string(data)
-	return &result, err
 }
 
 func buildInstances(componentSpec appsv1alpha1.ClusterComponentSpec, horizontalScaling appsv1alpha1.HorizontalScaling) []appsv1alpha1.InstanceTemplate {
@@ -163,18 +123,17 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 		copyReplicas := v.Replicas
 		var (
 			copyInstances        *[]appsv1alpha1.InstanceTemplate
-			copyOfflineInstances *string
+			copyOfflineInstances *[]string
 		)
 		if len(v.Instances) > 0 {
 			var instances []appsv1alpha1.InstanceTemplate
 			instances = append(instances, v.Instances...)
 			copyInstances = &instances
 		}
-		if len(opsRes.Cluster.Annotations) > 0 {
-			offlineInstances, ok := opsRes.Cluster.Annotations[rsm2.OfflineInstancesAnnotationKey]
-			if ok {
-				copyOfflineInstances = &offlineInstances
-			}
+		if len(v.OfflineInstances) > 0 {
+			var offlineInstances []string
+			offlineInstances = append(offlineInstances, v.OfflineInstances...)
+			copyOfflineInstances = &offlineInstances
 		}
 		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
 			Replicas:         &copyReplicas,
@@ -247,12 +206,7 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 			comp.Instances = *lastConfig.Instances
 		}
 		if lastConfig.OfflineInstances != nil {
-			annotations := opsRes.Cluster.Annotations
-			if annotations == nil {
-				annotations = make(map[string]string)
-			}
-			annotations[rsm2.OfflineInstancesAnnotationKey] = *lastConfig.OfflineInstances
-			opsRes.Cluster.Annotations = annotations
+			comp.OfflineInstances = *lastConfig.OfflineInstances
 		}
 		return nil
 	})

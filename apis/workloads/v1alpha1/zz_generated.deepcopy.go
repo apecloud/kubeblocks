@@ -350,6 +350,11 @@ func (in *ReplicatedStateMachineSpec) DeepCopyInto(out *ReplicatedStateMachineSp
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.OfflineInstances != nil {
+		in, out := &in.OfflineInstances, &out.OfflineInstances
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.VolumeClaimTemplates != nil {
 		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
 		*out = make([]v1.PersistentVolumeClaim, len(*in))

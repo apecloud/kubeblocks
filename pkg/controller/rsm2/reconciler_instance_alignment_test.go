@@ -131,16 +131,4 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			}
 		})
 	})
-
-	Context("updateOfflineInstanceAnnotation", func() {
-		It("should work well", func() {
-			annotations := map[string]string{
-				OfflineInstancesAnnotationKey: "[\"bar-0\", \"bar-1\"]",
-			}
-			rsm.Annotations = annotations
-			Expect(updateOfflineInstanceAnnotation(rsm, "bar-1")).Should(Succeed())
-			Expect(rsm.Annotations).Should(HaveKey(OfflineInstancesAnnotationKey))
-			Expect(rsm.Annotations[OfflineInstancesAnnotationKey]).Should(Equal("[\"bar-0\"]"))
-		})
-	})
 })

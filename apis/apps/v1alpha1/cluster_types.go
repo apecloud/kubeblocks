@@ -614,6 +614,11 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
+
+	// Specifies instances to be scaled in with dedicated names in the list.
+	//
+	// +optional
+	OfflineInstances []string `json:"offlineInstances,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

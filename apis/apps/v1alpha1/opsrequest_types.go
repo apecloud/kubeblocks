@@ -287,7 +287,7 @@ type HorizontalScaling struct {
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
 
-	// Specifies instances to be deleted with dedicated names in the list.
+	// Specifies instances to be scaled in with dedicated names in the list.
 	//
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
@@ -833,7 +833,7 @@ type LastComponentConfiguration struct {
 
 	// Records the last offline instances of the component.
 	// +optional
-	OfflineInstances *string `json:"offlineInstances,omitempty"`
+	OfflineInstances *[]string `json:"offlineInstances,omitempty"`
 }
 
 type LastConfiguration struct {

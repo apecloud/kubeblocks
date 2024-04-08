@@ -989,6 +989,18 @@ TLSConfig
 <p>Overrides values in default Template.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -4654,6 +4666,18 @@ It is important to ensure that the Name of each InstanceTemplate is unique.</p>
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">ClusterComponentStatus
@@ -8268,6 +8292,18 @@ TLSConfig
 <p>Overrides values in default Template.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentStatus">ComponentStatus
@@ -11095,7 +11131,7 @@ Or the InstanceTemplate will be added as a new one.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies instances to be deleted with dedicated names in the list.</p>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
 </td>
 </tr>
 </tbody>
@@ -20879,6 +20915,18 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeClaimTemplates</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
@@ -21792,6 +21840,18 @@ By default, the ordinal starts from 0 for each InstanceTemplate.
 It is important to ensure that the Name of each InstanceTemplate is unique.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the RSM.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
 </td>
 </tr>
 <tr>

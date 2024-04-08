@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
-	"encoding/json"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -165,40 +163,12 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err := tree.Delete(pod); err != nil {
 			return nil, err
 		}
-		if err := updateOfflineInstanceAnnotation(rsm, pod.Name); err != nil {
-			return nil, err
-		}
 		// TODO(free6om): handle pvc management policy
 		// Retain by default.
 		deleteCount--
 	}
 
 	return tree, nil
-}
-
-func updateOfflineInstanceAnnotation(rsm *workloads.ReplicatedStateMachine, name string) error {
-	offlineInstances, err := ParseOfflineInstances(rsm.Annotations)
-	if err != nil {
-		return err
-	}
-	if len(offlineInstances) == 0 {
-		return nil
-	}
-	for i, instance := range offlineInstances {
-		if instance == name {
-			offlineInstances = append(offlineInstances[:i], offlineInstances[i+1:]...)
-			break
-		}
-	}
-	if len(offlineInstances) == 0 {
-		return nil
-	}
-	offlineInstancesByte, err := json.Marshal(offlineInstances)
-	if err != nil {
-		return err
-	}
-	rsm.Annotations[OfflineInstancesAnnotationKey] = string(offlineInstancesByte)
-	return nil
 }
 
 var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}

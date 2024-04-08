@@ -21,11 +21,14 @@ package apps
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -201,5 +204,50 @@ func (r *varsReader) Get(ctx context.Context, key client.ObjectKey, obj client.O
 }
 
 func (r *varsReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	return r.cli.List(ctx, list, opts...)
+	items := reflect.ValueOf(list).Elem().FieldByName("Items")
+	if !items.IsValid() {
+		return fmt.Errorf("ObjectList has no Items field: %s", list.GetObjectKind().GroupVersionKind().String())
+	}
+
+	if err := r.cli.List(ctx, list, opts...); err != nil {
+		return err
+	}
+
+	objects := r.listFromGraph(items.Type(), opts...)
+
+	// remove duplicated items
+	names := sets.New[string]()
+	for i := 0; i < objects.Len(); i++ {
+		names.Insert(objects.Index(i).FieldByName("Name").String())
+	}
+	for i := 0; i < items.Len(); i++ {
+		obj := items.Index(i)
+		name := obj.FieldByName("Name").String()
+		if !names.Has(name) {
+			names.Insert(name)
+			objects = reflect.Append(objects, obj)
+		}
+	}
+	items.Set(objects)
+	return nil
+}
+
+func (r *varsReader) listFromGraph(objectListType reflect.Type, opts ...client.ListOption) reflect.Value {
+	objects := reflect.MakeSlice(objectListType, 0, 0)
+	graphObjs := r.graphCli.FindAll(r.dag, reflect.New(objectListType.Elem()).Interface())
+	if len(graphObjs) > 0 {
+		listOpts := &client.ListOptions{}
+		for _, opt := range opts {
+			opt.ApplyToList(listOpts)
+		}
+		for i, obj := range graphObjs {
+			if listOpts.LabelSelector != nil {
+				if !listOpts.LabelSelector.Matches(labels.Set(obj.GetLabels())) {
+					continue
+				}
+			}
+			objects = reflect.Append(objects, reflect.ValueOf(graphObjs[i]).Elem())
+		}
+	}
+	return objects
 }

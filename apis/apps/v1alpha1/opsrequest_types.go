@@ -278,6 +278,19 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
+
+	// Specifies instances to be added and/or deleted for the workloads.
+	// Name and Replicas should be provided. Other fields will simply be ignored.
+	// The Replicas will be overridden if an existing InstanceTemplate is matched by Name.
+	// Or the InstanceTemplate will be added as a new one.
+	//
+	// +optional
+	Instances []InstanceTemplate `json:"instances,omitempty"`
+
+	// Specifies instances to be scaled in with dedicated names in the list.
+	//
+	// +optional
+	OfflineInstances []string `json:"offlineInstances,omitempty"`
 }
 
 // Reconfigure represents the variables required for updating a configuration.
@@ -813,6 +826,14 @@ type LastComponentConfiguration struct {
 	// The resource key is in the list of [pods].
 	// +optional
 	TargetResources map[ComponentResourceKey][]string `json:"targetResources,omitempty"`
+
+	// Records the last instances of the component.
+	// +optional
+	Instances *[]InstanceTemplate `json:"instances,omitempty"`
+
+	// Records the last offline instances of the component.
+	// +optional
+	OfflineInstances *[]string `json:"offlineInstances,omitempty"`
 }
 
 type LastConfiguration struct {

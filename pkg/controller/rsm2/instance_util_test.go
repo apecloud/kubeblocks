@@ -37,7 +37,7 @@ import (
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-var _ = Describe("replica util test", func() {
+var _ = Describe("instance util test", func() {
 	BeforeEach(func() {
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 			SetService(&corev1.Service{}).
@@ -99,25 +99,27 @@ var _ = Describe("replica util test", func() {
 		})
 	})
 
-	Context("validateDupReplicaNames", func() {
+	Context("ValidateDupInstanceNames", func() {
 		It("should work well", func() {
 			By("build name list without duplication")
 			replicas := []string{"pod-0", "pod-1"}
-			Expect(validateDupReplicaNames(replicas, func(item string) string {
+			Expect(ValidateDupInstanceNames(replicas, func(item string) string {
 				return item
 			})).Should(Succeed())
 
 			By("add a duplicate name")
 			replicas = append(replicas, "pod-0")
-			Expect(validateDupReplicaNames(replicas, func(item string) string {
+			Expect(ValidateDupInstanceNames(replicas, func(item string) string {
 				return item
 			})).ShouldNot(Succeed())
 		})
 	})
 
-	Context("buildReplicaName2TemplateMap", func() {
+	Context("buildInstanceName2TemplateMap", func() {
 		It("build a rsm with default template only", func() {
-			nameTemplate, err := buildReplicaName2TemplateMap(rsm, nil)
+			rsmExt, err := buildRSMExt(rsm, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := buildInstanceName2TemplateMap(rsmExt)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name0 := rsm.Name + "-0"
@@ -131,7 +133,8 @@ var _ = Describe("replica util test", func() {
 		})
 
 		It("build a rsm with one instance template override", func() {
-			nameOverride0 := "name-o-0"
+			nameOverride := "name-override"
+			nameOverride0 := rsm.Name + "-" + nameOverride + "-0"
 			annotationOverride := map[string]string{
 				"foo": "bar",
 			}
@@ -140,13 +143,15 @@ var _ = Describe("replica util test", func() {
 			}
 			imageOverride := "foo:latest"
 			instance := workloads.InstanceTemplate{
-				Name:        &nameOverride0,
+				Name:        nameOverride,
 				Annotations: annotationOverride,
 				Labels:      labelOverride,
 				Image:       &imageOverride,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instance)
-			nameTemplate, err := buildReplicaName2TemplateMap(rsm, nil)
+			rsmExt, err := buildRSMExt(rsm, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := buildInstanceName2TemplateMap(rsmExt)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name0 := rsm.Name + "-0"
@@ -165,15 +170,17 @@ var _ = Describe("replica util test", func() {
 		})
 	})
 
-	Context("buildReplicaByTemplate", func() {
+	Context("buildInstanceByTemplate", func() {
 		It("should work well", func() {
-			nameTemplate, err := buildReplicaName2TemplateMap(rsm, nil)
+			rsmExt, err := buildRSMExt(rsm, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := buildInstanceName2TemplateMap(rsmExt)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
 			template := nameTemplate[name]
-			replica, err := buildReplicaByTemplate(name, template, rsm)
+			replica, err := buildInstanceByTemplate(name, template, rsm)
 			Expect(err).Should(BeNil())
 			Expect(replica.pod).ShouldNot(BeNil())
 			Expect(replica.pvcs).ShouldNot(BeNil())
@@ -201,29 +208,16 @@ var _ = Describe("replica util test", func() {
 			By("a valid spec")
 			Expect(validateSpec(rsm, nil)).Should(Succeed())
 
-			By("instance.replicas exceeds 1 when name set")
-			rsm1 := rsm.DeepCopy()
-			name := "name-override-0"
-			replicas := int32(2)
-			instance := workloads.InstanceTemplate{
-				Name:     &name,
-				Replicas: &replicas,
-			}
-			rsm1.Spec.Instances = append(rsm1.Spec.Instances, instance)
-			err := validateSpec(rsm1, nil)
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("replicas should be empty or no more than 1 if name set"))
-
 			By("sum of replicas in instance exceeds spec.replicas")
 			rsm2 := rsm.DeepCopy()
-			replicas = 4
-			generateName := "barrrrr"
-			instance = workloads.InstanceTemplate{
-				Replicas:     &replicas,
-				GenerateName: &generateName,
+			replicas := int32(4)
+			name := "barrrrr"
+			instance := workloads.InstanceTemplate{
+				Name:     name,
+				Replicas: &replicas,
 			}
 			rsm2.Spec.Instances = append(rsm2.Spec.Instances, instance)
-			err = validateSpec(rsm2, nil)
+			err := validateSpec(rsm2, nil)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("should not greater than replicas in spec"))
 		})
@@ -349,12 +343,12 @@ var _ = Describe("replica util test", func() {
 			Expect(err).Should(BeNil())
 			instances := []workloads.InstanceTemplate{
 				{
-					Replicas:     func() *int32 { r := int32(2); return &r }(),
-					GenerateName: func() *string { n := "hello"; return &n }(),
+					Name:     "hello",
+					Replicas: func() *int32 { r := int32(2); return &r }(),
 				},
 				{
+					Name:     "world",
 					Replicas: func() *int32 { r := int32(1); return &r }(),
-					Name:     func() *string { n := "world"; return &n }(),
 				},
 			}
 			rsm := builder.NewReplicatedStateMachineBuilder(namespace, name).
@@ -366,20 +360,52 @@ var _ = Describe("replica util test", func() {
 			Expect(tree.Add(templateObj)).Should(Succeed())
 
 			By("parse instance templates")
-			instanceTemplates := getInstanceTemplates(rsm, tree)
+			template, err := findTemplateObject(rsm, tree)
+			Expect(err).Should(BeNil())
+			instanceTemplates := getInstanceTemplates(rsm.Spec.Instances, template)
 			// append templates from mock function
 			instances = append(instances, []workloads.InstanceTemplate{
 				{
-					Replicas:     func() *int32 { r := int32(2); return &r }(),
-					GenerateName: func() *string { n := "foo"; return &n }(),
+					Name:     "foo",
+					Replicas: func() *int32 { r := int32(2); return &r }(),
 				},
 				{
+					Name:     "bar0",
 					Replicas: func() *int32 { r := int32(1); return &r }(),
-					Name:     func() *string { n := "bar-0-1"; return &n }(),
 					Image:    func() *string { i := "busybox"; return &i }(),
 				},
 			}...)
 			Expect(instanceTemplates).Should(Equal(instances))
+		})
+	})
+
+	Context("GenerateInstanceNamesFromTemplate", func() {
+		It("should work well", func() {
+			parentName := "foo"
+			templateName := "bar"
+			templates := []*instanceTemplateExt{
+				{
+					Name:     "",
+					Replicas: 2,
+				},
+				{
+					Replicas: 2,
+					Name:     templateName,
+				},
+			}
+			offlineInstances := []string{"foo-bar-1", "foo-0"}
+
+			var instanceNameList []string
+			for _, template := range templates {
+				instanceNames := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, offlineInstances)
+				instanceNameList = append(instanceNameList, instanceNames...)
+			}
+			getNameNOrdinalFunc := func(i int) (string, int) {
+				return ParseParentNameAndOrdinal(instanceNameList[i])
+			}
+			BaseSort(instanceNameList, getNameNOrdinalFunc, nil, false)
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
 	})
 })

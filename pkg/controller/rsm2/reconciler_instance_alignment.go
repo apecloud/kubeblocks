@@ -29,18 +29,18 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// replicasAlignmentReconciler is responsible for aligning the actual replicas(i.e. number of pods) with the desired replicas specified in the spec,
+// instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
 // including horizontal scaling and recovering from unintended pod deletions etc.
-// only handle replica count, don't care replica revision.
+// only handle instance count, don't care instance revision.
 //
 // TODO(free6om): support membership reconfiguration
-type replicasAlignmentReconciler struct{}
+type instanceAlignmentReconciler struct{}
 
 func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
-	return &replicasAlignmentReconciler{}
+	return &instanceAlignmentReconciler{}
 }
 
-func (r *replicasAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
@@ -54,10 +54,15 @@ func (r *replicasAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 	return kubebuilderx.ResultSatisfied
 }
 
-func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
+	rsmExt, err := buildRSMExt(rsm, tree)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1. build desired name to template map
-	nameToTemplateMap, err := buildReplicaName2TemplateMap(rsm, tree)
+	nameToTemplateMap, err := buildInstanceName2TemplateMap(rsmExt)
 	if err != nil {
 		return nil, err
 	}
@@ -68,12 +73,12 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		newNameSet.Insert(name)
 	}
 	oldNameSet := sets.NewString()
-	oldReplicaMap := make(map[string]*corev1.Pod)
-	oldReplicaList := tree.List(&corev1.Pod{})
-	for _, object := range oldReplicaList {
+	oldInstanceMap := make(map[string]*corev1.Pod)
+	oldInstanceList := tree.List(&corev1.Pod{})
+	for _, object := range oldInstanceList {
 		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)
-		oldReplicaMap[object.GetName()] = pod
+		oldInstanceMap[object.GetName()] = pod
 	}
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
@@ -88,17 +93,17 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 	// TODO(free6om): handle BestEffortParallel: always keep the majority available.
 
-	// 3. handle alignment (create new replicas and delete useless replicas)
-	// create new replicas
+	// 3. handle alignment (create new instances and delete useless instances)
+	// create new instances
 	newNameList := newNameSet.List()
-	baseSort(newNameList, func(i int) (string, int) {
-		return parseParentNameAndOrdinal(newNameList[i])
+	BaseSort(newNameList, func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(newNameList[i])
 	}, nil, false)
 	getPredecessor := func(i int) *corev1.Pod {
 		if i <= 0 {
 			return nil
 		}
-		return oldReplicaMap[newNameList[i-1]]
+		return oldInstanceMap[newNameList[i-1]]
 	}
 	for i, name := range newNameList {
 		if _, ok := createNameSet[name]; !ok {
@@ -111,14 +116,14 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if shouldReady && predecessor != nil && !isHealthy(predecessor) {
 			break
 		}
-		replica, err := buildReplicaByTemplate(name, nameToTemplateMap[name], rsm)
+		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], rsm)
 		if err != nil {
 			return nil, err
 		}
-		if err := tree.Add(replica.pod); err != nil {
+		if err := tree.Add(inst.pod); err != nil {
 			return nil, err
 		}
-		for _, pvc := range replica.pvcs {
+		for _, pvc := range inst.pvcs {
 			switch oldPvc, err := tree.Get(pvc); {
 			case err != nil:
 				return nil, err
@@ -138,10 +143,10 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		createCount--
 	}
 
-	// delete useless replicas
+	// delete useless instances
 	priorities := make(map[string]int)
-	sortObjects(oldReplicaList, priorities, true)
-	for _, object := range oldReplicaList {
+	sortObjects(oldInstanceList, priorities, true)
+	for _, object := range oldInstanceList {
 		pod, _ := object.(*corev1.Pod)
 		if _, ok := deleteNameSet[pod.Name]; !ok {
 			continue
@@ -166,4 +171,4 @@ func (r *replicasAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	return tree, nil
 }
 
-var _ kubebuilderx.Reconciler = &replicasAlignmentReconciler{}
+var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}

@@ -56,20 +56,19 @@ var _ = Describe("status reconciler test", func() {
 			tree.SetRoot(rsm)
 
 			By("prepare current tree")
-			// desired: bar-0, bar-1, bar-2, bar-3, foo-0, foo-1, hello
 			replicas := int32(7)
 			rsm.Spec.Replicas = &replicas
 			rsm.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			nameHello := "hello"
 			instanceHello := workloads.InstanceTemplate{
-				Name: &nameHello,
+				Name: nameHello,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceHello)
 			generateNameFoo := "foo"
 			replicasFoo := int32(2)
 			instanceFoo := workloads.InstanceTemplate{
-				GenerateName: &generateNameFoo,
-				Replicas:     &replicasFoo,
+				Name:     generateNameFoo,
+				Replicas: &replicasFoo,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceFoo)
 

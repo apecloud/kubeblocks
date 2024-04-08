@@ -71,7 +71,7 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("Test the functions in ops_util.go")
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1, nil)
 			Expect(patchValidateErrorCondition(ctx, k8sClient, opsRes, "validate error")).Should(Succeed())
 			Expect(PatchOpsHandlerNotSupported(ctx, k8sClient, opsRes)).Should(Succeed())
 			Expect(isOpsRequestFailedPhase(appsv1alpha1.OpsFailedPhase)).Should(BeTrue())
@@ -83,7 +83,7 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("Test the functions in ops_util.go")
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1, nil)
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 
 			By("mock component failed")
@@ -113,7 +113,7 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			runHscaleOps := func(expectPhase appsv1alpha1.OpsPhase) *appsv1alpha1.OpsRequest {
-				ops := createHorizontalScaling(clusterName, 1)
+				ops := createHorizontalScaling(clusterName, 1, nil)
 				opsRes.OpsRequest = ops
 				_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 				Expect(err).ShouldNot(HaveOccurred())

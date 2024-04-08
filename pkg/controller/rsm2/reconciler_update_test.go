@@ -61,20 +61,20 @@ var _ = Describe("update reconciler test", func() {
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
 			By("prepare current tree")
-			// desired: bar-0, bar-1, bar-2, bar-3, foo-0, foo-1, hello
+			// desired: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
 			replicas := int32(7)
 			rsm.Spec.Replicas = &replicas
 			rsm.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			nameHello := "hello"
 			instanceHello := workloads.InstanceTemplate{
-				Name: &nameHello,
+				Name: nameHello,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceHello)
 			generateNameFoo := "foo"
 			replicasFoo := int32(2)
 			instanceFoo := workloads.InstanceTemplate{
-				GenerateName: &generateNameFoo,
-				Replicas:     &replicasFoo,
+				Name:     generateNameFoo,
+				Replicas: &replicasFoo,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceFoo)
 
@@ -138,7 +138,7 @@ var _ = Describe("update reconciler test", func() {
 			reconciler = NewUpdateReconciler()
 
 			By("reconcile with default UpdateStrategy(RollingUpdate, no partition, MaxUnavailable=1)")
-			// order: bar-0, bar-1, bar-2, bar-3, foo-0, foo-1, hello
+			// order: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
 			// expected: bar-0 being deleted
 			defaultTree, err := newTree.DeepCopy()
 			Expect(err).Should(BeNil())
@@ -159,7 +159,7 @@ var _ = Describe("update reconciler test", func() {
 					MaxUnavailable: &maxUnavailable,
 				},
 			}
-			// order: bar-0, bar-1, bar-2, bar-3, foo-0, foo-1, hello
+			// order: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
 			// expected: bar-0, bar-1 being deleted
 			_, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())

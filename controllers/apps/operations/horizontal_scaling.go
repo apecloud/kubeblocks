@@ -64,10 +64,36 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		if horizontalScaling, ok = horizontalScalingMap[component.Name]; !ok {
 			continue
 		}
-		r := horizontalScaling.Replicas
-		opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
+
+		instances := buildInstances(opsRes.Cluster.Spec.ComponentSpecs[index], horizontalScaling)
+		opsRes.Cluster.Spec.ComponentSpecs[index].Instances = instances
+		if horizontalScaling.OfflineInstances != nil {
+			opsRes.Cluster.Spec.ComponentSpecs[index].OfflineInstances = horizontalScaling.OfflineInstances
+		}
+		opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = horizontalScaling.Replicas
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
+}
+
+func buildInstances(componentSpec appsv1alpha1.ClusterComponentSpec, horizontalScaling appsv1alpha1.HorizontalScaling) []appsv1alpha1.InstanceTemplate {
+	if componentSpec.Instances == nil && horizontalScaling.Instances == nil {
+		return nil
+	}
+	templates := componentSpec.Instances
+	for _, instance := range horizontalScaling.Instances {
+		found := false
+		for i := range templates {
+			if templates[i].Name != instance.Name {
+				continue
+			}
+			templates[i].Replicas = instance.Replicas
+			found = true
+		}
+		if !found {
+			templates = append(templates, instance)
+		}
+	}
+	return templates
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -95,8 +121,24 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 			continue
 		}
 		copyReplicas := v.Replicas
+		var (
+			copyInstances        *[]appsv1alpha1.InstanceTemplate
+			copyOfflineInstances *[]string
+		)
+		if len(v.Instances) > 0 {
+			var instances []appsv1alpha1.InstanceTemplate
+			instances = append(instances, v.Instances...)
+			copyInstances = &instances
+		}
+		if len(v.OfflineInstances) > 0 {
+			var offlineInstances []string
+			offlineInstances = append(offlineInstances, v.OfflineInstances...)
+			copyOfflineInstances = &offlineInstances
+		}
 		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
-			Replicas: &copyReplicas,
+			Replicas:         &copyReplicas,
+			Instances:        copyInstances,
+			OfflineInstances: copyOfflineInstances,
 		}
 		if hsInfo.Replicas < copyReplicas {
 			podNames, err := getCompPodNamesBeforeScaleDownReplicas(reqCtx, cli, *opsRes.Cluster, v.Name)
@@ -160,6 +202,12 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 		}
 		lastConfig.TargetResources[appsv1alpha1.PodsCompResourceKey] = podNames
 		comp.Replicas = *lastConfig.Replicas
+		if lastConfig.Instances != nil {
+			comp.Instances = *lastConfig.Instances
+		}
+		if lastConfig.OfflineInstances != nil {
+			comp.OfflineInstances = *lastConfig.OfflineInstances
+		}
 		return nil
 	})
 }

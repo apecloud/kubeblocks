@@ -49,6 +49,7 @@ func BuildRSMFrom(synthesizeComp *SynthesizedComponent, protoRSM *workloads.Repl
 		"podmanagementpolicy":       &rsmPodManagementPolicyConvertor{},
 		"updatestrategy":            &rsmUpdateStrategyConvertor{},
 		"instances":                 &rsmInstancesConvertor{},
+		"offlineinstances":          &rsmOfflineInstancesConvertor{},
 	}
 	if err := covertObject(convertors, &protoRSM.Spec, synthesizeComp); err != nil {
 		return nil, err
@@ -127,31 +128,46 @@ func (c *rsmInstancesConvertor) convert(args ...any) (any, error) {
 		return nil, err
 	}
 
-	componentInstanceToRSMInstance := func(instance *appsv1alpha1.InstanceTemplate) *workloads.InstanceTemplate {
-		if instance == nil {
-			return nil
-		}
-		return &workloads.InstanceTemplate{
-			Replicas:             instance.Replicas,
-			Name:                 instance.Name,
-			GenerateName:         instance.GenerateName,
-			Annotations:          instance.Annotations,
-			Labels:               instance.Labels,
-			Image:                instance.Image,
-			NodeName:             instance.NodeName,
-			NodeSelector:         instance.NodeSelector,
-			Tolerations:          instance.Tolerations,
-			Resources:            instance.Resources,
-			Volumes:              instance.Volumes,
-			VolumeMounts:         instance.VolumeMounts,
-			VolumeClaimTemplates: instance.VolumeClaimTemplates,
-		}
-	}
 	var instances []workloads.InstanceTemplate
 	for _, instance := range synthesizedComp.Instances {
-		instances = append(instances, *componentInstanceToRSMInstance(&instance))
+		instances = append(instances, *AppsInstanceToWorkloadInstance(&instance))
 	}
 	return instances, nil
+}
+
+// rsmOfflineInstancesConvertor converts component offlineInstances to rsm offlineInstances
+type rsmOfflineInstancesConvertor struct{}
+
+func (c *rsmOfflineInstancesConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseRSMConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var offlineInstances []string
+	offlineInstances = append(offlineInstances, synthesizedComp.OfflineInstances...)
+	return offlineInstances, nil
+}
+
+func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *workloads.InstanceTemplate {
+	if instance == nil {
+		return nil
+	}
+	return &workloads.InstanceTemplate{
+		Name:                 instance.Name,
+		Replicas:             instance.Replicas,
+		Annotations:          instance.Annotations,
+		Labels:               instance.Labels,
+		Image:                instance.Image,
+		NodeName:             instance.NodeName,
+		NodeSelector:         instance.NodeSelector,
+		Tolerations:          instance.Tolerations,
+		Resources:            instance.Resources,
+		Env:                  instance.Env,
+		Volumes:              instance.Volumes,
+		VolumeMounts:         instance.VolumeMounts,
+		VolumeClaimTemplates: instance.VolumeClaimTemplates,
+	}
 }
 
 // parseRSMConvertorArgs parses the args of rsm convertor.

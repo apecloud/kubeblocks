@@ -27,13 +27,17 @@ const (
 )
 
 const (
-	// FeatureGateRSMReplicaProvider determines the replica provider for the RSM controller.
-	// A replica provider is responsible for managing the underlying API resources required for the smooth operation of the RSM.
-	// The currently supported replica providers are StatefulSet and Pod.
-	// Planned supported replica providers include OpenKruise Advanced StatefulSet and KB Replica.
+	// FeatureGateRSMReplicaProvider determines the instance provider for the RSM controller.
+	// A instance provider is responsible for managing the underlying API resources required for the smooth operation of the RSM.
+	// The currently supported instance providers are StatefulSet and Pod.
+	// Planned supported instance providers include OpenKruise Advanced StatefulSet and KB Replica.
 	FeatureGateRSMReplicaProvider = "RSM_REPLICA_PROVIDER"
 
 	defaultReplicaProvider = PodProvider
+
+	// MaxPlainRevisionCount specified max number of plain revision stored in rsm.status.updateRevisions.
+	// All revisions will be compressed if exceeding this value.
+	MaxPlainRevisionCount = "MAX_PLAIN_REVISION_COUNT"
 
 	templateRefAnnotationKey = "kubeblocks.io/template-ref"
 	templateRefDataKey       = "instances"

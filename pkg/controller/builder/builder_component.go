@@ -147,3 +147,8 @@ func (builder *ComponentBuilder) SetInstances(instances []appsv1alpha1.InstanceT
 	builder.get().Spec.Instances = instances
 	return builder
 }
+
+func (builder *ComponentBuilder) SetOfflineInstances(offlineInstances []string) *ComponentBuilder {
+	builder.get().Spec.OfflineInstances = offlineInstances
+	return builder
+}

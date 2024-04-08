@@ -22,8 +22,8 @@ package rsm2
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -54,23 +54,23 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
 			By("prepare current tree")
-			// desired: hello, foo-0, foo-1, bar-0, bar-1, bar-2, bar-3
-			// current: foo-0, bar-1
+			// desired: bar-hello-0, bar-foo-0, bar-foo-1, bar-0, bar-1, bar-2, bar-3
+			// current: bar-foo-0, bar-1
 			replicas := int32(7)
 			rsm.Spec.Replicas = &replicas
 			nameHello := "hello"
 			instanceHello := workloads.InstanceTemplate{
-				Name: &nameHello,
+				Name: nameHello,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceHello)
-			generateNameFoo := "foo"
+			nameFoo := "foo"
 			replicasFoo := int32(2)
 			instanceFoo := workloads.InstanceTemplate{
-				GenerateName: &generateNameFoo,
-				Replicas:     &replicasFoo,
+				Name:     nameFoo,
+				Replicas: &replicasFoo,
 			}
 			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceFoo)
-			podFoo0 := builder.NewPodBuilder(namespace, "foo-0").GetObject()
+			podFoo0 := builder.NewPodBuilder(namespace, rsm.Name+"-foo-0").GetObject()
 			podBar1 := builder.NewPodBuilder(namespace, "bar-1").GetObject()
 			Expect(tree.Add(podFoo0, podBar1)).Should(Succeed())
 
@@ -84,7 +84,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(err).Should(BeNil())
 			newTree, err := reconciler.Reconcile(orderedReadyTree)
 			Expect(err).Should(BeNil())
-			// desired: bar-0, bar-1, foo-0
+			// desired: bar-0, bar-1, bar-foo-0
 			pods := newTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(3))
 			currentPodSnapshot := make(model.ObjectSnapshot)
@@ -109,7 +109,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			parallelRsm.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			newTree, err = reconciler.Reconcile(parallelTree)
 			Expect(err).Should(BeNil())
-			// desired: hello, foo-0, foo-1, bar-0, bar-1, bar-2, bar-3
+			// desired: bar-hello-0, bar-foo-0, bar-foo-1, bar-0, bar-1, bar-2, bar-3
 			pods = newTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(7))
 			currentPodSnapshot = make(model.ObjectSnapshot)
@@ -119,8 +119,8 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				currentPodSnapshot[*name] = object
 			}
 
-			podHello := builder.NewPodBuilder(namespace, "hello").GetObject()
-			podFoo1 := builder.NewPodBuilder(namespace, "foo-1").GetObject()
+			podHello := builder.NewPodBuilder(namespace, rsm.Name+"-hello-0").GetObject()
+			podFoo1 := builder.NewPodBuilder(namespace, rsm.Name+"-foo-1").GetObject()
 			podBar2 := builder.NewPodBuilder(namespace, "bar-2").GetObject()
 			podBar3 := builder.NewPodBuilder(namespace, "bar-3").GetObject()
 			for _, object := range []client.Object{podHello, podFoo0, podFoo1, podBar0, podBar1, podBar2, podBar3} {

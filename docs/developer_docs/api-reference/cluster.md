@@ -989,6 +989,18 @@ TLSConfig
 <p>Overrides values in default Template.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -4646,6 +4658,24 @@ A component manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the component to manage instances from different templates.</p>
+<p>The naming convention for instances (pods) based on the Component Name, InstanceTemplate Name, and ordinal.
+The constructed instance name follows the pattern: $(component.name)-$(template.name)-$(ordinal).
+By default, the ordinal starts from 0 for each InstanceTemplate.
+It is important to ensure that the Name of each InstanceTemplate is unique.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the Component.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
 </td>
 </tr>
 </tbody>
@@ -8283,6 +8313,18 @@ TLSConfig
 <p>Overrides values in default Template.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentStatus">ComponentStatus
@@ -11084,6 +11126,35 @@ int32
 <p>Specifies the number of replicas for the workloads.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be added and/or deleted for the workloads.
+Name and Replicas should be provided. Other fields will simply be ignored.
+The Replicas will be overridden if an existing InstanceTemplate is matched by Name.
+Or the InstanceTemplate will be added as a new one.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HostNetwork">HostNetwork
@@ -11201,7 +11272,7 @@ If not set, it will rebuild on a random node.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>)
 </p>
 <div>
 <p>InstanceTemplate defines values to override in pod template.</p>
@@ -11216,6 +11287,20 @@ If not set, it will rebuild on a random node.</p>
 <tbody>
 <tr>
 <td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the template.
+Each instance of the template derives its name from the Component&rsquo;s Name, the template&rsquo;s Name and the instance&rsquo;s ordinal.
+The constructed instance name follows the pattern $(component.name)-$(template.name)-$(ordinal).
+The ordinal starts from 0 by default.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -11225,38 +11310,6 @@ int32
 <em>(Optional)</em>
 <p>Number of replicas of this template.
 Default is 1.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the name of the instance.
-Only applied when Replicas is 1.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>generateName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>GenerateName is an optional prefix, used by the server, to generate a unique
-name ONLY IF the Name field has not been provided.
-If this field is used, the name returned to the client will be different
-than the name passed. This value will also be combined with a unique suffix.
-The provided value has the same validation rules as the Name field,
-and may be truncated by the length of the suffix required to make the value
-unique on the server.</p>
-<p>Applied only if Name is not specified.</p>
 </td>
 </tr>
 <tr>
@@ -11350,6 +11403,21 @@ Kubernetes core/v1.ResourceRequirements
 <em>(Optional)</em>
 <p>Defines Resources to override.
 Will override the first container&rsquo;s resources of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Env to override.
+Add new or override existing envs.</p>
 </td>
 </tr>
 <tr>
@@ -11631,6 +11699,32 @@ map[github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ComponentResourceKey][]str
 <em>(Optional)</em>
 <p>Records the information about the target resources affected by the component.
 The resource key is in the list of [pods].</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
+InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the last instances of the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the last offline instances of the component.</p>
 </td>
 </tr>
 </tbody>
@@ -20832,6 +20926,24 @@ A RSM manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the RSM to manage instances from different templates.</p>
+<p>The naming convention for instances (pods) based on the RSM Name, InstanceTemplate Name, and ordinal.
+The constructed instance name follows the pattern: $(rsm.name)-$(template.name)-$(ordinal).
+By default, the ordinal starts from 0 for each InstanceTemplate.
+It is important to ensure that the Name of each InstanceTemplate is unique.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the RSM.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
 </td>
 </tr>
 <tr>
@@ -21178,6 +21290,20 @@ Kubernetes core/v1.EnvVarSource
 <tbody>
 <tr>
 <td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the template.
+Each instance of the template derives its name from the RSM&rsquo;s Name, the template&rsquo;s Name and the instance&rsquo;s ordinal.
+The constructed instance name follows the pattern $(rsm.name)-$(template.name)-$(ordinal).
+The ordinal starts from 0 by default.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -21187,38 +21313,6 @@ int32
 <em>(Optional)</em>
 <p>Number of replicas of this template.
 Default is 1.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the name of the instance.
-Only applied when Replicas is 1.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>generateName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>GenerateName is an optional prefix, used by the server, to generate a unique
-name ONLY IF the Name field has not been provided.
-If this field is used, the name returned to the client will be different
-than the name passed. This value will also be combined with a unique suffix.
-The provided value has the same validation rules as the Name field,
-and may be truncated by the length of the suffix required to make the value
-unique on the server.</p>
-<p>Applied only if Name is not specified.</p>
 </td>
 </tr>
 <tr>
@@ -21312,6 +21406,21 @@ Kubernetes core/v1.ResourceRequirements
 <em>(Optional)</em>
 <p>Defines Resources to override.
 Will override the first container&rsquo;s resources of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Env to override.
+Add new or override existing envs.</p>
 </td>
 </tr>
 <tr>
@@ -21746,6 +21855,24 @@ A RSM manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the RSM to manage instances from different templates.</p>
+<p>The naming convention for instances (pods) based on the RSM Name, InstanceTemplate Name, and ordinal.
+The constructed instance name follows the pattern: $(rsm.name)-$(template.name)-$(ordinal).
+By default, the ordinal starts from 0 for each InstanceTemplate.
+It is important to ensure that the Name of each InstanceTemplate is unique.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the RSM.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
 </td>
 </tr>
 <tr>

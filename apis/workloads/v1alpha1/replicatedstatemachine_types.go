@@ -26,35 +26,22 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 type InstanceTemplate struct {
+	// Specifies the name of the template.
+	// Each instance of the template derives its name from the RSM's Name, the template's Name and the instance's ordinal.
+	// The constructed instance name follows the pattern $(rsm.name)-$(template.name)-$(ordinal).
+	// The ordinal starts from 0 by default.
+	//
+	// +kubebuilder:validation:MaxLength=54
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
 	// Number of replicas of this template.
 	// Default is 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
-
-	// Defines the name of the instance.
-	// Only applied when Replicas is 1.
-	//
-	// +kubebuilder:validation:MaxLength=64
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	Name *string `json:"name,omitempty"`
-
-	// GenerateName is an optional prefix, used by the server, to generate a unique
-	// name ONLY IF the Name field has not been provided.
-	// If this field is used, the name returned to the client will be different
-	// than the name passed. This value will also be combined with a unique suffix.
-	// The provided value has the same validation rules as the Name field,
-	// and may be truncated by the length of the suffix required to make the value
-	// unique on the server.
-	//
-	// Applied only if Name is not specified.
-	//
-	// +kubebuilder:validation:MaxLength=54
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	GenerateName *string `json:"generateName,omitempty"`
 
 	// Defines annotations to override.
 	// Add new or override existing annotations.
@@ -88,6 +75,11 @@ type InstanceTemplate struct {
 	// Will override the first container's resources of the pod.
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Defines Env to override.
+	// Add new or override existing envs.
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
 
 	// Defines Volumes to override.
 	// Add new or override existing volumes.
@@ -156,8 +148,21 @@ type ReplicatedStateMachineSpec struct {
 	// The InstanceTemplate provides a way to override values in the default template,
 	// allowing the RSM to manage instances from different templates.
 	//
+	// The naming convention for instances (pods) based on the RSM Name, InstanceTemplate Name, and ordinal.
+	// The constructed instance name follows the pattern: $(rsm.name)-$(template.name)-$(ordinal).
+	// By default, the ordinal starts from 0 for each InstanceTemplate.
+	// It is important to ensure that the Name of each InstanceTemplate is unique.
+	//
+	// The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the RSM.
+	// Any remaining replicas will be generated using the default template and will follow the default naming rules.
+	//
 	// +optional
-	Instances []InstanceTemplate `json:"instances,omitempty"`
+	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Specifies instances to be scaled in with dedicated names in the list.
+	//
+	// +optional
+	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
 	// Represents a list of claims that pods are allowed to reference.
 	// The ReplicatedStateMachine controller is responsible for mapping network identities to

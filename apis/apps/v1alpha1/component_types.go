@@ -120,7 +120,12 @@ type ComponentSpec struct {
 
 	// Overrides values in default Template.
 	// +optional
-	Instances []InstanceTemplate `json:"instances,omitempty"`
+	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Specifies instances to be scaled in with dedicated names in the list.
+	//
+	// +optional
+	OfflineInstances []string `json:"offlineInstances,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the cluster.

@@ -167,8 +167,8 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
 	namespacedKindsPlus := []client.ObjectList{
 		&appsv1alpha1.ComponentList{},
-		&appsv1.StatefulSetList{}, // be compatible with 0.6 workloads.
-		&policyv1.PodDisruptionBudgetList{},
+		&appsv1.StatefulSetList{},           // be compatible with 0.6 workloads.
+		&policyv1.PodDisruptionBudgetList{}, // be compatible with 0.6 workloads.
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{}, // be backward compatible
 		&rbacv1.RoleBindingList{},    // be backward compatible

@@ -358,8 +358,10 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	// use specified service version or the latest.
 	if len(serviceVersion) == 0 {
 		serviceVersions := maps.Keys(serviceVersionToCompDefs)
-		slices.SortFunc(serviceVersions, serviceVersionComparator)
-		serviceVersion = serviceVersions[len(serviceVersions)-1]
+		if len(serviceVersions) > 0 {
+			slices.SortFunc(serviceVersions, serviceVersionComparator)
+			serviceVersion = serviceVersions[len(serviceVersions)-1]
+		}
 	}
 
 	// component definitions that support the service version

@@ -1214,8 +1214,8 @@ type MultipleClusterObjectValueFormatFlatten struct {
 type PrometheusProtocol string
 
 const (
-	HttpProtocol  = "http"
-	HttpsProtocol = "https"
+	HTTPProtocol  = "http"
+	HTTPSProtocol = "https"
 )
 
 // MonitorKind defines the kind of monitor.

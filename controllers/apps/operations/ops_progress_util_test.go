@@ -144,7 +144,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("create horizontalScaling operation to test the progressDetails when scaling down the replicas")
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1, nil)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp) // appsv1alpha1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 
@@ -190,7 +190,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			})).ShouldNot(HaveOccurred())
 			// ops will use the startTimestamp to make decision, start time should not equal the pod createTime during testing.
 			time.Sleep(time.Second)
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 3)
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, 3, nil)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp, statelessComp)
 			// update ops phase to Running first
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)

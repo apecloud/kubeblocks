@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -45,18 +46,19 @@ import (
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-type podTemplateSpecExt struct {
+type instanceTemplateExt struct {
+	Name     string
 	Replicas int32
 	corev1.PodTemplateSpec
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 }
 
-type replica struct {
-	pod  *corev1.Pod
-	pvcs []*corev1.PersistentVolumeClaim
+type rsmExt struct {
+	rsm               *workloads.ReplicatedStateMachine
+	instanceTemplates []*workloads.InstanceTemplate
 }
 
-var replicaNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+var instanceNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
 var (
 	reader *zstd.Decoder
@@ -71,10 +73,17 @@ func init() {
 	runtime.Must(err)
 }
 
-func parseParentNameAndOrdinal(s string) (string, int) {
+type instance struct {
+	pod  *corev1.Pod
+	pvcs []*corev1.PersistentVolumeClaim
+}
+
+// ParseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
+// -1 will be returned if no numeric suffix contained.
+func ParseParentNameAndOrdinal(s string) (string, int) {
 	parent := s
 	ordinal := -1
-	subMatches := replicaNameRegex.FindStringSubmatch(s)
+	subMatches := instanceNameRegex.FindStringSubmatch(s)
 	if len(subMatches) < 3 {
 		return parent, ordinal
 	}
@@ -94,12 +103,12 @@ func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, r
 		return rolePriorityMap[role]
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(objects[i].GetName())
+		return ParseParentNameAndOrdinal(objects[i].GetName())
 	}
-	baseSort(objects, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
+	BaseSort(objects, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }
 
-func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePriorityFunc func(i int) int, reverse bool) {
+func BaseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePriorityFunc func(i int) int, reverse bool) {
 	if getRolePriorityFunc == nil {
 		getRolePriorityFunc = func(_ int) int {
 			return 0
@@ -156,20 +165,20 @@ func getPodRevision(pod *corev1.Pod) string {
 	return pod.Labels[appsv1.ControllerRevisionHashLabelKey]
 }
 
-func validateDupReplicaNames[T any](replicas []T, getNameFunc func(item T) string) error {
-	podNameCount := make(map[string]int)
-	for _, r := range replicas {
+func ValidateDupInstanceNames[T any](instances []T, getNameFunc func(item T) string) error {
+	instanceNameCount := make(map[string]int)
+	for _, r := range instances {
 		name := getNameFunc(r)
-		count, exist := podNameCount[name]
+		count, exist := instanceNameCount[name]
 		if exist {
 			count++
 		} else {
 			count = 1
 		}
-		podNameCount[name] = count
+		instanceNameCount[name] = count
 	}
 	dupNames := ""
-	for name, count := range podNameCount {
+	for name, count := range instanceNameCount {
 		if count > 1 {
 			dupNames = fmt.Sprintf("%s%s,", dupNames, name)
 		}
@@ -180,64 +189,68 @@ func validateDupReplicaNames[T any](replicas []T, getNameFunc func(item T) strin
 	return nil
 }
 
-func buildReplicaName2TemplateMap(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (map[string]*podTemplateSpecExt, error) {
-	replicaTemplateGroups := buildReplicaTemplateGroups(rsm, tree)
-	nameTemplateMap := make(map[string]*podTemplateSpecExt)
-	var (
-		replicaNameList []string
-		replicaNames    []string
-		ordinal         int
-		err             error
-	)
-	for _, templateList := range replicaTemplateGroups {
-		ordinal = 0
-		for _, template := range templateList {
-			replicaNames, ordinal, err = buildReplicaNames(template, ordinal)
-			if err != nil {
-				return nil, err
-			}
-			for _, name := range replicaNames {
-				nameTemplateMap[name] = template
-			}
-			replicaNameList = append(replicaNameList, replicaNames...)
+func buildInstanceName2TemplateMap(rsmExt *rsmExt) (map[string]*instanceTemplateExt, error) {
+	instanceTemplateList, err := buildInstanceTemplateExts(rsmExt)
+	if err != nil {
+		return nil, err
+	}
+	allNameTemplateMap := make(map[string]*instanceTemplateExt)
+	var instanceNameList []string
+	for _, template := range instanceTemplateList {
+		instanceNames := GenerateInstanceNamesFromTemplate(rsmExt.rsm.Name, template.Name, template.Replicas, rsmExt.rsm.Spec.OfflineInstances)
+		instanceNameList = append(instanceNameList, instanceNames...)
+		for _, name := range instanceNames {
+			allNameTemplateMap[name] = template
 		}
 	}
 	// validate duplicate pod names
 	getNameFunc := func(n string) string {
 		return n
 	}
-	if err = validateDupReplicaNames(replicaNameList, getNameFunc); err != nil {
+	if err = ValidateDupInstanceNames(instanceNameList, getNameFunc); err != nil {
 		return nil, err
 	}
 
-	return nameTemplateMap, nil
+	return allNameTemplateMap, nil
 }
 
-func buildReplicaNames(template *podTemplateSpecExt, ordinal int) ([]string, int, error) {
-	generatePodName := func(name, generateName string, ordinal int) (string, int) {
-		if len(name) > 0 {
-			return name, ordinal
+func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string) []string {
+	instanceNames, _ := generateInstanceNames(parentName, templateName, replicas, 0, offlineInstances)
+	return instanceNames
+}
+
+// generateInstanceNames generates instance names based on certain rules:
+// The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
+// The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
+func generateInstanceNames(parentName, templateName string,
+	replicas int32, ordinal int32, offlineInstances []string) ([]string, int32) {
+	usedNames := sets.New(offlineInstances...)
+	var instanceNameList []string
+	for count := int32(0); count < replicas; count++ {
+		var name string
+		for {
+			if len(templateName) == 0 {
+				name = fmt.Sprintf("%s-%d", parentName, ordinal)
+			} else {
+				name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
+			}
+			ordinal++
+			if !usedNames.Has(name) {
+				instanceNameList = append(instanceNameList, name)
+				break
+			}
 		}
-		n := fmt.Sprintf("%s-%d", generateName, ordinal)
-		ordinal++
-		return n, ordinal
 	}
-	var replicaNameList []string
-	var name string
-	for i := 0; i < int(template.Replicas); i++ {
-		name, ordinal = generatePodName(template.Name, template.GenerateName, ordinal)
-		replicaNameList = append(replicaNameList, name)
-	}
-	return replicaNameList, ordinal, nil
+	return instanceNameList, ordinal
 }
 
-func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *workloads.ReplicatedStateMachine) (*replica, error) {
-	revision, err := buildPodTemplateRevision(template, parent)
+func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.ReplicatedStateMachine) (*instance, error) {
+	revision, err := buildInstanceTemplateRevision(template, parent)
 	if err != nil {
 		return nil, err
 	}
 	// 1. build a pod from template
-	pod := builder.NewPodBuilder(template.Namespace, name).
+	pod := builder.NewPodBuilder(parent.Namespace, name).
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddControllerRevisionHashLabel(revision).
@@ -254,7 +267,7 @@ func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *w
 	pvcNameMap := make(map[string]string)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
 		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, pod.GetName())
-		pvc := builder.NewPVCBuilder(template.Namespace, pvcName).
+		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
 			AddLabelsInMap(template.Labels).
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
@@ -283,11 +296,11 @@ func buildReplicaByTemplate(name string, template *podTemplateSpecExt, parent *w
 	if err = controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
-	replica := &replica{
+	inst := &instance{
 		pod:  pod,
 		pvcs: pvcs,
 	}
-	return replica, nil
+	return inst, nil
 }
 
 // copyAndMerge merges two objects for updating:
@@ -379,35 +392,31 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 func validateSpec(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) error {
 	replicasInTemplates := int32(0)
-	var names string
-	instanceTemplates := getInstanceTemplates(rsm, tree)
-	for _, instance := range instanceTemplates {
+	rsmExt, err := buildRSMExt(rsm, tree)
+	if err != nil {
+		return err
+	}
+	templateNames := sets.New[string]()
+	for _, template := range rsmExt.instanceTemplates {
 		replicas := int32(1)
-		if instance.Replicas != nil {
-			replicas = *instance.Replicas
+		if template.Replicas != nil {
+			replicas = *template.Replicas
 		}
 		replicasInTemplates += replicas
-
-		if instance.Name != nil {
-			if instance.Replicas != nil && *instance.Replicas > 1 {
-				names = fmt.Sprintf("%s%s,", names, *instance.Name)
-			}
+		if templateNames.Has(template.Name) {
+			return fmt.Errorf("duplicate instance template name: %s", template.Name)
 		}
+		templateNames.Insert(template.Name)
 	}
 	// sum of spec.templates[*].replicas should not greater than spec.replicas
 	if replicasInTemplates > *rsm.Spec.Replicas {
 		return fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *rsm.Spec.Replicas)
 	}
 
-	// instance.replicas should be nil or 1 if instance.name set
-	if len(names) > 0 {
-		return fmt.Errorf("replicas should be empty or no more than 1 if name set, instance names: %s", names)
-	}
-
 	return nil
 }
 
-func buildPodTemplateRevision(template *podTemplateSpecExt, parent *workloads.ReplicatedStateMachine) (string, error) {
+func buildInstanceTemplateRevision(template *instanceTemplateExt, parent *workloads.ReplicatedStateMachine) (string, error) {
 	// try to generate the same revision as if generated by sts controller
 	rsm := builder.NewReplicatedStateMachineBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
@@ -423,58 +432,50 @@ func buildPodTemplateRevision(template *podTemplateSpecExt, parent *workloads.Re
 	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
-func buildReplicaTemplateGroups(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) map[string][]*podTemplateSpecExt {
-	var podTemplates []*podTemplateSpecExt
-	var replicasInTemplates int32
-	envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
-	defaultTemplate := rsm1.BuildPodTemplate(rsm, envConfigName)
-	buildPodTemplateExt := func(replicas int32) *podTemplateSpecExt {
+func buildInstanceTemplateExts(rsmExt *rsmExt) ([]*instanceTemplateExt, error) {
+	envConfigName := rsm1.GetEnvConfigMapName(rsmExt.rsm.Name)
+	defaultTemplate := rsm1.BuildPodTemplate(rsmExt.rsm, envConfigName)
+	makeInstanceTemplateExt := func() *instanceTemplateExt {
 		var claims []corev1.PersistentVolumeClaim
-		for _, template := range rsm.Spec.VolumeClaimTemplates {
+		for _, template := range rsmExt.rsm.Spec.VolumeClaimTemplates {
 			claims = append(claims, *template.DeepCopy())
 		}
-		return &podTemplateSpecExt{
-			Replicas:             replicas,
+		return &instanceTemplateExt{
 			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
 			VolumeClaimTemplates: claims,
 		}
 	}
-	instanceTemplates := getInstanceTemplates(rsm, tree)
-	for _, instance := range instanceTemplates {
+
+	var instanceTemplateExtList []*instanceTemplateExt
+	for _, template := range rsmExt.instanceTemplates {
+		templateExt := makeInstanceTemplateExt()
+		buildInstanceTemplateExt(*template, templateExt)
+		instanceTemplateExtList = append(instanceTemplateExtList, templateExt)
+	}
+
+	return instanceTemplateExtList, nil
+}
+
+func BuildInstanceTemplates(totalReplicas int32, instances []workloads.InstanceTemplate, instancesCompressed *corev1.ConfigMap) []*workloads.InstanceTemplate {
+	var instanceTemplateList []*workloads.InstanceTemplate
+	var replicasInTemplates int32
+	instanceTemplates := getInstanceTemplates(instances, instancesCompressed)
+	for i := range instanceTemplates {
+		instance := &instanceTemplates[i]
 		replicas := int32(1)
 		if instance.Replicas != nil {
 			replicas = *instance.Replicas
 		}
-		template := buildPodTemplateExt(replicas)
-		applyInstanceTemplate(instance, template)
-		podTemplates = append(podTemplates, template)
-		replicasInTemplates += template.Replicas
+		instanceTemplateList = append(instanceTemplateList, instance)
+		replicasInTemplates += replicas
 	}
-	if replicasInTemplates < *rsm.Spec.Replicas {
-		template := buildPodTemplateExt(*rsm.Spec.Replicas - replicasInTemplates)
-		podTemplates = append(podTemplates, template)
-	}
-	// set the default name generator and namespace
-	for _, template := range podTemplates {
-		if template.GenerateName == "" {
-			template.GenerateName = rsm.Name
-		}
-		template.Namespace = rsm.Namespace
+	if replicasInTemplates < totalReplicas {
+		replicas := totalReplicas - replicasInTemplates
+		instance := &workloads.InstanceTemplate{Replicas: &replicas}
+		instanceTemplateList = append(instanceTemplateList, instance)
 	}
 
-	// group the pod templates by template.Name if set or by template.GenerateName
-	replicaTemplateGroups := make(map[string][]*podTemplateSpecExt)
-	for _, template := range podTemplates {
-		name := template.Name
-		if template.Name == "" {
-			name = template.GenerateName
-		}
-		templates := replicaTemplateGroups[name]
-		templates = append(templates, template)
-		replicaTemplateGroups[name] = templates
-	}
-
-	return replicaTemplateGroups
+	return instanceTemplateList
 }
 
 func getInstanceTemplateMap(annotations map[string]string) (map[string]string, error) {
@@ -492,39 +493,9 @@ func getInstanceTemplateMap(annotations map[string]string) (map[string]string, e
 	return templateMap, nil
 }
 
-func getInstanceTemplates(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) []workloads.InstanceTemplate {
-	if tree == nil {
-		return rsm.Spec.Instances
-	}
-	templateMap, err := getInstanceTemplateMap(rsm.Annotations)
-	// error has been checked in prepare stage, there should be no error occurs
-	if err != nil {
-		return nil
-	}
-	findTemplate := func() (*corev1.ConfigMap, error) {
-		for name, templateName := range templateMap {
-			if name != rsm.Name {
-				continue
-			}
-			// find the compressed instance templates, parse them
-			template := builder.NewConfigMapBuilder(rsm.Namespace, templateName).GetObject()
-			templateObj, err := tree.Get(template)
-			if err != nil {
-				return nil, err
-			}
-			template, _ = templateObj.(*corev1.ConfigMap)
-			return template, nil
-		}
-		return nil, nil
-	}
-
-	template, err := findTemplate()
-	// error should not occur as has been checked in tree load stage.
-	if err != nil {
-		return nil
-	}
+func getInstanceTemplates(instances []workloads.InstanceTemplate, template *corev1.ConfigMap) []workloads.InstanceTemplate {
 	if template == nil {
-		return rsm.Spec.Instances
+		return instances
 	}
 
 	// if template is found with incorrect format, try it as the whole templates is corrupted.
@@ -545,51 +516,90 @@ func getInstanceTemplates(rsm *workloads.ReplicatedStateMachine, tree *kubebuild
 		return nil
 	}
 
-	return append(rsm.Spec.Instances, extraTemplates...)
+	return append(instances, extraTemplates...)
 }
 
-func applyInstanceTemplate(instance workloads.InstanceTemplate, template *podTemplateSpecExt) {
+func findTemplateObject(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (*corev1.ConfigMap, error) {
+	templateMap, err := getInstanceTemplateMap(rsm.Annotations)
+	// error has been checked in prepare stage, there should be no error occurs
+	if err != nil {
+		return nil, nil
+	}
+	for name, templateName := range templateMap {
+		if name != rsm.Name {
+			continue
+		}
+		// find the compressed instance templates, parse them
+		template := builder.NewConfigMapBuilder(rsm.Namespace, templateName).GetObject()
+		templateObj, err := tree.Get(template)
+		if err != nil {
+			return nil, err
+		}
+		template, _ = templateObj.(*corev1.ConfigMap)
+		return template, nil
+	}
+	return nil, nil
+}
+
+func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *instanceTemplateExt) {
+	templateExt.Name = template.Name
 	replicas := int32(1)
-	if instance.Replicas != nil {
-		replicas = *instance.Replicas
+	if template.Replicas != nil {
+		replicas = *template.Replicas
 	}
-	template.Replicas = replicas
-	if instance.Name != nil {
-		template.Name = *instance.Name
+	templateExt.Replicas = replicas
+	if template.NodeName != nil {
+		templateExt.Spec.NodeName = *template.NodeName
 	}
-	if instance.GenerateName != nil {
-		template.GenerateName = *instance.GenerateName
-	}
-	if instance.NodeName != nil {
-		template.Spec.NodeName = *instance.NodeName
-	}
-	mergeMap(&instance.Annotations, &template.Annotations)
-	mergeMap(&instance.Labels, &template.Labels)
-	mergeMap(&instance.NodeSelector, &template.Spec.NodeSelector)
-	if len(template.Spec.Containers) > 0 {
-		if instance.Image != nil {
-			template.Spec.Containers[0].Image = *instance.Image
+	mergeMap(&template.Annotations, &templateExt.Annotations)
+	mergeMap(&template.Labels, &templateExt.Labels)
+	mergeMap(&template.NodeSelector, &templateExt.Spec.NodeSelector)
+	if len(templateExt.Spec.Containers) > 0 {
+		if template.Image != nil {
+			templateExt.Spec.Containers[0].Image = *template.Image
 		}
-		if instance.Resources != nil {
-			template.Spec.Containers[0].Resources = *instance.Resources
+		if template.Resources != nil {
+			templateExt.Spec.Containers[0].Resources = *template.Resources
+		}
+		if template.Env != nil {
+			mergeList(&template.Env, &templateExt.Spec.Containers[0].Env,
+				func(item corev1.EnvVar) func(corev1.EnvVar) bool {
+					return func(env corev1.EnvVar) bool {
+						return env.Name == item.Name
+					}
+				})
 		}
 	}
-	mergeList(&instance.Volumes, &template.Spec.Volumes,
+	mergeList(&template.Volumes, &templateExt.Spec.Volumes,
 		func(item corev1.Volume) func(corev1.Volume) bool {
 			return func(v corev1.Volume) bool {
 				return v.Name == item.Name
 			}
 		})
-	mergeList(&instance.VolumeMounts, &template.Spec.Containers[0].VolumeMounts,
+	mergeList(&template.VolumeMounts, &templateExt.Spec.Containers[0].VolumeMounts,
 		func(item corev1.VolumeMount) func(corev1.VolumeMount) bool {
 			return func(vm corev1.VolumeMount) bool {
 				return vm.Name == item.Name
 			}
 		})
-	mergeList(&instance.VolumeClaimTemplates, &template.VolumeClaimTemplates,
+	mergeList(&template.VolumeClaimTemplates, &templateExt.VolumeClaimTemplates,
 		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
 			return func(claim corev1.PersistentVolumeClaim) bool {
 				return claim.Name == item.Name
 			}
 		})
+}
+
+func buildRSMExt(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (*rsmExt, error) {
+	instancesCompressed, err := findTemplateObject(rsm, tree)
+	if err != nil {
+		return nil, err
+	}
+
+	instanceTemplateList := BuildInstanceTemplates(*rsm.Spec.Replicas, rsm.Spec.Instances, instancesCompressed)
+
+	return &rsmExt{
+		rsm:               rsm,
+		instanceTemplates: instanceTemplateList,
+	}, nil
 }

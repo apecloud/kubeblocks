@@ -311,6 +311,8 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	rsmObjCopy.Spec.MembershipReconfiguration = rsmProto.Spec.MembershipReconfiguration
 	rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
 	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
+	rsmObjCopy.Spec.Instances = rsmProto.Spec.Instances
+	rsmObjCopy.Spec.OfflineInstances = rsmProto.Spec.OfflineInstances
 
 	if rsmProto.Spec.UpdateStrategy.Type != "" || rsmProto.Spec.UpdateStrategy.RollingUpdate != nil {
 		updateUpdateStrategy(rsmObjCopy, rsmProto)

@@ -254,7 +254,16 @@ spec:
                         and by default, all these instances are generated from the
                         same template. The InstanceTemplate provides a way to override
                         values in the default template, allowing the component to
-                        manage instances from different templates."
+                        manage instances from different templates. \n The naming convention
+                        for instances (pods) based on the Component Name, InstanceTemplate
+                        Name, and ordinal. The constructed instance name follows the
+                        pattern: $(component.name)-$(template.name)-$(ordinal). By
+                        default, the ordinal starts from 0 for each InstanceTemplate.
+                        It is important to ensure that the Name of each InstanceTemplate
+                        is unique. \n The sum of replicas across all InstanceTemplates
+                        should not exceed the total number of Replicas specified for
+                        the Component. Any remaining replicas will be generated using
+                        the default template and will follow the default naming rules."
                       items:
                         description: InstanceTemplate defines values to override in
                           pod template.
@@ -265,19 +274,127 @@ spec:
                             description: Defines annotations to override. Add new
                               or override existing annotations.
                             type: object
-                          generateName:
-                            description: "GenerateName is an optional prefix, used
-                              by the server, to generate a unique name ONLY IF the
-                              Name field has not been provided. If this field is used,
-                              the name returned to the client will be different than
-                              the name passed. This value will also be combined with
-                              a unique suffix. The provided value has the same validation
-                              rules as the Name field, and may be truncated by the
-                              length of the suffix required to make the value unique
-                              on the server. \n Applied only if Name is not specified."
-                            maxLength: 54
-                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                            type: string
+                          env:
+                            description: Defines Env to override. Add new or override
+                              existing envs.
+                            items:
+                              description: EnvVar represents an environment variable
+                                present in a Container.
+                              properties:
+                                name:
+                                  description: Name of the environment variable. Must
+                                    be a C_IDENTIFIER.
+                                  type: string
+                                value:
+                                  description: 'Variable references $(VAR_NAME) are
+                                    expanded using the previously defined environment
+                                    variables in the container and any service environment
+                                    variables. If a variable cannot be resolved, the
+                                    reference in the input string will be unchanged.
+                                    Double $$ are reduced to a single $, which allows
+                                    for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)"
+                                    will produce the string literal "$(VAR_NAME)".
+                                    Escaped references will never be expanded, regardless
+                                    of whether the variable exists or not. Defaults
+                                    to "".'
+                                  type: string
+                                valueFrom:
+                                  description: Source for the environment variable's
+                                    value. Cannot be used if value is not empty.
+                                  properties:
+                                    configMapKeyRef:
+                                      description: Selects a key of a ConfigMap.
+                                      properties:
+                                        key:
+                                          description: The key to select.
+                                          type: string
+                                        name:
+                                          description: 'Name of the referent. More
+                                            info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                            TODO: Add other useful fields. apiVersion,
+                                            kind, uid?'
+                                          type: string
+                                        optional:
+                                          description: Specify whether the ConfigMap
+                                            or its key must be defined
+                                          type: boolean
+                                      required:
+                                      - key
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    fieldRef:
+                                      description: 'Selects a field of the pod: supports
+                                        metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
+                                        `metadata.annotations[''<KEY>'']`, spec.nodeName,
+                                        spec.serviceAccountName, status.hostIP, status.podIP,
+                                        status.podIPs.'
+                                      properties:
+                                        apiVersion:
+                                          description: Version of the schema the FieldPath
+                                            is written in terms of, defaults to "v1".
+                                          type: string
+                                        fieldPath:
+                                          description: Path of the field to select
+                                            in the specified API version.
+                                          type: string
+                                      required:
+                                      - fieldPath
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    resourceFieldRef:
+                                      description: 'Selects a resource of the container:
+                                        only resources limits and requests (limits.cpu,
+                                        limits.memory, limits.ephemeral-storage, requests.cpu,
+                                        requests.memory and requests.ephemeral-storage)
+                                        are currently supported.'
+                                      properties:
+                                        containerName:
+                                          description: 'Container name: required for
+                                            volumes, optional for env vars'
+                                          type: string
+                                        divisor:
+                                          anyOf:
+                                          - type: integer
+                                          - type: string
+                                          description: Specifies the output format
+                                            of the exposed resources, defaults to
+                                            "1"
+                                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                          x-kubernetes-int-or-string: true
+                                        resource:
+                                          description: 'Required: resource to select'
+                                          type: string
+                                      required:
+                                      - resource
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    secretKeyRef:
+                                      description: Selects a key of a secret in the
+                                        pod's namespace
+                                      properties:
+                                        key:
+                                          description: The key of the secret to select
+                                            from.  Must be a valid secret key.
+                                          type: string
+                                        name:
+                                          description: 'Name of the referent. More
+                                            info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                            TODO: Add other useful fields. apiVersion,
+                                            kind, uid?'
+                                          type: string
+                                        optional:
+                                          description: Specify whether the Secret
+                                            or its key must be defined
+                                          type: boolean
+                                      required:
+                                      - key
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                  type: object
+                              required:
+                              - name
+                              type: object
+                            type: array
                           image:
                             description: Defines image to override. Will override
                               the first container's image of the pod.
@@ -289,9 +406,12 @@ spec:
                               existing labels.
                             type: object
                           name:
-                            description: Defines the name of the instance. Only applied
-                              when Replicas is 1.
-                            maxLength: 64
+                            description: Specifies the name of the template. Each
+                              instance of the template derives its name from the Component's
+                              Name, the template's Name and the instance's ordinal.
+                              The constructed instance name follows the pattern $(component.name)-$(template.name)-$(ordinal).
+                              The ordinal starts from 0 by default.
+                            maxLength: 54
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           nodeName:
@@ -2699,6 +2819,8 @@ spec:
                               - name
                               type: object
                             type: array
+                        required:
+                        - name
                         type: object
                       type: array
                     issuer:
@@ -2755,6 +2877,12 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    offlineInstances:
+                      description: Specifies instances to be scaled in with dedicated
+                        names in the list.
+                      items:
+                        type: string
+                      type: array
                     replicas:
                       default: 1
                       description: Specifies the number of component replicas.
@@ -3908,7 +4036,17 @@ spec:
                             are generated from the same template. The InstanceTemplate
                             provides a way to override values in the default template,
                             allowing the component to manage instances from different
-                            templates."
+                            templates. \n The naming convention for instances (pods)
+                            based on the Component Name, InstanceTemplate Name, and
+                            ordinal. The constructed instance name follows the pattern:
+                            $(component.name)-$(template.name)-$(ordinal). By default,
+                            the ordinal starts from 0 for each InstanceTemplate. It
+                            is important to ensure that the Name of each InstanceTemplate
+                            is unique. \n The sum of replicas across all InstanceTemplates
+                            should not exceed the total number of Replicas specified
+                            for the Component. Any remaining replicas will be generated
+                            using the default template and will follow the default
+                            naming rules."
                           items:
                             description: InstanceTemplate defines values to override
                               in pod template.
@@ -3919,20 +4057,131 @@ spec:
                                 description: Defines annotations to override. Add
                                   new or override existing annotations.
                                 type: object
-                              generateName:
-                                description: "GenerateName is an optional prefix,
-                                  used by the server, to generate a unique name ONLY
-                                  IF the Name field has not been provided. If this
-                                  field is used, the name returned to the client will
-                                  be different than the name passed. This value will
-                                  also be combined with a unique suffix. The provided
-                                  value has the same validation rules as the Name
-                                  field, and may be truncated by the length of the
-                                  suffix required to make the value unique on the
-                                  server. \n Applied only if Name is not specified."
-                                maxLength: 54
-                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                                type: string
+                              env:
+                                description: Defines Env to override. Add new or override
+                                  existing envs.
+                                items:
+                                  description: EnvVar represents an environment variable
+                                    present in a Container.
+                                  properties:
+                                    name:
+                                      description: Name of the environment variable.
+                                        Must be a C_IDENTIFIER.
+                                      type: string
+                                    value:
+                                      description: 'Variable references $(VAR_NAME)
+                                        are expanded using the previously defined
+                                        environment variables in the container and
+                                        any service environment variables. If a variable
+                                        cannot be resolved, the reference in the input
+                                        string will be unchanged. Double $$ are reduced
+                                        to a single $, which allows for escaping the
+                                        $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+                                        produce the string literal "$(VAR_NAME)".
+                                        Escaped references will never be expanded,
+                                        regardless of whether the variable exists
+                                        or not. Defaults to "".'
+                                      type: string
+                                    valueFrom:
+                                      description: Source for the environment variable's
+                                        value. Cannot be used if value is not empty.
+                                      properties:
+                                        configMapKeyRef:
+                                          description: Selects a key of a ConfigMap.
+                                          properties:
+                                            key:
+                                              description: The key to select.
+                                              type: string
+                                            name:
+                                              description: 'Name of the referent.
+                                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                                TODO: Add other useful fields. apiVersion,
+                                                kind, uid?'
+                                              type: string
+                                            optional:
+                                              description: Specify whether the ConfigMap
+                                                or its key must be defined
+                                              type: boolean
+                                          required:
+                                          - key
+                                          type: object
+                                          x-kubernetes-map-type: atomic
+                                        fieldRef:
+                                          description: 'Selects a field of the pod:
+                                            supports metadata.name, metadata.namespace,
+                                            `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
+                                            spec.nodeName, spec.serviceAccountName,
+                                            status.hostIP, status.podIP, status.podIPs.'
+                                          properties:
+                                            apiVersion:
+                                              description: Version of the schema the
+                                                FieldPath is written in terms of,
+                                                defaults to "v1".
+                                              type: string
+                                            fieldPath:
+                                              description: Path of the field to select
+                                                in the specified API version.
+                                              type: string
+                                          required:
+                                          - fieldPath
+                                          type: object
+                                          x-kubernetes-map-type: atomic
+                                        resourceFieldRef:
+                                          description: 'Selects a resource of the
+                                            container: only resources limits and requests
+                                            (limits.cpu, limits.memory, limits.ephemeral-storage,
+                                            requests.cpu, requests.memory and requests.ephemeral-storage)
+                                            are currently supported.'
+                                          properties:
+                                            containerName:
+                                              description: 'Container name: required
+                                                for volumes, optional for env vars'
+                                              type: string
+                                            divisor:
+                                              anyOf:
+                                              - type: integer
+                                              - type: string
+                                              description: Specifies the output format
+                                                of the exposed resources, defaults
+                                                to "1"
+                                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                              x-kubernetes-int-or-string: true
+                                            resource:
+                                              description: 'Required: resource to
+                                                select'
+                                              type: string
+                                          required:
+                                          - resource
+                                          type: object
+                                          x-kubernetes-map-type: atomic
+                                        secretKeyRef:
+                                          description: Selects a key of a secret in
+                                            the pod's namespace
+                                          properties:
+                                            key:
+                                              description: The key of the secret to
+                                                select from.  Must be a valid secret
+                                                key.
+                                              type: string
+                                            name:
+                                              description: 'Name of the referent.
+                                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                                TODO: Add other useful fields. apiVersion,
+                                                kind, uid?'
+                                              type: string
+                                            optional:
+                                              description: Specify whether the Secret
+                                                or its key must be defined
+                                              type: boolean
+                                          required:
+                                          - key
+                                          type: object
+                                          x-kubernetes-map-type: atomic
+                                      type: object
+                                  required:
+                                  - name
+                                  type: object
+                                type: array
                               image:
                                 description: Defines image to override. Will override
                                   the first container's image of the pod.
@@ -3944,9 +4193,13 @@ spec:
                                   override existing labels.
                                 type: object
                               name:
-                                description: Defines the name of the instance. Only
-                                  applied when Replicas is 1.
-                                maxLength: 64
+                                description: Specifies the name of the template. Each
+                                  instance of the template derives its name from the
+                                  Component's Name, the template's Name and the instance's
+                                  ordinal. The constructed instance name follows the
+                                  pattern $(component.name)-$(template.name)-$(ordinal).
+                                  The ordinal starts from 0 by default.
+                                maxLength: 54
                                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                 type: string
                               nodeName:
@@ -6491,6 +6744,8 @@ spec:
                                   - name
                                   type: object
                                 type: array
+                            required:
+                            - name
                             type: object
                           type: array
                         issuer:
@@ -6547,6 +6802,12 @@ spec:
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
+                        offlineInstances:
+                          description: Specifies instances to be scaled in with dedicated
+                            names in the list.
+                          items:
+                            type: string
+                          type: array
                         replicas:
                           default: 1
                           description: Specifies the number of component replicas.

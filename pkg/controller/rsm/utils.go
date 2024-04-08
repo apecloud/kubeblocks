@@ -691,12 +691,6 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 	if len(membersStatus) != int(*rsm.Spec.Replicas) {
 		return false
 	}
-	for i := 0; i < int(*rsm.Spec.Replicas); i++ {
-		podName := getPodName(rsm.Name, i)
-		if !isMemberReady(podName, membersStatus) {
-			return false
-		}
-	}
 	hasLeader := false
 	for _, status := range membersStatus {
 		if status.ReadyWithoutPrimary {

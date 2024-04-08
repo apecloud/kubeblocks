@@ -133,6 +133,7 @@ func init() {
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
 	viper.SetDefault(rsm2.FeatureGateRSMReplicaProvider, string(rsm2.PodProvider))
+	viper.SetDefault(rsm2.MaxPlainRevisionCount, 1024)
 	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 }

@@ -34,7 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 )
 
-// updateReconciler handles the updates of replicas based on the UpdateStrategy.
+// updateReconciler handles the updates of instances based on the UpdateStrategy.
 // Currently, two update strategies are supported: 'OnDelete' and 'RollingUpdate'.
 type updateReconciler struct{}
 
@@ -60,8 +60,13 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
+	rsmExt, err := buildRSMExt(rsm, tree)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1. build desired name to template map
-	nameToTemplateMap, err := buildReplicaName2TemplateMap(rsm, tree)
+	nameToTemplateMap, err := buildInstanceName2TemplateMap(rsmExt)
 	if err != nil {
 		return nil, err
 	}
@@ -72,17 +77,17 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		newNameSet.Insert(name)
 	}
 	oldNameSet := sets.NewString()
-	oldReplicaMap := make(map[string]*corev1.Pod)
+	oldInstanceMap := make(map[string]*corev1.Pod)
 	var oldPodList []*corev1.Pod
 	for _, object := range tree.List(&corev1.Pod{}) {
 		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)
-		oldReplicaMap[object.GetName()] = pod
+		oldInstanceMap[object.GetName()] = pod
 		oldPodList = append(oldPodList, pod)
 	}
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
-		tree.Logger.Info(fmt.Sprintf("RSM %s/%s replicas are not aligned", rsm.Namespace, rsm.Name))
+		tree.Logger.Info(fmt.Sprintf("RSM %s/%s instances are not aligned", rsm.Namespace, rsm.Name))
 		return tree, nil
 	}
 

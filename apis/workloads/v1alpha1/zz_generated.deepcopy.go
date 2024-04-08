@@ -100,16 +100,6 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.Name != nil {
-		in, out := &in.Name, &out.Name
-		*out = new(string)
-		**out = **in
-	}
-	if in.GenerateName != nil {
-		in, out := &in.GenerateName, &out.GenerateName
-		*out = new(string)
-		**out = **in
-	}
 	if in.Annotations != nil {
 		in, out := &in.Annotations, &out.Annotations
 		*out = make(map[string]string, len(*in))
@@ -152,6 +142,13 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 		in, out := &in.Resources, &out.Resources
 		*out = new(v1.ResourceRequirements)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.Env != nil {
+		in, out := &in.Env, &out.Env
+		*out = make([]v1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Volumes != nil {
 		in, out := &in.Volumes, &out.Volumes
@@ -352,6 +349,11 @@ func (in *ReplicatedStateMachineSpec) DeepCopyInto(out *ReplicatedStateMachineSp
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.OfflineInstances != nil {
+		in, out := &in.OfflineInstances, &out.OfflineInstances
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	if in.VolumeClaimTemplates != nil {
 		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates

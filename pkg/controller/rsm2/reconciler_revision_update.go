@@ -25,6 +25,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 )
 
 // revisionUpdateReconciler is responsible for updating the expected replica names and their corresponding revisions in the status when there are changes in the spec.
@@ -86,7 +87,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	}
 
 	// 3. persistent these revisions to status
-	revisions, err := buildUpdateRevisions(updatedRevisions)
+	revisions, err := rsmcommon.BuildUpdateRevisions(updatedRevisions)
 	if err != nil {
 		return nil, err
 	}

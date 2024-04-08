@@ -96,7 +96,6 @@ var _ = Describe("Component Utils", func() {
 			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
 			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
-			testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
 			_ = testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 
 			By("test GetClusterByObject function")
@@ -115,11 +114,7 @@ var _ = Describe("Component Utils", func() {
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
 			By("test GetComponentStsMinReadySeconds")
-			minReadySeconds, _ := component.GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
-				appsv1alpha1.Stateless, statelessCompName)
-			Expect(minReadySeconds).To(Equal(int32(10)))
-			minReadySeconds, _ = component.GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
-				appsv1alpha1.Consensus, statelessCompName)
+			minReadySeconds, _ := component.GetComponentRSMMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
 		})
 	})

@@ -4288,7 +4288,7 @@ string
 </em>
 </td>
 <td>
-<p>The name of the service.</p>
+<p>References the component service name defined in the ComponentDefinition.Spec.Services[x].Name.</p>
 </td>
 </tr>
 <tr>

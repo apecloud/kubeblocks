@@ -168,9 +168,9 @@ func equalField(old, new any) bool {
 		q = v
 		return
 	}
-	switch old.(type) {
+	switch o := old.(type) {
 	case map[string]string:
-		oldMap, _ := old.(map[string]string)
+		oldMap := o
 		newMap, _ := new.(map[string]string)
 		if len(newMap) > len(oldMap) {
 			return false
@@ -188,7 +188,7 @@ func equalField(old, new any) bool {
 	case *int64, string:
 		return reflect.DeepEqual(old, new)
 	case []corev1.Container:
-		ocs, _ := old.([]corev1.Container)
+		ocs := o
 		ncs, _ := new.([]corev1.Container)
 		if len(ocs) != len(ncs) {
 			return false
@@ -206,7 +206,7 @@ func equalField(old, new any) bool {
 		}
 		return true
 	case []corev1.Toleration:
-		ot, _ := old.([]corev1.Toleration)
+		ot := o
 		nt, _ := new.([]corev1.Toleration)
 		if nt == nil {
 			return true
@@ -222,7 +222,7 @@ func equalField(old, new any) bool {
 		}
 		return true
 	case corev1.ResourceList:
-		or, _ := old.(corev1.ResourceList)
+		or := o
 		nr, _ := new.(corev1.ResourceList)
 		oc := getQuantity(or, corev1.ResourceCPU)
 		om := getQuantity(or, corev1.ResourceMemory)

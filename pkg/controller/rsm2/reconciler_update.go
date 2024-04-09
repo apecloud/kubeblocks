@@ -145,6 +145,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		}
 		if updatePolicy == InPlaceUpdatePolicy {
 			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], rsm, getPodRevision(pod))
+			if err != nil {
+				return nil, err
+			}
 			newPod := copyAndMerge(pod, newInstance.pod)
 			if err = tree.Update(newPod); err != nil {
 				return nil, err

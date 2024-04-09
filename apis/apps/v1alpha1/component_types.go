@@ -215,6 +215,11 @@ type ComponentSpec struct {
 	// Defines RuntimeClassName for all Pods managed by this component.
 	// +optional
 	RuntimeClassName *string `json:"runtimeClassName,omitempty"`
+
+	// Defines the sidecar containers that will be attached to the component's main container.
+	//
+	// +optional
+	Sidecars []string `json:"sidecars,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the cluster.

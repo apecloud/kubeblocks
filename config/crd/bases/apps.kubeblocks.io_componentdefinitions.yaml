@@ -13731,21 +13731,16 @@ spec:
                           - http
                           - https
                           type: string
-                        prometheusConfig:
+                        scrapeConfig:
                           properties:
                             metricsPath:
                               description: Specifies the http/https url path to scrape
                                 for metrics. If empty, Prometheus uses the default
                                 value (e.g. `/metrics`).
                               type: string
-                            params:
-                              additionalProperties:
-                                items:
-                                  type: string
-                                type: array
-                              description: The URL parameters to be used in the HTTP
-                                request.
-                              type: object
+                            metricsPort:
+                              description: Specifies the port name to scrape for metrics.
+                              type: string
                             protocol:
                               description: Specifies the schema to use for scraping.
                                 `http` and `https` are the expected values unless

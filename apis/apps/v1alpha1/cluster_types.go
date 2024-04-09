@@ -837,7 +837,7 @@ type ClusterComponentSpec struct {
 	// Defines the sidecar containers that will be attached to the component's main container.
 	//
 	// +optional
-	Sidecars []string `json:"sidecars"`
+	Sidecars []string `json:"sidecars,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

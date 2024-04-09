@@ -4516,6 +4516,12 @@ spec:
                   - name
                   type: object
                 type: array
+              sidecars:
+                description: Defines the sidecar containers that will be attached
+                  to the component's main container.
+                items:
+                  type: string
+                type: array
               tlsConfig:
                 description: "Specifies the TLS configuration for the component, including:
                   \n - A boolean flag that indicates whether the component should

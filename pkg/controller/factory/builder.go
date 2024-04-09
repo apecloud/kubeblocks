@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -51,7 +52,7 @@ import (
 )
 
 // BuildInstanceSet builds a InstanceSet object from SynthesizedComponent.
-func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
+func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
 		clusterDefName     = synthesizedComp.ClusterDefName
 		clusterCompDefName = synthesizedComp.ClusterCompDefName
@@ -73,7 +74,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent) (*workloa
 	// build annotations
 	mergeAnnotations := intctrlutil.MergeMetadataMaps(
 		constant.GetKBGenerationAnnotation(synthesizedComp.ClusterGeneration),
-		getMonitorAnnotations(synthesizedComp),
+		getMonitorAnnotations(synthesizedComp, componentDef),
 		compDefLabel,
 		constant.GetServiceVersionAnnotation(synthesizedComp.ServiceVersion),
 		synthesizedComp.Annotations,
@@ -140,25 +141,34 @@ func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeC
 }
 
 // getMonitorAnnotations returns the annotations for the monitor.
-func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent) map[string]string {
-	annotations := make(map[string]string, 0)
-	falseStr := "false"
-	trueStr := "true"
-	switch {
-	case !synthesizedComp.Monitor.Enable:
-		annotations["monitor.kubeblocks.io/scrape"] = falseStr
-		annotations["monitor.kubeblocks.io/agamotto"] = falseStr
-	case synthesizedComp.Monitor.BuiltIn:
-		annotations["monitor.kubeblocks.io/scrape"] = falseStr
-		annotations["monitor.kubeblocks.io/agamotto"] = trueStr
-	default:
-		annotations["monitor.kubeblocks.io/scrape"] = trueStr
-		annotations["monitor.kubeblocks.io/path"] = synthesizedComp.Monitor.ScrapePath
-		annotations["monitor.kubeblocks.io/port"] = strconv.Itoa(int(synthesizedComp.Monitor.ScrapePort))
-		annotations["monitor.kubeblocks.io/scheme"] = "http"
-		annotations["monitor.kubeblocks.io/agamotto"] = falseStr
+func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) map[string]string {
+	if len(synthesizedComp.Sidecars) == 0 || componentDef == nil {
+		return nil
 	}
-	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, annotations)
+
+	monitor, container := getMetricsSidecarContainers(synthesizedComp.Sidecars, componentDef.Spec.SidecarContainerSpecs)
+	if monitor != nil {
+		return nil
+	}
+
+	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor.ScrapeConfig, container))
+}
+
+func getMetricsSidecarContainers(sidecars []string, containerSpecs []appsv1alpha1.SidecarContainerSpec) (*appsv1alpha1.MonitorSource, *corev1.Container) {
+	for i := range containerSpecs {
+		spec := &containerSpecs[i]
+		if slices.Contains(sidecars, spec.Name) && isMetricsContainer(spec) {
+			return spec.SidecarContainerSources.Monitor, &spec.Container
+		}
+	}
+	return nil, nil
+}
+
+func isMetricsContainer(sidecarContainer *appsv1alpha1.SidecarContainerSpec) bool {
+	return sidecarContainer.SidecarContainerSources != nil &&
+		sidecarContainer.SidecarContainerSources.Monitor != nil &&
+		sidecarContainer.SidecarContainerSources.Monitor.SidecarKind == appsv1alpha1.MetricsKind &&
+		sidecarContainer.SidecarContainerSources.Monitor.ScrapeConfig != nil
 }
 
 func setDefaultResourceLimits(its *workloads.InstanceSet) {

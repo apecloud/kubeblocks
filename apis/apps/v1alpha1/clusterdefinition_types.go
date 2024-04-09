@@ -485,7 +485,7 @@ type ServiceRefDeclarationSpec struct {
 	ServiceVersion string `json:"serviceVersion"`
 }
 
-type PrometheusConfig struct {
+type PrometheusScrapeConfig struct {
 	// Specifies the http/https url path to scrape for metrics.
 	// If empty, Prometheus uses the default value (e.g. `/metrics`).
 	//
@@ -493,10 +493,10 @@ type PrometheusConfig struct {
 	// +optional
 	MetricsPath string `json:"metricsPath,omitempty"`
 
-	// The URL parameters to be used in the HTTP request.
+	// Specifies the port name to scrape for metrics.
 	//
 	// +optional
-	Params map[string][]string `json:"params,omitempty"`
+	MetricsPort string `json:"metricsPort,omitempty"`
 
 	// Specifies the schema to use for scraping.
 	// `http` and `https` are the expected values unless you rewrite the `__scheme__` label via relabeling.
@@ -512,7 +512,7 @@ type MonitorSource struct {
 	// +kubebuilder:validation:Required
 	SidecarKind MonitorKind `json:"kind"`
 
-	PrometheusConfig PrometheusConfig `json:"prometheusConfig,omitempty"`
+	ScrapeConfig *PrometheusScrapeConfig `json:"scrapeConfig,omitempty"`
 }
 
 type SidecarContainerSource struct {

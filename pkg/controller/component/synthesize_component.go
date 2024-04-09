@@ -176,6 +176,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		ServiceAccountName: comp.Spec.ServiceAccountName,
 		Instances:          comp.Spec.Instances,
 		OfflineInstances:   comp.Spec.OfflineInstances,
+		Sidecars:           comp.Spec.Sidecars,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.

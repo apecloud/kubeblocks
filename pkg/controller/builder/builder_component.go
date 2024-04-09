@@ -65,15 +65,15 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
+func (builder *ComponentBuilder) SetSidecarContainers(sidecars []string) *ComponentBuilder {
+	builder.get().Spec.Sidecars = sidecars
+	return builder
+}
+
 func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBuilder {
 	builder.get().Spec.EnabledLogs = logNames
 	return builder
 }
-
-// func (builder *ComponentBuilder) SetMonitor(monitor bool) *ComponentBuilder {
-// 	builder.get().Spec.Monitor = monitor
-// 	return builder
-// }
 
 func (builder *ComponentBuilder) SetTLSConfig(enable bool, issuer *appsv1alpha1.Issuer) *ComponentBuilder {
 	if enable {

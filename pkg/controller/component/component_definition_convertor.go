@@ -62,6 +62,7 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
+		"sidecarcontainerspecs":  &compDefSidecarContainersConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer); err != nil {
@@ -726,4 +727,11 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 		WithoutCandidate:    withoutCandidateAction,
 		ScriptSpecSelectors: mergeScriptSpec(),
 	}
+}
+
+type compDefSidecarContainersConvertor struct{}
+
+func (c *compDefSidecarContainersConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.SidecarContainerSpecs, nil
 }

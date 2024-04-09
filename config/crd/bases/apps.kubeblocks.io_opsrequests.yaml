@@ -6600,7 +6600,7 @@ spec:
                               name:
                                 description: References the component service name
                                   defined in the ComponentDefinition.Spec.Services[x].Name.
-                                maxLength: 15
+                                maxLength: 25
                                 type: string
                               podService:
                                 description: Indicates whether to generate individual
@@ -9669,7 +9669,7 @@ spec:
                               name:
                                 description: References the component service name
                                   defined in the ComponentDefinition.Spec.Services[x].Name.
-                                maxLength: 15
+                                maxLength: 25
                                 type: string
                               podService:
                                 description: Indicates whether to generate individual

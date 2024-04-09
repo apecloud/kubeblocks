@@ -3029,7 +3029,7 @@ spec:
                           name:
                             description: References the component service name defined
                               in the ComponentDefinition.Spec.Services[x].Name.
-                            maxLength: 15
+                            maxLength: 25
                             type: string
                           podService:
                             description: Indicates whether to generate individual
@@ -3533,7 +3533,7 @@ spec:
                         it indicates the name of the service. Others can refer to
                         this service by its name. (e.g., connection credential) Cannot
                         be updated.
-                      maxLength: 15
+                      maxLength: 25
                       type: string
                     roleSelector:
                       description: RoleSelector extends the ServiceSpec.Selector by
@@ -6962,7 +6962,7 @@ spec:
                               name:
                                 description: References the component service name
                                   defined in the ComponentDefinition.Spec.Services[x].Name.
-                                maxLength: 15
+                                maxLength: 25
                                 type: string
                               podService:
                                 description: Indicates whether to generate individual

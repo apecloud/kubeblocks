@@ -798,7 +798,7 @@ type Service struct {
 	// Cannot be updated.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=15
+	// +kubebuilder:validation:MaxLength=25
 	Name string `json:"name"`
 
 	// ServiceName defines the name of the underlying service object.

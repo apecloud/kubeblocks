@@ -25,19 +25,15 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("generate service descriptor", func() {
@@ -98,6 +94,33 @@ var _ = Describe("generate service descriptor", func() {
 		mockClient.Finish()
 		cleanEnv()
 	})
+
+	buildServiceReferencesLegacy := func(ctx context.Context,
+		cli client.Reader,
+		clusterDef *appsv1alpha1.ClusterDefinition,
+		clusterVer *appsv1alpha1.ClusterVersion,
+		cluster *appsv1alpha1.Cluster,
+		clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
+		var (
+			compDef *appsv1alpha1.ComponentDefinition
+			comp    *appsv1alpha1.Component
+			err     error
+		)
+		if compDef, err = BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec); err != nil {
+			return nil, err
+		}
+		if comp, err = BuildComponent(cluster, clusterCompSpec, nil, nil); err != nil {
+			return nil, err
+		}
+		synthesizedComp := &SynthesizedComponent{
+			Namespace:   namespace,
+			ClusterName: cluster.Name,
+		}
+		if err = buildServiceReferences(ctx, cli, synthesizedComp, compDef, comp); err != nil {
+			return nil, err
+		}
+		return synthesizedComp.ServiceReferences, nil
+	}
 
 	// for test GetContainerWithVolumeMount
 	Context("generate service descriptor test", func() {
@@ -221,17 +244,8 @@ var _ = Describe("generate service descriptor", func() {
 				SetServiceRefs(serviceRefs).
 				Create(&testCtx).GetObject()
 
-			clusterKey := client.ObjectKeyFromObject(cluster)
-			req := ctrl.Request{
-				NamespacedName: clusterKey,
-			}
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: testCtx.Ctx,
-				Req: req,
-				Log: log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
-			}
 			By("GenServiceReferences failed because external service descriptor not found")
-			serviceReferences, err := GenServiceReferencesLegacy(reqCtx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err := buildServiceReferencesLegacy(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 			Expect(serviceReferences).Should(BeNil())
@@ -258,7 +272,7 @@ var _ = Describe("generate service descriptor", func() {
 				Create(&testCtx).GetObject()
 
 			By("GenServiceReferences failed because external service descriptor status is not available")
-			serviceReferences, err = GenServiceReferencesLegacy(reqCtx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = buildServiceReferencesLegacy(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status is not available"))
 			Expect(serviceReferences).Should(BeNil())
@@ -269,7 +283,7 @@ var _ = Describe("generate service descriptor", func() {
 			})).Should(Succeed())
 
 			By("GenServiceReferences failed because external service descriptor kind and version not match")
-			serviceReferences, err = GenServiceReferencesLegacy(reqCtx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = buildServiceReferencesLegacy(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("kind or version is not match with"))
 			Expect(serviceReferences).Should(BeNil())
@@ -296,7 +310,7 @@ var _ = Describe("generate service descriptor", func() {
 			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: secret.Name,
 				Namespace: secret.Namespace}, secret)).Should(Succeed())
-			serviceReferences, err = GenServiceReferencesLegacy(reqCtx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = buildServiceReferencesLegacy(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(serviceReferences).ShouldNot(BeNil())
 			Expect(len(serviceReferences)).Should(Equal(2))

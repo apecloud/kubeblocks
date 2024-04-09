@@ -909,6 +909,10 @@ type ServiceRef struct {
 	// +optional
 	Cluster string `json:"cluster,omitempty"`
 
+	Service *string `json:"service,omitempty"`
+
+	Credential *string `json:"credential,omitempty"`
+
 	// The service descriptor of the service provided by external sources.
 	//
 	// When referencing a service provided by external sources, the ServiceDescriptor object name is required to

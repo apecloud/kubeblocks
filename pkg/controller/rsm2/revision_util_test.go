@@ -969,4 +969,21 @@ var _ = Describe("revision util test", func() {
 			Expect(cr.Name).Should(Equal("redis-test-redis-7665b47874"))
 		})
 	})
+
+	Context("buildUpdateRevisions & getUpdateRevisions", func() {
+		It("should work well", func() {
+			updateRevisions := map[string]string{
+				"pod-0": "revision-0",
+				"pod-1": "revision-1",
+				"pod-2": "revision-2",
+				"pod-3": "revision-3",
+				"pod-4": "revision-4",
+			}
+			revisions, err := buildUpdateRevisions(updateRevisions)
+			Expect(err).Should(BeNil())
+			decodeRevisions, err := getUpdateRevisions(revisions)
+			Expect(err).Should(BeNil())
+			Expect(decodeRevisions).Should(Equal(updateRevisions))
+		})
+	})
 })

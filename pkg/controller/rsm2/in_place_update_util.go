@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -286,7 +285,7 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 }
 
 func getPodUpdatePolicy(rsm *workloads.ReplicatedStateMachine, pod *corev1.Pod) (PodUpdatePolicy, error) {
-	updateRevisions, err := rsmcommon.GetUpdateRevisions(rsm.Status.UpdateRevisions)
+	updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
 	if err != nil {
 		return NoOpsPolicy, err
 	}

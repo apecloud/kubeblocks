@@ -17650,25 +17650,9 @@ NamedVar
 </td>
 <td>
 <em>(Optional)</em>
-<p>Port references a port defined in the service.</p>
+<p>Port references a port or node-port defined in the service.</p>
 <p>If the referenced service is a pod-service, there will be multiple service objects matched,
 and the value will be presented in the following format: service1.name:port1,service2.name:port2&hellip;</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodePort</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.NamedVar">
-NamedVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>NodePort references a node-port defined in the service.</p>
-<p>If the referenced service is a pod-service, there will be multiple service objects matched,
-and the value will be presented in the following format: service1.name:nodePort1,service2.name:nodePort2&hellip;</p>
 </td>
 </tr>
 </tbody>

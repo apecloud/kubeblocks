@@ -40,13 +40,13 @@ import (
 )
 
 const (
-	BackupDataJobNamePrefix      = "dp-backup"
-	prebackupJobNamePrefix       = "dp-prebackup"
-	postbackupJobNamePrefix      = "dp-postbackup"
-	BackupDataContainerName      = "backupdata"
-	SyncProgressContainerName    = "sync-progress"
-	SyncProgressSharedVolumeName = "sync-progress-shared-volume"
-	SyncProgressSharedMountPath  = "/dp-sync-progress"
+	BackupDataJobNamePrefix = "dp-backup"
+	prebackupJobNamePrefix  = "dp-prebackup"
+	postbackupJobNamePrefix = "dp-postbackup"
+	BackupDataContainerName = "backupdata"
+	managerContainerName    = "manager"
+	managerSharedVolumeName = "manager-shared-volume"
+	managerSharedMountPath  = "/dp-manager"
 )
 
 // Request is a request for a backup, with all references to other objects.
@@ -182,9 +182,7 @@ func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (act
 		if err != nil {
 			return nil, fmt.Errorf("failed to build job action pod spec: %w", err)
 		}
-		if backupDataAct.SyncProgress != nil {
-			r.InjectSyncProgressContainer(podSpec, backupDataAct.SyncProgress, r.buildSyncProgressCommand())
-		}
+		r.InjectManagerContainer(podSpec, backupDataAct.SyncProgress, r.buildSyncProgressCommand())
 		return &action.JobAction{
 			Name:         name,
 			ObjectMeta:   *buildBackupJobObjMeta(r.Backup, name),
@@ -197,9 +195,7 @@ func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (act
 		if err != nil {
 			return nil, err
 		}
-		if backupDataAct.SyncProgress != nil {
-			r.InjectSyncProgressContainer(podSpec, backupDataAct.SyncProgress, r.buildContinuousSyncProgressCommand())
-		}
+		r.InjectManagerContainer(podSpec, backupDataAct.SyncProgress, r.buildContinuousSyncProgressCommand())
 		return &action.StatefulSetAction{
 			Name: r.Name,
 			ObjectMeta: metav1.ObjectMeta{
@@ -349,7 +345,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 			},
 			{
 				Name:  dptypes.DPBackupInfoFile,
-				Value: SyncProgressSharedMountPath + "/" + BackupInfoFileName,
+				Value: managerSharedMountPath + "/" + BackupInfoFileName,
 			},
 			{
 				Name:  dptypes.DPTTL,
@@ -380,7 +376,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	buildVolumes := func() []corev1.Volume {
 		volumes := []corev1.Volume{
 			{
-				Name: SyncProgressSharedVolumeName,
+				Name: managerSharedVolumeName,
 				VolumeSource: corev1.VolumeSource{
 					EmptyDir: &corev1.EmptyDirVolumeSource{},
 				},
@@ -396,8 +392,8 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	buildVolumeMounts := func() []corev1.VolumeMount {
 		volumesMount := []corev1.VolumeMount{
 			{
-				Name:      SyncProgressSharedVolumeName,
-				MountPath: SyncProgressSharedMountPath,
+				Name:      managerSharedVolumeName,
+				MountPath: managerSharedMountPath,
 			},
 		}
 		// only mount the volumes when the backup pod is running on the target pod node.
@@ -469,29 +465,39 @@ func (r *Request) buildSyncProgressCommand() string {
 set -o errexit
 set -o nounset
 
-function update_backup_stauts() {
-  local backup_info_file="$1"
-  local exit_file="$1.exit"
-  local sleep_seconds="$2"
-  while true; do 
-    if [ -f "$exit_file" ]; then
-      echo "exit file $exit_file exists, exit"
-      exit 1
-    fi
-    if [ -f "$backup_info_file" ]; then
-      break
-    fi
-    echo "backup info file not exists, wait for ${sleep_seconds}s"
-    sleep $sleep_seconds
-  done
-  local backup_info=$(cat $backup_info_file)
-  echo backupInfo:${backup_info}
-  local namespace="$3"
-  local backup_name="$4"
-  status="{\"status\":${backup_info}}"
-  kubectl -n "$namespace" patch backups.dataprotection.kubeblocks.io "$backup_name" --subresource=status --type=merge --patch "${status}"
-}
-update_backup_stauts ${%s} ${%s} %s %s
+export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
+export DATASAFED_BACKEND_BASE_PATH="$DP_BACKUP_BASE_PATH"
+
+backup_info_file="${%s}"
+sleep_seconds="${%s}"
+namespace="%s"
+backup_name="%s"
+
+if [ "$sleep_seconds" -le 0 ]; then
+  sleep_seconds=30
+fi
+
+exit_file="${backup_info_file}.exit"
+while true; do
+  if [ -f "$exit_file" ]; then
+    echo "exit file $exit_file exists, exit"
+    exit 1
+  fi
+  if [ -f "$backup_info_file" ]; then
+    break
+  fi
+  echo "backup info file not exists, wait for ${sleep_seconds}s"
+  sleep "$sleep_seconds"
+done
+
+backup_info=$(cat "$backup_info_file")
+echo "backupInfo:${backup_info}"
+
+status="{\"status\":${backup_info}}"
+kubectl -n "$namespace" patch backups.dataprotection.kubeblocks.io "$backup_name" --subresource=status --type=merge --patch "${status}"
+
+# save the backup CR object to the backup repo
+kubectl -n "$namespace" get backups.dataprotection.kubeblocks.io "$backup_name" -o json | datasafed push - "/kubeblocks-backup.json"
 `, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)
 }
 
@@ -536,16 +542,14 @@ done
 `, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)
 }
 
-// InjectSyncProgressContainer injects a container to sync the backup progress.
-func (r *Request) InjectSyncProgressContainer(podSpec *corev1.PodSpec,
+// InjectManagerContainer injects a sidecar that will sync the backup status
+// or push the backup CR object to the backup repo.
+func (r *Request) InjectManagerContainer(podSpec *corev1.PodSpec,
 	sync *dpv1alpha1.SyncProgress, command string) {
-	if !boolptr.IsSetToTrue(sync.Enabled) {
-		return
-	}
 
 	// build container to sync backup progress that will update the backup status
 	container := podSpec.Containers[0].DeepCopy()
-	container.Name = SyncProgressContainerName
+	container.Name = managerContainerName
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Resources = corev1.ResourceRequirements{Limits: nil, Requests: nil}
@@ -554,7 +558,7 @@ func (r *Request) InjectSyncProgressContainer(podSpec *corev1.PodSpec,
 
 	// append some envs
 	checkIntervalSeconds := int32(5)
-	if sync.IntervalSeconds != nil && *sync.IntervalSeconds > 0 {
+	if sync != nil && sync.IntervalSeconds != nil && *sync.IntervalSeconds > 0 {
 		checkIntervalSeconds = *sync.IntervalSeconds
 	}
 	container.Env = append(container.Env,

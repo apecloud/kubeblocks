@@ -182,7 +182,7 @@ type ComponentDefinitionSpec struct {
 	// +listMapKey=name
 	// +optional
 	// +optional
-	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarSpecs,omitempty"`
+	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarContainerSpecs,omitempty"`
 
 	// Represents user-defined variables that can be used as environment variables for Pods and Actions,
 	// or to render templates of config and script.

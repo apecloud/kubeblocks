@@ -720,7 +720,7 @@ type ClusterComponentDefinition struct {
 	// +optional
 	// +optional
 	// +optional
-	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarSpecs,omitempty"`
+	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarContainerSpecs,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {

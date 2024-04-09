@@ -9166,7 +9166,7 @@ spec:
                         - serviceRefDeclarationSpecs
                         type: object
                       type: array
-                    sidecarSpecs:
+                    sidecarContainerSpecs:
                       description: Defines the sidecar containers that will be attached
                         to the component's main container.
                       items:

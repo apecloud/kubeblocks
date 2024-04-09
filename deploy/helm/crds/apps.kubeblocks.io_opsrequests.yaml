@@ -6598,7 +6598,8 @@ spec:
                                   info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                                 type: object
                               name:
-                                description: The name of the service.
+                                description: References the component service name
+                                  defined in the ComponentDefinition.Spec.Services[x].Name.
                                 maxLength: 15
                                 type: string
                               podService:
@@ -9666,7 +9667,8 @@ spec:
                                   info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                                 type: object
                               name:
-                                description: The name of the service.
+                                description: References the component service name
+                                  defined in the ComponentDefinition.Spec.Services[x].Name.
                                 maxLength: 15
                                 type: string
                               podService:

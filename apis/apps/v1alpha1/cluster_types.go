@@ -808,7 +808,7 @@ type TLSSecretRef struct {
 }
 
 type ClusterComponentService struct {
-	// The name of the service.
+	// References the component service name defined in the ComponentDefinition.Spec.Services[x].Name.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=15

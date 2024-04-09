@@ -11747,6 +11747,7 @@ spec:
                         it indicates the name of the service. Others can refer to
                         this service by its name. (e.g., connection credential) Cannot
                         be updated.
+                      maxLength: 15
                       type: string
                     podService:
                       description: Indicates whether to generate individual services

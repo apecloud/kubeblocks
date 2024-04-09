@@ -59,6 +59,13 @@ func (builder *PodBuilder) SetFinalizers() *PodBuilder {
 	return builder
 }
 
+func (builder *PodBuilder) AddInitContainer(container corev1.Container) *PodBuilder {
+	containers := builder.get().Spec.InitContainers
+	containers = append(containers, container)
+	builder.get().Spec.InitContainers = containers
+	return builder
+}
+
 func (builder *PodBuilder) AddContainer(container corev1.Container) *PodBuilder {
 	containers := builder.get().Spec.Containers
 	containers = append(containers, container)

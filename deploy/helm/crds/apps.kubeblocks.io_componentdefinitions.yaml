@@ -11747,6 +11747,7 @@ spec:
                         it indicates the name of the service. Others can refer to
                         this service by its name. (e.g., connection credential) Cannot
                         be updated.
+                      maxLength: 25
                       type: string
                     podService:
                       description: Indicates whether to generate individual services
@@ -12610,32 +12611,15 @@ spec:
                             name:
                               description: Name of the referent object.
                               type: string
-                            nodePort:
-                              description: "NodePort references a node-port defined
-                                in the service. \n If the referenced service is a
-                                pod-service, there will be multiple service objects
-                                matched, and the value will be presented in the following
-                                format: service1.name:nodePort1,service2.name:nodePort2..."
-                              properties:
-                                name:
-                                  type: string
-                                option:
-                                  description: VarOption defines whether a variable
-                                    is required or optional.
-                                  enum:
-                                  - Required
-                                  - Optional
-                                  type: string
-                              type: object
                             optional:
                               description: Specify whether the object must be defined.
                               type: boolean
                             port:
-                              description: "Port references a port defined in the
-                                service. \n If the referenced service is a pod-service,
-                                there will be multiple service objects matched, and
-                                the value will be presented in the following format:
-                                service1.name:port1,service2.name:port2..."
+                              description: "Port references a port or node-port defined
+                                in the service. \n If the referenced service is a
+                                pod-service, there will be multiple service objects
+                                matched, and the value will be presented in the following
+                                format: service1.name:port1,service2.name:port2..."
                               properties:
                                 name:
                                   type: string

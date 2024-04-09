@@ -942,21 +942,13 @@ type ServiceVars struct {
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
 
-	// Port references a port defined in the service.
+	// Port references a port or node-port defined in the service.
 	//
 	// If the referenced service is a pod-service, there will be multiple service objects matched,
 	// and the value will be presented in the following format: service1.name:port1,service2.name:port2...
 	//
 	// +optional
 	Port *NamedVar `json:"port,omitempty"`
-
-	// NodePort references a node-port defined in the service.
-	//
-	// If the referenced service is a pod-service, there will be multiple service objects matched,
-	// and the value will be presented in the following format: service1.name:nodePort1,service2.name:nodePort2...
-	//
-	// +optional
-	NodePort *NamedVar `json:"nodePort,omitempty"`
 }
 
 // CredentialVars defines the vars that can be referenced from a Credential (SystemAccount).

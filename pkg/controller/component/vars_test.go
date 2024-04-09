@@ -611,7 +611,7 @@ var _ = Describe("vars", func() {
 								Optional: required(),
 							},
 							ServiceVars: appsv1alpha1.ServiceVars{
-								NodePort: &appsv1alpha1.NamedVar{
+								Port: &appsv1alpha1.NamedVar{
 									Name:   "default",
 									Option: &appsv1alpha1.VarRequired,
 								},

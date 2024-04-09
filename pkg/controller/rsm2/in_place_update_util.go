@@ -301,6 +301,9 @@ func getPodUpdatePolicy(rsm *workloads.ReplicatedStateMachine, pod *corev1.Pod) 
 	templateList := buildInstanceTemplateExts(rsmExt)
 	parentName, _ := ParseParentNameAndOrdinal(pod.Name)
 	templateName, _ := strings.CutPrefix(parentName, rsm.Name)
+	if len(templateName) > 0 {
+		templateName, _ = strings.CutPrefix(templateName, "-")
+	}
 	index := slices.IndexFunc(templateList, func(templateExt *instanceTemplateExt) bool {
 		return templateName == templateExt.Name
 	})

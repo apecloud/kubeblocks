@@ -91,6 +91,12 @@ func injectSidecarContainers(compDef *appsv1alpha1.ComponentDefinition, synthesi
 		}
 		containers = append(containers, sidecar.Container)
 	}
+
+	// replace containers env default credential placeholder
+	replacedEnvs := component.GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName)
+	for _, c := range containers {
+		c.Env = component.ReplaceSecretEnvVars(replacedEnvs, c.Env)
+	}
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, containers...)
 	return containers
 }

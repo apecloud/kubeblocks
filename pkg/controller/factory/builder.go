@@ -147,7 +147,7 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, comp
 	}
 
 	monitor, container := getMetricsSidecarContainers(synthesizedComp.Sidecars, componentDef.Spec.SidecarContainerSpecs)
-	if monitor != nil {
+	if monitor == nil {
 		return nil
 	}
 
@@ -158,17 +158,16 @@ func getMetricsSidecarContainers(sidecars []string, containerSpecs []appsv1alpha
 	for i := range containerSpecs {
 		spec := &containerSpecs[i]
 		if slices.Contains(sidecars, spec.Name) && isMetricsContainer(spec) {
-			return spec.SidecarContainerSources.Monitor, &spec.Container
+			return spec.Monitor, &spec.Container
 		}
 	}
 	return nil, nil
 }
 
 func isMetricsContainer(sidecarContainer *appsv1alpha1.SidecarContainerSpec) bool {
-	return sidecarContainer.SidecarContainerSources != nil &&
-		sidecarContainer.SidecarContainerSources.Monitor != nil &&
-		sidecarContainer.SidecarContainerSources.Monitor.SidecarKind == appsv1alpha1.MetricsKind &&
-		sidecarContainer.SidecarContainerSources.Monitor.ScrapeConfig != nil
+	return sidecarContainer.Monitor != nil &&
+		sidecarContainer.Monitor.SidecarKind == appsv1alpha1.MetricsKind &&
+		sidecarContainer.Monitor.ScrapeConfig != nil
 }
 
 func setDefaultResourceLimits(its *workloads.InstanceSet) {

@@ -9762,6 +9762,8 @@ spec:
                                 - traces
                                 type: string
                               scrapeConfig:
+                                description: Defines the scrape configuration for
+                                  the prometheus.
                                 properties:
                                   metricsPath:
                                     description: Specifies the http/https url path
@@ -10553,6 +10555,8 @@ spec:
                         required:
                         - name
                         type: object
+                      maxItems: 32
+                      minItems: 1
                       type: array
                       x-kubernetes-list-map-keys:
                       - name

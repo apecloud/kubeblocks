@@ -512,6 +512,9 @@ type MonitorSource struct {
 	// +kubebuilder:validation:Required
 	SidecarKind MonitorKind `json:"kind"`
 
+	// Defines the scrape configuration for the prometheus.
+	//
+	// +optional
 	ScrapeConfig *PrometheusScrapeConfig `json:"scrapeConfig,omitempty"`
 }
 
@@ -529,7 +532,7 @@ type SidecarContainerSpec struct {
 	// In order to allow prometheus to scrape metrics from the sidecar container, the schema, port, and url will be injected into the annotation of the service.
 	//
 	// +optional
-	SidecarContainerSources *SidecarContainerSource `json:",inline"`
+	*SidecarContainerSource `json:",inline"`
 }
 
 
@@ -713,12 +716,12 @@ type ClusterComponentDefinition struct {
 	// Defines the sidecar containers that will be attached to the component's main container.
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:MinItems= 1
+	// +kubebuilder:validation:MaxItems= 32
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	// +optional
-	// +optional
 	// +optional
 	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarContainerSpecs,omitempty"`
 }

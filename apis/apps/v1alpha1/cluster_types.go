@@ -825,6 +825,9 @@ type ClusterComponentSpec struct {
 
 	// Defines the sidecar containers that will be attached to the component's main container.
 	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=32
+	// +listType=set
 	// +optional
 	Sidecars []string `json:"sidecars,omitempty"`
 }

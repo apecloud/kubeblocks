@@ -176,6 +176,8 @@ type ComponentDefinitionSpec struct {
 	// Defines the sidecar containers that will be attached to the component's main container.
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:MinItems:= 1
+	// +kubebuilder:validation:MaxItems:= 32
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map

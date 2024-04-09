@@ -5537,8 +5537,8 @@ func (in *SidecarContainerSource) DeepCopy() *SidecarContainerSource {
 func (in *SidecarContainerSpec) DeepCopyInto(out *SidecarContainerSpec) {
 	*out = *in
 	in.Container.DeepCopyInto(&out.Container)
-	if in.SidecarContainerSources != nil {
-		in, out := &in.SidecarContainerSources, &out.SidecarContainerSources
+	if in.SidecarContainerSource != nil {
+		in, out := &in.SidecarContainerSource, &out.SidecarContainerSource
 		*out = new(SidecarContainerSource)
 		(*in).DeepCopyInto(*out)
 	}

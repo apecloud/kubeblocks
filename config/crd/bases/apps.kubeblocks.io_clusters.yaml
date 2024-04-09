@@ -4509,7 +4509,10 @@ spec:
                         to the component's main container.
                       items:
                         type: string
+                      maxItems: 32
+                      minItems: 1
                       type: array
+                      x-kubernetes-list-type: set
                     switchPolicy:
                       description: "Defines the strategy for switchover and failover
                         when workloadType is Replication. \n Deprecated since v0.9.
@@ -11120,7 +11123,10 @@ spec:
                             attached to the component's main container.
                           items:
                             type: string
+                          maxItems: 32
+                          minItems: 1
                           type: array
+                          x-kubernetes-list-type: set
                         switchPolicy:
                           description: "Defines the strategy for switchover and failover
                             when workloadType is Replication. \n Deprecated since

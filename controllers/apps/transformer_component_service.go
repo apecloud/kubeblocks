@@ -21,6 +21,8 @@ package apps
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"golang.org/x/exp/maps"
@@ -34,6 +36,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
+)
+
+var (
+	ordinalRegexpPattern = `-\d+$`
+	ordinalRegexp        = regexp.MustCompile(ordinalRegexpPattern)
 )
 
 // componentServiceTransformer handles component services.
@@ -68,6 +76,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			}
 		}
 	}
+	// TODO: delete orphaned services
 	return nil
 }
 
@@ -80,24 +89,77 @@ func (t *componentServiceTransformer) buildCompService(comp *appsv1alpha1.Compon
 	if service.PodService == nil || !*service.PodService {
 		return t.buildServices(comp, synthesizeComp, []*appsv1alpha1.ComponentService{service})
 	}
+	return t.buildPodService(comp, synthesizeComp, service)
+}
+
+func (t *componentServiceTransformer) buildPodService(comp *appsv1alpha1.Component,
+	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) ([]*corev1.Service, error) {
+	pods, err := t.podsNameNOrdinal(synthesizeComp)
+	if err != nil {
+		return nil, err
+	}
 
 	services := make([]*appsv1alpha1.ComponentService, 0)
-	for i := int32(0); i < synthesizeComp.Replicas; i++ {
+	for name, ordinal := range pods {
 		svc := service.DeepCopy()
-		svc.Name = fmt.Sprintf("%s-%d", service.Name, i)
+		svc.Name = fmt.Sprintf("%s-%d", service.Name, ordinal)
 		if len(service.ServiceName) == 0 {
-			svc.ServiceName = fmt.Sprintf("%d", i)
+			svc.ServiceName = fmt.Sprintf("%d", ordinal)
 		} else {
-			svc.ServiceName = fmt.Sprintf("%s-%d", service.ServiceName, i)
+			svc.ServiceName = fmt.Sprintf("%s-%d", service.ServiceName, ordinal)
 		}
 		if svc.Spec.Selector == nil {
 			svc.Spec.Selector = make(map[string]string)
 		}
-		// TODO(xingran): use StatefulSet's podName as default selector to select unique pod
-		svc.Spec.Selector[constant.StatefulSetPodNameLabelKey] = constant.GeneratePodName(synthesizeComp.ClusterName, synthesizeComp.Name, int(i))
+		svc.Spec.Selector[constant.KBAppPodNameLabelKey] = name
 		services = append(services, svc)
 	}
 	return t.buildServices(comp, synthesizeComp, services)
+}
+
+func (t *componentServiceTransformer) podsNameNOrdinal(synthesizeComp *component.SynthesizedComponent) (map[string]int, error) {
+	templateReplicas := func(template appsv1alpha1.InstanceTemplate) int32 {
+		replicas := int32(1) // default replicas
+		if template.Replicas != nil {
+			replicas = *template.Replicas
+		}
+		return replicas
+	}
+
+	templateReplicasCnt := int32(0)
+	for _, template := range synthesizeComp.Instances {
+		if len(template.Name) > 0 {
+			templateReplicasCnt += templateReplicas(template)
+		}
+	}
+
+	podNames := make([]string, 0)
+	workloadName := constant.GenerateRSMNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
+	for _, template := range synthesizeComp.Instances {
+		templateNames := rsm2.GenerateInstanceNamesFromTemplate(workloadName, template.Name, templateReplicas(template), synthesizeComp.OfflineInstances)
+		podNames = append(podNames, templateNames...)
+	}
+	if templateReplicasCnt < synthesizeComp.Replicas {
+		names := rsm2.GenerateInstanceNamesFromTemplate(workloadName, "", synthesizeComp.Replicas-templateReplicasCnt, synthesizeComp.OfflineInstances)
+		podNames = append(podNames, names...)
+	}
+
+	pods := make(map[string]int)
+	for _, name := range podNames {
+		ordinal, err := func() (int, error) {
+			result := ordinalRegexp.FindString(name)
+			if len(result) == 0 {
+				return 0, fmt.Errorf("invalid pod name: %s", name)
+			}
+			o, _ := strconv.Atoi(result[1:])
+			return o, nil
+		}()
+		if err != nil {
+			return nil, err
+		}
+		pods[name] = ordinal
+	}
+	return pods, nil
 }
 
 func (t *componentServiceTransformer) buildServices(comp *appsv1alpha1.Component,

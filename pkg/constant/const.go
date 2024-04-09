@@ -93,23 +93,25 @@ const (
 	ZoneLabelKey         = "topology.kubernetes.io/zone"
 
 	// kubeblocks.io labels
-	BackupProtectionLabelKey                 = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
-	AddonProviderLabelKey                    = "kubeblocks.io/provider"          // AddonProviderLabelKey marks the addon provider
-	RoleLabelKey                             = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
-	ReadyWithoutPrimaryKey                   = "kubeblocks.io/ready-without-primary"
-	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
-	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
-	KBAppClusterUIDLabelKey                  = "apps.kubeblocks.io/cluster-uid"
-	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
-	KBAppShardingNameLabelKey                = "apps.kubeblocks.io/sharding-name"
-	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref" // refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
-	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type"      // refer clusterDefinition.Spec.Type (deprecated)
-	KBManagedByKey                           = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
-	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
-	VolumeClaimTemplateNameLabelKey          = "apps.kubeblocks.io/vct-name"
-	KBAppServiceVersionLabelKey              = "apps.kubeblocks.io/service-version"
-	VolumeClaimTemplateNameLabelKeyForLegacy = "vct.kubeblocks.io/name" // Deprecated: only compatible with version 0.5, will be removed in 0.7
-	WorkloadTypeLabelKey                     = "apps.kubeblocks.io/workload-type"
+	BackupProtectionLabelKey = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
+	AddonProviderLabelKey    = "kubeblocks.io/provider"          // AddonProviderLabelKey marks the addon provider
+	RoleLabelKey             = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
+	ReadyWithoutPrimaryKey   = "kubeblocks.io/ready-without-primary"
+	VolumeTypeLabelKey       = "kubeblocks.io/volume-type"
+	ClusterAccountLabelKey   = "account.kubeblocks.io/name"
+
+	KBAppClusterUIDLabelKey         = "apps.kubeblocks.io/cluster-uid"
+	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
+	KBAppShardingNameLabelKey       = "apps.kubeblocks.io/sharding-name"
+	KBAppComponentDefRefLabelKey    = "apps.kubeblocks.io/component-def-ref" // refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
+	KBAppClusterDefTypeLabelKey     = "apps.kubeblocks.io/cluster-type"      // refer clusterDefinition.Spec.Type (deprecated)
+	KBManagedByKey                  = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
+	PVCNameLabelKey                 = "apps.kubeblocks.io/pvc-name"
+	VolumeClaimTemplateNameLabelKey = "apps.kubeblocks.io/vct-name"
+	KBAppServiceVersionLabelKey     = "apps.kubeblocks.io/service-version"
+	WorkloadTypeLabelKey            = "apps.kubeblocks.io/workload-type"
+	KBAppPodNameLabelKey            = "apps.kubeblocks.io/pod-name"
+
 	ClassProviderLabelKey                    = "class.kubeblocks.io/provider"
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"
 	ClusterVerLabelKey                       = "clusterversion.kubeblocks.io/name"
@@ -132,6 +134,7 @@ const (
 	ServiceDescriptorNameLabelKey            = "servicedescriptor.kubeblocks.io/name"
 	RestoreForHScaleLabelKey                 = "apps.kubeblocks.io/restore-for-hscale"
 	ResourceConstraintProviderLabelKey       = "resourceconstraint.kubeblocks.io/provider"
+	VolumeClaimTemplateNameLabelKeyForLegacy = "vct.kubeblocks.io/name" // Deprecated: only compatible with version 0.5, will be removed in 0.7
 
 	// StatefulSetPodNameLabelKey is used to mark the pod name of the StatefulSet
 	StatefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"

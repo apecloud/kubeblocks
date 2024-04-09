@@ -254,6 +254,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddControllerRevisionHashLabel(revision).
+		AddLabelsInMap(map[string]string{constant.KBAppPodNameLabelKey: name}).
 		SetPodSpec(*template.Spec.DeepCopy()).
 		GetObject()
 	// Set these immutable fields only on initial Pod creation, not updates.

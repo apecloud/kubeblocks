@@ -796,7 +796,9 @@ type Service struct {
 	// otherwise, it indicates the name of the service.
 	// Others can refer to this service by its name. (e.g., connection credential)
 	// Cannot be updated.
-	// +required
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=25
 	Name string `json:"name"`
 
 	// ServiceName defines the name of the underlying service object.
@@ -813,15 +815,18 @@ type Service struct {
 
 	// If ServiceType is LoadBalancer, cloud provider related parameters can be put here
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.
+	//
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Spec defines the behavior of a service.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	//
 	// +optional
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 
 	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
+	//
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
 }

@@ -27,7 +27,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -44,6 +43,7 @@ type realUpdatePlan struct {
 	pods            []corev1.Pod
 	dag             *graph.DAG
 	podsToBeUpdated []*corev1.Pod
+	isPodUpdated    func(*workloads.ReplicatedStateMachine, *corev1.Pod) (bool, error)
 }
 
 var _ updatePlan = &realUpdatePlan{}
@@ -71,21 +71,24 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 		return ErrWait
 	}
 
-	isRoleful := func() bool { return len(p.rsm.Spec.Roles) > 0 }()
-	isHeterogeneous := func() bool { return len(p.rsm.Status.UpdateRevisions) > 0 }()
-	updateRevision := p.rsm.Status.UpdateRevision
-	if isHeterogeneous {
-		updateRevisions, err := rsmcommon.GetUpdateRevisions(p.rsm.Status.UpdateRevisions)
-		if err != nil {
-			return err
-		}
-		updateRevision = updateRevisions[pod.Name]
+	var (
+		isPodUpdated bool
+		err          error
+	)
+	if p.isPodUpdated == nil {
+		isPodUpdated, err = p.defaultIsPodUpdatedFunc(&p.rsm, pod)
+	} else {
+		isPodUpdated, err = p.isPodUpdated(&p.rsm, pod)
+	}
+	if err != nil {
+		return err
 	}
 	// if pod is the latest version, we do nothing
-	if intctrlutil.GetPodRevision(pod) == updateRevision {
+	if isPodUpdated {
 		if !intctrlutil.PodIsReady(pod) {
 			return ErrWait
 		}
+		isRoleful := func() bool { return len(p.rsm.Spec.Roles) > 0 }()
 		if isRoleful && !intctrlutil.PodIsReadyWithLabel(*pod) {
 			return ErrWait
 		}
@@ -95,6 +98,10 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	// delete the pod to trigger associate StatefulSet to re-create it
 	p.podsToBeUpdated = append(p.podsToBeUpdated, pod)
 	return ErrStop
+}
+
+func (p *realUpdatePlan) defaultIsPodUpdatedFunc(rsm *workloads.ReplicatedStateMachine, pod *corev1.Pod) (bool, error) {
+	return intctrlutil.GetPodRevision(pod) == rsm.Status.UpdateRevision, nil
 }
 
 // build builds the update plan based on updateStrategy
@@ -212,10 +219,15 @@ func newUpdatePlan(rsm workloads.ReplicatedStateMachine, pods []corev1.Pod) upda
 	}
 }
 
-func NewUpdatePlan(rsm workloads.ReplicatedStateMachine, pods []*corev1.Pod) updatePlan {
+func NewUpdatePlan(rsm workloads.ReplicatedStateMachine, pods []*corev1.Pod, isPodUpdated func(*workloads.ReplicatedStateMachine, *corev1.Pod) (bool, error)) updatePlan {
 	var podList []corev1.Pod
 	for _, pod := range pods {
 		podList = append(podList, *pod)
 	}
-	return newUpdatePlan(rsm, podList)
+	return &realUpdatePlan{
+		rsm:          rsm,
+		pods:         podList,
+		dag:          graph.NewDAG(),
+		isPodUpdated: isPodUpdated,
+	}
 }

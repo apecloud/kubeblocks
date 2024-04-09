@@ -190,10 +190,7 @@ func ValidateDupInstanceNames[T any](instances []T, getNameFunc func(item T) str
 }
 
 func buildInstanceName2TemplateMap(rsmExt *rsmExt) (map[string]*instanceTemplateExt, error) {
-	instanceTemplateList, err := buildInstanceTemplateExts(rsmExt)
-	if err != nil {
-		return nil, err
-	}
+	instanceTemplateList := buildInstanceTemplateExts(rsmExt)
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
 	for _, template := range instanceTemplateList {
@@ -207,7 +204,7 @@ func buildInstanceName2TemplateMap(rsmExt *rsmExt) (map[string]*instanceTemplate
 	getNameFunc := func(n string) string {
 		return n
 	}
-	if err = ValidateDupInstanceNames(instanceNameList, getNameFunc); err != nil {
+	if err := ValidateDupInstanceNames(instanceNameList, getNameFunc); err != nil {
 		return nil, err
 	}
 
@@ -244,12 +241,15 @@ func generateInstanceNames(parentName, templateName string,
 	return instanceNameList, ordinal
 }
 
-func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.ReplicatedStateMachine) (*instance, error) {
-	revision, err := buildInstanceTemplateRevision(template, parent)
-	if err != nil {
-		return nil, err
-	}
+func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.ReplicatedStateMachine, revision string) (*instance, error) {
 	// 1. build a pod from template
+	var err error
+	if len(revision) == 0 {
+		revision, err = buildInstanceTemplateRevision(template, parent)
+		if err != nil {
+			return nil, err
+		}
+	}
 	pod := builder.NewPodBuilder(parent.Namespace, name).
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
@@ -291,7 +291,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 		}
 	})
 
-	if err = controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
+	if err := controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
 	inst := &instance{
@@ -424,7 +424,7 @@ func buildInstanceTemplateRevision(template *instanceTemplateExt, parent *worklo
 	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
-func buildInstanceTemplateExts(rsmExt *rsmExt) ([]*instanceTemplateExt, error) {
+func buildInstanceTemplateExts(rsmExt *rsmExt) []*instanceTemplateExt {
 	envConfigName := rsm1.GetEnvConfigMapName(rsmExt.rsm.Name)
 	defaultTemplate := rsm1.BuildPodTemplate(rsmExt.rsm, envConfigName)
 	makeInstanceTemplateExt := func() *instanceTemplateExt {
@@ -445,10 +445,10 @@ func buildInstanceTemplateExts(rsmExt *rsmExt) ([]*instanceTemplateExt, error) {
 		instanceTemplateExtList = append(instanceTemplateExtList, templateExt)
 	}
 
-	return instanceTemplateExtList, nil
+	return instanceTemplateExtList
 }
 
-func BuildInstanceTemplates(totalReplicas int32, instances []workloads.InstanceTemplate, instancesCompressed *corev1.ConfigMap) []*workloads.InstanceTemplate {
+func buildInstanceTemplates(totalReplicas int32, instances []workloads.InstanceTemplate, instancesCompressed *corev1.ConfigMap) []*workloads.InstanceTemplate {
 	var instanceTemplateList []*workloads.InstanceTemplate
 	var replicasInTemplates int32
 	instanceTemplates := getInstanceTemplates(instances, instancesCompressed)
@@ -594,7 +594,7 @@ func buildRSMExt(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.Objec
 		return nil, err
 	}
 
-	instanceTemplateList := BuildInstanceTemplates(*rsm.Spec.Replicas, rsm.Spec.Instances, instancesCompressed)
+	instanceTemplateList := buildInstanceTemplates(*rsm.Spec.Replicas, rsm.Spec.Instances, instancesCompressed)
 
 	return &rsmExt{
 		rsm:               rsm,

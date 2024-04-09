@@ -55,18 +55,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		podList = append(podList, *pod)
 	}
 	// 2. calculate status summary
-	// the key is how to know pod is updated.
-	// proposal 1:
-	// build a pod.name to revision map, store it in status.currentRevisions and status.updatedRevisions.
-	// keep the status.currentRevision and status.updatedRevision as the last template's revision.
-	//
-	// proposal 2:
-	// build a pod.name to revision map, store it in a cm. set currentRevision and updatedRevision as the name of the cm.
-	//
-	// proposal 3:
-	// patch updated revision to the outdated pod as a label
-	//
-	// proposal 1 is used currently.
 	updateRevisions, err := rsmcommon.GetUpdateRevisions(rsm.Status.UpdateRevisions)
 	if err != nil {
 		return nil, err
@@ -86,8 +74,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			switch revision, ok := updateRevisions[pod.Name]; {
-			case !ok, revision != getPodRevision(pod):
+			isPodUpdated, err := IsPodUpdated(rsm, pod)
+			if err != nil {
+				return nil, err
+			}
+			switch _, ok := updateRevisions[pod.Name]; {
+			case !ok, !isPodUpdated:
 				currentReplicas++
 			default:
 				updatedReplicas++

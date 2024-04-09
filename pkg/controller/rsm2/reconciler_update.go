@@ -31,7 +31,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 )
 
 // updateReconciler handles the updates of instances based on the UpdateStrategy.
@@ -112,19 +111,13 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 
 	// TODO(free6om): compute updateCount from PodManagementPolicy(Serial/OrderedReady, Parallel, BestEffortParallel).
 	// align MemberUpdateStrategy with PodManagementPolicy if it has nil value.
-	//rsmForPlan := getRSMForUpdatePlan(rsm)
-	//plan := rsm1.NewUpdatePlan(*rsmForPlan, oldPodList)
-	//podsToBeUpdated, err := plan.Execute()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//updateCount := len(podsToBeUpdated)
-	updateCount := 1
-
-	updateRevisions, err := rsmcommon.GetUpdateRevisions(rsm.Status.UpdateRevisions)
+	rsmForPlan := getRSMForUpdatePlan(rsm)
+	plan := rsm1.NewUpdatePlan(*rsmForPlan, oldPodList, IsPodUpdated)
+	podsToBeUpdated, err := plan.Execute()
 	if err != nil {
 		return nil, err
 	}
+	updateCount := len(podsToBeUpdated)
 
 	updatingPods := 0
 	updatedPods := 0
@@ -142,12 +135,16 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			tree.Logger.Info(fmt.Sprintf("RSM %s/%s blocks on scale-in as the pod %s is not healthy", rsm.Namespace, rsm.Name, pod.Name))
 			break
 		}
-		newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], rsm)
 		if err != nil {
 			return nil, err
 		}
-		updatePolicy := getPodUpdatePolicy(pod, newInstance.pod, updateRevisions[pod.Name])
+
+		updatePolicy, err := getPodUpdatePolicy(rsm, pod)
+		if err != nil {
+			return nil, err
+		}
 		if updatePolicy == InPlaceUpdatePolicy {
+			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], rsm, getPodRevision(pod))
 			newPod := copyAndMerge(pod, newInstance.pod)
 			if err = tree.Update(newPod); err != nil {
 				return nil, err

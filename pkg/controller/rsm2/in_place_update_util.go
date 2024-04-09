@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/rogpeppe/go-internal/semver"
 	"golang.org/x/exp/slices"
@@ -29,6 +31,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -281,29 +285,59 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func getPodUpdatePolicy(old, new *corev1.Pod, updateRevision string) PodUpdatePolicy {
-	if getPodRevision(old) != updateRevision {
-		return RecreatePolicy
+func getPodUpdatePolicy(rsm *workloads.ReplicatedStateMachine, pod *corev1.Pod) (PodUpdatePolicy, error) {
+	updateRevisions, err := rsmcommon.GetUpdateRevisions(rsm.Status.UpdateRevisions)
+	if err != nil {
+		return NoOpsPolicy, err
 	}
 
-	basicUpdate := !equalBasicInPlaceFields(old, new)
+	if getPodRevision(pod) != updateRevisions[pod.Name] {
+		return RecreatePolicy, nil
+	}
+
+	rsmExt, err := buildRSMExt(rsm, nil)
+	if err != nil {
+		return NoOpsPolicy, err
+	}
+	templateList := buildInstanceTemplateExts(rsmExt)
+	parentName, _ := ParseParentNameAndOrdinal(pod.Name)
+	templateName, _ := strings.CutPrefix(parentName, rsm.Name)
+	index := slices.IndexFunc(templateList, func(templateExt *instanceTemplateExt) bool {
+		return templateName == templateExt.Name
+	})
+	if index < 0 {
+		return NoOpsPolicy, fmt.Errorf("no corresponding template found for instance %s", pod.Name)
+	}
+	inst, err := buildInstanceByTemplate(pod.Name, templateList[index], rsm, getPodRevision(pod))
+	if err != nil {
+		return NoOpsPolicy, err
+	}
+	basicUpdate := !equalBasicInPlaceFields(pod, inst.pod)
 	if viper.GetBool(FeatureGateIgnorePodVerticalScaling) {
 		if basicUpdate {
-			return InPlaceUpdatePolicy
+			return InPlaceUpdatePolicy, nil
 		}
-		return NoOpsPolicy
+		return NoOpsPolicy, nil
 	}
 
-	resourceUpdate := !equalResourcesInPlaceFields(old, new)
+	resourceUpdate := !equalResourcesInPlaceFields(pod, inst.pod)
 	if resourceUpdate {
 		if supportPodVerticalScaling() {
-			return InPlaceUpdatePolicy
+			return InPlaceUpdatePolicy, nil
 		}
-		return RecreatePolicy
+		return RecreatePolicy, nil
 	}
 
 	if basicUpdate {
-		return InPlaceUpdatePolicy
+		return InPlaceUpdatePolicy, nil
 	}
-	return NoOpsPolicy
+	return NoOpsPolicy, nil
+}
+
+// IsPodUpdated tells whether the pod's spec is as expected in the rsm.
+// This function is meant to replace the old fashion `GetPodRevision(pod) == updateRevision`,
+// as the pod template revision has been redefined in rsm2.
+func IsPodUpdated(rsm *workloads.ReplicatedStateMachine, pod *corev1.Pod) (bool, error) {
+	policy, err := getPodUpdatePolicy(rsm, pod)
+	return policy == NoOpsPolicy, err
 }

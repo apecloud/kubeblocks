@@ -180,7 +180,7 @@ var _ = Describe("instance util test", func() {
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
 			template := nameTemplate[name]
-			replica, err := buildInstanceByTemplate(name, template, rsm)
+			replica, err := buildInstanceByTemplate(name, template, rsm, "")
 			Expect(err).Should(BeNil())
 			Expect(replica.pod).ShouldNot(BeNil())
 			Expect(replica.pvcs).ShouldNot(BeNil())

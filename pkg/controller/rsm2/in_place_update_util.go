@@ -20,15 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm2
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-	"github.com/rogpeppe/go-internal/semver"
-	corev1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"reflect"
 
+	"github.com/rogpeppe/go-internal/semver"
+	"golang.org/x/exp/slices"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type PodUpdatePolicy string
@@ -39,17 +41,17 @@ const (
 	InPlaceUpdatePolicy PodUpdatePolicy = "InPlaceUpdate"
 )
 
-func supportPodVerticalScaling() (bool, error) {
+func supportPodVerticalScaling() bool {
 	kubeVersion, err := utils.GetKubeVersion()
+	// if the Kubernetes version is unknown, assume pod vertical scaling is not supported.
 	if err != nil {
-		return false, err
+		return false
 	}
-	if semver.Compare(kubeVersion, "1.29") >= 0 {
-		return true, nil
+	if semver.Compare(kubeVersion, "v1.29") >= 0 {
+		return true
 	}
 
-	enabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
-	return enabled, nil
+	return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 }
 
 func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
@@ -80,29 +82,6 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	return template
 }
 
-func copyBasicInPlaceFields(src *corev1.Pod) *corev1.Pod {
-	var (
-		containers     []corev1.Container
-		initContainers []corev1.Container
-	)
-	for _, container := range src.Spec.Containers {
-		containers = append(containers, corev1.Container{Image: container.Image})
-	}
-	for _, container := range src.Spec.InitContainers {
-		initContainers = append(initContainers, corev1.Container{Image: container.Image})
-	}
-	dst := builder.NewPodBuilder("", "").
-		AddAnnotationsInMap(src.Annotations).
-		AddLabelsInMap(src.Labels).
-		AddTolerations(src.Spec.Tolerations...).
-		SetActiveDeadlineSeconds(src.Spec.ActiveDeadlineSeconds).
-		SetInitContainers(initContainers).
-		SetContainers(containers).
-		GetObject()
-	return dst
-
-}
-
 func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList, corev1.ResourceList) {
 	requests := make(corev1.ResourceList)
 	limits := make(corev1.ResourceList)
@@ -123,19 +102,6 @@ func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList
 		}
 	}
 	return requests, limits
-}
-
-func copyResourceInPlaceFields(src *corev1.Pod) *corev1.Pod {
-	var containers []corev1.Container
-	for _, container := range src.Spec.Containers {
-		requests, limits := copyRequestsNLimitsFields(&container)
-		resources := corev1.ResourceRequirements{
-			Requests: requests,
-			Limits:   limits,
-		}
-		containers = append(containers, corev1.Container{Resources: resources})
-	}
-	return builder.NewPodBuilder("", "").SetContainers(containers).GetObject()
 }
 
 func mergeInPlaceFields(src, dst *corev1.Pod) {
@@ -181,37 +147,163 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 	}
 }
 
-func shouldDoPodUpdate(old, new *corev1.Pod, updateRevisions map[string]string) (PodUpdatePolicy, error) {
-	if getPodRevision(old) != updateRevisions[old.Name] {
-		return RecreatePolicy, nil
+func equalField(old, new any) bool {
+	oType := reflect.TypeOf(old)
+	nType := reflect.TypeOf(new)
+	if oType.Kind() != nType.Kind() {
+		return false
+	}
+	getQuantity := func(resources corev1.ResourceList, key corev1.ResourceName) (q resource.Quantity) {
+		q = resource.MustParse("0")
+		if len(resources) == 0 {
+			return
+		}
+		v, ok := resources[key]
+		if !ok {
+			return
+		}
+		q = v
+		return
+	}
+	switch old.(type) {
+	case map[string]string:
+		oldMap, _ := old.(map[string]string)
+		newMap, _ := new.(map[string]string)
+		if len(newMap) > len(oldMap) {
+			return false
+		}
+		for k, v := range newMap {
+			ov, ok := oldMap[k]
+			if !ok {
+				return false
+			}
+			if ov != v {
+				return false
+			}
+		}
+		return true
+	case *int64, string:
+		return reflect.DeepEqual(old, new)
+	case []corev1.Container:
+		ocs, _ := old.([]corev1.Container)
+		ncs, _ := new.([]corev1.Container)
+		if len(ocs) != len(ncs) {
+			return false
+		}
+		for _, nc := range ncs {
+			index := slices.IndexFunc(ocs, func(oc corev1.Container) bool {
+				return nc.Name == oc.Name
+			})
+			if index < 0 {
+				return false
+			}
+			if nc.Image != ocs[index].Image {
+				return false
+			}
+		}
+		return true
+	case []corev1.Toleration:
+		ot, _ := old.([]corev1.Toleration)
+		nt, _ := new.([]corev1.Toleration)
+		if nt == nil {
+			return true
+		}
+		// according to the Pod API spec, tolerations can only be appended.
+		// means old tolerations must be in new toleration list.
+		for _, t := range ot {
+			if slices.IndexFunc(nt, func(toleration corev1.Toleration) bool {
+				return reflect.DeepEqual(t, toleration)
+			}) < 0 {
+				return false
+			}
+		}
+		return true
+	case corev1.ResourceList:
+		or, _ := old.(corev1.ResourceList)
+		nr, _ := new.(corev1.ResourceList)
+		oc := getQuantity(or, corev1.ResourceCPU)
+		om := getQuantity(or, corev1.ResourceMemory)
+		nc := getQuantity(nr, corev1.ResourceCPU)
+		nm := getQuantity(nr, corev1.ResourceMemory)
+		return oc.Equal(nc) && om.Equal(nm)
+	}
+	return false
+}
+
+func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
+	// Only comparing annotations and labels that are relevant to the new spec.
+	// These two fields might be modified by other controllers without the RSM controller knowing.
+	// For instance, two new annotations have been added by Patroni.
+	// There are two strategies to handle this situation: override or replace.
+	// The recreation approach (recreating pod(s) when any field is updated in the pod template) used by StatefulSet/Deployment/DaemonSet
+	// is a replacement policy.
+	// Here, we use the override policy, which means keeping the annotations or labels that the new instance template doesn't care about during an in-place update.
+	if !equalField(old.Annotations, new.Annotations) {
+		return false
+	}
+	if !equalField(old.Labels, new.Labels) {
+		return false
+	}
+	if !equalField(old.Spec.ActiveDeadlineSeconds, new.Spec.ActiveDeadlineSeconds) {
+		return false
+	}
+	if !equalField(old.Spec.InitContainers, new.Spec.InitContainers) {
+		return false
+	}
+	if !equalField(old.Spec.Containers, new.Spec.Containers) {
+		return false
+	}
+	if !equalField(old.Spec.Tolerations, new.Spec.Tolerations) {
+		return false
+	}
+	return true
+}
+
+func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
+	if len(old.Spec.Containers) != len(new.Spec.Containers) {
+		return false
+	}
+	for _, nc := range new.Spec.Containers {
+		index := slices.IndexFunc(old.Spec.Containers, func(oc corev1.Container) bool {
+			return oc.Name == nc.Name
+		})
+		if index < 0 {
+			return false
+		}
+		oc := old.Spec.Containers[index]
+		if !equalField(oc.Resources.Requests, nc.Resources.Requests) {
+			return false
+		}
+		if !equalField(oc.Resources.Limits, nc.Resources.Limits) {
+			return false
+		}
+	}
+	return true
+}
+
+func getPodUpdatePolicy(old, new *corev1.Pod, updateRevision string) PodUpdatePolicy {
+	if getPodRevision(old) != updateRevision {
+		return RecreatePolicy
 	}
 
-	ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
-	oldInPlace := copyBasicInPlaceFields(old)
-	newInPlace := copyBasicInPlaceFields(new)
-	basicUpdate := reflect.DeepEqual(oldInPlace, newInPlace)
-	if ignorePodVerticalScaling {
+	basicUpdate := !equalBasicInPlaceFields(old, new)
+	if viper.GetBool(FeatureGateIgnorePodVerticalScaling) {
 		if basicUpdate {
-			return InPlaceUpdatePolicy, nil
+			return InPlaceUpdatePolicy
 		}
-		return NoOpsPolicy, nil
+		return NoOpsPolicy
 	}
 
-	oldInPlace = copyResourceInPlaceFields(old)
-	newInPlace = copyResourceInPlaceFields(new)
-	resourceUpdate := reflect.DeepEqual(oldInPlace, newInPlace)
+	resourceUpdate := !equalResourcesInPlaceFields(old, new)
 	if resourceUpdate {
-		supportVerticalScaling, err := supportPodVerticalScaling()
-		if err != nil {
-			return NoOpsPolicy, err
+		if supportPodVerticalScaling() {
+			return InPlaceUpdatePolicy
 		}
-		if supportVerticalScaling {
-			return InPlaceUpdatePolicy, nil
-		}
-		return RecreatePolicy, nil
+		return RecreatePolicy
 	}
+
 	if basicUpdate {
-		return InPlaceUpdatePolicy, nil
+		return InPlaceUpdatePolicy
 	}
-	return NoOpsPolicy, nil
+	return NoOpsPolicy
 }

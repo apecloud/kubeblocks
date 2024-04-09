@@ -112,13 +112,14 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 
 	// TODO(free6om): compute updateCount from PodManagementPolicy(Serial/OrderedReady, Parallel, BestEffortParallel).
 	// align MemberUpdateStrategy with PodManagementPolicy if it has nil value.
-	rsmForPlan := getRSMForUpdatePlan(rsm)
-	plan := rsm1.NewUpdatePlan(*rsmForPlan, oldPodList)
-	podsToBeUpdated, err := plan.Execute()
-	if err != nil {
-		return nil, err
-	}
-	updateCount := len(podsToBeUpdated)
+	//rsmForPlan := getRSMForUpdatePlan(rsm)
+	//plan := rsm1.NewUpdatePlan(*rsmForPlan, oldPodList)
+	//podsToBeUpdated, err := plan.Execute()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//updateCount := len(podsToBeUpdated)
+	updateCount := 1
 
 	updateRevisions, err := rsmcommon.GetUpdateRevisions(rsm.Status.UpdateRevisions)
 	if err != nil {
@@ -145,17 +146,15 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		if err != nil {
 			return nil, err
 		}
-		updatePolicy, err := shouldDoPodUpdate(pod, newInstance.pod, updateRevisions)
-		if err != nil {
-			return nil, err
-		}
-		if updatePolicy != NoOpsPolicy && !isTerminating(pod) {
-			if updatePolicy == InPlaceUpdatePolicy {
-				newPod := copyAndMerge(pod, newInstance.pod)
-				if err = tree.Update(newPod); err != nil {
-					return nil, err
-				}
-			} else {
+		updatePolicy := getPodUpdatePolicy(pod, newInstance.pod, updateRevisions[pod.Name])
+		if updatePolicy == InPlaceUpdatePolicy {
+			newPod := copyAndMerge(pod, newInstance.pod)
+			if err = tree.Update(newPod); err != nil {
+				return nil, err
+			}
+			updatingPods++
+		} else if updatePolicy == RecreatePolicy {
+			if !isTerminating(pod) {
 				if err = tree.Delete(pod); err != nil {
 					return nil, err
 				}

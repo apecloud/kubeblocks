@@ -885,18 +885,6 @@ This field can be used to specify the desired number of replicas.</p>
 </tr>
 <tr>
 <td>
-<code>monitor</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether monitoring is enabled.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>enabledLogs</code><br/>
 <em>
 []string
@@ -1065,6 +1053,18 @@ string
 <td>
 <em>(Optional)</em>
 <p>Defines RuntimeClassName for all Pods managed by this component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sidecars</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
 </td>
 </tr>
 </table>
@@ -1280,6 +1280,20 @@ Such instance-specific overrides can be specified in the <code>cluster.spec.comp
 </tr>
 <tr>
 <td>
+<code>sidecarContainerSpecs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">
+[]SidecarContainerSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>vars</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.EnvVar">
@@ -1426,21 +1440,6 @@ name: general
 - filePathPattern: /data/mysql/log/mysqld-slowquery.log
 name: slow
 </code></pre>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Define how the exporter integrates with the external Time Series Database.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -3792,20 +3791,6 @@ ClusterDefinitionProbes
 </tr>
 <tr>
 <td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specify the config that how to monitor the component.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>logConfigs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LogConfig">
@@ -4057,6 +4042,20 @@ configmap and mounted to the current component.</p>
 <p>Used to declare the service reference of the current component.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>sidecarContainerSpecs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">
+[]SidecarContainerSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentPhase">ClusterComponentPhase
@@ -4298,18 +4297,6 @@ cluster:
 name: &quot;my-postgres-cluster&quot;
 </code></pre>
 <p>The example above includes references to an external Redis Sentinel service and a PostgreSQL cluster managed by KubeBlocks.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether monitoring is enabled.</p>
 </td>
 </tr>
 <tr>
@@ -4598,6 +4585,18 @@ and avoiding conflicts with new instances.</li>
 ordinal consistency within the cluster.
 Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
 The cluster administrator must manually manage the cleanup and removal of these resources when they are no longer needed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sidecars</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
 </td>
 </tr>
 </tbody>
@@ -6964,6 +6963,20 @@ Such instance-specific overrides can be specified in the <code>cluster.spec.comp
 </tr>
 <tr>
 <td>
+<code>sidecarContainerSpecs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">
+[]SidecarContainerSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>vars</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.EnvVar">
@@ -7110,21 +7123,6 @@ name: general
 - filePathPattern: /data/mysql/log/mysqld-slowquery.log
 name: slow
 </code></pre>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Define how the exporter integrates with the external Time Series Database.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -8209,18 +8207,6 @@ This field can be used to specify the desired number of replicas.</p>
 </tr>
 <tr>
 <td>
-<code>monitor</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether monitoring is enabled.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>enabledLogs</code><br/>
 <em>
 []string
@@ -8389,6 +8375,18 @@ string
 <td>
 <em>(Optional)</em>
 <p>Defines RuntimeClassName for all Pods managed by this component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sidecars</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
 </td>
 </tr>
 </tbody>
@@ -11277,51 +11275,6 @@ If the shell is required, it must be explicitly invoked in the command.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ExporterConfig">ExporterConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>scrapePort</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
-Kubernetes api utils intstr.IntOrString
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the port on which the exporter listens for the Time Series Database to scrape metrics.</p>
-<p>It is a required field and accepts either an integer value or a string representation of the port number.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scrapePath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the URL path at which the exporter serves metrics data for scraping by the Time Series Database.
-The path should be configured on the exporter to respond with metrics in a compatible format.
-This field is optional and defaults to &ldquo;/metrics&rdquo; if not specified, with a maximum length of 128 characters.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Expose">Expose
 </h3>
 <p>
@@ -12615,10 +12568,18 @@ for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
+<h3 id="apps.kubeblocks.io/v1alpha1.MonitorKind">MonitorKind
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource</a>)
+</p>
+<div>
+<p>MonitorKind defines the kind of monitor.</p>
+</div>
+<h3 id="apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSource">SidecarContainerSource</a>)
 </p>
 <div>
 </div>
@@ -12632,33 +12593,27 @@ for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</
 <tbody>
 <tr>
 <td>
-<code>builtIn</code><br/>
+<code>kind</code><br/>
 <em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determines whether built-in monitoring is enabled.
-When true, monitoring metrics are automatically scraped.
-If set to false, configuration via <code>exporterConfig</code> is required to manage metrics scraping.</p>
-<p>Note: This field has no effect and will be deprecated soon.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>exporterConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ExporterConfig">
-ExporterConfig
+<a href="#apps.kubeblocks.io/v1alpha1.MonitorKind">
+MonitorKind
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Specifies the settings for an external Time Series Database exporter, including the scrape path and port.
-This configuration is necessary for the Time Series Database to scrape metrics from the specified exporter.</p>
-<p>This field is valid when <code>builtIn</code> is set to false.</p>
+<p>Defines the kind of monitor, such as metrics or logs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapeConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">
+PrometheusScrapeConfig
+</a>
+</em>
+</td>
+<td>
 </td>
 </tr>
 </tbody>
@@ -15457,6 +15412,72 @@ Kubernetes meta/v1.Time
 <td>
 <em>(Optional)</em>
 <p>Represents the completion time of object processing.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.PrometheusProtocol">PrometheusProtocol
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">PrometheusScrapeConfig</a>)
+</p>
+<div>
+<p>PrometheusProtocol defines the protocol of prometheus scrape metrics.</p>
+</div>
+<h3 id="apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">PrometheusScrapeConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metricsPath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the http/https url path to scrape for metrics.
+If empty, Prometheus uses the default value (e.g. <code>/metrics</code>).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>metricsPort</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the port name to scrape for metrics.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>protocol</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PrometheusProtocol">
+PrometheusProtocol
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the schema to use for scraping.
+<code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
+If empty, Prometheus uses the default value <code>http</code>.</p>
 </td>
 </tr>
 </tbody>
@@ -18546,6 +18567,87 @@ This allows for custom actions to be performed after a new shard is provisioned.
 This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 Resources and data associated with the corresponding Component will also be deleted.</li>
 </ul>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.SidecarContainerSource">SidecarContainerSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">SidecarContainerSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>monitor</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">
+MonitorSource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the function or purpose of the container, such as the monitor type sidecar.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">SidecarContainerSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Container</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
+Kubernetes core/v1.Container
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>Container</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>SidecarContainerSources</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSource">
+SidecarContainerSource
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>SidecarContainerSources</code> are embedded into this type.)
+</p>
+<em>(Optional)</em>
+<p>Define the function or purpose of the container, such as the monitor type sidecar.
+In order to allow prometheus to scrape metrics from the sidecar container, the schema, port, and url will be injected into the annotation of the service.</p>
 </td>
 </tr>
 </tbody>

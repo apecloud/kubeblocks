@@ -9757,8 +9757,9 @@ spec:
                                 description: Defines the kind of monitor, such as
                                   metrics or logs.
                                 enum:
-                                - http
-                                - https
+                                - metrics
+                                - logs
+                                - traces
                                 type: string
                               scrapeConfig:
                                 properties:

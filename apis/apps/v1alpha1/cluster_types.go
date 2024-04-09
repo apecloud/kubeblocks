@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -223,16 +222,6 @@ type ClusterSpec struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Storage ClusterStorage `json:"storage,omitempty"`
-
-	// The configuration of monitor.
-	//
-	// Deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	Monitor ClusterMonitor `json:"monitor,omitempty"`
 
 	// The configuration of network.
 	//
@@ -1175,15 +1164,6 @@ type ClusterComponentService struct {
 	//
 	// +optional
 	PodService *bool `json:"podService,omitempty"`
-}
-
-// ClusterMonitor is deprecated since v0.9.
-type ClusterMonitor struct {
-	// Defines the frequency at which monitoring occurs. If set to 0, monitoring is disabled.
-	//
-	// +kubebuilder:validation:XIntOrString
-	// +optional
-	MonitoringInterval *intstr.IntOrString `json:"monitoringInterval,omitempty"`
 }
 
 // ClusterNetwork is deprecated since v0.9.

@@ -1220,7 +1220,7 @@ const (
 
 // MonitorKind defines the kind of monitor.
 // +enum
-// +kubebuilder:validation:Enum={http,https}
+// +kubebuilder:validation:Enum={metrics,logs,traces}
 type MonitorKind string
 
 const (

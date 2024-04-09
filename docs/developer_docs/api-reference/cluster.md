@@ -378,23 +378,6 @@ Existing usage should be updated to the current preferred approach to avoid comp
 </tr>
 <tr>
 <td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterMonitor">
-ClusterMonitor
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The configuration of monitor.</p>
-<p>Deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>network</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterNetwork">
@@ -5254,38 +5237,6 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterMonitor">ClusterMonitor
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>)
-</p>
-<div>
-<p>ClusterMonitor is deprecated since v0.9.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>monitoringInterval</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
-Kubernetes api utils intstr.IntOrString
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the frequency at which monitoring occurs. If set to 0, monitoring is disabled.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterNetwork">ClusterNetwork
 </h3>
 <p>
@@ -5848,23 +5799,6 @@ ClusterStorage
 <em>(Optional)</em>
 <p>Specifies the storage of the first componentSpec, if the storage of the first componentSpec is specified,
 this value will be ignored.</p>
-<p>Deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterMonitor">
-ClusterMonitor
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The configuration of monitor.</p>
 <p>Deprecated since v0.9.
 This field is maintained for backward compatibility and its use is discouraged.
 Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
@@ -12614,6 +12548,8 @@ PrometheusScrapeConfig
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>Defines the scrape configuration for the prometheus.</p>
 </td>
 </tr>
 </tbody>
@@ -18634,7 +18570,7 @@ Kubernetes core/v1.Container
 </tr>
 <tr>
 <td>
-<code>SidecarContainerSources</code><br/>
+<code>SidecarContainerSource</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSource">
 SidecarContainerSource
@@ -18643,7 +18579,7 @@ SidecarContainerSource
 </td>
 <td>
 <p>
-(Members of <code>SidecarContainerSources</code> are embedded into this type.)
+(Members of <code>SidecarContainerSource</code> are embedded into this type.)
 </p>
 <em>(Optional)</em>
 <p>Define the function or purpose of the container, such as the monitor type sidecar.

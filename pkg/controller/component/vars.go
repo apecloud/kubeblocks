@@ -535,8 +535,6 @@ func resolveServiceVarRef(ctx context.Context, cli client.Reader, synthesizedCom
 		resolveFunc = resolveServiceHostRef
 	case selector.Port != nil:
 		resolveFunc = resolveServicePortRef
-	case selector.NodePort != nil:
-		resolveFunc = resolveServiceNodePortRef
 	default:
 		return nil, nil, nil
 	}
@@ -572,110 +570,71 @@ func resolveServiceHostRef(ctx context.Context, cli client.Reader, synthesizedCo
 func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
-		return resolveServicePort(defineKey, selector, obj.(*resolvedServiceObj), false)
-	}
-	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Port.Option, resolvePort)
-}
-
-func resolveServiceNodePortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
-	resolveNodePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		robj := obj.(*resolvedServiceObj)
 		services := []*corev1.Service{robj.service}
 		if robj.podServices != nil {
 			services = robj.podServices
 		}
+
+		hasNodePort := func(svc *corev1.Service, svcPort corev1.ServicePort) bool {
+			return (svc.Spec.Type == corev1.ServiceTypeNodePort || svc.Spec.Type == corev1.ServiceTypeLoadBalancer) && svcPort.NodePort > 0
+		}
+
+		port := func(svc *corev1.Service, svcPort corev1.ServicePort) int {
+			if hasNodePort(svc, svcPort) {
+				return int(svcPort.NodePort)
+			}
+			return int(svcPort.Port)
+		}
+
+		svcPorts := make(map[string]string)
 		for _, svc := range services {
-			if svc.Spec.Type == corev1.ServiceTypeNodePort || svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
-				continue
-			}
-			return nil, nil
-		}
-		return resolveServicePort(defineKey, selector, robj, true)
-	}
-	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.NodePort.Option, resolveNodePort)
-}
-
-func resolveServicePort(defineKey string, selector appsv1alpha1.ServiceVarSelector, robj *resolvedServiceObj, nodeport bool) (*corev1.EnvVar, *corev1.EnvVar) {
-	services := []*corev1.Service{robj.service}
-	if robj.podServices != nil {
-		services = robj.podServices
-	}
-
-	filter := func() func(corev1.ServicePort) (bool, int) {
-		if nodeport {
-			return func(svcPort corev1.ServicePort) (bool, int) {
-				if svcPort.NodePort != 0 && svcPort.Name == selector.NodePort.Name {
-					return true, int(svcPort.NodePort)
+			for _, svcPort := range svc.Spec.Ports {
+				if svcPort.Name == selector.Port.Name {
+					svcPorts[svc.Name] = strconv.Itoa(port(svc, svcPort))
+					break
 				}
-				return false, 0
 			}
-		}
-		return func(svcPort corev1.ServicePort) (bool, int) {
-			if svcPort.Name == selector.Port.Name {
-				return true, int(svcPort.Port)
-			}
-			return false, 0
-		}
-	}()
 
-	svcPorts := make(map[string]string)
-	for _, svc := range services {
-		for _, svcPort := range svc.Spec.Ports {
-			matched, port := filter(svcPort)
-			if matched {
-				svcPorts[svc.Name] = strconv.Itoa(port)
-				break
+			if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(selector.Port.Name) == 0) {
+				svcPorts[svc.Name] = strconv.Itoa(port(svc, svc.Spec.Ports[0]))
 			}
 		}
 
-		v := func() *appsv1alpha1.NamedVar {
-			if nodeport {
-				return selector.NodePort
+		if len(svcPorts) > 0 {
+			svcNames := maps.Keys(svcPorts)
+			slices.Sort(svcNames)
+
+			ports := func() []string {
+				var ports []string
+				for _, svcName := range svcNames {
+					ports = append(ports, svcPorts[svcName])
+				}
+				return ports
 			}
-			return selector.Port
-		}
-		if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(v().Name) == 0) {
-			if nodeport {
-				svcPorts[svc.Name] = strconv.Itoa(int(svc.Spec.Ports[0].NodePort))
+			namedPorts := func() []string {
+				var namedPorts []string
+				for _, svcName := range svcNames {
+					namedPorts = append(namedPorts, fmt.Sprintf("%s:%s", svcName, svcPorts[svcName]))
+				}
+				return namedPorts
+			}
+
+			if robj.service != nil {
+				return &corev1.EnvVar{
+					Name:  defineKey,
+					Value: ports()[0],
+				}, nil
 			} else {
-				svcPorts[svc.Name] = strconv.Itoa(int(svc.Spec.Ports[0].Port))
+				return &corev1.EnvVar{
+					Name:  defineKey,
+					Value: strings.Join(namedPorts(), ","),
+				}, nil
 			}
 		}
+		return nil, nil
 	}
-
-	if len(svcPorts) > 0 {
-		svcNames := maps.Keys(svcPorts)
-		slices.Sort(svcNames)
-
-		ports := func() []string {
-			var ports []string
-			for _, svcName := range svcNames {
-				ports = append(ports, svcPorts[svcName])
-			}
-			return ports
-		}
-		namedPorts := func() []string {
-			var namedPorts []string
-			for _, svcName := range svcNames {
-				namedPorts = append(namedPorts, fmt.Sprintf("%s:%s", svcName, svcPorts[svcName]))
-			}
-			return namedPorts
-		}
-
-		if robj.service != nil {
-			return &corev1.EnvVar{
-				Name:  defineKey,
-				Value: ports()[0],
-			}, nil
-		} else {
-			return &corev1.EnvVar{
-				Name:  defineKey,
-				Value: strings.Join(namedPorts(), ","),
-			}, nil
-		}
-	}
-	return nil, nil
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Port.Option, resolvePort)
 }
 
 func resolveCredentialVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

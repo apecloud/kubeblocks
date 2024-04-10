@@ -116,7 +116,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if shouldReady && predecessor != nil && !isHealthy(predecessor) {
 			break
 		}
-		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], rsm)
+		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], rsm, "")
 		if err != nil {
 			return nil, err
 		}

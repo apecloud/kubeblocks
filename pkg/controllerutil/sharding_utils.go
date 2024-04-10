@@ -71,42 +71,6 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 	return compSpecList, nil
 }
 
-// ListShardingCompNames lists sharding component names. It returns undeleted and deleting sharding component names.
-func ListShardingCompNames(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]string, []string, error) {
-	if shardingSpec == nil {
-		return []string{}, []string{}, nil
-	}
-
-	undeletedShardingComps, deletingShardingComps, err := listNCheckShardingComponents(ctx, cli, cluster, shardingSpec)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	appendCompShortName := func(comp appsv1alpha1.Component, nameList *[]string) error {
-		compShortName, err := parseCompShortName(cluster.Name, comp.Name)
-		if err != nil {
-			return err
-		}
-		*nameList = append(*nameList, compShortName)
-		return nil
-	}
-
-	undeletedCompNameList := make([]string, 0, len(undeletedShardingComps))
-	deletingCompNameList := make([]string, 0, len(deletingShardingComps))
-	for _, comp := range undeletedShardingComps {
-		if err := appendCompShortName(comp, &undeletedCompNameList); err != nil {
-			return nil, nil, err
-		}
-	}
-	for _, comp := range deletingShardingComps {
-		if err := appendCompShortName(comp, &deletingCompNameList); err != nil {
-			return nil, nil, err
-		}
-	}
-	return undeletedCompNameList, deletingCompNameList, nil
-}
-
 // listNCheckShardingComponents lists sharding components and checks if the sharding components are correct. It returns undeleted and deleting sharding components.
 func listNCheckShardingComponents(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]appsv1alpha1.Component, []appsv1alpha1.Component, error) {

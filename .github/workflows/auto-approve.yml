@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Automatic Approve
-        uses: hmarr/auto-approve-action@v3
+        uses: apecloud-inc/auto-approve-action@v4
         with:
           github-token: ${{ env.GITHUB_TOKEN }}
           pull-request-number: ${{ github.event.issue.number }}

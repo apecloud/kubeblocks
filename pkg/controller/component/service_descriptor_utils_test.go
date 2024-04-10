@@ -21,6 +21,8 @@ package component
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -453,7 +455,7 @@ var _ = Describe("build service references", func() {
 						Service: &appsv1alpha1.ServiceRefServiceSelector{
 							Component: etcdComponent,
 							Service:   "", // default service
-							Port:      "", // to match first port
+							Port:      "peer",
 						},
 					},
 				},
@@ -492,6 +494,66 @@ var _ = Describe("build service references", func() {
 			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(reader.objs[0].GetName()))
 			Expect(serviceDescriptor.Spec.Port).Should(Not(BeNil()))
 			Expect(serviceDescriptor.Spec.Port.Value).Should(Equal("2380"))
+			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
+		})
+
+		It("service vars - pod service", func() {
+			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
+				{
+					Name: serviceRefDeclaration.Name,
+					ClusterRef: &appsv1alpha1.ServiceRefClusterSelector{
+						Cluster: etcdCluster,
+						Service: &appsv1alpha1.ServiceRefServiceSelector{
+							Component: etcdComponent,
+							Service:   "peer",
+							Port:      "peer",
+						},
+					},
+				},
+			}
+			newPodService := func(ordinal int) *corev1.Service {
+				return &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      fmt.Sprintf("%s-%d", constant.GenerateComponentServiceName(etcdCluster, etcdComponent, "peer"), ordinal),
+						Labels:    constant.GetComponentWellKnownLabels(etcdCluster, etcdComponent),
+					},
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Name: "peer",
+								Port: 2380,
+							},
+							{
+								Name: "client",
+								Port: 2379,
+							},
+						},
+					},
+				}
+			}
+			reader := &mockReader{
+				cli:  testCtx.Cli,
+				objs: []client.Object{newPodService(0), newPodService(1), newPodService(2)},
+			}
+
+			endpoints, ports := make([]string, 0), make([]string, 0)
+			for i := 0; i < 3; i++ {
+				endpoints = append(endpoints, reader.objs[i].GetName())
+				ports = append(ports, fmt.Sprintf("%s:%s", reader.objs[i].GetName(), "2380"))
+			}
+			expectedEndpointValue, expectedPortValue := strings.Join(endpoints, ","), strings.Join(ports, ",")
+
+			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
+			Expect(err).Should(Succeed())
+
+			Expect(synthesizedComp.ServiceReferences).Should(HaveKey(serviceRefDeclaration.Name))
+			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
+			Expect(serviceDescriptor).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Endpoint).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(expectedEndpointValue))
+			Expect(serviceDescriptor.Spec.Port).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Port.Value).Should(Equal(expectedPortValue))
 			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
 		})
 

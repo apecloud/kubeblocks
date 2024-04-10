@@ -959,13 +959,17 @@ type ServiceRefServiceSelector struct {
 	// The name of the service to reference.
 	//
 	// Leave it empty to reference the default service. Set it to "headless" to reference the default headless service.
+	// If the referenced service is a pod-service, there will be multiple service objects matched,
+	// and the resolved value will be presented in the following format: service1.name,service2.name...
 	//
 	// +kubebuilder:validation:Required
 	Service string `json:"service"`
 
 	// The port name of the service to reference.
 	//
-	// If not specified, the first port will be used by default.
+	// If there is a non-zero node-port exist for the matched service port, the node-port will be selected first.
+	// If the referenced service is a pod-service, there will be multiple service objects matched,
+	// and the resolved value will be presented in the following format: service1.name:port1,service2.name:port2...
 	//
 	// +optional
 	Port string `json:"port,omitempty"`

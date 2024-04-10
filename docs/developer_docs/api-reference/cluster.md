@@ -17577,7 +17577,9 @@ string
 </td>
 <td>
 <p>The name of the service to reference.</p>
-<p>Leave it empty to reference the default service. Set it to &ldquo;headless&rdquo; to reference the default headless service.</p>
+<p>Leave it empty to reference the default service. Set it to &ldquo;headless&rdquo; to reference the default headless service.
+If the referenced service is a pod-service, there will be multiple service objects matched,
+and the resolved value will be presented in the following format: service1.name,service2.name&hellip;</p>
 </td>
 </tr>
 <tr>
@@ -17590,7 +17592,9 @@ string
 <td>
 <em>(Optional)</em>
 <p>The port name of the service to reference.</p>
-<p>If not specified, the first port will be used by default.</p>
+<p>If there is a non-zero node-port exist for the matched service port, the node-port will be selected first.
+If the referenced service is a pod-service, there will be multiple service objects matched,
+and the resolved value will be presented in the following format: service1.name:port1,service2.name:port2&hellip;</p>
 </td>
 </tr>
 </tbody>

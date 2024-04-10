@@ -120,6 +120,7 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 		for i, c := range dst.Spec.InitContainers {
 			if container.Name == c.Name {
 				dst.Spec.InitContainers[i].Image = container.Image
+				break
 			}
 		}
 	}

@@ -107,6 +107,7 @@ type ConfigTemplateExtension struct {
 	Policy MergedPolicy `json:"policy,omitempty"`
 }
 
+// LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
 // Deprecated: LegacyRenderedTemplateSpec is deprecated since 0.10.0
 type LegacyRenderedTemplateSpec struct {
 	// Extends the configuration template.

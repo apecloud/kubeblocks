@@ -12403,7 +12403,8 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfig
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
 </p>
 <div>
-<p>Deprecated: LegacyRenderedTemplateSpec is deprecated since 0.10.0</p>
+<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
+Deprecated: LegacyRenderedTemplateSpec is deprecated since 0.10.0</p>
 </div>
 <table>
 <thead>

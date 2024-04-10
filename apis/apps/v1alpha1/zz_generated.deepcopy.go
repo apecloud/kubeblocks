@@ -1429,6 +1429,11 @@ func (in *ComponentConfigSpec) DeepCopyInto(out *ComponentConfigSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.InjectEnvTo != nil {
+		in, out := &in.InjectEnvTo, &out.InjectEnvTo
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.ReRenderResourceTypes != nil {
 		in, out := &in.ReRenderResourceTypes, &out.ReRenderResourceTypes
 		*out = make([]RerenderResourceType, len(*in))

@@ -159,7 +159,7 @@ func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string,
 }
 
 func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateRef, configConstraintRef,
-	namespace, volumeName string, asEnvFrom ...string) *MockComponentDefinitionFactory {
+	namespace, volumeName string, injectEnvTo ...string) *MockComponentDefinitionFactory {
 	config := appsv1alpha1.ComponentConfigSpec{
 		ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 			Name:        name,
@@ -168,7 +168,7 @@ func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateR
 			VolumeName:  volumeName,
 		},
 		ConfigConstraintRef: configConstraintRef,
-		AsEnvFrom:           asEnvFrom,
+		InjectEnvTo:         injectEnvTo,
 	}
 	if f.Get().Spec.Configs == nil {
 		f.Get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)

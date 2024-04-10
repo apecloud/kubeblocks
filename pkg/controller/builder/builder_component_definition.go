@@ -128,7 +128,7 @@ func (builder *ComponentDefinitionBuilder) AddServiceExt(name, serviceName strin
 }
 
 func (builder *ComponentDefinitionBuilder) AddConfigTemplate(name, configTemplateRef, configConstraintRef,
-	namespace, volumeName string, asEnvFrom ...string) *ComponentDefinitionBuilder {
+	namespace, volumeName string, injectEnvTo ...string) *ComponentDefinitionBuilder {
 	config := appsv1alpha1.ComponentConfigSpec{
 		ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 			Name:        name,
@@ -137,7 +137,7 @@ func (builder *ComponentDefinitionBuilder) AddConfigTemplate(name, configTemplat
 			VolumeName:  volumeName,
 		},
 		ConfigConstraintRef: configConstraintRef,
-		AsEnvFrom:           asEnvFrom,
+		InjectEnvTo:         injectEnvTo,
 	}
 	if builder.get().Spec.Configs == nil {
 		builder.get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)

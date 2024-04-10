@@ -11392,6 +11392,18 @@ Add new or override existing tolerations.</p>
 </tr>
 <tr>
 <td>
+<code>RuntimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines RuntimeClass to override.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
@@ -21375,6 +21387,18 @@ map[string]string
 <em>(Optional)</em>
 <p>Defines Tolerations to override.
 Add new or override existing tolerations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>RuntimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines RuntimeClass to override.</p>
 </td>
 </tr>
 <tr>

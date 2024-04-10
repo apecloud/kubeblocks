@@ -568,6 +568,7 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 				return false
 			}
 		})
+	templateExt.Spec.RuntimeClassName = template.RuntimeClassName
 	mergeList(&template.Volumes, &templateExt.Spec.Volumes,
 		func(item corev1.Volume) func(corev1.Volume) bool {
 			return func(v corev1.Volume) bool {

@@ -403,6 +403,9 @@ spec:
                         description: InstanceTemplate defines values to override in
                           pod template.
                         properties:
+                          RuntimeClassName:
+                            description: Defines RuntimeClass to override.
+                            type: string
                           annotations:
                             additionalProperties:
                               type: string
@@ -3854,6 +3857,9 @@ spec:
                             description: InstanceTemplate defines values to override
                               in pod template.
                             properties:
+                              RuntimeClassName:
+                                description: Defines RuntimeClass to override.
+                                type: string
                               annotations:
                                 additionalProperties:
                                   type: string
@@ -6926,6 +6932,9 @@ spec:
                             description: InstanceTemplate defines values to override
                               in pod template.
                             properties:
+                              RuntimeClassName:
+                                description: Defines RuntimeClass to override.
+                                type: string
                               annotations:
                                 additionalProperties:
                                   type: string

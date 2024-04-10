@@ -42,3 +42,14 @@ kubectl get cronjob
 NAME                                        SCHEDULE     SUSPEND   ACTIVE   LAST SCHEDULE   AGE
 96523399-testmysql-default-xtrabackup   0 18 * * *   False     0        <none>          57m
 ```
+
+您也可以执行以下命令，查看集群信息。其中，`Data Protection:` 部分会显示自动备份的配置信息。
+
+```bash
+kbcli cluster describe mysql-cluster
+>
+...
+Data Protection:
+BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION
+my-repo       Enabled       0 18 * * *        xtrabackup      7d
+```

@@ -70,6 +70,6 @@ mybackup   mysql-cluster-mysql-backup-policy   volume-snapshot   my-repo   Compl
 
 1. 使用云盘快照创建备份时，请确保使用的存储支持快照功能，否则会导致备份失败。
 
-2. 通过 kubectl 手动创建的备份，不会自动删除，需要您手动删除。
+2. 通过 kubectl 或者 kbcli 手动创建的备份不会自动删除，需要您手动删除。
 
 :::

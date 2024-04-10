@@ -21,11 +21,11 @@ KubeBlocks 支持从备份集中恢复数据。
 
 - 恢复
 
-  - [从备份集中恢复数据](../backup-and-restore/restore/restore-data-from-backup-set.md)
+  - [从备份集中恢复数据](../backup-and-restore/restore/restore-data-from-backup-set.md)。
 
 可按照以下顺序对数据库集群进行备份和恢复操作。
 
-1. [配置 BackupRepo](./backup/backup-repo.md).
-2. [配置 BackupPolicy](./backup/configure-backup-policy.md).
+1. [配置 BackupRepo](./backup/backup-repo.md)。
+2. [配置 BackupPolicy](./backup/configure-backup-policy.md)。
 3. [定时备份](./backup/scheduled-backup.md)或者[按需备份](./backup/on-demand-backup.md)集群数据。
 4. 从备份集中[恢复集群数据](./restore/restore-data-from-backup-set.md)。

@@ -29,8 +29,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func resolveServiceReferences(ctx context.Context, cli client.Reader, comp *SynthesizedComponent) error {
-	for _, serviceDescriptor := range comp.ServiceReferences {
+func resolveServiceReferences(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent) error {
+	for _, serviceDescriptor := range synthesizedComp.ServiceReferences {
 		// Only support referencing endpoint and port in configuration
 		credentialVars := []*appsv1alpha1.CredentialVar{
 			serviceDescriptor.Spec.Endpoint,

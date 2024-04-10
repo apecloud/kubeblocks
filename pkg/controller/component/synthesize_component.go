@@ -218,8 +218,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
-	// build serviceReferences
-	if err = buildServiceReferences(reqCtx, cli, synthesizeComp, compDef, comp); err != nil {
+	if err = buildServiceReferences(reqCtx.Ctx, cli, synthesizeComp, compDef, comp); err != nil {
 		reqCtx.Log.Error(err, "build service references failed.")
 		return nil, err
 	}
@@ -372,18 +371,6 @@ func buildAndUpdateResources(reqCtx intctrlutil.RequestCtx, cli client.Reader, s
 		return err
 	}
 	return nil
-}
-
-// buildServiceReferences builds serviceReferences for component.
-func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli client.Reader,
-	synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
-	serviceReferences, err := GenServiceReferences(reqCtx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, compDef, comp)
-	if err != nil {
-		return err
-	}
-	synthesizeComp.ServiceReferences = serviceReferences
-
-	return resolveServiceReferences(reqCtx.Ctx, cli, synthesizeComp)
 }
 
 func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) {

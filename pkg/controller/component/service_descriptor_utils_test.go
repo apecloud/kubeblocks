@@ -37,7 +37,7 @@ import (
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
-var _ = Describe("generate service descriptor", func() {
+var _ = Describe("build service references", func() {
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -344,6 +344,254 @@ var _ = Describe("generate service descriptor", func() {
 			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.Value).Should(BeEmpty())
 			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom).ShouldNot(BeNil())
 			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
+		})
+	})
+
+	Context("service reference from new cluster objects", func() {
+		const (
+			etcd          = "etcd"
+			etcdVersion   = "v3.5.6"
+			etcdCluster   = "etcd"
+			etcdComponent = "etcd"
+		)
+
+		var (
+			compDef         *appsv1alpha1.ComponentDefinition
+			comp            *appsv1alpha1.Component
+			synthesizedComp *SynthesizedComponent
+
+			serviceRefDeclaration = appsv1alpha1.ServiceRefDeclaration{
+				Name: etcd,
+				ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+					{
+						ServiceKind:    etcd,
+						ServiceVersion: etcdVersion,
+					},
+				},
+			}
+		)
+
+		BeforeEach(func() {
+			compDef = &appsv1alpha1.ComponentDefinition{
+				Spec: appsv1alpha1.ComponentDefinitionSpec{
+					ServiceRefDeclarations: []appsv1alpha1.ServiceRefDeclaration{serviceRefDeclaration},
+				},
+			}
+			comp = &appsv1alpha1.Component{
+				Spec: appsv1alpha1.ComponentSpec{
+					ServiceRefs: []appsv1alpha1.ServiceRef{},
+				},
+			}
+			synthesizedComp = &SynthesizedComponent{
+				Namespace:   namespace,
+				ClusterName: clusterName,
+			}
+		})
+
+		It("has service-ref not defined", func() {
+			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("service-ref for %s is not defined", serviceRefDeclaration.Name))
+		})
+
+		It("service vars - cluster service", func() {
+			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
+				{
+					Name: serviceRefDeclaration.Name,
+					ClusterRef: &appsv1alpha1.ServiceRefClusterSelector{
+						Cluster: etcdCluster,
+						Service: &appsv1alpha1.ServiceRefServiceSelector{
+							Service: "client",
+							Port:    "client",
+						},
+					},
+				},
+			}
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      constant.GenerateClusterServiceName(etcdCluster, "client"),
+						},
+						Spec: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{
+									Name: "peer",
+									Port: 2380,
+								},
+								{
+									Name: "client",
+									Port: 2379,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
+			Expect(err).Should(Succeed())
+
+			Expect(synthesizedComp.ServiceReferences).Should(HaveKey(serviceRefDeclaration.Name))
+			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
+			Expect(serviceDescriptor).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Endpoint).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(reader.objs[0].GetName()))
+			Expect(serviceDescriptor.Spec.Port).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Port.Value).Should(Equal("2379"))
+			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
+		})
+
+		It("service vars - component service", func() {
+			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
+				{
+					Name: serviceRefDeclaration.Name,
+					ClusterRef: &appsv1alpha1.ServiceRefClusterSelector{
+						Cluster: etcdCluster,
+						Service: &appsv1alpha1.ServiceRefServiceSelector{
+							Component: etcdComponent,
+							Service:   "", // default service
+							Port:      "", // to match first port
+						},
+					},
+				},
+			}
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      constant.GenerateComponentServiceName(etcdCluster, etcdComponent, ""),
+						},
+						Spec: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{
+									Name: "peer",
+									Port: 2380,
+								},
+								{
+									Name: "client",
+									Port: 2379,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
+			Expect(err).Should(Succeed())
+
+			Expect(synthesizedComp.ServiceReferences).Should(HaveKey(serviceRefDeclaration.Name))
+			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
+			Expect(serviceDescriptor).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Endpoint).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(reader.objs[0].GetName()))
+			Expect(serviceDescriptor.Spec.Port).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Port.Value).Should(Equal("2380"))
+			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
+		})
+
+		It("credential vars - same namespace", func() {
+			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
+				{
+					Name:      serviceRefDeclaration.Name,
+					Namespace: namespace,
+					ClusterRef: &appsv1alpha1.ServiceRefClusterSelector{
+						Cluster: etcdCluster,
+						Credential: &appsv1alpha1.ServiceRefCredentialSelector{
+							Component: etcdComponent,
+							Name:      "default",
+						},
+					},
+				},
+			}
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      constant.GenerateAccountSecretName(etcdCluster, etcdComponent, "default"),
+						},
+						Data: map[string][]byte{
+							constant.AccountNameForSecret:   []byte("username"),
+							constant.AccountPasswdForSecret: []byte("password"),
+						},
+					},
+				},
+			}
+
+			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
+			Expect(err).Should(Succeed())
+
+			Expect(synthesizedComp.ServiceReferences).Should(HaveKey(serviceRefDeclaration.Name))
+			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
+			Expect(serviceDescriptor).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Username).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Username.ValueFrom).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Username.ValueFrom).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Username.ValueFrom.SecretKeyRef).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Username.ValueFrom.SecretKeyRef.Name).Should(Equal(reader.objs[0].GetName()))
+			Expect(serviceDescriptor.Spec.Auth.Username.ValueFrom.SecretKeyRef.Key).Should(Equal(constant.AccountNameForSecret))
+			Expect(serviceDescriptor.Spec.Auth.Password).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Password.ValueFrom).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Password.ValueFrom.SecretKeyRef).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Password.ValueFrom.SecretKeyRef.Name).Should(Equal(reader.objs[0].GetName()))
+			Expect(serviceDescriptor.Spec.Auth.Password.ValueFrom.SecretKeyRef.Key).Should(Equal(constant.AccountPasswdForSecret))
+			Expect(serviceDescriptor.Spec.Endpoint).Should(BeNil())
+			Expect(serviceDescriptor.Spec.Port).Should(BeNil())
+		})
+
+		It("credential vars - different namespace", func() {
+			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
+				{
+					Name:      serviceRefDeclaration.Name,
+					Namespace: "external",
+					ClusterRef: &appsv1alpha1.ServiceRefClusterSelector{
+						Cluster: etcdCluster,
+						Credential: &appsv1alpha1.ServiceRefCredentialSelector{
+							Component: etcdComponent,
+							Name:      "default",
+						},
+					},
+				},
+			}
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "external",
+							Name:      constant.GenerateAccountSecretName(etcdCluster, etcdComponent, "default"),
+						},
+						Data: map[string][]byte{
+							constant.AccountNameForSecret:   []byte("username"),
+							constant.AccountPasswdForSecret: []byte("password"),
+						},
+					},
+				},
+			}
+
+			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
+			Expect(err).Should(Succeed())
+
+			Expect(synthesizedComp.ServiceReferences).Should(HaveKey(serviceRefDeclaration.Name))
+			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
+			Expect(serviceDescriptor).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Username).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Username.Value).Should(Equal("username"))
+			Expect(serviceDescriptor.Spec.Auth.Username.ValueFrom).Should(BeNil())
+			Expect(serviceDescriptor.Spec.Auth.Password).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Auth.Password.Value).Should(Equal("password"))
+			Expect(serviceDescriptor.Spec.Auth.Password.ValueFrom).Should(BeNil())
+			Expect(serviceDescriptor.Spec.Endpoint).Should(BeNil())
+			Expect(serviceDescriptor.Spec.Port).Should(BeNil())
 		})
 	})
 })

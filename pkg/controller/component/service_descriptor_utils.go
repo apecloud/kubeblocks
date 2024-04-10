@@ -155,28 +155,32 @@ func referencedServiceVars(ctx context.Context, cli client.Reader, namespace str
 		serviceKey.Name = generate(clusterRef.Cluster, clusterRef.Service.Component, clusterRef.Service.Service)
 	}
 
+	// TODO: support the node-port and pod-service
 	service := &corev1.Service{}
 	if err := cli.Get(ctx, serviceKey, service); err != nil {
 		return nil, nil, err
 	}
 
-	resolvePort := func() *int32 {
+	resolvePort := func() (*int32, error) {
 		if len(service.Spec.Ports) == 0 {
-			return nil
+			return nil, nil
 		}
 		if len(clusterRef.Service.Port) == 0 {
-			return &service.Spec.Ports[0].Port
+			return &service.Spec.Ports[0].Port, nil
 		}
 		for i, p := range service.Spec.Ports {
 			if p.Name == clusterRef.Service.Port {
-				return &service.Spec.Ports[i].Port
+				return &service.Spec.Ports[i].Port, nil
 			}
 		}
-		return nil
+		return nil, fmt.Errorf("port %s is not found in service %s of cluster %s",
+			clusterRef.Service.Port, service.Name, clusterRef.Cluster)
 	}
 
 	endpoint = &appsv1alpha1.CredentialVar{Value: service.Name}
-	if p := resolvePort(); p != nil {
+	if p, err := resolvePort(); err != nil {
+		return nil, nil, err
+	} else if p != nil {
 		port = &appsv1alpha1.CredentialVar{Value: fmt.Sprintf("%d", *p)}
 	}
 	return endpoint, port, nil

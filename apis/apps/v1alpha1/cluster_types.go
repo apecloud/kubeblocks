@@ -909,6 +909,7 @@ type ServiceRef struct {
 	// the ClusterDefinition will not be validated.
 	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Cluster string `json:"cluster,omitempty"`
 

@@ -107,7 +107,9 @@ spec:
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           defaultMode:
-                            description: "Refers to the mode bits used to set permissions
+                            description: "Deprecated: DefaultMode is deprecated since
+                              0.10.0 for scripts, auto set 0555 for configs, auto
+                              set 0444 Refers to the mode bits used to set permissions
                               on created files by default. \n Must be an octal value
                               between 0000 and 0777 or a decimal value between 0 and
                               511. YAML accepts both octal and decimal values, JSON
@@ -118,6 +120,22 @@ spec:
                               can be other mode bits set."
                             format: int32
                             type: integer
+                          injectEnvTo:
+                            description: "Specifies the containers to inject the ConfigMap
+                              parameters as environment variables. \n This is useful
+                              when application images accept parameters through environment
+                              variables and generate the final configuration file
+                              in the startup script based on these variables. \n This
+                              field allows users to specify a list of container names,
+                              and KubeBlocks will inject the environment variables
+                              converted from the ConfigMap into these designated containers.
+                              This provides a flexible way to pass the configuration
+                              items from the ConfigMap to the container without modifying
+                              the image."
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: set
                           keys:
                             description: "Specifies the configuration files within
                               the ConfigMap that support dynamic updates. \n A configuration
@@ -199,8 +217,8 @@ spec:
                               description: RerenderResourceType defines the resource
                                 requirements for a component.
                               enum:
-                              - resources
-                              - replcias
+                              - vscale
+                              - hscale
                               - tls
                               type: string
                             type: array

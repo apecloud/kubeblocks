@@ -888,12 +888,11 @@ type ServiceRef struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Specifies the namespace of the referenced Cluster or the namespace of the referenced ServiceDescriptor object.
-	// If not provided, the referenced Cluster and ServiceDescriptor will be searched in the namespace of the current
-	// cluster by default.
+	// Specifies the namespace of the referenced Cluster or ServiceDescriptor object.
+	// If not specified, the namespace of the current cluster will be used.
 	//
 	// +optional
-	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
+	Namespace string `json:"namespace,omitempty"`
 
 	// The name of the KubeBlocks cluster being referenced when a service provided by another KubeBlocks cluster is
 	// being referenced.
@@ -909,21 +908,74 @@ type ServiceRef struct {
 	// +optional
 	Cluster string `json:"cluster,omitempty"`
 
-	Service *string `json:"service,omitempty"`
-
-	Credential *string `json:"credential,omitempty"`
+	// Specifies the cluster to reference.
+	//
+	// +optional
+	ClusterRef *ServiceRefClusterSelector `json:"clusterRef,omitempty"`
 
 	// The service descriptor of the service provided by external sources.
 	//
-	// When referencing a service provided by external sources, the ServiceDescriptor object name is required to
-	// establish the service binding.
+	// When referencing a service provided by external sources, a ServiceDescriptor object is required to establish
+	// the service binding.
 	// The `serviceDescriptor.spec.serviceKind` and `serviceDescriptor.spec.serviceVersion` should match the serviceKind
-	// and serviceVersion defined in the service reference declaration in the ClusterDefinition.
+	// and serviceVersion declared in the definition.
 	//
 	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
 	//
 	// +optional
 	ServiceDescriptor string `json:"serviceDescriptor,omitempty"`
+}
+
+type ServiceRefClusterSelector struct {
+	// The name of the cluster to reference.
+	//
+	// +kubebuilder:validation:Required
+	Cluster string `json:"cluster"`
+
+	// The service to reference from the cluster.
+	//
+	// +optional
+	Service *ServiceRefServiceSelector `json:"service,omitempty"`
+
+	// The credential (SystemAccount) to reference from the cluster.
+	//
+	// +optional
+	Credential *ServiceRefCredentialSelector `json:"credential,omitempty"`
+}
+
+type ServiceRefServiceSelector struct {
+	// The name of the component where the service resides in.
+	//
+	// It is required when referencing a component service.
+	//
+	// +optional
+	Component string `json:"component,omitempty"`
+
+	// The name of the service to reference.
+	//
+	// Leave it empty to reference the default service. Set it to "headless" to reference the default headless service.
+	//
+	// +kubebuilder:validation:Required
+	Service string `json:"service"`
+
+	// The port name of the service to reference.
+	//
+	// If not specified, the first port will be used by default.
+	//
+	// +optional
+	Port string `json:"port,omitempty"`
+}
+
+type ServiceRefCredentialSelector struct {
+	// The name of the component where the credential resides in.
+	//
+	// +kubebuilder:validation:Required
+	Component string `json:"component"`
+
+	// The name of the credential (SystemAccount) to reference.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
 }
 
 // +genclient

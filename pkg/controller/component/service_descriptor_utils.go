@@ -54,15 +54,18 @@ func buildServiceReferences(ctx context.Context, cli client.Reader,
 		}
 
 		var (
-			sd  *appsv1alpha1.ServiceDescriptor
-			err error
+			namespace   = synthesizedComp.Namespace
+			clusterName = synthesizedComp.ClusterName
+			sd          *appsv1alpha1.ServiceDescriptor
+			err         error
 		)
 		switch {
 		case serviceRef.Cluster != "":
-			sd, err = handleServiceRefFromCluster(ctx, cli,
-				synthesizedComp.Namespace, synthesizedComp.ClusterName, *serviceRef, serviceRefDecl, !IsGenerated(comp))
+			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, clusterName, *serviceRef, serviceRefDecl, true)
+		case serviceRef.ClusterRef != nil:
+			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, clusterName, *serviceRef, serviceRefDecl, false)
 		case serviceRef.ServiceDescriptor != "":
-			sd, err = handleServiceRefFromServiceDescriptor(ctx, cli, synthesizedComp.Namespace, *serviceRef, serviceRefDecl)
+			sd, err = handleServiceRefFromServiceDescriptor(ctx, cli, namespace, *serviceRef, serviceRefDecl)
 		}
 		if err != nil {
 			return err
@@ -77,14 +80,14 @@ func buildServiceReferences(ctx context.Context, cli client.Reader,
 }
 
 func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespace, clusterName string,
-	serviceRef appsv1alpha1.ServiceRef, serviceRefDecl appsv1alpha1.ServiceRefDeclaration, newAPI bool) (*appsv1alpha1.ServiceDescriptor, error) {
+	serviceRef appsv1alpha1.ServiceRef, serviceRefDecl appsv1alpha1.ServiceRefDeclaration, legacy bool) (*appsv1alpha1.ServiceDescriptor, error) {
 	if serviceRef.Cluster == clusterName {
 		return nil, fmt.Errorf("cluster %s cannot reference itself", clusterName)
 	}
 
 	resolver := referencedVars
-	if newAPI {
-		resolver = referencedVars4NewAPI
+	if legacy {
+		resolver = referencedVars4Legacy
 	}
 	vars, err := resolver(ctx, cli, namespace, serviceRef)
 	if err != nil {
@@ -104,6 +107,118 @@ func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespa
 }
 
 func referencedVars(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1alpha1.ServiceRef) ([]*appsv1alpha1.CredentialVar, error) {
+	var (
+		vars = []*appsv1alpha1.CredentialVar{nil, nil, nil, nil}
+		err  error
+	)
+	vars[0], vars[1], err = referencedServiceVars(ctx, cli, namespace, serviceRef)
+	if err != nil {
+		return nil, err
+	}
+	vars[2], vars[3], err = referencedCredentialVars(ctx, cli, namespace, serviceRef)
+	if err != nil {
+		return nil, err
+	}
+	return vars, nil
+}
+
+func referencedServiceVars(ctx context.Context, cli client.Reader, namespace string,
+	serviceRef appsv1alpha1.ServiceRef) (*appsv1alpha1.CredentialVar, *appsv1alpha1.CredentialVar, error) {
+	var (
+		clusterRef     = serviceRef.ClusterRef
+		endpoint, port *appsv1alpha1.CredentialVar
+	)
+
+	if clusterRef.Service == nil {
+		return nil, nil, nil
+	}
+
+	serviceKey := types.NamespacedName{Namespace: namespace}
+	if serviceRef.Namespace != "" {
+		serviceKey.Namespace = serviceRef.Namespace
+	}
+	if len(clusterRef.Service.Component) == 0 {
+		serviceKey.Name = constant.GenerateClusterServiceName(clusterRef.Cluster, clusterRef.Service.Service)
+	} else {
+		generate := constant.GenerateComponentServiceName
+		if clusterRef.Service.Service == "headless" {
+			generate = constant.GenerateComponentHeadlessServiceName
+		}
+		serviceKey.Name = generate(clusterRef.Cluster, clusterRef.Service.Component, clusterRef.Service.Service)
+	}
+
+	service := &corev1.Service{}
+	if err := cli.Get(ctx, serviceKey, service); err != nil {
+		return nil, nil, err
+	}
+
+	resolvePort := func() *int32 {
+		if len(service.Spec.Ports) == 0 {
+			return nil
+		}
+		if len(clusterRef.Service.Port) == 0 {
+			return &service.Spec.Ports[0].Port
+		}
+		for i, p := range service.Spec.Ports {
+			if p.Name == clusterRef.Service.Port {
+				return &service.Spec.Ports[i].Port
+			}
+		}
+		return nil
+	}
+
+	endpoint = &appsv1alpha1.CredentialVar{Value: service.Name}
+	if p := resolvePort(); p != nil {
+		port = &appsv1alpha1.CredentialVar{Value: fmt.Sprintf("%d", *p)}
+	}
+	return endpoint, port, nil
+}
+
+func referencedCredentialVars(ctx context.Context, cli client.Reader, namespace string,
+	serviceRef appsv1alpha1.ServiceRef) (*appsv1alpha1.CredentialVar, *appsv1alpha1.CredentialVar, error) {
+	var (
+		clusterRef = serviceRef.ClusterRef
+		vars       = []*appsv1alpha1.CredentialVar{nil, nil}
+	)
+
+	if clusterRef.Credential == nil {
+		return nil, nil, nil
+	}
+
+	secretKey := types.NamespacedName{
+		Namespace: namespace,
+		Name:      constant.GenerateAccountSecretName(clusterRef.Cluster, clusterRef.Credential.Component, clusterRef.Credential.Name),
+	}
+	if serviceRef.Namespace != "" {
+		secretKey.Namespace = serviceRef.Namespace
+	}
+	secret := &corev1.Secret{}
+	if err := cli.Get(ctx, secretKey, secret); err != nil {
+		return nil, nil, err
+	}
+
+	for idx, key := range []string{constant.AccountNameForSecret, constant.AccountPasswdForSecret} {
+		if _, ok := secret.Data[key]; ok {
+			if secret.Namespace == namespace {
+				vars[idx] = &appsv1alpha1.CredentialVar{
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: secret.Name},
+							Key:                  key,
+						},
+					},
+				}
+			} else {
+				vars[idx] = &appsv1alpha1.CredentialVar{
+					Value: string(secret.Data[key]),
+				}
+			}
+		}
+	}
+	return vars[0], vars[1], nil
+}
+
+func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1alpha1.ServiceRef) ([]*appsv1alpha1.CredentialVar, error) {
 	secret := &corev1.Secret{}
 	secretKey := types.NamespacedName{
 		Namespace: func() string {
@@ -129,63 +244,6 @@ func referencedVars(ctx context.Context, cli client.Reader, namespace string, se
 		if _, ok := secret.Data[key]; ok {
 			vars[idx] = &appsv1alpha1.CredentialVar{
 				Value: string(secret.Data[key]),
-			}
-		}
-	}
-	return vars, nil
-}
-
-func referencedVars4NewAPI(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1alpha1.ServiceRef) ([]*appsv1alpha1.CredentialVar, error) {
-	objectNamespace := func() string {
-		if serviceRef.Namespace != "" {
-			return serviceRef.Namespace
-		}
-		return namespace
-	}
-
-	vars := []*appsv1alpha1.CredentialVar{nil, nil, nil, nil}
-	if serviceRef.Service != nil {
-		serviceKey := types.NamespacedName{
-			Namespace: objectNamespace(),
-			// TODO: service name
-			Name: constant.GenerateClusterServiceName(serviceRef.Cluster, *serviceRef.Service),
-		}
-		service := &corev1.Service{}
-		if err := cli.Get(ctx, serviceKey, service); err != nil {
-			return nil, err
-		}
-		vars[0] = &appsv1alpha1.CredentialVar{Value: service.Name}
-		// TODO: port
-		vars[1] = &appsv1alpha1.CredentialVar{Value: fmt.Sprintf("%d", service.Spec.Ports[0].Port)}
-	}
-
-	if serviceRef.Credential != nil {
-		secretKey := types.NamespacedName{
-			Namespace: objectNamespace(),
-			// TODO: component name
-			Name: constant.GenerateAccountSecretName(serviceRef.Cluster, "", *serviceRef.Credential),
-		}
-		secret := &corev1.Secret{}
-		if err := cli.Get(ctx, secretKey, secret); err != nil {
-			return nil, err
-		}
-		// TODO: check the key
-		for idx, key := range []string{constant.ServiceDescriptorUsernameKey, constant.ServiceDescriptorPasswordKey} {
-			if _, ok := secret.Data[key]; ok {
-				if secret.Namespace == namespace {
-					vars[idx+2] = &appsv1alpha1.CredentialVar{
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: secret.Name},
-								Key:                  key,
-							},
-						},
-					}
-				} else {
-					vars[idx+2] = &appsv1alpha1.CredentialVar{
-						Value: string(secret.Data[key]),
-					}
-				}
 			}
 		}
 	}

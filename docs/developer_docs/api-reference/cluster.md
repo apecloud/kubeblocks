@@ -17284,9 +17284,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the namespace of the referenced Cluster or the namespace of the referenced ServiceDescriptor object.
-If not provided, the referenced Cluster and ServiceDescriptor will be searched in the namespace of the current
-cluster by default.</p>
+<p>Specifies the namespace of the referenced Cluster or ServiceDescriptor object.
+If not specified, the namespace of the current cluster will be used.</p>
 </td>
 </tr>
 <tr>
@@ -17310,6 +17309,20 @@ If both Cluster and ServiceDescriptor are specified, the Cluster takes precedenc
 </tr>
 <tr>
 <td>
+<code>clusterRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ServiceRefClusterSelector">
+ServiceRefClusterSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the cluster to reference.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>serviceDescriptor</code><br/>
 <em>
 string
@@ -17318,11 +17331,106 @@ string
 <td>
 <em>(Optional)</em>
 <p>The service descriptor of the service provided by external sources.</p>
-<p>When referencing a service provided by external sources, the ServiceDescriptor object name is required to
-establish the service binding.
+<p>When referencing a service provided by external sources, a ServiceDescriptor object is required to establish
+the service binding.
 The <code>serviceDescriptor.spec.serviceKind</code> and <code>serviceDescriptor.spec.serviceVersion</code> should match the serviceKind
-and serviceVersion defined in the service reference declaration in the ClusterDefinition.</p>
+and serviceVersion declared in the definition.</p>
 <p>If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ServiceRefClusterSelector">ServiceRefClusterSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceRef">ServiceRef</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>cluster</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the cluster to reference.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ServiceRefServiceSelector">
+ServiceRefServiceSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The service to reference from the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>credential</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ServiceRefCredentialSelector">
+ServiceRefCredentialSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The credential (SystemAccount) to reference from the cluster.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ServiceRefCredentialSelector">ServiceRefCredentialSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceRefClusterSelector">ServiceRefClusterSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>component</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the component where the credential resides in.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the credential (SystemAccount) to reference.</p>
 </td>
 </tr>
 </tbody>
@@ -17416,6 +17524,61 @@ string
 <td>
 <p>Defines the service version of the service reference. This is a regular expression that matches a version number pattern.
 For instance, <code>^8.0.8$</code>, <code>8.0.\d&#123;1,2&#125;$</code>, <code>^[v\-]*?(\d&#123;1,2&#125;\.)&#123;0,3&#125;\d&#123;1,2&#125;$</code> are all valid patterns.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ServiceRefServiceSelector">ServiceRefServiceSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceRefClusterSelector">ServiceRefClusterSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>component</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the component where the service resides in.</p>
+<p>It is required when referencing a component service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the service to reference.</p>
+<p>Leave it empty to reference the default service. Set it to &ldquo;headless&rdquo; to reference the default headless service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The port name of the service to reference.</p>
+<p>If not specified, the first port will be used by default.</p>
 </td>
 </tr>
 </tbody>

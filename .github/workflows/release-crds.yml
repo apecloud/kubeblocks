@@ -69,7 +69,7 @@ jobs:
       - name: generate KubeBlocks yaml
         if: ${{ matrix.yaml == 'kubeblocks.yaml' }}
         run: |
-          make bump-chart-ver
+          make bump-chart-ver VERSION="${{ needs.release-version.outputs.release-version }}"
           touch ${{ matrix.yaml }}
           helm template kubeblocks deploy/helm --dependency-update --set > ${{ matrix.yaml }}
 

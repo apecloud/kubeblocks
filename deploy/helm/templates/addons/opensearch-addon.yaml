@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "opensearch"
-  "version" "0.8.0"
+  "version" "0.9.0"
   "model" "search-engine"
   "provider" "community"
   "description" "OpenSearch is a scalable, flexible, and extensible open-source software suite for search, analytics, and observability applications licensed under Apache 2.0."

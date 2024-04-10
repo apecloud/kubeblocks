@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "foxlake"
-  "version" "0.8.0"
+  "version" "0.9.0"
   "model" "RDBMS"
   "provider" "apecloud"
   "description" "ApeCloud FoxLake is an open-source cloud-native data warehouse."

@@ -54,8 +54,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        yaml: [ 'kubeblocks_crd.yaml', 'kubeblocks.yaml' ]
-    name: Upload KubeBlocks yaml
+        yaml: [ 'kubeblocks_crds.yaml', 'kubeblocks.yaml' ]
+    name: Upload ${{ matrix.yaml }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,14 +66,14 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
 
-      - name: merge KubeBlocks crds
+      - name: generate KubeBlocks yaml
         if: ${{ matrix.yaml == 'kubeblocks.yaml' }}
         run: |
           touch ${{ matrix.yaml }}
           helm template kubeblocks deploy/helm --dependency-update > ${{ matrix.yaml }}
 
       - name: merge KubeBlocks crds
-        if: ${{ matrix.yaml == 'kubeblocks_crd.yaml' }}
+        if: ${{ matrix.yaml == 'kubeblocks_crds.yaml' }}
         run: |
           touch ${{ matrix.yaml }}
           crds_path="deploy/helm/crds"

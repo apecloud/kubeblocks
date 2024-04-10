@@ -223,6 +223,16 @@ type ComponentSpec struct {
 	// +listType=set
 	// +optional
 	Sidecars []string `json:"sidecars,omitempty"`
+
+	// Determines whether the metrics exporter needs to be published to the service endpoint.
+	// If set to true, the metrics exporter will be published to the service endpoint,
+	// the service will be injected with the following annotations:
+	// - "monitor.kubeblocks.io/path"
+	// - "monitor.kubeblocks.io/port"
+	// - "monitor.kubeblocks.io/scheme"
+	//
+	// +optional
+	MonitorEnabled *bool `json:"monitorEnabled,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the cluster.

@@ -70,6 +70,7 @@ type SynthesizedComponent struct {
 	ComponentServices   []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
 	MinReadySeconds     int32                               `json:"minReadySeconds,omitempty"`
 	Sidecars            []string                            `json:"sidecars,omitempty"`
+	MonitorEnabled      bool                                `json:"monitorEnabled,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.
 	Probes           *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`           // The Probes will be replaced with LifecycleActions.RoleProbe in the future.

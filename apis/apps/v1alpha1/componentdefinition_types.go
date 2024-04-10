@@ -186,6 +186,11 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarContainerSpecs,omitempty"`
 
+	// Defines the built-in metrics exporter container.
+	//
+	// +optional
+	BuiltinMonitorContainer *BuiltinMonitorContainerRef `json:"builtinMonitorContainer,omitempty"`
+
 	// Represents user-defined variables that can be used as environment variables for Pods and Actions,
 	// or to render templates of config and script.
 	// These variables are placed in front of the environment variables declared in the Pod if used as

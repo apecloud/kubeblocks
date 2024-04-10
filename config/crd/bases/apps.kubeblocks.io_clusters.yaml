@@ -3020,6 +3020,14 @@ spec:
                       required:
                       - name
                       type: object
+                    monitorEnabled:
+                      description: 'Determines whether the metrics exporter needs
+                        to be published to the service endpoint. If set to true, the
+                        metrics exporter will be published to the service endpoint,
+                        the service will be injected with the following annotations:
+                        - "monitor.kubeblocks.io/path" - "monitor.kubeblocks.io/port"
+                        - "monitor.kubeblocks.io/scheme"'
+                      type: boolean
                     name:
                       description: "Specifies the name of the Component. This name
                         is also part of the Service DNS name and must comply with
@@ -9545,6 +9553,14 @@ spec:
                           required:
                           - name
                           type: object
+                        monitorEnabled:
+                          description: 'Determines whether the metrics exporter needs
+                            to be published to the service endpoint. If set to true,
+                            the metrics exporter will be published to the service
+                            endpoint, the service will be injected with the following
+                            annotations: - "monitor.kubeblocks.io/path" - "monitor.kubeblocks.io/port"
+                            - "monitor.kubeblocks.io/scheme"'
+                          type: boolean
                         name:
                           description: "Specifies the name of the Component. This
                             name is also part of the Service DNS name and must comply

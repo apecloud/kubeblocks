@@ -535,6 +535,14 @@ type SidecarContainerSpec struct {
 	*SidecarContainerSource `json:",inline"`
 }
 
+type BuiltinMonitorContainerRef struct {
+	// Specifies the name of the built-in metrics exporter container.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	PrometheusScrapeConfig `json:",inline"`
+}
 
 // ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
 // has been replaced by ComponentDefinition.
@@ -724,6 +732,11 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=name
 	// +optional
 	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarContainerSpecs,omitempty"`
+
+	// Defines the built-in metrics exporter container.
+	//
+	// +optional
+	BuiltinMonitorContainer *BuiltinMonitorContainerRef `json:"builtinMonitorContainer,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {

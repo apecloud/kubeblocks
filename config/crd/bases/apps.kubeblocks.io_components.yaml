@@ -2759,6 +2759,13 @@ spec:
                   - name
                   type: object
                 type: array
+              monitorEnabled:
+                description: 'Determines whether the metrics exporter needs to be
+                  published to the service endpoint. If set to true, the metrics exporter
+                  will be published to the service endpoint, the service will be injected
+                  with the following annotations: - "monitor.kubeblocks.io/path" -
+                  "monitor.kubeblocks.io/port" - "monitor.kubeblocks.io/scheme"'
+                type: boolean
               offlineInstances:
                 description: "Specifies the names of instances to be transitioned
                   to offline status. \n Marking an instance as offline results in

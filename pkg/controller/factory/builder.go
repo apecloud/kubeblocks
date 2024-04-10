@@ -142,23 +142,51 @@ func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeC
 
 // getMonitorAnnotations returns the annotations for the monitor.
 func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) map[string]string {
-	if len(synthesizedComp.Sidecars) == 0 || componentDef == nil {
+	if !synthesizedComp.MonitorEnabled || componentDef == nil || !isSupportedMonitor(componentDef, synthesizedComp) {
 		return nil
 	}
 
-	monitor, container := getMetricsSidecarContainers(synthesizedComp.Sidecars, componentDef.Spec.SidecarContainerSpecs)
+	var container *corev1.Container
+	var monitor *appsv1alpha1.PrometheusScrapeConfig
+	if hasBuiltinMonitor(componentDef) {
+		monitor, container = getBuiltinContainer(synthesizedComp, componentDef.Spec.BuiltinMonitorContainer)
+	} else if hasMetricsSidecar(synthesizedComp) {
+		monitor, container = getMetricsSidecarContainer(synthesizedComp.Sidecars, componentDef.Spec.SidecarContainerSpecs)
+	}
+
 	if monitor == nil {
 		return nil
 	}
-
-	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor.ScrapeConfig, container))
+	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor, container))
 }
 
-func getMetricsSidecarContainers(sidecars []string, containerSpecs []appsv1alpha1.SidecarContainerSpec) (*appsv1alpha1.MonitorSource, *corev1.Container) {
+func isSupportedMonitor(componentDef *appsv1alpha1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) bool {
+	return hasMetricsSidecar(synthesizedComp) || hasBuiltinMonitor(componentDef)
+}
+
+func hasBuiltinMonitor(componentDef *appsv1alpha1.ComponentDefinition) bool {
+	return componentDef.Spec.BuiltinMonitorContainer != nil
+}
+
+func hasMetricsSidecar(comp *component.SynthesizedComponent) bool {
+	return len(comp.Sidecars) > 0
+}
+
+func getMetricsSidecarContainer(sidecars []string, containerSpecs []appsv1alpha1.SidecarContainerSpec) (*appsv1alpha1.PrometheusScrapeConfig, *corev1.Container) {
 	for i := range containerSpecs {
 		spec := &containerSpecs[i]
 		if slices.Contains(sidecars, spec.Name) && isMetricsContainer(spec) {
-			return spec.Monitor, &spec.Container
+			return spec.Monitor.ScrapeConfig, &spec.Container
+		}
+	}
+	return nil, nil
+}
+
+func getBuiltinContainer(synthesizedComp *component.SynthesizedComponent, builtinMonitorContainer *appsv1alpha1.BuiltinMonitorContainerRef) (*appsv1alpha1.PrometheusScrapeConfig, *corev1.Container) {
+	containers := synthesizedComp.PodSpec.Containers
+	for i := range containers {
+		if containers[i].Name == builtinMonitorContainer.Name {
+			return &builtinMonitorContainer.PrometheusScrapeConfig, &containers[i]
 		}
 	}
 	return nil, nil

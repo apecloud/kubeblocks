@@ -177,6 +177,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Instances:          comp.Spec.Instances,
 		OfflineInstances:   comp.Spec.OfflineInstances,
 		Sidecars:           comp.Spec.Sidecars,
+		MonitorEnabled:     buildMonitorEnabled(comp),
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -243,6 +244,13 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alp
 		return
 	}
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
+}
+
+func buildMonitorEnabled(comp *appsv1alpha1.Component) bool {
+	if comp.Spec.MonitorEnabled != nil {
+		return *comp.Spec.MonitorEnabled
+	}
+	return false
 }
 
 func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {

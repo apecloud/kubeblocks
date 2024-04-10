@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "qdrant"
-  "version" "0.8.0"
+  "version" "0.9.0"
   "model" "vector"
   "provider" "community"
   "description" "Qdrant is an open source (Apache-2.0 licensed), vector similarity search engine and vector database."

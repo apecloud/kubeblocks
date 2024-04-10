@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "redis"
-  "version" "0.8.1"
+  "version" "0.9.0"
   "model" "key-value"
   "provider" "community"
   "description" "Redis is an open source (BSD licensed), in-memory data structure store, used as a database, cache and message broker."

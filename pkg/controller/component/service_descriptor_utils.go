@@ -37,6 +37,14 @@ import (
 
 func buildServiceReferences(ctx context.Context, cli client.Reader,
 	synthesizedComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
+	if err := buildServiceReferencesWithoutResolve(ctx, cli, synthesizedComp, compDef, comp); err != nil {
+		return err
+	}
+	return resolveServiceReferences(ctx, cli, synthesizedComp)
+}
+
+func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader,
+	synthesizedComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
 	if compDef == nil || comp == nil || len(compDef.Spec.ServiceRefDeclarations) == 0 {
 		return nil
 	}
@@ -243,7 +251,12 @@ func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace str
 	for idx, key := range keys {
 		if _, ok := secret.Data[key]; ok {
 			vars[idx] = &appsv1alpha1.CredentialVar{
-				Value: string(secret.Data[key]),
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: secret.Name},
+						Key:                  key,
+					},
+				},
 			}
 		}
 	}

@@ -25,15 +25,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("generate service descriptor", func() {
@@ -95,7 +96,7 @@ var _ = Describe("generate service descriptor", func() {
 		cleanEnv()
 	})
 
-	buildServiceReferencesLegacy := func(ctx context.Context,
+	buildServiceReferences4Test := func(ctx context.Context,
 		cli client.Reader,
 		clusterDef *appsv1alpha1.ClusterDefinition,
 		clusterVer *appsv1alpha1.ClusterVersion,
@@ -116,7 +117,7 @@ var _ = Describe("generate service descriptor", func() {
 			Namespace:   namespace,
 			ClusterName: cluster.Name,
 		}
-		if err = buildServiceReferences(ctx, cli, synthesizedComp, compDef, comp); err != nil {
+		if err = buildServiceReferencesWithoutResolve(ctx, cli, synthesizedComp, compDef, comp); err != nil {
 			return nil, err
 		}
 		return synthesizedComp.ServiceReferences, nil
@@ -245,7 +246,7 @@ var _ = Describe("generate service descriptor", func() {
 				Create(&testCtx).GetObject()
 
 			By("GenServiceReferences failed because external service descriptor not found")
-			serviceReferences, err := buildServiceReferencesLegacy(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err := buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 			Expect(serviceReferences).Should(BeNil())
@@ -272,7 +273,7 @@ var _ = Describe("generate service descriptor", func() {
 				Create(&testCtx).GetObject()
 
 			By("GenServiceReferences failed because external service descriptor status is not available")
-			serviceReferences, err = buildServiceReferencesLegacy(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status is not available"))
 			Expect(serviceReferences).Should(BeNil())
@@ -283,7 +284,7 @@ var _ = Describe("generate service descriptor", func() {
 			})).Should(Succeed())
 
 			By("GenServiceReferences failed because external service descriptor kind and version not match")
-			serviceReferences, err = buildServiceReferencesLegacy(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("kind or version is not match with"))
 			Expect(serviceReferences).Should(BeNil())
@@ -310,7 +311,7 @@ var _ = Describe("generate service descriptor", func() {
 			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: secret.Name,
 				Namespace: secret.Namespace}, secret)).Should(Succeed())
-			serviceReferences, err = buildServiceReferencesLegacy(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(serviceReferences).ShouldNot(BeNil())
 			Expect(len(serviceReferences)).Should(Equal(2))

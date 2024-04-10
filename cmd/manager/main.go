@@ -134,6 +134,7 @@ func init() {
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
 	viper.SetDefault(rsm2.FeatureGateRSMReplicaProvider, string(rsm2.PodProvider))
 	viper.SetDefault(rsm2.MaxPlainRevisionCount, 1024)
+	viper.SetDefault(rsm2.FeatureGateIgnorePodVerticalScaling, false)
 	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 }

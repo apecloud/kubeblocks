@@ -30,12 +30,12 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func mergeMap(src, dst *map[string]string) {
-	if *src == nil {
+func mergeMap[K comparable, V any](src, dst *map[K]V) {
+	if len(*src) == 0 {
 		return
 	}
 	if *dst == nil {
-		*dst = make(map[string]string)
+		*dst = make(map[K]V)
 	}
 	for k, v := range *src {
 		(*dst)[k] = v

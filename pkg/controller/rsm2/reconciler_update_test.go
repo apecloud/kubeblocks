@@ -35,7 +35,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 )
 
 var _ = Describe("update reconciler test", func() {
@@ -131,7 +130,7 @@ var _ = Describe("update reconciler test", func() {
 				if labels == nil {
 					labels = make(map[string]string)
 				}
-				updateRevisions, err := rsmcommon.GetUpdateRevisions(rsm.Status.UpdateRevisions)
+				updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
 				Expect(err).Should(BeNil())
 				labels[appsv1.ControllerRevisionHashLabelKey] = updateRevisions[pod.Name]
 			}

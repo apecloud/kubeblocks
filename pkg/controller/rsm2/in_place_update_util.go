@@ -111,9 +111,11 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 	mergeMap(&src.Annotations, &dst.Annotations)
 	mergeMap(&src.Labels, &dst.Labels)
 	dst.Spec.ActiveDeadlineSeconds = src.Spec.ActiveDeadlineSeconds
+	// according to the Pod API spec, tolerations can only be appended.
+	// means old tolerations must be in new toleration list.
 	mergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
 		return func(t corev1.Toleration) bool {
-			return false
+			return reflect.DeepEqual(item, t)
 		}
 	})
 	for _, container := range src.Spec.InitContainers {
@@ -207,20 +209,6 @@ func equalField(old, new any) bool {
 		}
 		return true
 	case []corev1.Toleration:
-		ot := o
-		nt, _ := new.([]corev1.Toleration)
-		if nt == nil {
-			return true
-		}
-		// according to the Pod API spec, tolerations can only be appended.
-		// means old tolerations must be in new toleration list.
-		for _, t := range ot {
-			if slices.IndexFunc(nt, func(toleration corev1.Toleration) bool {
-				return reflect.DeepEqual(t, toleration)
-			}) < 0 {
-				return false
-			}
-		}
 		return true
 	case corev1.ResourceList:
 		or := o

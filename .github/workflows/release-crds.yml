@@ -69,8 +69,9 @@ jobs:
       - name: generate KubeBlocks yaml
         if: ${{ matrix.yaml == 'kubeblocks.yaml' }}
         run: |
+          make bump-chart-ver
           touch ${{ matrix.yaml }}
-          helm template kubeblocks deploy/helm --dependency-update > ${{ matrix.yaml }}
+          helm template kubeblocks deploy/helm --dependency-update --set > ${{ matrix.yaml }}
 
       - name: merge KubeBlocks crds
         if: ${{ matrix.yaml == 'kubeblocks_crds.yaml' }}

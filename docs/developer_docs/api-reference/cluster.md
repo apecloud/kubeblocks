@@ -1050,6 +1050,23 @@ string
 <p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>monitorEnabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determines whether the metrics exporter needs to be published to the service endpoint.
+If set to true, the metrics exporter will be published to the service endpoint,
+the service will be injected with the following annotations:
+- &ldquo;monitor.kubeblocks.io/path&rdquo;
+- &ldquo;monitor.kubeblocks.io/port&rdquo;
+- &ldquo;monitor.kubeblocks.io/scheme&rdquo;</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -1273,6 +1290,20 @@ Such instance-specific overrides can be specified in the <code>cluster.spec.comp
 <td>
 <em>(Optional)</em>
 <p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>builtinMonitorContainer</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">
+BuiltinMonitorContainerRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the built-in metrics exporter container.</p>
 </td>
 </tr>
 <tr>
@@ -3543,6 +3574,49 @@ string
 <td></td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">BuiltinMonitorContainerRef
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the built-in metrics exporter container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>PrometheusScrapeConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">
+PrometheusScrapeConfig
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>PrometheusScrapeConfig</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterBackup">ClusterBackup
 </h3>
 <p>
@@ -4037,6 +4111,20 @@ configmap and mounted to the current component.</p>
 <td>
 <em>(Optional)</em>
 <p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>builtinMonitorContainer</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">
+BuiltinMonitorContainerRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the built-in metrics exporter container.</p>
 </td>
 </tr>
 </tbody>
@@ -4580,6 +4668,23 @@ The cluster administrator must manually manage the cleanup and removal of these 
 <td>
 <em>(Optional)</em>
 <p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>monitorEnabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determines whether the metrics exporter needs to be published to the service endpoint.
+If set to true, the metrics exporter will be published to the service endpoint,
+the service will be injected with the following annotations:
+- &ldquo;monitor.kubeblocks.io/path&rdquo;
+- &ldquo;monitor.kubeblocks.io/port&rdquo;
+- &ldquo;monitor.kubeblocks.io/scheme&rdquo;</p>
 </td>
 </tr>
 </tbody>
@@ -6606,6 +6711,23 @@ pass the configuration items from the ConfigMap to the container without modifyi
 </tr>
 <tr>
 <td>
+<code>injectEnvTo</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
+<p>This is useful when application images accept parameters through environment variables and
+generate the final configuration file in the startup script based on these variables.</p>
+<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
+variables converted from the ConfigMap into these designated containers. This provides a flexible way to
+pass the configuration items from the ConfigMap to the container without modifying the image.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>reRenderResourceTypes</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.RerenderResourceType">
@@ -6907,6 +7029,20 @@ Such instance-specific overrides can be specified in the <code>cluster.spec.comp
 <td>
 <em>(Optional)</em>
 <p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>builtinMonitorContainer</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">
+BuiltinMonitorContainerRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the built-in metrics exporter container.</p>
 </td>
 </tr>
 <tr>
@@ -8323,6 +8459,23 @@ string
 <p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>monitorEnabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determines whether the metrics exporter needs to be published to the service endpoint.
+If set to true, the metrics exporter will be published to the service endpoint,
+the service will be injected with the following annotations:
+- &ldquo;monitor.kubeblocks.io/path&rdquo;
+- &ldquo;monitor.kubeblocks.io/port&rdquo;
+- &ldquo;monitor.kubeblocks.io/scheme&rdquo;</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentStatus">ComponentStatus
@@ -8545,7 +8698,10 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Refers to the mode bits used to set permissions on created files by default.</p>
+<p>Deprecated: DefaultMode is deprecated since 0.10.0
+for scripts, auto set 0555
+for configs, auto set 0444
+Refers to the mode bits used to set permissions on created files by default.</p>
 <p>Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
 YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
 Defaults to 0644.</p>
@@ -12247,6 +12403,7 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfig
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
 </p>
 <div>
+<p>Deprecated: LegacyRenderedTemplateSpec is deprecated since 0.10.0</p>
 </div>
 <table>
 <thead>
@@ -15363,7 +15520,7 @@ Kubernetes meta/v1.Time
 <h3 id="apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">PrometheusScrapeConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">BuiltinMonitorContainerRef</a>, <a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource</a>)
 </p>
 <div>
 </div>
@@ -16287,9 +16444,9 @@ StatefulSetSpec
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;replicas&#34;</p></td>
+<tbody><tr><td><p>&#34;hscale&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;resources&#34;</p></td>
+</tr><tr><td><p>&#34;vscale&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

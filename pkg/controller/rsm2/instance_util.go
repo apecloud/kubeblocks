@@ -565,7 +565,7 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 	mergeList(&template.Tolerations, &templateExt.Spec.Tolerations,
 		func(item corev1.Toleration) func(corev1.Toleration) bool {
 			return func(t corev1.Toleration) bool {
-				return false
+				return reflect.DeepEqual(item, t)
 			}
 		})
 	templateExt.Spec.RuntimeClassName = template.RuntimeClassName

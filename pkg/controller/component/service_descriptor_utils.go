@@ -50,7 +50,7 @@ func buildServiceReferences(ctx context.Context, cli client.Reader,
 	for _, serviceRefDecl := range compDef.Spec.ServiceRefDeclarations {
 		serviceRef, ok := serviceRefs[serviceRefDecl.Name]
 		if !ok {
-			return fmt.Errorf("service-ref %s is not defined", serviceRefDecl.Name)
+			return fmt.Errorf("service-ref for %s is not defined", serviceRefDecl.Name)
 		}
 
 		var (
@@ -94,7 +94,7 @@ func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespa
 		return nil, err
 	}
 
-	// in-memory service descriptor object, the namespace and name are not important
+	// just in-memory service descriptor object, the namespace and name are trivial
 	b := builder.NewServiceDescriptorBuilder(namespace, serviceRefDecl.Name).
 		SetServiceVersion("").
 		SetServiceKind("")

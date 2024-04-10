@@ -4288,7 +4288,7 @@ string
 </em>
 </td>
 <td>
-<p>The name of the service.</p>
+<p>References the component service name defined in the ComponentDefinition.Spec.Services[x].Name.</p>
 </td>
 </tr>
 <tr>
@@ -11392,6 +11392,18 @@ Add new or override existing tolerations.</p>
 </tr>
 <tr>
 <td>
+<code>RuntimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines RuntimeClass to override.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
@@ -17284,9 +17296,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the namespace of the referenced Cluster or the namespace of the referenced ServiceDescriptor object.
-If not provided, the referenced Cluster and ServiceDescriptor will be searched in the namespace of the current
-cluster by default.</p>
+<p>Specifies the namespace of the referenced Cluster or ServiceDescriptor object.
+If not specified, the namespace of the current cluster will be used.</p>
 </td>
 </tr>
 <tr>
@@ -17310,6 +17321,20 @@ If both Cluster and ServiceDescriptor are specified, the Cluster takes precedenc
 </tr>
 <tr>
 <td>
+<code>clusterRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ServiceRefClusterSelector">
+ServiceRefClusterSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the cluster to reference.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>serviceDescriptor</code><br/>
 <em>
 string
@@ -17318,11 +17343,106 @@ string
 <td>
 <em>(Optional)</em>
 <p>The service descriptor of the service provided by external sources.</p>
-<p>When referencing a service provided by external sources, the ServiceDescriptor object name is required to
-establish the service binding.
+<p>When referencing a service provided by external sources, a ServiceDescriptor object is required to establish
+the service binding.
 The <code>serviceDescriptor.spec.serviceKind</code> and <code>serviceDescriptor.spec.serviceVersion</code> should match the serviceKind
-and serviceVersion defined in the service reference declaration in the ClusterDefinition.</p>
+and serviceVersion declared in the definition.</p>
 <p>If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ServiceRefClusterSelector">ServiceRefClusterSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceRef">ServiceRef</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>cluster</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the cluster to reference.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ServiceRefServiceSelector">
+ServiceRefServiceSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The service to reference from the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>credential</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ServiceRefCredentialSelector">
+ServiceRefCredentialSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The credential (SystemAccount) to reference from the cluster.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ServiceRefCredentialSelector">ServiceRefCredentialSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceRefClusterSelector">ServiceRefClusterSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>component</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the component where the credential resides in.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the credential (SystemAccount) to reference.</p>
 </td>
 </tr>
 </tbody>
@@ -17416,6 +17536,65 @@ string
 <td>
 <p>Defines the service version of the service reference. This is a regular expression that matches a version number pattern.
 For instance, <code>^8.0.8$</code>, <code>8.0.\d&#123;1,2&#125;$</code>, <code>^[v\-]*?(\d&#123;1,2&#125;\.)&#123;0,3&#125;\d&#123;1,2&#125;$</code> are all valid patterns.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ServiceRefServiceSelector">ServiceRefServiceSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceRefClusterSelector">ServiceRefClusterSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>component</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the component where the service resides in.</p>
+<p>It is required when referencing a component service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the service to reference.</p>
+<p>Leave it empty to reference the default service. Set it to &ldquo;headless&rdquo; to reference the default headless service.
+If the referenced service is a pod-service, there will be multiple service objects matched,
+and the resolved value will be presented in the following format: service1.name,service2.name&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The port name of the service to reference.</p>
+<p>If there is a non-zero node-port exist for the matched service port, the node-port will be selected first.
+If the referenced service is a pod-service, there will be multiple service objects matched,
+and the resolved value will be presented in the following format: service1.name:port1,service2.name:port2&hellip;</p>
 </td>
 </tr>
 </tbody>
@@ -17650,25 +17829,9 @@ NamedVar
 </td>
 <td>
 <em>(Optional)</em>
-<p>Port references a port defined in the service.</p>
+<p>Port references a port or node-port defined in the service.</p>
 <p>If the referenced service is a pod-service, there will be multiple service objects matched,
 and the value will be presented in the following format: service1.name:port1,service2.name:port2&hellip;</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodePort</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.NamedVar">
-NamedVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>NodePort references a node-port defined in the service.</p>
-<p>If the referenced service is a pod-service, there will be multiple service objects matched,
-and the value will be presented in the following format: service1.name:nodePort1,service2.name:nodePort2&hellip;</p>
 </td>
 </tr>
 </tbody>
@@ -21391,6 +21554,18 @@ map[string]string
 <em>(Optional)</em>
 <p>Defines Tolerations to override.
 Add new or override existing tolerations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>RuntimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines RuntimeClass to override.</p>
 </td>
 </tr>
 <tr>

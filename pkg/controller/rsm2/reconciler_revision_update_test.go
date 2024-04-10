@@ -28,7 +28,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 )
 
 var _ = Describe("revision update reconciler test", func() {
@@ -57,7 +56,7 @@ var _ = Describe("revision update reconciler test", func() {
 			newRsm, ok := newTree.GetRoot().(*workloads.ReplicatedStateMachine)
 			Expect(ok).Should(BeTrue())
 			Expect(newRsm.Status.ObservedGeneration).Should(Equal(rsm.Generation))
-			updateRevisions, err := rsmcommon.GetUpdateRevisions(newRsm.Status.UpdateRevisions)
+			updateRevisions, err := getUpdateRevisions(newRsm.Status.UpdateRevisions)
 			Expect(err).Should(BeNil())
 			Expect(updateRevisions).Should(HaveLen(3))
 			Expect(updateRevisions).Should(HaveKey(rsm.Name + "-0"))

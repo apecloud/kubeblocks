@@ -180,7 +180,7 @@ var _ = Describe("instance util test", func() {
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
 			template := nameTemplate[name]
-			replica, err := buildInstanceByTemplate(name, template, rsm)
+			replica, err := buildInstanceByTemplate(name, template, rsm, "")
 			Expect(err).Should(BeNil())
 			Expect(replica.pod).ShouldNot(BeNil())
 			Expect(replica.pvcs).ShouldNot(BeNil())
@@ -297,12 +297,14 @@ var _ = Describe("instance util test", func() {
 			Expect(cm).Should(Equal(newCm))
 
 			By("merge pod")
-			oldPod := builder.NewPodBuilder(namespace, name).GetObject()
+			oldPod := builder.NewPodBuilder(namespace, name).
+				AddContainer(corev1.Container{Name: "foo", Image: "bar-old"}).
+				GetObject()
 			newPod := builder.NewPodBuilder(namespace, name).
 				SetPodSpec(template.Spec).
 				GetObject()
 			pod := copyAndMerge(oldPod, newPod)
-			Expect(pod).Should(BeNil())
+			Expect(equalBasicInPlaceFields(pod.(*corev1.Pod), newPod)).Should(BeTrue())
 
 			By("merge pvc")
 			oldPvc := builder.NewPVCBuilder(namespace, name).

@@ -31,7 +31,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsmcommon"
 )
 
 // updateReconciler handles the updates of instances based on the UpdateStrategy.
@@ -113,24 +112,19 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	// TODO(free6om): compute updateCount from PodManagementPolicy(Serial/OrderedReady, Parallel, BestEffortParallel).
 	// align MemberUpdateStrategy with PodManagementPolicy if it has nil value.
 	rsmForPlan := getRSMForUpdatePlan(rsm)
-	plan := rsm1.NewUpdatePlan(*rsmForPlan, oldPodList)
+	plan := rsm1.NewUpdatePlan(*rsmForPlan, oldPodList, IsPodUpdated)
 	podsToBeUpdated, err := plan.Execute()
 	if err != nil {
 		return nil, err
 	}
 	updateCount := len(podsToBeUpdated)
 
-	updateRevisions, err := rsmcommon.GetUpdateRevisions(rsm.Status.UpdateRevisions)
-	if err != nil {
-		return nil, err
-	}
-
-	deletedPods := 0
+	updatingPods := 0
 	updatedPods := 0
 	priorities := rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
 	sortObjects(oldPodList, priorities, false)
 	for _, pod := range oldPodList {
-		if deletedPods >= updateCount || deletedPods >= unavailable {
+		if updatingPods >= updateCount || updatingPods >= unavailable {
 			break
 		}
 		if updatedPods >= partition {
@@ -141,14 +135,31 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			tree.Logger.Info(fmt.Sprintf("RSM %s/%s blocks on scale-in as the pod %s is not healthy", rsm.Namespace, rsm.Name, pod.Name))
 			break
 		}
-		newPodRevision := updateRevisions[pod.Name]
-		if getPodRevision(pod) != newPodRevision && !isTerminating(pod) {
-			if err = tree.Delete(pod); err != nil {
+		if err != nil {
+			return nil, err
+		}
+
+		updatePolicy, err := getPodUpdatePolicy(rsm, pod)
+		if err != nil {
+			return nil, err
+		}
+		if updatePolicy == InPlaceUpdatePolicy {
+			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], rsm, getPodRevision(pod))
+			if err != nil {
 				return nil, err
 			}
-			// TODO(free6om): handle pvc management policy
-			// Retain by default.
-			deletedPods++
+			newPod := copyAndMerge(pod, newInstance.pod)
+			if err = tree.Update(newPod); err != nil {
+				return nil, err
+			}
+			updatingPods++
+		} else if updatePolicy == RecreatePolicy {
+			if !isTerminating(pod) {
+				if err = tree.Delete(pod); err != nil {
+					return nil, err
+				}
+			}
+			updatingPods++
 		}
 		updatedPods++
 	}

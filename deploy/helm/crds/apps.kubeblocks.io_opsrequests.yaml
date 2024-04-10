@@ -403,6 +403,9 @@ spec:
                         description: InstanceTemplate defines values to override in
                           pod template.
                         properties:
+                          RuntimeClassName:
+                            description: Defines RuntimeClass to override.
+                            type: string
                           annotations:
                             additionalProperties:
                               type: string
@@ -3854,6 +3857,9 @@ spec:
                             description: InstanceTemplate defines values to override
                               in pod template.
                             properties:
+                              RuntimeClassName:
+                                description: Defines RuntimeClass to override.
+                                type: string
                               annotations:
                                 additionalProperties:
                                   type: string
@@ -6598,8 +6604,9 @@ spec:
                                   info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                                 type: object
                               name:
-                                description: The name of the service.
-                                maxLength: 15
+                                description: References the component service name
+                                  defined in the ComponentDefinition.Spec.Services[x].Name.
+                                maxLength: 25
                                 type: string
                               podService:
                                 description: Indicates whether to generate individual
@@ -6925,6 +6932,9 @@ spec:
                             description: InstanceTemplate defines values to override
                               in pod template.
                             properties:
+                              RuntimeClassName:
+                                description: Defines RuntimeClass to override.
+                                type: string
                               annotations:
                                 additionalProperties:
                                   type: string
@@ -9666,8 +9676,9 @@ spec:
                                   info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                                 type: object
                               name:
-                                description: The name of the service.
-                                maxLength: 15
+                                description: References the component service name
+                                  defined in the ComponentDefinition.Spec.Services[x].Name.
+                                maxLength: 25
                                 type: string
                               podService:
                                 description: Indicates whether to generate individual

@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "polardbx"
-  "version" "0.8.1"
+  "version" "0.9.0"
   "model" "RDBMS"
   "provider" "community"
   "description" "PolarDB-X is a cloud native distributed SQL Database designed for high concurrency, massive storage, complex querying scenarios."

@@ -532,6 +532,7 @@ func (r *BackupReconciler) handleRunningPhase(
 		// if all actions completed, update backup status to completed, otherwise,
 		// continue to handle following actions.
 		for targetPodName, acts := range actions {
+		actions:
 			for _, act := range acts {
 				status, err := act.Execute(actionCtx)
 				if err != nil {
@@ -545,14 +546,14 @@ func (r *BackupReconciler) handleRunningPhase(
 					continue
 				case dpv1alpha1.ActionPhaseFailed:
 					existFailedAction = true
-					break
+					break actions
 				case dpv1alpha1.ActionPhaseRunning:
 					// update status
 					if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
 						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 					}
 					waiting = true
-					break
+					break actions
 				}
 			}
 		}

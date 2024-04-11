@@ -244,11 +244,6 @@ func (r *Request) buildCreateVolumeSnapshotAction(targetPod *corev1.Pod, name st
 	}, nil
 }
 
-// TODO(ldm): implement this
-func (r *Request) buildBackupKubeResourcesAction() (action.Action, error) {
-	return nil, nil
-}
-
 func (r *Request) buildAction(targetPod *corev1.Pod,
 	name string,
 	act *dpv1alpha1.ActionSpec) (action.Action, error) {

@@ -100,4 +100,22 @@ Additionally, the `replicas` field in the instance template is identical to that
 
 ## Detailed information of instance template
 
-For each component, multiple instance templates can be defined. Template name is configured with `name` field, and must remain unique within the same component.
+- `Name` field: For each component, multiple instance templates can be defined. Template name is configured with `Name` field, and must remain unique within the same component.
+- `Replica` field: Each template can set the number of instances rendered based on that template via the `Replicas` field, of which the default value is 1. The sum of `Replicas` for all instance templates within the same component must be less than or equal to the `Replicas` value of the component. If the number of instances rendered based on the instance templates is less than the total number required by the component, the remaining instances will be rendered using the default template.
+
+The pattern for the names of instances rendered based on instance templates is `$(cluster name)-$(component name)-$(instance template name)-ordinal`. For example, in the above RisingWave cluster, the cluster name is `risingwave`, the component name is `compute`, the instance template name is `instance`, and the number of `Replicas` is 3. Therefore, the rendered instance names are: risingwave-compute-instance-0, risingwave-compute-instance-1, risingwave-compute-instance-2.
+
+Instance templates can be used during cluster creation and can be updated during operations period. Specifically, this includes adding, deleting, or updating instance templates. Updating instance templates may update, delete, or reconstruct instances. You are recommended to carefully evaluate whether the final changes meet expectations before performing updates.
+
+### Annotations
+### Labels
+### Image
+### NodeName
+### NodeSelector
+### Tolerations
+### RuntimeClassName
+### Resources
+### Env
+### Volumes
+### VolumeMounts
+### VolumeClaimTemplates

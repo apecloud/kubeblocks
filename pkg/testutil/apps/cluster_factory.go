@@ -29,13 +29,12 @@ type MockClusterFactory struct {
 	BaseFactory[appsv1alpha1.Cluster, *appsv1alpha1.Cluster, MockClusterFactory]
 }
 
-func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory {
+func NewClusterFactory(namespace, name, cdRef string) *MockClusterFactory {
 	f := &MockClusterFactory{}
 	f.Init(namespace, name,
 		&appsv1alpha1.Cluster{
 			Spec: appsv1alpha1.ClusterSpec{
 				ClusterDefRef:     cdRef,
-				ClusterVersionRef: cvRef,
 				ComponentSpecs:    []appsv1alpha1.ClusterComponentSpec{},
 				TerminationPolicy: appsv1alpha1.WipeOut,
 			},

@@ -54,10 +54,6 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	if err = t.loadNCheckClusterVersion(transCtx, cluster); err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
-
 	if withClusterTopology(cluster) {
 		// check again with cluster definition loaded,
 		// and update topology to cluster spec in case the default topology changed.
@@ -97,27 +93,6 @@ func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterDefinition(transCt
 		cd = &appsv1alpha1.ClusterDefinition{}
 	}
 	transCtx.ClusterDef = cd
-	return nil
-}
-
-func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterVersion(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
-	var cv *appsv1alpha1.ClusterVersion
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		cv = &appsv1alpha1.ClusterVersion{}
-		key := types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}
-		if err := transCtx.Client.Get(transCtx.Context, key, cv); err != nil {
-			return err
-		}
-	}
-
-	if cv != nil && cv.Status.Phase != appsv1alpha1.AvailablePhase {
-		return fmt.Errorf("referred ClusterVersion is unavailable: %s", cv.Name)
-	}
-
-	if cv == nil {
-		cv = &appsv1alpha1.ClusterVersion{}
-	}
-	transCtx.ClusterVer = cv
 	return nil
 }
 

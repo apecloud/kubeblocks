@@ -212,12 +212,14 @@ spec:
                                         properties:
                                           mappingValue:
                                             description: The value that corresponds
-                                              to the specified ClusterVersion names.
+                                              to the specified ClusterVersion or ComponentDefinition
+                                              names.
                                             type: string
                                           names:
                                             description: Represents an array of ClusterVersion
-                                              names that can be mapped to an environment
-                                              variable value.
+                                              or ComponentDefinition names that can
+                                              be mapped to an environment variable
+                                              value.
                                             items:
                                               type: string
                                             type: array
@@ -233,12 +235,14 @@ spec:
                                         properties:
                                           mappingValue:
                                             description: The value that corresponds
-                                              to the specified ClusterVersion names.
+                                              to the specified ClusterVersion or ComponentDefinition
+                                              names.
                                             type: string
                                           names:
                                             description: Represents an array of ClusterVersion
-                                              names that can be mapped to an environment
-                                              variable value.
+                                              or ComponentDefinition names that can
+                                              be mapped to an environment variable
+                                              value.
                                             items:
                                               type: string
                                             type: array

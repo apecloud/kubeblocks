@@ -36,11 +36,10 @@ import (
 
 var _ = Describe("affinity utils", func() {
 	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
-		clusterName        = "test-cluster"
-		mysqlCompDefName   = "replicasets"
-		mysqlCompName      = "mysql"
+		clusterDefName   = "test-clusterdef"
+		clusterName      = "test-cluster"
+		mysqlCompDefName = "replicasets"
+		mysqlCompName    = "mysql"
 
 		clusterTolerationKey = "testClusterTolerationKey"
 		topologyKey          = "testTopologyKey"
@@ -58,10 +57,6 @@ var _ = Describe("affinity utils", func() {
 				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				GetObject()
 
-			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				GetObject()
-
 			affinity := &appsv1alpha1.Affinity{
 				PodAntiAffinity: podAntiAffinity,
 				TopologyKeys:    []string{topologyKey},
@@ -76,8 +71,7 @@ var _ = Describe("affinity utils", func() {
 				Effect:   corev1.TaintEffectNoExecute,
 			}
 
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, clusterVersionObj.Name).
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
 				AddComponent(mysqlCompName, mysqlCompDefName).
 				SetClusterAffinity(affinity).
 				AddClusterToleration(toleration).
@@ -88,7 +82,7 @@ var _ = Describe("affinity utils", func() {
 				Log: logger,
 			}
 			component, _ = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli,
-				clusterDefObj, clusterVersionObj, clusterObj, &clusterObj.Spec.ComponentSpecs[0])
+				clusterDefObj, clusterObj, &clusterObj.Spec.ComponentSpecs[0])
 		}
 	)
 

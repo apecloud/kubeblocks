@@ -41,10 +41,8 @@ import (
 )
 
 var _ = Describe("SystemAccount Controller", func() {
-
 	const (
 		clusterDefName                = "test-clusterdef"
-		clusterVersionName            = "test-clusterversion"
 		clusterNamePrefix             = "test-cluster"
 		mysqlCompDefName              = "replicasets"
 		mysqlCompTypeWOSysAcctDefName = "wo-sysacct"
@@ -80,9 +78,8 @@ var _ = Describe("SystemAccount Controller", func() {
 	}
 
 	var (
-		ctx               = context.Background()
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
+		ctx           = context.Background()
+		clusterDefObj *appsv1alpha1.ClusterDefinition
 	)
 
 	cleanEnv := func() {
@@ -195,19 +192,13 @@ var _ = Describe("SystemAccount Controller", func() {
 	}
 
 	initSysAccountTestsAndCluster := func(testCases map[string]*sysAcctTestCase) (clustersMap map[string]types.NamespacedName) {
-		// create clusterdef and cluster versions, but not clusters
+		// create clusterdef, but not clusters
 		By("Create a clusterDefinition obj")
 		systemAccount := mockSystemAccountsSpec()
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 			AddSystemAccountSpec(systemAccount).
 			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompTypeWOSysAcctDefName).
-			Create(&testCtx).GetObject()
-
-		By("Create a clusterVersion obj")
-		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponentVersion(mysqlCompNameWOSysAcct).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			Create(&testCtx).GetObject()
 
 		Expect(clusterDefObj).NotTo(BeNil())
@@ -250,8 +241,8 @@ var _ = Describe("SystemAccount Controller", func() {
 
 		// create cluster defined in each testcase
 		for testName, testCase := range testCases {
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefObj.Name).
+				WithRandomName().
 				AddComponent(testCase.componentName, testCase.componentDefRef).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()

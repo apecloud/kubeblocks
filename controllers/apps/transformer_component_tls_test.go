@@ -45,7 +45,6 @@ import (
 var _ = Describe("TLS self-signed cert function", func() {
 	const (
 		clusterDefName      = "test-clusterdef-tls"
-		clusterVersionName  = "test-clusterversion-tls"
 		clusterNamePrefix   = "test-cluster"
 		statefulCompDefName = "mysql"
 		statefulCompName    = "mysql"
@@ -64,7 +63,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest configurations
@@ -100,109 +99,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				CheckedCreate(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(statefulCompDefName).AddContainerShort(mysqlContainerName, testapps.ApeCloudMySQLImage).
-				CheckedCreate(&testCtx).GetObject()
-
 		})
-
-		// Context("when issuer is KubeBlocks", func() {
-		// 	var tlsIssuer *appsv1alpha1.Issuer
-		//
-		// 	BeforeEach(func() {
-		// 		tlsIssuer = &appsv1alpha1.Issuer{
-		// 			Name: appsv1alpha1.IssuerKubeBlocks,
-		// 		}
-		// 	})
-		//
-		// 	It("should create/delete the tls cert Secret", func() {
-		//
-		// 		// REVIEW: do review this test setup
-		// 		//  In [AfterEach] at: /Users/nashtsai/go/src/github.com/apecloud/kubeblocks/pkg/testutil/apps/common_util.go:323
-		// 		// Assertion in callback at /Users/nashtsai/go/src/github.com/apecloud/kubeblocks/pkg/testutil/apps/common_util.go:322 failed:
-		// 		// Expected
-		// 		// <[]v1.StatefulSet | len:1, cap:1>:
-		// 		// 	to be empty
-		// 		// 	In [AfterEach] at:
-		//
-		// 		By("create a cluster obj")
-		// 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace,
-		// 			clusterNamePrefix, clusterDefName, clusterVersionName).
-		// 			WithRandomName().
-		// 			AddComponentDef(statefulCompName, statefulCompDefName).
-		// 			SetReplicas(3).
-		// 			SetTLS(true).
-		// 			SetIssuer(tlsIssuer).
-		// 			Create(&testCtx).
-		// 			GetObject()
-		//
-		// 		clusterKey := client.ObjectKeyFromObject(clusterObj)
-		//
-		// 		By("Waiting for the cluster enter creating phase")
-		// 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		// 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
-		//
-		// 		By("By inspect that TLS cert. secret")
-		// 		ns := clusterObj.Namespace
-		// 		name := plan.GenerateTLSSecretName(clusterObj.Name, statefulCompName)
-		// 		nsName := types.NamespacedName{Namespace: ns, Name: name}
-		// 		secret := &corev1.Secret{}
-		//
-		// 		// REVIEW: Caught following:
-		// 		// [FAILED] Timed out after 10.000s.
-		// 		// 	Expected success, but got an error:
-		// 		// <*errors.StatusError | 0x14001dc46e0>: {
-		// 		// ErrStatus: {
-		// 		// TypeMeta: {Kind: "", APIVersion: ""},
-		// 		// ListMeta: {
-		// 		// SelfLink: "",
-		// 		// 	ResourceVersion: "",
-		// 		// 		Continue: "",
-		// 		// 		RemainingItemCount: nil,
-		// 		// },
-		// 		// Status: "Failure",
-		// 		// 	Message: "secrets \"test-clusterlmgbpe-mysql-tls-certs\" not found",
-		// 		// 		Reason: "NotFound",
-		// 		// 		Details: {
-		// 		// 	Name: "test-clusterlmgbpe-mysql-tls-certs",
-		// 		// 		Group: "",
-		// 		// 			Kind: "secrets",
-		// 		// 			UID: "",
-		// 		// 			Causes: nil,
-		// 		// 			RetryAfterSeconds: 0,
-		// 		// 	},
-		// 		// Code: 404,
-		// 		// },
-		// 		// }
-		// 		// secrets "test-clusterlmgbpe-mysql-tls-certs" not found
-		//
-		// 		Eventually(k8sClient.Get(ctx, nsName, secret)).Should(Succeed())
-		//
-		// 		By("Checking volume & volumeMount settings in podSpec")
-		// 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
-		// 		sts := stsList.Items[0]
-		// 		hasTLSVolume := false
-		// 		for _, volume := range sts.Spec.Template.Spec.Volumes {
-		// 			if volume.Name == builder.VolumeName {
-		// 				hasTLSVolume = true
-		// 				break
-		// 			}
-		// 		}
-		// 		Expect(hasTLSVolume).Should(BeTrue())
-		// 		for _, container := range sts.Spec.Template.Spec.Containers {
-		// 			hasTLSVolumeMount := false
-		// 			for _, mount := range container.VolumeMounts {
-		// 				if mount.Name == builder.VolumeName {
-		// 					hasTLSVolumeMount = true
-		// 					break
-		// 				}
-		// 			}
-		// 			Expect(hasTLSVolumeMount).Should(BeTrue())
-		// 		}
-		// 	})
-		// })
 
 		Context("when issuer is UserProvided", func() {
 			var userProvidedTLSSecretObj *corev1.Secret
@@ -235,7 +132,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					},
 				}
 				By("create cluster obj")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompDefName).
 					SetReplicas(3).
@@ -248,45 +145,12 @@ var _ = Describe("TLS self-signed cert function", func() {
 					clusterObj)).
 					Should(Succeed())
 			})
-
-			// REVIEW/TODO: following test setup needs to be revised, the setup looks like
-			//   hacking test result, it's expected that cluster.status.observerGeneration=1
-			//   with error conditions
-			// It("should not create the cluster when secret referenced not exist", func() {
-			// 	tlsIssuer := &appsv1alpha1.Issuer{
-			// 		Name: appsv1alpha1.IssuerUserProvided,
-			// 		SecretRef: &appsv1alpha1.TLSSecretRef{
-			// 			Name: "secret-name-not-exist",
-			// 			CA:   "ca.crt",
-			// 			Cert: "tls.crt",
-			// 			Key:  "tls.key",
-			// 		},
-			// 	}
-			// 	By("create cluster obj")
-			// 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
-			// 		WithRandomName().
-			// 		AddComponentDef(statefulCompName, statefulCompDefName).
-			// 		SetReplicas(3).
-			// 		SetTLS(true).
-			// 		SetIssuer(tlsIssuer).
-			// 		Create(&testCtx).
-			// 		GetObject()
-
-			// 	clusterKey := client.ObjectKeyFromObject(clusterObj)
-			// By("Waiting for the cluster enter creating phase")
-			// Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-			// Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
-
-			// 	By("By check cluster status.phase=ConditionsError")
-			// 	Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).
-			// 		Should(Equal(appsv1alpha1.ConditionsErrorPhase))
-			// })
 		})
 
 		Context("when switch between disabled and enabled", func() {
 			It("should handle tls settings properly", func() {
 				By("create cluster with tls disabled")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompDefName).
 					SetReplicas(3).

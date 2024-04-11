@@ -41,7 +41,7 @@ var _ = Describe("cluster utils test", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest mocked objects
@@ -56,7 +56,6 @@ var _ = Describe("cluster utils test", func() {
 	Context("cluster utils test", func() {
 		const (
 			clusterDefName        = "test-clusterdef"
-			clusterVersionName    = "test-clusterversion"
 			clusterName           = "test-cls"
 			mysqlCompDefName      = "replicasets"
 			mysqlCompName         = "mysql"
@@ -65,9 +64,8 @@ var _ = Describe("cluster utils test", func() {
 		)
 
 		var (
-			clusterDef     *appsv1alpha1.ClusterDefinition
-			clusterVersion *appsv1alpha1.ClusterVersion
-			cluster        *appsv1alpha1.Cluster
+			clusterDef *appsv1alpha1.ClusterDefinition
+			cluster    *appsv1alpha1.Cluster
 		)
 
 		BeforeEach(func() {
@@ -76,12 +74,7 @@ var _ = Describe("cluster utils test", func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(mysqlCompDefName).
-				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				GetObject()
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDef.Name, clusterVersion.Name).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
 				SetUID(clusterName).
 				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddShardingSpecV2(mysqlShardingName, mysqlCompDefName).

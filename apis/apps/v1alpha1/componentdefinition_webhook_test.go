@@ -33,9 +33,7 @@ var _ = Describe("componentDefinition webhook", func() {
 	)
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err := k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 	}
 	BeforeEach(func() {

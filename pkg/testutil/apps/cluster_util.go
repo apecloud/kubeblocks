@@ -32,34 +32,28 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
-// InitClusterWithHybridComps initializes a cluster environment for testing, includes ClusterDefinition/ClusterVersion/Cluster resources.
+// InitClusterWithHybridComps initializes a cluster environment for testing, includes ClusterDefinition/Cluster resources.
 func InitClusterWithHybridComps(
 	testCtx *testutil.TestContext,
 	clusterDefName,
-	clusterVersionName,
 	clusterName,
 	statelessCompDefName,
 	statefulCompDefName,
-	consensusCompDefName string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
+	consensusCompDefName string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
 	clusterDef := NewClusterDefFactory(clusterDefName).
 		AddComponentDef(StatelessNginxComponent, statelessCompDefName).
 		AddComponentDef(ConsensusMySQLComponent, consensusCompDefName).
 		AddComponentDef(StatefulMySQLComponent, statefulCompDefName).
 		Create(testCtx).GetObject()
-	clusterVersion := NewClusterVersionFactory(clusterVersionName, clusterDefName).
-		AddComponentVersion(statelessCompDefName).AddContainerShort(DefaultNginxContainerName, NginxImage).
-		AddComponentVersion(consensusCompDefName).AddContainerShort(DefaultMySQLContainerName, NginxImage).
-		AddComponentVersion(statefulCompDefName).AddContainerShort(DefaultMySQLContainerName, NginxImage).
-		Create(testCtx).GetObject()
 	pvcSpec := NewPVCSpec("1Gi")
-	cluster := NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+	cluster := NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
 		AddComponent(statelessCompDefName, statelessCompDefName).SetReplicas(1).
 		AddComponent(consensusCompDefName, consensusCompDefName).SetReplicas(3).
 		AddVolumeClaimTemplate(DataVolumeName, pvcSpec).
 		AddComponent(statefulCompDefName, statefulCompDefName).SetReplicas(3).
 		AddVolumeClaimTemplate(DataVolumeName, pvcSpec).
 		Create(testCtx).GetObject()
-	return clusterDef, clusterVersion, cluster
+	return clusterDef, cluster
 }
 
 func CreateK8sResource(testCtx *testutil.TestContext, obj client.Object) client.Object {

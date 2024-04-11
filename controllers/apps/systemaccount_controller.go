@@ -174,13 +174,6 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}
 
-	clusterVersion := &appsv1alpha1.ClusterVersion{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, clusterVersion); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
-	}
-
-	componentVersions := clusterVersion.Spec.GetDefNameMappingComponents()
-
 	// process accounts for each component
 	processAccountsForComponent := func(compDef *appsv1alpha1.ClusterComponentDefinition, compDecl *appsv1alpha1.ClusterComponentSpec,
 		svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) error {
@@ -241,8 +234,6 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			case appsv1alpha1.CreateByStmt:
 				if engine == nil {
 					execConfig := compDef.SystemAccounts.CmdExecutorConfig
-					// complete execConfig with settings from component version
-					completeExecConfig(execConfig, componentVersions[compDef.Name])
 					engine = newCustomizedEngine(execConfig, cluster, compDecl.Name)
 				}
 				reqCtx.Log.V(1).Info("create account by stmt", "cluster", req.NamespacedName, "account", account.Name, "strategy", strategy)

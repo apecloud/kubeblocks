@@ -28,7 +28,6 @@ import (
 
 const (
 	APIVersion            = "apps.kubeblocks.io/v1alpha1"
-	ClusterVersionKind    = "ClusterVersion"
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"
 	ComponentKind         = "Component"
@@ -247,7 +246,7 @@ const (
 	ConditionTypeSwitchoverPrefix    = "Switchover-"         // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
-// Phase represents the current status of the ClusterDefinition and ClusterVersion CR.
+// Phase represents the current status of the ClusterDefinition CR.
 //
 // +enum
 // +kubebuilder:validation:Enum={Available,Unavailable}

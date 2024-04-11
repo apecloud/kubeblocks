@@ -121,12 +121,11 @@ func GetConsensusRoleCountMap(testCtx testutil.TestContext, k8sClient client.Cli
 func CreateSimpleConsensusMySQLClusterWithConfig(
 	testCtx testutil.TestContext,
 	clusterDefName,
-	clusterVersionName,
 	clusterName,
 	mysqlConfigTemplatePath,
 	mysqlConfigConstraintPath,
 	mysqlScriptsPath string) (
-	*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
+	*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
 	const mysqlCompName = "mysql"
 	const mysqlCompDefName = "mysql"
 	const mysqlConfigName = "mysql-component-config"
@@ -197,14 +196,6 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 		AddContainerEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "CLUSTER_ID", Value: "1"}).
 		Create(&testCtx).GetObject()
 
-	By("Create a clusterVersion obj")
-	clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-		AddComponentVersion(mysqlCompDefName).
-		AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(mysqlConfigName), configmap.Name,
-			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-		Create(&testCtx).GetObject()
-
 	By("Creating a cluster")
 	pvcSpec := appsv1alpha1.PersistentVolumeClaimSpec{
 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -214,15 +205,14 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 			},
 		},
 	}
-	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-		clusterDefObj.Name, clusterVersionObj.Name).
+	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
 		AddComponent(mysqlCompName, mysqlCompDefName).
 		SetReplicas(3).
 		SetEnabledLogs("error", "general", "slow").
 		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 		Create(&testCtx).GetObject()
 
-	return clusterDefObj, clusterVersionObj, clusterObj
+	return clusterDefObj, clusterObj
 }
 
 var _ = BeforeSuite(func() {
@@ -305,13 +295,6 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("cluster-definition-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&apps.ClusterVersionReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("cluster-version-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

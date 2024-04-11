@@ -36,7 +36,6 @@ var _ = Describe("Backup OpsRequest", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr //nolint:goconst
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr     //nolint:goconst
 		clusterName           = "cluster-for-ops-" + randomStr            //nolint:goconst
 	)
 
@@ -47,7 +46,7 @@ var _ = Describe("Backup OpsRequest", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -68,7 +67,7 @@ var _ = Describe("Backup OpsRequest", func() {
 		)
 		BeforeEach(func() {
 			By("init operations resources ")
-			opsRes, _, _ = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ = initOperationsResources(clusterDefinitionName, clusterName)
 			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 		})
 

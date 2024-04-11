@@ -31,7 +31,7 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-var _ = Describe("test clusterVersion controller", func() {
+var _ = Describe("test ServiceDescriptor controller", func() {
 
 	var (
 		randomStr = testCtx.GetRandomStr()
@@ -45,7 +45,7 @@ var _ = Describe("test clusterVersion controller", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 	}
 	BeforeEach(cleanEnv)

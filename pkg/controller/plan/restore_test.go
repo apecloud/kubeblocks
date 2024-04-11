@@ -61,7 +61,7 @@ var _ = Describe("Restore", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
@@ -91,19 +91,17 @@ var _ = Describe("Restore", func() {
 
 	Context("Cluster Restore", func() {
 		const (
-			clusterDefName     = "test-clusterdef"
-			clusterVersionName = "test-clusterversion"
-			mysqlCompType      = "replicasets"
-			mysqlCompName      = "mysql"
-			nginxCompType      = "proxy"
-			topologyKey        = "testTopologyKey"
-			labelKey           = "testNodeLabelKey"
-			labelValue         = "testLabelValue"
+			clusterDefName = "test-clusterdef"
+			mysqlCompType  = "replicasets"
+			mysqlCompName  = "mysql"
+			nginxCompType  = "proxy"
+			topologyKey    = "testTopologyKey"
+			labelKey       = "testNodeLabelKey"
+			labelValue     = "testLabelValue"
 		)
 
 		var (
 			clusterDef              *appsv1alpha1.ClusterDefinition
-			clusterVersion          *appsv1alpha1.ClusterVersion
 			cluster                 *appsv1alpha1.Cluster
 			synthesizedComponent    *component.SynthesizedComponent
 			compObj                 *appsv1alpha1.Component
@@ -118,16 +116,8 @@ var _ = Describe("Restore", func() {
 				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompType).
 				AddComponentDef(testapps.StatelessNginxComponent, nginxCompType).
 				Create(&testCtx).GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(mysqlCompType).
-				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				AddComponentVersion(nginxCompType).
-				AddInitContainerShort("nginx-init", testapps.NginxImage).
-				AddContainerShort("nginx", testapps.NginxImage).
-				Create(&testCtx).GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDef.Name, clusterVersion.Name).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
 				SetReplicas(3).
 				SetClusterAffinity(&appsv1alpha1.Affinity{

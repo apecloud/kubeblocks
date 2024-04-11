@@ -111,7 +111,6 @@ const (
 	VolumeClaimTemplateNameLabelKeyForLegacy = "vct.kubeblocks.io/name" // Deprecated: only compatible with version 0.5, will be removed in 0.7
 	WorkloadTypeLabelKey                     = "apps.kubeblocks.io/workload-type"
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"
-	ClusterVerLabelKey                       = "clusterversion.kubeblocks.io/name"
 	ComponentDefinitionLabelKey              = "componentdefinition.kubeblocks.io/name"
 	ComponentVersionLabelKey                 = "componentversion.kubeblocks.io/name"
 	CMConfigurationSpecProviderLabelKey      = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
@@ -135,18 +134,16 @@ const (
 	StatefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 
 	// kubeblocks.io annotations
-	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"           // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
-	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version" // DefaultClusterVersionAnnotationKey specifies the default cluster version.
-	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request"                // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey                      = "kubeblocks.io/reconcile"                  // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey                        = "kubeblocks.io/restart"                    // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	RestoreFromBackupAnnotationKey              = "kubeblocks.io/restore-from-backup"        // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request"         // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey                      = "kubeblocks.io/reconcile"           // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey                        = "kubeblocks.io/restart"             // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	RestoreFromBackupAnnotationKey              = "kubeblocks.io/restore-from-backup" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
 	SnapShotForStartAnnotationKey               = "kubeblocks.io/snapshot-for-start"
 	ComponentReplicasAnnotationKey              = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
 	BackupPolicyTemplateAnnotationKey           = "apps.kubeblocks.io/backup-policy-template"
 	LastAppliedClusterAnnotationKey             = "apps.kubeblocks.io/last-applied-cluster"
 	PVLastClaimPolicyAnnotationKey              = "apps.kubeblocks.io/pv-last-claim-policy"
-	HaltRecoveryAllowInconsistentCVAnnotKey     = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
 	HaltRecoveryAllowInconsistentResAnnotKey    = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	PrimaryAnnotationKey                        = "rs.apps.kubeblocks.io/primary"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
@@ -168,7 +165,7 @@ const (
 	ServiceDescriptorFinalizerName = "servicedescriptor.kubeblocks.io/finalizer"
 	OpsRequestFinalizerName        = "opsrequest.kubeblocks.io/finalizer"
 
-	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
+	// ConfigurationTplLabelPrefixKey clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
 

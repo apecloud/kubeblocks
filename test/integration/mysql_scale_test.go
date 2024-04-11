@@ -38,7 +38,6 @@ import (
 
 var _ = Describe("MySQL Scaling function", func() {
 	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 	const scriptConfigName = "test-cluster-mysql-scripts"
 	const mysqlCompDefName = "replicasets"
@@ -53,7 +52,7 @@ var _ = Describe("MySQL Scaling function", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -70,10 +69,9 @@ var _ = Describe("MySQL Scaling function", func() {
 	// Testcases
 
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		clusterObj        *appsv1alpha1.Cluster
-		clusterKey        types.NamespacedName
+		clusterDefObj *appsv1alpha1.ClusterDefinition
+		clusterObj    *appsv1alpha1.Cluster
+		clusterKey    types.NamespacedName
 	)
 
 	testVerticalScaleCPUAndMemory := func() {
@@ -90,8 +88,8 @@ var _ = Describe("MySQL Scaling function", func() {
 				"memory": resource.MustParse("256Mi"),
 			},
 		}
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefObj.Name).
+			WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompDefName).
 			SetResources(resources).SetReplicas(1).
 			Create(&testCtx).GetObject()
@@ -160,8 +158,8 @@ var _ = Describe("MySQL Scaling function", func() {
 		dataPvcSpec := testapps.NewPVCSpec(oldStorageValue.String())
 		logPvcSpec := dataPvcSpec
 		logPvcSpec.StorageClassName = &defaultStorageClass.Name
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefObj.Name).
+			WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, dataPvcSpec).
 			AddVolumeClaimTemplate(testapps.LogVolumeName, logPvcSpec).
@@ -228,11 +226,6 @@ var _ = Describe("MySQL Scaling function", func() {
 				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(mysqlCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
 		})
 
 		It("should handle VerticalScalingOpsRequest and change Cluster's cpu&memory requirements", func() {
@@ -255,11 +248,6 @@ var _ = Describe("MySQL Scaling function", func() {
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
 				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(mysqlCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 

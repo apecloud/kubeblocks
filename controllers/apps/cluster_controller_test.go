@@ -49,7 +49,6 @@ import (
 var _ = Describe("Cluster Controller", func() {
 	const (
 		clusterDefName         = "test-clusterdef"
-		clusterVersionName     = "test-clusterversion"
 		compDefName            = "test-compdef"
 		compVersionName        = "test-compversion"
 		clusterName            = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
@@ -62,14 +61,13 @@ var _ = Describe("Cluster Controller", func() {
 	)
 
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		compDefObj        *appsv1alpha1.ComponentDefinition
-		compVersionObj    *appsv1alpha1.ComponentVersion
-		clusterObj        *appsv1alpha1.Cluster
-		clusterKey        types.NamespacedName
-		allSettings       map[string]interface{}
-		defaultTopology   = appsv1alpha1.ClusterTopology{
+		clusterDefObj   *appsv1alpha1.ClusterDefinition
+		compDefObj      *appsv1alpha1.ComponentDefinition
+		compVersionObj  *appsv1alpha1.ComponentVersion
+		clusterObj      *appsv1alpha1.Cluster
+		clusterKey      types.NamespacedName
+		allSettings     map[string]interface{}
+		defaultTopology = appsv1alpha1.ClusterTopology{
 			Name:    "default",
 			Default: true,
 			Components: []appsv1alpha1.ClusterTopologyComponent{
@@ -90,7 +88,6 @@ var _ = Describe("Cluster Controller", func() {
 
 	resetTestContext := func() {
 		clusterDefObj = nil
-		clusterVersionObj = nil
 		clusterObj = nil
 		resetViperCfg()
 	}
@@ -103,7 +100,7 @@ var _ = Describe("Cluster Controller", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest mocked objects
@@ -143,13 +140,6 @@ var _ = Describe("Cluster Controller", func() {
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
 			AddClusterTopology(defaultTopology).
-			Create(&testCtx).
-			GetObject()
-
-		By("Create a clusterVersion obj")
-		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponentVersion(consensusCompDefName).
-			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			Create(&testCtx).
 			GetObject()
 
@@ -197,11 +187,6 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(clusterDef.Status.ObservedGeneration).Should(Equal(clusterDef.Generation))
 				g.Expect(clusterDef.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 			})).Should(Succeed())
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj),
-			func(g Gomega, clusterVersion *appsv1alpha1.ClusterVersion) {
-				g.Expect(clusterVersion.Status.ObservedGeneration).Should(Equal(clusterVersion.Generation))
-				g.Expect(clusterVersion.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-			})).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
 			func(g Gomega, compDef *appsv1alpha1.ComponentDefinition) {
 				g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
@@ -229,8 +214,8 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	createClusterObjNoWait := func(clusterDefName, clusterVerName string, processor ...func(*testapps.MockClusterFactory)) {
-		f := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVerName).
+	createClusterObjNoWait := func(clusterDefName string, processor ...func(*testapps.MockClusterFactory)) {
+		f := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
 			WithRandomName()
 		for _, p := range processor {
 			if p != nil {
@@ -284,7 +269,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjNoWait("", "", componentProcessorWrapper(false, compName, compDefName, processor))
+		createClusterObjNoWait("", componentProcessorWrapper(false, compName, compDefName, processor))
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -301,7 +286,7 @@ var _ = Describe("Cluster Controller", func() {
 	createClusterObjWithTopology := func(topology, compName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
 		setTopology := func(f *testapps.MockClusterFactory) { f.SetTopology(topology) }
-		createClusterObjNoWait(clusterDefObj.Name, "", componentProcessorWrapper(false, compName, "", setTopology, processor))
+		createClusterObjNoWait(clusterDefObj.Name, componentProcessorWrapper(false, compName, "", setTopology, processor))
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -317,7 +302,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	createLegacyClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjNoWait(clusterDefObj.Name, clusterVersionObj.Name, componentProcessorWrapper(true, compName, compDefName, processor))
+		createClusterObjNoWait(clusterDefObj.Name, componentProcessorWrapper(true, compName, compDefName, processor))
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -333,7 +318,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	createClusterObjWithSharding := func(compTplName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjNoWait("", "", shardingComponentProcessorWrapper(false, compTplName, compDefName, processor))
+		createClusterObjNoWait("", shardingComponentProcessorWrapper(false, compTplName, compDefName, processor))
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -350,8 +335,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	createLegacyClusterObjWithSharding := func(compTplName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjNoWait(clusterDefObj.Name, clusterVersionObj.Name,
-			shardingComponentProcessorWrapper(true, compTplName, compDefName, processor))
+		createClusterObjNoWait(clusterDefObj.Name, shardingComponentProcessorWrapper(true, compTplName, compDefName, processor))
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -368,7 +352,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	createClusterObjWithMultipleTemplates := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjNoWait("", "", multipleTemplateComponentProcessorWrapper(compName, compDefName, processor))
+		createClusterObjNoWait("", multipleTemplateComponentProcessorWrapper(compName, compDefName, processor))
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -395,9 +379,8 @@ var _ = Describe("Cluster Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testClusterWithoutClusterVersion := func(compName, compDefName string) {
-		By("creating a cluster w/o cluster version")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, "").
+	testCluster := func(compName, compDefName string) {
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
 			AddComponent(consensusCompName, consensusCompDefName).SetReplicas(3).
 			WithRandomName().
 			Create(&testCtx).
@@ -471,7 +454,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	testClusterComponentScaleIn := func(compName, compDefName string) {
 		By("creating and checking a cluster with multi component")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, "").
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
 			AddComponent(compName, compDefName).SetReplicas(3).
 			AddComponent(multiConsensusCompName, compDefName).SetReplicas(3).
 			WithRandomName().
@@ -1066,8 +1049,8 @@ var _ = Describe("Cluster Controller", func() {
 			cleanEnv()
 		})
 
-		It("create cluster w/o cluster version", func() {
-			testClusterWithoutClusterVersion(consensusCompName, consensusCompDefName)
+		It("create cluster", func() {
+			testCluster(consensusCompName, consensusCompDefName)
 		})
 
 		It("create cluster with legacy component", func() {
@@ -1189,8 +1172,7 @@ var _ = Describe("Cluster Controller", func() {
 		It("test cluster conditions when cluster definition non-exist", func() {
 			By("create a cluster with cluster definition non-exist")
 			mockCompDefName := fmt.Sprintf("%s-%s", consensusCompDefName, testCtx.GetRandomStr())
-			createClusterObjNoWait(clusterDefObj.Name, clusterVersionObj.Name,
-				componentProcessorWrapper(true, consensusCompName, mockCompDefName))
+			createClusterObjNoWait(clusterDefObj.Name, componentProcessorWrapper(true, consensusCompName, mockCompDefName))
 
 			By("check conditions")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
@@ -1198,53 +1180,6 @@ var _ = Describe("Cluster Controller", func() {
 				condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Reason).Should(BeEquivalentTo(ReasonPreCheckFailed))
-			})).Should(Succeed())
-		})
-
-		It("test cluster conditions when cluster version unavailable", func() {
-			By("mock cluster version unavailable")
-			mockCompDefName := "random-comp-def"
-			clusterVersionKey := client.ObjectKeyFromObject(clusterVersionObj)
-			Expect(testapps.GetAndChangeObj(&testCtx, clusterVersionKey, func(clusterVersion *appsv1alpha1.ClusterVersion) {
-				for i, comp := range clusterVersion.Spec.ComponentVersions {
-					if comp.ComponentDefRef == consensusCompDefName {
-						clusterVersion.Spec.ComponentVersions[i].ComponentDefRef = mockCompDefName
-						break
-					}
-				}
-			})()).ShouldNot(HaveOccurred())
-			Eventually(testapps.CheckObj(&testCtx, clusterVersionKey, func(g Gomega, clusterVersion *appsv1alpha1.ClusterVersion) {
-				g.Expect(clusterVersion.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
-			})).Should(Succeed())
-
-			By("create a cluster with the unavailable cluster version")
-			createClusterObjNoWait(clusterDefObj.Name, clusterVersionObj.Name,
-				componentProcessorWrapper(true, consensusCompName, consensusCompDefName))
-
-			By("expect the cluster provisioning condition as pre-check failed")
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-				g.Expect(cluster.Status.ObservedGeneration).Should(BeZero())
-				condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
-				g.Expect(condition).ShouldNot(BeNil())
-				g.Expect(condition.Reason).Should(BeEquivalentTo(ReasonPreCheckFailed))
-			})).Should(Succeed())
-
-			By("reset cluster version to Available")
-			Expect(testapps.GetAndChangeObj(&testCtx, clusterVersionKey, func(clusterVersion *appsv1alpha1.ClusterVersion) {
-				for i, comp := range clusterVersion.Spec.ComponentVersions {
-					if comp.ComponentDefRef == mockCompDefName {
-						clusterVersion.Spec.ComponentVersions[i].ComponentDefRef = consensusCompDefName
-						break
-					}
-				}
-			})()).ShouldNot(HaveOccurred())
-			Eventually(testapps.CheckObj(&testCtx, clusterVersionKey, func(g Gomega, clusterVersion *appsv1alpha1.ClusterVersion) {
-				g.Expect(clusterVersion.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-			})).Should(Succeed())
-
-			By("expect the cluster phase transit to Creating")
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 			})).Should(Succeed())
 		})
 	})
@@ -1260,13 +1195,12 @@ var _ = Describe("Cluster Controller", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj, clusterVersionName)
+			createBackupPolicyTpl(clusterDefObj)
 		})
 
 		createClusterWithBackup := func(backup *appsv1alpha1.ClusterBackup) {
 			By("Creating a cluster")
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, clusterVersionObj.Name).
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
 				AddComponent(compName, compDefName).WithRandomName().SetBackup(backup).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -1523,7 +1457,7 @@ var _ = Describe("Cluster Controller", func() {
 	})
 })
 
-func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, mappingClusterVersions ...string) {
+func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
 		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
@@ -1531,7 +1465,7 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, mappin
 	ttl := "7d"
 	for _, v := range clusterDefObj.Spec.ComponentDefs {
 		bpt = bpt.AddBackupPolicy(v.Name).
-			AddBackupMethod(backupMethodName, false, actionSetName, mappingClusterVersions...).
+			AddBackupMethod(backupMethodName, false, actionSetName).
 			SetBackupMethodVolumeMounts("data", "/data").
 			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
 			SetBackupMethodVolumes([]string{"data"}).

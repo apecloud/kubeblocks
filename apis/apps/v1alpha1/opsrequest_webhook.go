@@ -279,18 +279,8 @@ func (r *OpsRequest) validateRestart(cluster *Cluster) error {
 }
 
 // validateUpgrade validates spec.clusterOps.upgrade
-func (r *OpsRequest) validateUpgrade(ctx context.Context,
-	k8sClient client.Client) error {
-	if r.Spec.Upgrade == nil {
-		return notEmptyError("spec.upgrade")
-	}
-
-	clusterVersion := &ClusterVersion{}
-	clusterVersionRef := r.Spec.Upgrade.ClusterVersionRef
-	if err := k8sClient.Get(ctx, types.NamespacedName{Name: clusterVersionRef}, clusterVersion); err != nil {
-		return fmt.Errorf("get clusterVersion: %s failed, err: %s", clusterVersionRef, err.Error())
-	}
-	return nil
+func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Client) error {
+	return fmt.Errorf("not implemented yet")
 }
 
 // validateVerticalScaling validates api when spec.type is VerticalScaling

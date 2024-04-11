@@ -39,9 +39,7 @@ import (
 )
 
 var _ = Describe("ConfigurationOperatorTest", func() {
-
 	var clusterObj *appsv1alpha1.Cluster
-	var clusterVersionObj *appsv1alpha1.ClusterVersion
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
 	var componentObj *appsv1alpha1.Component
 	var synthesizedComponent *component.SynthesizedComponent
@@ -70,8 +68,8 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
 		k8sMockClient = testutil.NewK8sMockClient()
-		clusterObj, clusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
-		synthesizedComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterVersionObj, clusterObj)
+		clusterObj, clusterDefObj, _ = newAllFieldsClusterObj(nil, false)
+		synthesizedComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterObj)
 		componentObj = newAllFieldsComponent(clusterObj)
 		configMapObj = testapps.NewConfigMap("default", mysqlConfigName,
 			testapps.SetConfigMapData("test", "test"))
@@ -114,7 +112,6 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 				[]client.Object{
 					clusterDefObj,
-					clusterVersionObj,
 					clusterObj,
 					clusterObj,
 					scriptsObj,
@@ -151,7 +148,6 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 				[]client.Object{
 					clusterDefObj,
-					clusterVersionObj,
 					clusterObj,
 					clusterObj,
 				},

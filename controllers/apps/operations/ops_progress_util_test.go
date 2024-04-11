@@ -42,7 +42,6 @@ var _ = Describe("Ops ProgressDetails", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 	)
 
@@ -53,7 +52,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -116,7 +115,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 		It("Test Ops ProgressDetails for rolling update", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 
 			By("create restart ops and pods of consensus component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)
@@ -140,7 +139,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 		It("Test Ops ProgressDetails with horizontally scaling replicas", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("create horizontalScaling operation to test the progressDetails when scaling down the replicas")

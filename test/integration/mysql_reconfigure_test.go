@@ -37,7 +37,6 @@ import (
 
 var _ = Describe("MySQL Reconfigure function", func() {
 	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 
 	const mysqlConfigTemplatePath = "resources/mysql-consensus-config-template.yaml"
@@ -58,7 +57,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest configurations
@@ -78,10 +77,9 @@ var _ = Describe("MySQL Reconfigure function", func() {
 	// Testcases
 
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		clusterObj        *appsv1alpha1.Cluster
-		clusterKey        types.NamespacedName
+		clusterDefObj *appsv1alpha1.ClusterDefinition
+		clusterObj    *appsv1alpha1.Cluster
+		clusterKey    types.NamespacedName
 	)
 
 	newReconfigureRequest := func(clusterName string, componentName string,
@@ -113,8 +111,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		By("Get configuration information from cluster")
 		componentName = clusterObj.Spec.ComponentSpecs[0].ComponentDefRef
-		tpls, err := core.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs,
-			clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName)
+		tpls, err := core.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs, clusterDefObj.Spec.ComponentDefs, componentName)
 		Expect(err).Should(BeNil())
 		Expect(len(tpls) > 0).Should(BeTrue())
 
@@ -141,10 +138,10 @@ var _ = Describe("MySQL Reconfigure function", func() {
 	testReconfigureThreeReplicas := func() {
 		By("Create a cluster obj")
 		clusterName := testapps.GetRandomizedKey("", clusterNamePrefix).Name
-		clusterDefObj, clusterVersionObj, clusterObj = CreateSimpleConsensusMySQLClusterWithConfig(
-			testCtx, clusterDefName, clusterVersionName, clusterName, mysqlConfigTemplatePath, mysqlConfigConstraintPath, mysqlScriptsPath)
+		clusterDefObj, clusterObj = CreateSimpleConsensusMySQLClusterWithConfig(
+			testCtx, clusterDefName, clusterName, mysqlConfigTemplatePath, mysqlConfigConstraintPath, mysqlScriptsPath)
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
-		fmt.Printf("ClusterDefinition:%s ClusterVersion:%s Cluster:%s \n", clusterDefObj.Name, clusterVersionObj.Name, clusterObj.Name)
+		fmt.Printf("ClusterDefinition:%s Cluster:%s \n", clusterDefObj.Name, clusterObj.Name)
 
 		By("Waiting the cluster is created")
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))

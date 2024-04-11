@@ -107,17 +107,6 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 		})
 	}
 
-	// check clusterVersionRef equality but allow clusters.apps.kubeblocks.io/allow-inconsistent-cv=true annotation override
-	if cluster.Spec.ClusterVersionRef != lc.Spec.ClusterVersionRef &&
-		cluster.Annotations[constant.HaltRecoveryAllowInconsistentCVAnnotKey] != trueVal {
-		return emitError(metav1.Condition{
-			Type:   appsv1alpha1.ConditionTypeHaltRecovery,
-			Reason: "HaltRecoveryFailed",
-			Message: fmt.Sprintf("not equal to last applied cluster.spec.clusterVersionRef %s; add '%s=true' annotation if void this check",
-				lc.Spec.ClusterVersionRef, constant.HaltRecoveryAllowInconsistentCVAnnotKey),
-		})
-	}
-
 	// check component len equality
 	if l := len(lc.Spec.ComponentSpecs); l != len(cluster.Spec.ComponentSpecs) {
 		return emitError(metav1.Condition{

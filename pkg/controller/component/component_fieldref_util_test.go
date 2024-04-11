@@ -33,7 +33,6 @@ import (
 var _ = Describe("ComponentRef Fields Tests", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterName = "test-cluster"
-	const clusterVersionName = "test-clusterversion"
 	const clusterNamespace = "test-compref"
 	const mysqlCompDefName = "mysql-def"
 	const referredCompDefName = "maxscale-def"
@@ -54,8 +53,8 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 			// add one mysql component
 			clusterDefBuilder = clusterDefBuilder.AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName)
 
-			By("create cluste builder")
-			clusterBuilder = testapps.NewClusterFactory(clusterNamespace, clusterName, clusterDefName, clusterVersionName)
+			By("create cluster builder")
+			clusterBuilder = testapps.NewClusterFactory(clusterNamespace, clusterName, clusterDefName)
 		})
 
 		It("test fieldref", func() {

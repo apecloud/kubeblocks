@@ -129,12 +129,11 @@ var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName stri
 
 var _ = Describe("Component Controller", func() {
 	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
-		compDefName        = "test-compdef"
-		clusterName        = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
-		leader             = "leader"
-		follower           = "follower"
+		clusterDefName = "test-clusterdef"
+		compDefName    = "test-compdef"
+		clusterName    = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
+		leader         = "leader"
+		follower       = "follower"
 		// REVIEW:
 		// - setup componentName and componentDefName as map entry pair
 		statelessCompName      = "stateless"
@@ -150,14 +149,13 @@ var _ = Describe("Component Controller", func() {
 	)
 
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		compDefObj        *appsv1alpha1.ComponentDefinition
-		clusterObj        *appsv1alpha1.Cluster
-		clusterKey        types.NamespacedName
-		compObj           *appsv1alpha1.Component
-		compKey           types.NamespacedName
-		allSettings       map[string]interface{}
+		clusterDefObj *appsv1alpha1.ClusterDefinition
+		compDefObj    *appsv1alpha1.ComponentDefinition
+		clusterObj    *appsv1alpha1.Cluster
+		clusterKey    types.NamespacedName
+		compObj       *appsv1alpha1.Component
+		compKey       types.NamespacedName
+		allSettings   map[string]interface{}
 	)
 
 	resetViperCfg := func() {
@@ -169,7 +167,6 @@ var _ = Describe("Component Controller", func() {
 
 	resetTestContext := func() {
 		clusterDefObj = nil
-		clusterVersionObj = nil
 		clusterObj = nil
 		resetViperCfg()
 	}
@@ -182,7 +179,7 @@ var _ = Describe("Component Controller", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest mocked objects
@@ -217,24 +214,13 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	// test function helpers
-	createAllWorkloadTypesClusterDef := func(noCreateAssociateCV ...bool) {
+	createAllWorkloadTypesClusterDef := func() {
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 			AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
 			AddComponentDef(testapps.ReplicationRedisComponent, replicationCompDefName).
 			AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
-			Create(&testCtx).GetObject()
-
-		if len(noCreateAssociateCV) > 0 && noCreateAssociateCV[0] {
-			return
-		}
-		By("Create a clusterVersion obj")
-		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponentVersion(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponentVersion(consensusCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponentVersion(replicationCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponentVersion(statelessCompDefName).AddContainerShort("nginx", testapps.NginxImage).
 			Create(&testCtx).GetObject()
 
 		By("Create a componentDefinition obj")
@@ -263,9 +249,9 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObjVx := func(clusterDefName, clusterVerName, compName, compDefName string, v2 bool,
+	createClusterObjVx := func(clusterDefName, compName, compDefName string, v2 bool,
 		processor func(*testapps.MockClusterFactory), phase *appsv1alpha1.ClusterPhase) {
-		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVerName).
+		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
 			WithRandomName()
 		if !v2 {
 			factory.AddComponent(compName, compDefName).SetReplicas(1)
@@ -309,17 +295,17 @@ var _ = Describe("Component Controller", func() {
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjVx(clusterDefObj.Name, clusterVersionObj.Name, compName, compDefName, false, processor, nil)
+		createClusterObjVx(clusterDefObj.Name, compName, compDefName, false, processor, nil)
 	}
 
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx("", "", compName, compDefName, true, processor, nil)
+		createClusterObjVx("", compName, compDefName, true, processor, nil)
 	}
 
 	createClusterObjV2WithPhase := func(compName, compDefName string, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx("", "", compName, compDefName, true, processor, &phase)
+		createClusterObjVx("", compName, compDefName, true, processor, &phase)
 	}
 
 	mockCompRunning := func(compName string) {
@@ -1674,8 +1660,8 @@ var _ = Describe("Component Controller", func() {
 	testReplicationWorkloadRunning := func(compName, compDefName string) {
 		By("Mock a cluster obj with replication componentDefRef.")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
+			WithRandomName().
 			AddComponent(compName, compDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -1705,8 +1691,8 @@ var _ = Describe("Component Controller", func() {
 
 		By("Mock a cluster obj")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
+			WithRandomName().
 			AddComponent(compName, compDefName).
 			SetReplicas(replicas).AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
@@ -1842,7 +1828,7 @@ var _ = Describe("Component Controller", func() {
 		restoreFromBackup := fmt.Sprintf(`{"%s":{"name":"%s"}}`, compName, backupName)
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		replicas := 3
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
 			WithRandomName().
 			AddComponent(compName, compDefName).
 			SetReplicas(int32(replicas)).
@@ -2156,8 +2142,7 @@ var _ = Describe("Component Controller", func() {
 			Expect(components).ShouldNot(BeEmpty())
 
 			By("Creating a cluster")
-			clusterBuilder := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, clusterVersionObj.Name)
+			clusterBuilder := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name)
 
 			compNames := make([]string, 0, len(components))
 			for compName, compDefName := range components {

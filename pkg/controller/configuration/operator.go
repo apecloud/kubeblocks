@@ -53,8 +53,6 @@ func NewConfigReconcileTask(resourceCtx *ResourceCtx,
 func (c *configOperator) Reconcile() error {
 	var synthesizedComponent = c.SynthesizedComponent
 
-	// Need to Merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
-	// ClusterDefinition.Components[*].ConfigTemplateRefs
 	if len(synthesizedComponent.ConfigTemplates) == 0 && len(synthesizedComponent.ScriptTemplates) == 0 {
 		return c.UpdateConfiguration()
 	}

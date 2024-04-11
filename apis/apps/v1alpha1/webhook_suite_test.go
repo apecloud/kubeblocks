@@ -144,7 +144,6 @@ var _ = BeforeSuite(func() {
 					&storagev1.StorageClass{},
 					&ClusterDefinition{},
 					&Cluster{},
-					&ClusterVersion{},
 					&OpsRequest{},
 					&appsv1beta1.ConfigConstraint{},
 				},
@@ -154,9 +153,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = (&ClusterDefinition{}).SetupWebhookWithManager(mgr)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = (&ClusterVersion{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = (&Cluster{}).SetupWebhookWithManager(mgr)

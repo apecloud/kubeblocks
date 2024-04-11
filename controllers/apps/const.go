@@ -22,7 +22,6 @@ package apps
 const (
 	// name of our custom finalizer
 	clusterDefinitionFinalizerName   = "clusterdefinition.kubeblocks.io/finalizer"
-	clusterVersionFinalizerName      = "clusterversion.kubeblocks.io/finalizer"
 	opsDefinitionFinalizerName       = "opsdefinition.kubeblocks.io/finalizer"
 	componentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
 	componentVersionFinalizerName    = "componentversion.kubeblocks.io/finalizer"

@@ -123,12 +123,12 @@ type ValueFrom struct {
 }
 
 type ValueMapping struct {
-	// Represents an array of ClusterVersion names that can be mapped to an environment variable value.
+	// Represents an array of ClusterVersion or ComponentDefinition names that can be mapped to an environment variable value.
 	//
 	// +kubebuilder:validation:Required
 	Names []string `json:"names"`
 
-	// The value that corresponds to the specified ClusterVersion names.
+	// The value that corresponds to the specified ClusterVersion or ComponentDefinition names.
 	//
 	// +kubebuilder:validation:Required
 	MappingValue string `json:"mappingValue"`

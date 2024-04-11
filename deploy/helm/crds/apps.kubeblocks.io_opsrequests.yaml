@@ -3638,7 +3638,7 @@ spec:
                 - message: forbidden to update spec.type
                   rule: self == oldSelf
               upgrade:
-                description: Specifies the cluster version by specifying clusterVersionRef.
+                description: Specifies the version by specifying clusterVersionRef.
                 properties:
                   clusterVersionRef:
                     description: A reference to the name of the ClusterVersion.

@@ -33,7 +33,6 @@ import (
 )
 
 const clusterDefName = "test-clusterdef"
-const clusterVersionName = "test-clusterversion"
 const clusterName = "test-cluster"
 const mysqlCompDefName = "replicasets"
 const scriptConfigName = "test-script-config"
@@ -56,32 +55,13 @@ func allFieldsClusterDefObj(needCreate bool) *appsv1alpha1.ClusterDefinition {
 	return clusterDefObj
 }
 
-func allFieldsClusterVersionObj(needCreate bool) *appsv1alpha1.ClusterVersion {
-	clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-		AddComponentVersion(mysqlCompDefName).
-		AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-		GetObject()
-	if needCreate {
-		Expect(testCtx.CreateObj(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
-	}
-	return clusterVersionObj
-}
-
-func newAllFieldsClusterObj(
-	clusterDefObj *appsv1alpha1.ClusterDefinition,
-	clusterVersionObj *appsv1alpha1.ClusterVersion,
-	needCreate bool,
-) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, types.NamespacedName) {
-	// setup Cluster obj requires default ClusterDefinition and ClusterVersion objects
+func newAllFieldsClusterObj(clusterDefObj *appsv1alpha1.ClusterDefinition, needCreate bool) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterDefinition, types.NamespacedName) {
+	// setup Cluster obj requires default ClusterDefinition object
 	if clusterDefObj == nil {
 		clusterDefObj = allFieldsClusterDefObj(needCreate)
 	}
-	if clusterVersionObj == nil {
-		clusterVersionObj = allFieldsClusterVersionObj(needCreate)
-	}
 	pvcSpec := testapps.NewPVCSpec("1Gi")
-	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-		clusterDefObj.Name, clusterVersionObj.Name).
+	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
 		AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
 		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 		AddComponentService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
@@ -91,16 +71,15 @@ func newAllFieldsClusterObj(
 	if needCreate {
 		Expect(testCtx.CreateObj(testCtx.Ctx, clusterObj)).Should(Succeed())
 	}
-	return clusterObj, clusterDefObj, clusterVersionObj, key
+	return clusterObj, clusterDefObj, key
 }
 
-func newAllFieldsSynthesizedComponent(clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
+func newAllFieldsSynthesizedComponent(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: testCtx.Ctx,
 		Log: logger,
 	}
-	synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVer, cluster, &cluster.Spec.ComponentSpecs[0])
+	synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
 	Expect(err).Should(Succeed())
 	Expect(synthesizeComp).ShouldNot(BeNil())
 	addTestVolumeMount(synthesizeComp.PodSpec, mysqlCompName)

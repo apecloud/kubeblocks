@@ -108,8 +108,8 @@ const (
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey          = "apps.kubeblocks.io/vct-name"
 	KBAppServiceVersionLabelKey              = "apps.kubeblocks.io/service-version"
-	VolumeClaimTemplateNameLabelKeyForLegacy = "vct.kubeblocks.io/name" // Deprecated: only compatible with version 0.5, will be removed in 0.7
 	WorkloadTypeLabelKey                     = "apps.kubeblocks.io/workload-type"
+	KBAppPodNameLabelKey                     = "apps.kubeblocks.io/pod-name"
 	ClassProviderLabelKey                    = "class.kubeblocks.io/provider"
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"
 	ClusterVerLabelKey                       = "clusterversion.kubeblocks.io/name"
@@ -132,6 +132,7 @@ const (
 	ServiceDescriptorNameLabelKey            = "servicedescriptor.kubeblocks.io/name"
 	RestoreForHScaleLabelKey                 = "apps.kubeblocks.io/restore-for-hscale"
 	ResourceConstraintProviderLabelKey       = "resourceconstraint.kubeblocks.io/provider"
+	VolumeClaimTemplateNameLabelKeyForLegacy = "vct.kubeblocks.io/name" // Deprecated: only compatible with version 0.5, will be removed in 0.7
 
 	// StatefulSetPodNameLabelKey is used to mark the pod name of the StatefulSet
 	StatefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"

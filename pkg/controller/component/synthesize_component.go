@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -187,12 +186,8 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
-	// build and update resources
-	// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
-	if err := buildAndUpdateResources(reqCtx, cli, synthesizeComp, comp); err != nil {
-		reqCtx.Log.Error(err, "build and update resources failed.")
-		return nil, err
-	}
+	// update resources
+	buildAndUpdateResources(synthesizeComp, comp)
 
 	// build labels and annotations
 	buildLabelsAndAnnotations(compDef, comp, synthesizeComp)
@@ -356,21 +351,11 @@ func toVolumeClaimTemplates(compSpec *appsv1alpha1.ComponentSpec) []corev1.Persi
 	return ts
 }
 
-// buildResources builds and updates podSpec resources for component.
-// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
-func buildAndUpdateResources(reqCtx intctrlutil.RequestCtx, cli client.Reader, synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+// buildAndUpdateResources updates podSpec resources from component
+func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
 	if comp.Spec.Resources.Requests != nil || comp.Spec.Resources.Limits != nil {
 		synthesizeComp.PodSpec.Containers[0].Resources = comp.Spec.Resources
 	}
-	clsMgr, err := getClassManager(reqCtx.Ctx, cli, synthesizeComp)
-	if err != nil {
-		return err
-	}
-	if err := updateResources(synthesizeComp, comp, clsMgr); err != nil {
-		reqCtx.Log.Error(err, "update class resources failed")
-		return err
-	}
-	return nil
 }
 
 func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) {
@@ -686,69 +671,5 @@ func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec strin
 			return template
 		}
 	}
-	return nil
-}
-
-// getClassManager gets the class manager for build resource constraint.
-// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
-func getClassManager(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent) (*Manager, error) {
-	var (
-		classDefinitionList appsv1alpha1.ComponentClassDefinitionList
-		ml                  []client.ListOption
-	)
-	if synthesizedComp.ClusterDefName != "" {
-		ml = []client.ListOption{
-			client.MatchingLabels{constant.ClusterDefLabelKey: synthesizedComp.ClusterDefName},
-		}
-	} else {
-		ml = []client.ListOption{
-			client.MatchingLabels{constant.ComponentDefinitionLabelKey: synthesizedComp.CompDefName},
-		}
-	}
-
-	if err := cli.List(ctx, &classDefinitionList, ml...); err != nil {
-		return nil, err
-	}
-
-	var constraintList appsv1alpha1.ComponentResourceConstraintList
-	if err := cli.List(ctx, &constraintList); err != nil {
-		return nil, err
-	}
-	return NewManager(classDefinitionList, constraintList)
-}
-
-// updateResources updates the resources of pod spec with the expected resources from class manager.
-// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
-func updateResources(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component, clsMgr *Manager) error {
-	var (
-		expectResources corev1.ResourceList
-		err             error
-	)
-
-	if ignoreResourceConstraint(comp) {
-		return nil
-	}
-
-	if clsMgr == nil {
-		return nil
-	}
-
-	expectResources, err = clsMgr.GetResources(synthesizedComp, comp)
-	if err != nil || expectResources == nil {
-		return err
-	}
-
-	actualResources := synthesizedComp.PodSpec.Containers[0].Resources
-	if actualResources.Requests == nil {
-		actualResources.Requests = corev1.ResourceList{}
-	}
-	if actualResources.Limits == nil {
-		actualResources.Limits = corev1.ResourceList{}
-	}
-	for k, v := range expectResources {
-		actualResources.Requests[k] = v
-		actualResources.Limits[k] = v
-	}
-	synthesizedComp.PodSpec.Containers[0].Resources = actualResources
 	return nil
 }

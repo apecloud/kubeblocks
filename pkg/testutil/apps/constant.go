@@ -55,10 +55,6 @@ const (
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"
 
-	Class1c1gName                 = "general-1c1g"
-	Class2c4gName                 = "general-2c4g"
-	DefaultResourceConstraintName = "kb-resource-constraint"
-
 	StorageClassName = "test-sc"
 	EnvKeyImageTag   = "IMAGE_TAG"
 	DefaultImageTag  = "test"
@@ -476,22 +472,5 @@ var (
 			InitContainers: []corev1.Container{defaultRedisInitContainer},
 			Containers:     []corev1.Container{defaultRedisContainer},
 		},
-	}
-
-	Class1c1g = appsv1alpha1.ComponentClass{
-		Name:   Class1c1gName,
-		CPU:    resource.MustParse("1"),
-		Memory: resource.MustParse("1Gi"),
-	}
-
-	Class2c4g = appsv1alpha1.ComponentClass{
-		Name:   Class2c4gName,
-		CPU:    resource.MustParse("2"),
-		Memory: resource.MustParse("4Gi"),
-	}
-
-	DefaultClasses = map[string]appsv1alpha1.ComponentClass{
-		Class1c1gName: Class1c1g,
-		Class2c4gName: Class2c4g,
 	}
 )

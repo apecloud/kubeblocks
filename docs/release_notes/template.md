@@ -117,8 +117,6 @@ $kubeblocks_changes
 ### API changes
 - New APIs:
     - backuppolicytemplates.apps.kubeblocks.io
-    - componentclassdefinitions.apps.kubeblocks.io
-    - componentresourceconstraints.apps.kubeblocks.io
 
 - Deleted APIs:
     - backuppolicytemplates.dataprotection.kubeblocks.io

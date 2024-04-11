@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/authzed/controller-idioms/hash"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -166,25 +165,6 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 					Reason: "HaltRecoveryFailed",
 					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].volumeClaimTemplates=%s; add '%s=true' annotation to void this check",
 						comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
-				})
-			}
-
-			if lastUsedComp.ClassDefRef != nil {
-				if comp.ClassDefRef == nil || hash.Object(*comp.ClassDefRef) != hash.Object(*lastUsedComp.ClassDefRef) {
-					objJSON, _ := json.Marshal(lastUsedComp.ClassDefRef)
-					return emitError(metav1.Condition{
-						Type:   appsv1alpha1.ConditionTypeHaltRecovery,
-						Reason: "HaltRecoveryFailed",
-						Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].classDefRef=%s; add '%s=true' annotation to void this check",
-							comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
-					})
-				}
-			} else if comp.ClassDefRef != nil {
-				return emitError(metav1.Condition{
-					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
-					Reason: "HaltRecoveryFailed",
-					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].classDefRef=null; add '%s=true' annotation to void this check",
-						comp.Name, constant.HaltRecoveryAllowInconsistentResAnnotKey),
 				})
 			}
 

@@ -36,12 +36,6 @@ type ComponentSpec struct {
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
-	// References the class defined in ComponentClassDefinition.
-	//
-	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
-	// +optional
-	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
-
 	// Define service references for the current component. Based on the referenced services, they can be categorized into two types:
 	// - Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
 	// - Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.

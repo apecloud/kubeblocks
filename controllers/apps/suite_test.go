@@ -253,13 +253,6 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager, nil)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&ComponentClassReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("class-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
 	err = (&ServiceDescriptorReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),

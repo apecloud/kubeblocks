@@ -493,12 +493,6 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
-	// References the class defined in ComponentClassDefinition.
-	//
-	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
-	// +optional
-	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
-
 	// Defines service references for the current component.
 	//
 	// Based on the referenced services, they can be categorized into two types:
@@ -847,20 +841,6 @@ type ClusterComponentService struct {
 	//
 	// +optional
 	PodService *bool `json:"podService,omitempty"`
-}
-
-type ClassDefRef struct {
-	// Specifies the name of the ComponentClassDefinition.
-	//
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	Name string `json:"name,omitempty"`
-
-	// Defines the name of the class that is defined in the ComponentClassDefinition.
-	//
-	// +kubebuilder:validation:Required
-	Class string `json:"class"`
 }
 
 type ClusterMonitor struct {

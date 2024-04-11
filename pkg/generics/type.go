@@ -127,10 +127,6 @@ var BackupRepoSignature = func(_ dpv1alpha1.BackupRepo, _ *dpv1alpha1.BackupRepo
 
 var AddonSignature = func(_ extensionsv1alpha1.Addon, _ *extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList, _ *extensionsv1alpha1.AddonList) {
 }
-var ComponentResourceConstraintSignature = func(_ appsv1alpha1.ComponentResourceConstraint, _ *appsv1alpha1.ComponentResourceConstraint, _ appsv1alpha1.ComponentResourceConstraintList, _ *appsv1alpha1.ComponentResourceConstraintList) {
-}
-var ComponentClassDefinitionSignature = func(_ appsv1alpha1.ComponentClassDefinition, _ *appsv1alpha1.ComponentClassDefinition, _ appsv1alpha1.ComponentClassDefinitionList, _ *appsv1alpha1.ComponentClassDefinitionList) {
-}
 
 var StorageProviderSignature = func(_ storagev1alpha1.StorageProvider, _ *storagev1alpha1.StorageProvider, _ storagev1alpha1.StorageProviderList, _ *storagev1alpha1.StorageProviderList) {
 }

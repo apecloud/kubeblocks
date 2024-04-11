@@ -93,7 +93,6 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetEnabledLogs(compSpec.EnabledLogs).
 		SetServiceRefs(compSpec.ServiceRefs).
-		SetClassRef(compSpec.ClassDefRef).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
 		SetInstances(compSpec.Instances).
 		SetOfflineInstances(compSpec.OfflineInstances)

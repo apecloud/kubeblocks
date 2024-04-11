@@ -38,10 +38,6 @@ A component is the fundamental assembly component used to build a data storage a
 
 ComponentRef is used to select the component and its fields to be referenced.
 
-##### ComponentClassDefinition
-
-ComponentClassDefinition is to define component parameters.
-
 ##### ConfigConstraint
 
 KubeBlocks abstracts engine configuration files into ConfigConstraints to better support configuration changes. The abstracted information within ConfigConstraints includes the following content:

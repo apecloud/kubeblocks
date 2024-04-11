@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "pulsar"
-  "version" "0.8.2"
+  "version" "0.9.0"
   "model" "streaming"
   "provider" "community"
   "description" "Apache® Pulsar™ is an open-source, distributed messaging and streaming platform built for the cloud."

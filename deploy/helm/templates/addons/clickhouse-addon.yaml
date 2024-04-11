@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "clickhouse"
-  "version" "0.8.0"
+  "version" "0.9.0"
   "model" "RDBMS"
   "provider" "community"
   "description" "ClickHouse is an open-source column-oriented OLAP database management system. Use it to boost your database performance while providing linear scalability and hardware efficiency."

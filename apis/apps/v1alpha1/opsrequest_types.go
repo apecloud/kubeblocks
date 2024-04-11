@@ -240,11 +240,6 @@ type VerticalScaling struct {
 	// Defines the computational resource size for vertical scaling.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
-
-	// A reference to a class defined in ComponentClassDefinition.
-	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
-	// +optional
-	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 }
 
 // VolumeExpansion encapsulates the parameters required for a volume expansion operation.
@@ -808,11 +803,6 @@ type LastComponentConfiguration struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	corev1.ResourceRequirements `json:",inline,omitempty"`
-
-	// References a class defined in ComponentClassDefinition.
-	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
-	// +optional
-	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
 	// Records the last volumeClaimTemplates of the component.
 	// +optional

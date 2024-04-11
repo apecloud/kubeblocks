@@ -92,8 +92,8 @@ func (s *StatefulSetAction) Execute(ctx ActionContext) (actionStatus *dpv1alpha1
 		}, nil
 	}
 	sts.Spec.Template.Spec = *s.PodSpec
-	// update the statefulSet
 
+	// update the statefulSet
 	if err = ctx.Client.Update(ctx.Ctx, sts); err != nil {
 		return nil, err
 	}

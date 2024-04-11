@@ -26,15 +26,16 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -58,6 +59,17 @@ var _ = Describe("OpsRequest Controller", func() {
 	const mysqlCompName = "mysql"
 	const defaultMinReadySeconds = 10
 
+	var (
+		_1c1g = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
+		}
+		_2c4g = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("2"),
+			corev1.ResourceMemory: resource.MustParse("4Gi"),
+		}
+	)
+
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -79,8 +91,6 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ComponentResourceConstraintSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ComponentClassDefinitionSignature, ml)
 	}
 
 	BeforeEach(func() {
@@ -120,47 +130,20 @@ var _ = Describe("OpsRequest Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 	}
 
-	type resourceContext struct {
-		class    *appsv1alpha1.ComponentClass
-		resource corev1.ResourceRequirements
-	}
-
 	type verticalScalingContext struct {
-		source resourceContext
-		target resourceContext
+		source corev1.ResourceRequirements
+		target corev1.ResourceRequirements
 	}
 
 	testVerticalScaleCPUAndMemory := func(workloadType testapps.ComponentDefTplType, scalingCtx verticalScalingContext) {
 		const opsName = "mysql-verticalscaling"
 
-		By("Create class related objects")
-		testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
-			AddConstraints(testapps.GeneralResourceConstraint).
-			AddSelector(appsv1alpha1.ClusterResourceConstraintSelector{
-				ClusterDefRef: clusterDefName,
-				Components: []appsv1alpha1.ComponentResourceConstraintSelector{
-					{
-						ComponentDefRef: mysqlCompDefName,
-						Rules:           []string{"c1", "c2", "c3", "c4"},
-					},
-				},
-			}).
-			Create(&testCtx).GetObject()
-
-		testapps.NewComponentClassDefinitionFactory("custom", clusterDefObj.Name, mysqlCompDefName).
-			AddClasses([]appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
-			Create(&testCtx)
-
 		By("Create a cluster obj")
 		clusterFactory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompDefName).
-			SetReplicas(1)
-		if scalingCtx.source.class != nil {
-			clusterFactory.SetClassDefRef(&appsv1alpha1.ClassDefRef{Class: scalingCtx.source.class.Name})
-		} else {
-			clusterFactory.SetResources(scalingCtx.source.resource)
-		}
+			SetReplicas(1).
+			SetResources(scalingCtx.source)
 		clusterObj = clusterFactory.Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -198,22 +181,11 @@ var _ = Describe("OpsRequest Controller", func() {
 		opsKey := types.NamespacedName{Name: opsName, Namespace: testCtx.DefaultNamespace}
 		verticalScalingOpsRequest := testapps.NewOpsRequestObj(opsKey.Name, opsKey.Namespace,
 			clusterObj.Name, appsv1alpha1.VerticalScalingType)
-		if scalingCtx.target.class != nil {
-			verticalScalingOpsRequest.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
-				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					ClassDefRef: &appsv1alpha1.ClassDefRef{
-						Class: scalingCtx.target.class.Name,
-					},
-				},
-			}
-		} else {
-			verticalScalingOpsRequest.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
-				{
-					ComponentOps:         appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					ResourceRequirements: scalingCtx.target.resource,
-				},
-			}
+		verticalScalingOpsRequest.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
+			{
+				ComponentOps:         appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
+				ResourceRequirements: scalingCtx.target,
+			},
 		}
 		Expect(testCtx.CreateObj(testCtx.Ctx, verticalScalingOpsRequest)).Should(Succeed())
 
@@ -250,16 +222,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 
 		By("check cluster resource requirements changed")
-		var targetRequests corev1.ResourceList
-		if scalingCtx.target.class != nil {
-			targetRequests = corev1.ResourceList{
-				corev1.ResourceCPU:    scalingCtx.target.class.CPU,
-				corev1.ResourceMemory: scalingCtx.target.class.Memory,
-			}
-		} else {
-			targetRequests = scalingCtx.target.resource.Requests
-		}
-
+		targetRequests := scalingCtx.target.Requests
 		rsmList = testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, mysqlCompName)
 		mysqlRSM = &rsmList.Items[0]
 		Expect(reflect.DeepEqual(mysqlRSM.Spec.Template.Spec.Containers[0].Resources.Requests, targetRequests)).Should(BeTrue())
@@ -288,34 +251,10 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).GetObject()
 		})
 
-		It("create cluster by class, vertical scaling by resource", func() {
-			ctx := verticalScalingContext{
-				source: resourceContext{class: &testapps.Class1c1g},
-				target: resourceContext{resource: testapps.Class2c4g.ToResourceRequirements()},
-			}
-			testVerticalScaleCPUAndMemory(testapps.StatefulMySQLComponent, ctx)
-		})
-
-		It("create cluster by class, vertical scaling by class", func() {
-			ctx := verticalScalingContext{
-				source: resourceContext{class: &testapps.Class1c1g},
-				target: resourceContext{class: &testapps.Class2c4g},
-			}
-			testVerticalScaleCPUAndMemory(testapps.StatefulMySQLComponent, ctx)
-		})
-
-		It("create cluster by resource, vertical scaling by class", func() {
-			ctx := verticalScalingContext{
-				source: resourceContext{resource: testapps.Class1c1g.ToResourceRequirements()},
-				target: resourceContext{class: &testapps.Class2c4g},
-			}
-			testVerticalScaleCPUAndMemory(testapps.StatefulMySQLComponent, ctx)
-		})
-
 		It("create cluster by resource, vertical scaling by resource", func() {
 			ctx := verticalScalingContext{
-				source: resourceContext{resource: testapps.Class1c1g.ToResourceRequirements()},
-				target: resourceContext{resource: testapps.Class2c4g.ToResourceRequirements()},
+				source: corev1.ResourceRequirements{Requests: _1c1g, Limits: _1c1g},
+				target: corev1.ResourceRequirements{Requests: _2c4g, Limits: _2c4g},
 			}
 			testVerticalScaleCPUAndMemory(testapps.StatefulMySQLComponent, ctx)
 		})
@@ -438,8 +377,8 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {
 			ctx := verticalScalingContext{
-				source: resourceContext{class: &testapps.Class1c1g},
-				target: resourceContext{resource: testapps.Class2c4g.ToResourceRequirements()},
+				source: corev1.ResourceRequirements{Requests: _1c1g, Limits: _1c1g},
+				target: corev1.ResourceRequirements{Requests: _2c4g, Limits: _2c4g},
 			}
 			testVerticalScaleCPUAndMemory(testapps.ConsensusMySQLComponent, ctx)
 		})

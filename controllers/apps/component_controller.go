@@ -85,8 +85,6 @@ type ComponentReconciler struct {
 // read only + watch access
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentresourceconstraints,verbs=get;list;watch
-
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts/status,verbs=get
 

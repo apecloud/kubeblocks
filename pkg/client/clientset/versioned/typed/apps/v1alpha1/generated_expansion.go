@@ -28,11 +28,7 @@ type ClusterVersionExpansion interface{}
 
 type ComponentExpansion interface{}
 
-type ComponentClassDefinitionExpansion interface{}
-
 type ComponentDefinitionExpansion interface{}
-
-type ComponentResourceConstraintExpansion interface{}
 
 type ComponentVersionExpansion interface{}
 

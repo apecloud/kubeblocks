@@ -80,24 +80,6 @@ func Config() {
 				Expect(b).Should(BeTrue())
 			}
 		})
-		It(" configure componentresourceconstraint custom", func() {
-			componentResourceConstraint := "kubectl get ComponentResourceConstraint | grep kb-resource-constraint-e2e | awk '{print $1}'"
-			if checkResourceExists(componentResourceConstraint) {
-				log.Println("ComponentResourceConstraint already exists")
-			} else {
-				b := e2eutil.OpsYaml(dir+"/testdata/config/componentresourceconstraint_custom.yaml", "create")
-				Expect(b).Should(BeTrue())
-			}
-		})
-		It(" configure custom class", func() {
-			componentClassDefinition := "kubectl get ComponentClassDefinition | grep custom-class | awk '{print $1}'"
-			if checkResourceExists(componentClassDefinition) {
-				log.Println("ComponentClassDefinition already exists")
-			} else {
-				b := e2eutil.OpsYaml(dir+"/testdata/config/custom_class.yaml", "create")
-				Expect(b).Should(BeTrue())
-			}
-		})
 		It(" configure pg cluster version", func() {
 			clusterVersion := "kubectl get ClusterVersion | grep postgresql-14.7.2-latest | awk '{print $1}'"
 			if checkResourceExists(clusterVersion) {
@@ -127,11 +109,6 @@ func DeleteConfig() {
 		It("delete secret and backuprepo", func() {
 			deleteResource("kubectl delete secret " + ConfigType + "-credential-for-backuprepo -n kb-system")
 			deleteResource("kubectl delete backuprepo my-repo")
-		})
-
-		It("delete resources", func() {
-			deleteResource("kubectl delete ComponentResourceConstraint kb-resource-constraint-e2e")
-			deleteResource("kubectl delete ComponentClassDefinition custom-class")
 		})
 
 		It("delete cv", func() {

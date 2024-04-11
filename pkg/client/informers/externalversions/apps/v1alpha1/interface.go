@@ -34,12 +34,8 @@ type Interface interface {
 	ClusterVersions() ClusterVersionInformer
 	// Components returns a ComponentInformer.
 	Components() ComponentInformer
-	// ComponentClassDefinitions returns a ComponentClassDefinitionInformer.
-	ComponentClassDefinitions() ComponentClassDefinitionInformer
 	// ComponentDefinitions returns a ComponentDefinitionInformer.
 	ComponentDefinitions() ComponentDefinitionInformer
-	// ComponentResourceConstraints returns a ComponentResourceConstraintInformer.
-	ComponentResourceConstraints() ComponentResourceConstraintInformer
 	// ComponentVersions returns a ComponentVersionInformer.
 	ComponentVersions() ComponentVersionInformer
 	// ConfigConstraints returns a ConfigConstraintInformer.
@@ -88,19 +84,9 @@ func (v *version) Components() ComponentInformer {
 	return &componentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// ComponentClassDefinitions returns a ComponentClassDefinitionInformer.
-func (v *version) ComponentClassDefinitions() ComponentClassDefinitionInformer {
-	return &componentClassDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
 // ComponentDefinitions returns a ComponentDefinitionInformer.
 func (v *version) ComponentDefinitions() ComponentDefinitionInformer {
 	return &componentDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// ComponentResourceConstraints returns a ComponentResourceConstraintInformer.
-func (v *version) ComponentResourceConstraints() ComponentResourceConstraintInformer {
-	return &componentResourceConstraintInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ComponentVersions returns a ComponentVersionInformer.

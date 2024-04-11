@@ -254,8 +254,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddControllerRevisionHashLabel(revision).
-		// HACK: add the pod name to labels for that the pod can be selected by pod-services.
-		AddLabelsInMap(map[string]string{constant.StatefulSetPodNameLabelKey: name}).
+		AddLabelsInMap(map[string]string{constant.KBAppPodNameLabelKey: name}).
 		SetPodSpec(*template.Spec.DeepCopy()).
 		GetObject()
 	// Set these immutable fields only on initial Pod creation, not updates.

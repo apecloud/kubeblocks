@@ -63,14 +63,7 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 		if !ok {
 			continue
 		}
-		// TODO: support specify class object name in the Class field
-		if verticalScaling.ClassDefRef != nil {
-			component.ClassDefRef = verticalScaling.ClassDefRef
-		} else {
-			// clear old class ref
-			component.ClassDefRef = &appsv1alpha1.ClassDefRef{}
-			component.Resources = verticalScaling.ResourceRequirements
-		}
+		component.Resources = verticalScaling.ResourceRequirements
 		opsRes.Cluster.Spec.ComponentSpecs[index] = component
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
@@ -133,9 +126,6 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 		lastConfiguration := appsv1alpha1.LastComponentConfiguration{
 			ResourceRequirements: v.Resources,
 		}
-		if v.ClassDefRef != nil {
-			lastConfiguration.ClassDefRef = v.ClassDefRef
-		}
 		lastComponentInfo[v.Name] = lastConfiguration
 	}
 	opsRes.OpsRequest.Status.LastConfiguration.Components = lastComponentInfo
@@ -151,9 +141,6 @@ func (vs verticalScalingHandler) Cancel(reqCxt intctrlutil.RequestCtx, cli clien
 	}
 	return cancelComponentOps(reqCxt.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) error {
 		comp.Resources = lastConfig.ResourceRequirements
-		if lastConfig.ClassDefRef != nil {
-			comp.ClassDefRef = lastConfig.ClassDefRef
-		}
 		return nil
 	})
 }

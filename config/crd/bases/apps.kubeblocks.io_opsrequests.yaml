@@ -3678,21 +3678,6 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    classDefRef:
-                      description: A reference to a class defined in ComponentClassDefinition.
-                      properties:
-                        class:
-                          description: Defines the name of the class that is defined
-                            in the ComponentClassDefinition.
-                          type: string
-                        name:
-                          description: Specifies the name of the ComponentClassDefinition.
-                          maxLength: 63
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
-                      required:
-                      - class
-                      type: object
                     componentName:
                       description: Specifies the name of the cluster component.
                       type: string
@@ -3836,21 +3821,6 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                        classDefRef:
-                          description: References a class defined in ComponentClassDefinition.
-                          properties:
-                            class:
-                              description: Defines the name of the class that is defined
-                                in the ComponentClassDefinition.
-                              type: string
-                            name:
-                              description: Specifies the name of the ComponentClassDefinition.
-                              maxLength: 63
-                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                              type: string
-                          required:
-                          - class
-                          type: object
                         instances:
                           description: Records the last instances of the component.
                           items:
@@ -6911,21 +6881,6 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                        classDefRef:
-                          description: References a class defined in ComponentClassDefinition.
-                          properties:
-                            class:
-                              description: Defines the name of the class that is defined
-                                in the ComponentClassDefinition.
-                              type: string
-                            name:
-                              description: Specifies the name of the ComponentClassDefinition.
-                              maxLength: 63
-                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                              type: string
-                          required:
-                          - class
-                          type: object
                         instances:
                           description: Records the last instances of the component.
                           items:

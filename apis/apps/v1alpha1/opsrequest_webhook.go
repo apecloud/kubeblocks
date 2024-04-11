@@ -280,7 +280,7 @@ func (r *OpsRequest) validateRestart(cluster *Cluster) error {
 
 // validateUpgrade validates spec.clusterOps.upgrade
 func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Client) error {
-	return fmt.Errorf("not implemented yet")
+	return fmt.Errorf("not supported")
 }
 
 // validateVerticalScaling validates api when spec.type is VerticalScaling

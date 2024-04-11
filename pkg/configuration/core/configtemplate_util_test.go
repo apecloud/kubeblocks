@@ -31,22 +31,19 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 	var (
 		comName     = "replicats_name"
 		comType     = "replicats"
-		cComponents = []appsv1alpha1.ClusterComponentSpec{{
-			Name:            comName,
-			ComponentDefRef: comType,
-		}}
-		tpl1 = appsv1alpha1.ComponentConfigSpec{
+		cComponents = []appsv1alpha1.ClusterComponentSpec{
+			{
+				Name:            comName,
+				ComponentDefRef: comType,
+			},
+		}
+		tpl = appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 				Name:        "tpl1",
 				TemplateRef: "cm1",
 				VolumeName:  "volum1",
-			}}
-		tpl2 = appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:        "tpl2",
-				TemplateRef: "cm2",
-				VolumeName:  "volum2",
-			}}
+			},
+		}
 	)
 
 	type args struct {
@@ -59,48 +56,50 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 		args    args
 		want    []appsv1alpha1.ComponentConfigSpec
 		wantErr bool
-	}{{
-		name: "normal_test",
-		args: args{
-			comName:     comName,
-			cComponents: cComponents,
-			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:        comType,
-				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
-			}},
+	}{
+		{
+			name: "normal_test",
+			args: args{
+				comName:     comName,
+				cComponents: cComponents,
+				dComponents: []appsv1alpha1.ClusterComponentDefinition{{
+					Name:        comType,
+					ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl},
+				}},
+			},
+			want: []appsv1alpha1.ComponentConfigSpec{
+				tpl,
+			},
+			wantErr: false,
 		},
-		want: []appsv1alpha1.ComponentConfigSpec{
-			tpl2,
-			tpl1,
+		{
+			name: "failed_test",
+			args: args{
+				comName:     "not exist component",
+				cComponents: cComponents,
+				dComponents: []appsv1alpha1.ClusterComponentDefinition{{
+					Name:        comType,
+					ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl},
+				}},
+			},
+			want:    nil,
+			wantErr: true,
+		}, {
+			name: "not_exist_and_not_failed",
+			args: args{
+				comName:     comName,
+				cComponents: cComponents,
+				dComponents: []appsv1alpha1.ClusterComponentDefinition{{
+					Name:        comType,
+					ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl},
+				}},
+			},
+			want: []appsv1alpha1.ComponentConfigSpec{
+				tpl,
+			},
+			wantErr: false,
 		},
-		wantErr: false,
-	}, {
-		name: "failed_test",
-		args: args{
-			comName:     "not exist component",
-			cComponents: cComponents,
-			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:        comType,
-				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
-			}},
-		},
-		want:    nil,
-		wantErr: true,
-	}, {
-		name: "not_exist_and_not_failed",
-		args: args{
-			comName:     comName,
-			cComponents: cComponents,
-			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:        comType,
-				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
-			}},
-		},
-		want: []appsv1alpha1.ComponentConfigSpec{
-			tpl1,
-		},
-		wantErr: false,
-	}}
+	}
 
 	for _, tt := range tests {
 		got, err := GetConfigTemplatesFromComponent(

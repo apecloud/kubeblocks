@@ -79,6 +79,7 @@ type ComponentTemplateSpec struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }

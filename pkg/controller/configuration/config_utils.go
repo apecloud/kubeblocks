@@ -289,3 +289,11 @@ func enableHScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
 func enableVScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
 	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentVScaleType)
 }
+
+func configSetFromComponent(templates []appsv1alpha1.ComponentConfigSpec) []string {
+	configSet := make([]string, 0)
+	for _, template := range templates {
+		configSet = append(configSet, template.Name)
+	}
+	return configSet
+}

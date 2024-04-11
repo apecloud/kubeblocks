@@ -1,4 +1,4 @@
-name: Release Crds
+name: Release KubeBlocks Install And Crds Yaml
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   JIHULAB_KUBEBLOCKS_PROJECT_ID: 98723
   JIHULAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
-  KUBEBLOCKS_CRDS: "kubeblocks_crds.yaml"
+  HELM_VERSION: v3.14.3
 
 jobs:
   release-version:
@@ -49,32 +49,54 @@ jobs:
             --tag-name "${{ needs.release-version.outputs.release-version }}" \
             --access-token ${{ env.JIHULAB_ACCESS_TOKEN }}
 
-  upload-kubeblocks-crds:
+  upload-kubeblocks-yaml:
     needs: [ release-version, create-jihulab-release ]
-    name: Upload KubeBlocks crds
+    strategy:
+      fail-fast: false
+      matrix:
+        yaml: [ 'kubeblocks_crds.yaml', 'kubeblocks.yaml' ]
+    name: Upload ${{ matrix.yaml }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: merge KubeBlocks crds
+
+      - name: Install Helm
+        if: ${{ matrix.yaml == 'kubeblocks.yaml' }}
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: generate KubeBlocks yaml
+        if: ${{ matrix.yaml == 'kubeblocks.yaml' }}
         run: |
+          BUMP_VERSION="${{ needs.release-version.outputs.release-version }}"
+          if [[ "$BUMP_VERSION" == "v"* ]]; then
+              BUMP_VERSION="${BUMP_VERSION/v/}"
+          fi
+          make bump-chart-ver VERSION="${BUMP_VERSION}"
+          touch ${{ matrix.yaml }}
+          helm template kubeblocks deploy/helm --dependency-update > ${{ matrix.yaml }}
+
+      - name: merge KubeBlocks crds
+        if: ${{ matrix.yaml == 'kubeblocks_crds.yaml' }}
+        run: |
+          touch ${{ matrix.yaml }}
           crds_path="deploy/helm/crds"
-          KUBEBLOCKS_CRDS=${{ env.KUBEBLOCKS_CRDS }}
-          touch $KUBEBLOCKS_CRDS
           crds_list=$(ls $crds_path)
           for crd in $(echo $crds_list); do
-              echo "---" >> $KUBEBLOCKS_CRDS
-              cat $crds_path/$crd >> $KUBEBLOCKS_CRDS
+              echo "---" >> ${{ matrix.yaml }}
+              cat $crds_path/$crd >> ${{ matrix.yaml }}
           done
 
-      - name: upload KubeBlocks crds to jihulab
+      - name: upload KubeBlocks yaml to jihulab
         run: |
-          echo "Processing file: ${{ env.KUBEBLOCKS_CRDS }}"
+          echo "Processing file: ${{ matrix.yaml }}"
           bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
               --type 2 \
               --project-id ${{ env.JIHULAB_KUBEBLOCKS_PROJECT_ID }} \
               --tag-name "${{ needs.release-version.outputs.release-version }}" \
-              --asset-path ${{ github.workspace }}/${{ env.KUBEBLOCKS_CRDS }} \
-              --asset-name ${{ env.KUBEBLOCKS_CRDS }} \
+              --asset-path ${{ github.workspace }}/${{ matrix.yaml }} \
+              --asset-name ${{ matrix.yaml }} \
               --access-token ${{ env.JIHULAB_ACCESS_TOKEN }}
 
       - name: get KubeBlocks release upload url
@@ -85,10 +107,10 @@ jobs:
             --github-repo ${{ github.repository }} \
             --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
-      - name: upload KubeBlocks crds to github
+      - name: upload KubeBlocks yaml to github
         uses: actions/upload-release-asset@main
         with:
           upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ${{ github.workspace }}/${{ env.KUBEBLOCKS_CRDS }}
-          asset_name: ${{ env.KUBEBLOCKS_CRDS }}
+          asset_path: ${{ github.workspace }}/${{ matrix.yaml }}
+          asset_name: ${{ matrix.yaml }}
           asset_content_type: application/yaml

@@ -209,21 +209,6 @@ spec:
                           type: array
                           x-kubernetes-list-type: set
                       type: object
-                    classDefRef:
-                      description: References the class defined in ComponentClassDefinition.
-                      properties:
-                        class:
-                          description: Defines the name of the class that is defined
-                            in the ComponentClassDefinition.
-                          type: string
-                        name:
-                          description: Specifies the name of the ComponentClassDefinition.
-                          maxLength: 63
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
-                      required:
-                      - class
-                      type: object
                     componentDef:
                       description: References the name of the ComponentDefinition.
                         If both componentDefRef and componentDef are provided, the
@@ -268,6 +253,9 @@ spec:
                         description: InstanceTemplate defines values to override in
                           pod template.
                         properties:
+                          RuntimeClassName:
+                            description: Defines RuntimeClass to override.
+                            type: string
                           annotations:
                             additionalProperties:
                               type: string
@@ -2978,6 +2966,60 @@ spec:
                               will not be validated. If both Cluster and ServiceDescriptor
                               are specified, the Cluster takes precedence."
                             type: string
+                          clusterRef:
+                            description: Specifies the cluster to reference.
+                            properties:
+                              cluster:
+                                description: The name of the cluster to reference.
+                                type: string
+                              credential:
+                                description: The credential (SystemAccount) to reference
+                                  from the cluster.
+                                properties:
+                                  component:
+                                    description: The name of the component where the
+                                      credential resides in.
+                                    type: string
+                                  name:
+                                    description: The name of the credential (SystemAccount)
+                                      to reference.
+                                    type: string
+                                required:
+                                - component
+                                - name
+                                type: object
+                              service:
+                                description: The service to reference from the cluster.
+                                properties:
+                                  component:
+                                    description: "The name of the component where
+                                      the service resides in. \n It is required when
+                                      referencing a component service."
+                                    type: string
+                                  port:
+                                    description: "The port name of the service to
+                                      reference. \n If there is a non-zero node-port
+                                      exist for the matched service port, the node-port
+                                      will be selected first. If the referenced service
+                                      is a pod-service, there will be multiple service
+                                      objects matched, and the resolved value will
+                                      be presented in the following format: service1.name:port1,service2.name:port2..."
+                                    type: string
+                                  service:
+                                    description: "The name of the service to reference.
+                                      \n Leave it empty to reference the default service.
+                                      Set it to \"headless\" to reference the default
+                                      headless service. If the referenced service
+                                      is a pod-service, there will be multiple service
+                                      objects matched, and the resolved value will
+                                      be presented in the following format: service1.name,service2.name..."
+                                    type: string
+                                required:
+                                - service
+                                type: object
+                            required:
+                            - cluster
+                            type: object
                           name:
                             description: Specifies the identifier of the service reference
                               declaration. It corresponds to the serviceRefDeclaration
@@ -2985,21 +3027,18 @@ spec:
                             type: string
                           namespace:
                             description: Specifies the namespace of the referenced
-                              Cluster or the namespace of the referenced ServiceDescriptor
-                              object. If not provided, the referenced Cluster and
-                              ServiceDescriptor will be searched in the namespace
-                              of the current cluster by default.
+                              Cluster or ServiceDescriptor object. If not specified,
+                              the namespace of the current cluster will be used.
                             type: string
                           serviceDescriptor:
                             description: "The service descriptor of the service provided
                               by external sources. \n When referencing a service provided
-                              by external sources, the ServiceDescriptor object name
-                              is required to establish the service binding. The `serviceDescriptor.spec.serviceKind`
+                              by external sources, a ServiceDescriptor object is required
+                              to establish the service binding. The `serviceDescriptor.spec.serviceKind`
                               and `serviceDescriptor.spec.serviceVersion` should match
-                              the serviceKind and serviceVersion defined in the service
-                              reference declaration in the ClusterDefinition. \n If
-                              both Cluster and ServiceDescriptor are specified, the
-                              Cluster takes precedence."
+                              the serviceKind and serviceVersion declared in the definition.
+                              \n If both Cluster and ServiceDescriptor are specified,
+                              the Cluster takes precedence."
                             type: string
                         required:
                         - name
@@ -3027,8 +3066,9 @@ spec:
                               related parameters can be put here. More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                             type: object
                           name:
-                            description: The name of the service.
-                            maxLength: 15
+                            description: References the component service name defined
+                              in the ComponentDefinition.Spec.Services[x].Name.
+                            maxLength: 25
                             type: string
                           podService:
                             description: Indicates whether to generate individual
@@ -3532,6 +3572,7 @@ spec:
                         it indicates the name of the service. Others can refer to
                         this service by its name. (e.g., connection credential) Cannot
                         be updated.
+                      maxLength: 25
                       type: string
                     roleSelector:
                       description: RoleSelector extends the ServiceSpec.Selector by
@@ -3990,21 +4031,6 @@ spec:
                               type: array
                               x-kubernetes-list-type: set
                           type: object
-                        classDefRef:
-                          description: References the class defined in ComponentClassDefinition.
-                          properties:
-                            class:
-                              description: Defines the name of the class that is defined
-                                in the ComponentClassDefinition.
-                              type: string
-                            name:
-                              description: Specifies the name of the ComponentClassDefinition.
-                              maxLength: 63
-                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                              type: string
-                          required:
-                          - class
-                          type: object
                         componentDef:
                           description: References the name of the ComponentDefinition.
                             If both componentDefRef and componentDef are provided,
@@ -4051,6 +4077,9 @@ spec:
                             description: InstanceTemplate defines values to override
                               in pod template.
                             properties:
+                              RuntimeClassName:
+                                description: Defines RuntimeClass to override.
+                                type: string
                               annotations:
                                 additionalProperties:
                                   type: string
@@ -6907,6 +6936,63 @@ spec:
                                   not be validated. If both Cluster and ServiceDescriptor
                                   are specified, the Cluster takes precedence."
                                 type: string
+                              clusterRef:
+                                description: Specifies the cluster to reference.
+                                properties:
+                                  cluster:
+                                    description: The name of the cluster to reference.
+                                    type: string
+                                  credential:
+                                    description: The credential (SystemAccount) to
+                                      reference from the cluster.
+                                    properties:
+                                      component:
+                                        description: The name of the component where
+                                          the credential resides in.
+                                        type: string
+                                      name:
+                                        description: The name of the credential (SystemAccount)
+                                          to reference.
+                                        type: string
+                                    required:
+                                    - component
+                                    - name
+                                    type: object
+                                  service:
+                                    description: The service to reference from the
+                                      cluster.
+                                    properties:
+                                      component:
+                                        description: "The name of the component where
+                                          the service resides in. \n It is required
+                                          when referencing a component service."
+                                        type: string
+                                      port:
+                                        description: "The port name of the service
+                                          to reference. \n If there is a non-zero
+                                          node-port exist for the matched service
+                                          port, the node-port will be selected first.
+                                          If the referenced service is a pod-service,
+                                          there will be multiple service objects matched,
+                                          and the resolved value will be presented
+                                          in the following format: service1.name:port1,service2.name:port2..."
+                                        type: string
+                                      service:
+                                        description: "The name of the service to reference.
+                                          \n Leave it empty to reference the default
+                                          service. Set it to \"headless\" to reference
+                                          the default headless service. If the referenced
+                                          service is a pod-service, there will be
+                                          multiple service objects matched, and the
+                                          resolved value will be presented in the
+                                          following format: service1.name,service2.name..."
+                                        type: string
+                                    required:
+                                    - service
+                                    type: object
+                                required:
+                                - cluster
+                                type: object
                               name:
                                 description: Specifies the identifier of the service
                                   reference declaration. It corresponds to the serviceRefDeclaration
@@ -6914,22 +7000,19 @@ spec:
                                 type: string
                               namespace:
                                 description: Specifies the namespace of the referenced
-                                  Cluster or the namespace of the referenced ServiceDescriptor
-                                  object. If not provided, the referenced Cluster
-                                  and ServiceDescriptor will be searched in the namespace
-                                  of the current cluster by default.
+                                  Cluster or ServiceDescriptor object. If not specified,
+                                  the namespace of the current cluster will be used.
                                 type: string
                               serviceDescriptor:
                                 description: "The service descriptor of the service
                                   provided by external sources. \n When referencing
-                                  a service provided by external sources, the ServiceDescriptor
-                                  object name is required to establish the service
-                                  binding. The `serviceDescriptor.spec.serviceKind`
-                                  and `serviceDescriptor.spec.serviceVersion` should
-                                  match the serviceKind and serviceVersion defined
-                                  in the service reference declaration in the ClusterDefinition.
-                                  \n If both Cluster and ServiceDescriptor are specified,
-                                  the Cluster takes precedence."
+                                  a service provided by external sources, a ServiceDescriptor
+                                  object is required to establish the service binding.
+                                  The `serviceDescriptor.spec.serviceKind` and `serviceDescriptor.spec.serviceVersion`
+                                  should match the serviceKind and serviceVersion
+                                  declared in the definition. \n If both Cluster and
+                                  ServiceDescriptor are specified, the Cluster takes
+                                  precedence."
                                 type: string
                             required:
                             - name
@@ -6958,8 +7041,9 @@ spec:
                                   info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                                 type: object
                               name:
-                                description: The name of the service.
-                                maxLength: 15
+                                description: References the component service name
+                                  defined in the ComponentDefinition.Spec.Services[x].Name.
+                                maxLength: 25
                                 type: string
                               podService:
                                 description: Indicates whether to generate individual

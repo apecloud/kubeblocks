@@ -535,8 +535,6 @@ func resolveServiceVarRef(ctx context.Context, cli client.Reader, synthesizedCom
 		resolveFunc = resolveServiceHostRef
 	case selector.Port != nil:
 		resolveFunc = resolveServicePortRef
-	case selector.NodePort != nil:
-		resolveFunc = resolveServiceNodePortRef
 	default:
 		return nil, nil, nil
 	}
@@ -551,96 +549,68 @@ type resolvedServiceObj struct {
 func resolveServiceHostRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveHost := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
-		robj := obj.(*resolvedServiceObj)
-		svcNames := make([]string, 0)
-		if robj.service != nil {
-			svcNames = append(svcNames, robj.service.Name)
-		} else {
-			for _, svc := range robj.podServices {
-				svcNames = append(svcNames, svc.Name)
-			}
-		}
-		slices.Sort(svcNames)
-		return &corev1.EnvVar{
-			Name:  defineKey,
-			Value: strings.Join(svcNames, ","),
-		}, nil
+		return &corev1.EnvVar{Name: defineKey, Value: composeHostValueFromServices(obj)}, nil
 	}
 	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host, resolveHost)
 }
 
-func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
-	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
-		return resolveServicePort(defineKey, selector, obj.(*resolvedServiceObj), false)
-	}
-	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Port.Option, resolvePort)
-}
-
-func resolveServiceNodePortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
-	resolveNodePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
-		robj := obj.(*resolvedServiceObj)
-		services := []*corev1.Service{robj.service}
-		if robj.podServices != nil {
-			services = robj.podServices
-		}
-		for _, svc := range services {
-			if svc.Spec.Type == corev1.ServiceTypeNodePort || svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
-				continue
-			}
-			return nil, nil
-		}
-		return resolveServicePort(defineKey, selector, robj, true)
-	}
-	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.NodePort.Option, resolveNodePort)
-}
-
-func resolveServicePort(defineKey string, selector appsv1alpha1.ServiceVarSelector, robj *resolvedServiceObj, nodeport bool) (*corev1.EnvVar, *corev1.EnvVar) {
+func composeHostValueFromServices(obj any) string {
+	robj := obj.(*resolvedServiceObj)
 	services := []*corev1.Service{robj.service}
 	if robj.podServices != nil {
 		services = robj.podServices
 	}
 
-	filter := func() func(corev1.ServicePort) (bool, int) {
-		if nodeport {
-			return func(svcPort corev1.ServicePort) (bool, int) {
-				if svcPort.NodePort != 0 && svcPort.Name == selector.NodePort.Name {
-					return true, int(svcPort.NodePort)
-				}
-				return false, 0
-			}
+	svcNames := make([]string, 0)
+	for _, svc := range services {
+		svcNames = append(svcNames, svc.Name)
+	}
+	slices.Sort(svcNames)
+
+	return strings.Join(svcNames, ",")
+}
+
+func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		port := composePortValueFromServices(obj, selector.Port.Name)
+		if port == nil {
+			return nil, nil
 		}
-		return func(svcPort corev1.ServicePort) (bool, int) {
-			if svcPort.Name == selector.Port.Name {
-				return true, int(svcPort.Port)
-			}
-			return false, 0
+		return &corev1.EnvVar{Name: defineKey, Value: *port}, nil
+	}
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Port.Option, resolvePort)
+}
+
+func composePortValueFromServices(obj any, targetPortName string) *string {
+	robj := obj.(*resolvedServiceObj)
+	services := []*corev1.Service{robj.service}
+	if robj.podServices != nil {
+		services = robj.podServices
+	}
+
+	hasNodePort := func(svc *corev1.Service, svcPort corev1.ServicePort) bool {
+		return (svc.Spec.Type == corev1.ServiceTypeNodePort || svc.Spec.Type == corev1.ServiceTypeLoadBalancer) && svcPort.NodePort > 0
+	}
+
+	port := func(svc *corev1.Service, svcPort corev1.ServicePort) int {
+		if hasNodePort(svc, svcPort) {
+			return int(svcPort.NodePort)
 		}
-	}()
+		return int(svcPort.Port)
+	}
 
 	svcPorts := make(map[string]string)
 	for _, svc := range services {
 		for _, svcPort := range svc.Spec.Ports {
-			matched, port := filter(svcPort)
-			if matched {
-				svcPorts[svc.Name] = strconv.Itoa(port)
+			if svcPort.Name == targetPortName {
+				svcPorts[svc.Name] = strconv.Itoa(port(svc, svcPort))
 				break
 			}
 		}
 
-		v := func() *appsv1alpha1.NamedVar {
-			if nodeport {
-				return selector.NodePort
-			}
-			return selector.Port
-		}
-		if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(v().Name) == 0) {
-			if nodeport {
-				svcPorts[svc.Name] = strconv.Itoa(int(svc.Spec.Ports[0].NodePort))
-			} else {
-				svcPorts[svc.Name] = strconv.Itoa(int(svc.Spec.Ports[0].Port))
-			}
+		if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(targetPortName) == 0) {
+			svcPorts[svc.Name] = strconv.Itoa(port(svc, svc.Spec.Ports[0]))
 		}
 	}
 
@@ -663,19 +633,15 @@ func resolveServicePort(defineKey string, selector appsv1alpha1.ServiceVarSelect
 			return namedPorts
 		}
 
-		if robj.service != nil {
-			return &corev1.EnvVar{
-				Name:  defineKey,
-				Value: ports()[0],
-			}, nil
+		value := ""
+		if robj.podServices == nil {
+			value = ports()[0]
 		} else {
-			return &corev1.EnvVar{
-				Name:  defineKey,
-				Value: strings.Join(namedPorts(), ","),
-			}, nil
+			value = strings.Join(namedPorts(), ",")
 		}
+		return &value
 	}
-	return nil, nil
+	return nil
 }
 
 func resolveCredentialVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -850,46 +816,10 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 	selector appsv1alpha1.ServiceVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar)) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveObjs := func() (map[string]any, error) {
 		headlessGetter := func(compName string) (any, error) {
-			key := types.NamespacedName{
-				Namespace: synthesizedComp.Namespace,
-				Name:      constant.GenerateDefaultComponentHeadlessServiceName(synthesizedComp.ClusterName, compName),
-			}
-			obj := &corev1.Service{}
-			err := cli.Get(ctx, key, obj)
-			return &resolvedServiceObj{service: obj}, err
+			return headlessCompServiceGetter(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, compName)
 		}
 		getter := func(compName string) (any, error) {
-			svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName, selector.Name)
-			key := types.NamespacedName{
-				Namespace: synthesizedComp.Namespace,
-				Name:      svcName,
-			}
-			obj := &corev1.Service{}
-			err := cli.Get(ctx, key, obj)
-			if err == nil {
-				return &resolvedServiceObj{service: obj}, nil
-			}
-			if err != nil && !apierrors.IsNotFound(err) {
-				return nil, err
-			}
-
-			// fall-back to list services and find the matched prefix
-			svcList := &corev1.ServiceList{}
-			matchingLabels := client.MatchingLabels(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, compName))
-			err = cli.List(ctx, svcList, matchingLabels)
-			if err != nil {
-				return nil, err
-			}
-			objs := make([]*corev1.Service, 0)
-			for i, svc := range svcList.Items {
-				if strings.HasPrefix(svc.Name, svcName) {
-					objs = append(objs, &svcList.Items[i])
-				}
-			}
-			if len(objs) == 0 {
-				return nil, apierrors.NewNotFound(corev1.Resource("service"), selector.Name)
-			}
-			return &resolvedServiceObj{podServices: objs}, nil
+			return compServiceGetter(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, compName, selector.Name)
 		}
 		if selector.Name == "headless" {
 			return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, headlessGetter)
@@ -897,6 +827,61 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
 	}
 	return resolveClusterObjectVars("Service", selector.ClusterObjectReference, option, resolveObjs, resolveVar)
+}
+
+func clusterServiceGetter(ctx context.Context, cli client.Reader, namespace, clusterName, name string) (any, error) {
+	key := types.NamespacedName{
+		Namespace: namespace,
+		Name:      constant.GenerateClusterServiceName(clusterName, name),
+	}
+	obj := &corev1.Service{}
+	err := cli.Get(ctx, key, obj)
+	return &resolvedServiceObj{service: obj}, err
+}
+
+func compServiceGetter(ctx context.Context, cli client.Reader, namespace, clusterName, compName, name string) (any, error) {
+	svcName := constant.GenerateComponentServiceName(clusterName, compName, name)
+	key := types.NamespacedName{
+		Namespace: namespace,
+		Name:      svcName,
+	}
+	obj := &corev1.Service{}
+	err := cli.Get(ctx, key, obj)
+	if err == nil {
+		return &resolvedServiceObj{service: obj}, nil
+	}
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	// fall-back to list services and find the matched prefix
+	svcList := &corev1.ServiceList{}
+	matchingLabels := client.MatchingLabels(constant.GetComponentWellKnownLabels(clusterName, compName))
+	err = cli.List(ctx, svcList, matchingLabels)
+	if err != nil {
+		return nil, err
+	}
+	objs := make([]*corev1.Service, 0)
+	podServiceNamePrefix := fmt.Sprintf("%s-", svcName)
+	for i, svc := range svcList.Items {
+		if strings.HasPrefix(svc.Name, podServiceNamePrefix) {
+			objs = append(objs, &svcList.Items[i])
+		}
+	}
+	if len(objs) == 0 {
+		return nil, apierrors.NewNotFound(corev1.Resource("service"), name)
+	}
+	return &resolvedServiceObj{podServices: objs}, nil
+}
+
+func headlessCompServiceGetter(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) (any, error) {
+	key := types.NamespacedName{
+		Namespace: namespace,
+		Name:      constant.GenerateDefaultComponentHeadlessServiceName(clusterName, compName),
+	}
+	obj := &corev1.Service{}
+	err := cli.Get(ctx, key, obj)
+	return &resolvedServiceObj{service: obj}, err
 }
 
 func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

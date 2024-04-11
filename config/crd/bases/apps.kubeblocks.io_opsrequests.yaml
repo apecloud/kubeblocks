@@ -403,6 +403,9 @@ spec:
                         description: InstanceTemplate defines values to override in
                           pod template.
                         properties:
+                          RuntimeClassName:
+                            description: Defines RuntimeClass to override.
+                            type: string
                           annotations:
                             additionalProperties:
                               type: string
@@ -3675,21 +3678,6 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    classDefRef:
-                      description: A reference to a class defined in ComponentClassDefinition.
-                      properties:
-                        class:
-                          description: Defines the name of the class that is defined
-                            in the ComponentClassDefinition.
-                          type: string
-                        name:
-                          description: Specifies the name of the ComponentClassDefinition.
-                          maxLength: 63
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
-                      required:
-                      - class
-                      type: object
                     componentName:
                       description: Specifies the name of the cluster component.
                       type: string
@@ -3833,27 +3821,15 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                        classDefRef:
-                          description: References a class defined in ComponentClassDefinition.
-                          properties:
-                            class:
-                              description: Defines the name of the class that is defined
-                                in the ComponentClassDefinition.
-                              type: string
-                            name:
-                              description: Specifies the name of the ComponentClassDefinition.
-                              maxLength: 63
-                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                              type: string
-                          required:
-                          - class
-                          type: object
                         instances:
                           description: Records the last instances of the component.
                           items:
                             description: InstanceTemplate defines values to override
                               in pod template.
                             properties:
+                              RuntimeClassName:
+                                description: Defines RuntimeClass to override.
+                                type: string
                               annotations:
                                 additionalProperties:
                                   type: string
@@ -6598,8 +6574,9 @@ spec:
                                   info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                                 type: object
                               name:
-                                description: The name of the service.
-                                maxLength: 15
+                                description: References the component service name
+                                  defined in the ComponentDefinition.Spec.Services[x].Name.
+                                maxLength: 25
                                 type: string
                               podService:
                                 description: Indicates whether to generate individual
@@ -6904,27 +6881,15 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                        classDefRef:
-                          description: References a class defined in ComponentClassDefinition.
-                          properties:
-                            class:
-                              description: Defines the name of the class that is defined
-                                in the ComponentClassDefinition.
-                              type: string
-                            name:
-                              description: Specifies the name of the ComponentClassDefinition.
-                              maxLength: 63
-                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                              type: string
-                          required:
-                          - class
-                          type: object
                         instances:
                           description: Records the last instances of the component.
                           items:
                             description: InstanceTemplate defines values to override
                               in pod template.
                             properties:
+                              RuntimeClassName:
+                                description: Defines RuntimeClass to override.
+                                type: string
                               annotations:
                                 additionalProperties:
                                   type: string
@@ -9666,8 +9631,9 @@ spec:
                                   info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                                 type: object
                               name:
-                                description: The name of the service.
-                                maxLength: 15
+                                description: References the component service name
+                                  defined in the ComponentDefinition.Spec.Services[x].Name.
+                                maxLength: 25
                                 type: string
                               podService:
                                 description: Indicates whether to generate individual

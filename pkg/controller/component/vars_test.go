@@ -20,10 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -32,55 +30,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
-
-type mockReader struct {
-	cli  client.Reader
-	objs []client.Object
-}
-
-func (r *mockReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	for _, o := range r.objs {
-		// ignore the GVK check
-		if client.ObjectKeyFromObject(o) == key {
-			reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(o).Elem())
-			return nil
-		}
-	}
-	return r.cli.Get(ctx, key, obj, opts...)
-}
-
-func (r *mockReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	items := reflect.ValueOf(list).Elem().FieldByName("Items")
-	if !items.IsValid() {
-		return fmt.Errorf("ObjectList has no Items field: %s", list.GetObjectKind().GroupVersionKind().String())
-	}
-	objects := reflect.MakeSlice(items.Type(), 0, 0)
-
-	listOpts := &client.ListOptions{}
-	for _, opt := range opts {
-		opt.ApplyToList(listOpts)
-	}
-	for i, o := range r.objs {
-		// ignore the GVK check
-		if listOpts.LabelSelector != nil {
-			if listOpts.LabelSelector.Matches(labels.Set(o.GetLabels())) {
-				objects = reflect.Append(objects, reflect.ValueOf(r.objs[i]).Elem())
-			}
-		}
-	}
-	if objects.Len() != 0 {
-		items.Set(objects)
-		return nil
-	}
-	return r.cli.List(ctx, list, opts...)
-}
 
 var _ = Describe("vars", func() {
 	optional := func() *bool {
@@ -611,7 +566,7 @@ var _ = Describe("vars", func() {
 								Optional: required(),
 							},
 							ServiceVars: appsv1alpha1.ServiceVars{
-								NodePort: &appsv1alpha1.NamedVar{
+								Port: &appsv1alpha1.NamedVar{
 									Name:   "default",
 									Option: &appsv1alpha1.VarRequired,
 								},

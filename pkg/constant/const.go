@@ -112,7 +112,6 @@ const (
 	WorkloadTypeLabelKey            = "apps.kubeblocks.io/workload-type"
 	KBAppPodNameLabelKey            = "apps.kubeblocks.io/pod-name"
 
-	ClassProviderLabelKey                    = "class.kubeblocks.io/provider"
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"
 	ClusterVerLabelKey                       = "clusterversion.kubeblocks.io/name"
 	ComponentDefinitionLabelKey              = "componentdefinition.kubeblocks.io/name"
@@ -133,7 +132,6 @@ const (
 	OpsRequestNamespaceLabelKey              = "ops.kubeblocks.io/ops-namespace"
 	ServiceDescriptorNameLabelKey            = "servicedescriptor.kubeblocks.io/name"
 	RestoreForHScaleLabelKey                 = "apps.kubeblocks.io/restore-for-hscale"
-	ResourceConstraintProviderLabelKey       = "resourceconstraint.kubeblocks.io/provider"
 	VolumeClaimTemplateNameLabelKeyForLegacy = "vct.kubeblocks.io/name" // Deprecated: only compatible with version 0.5, will be removed in 0.7
 
 	// StatefulSetPodNameLabelKey is used to mark the pod name of the StatefulSet
@@ -188,9 +186,6 @@ const (
 	// Deprecated: only compatible with version 0.6, will be removed in 0.8
 	// CMInsEnableRerenderTemplateKey is used to enable rerender template
 	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
-
-	// IgnoreResourceConstraint is used to specify whether to ignore the resource constraint
-	IgnoreResourceConstraint = "resource.kubeblocks.io/ignore-constraint"
 
 	RBACRoleName        = "kubeblocks-cluster-pod-role"
 	RBACClusterRoleName = "kubeblocks-volume-protection-pod-role"

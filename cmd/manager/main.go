@@ -134,6 +134,7 @@ func init() {
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
 	viper.SetDefault(rsm2.FeatureGateRSMReplicaProvider, string(rsm2.PodProvider))
 	viper.SetDefault(rsm2.MaxPlainRevisionCount, 1024)
+	viper.SetDefault(rsm2.FeatureGateIgnorePodVerticalScaling, false)
 	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 }
@@ -458,15 +459,6 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("event-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Event")
-			os.Exit(1)
-		}
-
-		if err = (&appscontrollers.ComponentClassReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("class-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Class")
 			os.Exit(1)
 		}
 

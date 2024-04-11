@@ -268,7 +268,7 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 	if strategy == inPlaceUpdate && len(statements.UpdateStatement) == 0 {
 		// if update statement is empty, use reCreate strategy, which will drop and create the account.
 		strategy = reCreate
-		klog.Warningf("account %s in cluster %s exists, but its update statement is not set, will use %s strategy to update account.", userName, key.clusterName, strategy)
+		klog.Warningf("account %s in cluster %s exists, but its update statement is not set, will use %d strategy to update account.", userName, key.clusterName, strategy)
 	}
 
 	if strategy == inPlaceUpdate {

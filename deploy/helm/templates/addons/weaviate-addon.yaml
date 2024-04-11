@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "weaviate"
-  "version" "0.8.0"
+  "version" "0.9.0"
   "model" "vector"
   "provider" "community"
   "description" "Weaviate is an open-source (BSD-3.0 licensed)  vector database. It allows you to store data objects and vector embeddings from your favorite ML-models, and scale seamlessly into billions of data objects."

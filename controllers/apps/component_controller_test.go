@@ -2063,7 +2063,6 @@ var _ = Describe("Component Controller", func() {
 		customAnnotations := map[string]string{
 			customAnnotationKey:                                      customAnnotationValue,
 			customAnnotationKeyBeFiltered:                            customAnnotationValueBeFiltered,
-			constant.IgnoreResourceConstraint:                        "true",
 			constant.FeatureReconciliationInCompactModeAnnotationKey: "true",
 		}
 		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
@@ -2077,7 +2076,6 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(comp.Labels).ShouldNot(HaveKeyWithValue(customLabelKeyBeFiltered, customLabelValueBeFiltered))
 			g.Expect(comp.Annotations).Should(HaveKeyWithValue(customAnnotationKey, customAnnotationValue))
 			g.Expect(comp.Annotations).ShouldNot(HaveKeyWithValue(customAnnotationKeyBeFiltered, customAnnotationValueBeFiltered))
-			g.Expect(comp.Annotations).Should(HaveKeyWithValue(constant.IgnoreResourceConstraint, "true"))
 			g.Expect(comp.Annotations).Should(HaveKeyWithValue(constant.FeatureReconciliationInCompactModeAnnotationKey, "true"))
 		})).Should(Succeed())
 	}

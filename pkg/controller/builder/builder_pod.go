@@ -59,6 +59,13 @@ func (builder *PodBuilder) SetFinalizers() *PodBuilder {
 	return builder
 }
 
+func (builder *PodBuilder) AddInitContainer(container corev1.Container) *PodBuilder {
+	containers := builder.get().Spec.InitContainers
+	containers = append(containers, container)
+	builder.get().Spec.InitContainers = containers
+	return builder
+}
+
 func (builder *PodBuilder) AddContainer(container corev1.Container) *PodBuilder {
 	containers := builder.get().Spec.Containers
 	containers = append(containers, container)
@@ -103,5 +110,10 @@ func (builder *PodBuilder) SetAffinity(affinity *corev1.Affinity) *PodBuilder {
 
 func (builder *PodBuilder) SetTopologySpreadConstraints(topologySpreadConstraints []corev1.TopologySpreadConstraint) *PodBuilder {
 	builder.get().Spec.TopologySpreadConstraints = topologySpreadConstraints
+	return builder
+}
+
+func (builder *PodBuilder) SetActiveDeadlineSeconds(activeDeadline *int64) *PodBuilder {
+	builder.get().Spec.ActiveDeadlineSeconds = activeDeadline
 	return builder
 }

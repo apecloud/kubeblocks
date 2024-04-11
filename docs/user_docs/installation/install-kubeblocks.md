@@ -1,14 +1,14 @@
 ---
-title: Install KubeBlocks with Helm
+title: Install KubeBlocks
 description: Install KubeBlocks on the existing Kubernetes clusters with Helm
 keywords: [taints, affinity, tolerance, install, kbcli, KubeBlocks]
 sidebar_position: 3
 sidebar_label: Install KubeBlocks
 ---
 
-# Install KubeBlocks with Helm
+# Install KubeBlocks 
 
-KubeBlocks is kubernetes-native, you can use Helm to install it.
+KubeBlocks is kubernetes-native, you can use Helm or kubectl with yaml file to install it.
 :::note
 
 If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
@@ -48,11 +48,16 @@ Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm]
 
 ## Installation steps
 
+<Tabs>
+<TabItem value="Helm" label="Install with Helm" default>
+
+### Install with Helm
+
 Use Helm and follow the steps below to install KubeBlocks.
 
 1. Create dependent CRDs.
    ```bash
-   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.8.1/kubeblocks_crds.yaml
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.x.x/kubeblocks_crds.yaml
    ```
 
 2. Add Helm repo.
@@ -88,6 +93,24 @@ Use Helm and follow the steps below to install KubeBlocks.
      By default, the latest release version is installed.
 
      :::
+
+</TabItem>
+<TabItem value="kubectl" label="Install with kubectl" default>
+
+### Install with `kubectl`
+
+KubeBlocks can be installed like any other resource in Kubernetes, through a YAML manifest applied via `kubectl`.
+
+
+Run the following command to install the latest operator manifest for this minor release:
+
+ ```bash
+   kubectl create -f \address.yaml
+   ```
+
+</TabItem>
+</Tabs>
+
 
 ## Verify KubeBlocks installation
 

@@ -116,18 +116,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			testVerticalScaling(verticalScaling)
 		})
 
-		It("vertical scaling by class", func() {
-			verticalScaling := []appsv1alpha1.VerticalScaling{
-				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-					ClassDefRef: &appsv1alpha1.ClassDefRef{
-						Class: testapps.Class1c1gName,
-					},
-				},
-			}
-			testVerticalScaling(verticalScaling)
-		})
-
 		It("cancel vertical scaling opsRequest", func() {
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}

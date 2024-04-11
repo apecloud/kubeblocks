@@ -209,21 +209,6 @@ spec:
                           type: array
                           x-kubernetes-list-type: set
                       type: object
-                    classDefRef:
-                      description: References the class defined in ComponentClassDefinition.
-                      properties:
-                        class:
-                          description: Defines the name of the class that is defined
-                            in the ComponentClassDefinition.
-                          type: string
-                        name:
-                          description: Specifies the name of the ComponentClassDefinition.
-                          maxLength: 63
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
-                      required:
-                      - class
-                      type: object
                     componentDef:
                       description: References the name of the ComponentDefinition.
                         If both componentDefRef and componentDef are provided, the
@@ -4045,21 +4030,6 @@ spec:
                                 type: string
                               type: array
                               x-kubernetes-list-type: set
-                          type: object
-                        classDefRef:
-                          description: References the class defined in ComponentClassDefinition.
-                          properties:
-                            class:
-                              description: Defines the name of the class that is defined
-                                in the ComponentClassDefinition.
-                              type: string
-                            name:
-                              description: Specifies the name of the ComponentClassDefinition.
-                              maxLength: 63
-                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                              type: string
-                          required:
-                          - class
                           type: object
                         componentDef:
                           description: References the name of the ComponentDefinition.

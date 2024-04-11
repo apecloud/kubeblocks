@@ -138,11 +138,6 @@ func (builder *ComponentBuilder) SetServiceRefs(serviceRefs []appsv1alpha1.Servi
 	return builder
 }
 
-func (builder *ComponentBuilder) SetClassRef(classRef *appsv1alpha1.ClassDefRef) *ComponentBuilder {
-	builder.get().Spec.ClassDefRef = classRef
-	return builder
-}
-
 func (builder *ComponentBuilder) SetInstances(instances []appsv1alpha1.InstanceTemplate) *ComponentBuilder {
 	builder.get().Spec.Instances = instances
 	return builder

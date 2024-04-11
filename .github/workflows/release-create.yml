@@ -25,7 +25,7 @@ jobs:
           echo rel_version=v${{ env.REL_VERSION }} >> $GITHUB_OUTPUT
 
       - name: release pre-release without release notes
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: not ${{ env.WITH_RELEASE_NOTES }}
         with:
           # body_path: ./docs/release_notes/v${{ env.REL_VERSION }}/v${{ env.REL_VERSION }}.md
@@ -35,7 +35,7 @@ jobs:
           tag_name: v${{ env.REL_VERSION }}
           prerelease: true
       - name: release RC with release notes
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: ${{ env.WITH_RELEASE_NOTES }}
         with:
           body_path: ./docs/release_notes/v${{ env.REL_VERSION }}/v${{ env.REL_VERSION }}.md

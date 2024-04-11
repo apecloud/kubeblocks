@@ -3081,6 +3081,18 @@ Must comply with the IANA Service Naming rule.</p>
 </tr>
 <tr>
 <td>
+<code>isSharding</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies that this componentDef is a shading component definition.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>componentDefs</code><br/>
 <em>
 []string

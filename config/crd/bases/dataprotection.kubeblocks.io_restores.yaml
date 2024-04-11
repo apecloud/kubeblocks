@@ -279,9 +279,9 @@ spec:
                     - message: forbidden to update spec.prepareDataConfig.dataSourceRef
                       rule: self == oldSelf
                   requiredPolicyForAllPodSelection:
-                    description: Specifies the restore policy. This field is mandatory
-                      when the pod selection strategy for the source target is set
-                      to 'All'. optional
+                    description: Specifies the restore policy, which is required when
+                      the pod selection strategy for the source target is 'All'. This
+                      field is ignored if the pod selection strategy is 'Any'. optional
                     properties:
                       dataRestorePolicy:
                         default: OneToOne
@@ -2150,9 +2150,10 @@ spec:
                     description: Specifies the configuration for a job action.
                     properties:
                       requiredPolicyForAllPodSelection:
-                        description: Specifies the restore policy. This field is mandatory
+                        description: Specifies the restore policy, which is required
                           when the pod selection strategy for the source target is
-                          set to 'All'. optional
+                          'All'. This field is ignored if the pod selection strategy
+                          is 'Any'. optional
                         properties:
                           dataRestorePolicy:
                             default: OneToOne

@@ -14,8 +14,10 @@ When an exception occurs during your operation, you can perform the following st
 
 1. Check the cluster status.
 
+   Take the cluster named mycluster as an example.
+
     ```bash
-    kbcli cluster list mycluster
+    kubectl describe cluster mycluster
     ```
 
 2. Handle the exception according to the status information.

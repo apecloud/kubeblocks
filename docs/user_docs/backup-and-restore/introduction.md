@@ -21,7 +21,7 @@ KubeBlocks adopts physical backup which takes the physical files in a database a
 As for the restore function, KubeBlocks supports restoring data from the backup set.
 
 * Restore
-  * [Restore data from the backup set](./restore/restore-data-from-backup-set.md)
+  * [Restore data from the backup set](./restore/restore-data-from-backup-set.md).
 
 Follow the steps below to back up and restore your cluster.
 

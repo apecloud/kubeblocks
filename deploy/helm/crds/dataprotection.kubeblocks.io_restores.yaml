@@ -292,7 +292,7 @@ spec:
                           data restoration such that each data piece can only be restored
                           to a single target instance. This is the default policy.
                           When the number of target instances specified for restoration
-                          surpasses the count of original backup target instances,'
+                          surpasses the count of original backup target instances.'
                         type: string
                       sourceOfOneToMany:
                         description: Specifies the name of the source target pod.
@@ -2165,7 +2165,7 @@ spec:
                               such that each data piece can only be restored to a
                               single target instance. This is the default policy.
                               When the number of target instances specified for restoration
-                              surpasses the count of original backup target instances,'
+                              surpasses the count of original backup target instances.'
                             type: string
                           sourceOfOneToMany:
                             description: Specifies the name of the source target pod.
@@ -2240,7 +2240,7 @@ spec:
                                   values are: \n - `Any`: select any one pod that
                                   match the labelsSelector. - `All`: select all pods
                                   that match the labelsSelector. The backup data for
-                                  the current pod // will be stored in a subdirectory
+                                  the current pod will be stored in a subdirectory
                                   named after the pod."
                                 enum:
                                 - Any

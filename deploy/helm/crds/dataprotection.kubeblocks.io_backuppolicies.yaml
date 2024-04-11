@@ -347,8 +347,8 @@ spec:
                                 are: \n - `Any`: select any one pod that match the
                                 labelsSelector. - `All`: select all pods that match
                                 the labelsSelector. The backup data for the current
-                                pod // will be stored in a subdirectory named after
-                                the pod."
+                                pod will be stored in a subdirectory named after the
+                                pod."
                               enum:
                               - Any
                               - All
@@ -579,7 +579,7 @@ spec:
                                   values are: \n - `Any`: select any one pod that
                                   match the labelsSelector. - `All`: select all pods
                                   that match the labelsSelector. The backup data for
-                                  the current pod // will be stored in a subdirectory
+                                  the current pod will be stored in a subdirectory
                                   named after the pod."
                                 enum:
                                 - Any
@@ -807,8 +807,8 @@ spec:
                           pod when multiple pods are selected. Valid values are: \n
                           - `Any`: select any one pod that match the labelsSelector.
                           - `All`: select all pods that match the labelsSelector.
-                          The backup data for the current pod // will be stored in
-                          a subdirectory named after the pod."
+                          The backup data for the current pod will be stored in a
+                          subdirectory named after the pod."
                         enum:
                         - Any
                         - All
@@ -980,8 +980,8 @@ spec:
                             pod when multiple pods are selected. Valid values are:
                             \n - `Any`: select any one pod that match the labelsSelector.
                             - `All`: select all pods that match the labelsSelector.
-                            The backup data for the current pod // will be stored
-                            in a subdirectory named after the pod."
+                            The backup data for the current pod will be stored in
+                            a subdirectory named after the pod."
                           enum:
                           - Any
                           - All

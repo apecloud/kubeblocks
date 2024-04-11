@@ -53,7 +53,8 @@ func NewFakeActionSet(testCtx *testutil.TestContext) *dpv1alpha1.ActionSet {
 }
 
 func NewFakeBackupPolicy(testCtx *testutil.TestContext,
-	change func(backupPolicy *dpv1alpha1.BackupPolicy)) *dpv1alpha1.BackupPolicy {
+	change func(backupPolicy *dpv1alpha1.BackupPolicy),
+	doNotExpectAvailable ...bool) *dpv1alpha1.BackupPolicy {
 	bp := NewBackupPolicyFactory(testCtx.DefaultNamespace, BackupPolicyName).
 		SetBackupRepoName(BackupRepoName).
 		SetTarget(constant.AppInstanceLabelKey, ClusterName,
@@ -79,6 +80,9 @@ func NewFakeBackupPolicy(testCtx *testutil.TestContext,
 		},
 	}
 	Expect(testCtx.CreateObj(testCtx.Ctx, secret)).Should(Succeed())
+	if len(doNotExpectAvailable) > 0 && doNotExpectAvailable[0] {
+		return bp
+	}
 	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(bp),
 		func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 			g.Expect(bp.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))

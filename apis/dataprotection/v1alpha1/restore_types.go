@@ -213,7 +213,7 @@ type RequiredPolicyForAllPodSelection struct {
 	// - OneToMany: Enables restoration of all volumes from a single data copy of the original target instance.
 	// The 'sourceOfOneToMany' field must be set when using this policy.
 	// - OneToOne: Restricts data restoration such that each data piece can only be restored to a single target instance.
-	// This is the default policy. When the number of target instances specified for restoration surpasses the count of original backup target instances,
+	// This is the default policy. When the number of target instances specified for restoration surpasses the count of original backup target instances.
 	// +kubebuilder:default=OneToOne
 	// +kubebuilder:validation:Required
 	DataRestorePolicy DataRestorePolicy `json:"dataRestorePolicy"`

@@ -115,7 +115,7 @@ type PodSelector struct {
 	//
 	// - `Any`: select any one pod that match the labelsSelector.
 	// - `All`: select all pods that match the labelsSelector. The backup data for the current pod
-	//// will be stored in a subdirectory named after the pod.
+	// will be stored in a subdirectory named after the pod.
 	//
 	// +kubebuilder:default=Any
 	Strategy PodSelectionStrategy `json:"strategy,omitempty"`

@@ -375,11 +375,18 @@ var _ = Describe("build service references", func() {
 
 		BeforeEach(func() {
 			compDef = &appsv1alpha1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "compdef",
+				},
 				Spec: appsv1alpha1.ComponentDefinitionSpec{
 					ServiceRefDeclarations: []appsv1alpha1.ServiceRefDeclaration{serviceRefDeclaration},
 				},
 			}
 			comp = &appsv1alpha1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      "comp",
+				},
 				Spec: appsv1alpha1.ComponentSpec{
 					ServiceRefs: []appsv1alpha1.ServiceRef{},
 				},
@@ -392,6 +399,11 @@ var _ = Describe("build service references", func() {
 
 		It("has service-ref not defined", func() {
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
+			Expect(err).Should(Succeed())
+			Expect(synthesizedComp.ServiceReferences).Should(HaveLen(0))
+
+			comp.Spec.CompDef = compDef.GetName()
+			err = buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("service-ref for %s is not defined", serviceRefDeclaration.Name))
 		})

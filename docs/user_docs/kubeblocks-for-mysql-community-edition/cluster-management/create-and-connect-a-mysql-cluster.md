@@ -1,0 +1,321 @@
+---
+title: Create and connect to a MySQL Cluster
+description: How to create and connect to a MySQL cluster
+keywords: [mysql, create a mysql cluster, connect to a mysql cluster]
+sidebar_position: 1
+sidebar_label: Create and connect
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Create and connect to a MySQL cluster
+
+This tutorial shows how to create and connect to a MySQL cluster.
+
+## Create a MySQL cluster
+
+### Before you start
+
+* [Install KubeBlocks by Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* View all the database types and versions available for creating a cluster.
+  
+  Make sure the `mysql` cluster definition is installed with `kubectl get clusterdefinition mysql`.
+
+  ```bash
+  kubectl get clusterdefinition mysql
+  >
+  NAME    TOPOLOGIES   SERVICEREFS   STATUS      AGE
+  mysql                              Available   27m
+  ```
+
+  View all available versions for creating a cluster.
+
+  ```bash
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=mysql
+  ```
+
+* To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
+
+  ```bash
+  kubectl create namespace demo
+  ```
+
+### Create a cluster
+
+KubeBlocks supports the Standalone and Replication MySQL cluster. Below is an example of creating a Replication MySQL cluster in the namespace `demo`.
+
+<Tabs>
+
+<TabItem value="kubectl" label="kubectl" default>
+
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Replication Cluster.
+
+   ```yaml
+   cat <<EOF | kubectl apply -f -
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+     labels:
+       helm.sh/chart: mysql-cluster-0.9.0
+       app.kubernetes.io/version: "8.0.33"
+       app.kubernetes.io/instance: mycluster
+     annotations:
+       kubeblocks.io/extra-env: '{ "MYSQL_TOPOLOGY_MODE": "replication" }'
+   spec:
+     clusterVersionRef: mysql-8.0.33
+     terminationPolicy: Delete
+     affinity:
+       podAntiAffinity: Preferred
+       topologyKeys:
+         - kubernetes.io/hostname
+       tenancy: SharedNode
+     clusterDefinitionRef: mysql # ref clusterdefinition.name
+     componentSpecs:
+       - name: mysql
+         componentDefRef: mysql # ref clusterdefinition componentDefs.name
+         monitor: false
+         replicas: 1
+         serviceAccountName:
+         resources:
+           limits:
+             cpu: "1"
+             memory: "1Gi"
+           requests:
+             cpu: "1"
+             memory: "1Gi"
+         services:
+   EOF
+   ```
+
+* `kubeblocks.io/extra-env` in `metadata.annotations` defines the topology mode of a MySQL cluster. If you want to create a Standalone cluster, you can change the value to `standalone`.
+* `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
+* * `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
+* `spec.componentSpecs` is the list of components that define the cluster components.
+* `spec.componentSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json | jq '.spec.componentDefs[].name'`.
+* `spec.componentSpecs.name` is the name of the component.
+* `spec.componentSpecs.replicas` is the number of replicas of the component.
+* `spec.componentSpecs.resources` is the resource requirements of the component.
+
+For the details of different parameters, you can refer to API docs.
+
+Run the following commands to see the created MySQL cluster object:
+
+```bash
+kubectl get cluster mycluster -n demo -o yaml
+```
+
+<details>
+<summary>Output</summary>
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  creationTimestamp: "2024-03-28T10:08:23Z"
+  finalizers:
+  - cluster.kubeblocks.io/finalizer
+  generation: 1
+  labels:
+    clusterdefinition.kubeblocks.io/name: mysql
+    clusterversion.kubeblocks.io/name: mysql-8.0.33
+  name: mycluster
+  namespace: default
+  resourceVersion: "5466612"
+  uid: 2f630f27-3de3-4fd0-85eb-5fd7e4150c8c
+spec:
+  affinity:
+    podAntiAffinity: Preferred
+    tenancy: SharedNode
+  clusterDefinitionRef: mysql
+  clusterVersionRef: mysql-8.0.33
+  componentSpecs:
+  - componentDefRef: mysql
+    enabledLogs:
+    - error
+    - slow
+    monitor: false
+    name: mysql
+    replicas: 2
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+    serviceAccountName: kb-mycluster
+    switchPolicy:
+      type: Noop
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  monitor: {}
+  resources:
+    cpu: "0"
+    memory: "0"
+  storage:
+    size: "0"
+  terminationPolicy: Delete
+status:
+  clusterDefGeneration: 2
+  components:
+    mysql:
+      phase: Running
+      podsReady: true
+      podsReadyTime: "2024-03-29T18:12:43Z"
+  conditions:
+  - lastTransitionTime: "2024-03-28T10:08:23Z"
+    message: 'The operator has started the provisioning of Cluster: mycluster'
+    observedGeneration: 1
+    reason: PreCheckSucceed
+    status: "True"
+    type: ProvisioningStarted
+  - lastTransitionTime: "2024-03-28T10:08:23Z"
+    message: Successfully applied for resources
+    observedGeneration: 1
+    reason: ApplyResourcesSucceed
+    status: "True"
+    type: ApplyResources
+  - lastTransitionTime: "2024-03-29T18:12:43Z"
+    message: all pods of components are ready, waiting for the probe detection successful
+    reason: AllReplicasReady
+    status: "True"
+    type: ReplicasReady
+  - lastTransitionTime: "2024-03-29T18:12:43Z"
+    message: 'Cluster: mycluster is ready, current phase is Running'
+    reason: ClusterReady
+    status: "True"
+    type: Ready
+  observedGeneration: 1
+  phase: Running
+```
+
+</details>
+
+</TabItem>
+
+<TabItem value="helm" label="Helm">
+
+This tutorial takes creating a MySQL cluster from the addon repository cloned from the [KubeBlocks addons repository](https://github.com/apecloud/kubeblocks-addons/tree/main) as an example.
+
+1. Clone the KubeBlocks addon repository.
+
+   ```bash
+   git clone https://github.com/apecloud/kubeblocks-addons/tree/main
+   ```
+
+2. (Optional) If you want to create a cluster with custom specifications, you can view the values available for configuring.
+
+   ```bash
+   helm show values ./addons/mysql-cluster
+   ```
+
+3. Create a MySQL cluster.
+
+   ```bash
+   helm install mycluster ./addons/myql-cluster --namespace=demo
+   ```
+
+   If you need to customize the cluster specifications, use `--set` to specify the parameters. But only part of the parameters can be customized and you can view these parameters by running the command in step 2.
+
+   ```bash
+   helm install mycluster ./addons/mysql-cluster --namespace=demo --set cpu=4,mode=replication
+   ```
+
+4. Verify whether this cluster is created successfully.
+
+   ```bash
+   helm list -n demo
+   >
+   NAME   	   NAMESPACE	 REVISION	  UPDATED                             	STATUS  	CHART              	APP VERSION
+   mycluster   demo     	 1       	  2024-04-12 15:23:44.063714 +0800 CST	deployed	mysql-cluster-0.9.0	8.0.33
+   ```
+
+   ```bash
+   kubectl get cluster -n demo
+   >
+   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+   mycluster   mysql                mysql-8.0.33   Delete               Running   5m34s
+   ```
+
+</TabItem>
+
+</Tabs>
+
+## Connect to a MySQL Cluster
+
+<Tabs>
+
+<TabItem value="kubectl" label="kubectl">
+
+You can use `kubectl exec` to exec into a Pod and connect to a database.
+
+KubeBlocks operator creates a new Secret called `mycluster-conn-credential` to store the connection credential of the MySQL cluster. This secret contains the following keys:
+
+* `username`: the root username of the MySQL cluster.
+* `password`: the password of the root user.
+* `port`: the port of the MySQL cluster.
+* `host`: the host of the MySQL cluster.
+* `endpoint`: the endpoint of the MySQL cluster and it is the same as `host:port`.
+
+1. Run the command below to get the `username` and `password` for the `kubectl exec` command.
+
+   ```bash
+   kubectl get secrets mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   >
+   root
+   ```
+
+   ```bash
+   kubectl get secrets mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   >
+   b8wvrwlm
+   ```
+
+2. Exec into the Pod `mycluster-mysql-0` and connect to the database using username and password.
+
+   ```bash
+   kubectl exec -ti mycluster-mysql-0 -- bash
+
+   mysql -u root -p b8wvrwlm
+   ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+kbcli cluster connect <clustername>  --namespace <name>
+```
+
+</TabItem>
+
+<TabItem value="port-forward" label="port-forward">
+
+You can also port forward the service to connect to a database from your local machine.
+
+1. Run the following command to port forward the service.
+
+   ```bash
+   kubectl port-forward svc/mycluster-mysql 3306:3306 -n default
+   ```
+
+2. Open a new terminal and run the following command to connect to the database.
+
+   ```bash
+   mysql -uroot -pb8wvrwlm
+   ```
+
+</TabItem>
+
+</Tabs>
+
+For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).

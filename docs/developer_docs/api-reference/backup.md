@@ -3705,7 +3705,7 @@ Valid values are:</p>
 <ul>
 <li><code>Any</code>: select any one pod that match the labelsSelector.</li>
 <li><code>All</code>: select all pods that match the labelsSelector. The backup data for the current pod
-// will be stored in a subdirectory named after the pod.</li>
+will be stored in a subdirectory named after the pod.</li>
 </ul>
 </td>
 </tr>
@@ -4031,7 +4031,7 @@ DataRestorePolicy
 - OneToMany: Enables restoration of all volumes from a single data copy of the original target instance.
 The &lsquo;sourceOfOneToMany&rsquo; field must be set when using this policy.
 - OneToOne: Restricts data restoration such that each data piece can only be restored to a single target instance.
-This is the default policy. When the number of target instances specified for restoration surpasses the count of original backup target instances,</p>
+This is the default policy. When the number of target instances specified for restoration surpasses the count of original backup target instances.</p>
 </td>
 </tr>
 <tr>

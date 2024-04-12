@@ -315,7 +315,7 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 		r.volumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(volumeRestorePolicy)
 	}
 	r.restoreTime = backupSource[constant.RestoreTimeKeyForRestore]
-	return GetBackupFromRestoreFronBackupAnnotation(r.Ctx, r.Client, backupSource, synthesizedComponent.Name, r.Cluster.Namespace)
+	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, synthesizedComponent.Name, r.Cluster.Namespace)
 }
 
 // createRestoreAndWait create the restore CR and wait for completion.
@@ -386,7 +386,7 @@ func CleanupClusterRestoreAnnotation(cluster *appsv1alpha1.Cluster, compName str
 	return true, nil
 }
 
-func GetBackupFromRestoreFronBackupAnnotation(
+func GetBackupFromClusterAnnotation(
 	ctx context.Context,
 	cli client.Reader,
 	backupSource map[string]string,

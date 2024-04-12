@@ -59,7 +59,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		if !ok {
 			continue
 		}
-		backup, err := plan.GetBackupFromRestoreFronBackupAnnotation(c.Context, c.Client, backupSource, shardingSpec.Name, c.Cluster.Namespace)
+		backup, err := plan.GetBackupFromClusterAnnotation(c.Context, c.Client, backupSource, shardingSpec.Name, c.Cluster.Namespace)
 		if err != nil {
 			return err
 		}

@@ -6700,7 +6700,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
+<p>Deprecated: AsEnvFrom has been deprecated since 0.9.0 and will be removed in 0.10.0
+Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
 <p>This is useful when application images accept parameters through environment variables and
 generate the final configuration file in the startup script based on these variables.</p>
 <p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
@@ -8698,7 +8699,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Deprecated: DefaultMode is deprecated since 0.10.0
+<p>Deprecated: DefaultMode is deprecated since 0.9.0 and will be removed in 0.10.0
 for scripts, auto set 0555
 for configs, auto set 0444
 Refers to the mode bits used to set permissions on created files by default.</p>
@@ -12404,7 +12405,7 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfig
 </p>
 <div>
 <p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
-Deprecated: LegacyRenderedTemplateSpec is deprecated since 0.10.0</p>
+Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
 </div>
 <table>
 <thead>

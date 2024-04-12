@@ -361,7 +361,7 @@ func (r *BackupReconciler) prepareBackupRequest(
 		return nil, err
 	}
 	if backupPolicy.Status.Phase == dpv1alpha1.UnavailablePhase {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf(fmt.Sprintf(`phase of backupPolicy "%s" is Unavailable`, backupPolicy.Name)))
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`phase of backupPolicy "%s" is Unavailable`, backupPolicy.Name))
 	}
 
 	backupMethod := dputils.GetBackupMethodByName(backup.Spec.BackupMethod, backupPolicy)

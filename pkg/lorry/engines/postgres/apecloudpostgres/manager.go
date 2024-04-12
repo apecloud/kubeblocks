@@ -310,9 +310,9 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 	return nil
 }
 
-func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, host string) error {
+func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`,
-		host, mgr.Config.GetDBPort())
+		mgr.GetMemberAddrWithName(ctx, cluster, memberName), mgr.Config.GetDBPort())
 
 	_, err := mgr.ExecLeader(ctx, sql, cluster)
 	if err != nil {

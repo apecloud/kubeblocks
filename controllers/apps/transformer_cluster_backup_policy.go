@@ -259,6 +259,9 @@ func (r *clusterBackupPolicyTransformer) transformBackupSchedule(
 func (r *clusterBackupPolicyTransformer) buildBackupSchedule(
 	name string,
 	backupPolicy *dpv1alpha1.BackupPolicy) *dpv1alpha1.BackupSchedule {
+	if len(r.backupPolicy.Schedules) == 0 {
+		return nil
+	}
 	cluster := r.OrigCluster
 	backupSchedule := &dpv1alpha1.BackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{

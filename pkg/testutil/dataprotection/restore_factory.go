@@ -133,6 +133,17 @@ func (f *MockRestoreFactory) SetDataSourceRef(volumeSource, mountPath string) *M
 	return f
 }
 
+func (f *MockRestoreFactory) SetPrepareDataRequiredPolicy(restorePolicy dpv1alpha1.DataRestorePolicy, sourceTargetPodName string) *MockRestoreFactory {
+	f.initPrepareDataConfig()
+	f.Get().Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection = &dpv1alpha1.RequiredPolicyForAllPodSelection{
+		DataRestorePolicy: restorePolicy,
+		SourceOfOneToMany: &dpv1alpha1.SourceOfOneToMany{
+			TargetPodName: sourceTargetPodName,
+		},
+	}
+	return f
+}
+
 func (f *MockRestoreFactory) SetVolumeClaimsTemplate(templateName, volumeSource, mountPath, storageClass string, replicas, startingIndex int32, labels map[string]string) *MockRestoreFactory {
 	f.initPrepareDataConfig()
 	f.Get().Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate = &dpv1alpha1.RestoreVolumeClaimsTemplate{

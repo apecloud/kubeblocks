@@ -109,7 +109,7 @@ var _ = Describe("Backup Deleter Test", func() {
 					endTime, _ := time.Parse(time.RFC3339, "2023-01-01T10:00:00Z")
 					backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 					backup.Status.PersistentVolumeClaimName = backupPVCName
-					testdp.MockBackupStatusTarget(backup)
+					testdp.MockBackupStatusTarget(backup, dpv1alpha1.PodSelectionStrategyAny)
 					if useVolumeSnapshotBackup {
 						testdp.MockBackupVSStatusActions(backup)
 					}

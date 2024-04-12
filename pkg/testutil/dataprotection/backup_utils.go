@@ -275,7 +275,7 @@ func MockBackupStatusMethod(backup *dpv1alpha1.Backup, backupMethodName, targetV
 	}
 }
 
-func MockBackupStatusTarget(backup *dpv1alpha1.Backup) {
+func MockBackupStatusTarget(backup *dpv1alpha1.Backup, podSelectionStrategy dpv1alpha1.PodSelectionStrategy) {
 	backup.Status.Target = &dpv1alpha1.BackupStatusTarget{
 		BackupTarget: dpv1alpha1.BackupTarget{
 			PodSelector: &dpv1alpha1.PodSelector{
@@ -283,9 +283,9 @@ func MockBackupStatusTarget(backup *dpv1alpha1.Backup) {
 					MatchLabels: map[string]string{
 						constant.AppInstanceLabelKey:    ClusterName,
 						constant.KBAppComponentLabelKey: ComponentName,
-						constant.RoleLabelKey:           constant.Leader,
 					},
 				},
+				Strategy: podSelectionStrategy,
 			},
 		},
 	}

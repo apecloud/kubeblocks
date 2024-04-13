@@ -255,7 +255,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequest.Spec.Cancel = !opsRequest.Spec.Cancel
 			Expect(k8sClient.Patch(ctx, opsRequest, patch)).ShouldNot(HaveOccurred())
 
-			By(fmt.Sprintf("expect an error for updating spec.ClusterRef when ops phase is %s", phase))
+			By(fmt.Sprintf("expect an error for updating spec.ClusterServiceSelector when ops phase is %s", phase))
 			opsRequest.Spec.ClusterRef = newClusterName
 			Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("forbidden to update spec.clusterRef"))
 		}

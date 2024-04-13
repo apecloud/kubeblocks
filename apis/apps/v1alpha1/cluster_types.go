@@ -896,7 +896,7 @@ type ServiceRef struct {
 	// Specifies the cluster to reference.
 	//
 	// +optional
-	ClusterRef *ServiceRefClusterSelector `json:"clusterRef,omitempty"`
+	ClusterServiceSelector *ServiceRefClusterSelector `json:"clusterServiceSelector,omitempty"`
 
 	// The service descriptor of the service provided by external sources.
 	//

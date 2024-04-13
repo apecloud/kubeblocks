@@ -280,10 +280,46 @@ func cutJobName(jobName string) string {
 	return jobName
 }
 
+/*
+	FormatRestoreTimeAndValidate formats and validates the restore time string.
+
+The restoreTimeStr parameter represents the time string to be formatted and validated.
+If the restoreTimeStr is empty, it is returned as is without any formatting or validation.
+The function follows a specific time format/layout constraint for the restoreTimeStr API,
+which is "Jan 02, 2006 15:04:05 UTC-0700".
+If the restoreTimeStr does not match the expected format, the function attempts to parse it
+using the RFC3339 format as a fallback.
+If the restoreTimeStr still cannot be parsed, an error is returned.
+After successful parsing, the restoreTimeStr is formatted using the RFC3339 format.
+The function also checks if the restore time is within the time range specified by the
+continuousBackup parameter. If the restore time is outside the time range, an error is returned.
+The error message includes a suggestion to view the recoverable time using the kbcli command.
+
+Example usage:
+
+	restoreTimeStr, err := FormatRestoreTimeAndValidate("Jan 01, 2022 12:00:00 UTC-0700", continuousBackup)
+	if err != nil {
+	  fmt.Println("Error:", err)
+	  return
+	}
+	fmt.Println("Formatted restore time:", restoreTimeStr)
+
+Parameters:
+  - restoreTimeStr: The restore time string to be formatted and validated.
+  - continuousBackup: A pointer to the continuousBackup object that contains the time range
+    for validation.
+
+Returns:
+  - string: The formatted restore time string.
+  - error: An error if the restore time string cannot be parsed or is outside the time range.
+*/
 func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1alpha1.Backup) (string, error) {
 	if restoreTimeStr == "" {
 		return restoreTimeStr, nil
 	}
+	// layout defines the time format/layout constraint for the restoreTimeStr API.
+	// The layout follows the reference time "Jan 02, 2006 15:04:05 UTC-0700".
+	// It specifies the expected format of the restore time string.
 	layout := "Jan 02,2006 15:04:05 UTC-0700"
 	restoreTime, err := time.Parse(layout, restoreTimeStr)
 	if err != nil {
@@ -304,6 +340,10 @@ func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1a
 	return restoreTimeStr, nil
 }
 
+/*
+isTimeInRange checks if the given time is within the specified time range.
+It returns true if the time is within the range, otherwise false.
+*/
 func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }

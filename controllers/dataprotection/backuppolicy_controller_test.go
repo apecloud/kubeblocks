@@ -90,6 +90,7 @@ var _ = Describe("BackupPolicy Controller test", func() {
 					{Name: targetName, PodSelector: podSelector},
 					{Name: targetName, PodSelector: podSelector},
 				}
+				backupPolicy.Spec.Target = nil
 			}, true)
 			By("expect status of backupPolicy to unavailable")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(bp),

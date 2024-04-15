@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
 	"math/rand"
 	"slices"
 	"strings"
@@ -53,10 +52,7 @@ func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	p, err := t.assign(transCtx)
-	if err != nil {
-		return err
-	}
+	p := t.assign(transCtx)
 
 	cluster := transCtx.Cluster
 	if cluster.Annotations == nil {
@@ -78,31 +74,23 @@ func (t *clusterPlacementTransformer) assigned(transCtx *clusterTransformContext
 	}
 
 	p, ok := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
-	if !ok || len(strings.TrimSpace(p)) == 0 {
-		return false
-	}
-
-	contexts := strings.Split(strings.TrimSpace(p), ",")
-	return len(contexts) == 1 || len(contexts) >= t.maxReplicas(transCtx)
+	return ok && len(strings.TrimSpace(p)) > 0
 }
 
-func (t *clusterPlacementTransformer) assign(transCtx *clusterTransformContext) ([]string, error) {
+func (t *clusterPlacementTransformer) assign(transCtx *clusterTransformContext) []string {
 	replicas := t.maxReplicas(transCtx)
 	contexts := t.multiClusterMgr.GetContexts()
-	if len(contexts) > 1 && len(contexts) < replicas {
-		return nil, fmt.Errorf("not supported placement, replicas: %d, contexts: %s", replicas, contexts)
-	}
-
-	if len(contexts) == 1 {
-		return contexts, nil
+	if replicas >= len(contexts) {
+		return contexts
 	}
 
 	slices.Sort(contexts)
-	for i := len(contexts) - 1; i > 0; i-- {
-		j := rand.Intn(i + 1)
-		contexts[i], contexts[j] = contexts[j], contexts[i]
+	for k := 0; k < len(contexts); k++ {
+		rand.Shuffle(len(contexts), func(i, j int) {
+			contexts[i], contexts[j] = contexts[j], contexts[i]
+		})
 	}
-	return contexts[:replicas], nil
+	return contexts[:replicas]
 }
 
 func (t *clusterPlacementTransformer) maxReplicas(transCtx *clusterTransformContext) int {

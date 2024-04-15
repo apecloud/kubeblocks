@@ -57,38 +57,6 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	return Mgr, nil
 }
 
-func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
-	mgr.DBState = nil
-	mgr.UnsetIsLeader()
-	dbState := &dcs.DBState{
-		Extra: map[string]string{},
-	}
-
-	isLeader, err := mgr.IsLeader(ctx, cluster)
-	if err != nil {
-		mgr.Logger.Error(err, "check is leader failed")
-		return nil
-	}
-	mgr.SetIsLeader(isLeader)
-
-	memberAddrs := mgr.GetMemberAddrs(ctx, cluster)
-	if memberAddrs == nil {
-		mgr.Logger.Error(nil, "get member addrs failed")
-		return nil
-	}
-	mgr.memberAddrs = memberAddrs
-
-	healthStatus, err := mgr.getMemberHealthStatus(ctx, cluster, cluster.GetMemberWithName(mgr.CurrentMemberName))
-	if err != nil {
-		mgr.Logger.Error(err, "get member health status failed")
-		return nil
-	}
-	mgr.healthStatus = healthStatus
-
-	mgr.DBState = dbState
-	return dbState
-}
-
 func (mgr *Manager) IsLeader(ctx context.Context, _ *dcs.Cluster) (bool, error) {
 	isSet, isLeader := mgr.GetIsLeader()
 	if isSet {
@@ -311,8 +279,13 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 }
 
 func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
-	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`,
-		mgr.GetMemberAddrWithName(ctx, cluster, memberName), mgr.Config.GetDBPort())
+	addr := mgr.GetMemberAddrWithName(ctx, cluster, memberName)
+	if addr == "" {
+		mgr.Logger.Info(fmt.Sprintf("member %s already deleted", memberName))
+		return nil
+	}
+
+	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`, addr, mgr.Config.GetDBPort())
 
 	_, err := mgr.ExecLeader(ctx, sql, cluster)
 	if err != nil {

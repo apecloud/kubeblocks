@@ -57,6 +57,38 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	return Mgr, nil
 }
 
+func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
+	mgr.DBState = nil
+	mgr.UnsetIsLeader()
+	dbState := &dcs.DBState{
+		Extra: map[string]string{},
+	}
+
+	isLeader, err := mgr.IsLeader(ctx, cluster)
+	if err != nil {
+		mgr.Logger.Error(err, "check is leader failed")
+		return nil
+	}
+	mgr.SetIsLeader(isLeader)
+
+	memberAddrs := mgr.GetMemberAddrs(ctx, cluster)
+	if memberAddrs == nil {
+		mgr.Logger.Error(nil, "get member addrs failed")
+		return nil
+	}
+	mgr.memberAddrs = memberAddrs
+
+	healthStatus, err := mgr.getMemberHealthStatus(ctx, cluster, cluster.GetMemberWithName(mgr.CurrentMemberName))
+	if err != nil {
+		mgr.Logger.Error(err, "get member health status failed")
+		return nil
+	}
+	mgr.healthStatus = healthStatus
+
+	mgr.DBState = dbState
+	return dbState
+}
+
 func (mgr *Manager) IsLeader(ctx context.Context, _ *dcs.Cluster) (bool, error) {
 	isSet, isLeader := mgr.GetIsLeader()
 	if isSet {

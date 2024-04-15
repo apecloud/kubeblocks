@@ -445,32 +445,16 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("success if leave once", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(1)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
-			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
 			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
-			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))
-		})
-
-		It("success if leave twice", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(4)
-			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
-			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil).Times(2)
-			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
-			// first leave
-			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
-			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))
-			// second leave
-			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
-			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(1)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
-			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
 			err := lorryClient.LeaveMember(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
@@ -494,7 +478,6 @@ var _ = Describe("Lorry HTTP Client", func() {
 
 		It("execute command failed cased by executable file is not found", func() {
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
-			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
 			actions := map[string][]string{}
 			actions[constant.MemberLeaveAction] = []string{"binary_not_exist"}
 			jsonStr, _ := json.Marshal(actions)

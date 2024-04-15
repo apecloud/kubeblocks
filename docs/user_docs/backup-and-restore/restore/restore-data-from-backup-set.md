@@ -15,39 +15,11 @@ KubeBlocks supports restoring clusters from backups with the following instructi
 
 1. View backups.
 
-   For existing clusters, execute:
-
-   ```shell
-   kbcli cluster list-backups mysql-cluster
-   ```
-
-   If the cluster has been deleted, execute:
-
-   ```bash
-   kbcli dataprotection list-backups
-   ```
-
-2. Restore clusters from a specific backup.
-
-    <Tabs>
-
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```powershell
-    # Restore new cluster
-    kbcli cluster restore myrestore --backup mybackup
-    >
-    Cluster myrestore created
-
-    # View the status of the restored cluster
-    kbcli cluster list myrestore
-    NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-    myrestore   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Oct 30,2023 16:26 UTC+0800
+    ```shell
+    kubectl get backups
     ```
 
-    </TabItem>
-
-    <TabItem value="kubectl" label="kubectl">
+2. Restore clusters from a specific backup.
 
     You can set the `connectionPassword.annotations` of the restored cluster as that of the original cluster. The password of the original cluster can be accessed by viewing the annotation of `dataprotection.kubeblocks.io/connection-password` in the backup YAML file.
 
@@ -79,14 +51,6 @@ KubeBlocks supports restoring clusters from backups with the following instructi
     EOF
     ```
 
-    </TabItem>
-
-    </Tabs>
-
 3. Connect to the restored cluster for verification.
 
-    Once the cluster status is `Running`, run the following command to connect to the cluster for verification:
-
-    ```bash
-    kbcli cluster connect myrestore
-    ```
+    Once the cluster status is `Running`, connect to the cluster for verification ([Click to learn more connection methods](./../../kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster.md#connect-to-a-mysql-cluster)).

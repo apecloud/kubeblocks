@@ -1,12 +1,12 @@
 ---
-title: Migrate data in MongoDB to KubeBlocks
-description: How to migrate data in MongDB v5.* to KubeBlocks by kbcli migration
-keywords: [mongodb, migration, kbcli migration, migrate data in MongoDB to KubeBlocks]
+title: Migrate data in MongoDB by KubeBlocks
+description: How to migrate data in MongDB v5.* by KubeBlocks by kbcli migration
+keywords: [mongodb, migration, kbcli migration, migrate data in MongoDB by KubeBlocks]
 sidebar_position: 1
 sidebar_label: Migration by kbcli
 ---
 
-# Migrate data in MongoDB to KubeBlocks
+# Migrate data in MongoDB by KubeBlocks
 
 ## Before you start
 

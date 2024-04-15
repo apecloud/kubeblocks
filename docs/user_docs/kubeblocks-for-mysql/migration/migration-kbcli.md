@@ -1,7 +1,7 @@
 ---
 title: Migrate data in MySQL by KubeBlocks
 description: How to migrate data in MySQL v8.* by KubeBlocks and kbcli migration
-keywords: [mysql, migration, kbcli migration, migrate data in MySQL by KubeBlocks and kbcli]
+keywords: [mysql, migration, kbcli migration, migrate data in MySQL by KubeBlocks]
 sidebar_position: 2
 sidebar_label: Migration by kbcli
 ---

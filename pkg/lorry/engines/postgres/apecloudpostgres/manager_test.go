@@ -585,17 +585,26 @@ func TestLeaveMemberFromCluster(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
-	cluster := &dcs.Cluster{}
+	cluster := &dcs.Cluster{
+		Members: []dcs.Member{
+			{Name: manager.CurrentMemberName},
+		},
+	}
 
-	t.Run("exec alter system failed", func(t *testing.T) {
-		mock.ExpectExec("alter system").
+	t.Run("cluster has no leader now ", func(t *testing.T) {
+		mock.ExpectQuery("select ip_port").
 			WillReturnError(fmt.Errorf("some error"))
 
 		err := manager.LeaveMemberFromCluster(ctx, cluster, "")
-		assert.NotNil(t, err)
+		assert.Nil(t, err, nil)
 	})
 
+	cluster.Leader = &dcs.Leader{
+		Name: manager.CurrentMemberName,
+	}
 	t.Run("exec alter system success", func(t *testing.T) {
+		mock.ExpectQuery("select ip_port").
+			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}).AddRow("test-pod-0"))
 		mock.ExpectExec("alter system").
 			WillReturnResult(pgxmock.NewResult("alter system", 1))
 

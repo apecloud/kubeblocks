@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -60,7 +61,15 @@ func supportPodVerticalScaling() bool {
 func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	template := src.DeepCopy()
 	// filter annotations
-	template.Annotations = nil
+	// keep Restart annotation
+	var annotations map[string]string
+	if len(template.Annotations) > 0 {
+		if restart, ok := template.Annotations[constant.RestartAnnotationKey]; ok {
+			annotations = make(map[string]string, 1)
+			annotations[constant.RestartAnnotationKey] = restart
+		}
+	}
+	template.Annotations = annotations
 	// filter labels
 	template.Labels = nil
 	// filter spec.containers[*].images & spec.initContainers[*].images

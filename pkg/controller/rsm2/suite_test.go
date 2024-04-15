@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -149,6 +150,49 @@ func mockCompressedInstanceTemplates(ns, name string) (*corev1.ConfigMap, string
 		return nil, "", err
 	}
 	return templateObj, string(templateRefByte), nil
+}
+
+func buildRandomPod() *corev1.Pod {
+	randStr := rand.String(8)
+	deadline := rand.Int63nRange(0, 1024*1024)
+	randInt1 := rand.Int()
+	randInt2 := rand.Int()
+	return builder.NewPodBuilder(namespace, name).
+		AddLabels(randStr, randStr).
+		AddAnnotations(randStr, randStr).
+		SetActiveDeadlineSeconds(&deadline).
+		AddTolerations(corev1.Toleration{
+			Key:      randStr,
+			Operator: corev1.TolerationOpEqual,
+			Value:    randStr,
+		}).
+		AddInitContainer(corev1.Container{
+			Name:  "init-container",
+			Image: randStr,
+			Resources: corev1.ResourceRequirements{
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", randInt1)),
+					corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dm", randInt2)),
+				},
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", randInt1)),
+					corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dm", randInt2)),
+				},
+			}}).
+		AddContainer(corev1.Container{
+			Name:  "container",
+			Image: randStr,
+			Resources: corev1.ResourceRequirements{
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", randInt1)),
+					corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dm", randInt2)),
+				},
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", randInt1)),
+					corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dm", randInt2)),
+				},
+			}}).
+		GetObject()
 }
 
 func TestAPIs(t *testing.T) {

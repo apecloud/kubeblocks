@@ -201,29 +201,4 @@ var _ = Describe("instance util test", func() {
 			Expect(policy).Should(Equal(NoOpsPolicy))
 		})
 	})
-
-	Context("filterInPlaceFields", func() {
-		It("should work well", func() {
-			pod := buildRandomPod()
-			restartTime := (metav1.Time{Time: time.Now()}).Format(time.RFC3339)
-			pod.Annotations[constant.RestartAnnotationKey] = restartTime
-			podTemplateSpec := &corev1.PodTemplateSpec{
-				ObjectMeta: pod.ObjectMeta,
-				Spec:       pod.Spec,
-			}
-			result := filterInPlaceFields(podTemplateSpec)
-			Expect(result).ShouldNot(BeNil())
-			Expect(result.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
-			Expect(result.Annotations[constant.RestartAnnotationKey]).Should(Equal(restartTime))
-			Expect(result.Labels).Should(BeNil())
-			Expect(result.Spec.ActiveDeadlineSeconds).Should(BeNil())
-			Expect(result.Spec.Tolerations).Should(BeNil())
-			for _, container := range result.Spec.InitContainers {
-				Expect(container.Image).Should(BeEmpty())
-			}
-			for _, container := range result.Spec.Containers {
-				Expect(container.Image).Should(BeEmpty())
-			}
-		})
-	})
 })

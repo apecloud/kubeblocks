@@ -177,6 +177,9 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 	}
+	if synthesizeComp.HorizontalScalePolicy == nil {
+		buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
+	}
 
 	// build affinity and tolerations
 	if err := buildAffinitiesAndTolerations(comp, synthesizeComp); err != nil {
@@ -478,6 +481,17 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	}
 
 	return nil
+}
+
+func buildCompatibleHorizontalScalePolicy(compDef *appsv1alpha1.ComponentDefinition, synthesizeComp *SynthesizedComponent) {
+	if compDef.Annotations != nil {
+		if templateName, ok := compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey]; ok {
+			synthesizeComp.HorizontalScalePolicy = &appsv1alpha1.HorizontalScalePolicy{
+				Type:                     appsv1alpha1.HScaleDataClonePolicyCloneVolume,
+				BackupPolicyTemplateName: templateName,
+			}
+		}
+	}
 }
 
 // GetEnvReplacementMapForConnCredential gets the replacement map for connect credential

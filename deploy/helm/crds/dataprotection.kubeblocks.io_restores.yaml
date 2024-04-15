@@ -81,6 +81,10 @@ spec:
                   namespace:
                     description: Specifies the backup namespace.
                     type: string
+                  sourceTargetName:
+                    description: Specifies the source target for restoration, identified
+                      by its name.
+                    type: string
                 required:
                 - name
                 - namespace
@@ -274,6 +278,36 @@ spec:
                       rule: self.volumeSource != '' || self.mountPath !=''
                     - message: forbidden to update spec.prepareDataConfig.dataSourceRef
                       rule: self == oldSelf
+                  requiredPolicyForAllPodSelection:
+                    description: Specifies the restore policy, which is required when
+                      the pod selection strategy for the source target is 'All'. This
+                      field is ignored if the pod selection strategy is 'Any'. optional
+                    properties:
+                      dataRestorePolicy:
+                        default: OneToOne
+                        description: 'Specifies the data restore policy. Options include:
+                          - OneToMany: Enables restoration of all volumes from a single
+                          data copy of the original target instance. The ''sourceOfOneToMany''
+                          field must be set when using this policy. - OneToOne: Restricts
+                          data restoration such that each data piece can only be restored
+                          to a single target instance. This is the default policy.
+                          When the number of target instances specified for restoration
+                          surpasses the count of original backup target instances.'
+                        type: string
+                      sourceOfOneToMany:
+                        description: Specifies the name of the source target pod.
+                          This field is mandatory when the DataRestorePolicy is configured
+                          to 'OneToMany'.
+                        properties:
+                          targetPodName:
+                            description: Specifies the name of the source target pod.
+                            type: string
+                        required:
+                        - targetPodName
+                        type: object
+                    required:
+                    - dataRestorePolicy
+                    type: object
                   schedulingSpec:
                     description: Specifies the scheduling spec for the restoring pod.
                     properties:
@@ -2115,10 +2149,42 @@ spec:
                   jobAction:
                     description: Specifies the configuration for a job action.
                     properties:
+                      requiredPolicyForAllPodSelection:
+                        description: Specifies the restore policy, which is required
+                          when the pod selection strategy for the source target is
+                          'All'. This field is ignored if the pod selection strategy
+                          is 'Any'. optional
+                        properties:
+                          dataRestorePolicy:
+                            default: OneToOne
+                            description: 'Specifies the data restore policy. Options
+                              include: - OneToMany: Enables restoration of all volumes
+                              from a single data copy of the original target instance.
+                              The ''sourceOfOneToMany'' field must be set when using
+                              this policy. - OneToOne: Restricts data restoration
+                              such that each data piece can only be restored to a
+                              single target instance. This is the default policy.
+                              When the number of target instances specified for restoration
+                              surpasses the count of original backup target instances.'
+                            type: string
+                          sourceOfOneToMany:
+                            description: Specifies the name of the source target pod.
+                              This field is mandatory when the DataRestorePolicy is
+                              configured to 'OneToMany'.
+                            properties:
+                              targetPodName:
+                                description: Specifies the name of the source target
+                                  pod.
+                                type: string
+                            required:
+                            - targetPodName
+                            type: object
+                        required:
+                        - dataRestorePolicy
+                        type: object
                       target:
-                        description: Defines the pod that needs to be executed for
-                          the job action. A pod that meets the conditions will be
-                          selected for execution.
+                        description: Defines the pods that needs to be executed for
+                          the job action.
                         properties:
                           podSelector:
                             description: Selects one of the pods, identified by labels,
@@ -2167,6 +2233,19 @@ spec:
                                   is "key", the operator is "In", and the values array
                                   contains only "value". The requirements are ANDed.
                                 type: object
+                              strategy:
+                                default: Any
+                                description: "Specifies the strategy to select the
+                                  target pod when multiple pods are selected. Valid
+                                  values are: \n - `Any`: select any one pod that
+                                  match the labelsSelector. - `All`: select all pods
+                                  that match the labelsSelector. The backup data for
+                                  the current pod will be stored in a subdirectory
+                                  named after the pod."
+                                enum:
+                                - Any
+                                - All
+                                type: string
                             type: object
                             x-kubernetes-map-type: atomic
                           volumeMounts:

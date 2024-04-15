@@ -85,8 +85,13 @@ func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterDefinition(transCt
 		}
 	}
 
-	if cd != nil && cd.Status.Phase != appsv1alpha1.AvailablePhase {
-		return fmt.Errorf("referred ClusterDefinition is unavailable: %s", cd.Name)
+	if cd != nil {
+		if cd.Generation != cd.Status.ObservedGeneration {
+			return fmt.Errorf("the referenced ClusterDefinition is not up to date: %s", cd.Name)
+		}
+		if cd.Status.Phase != appsv1alpha1.AvailablePhase {
+			return fmt.Errorf("the referenced ClusterDefinition is unavailable: %s", cd.Name)
+		}
 	}
 
 	if cd == nil {

@@ -27,6 +27,7 @@ import (
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,6 +44,11 @@ import (
 type CreateVolumeSnapshotAction struct {
 	// Name is the Name of the action.
 	Name string
+
+	// the target pod index.
+	Index int
+
+	TargetPodName string
 
 	// Owner is the owner of the volume snapshot.
 	Owner client.Object
@@ -88,14 +94,17 @@ func (c *CreateVolumeSnapshotAction) Execute(actCtx ActionContext) (*dpv1alpha1.
 	}
 
 	var (
-		ok   bool
-		err  error
-		snap *vsv1.VolumeSnapshot
+		completed       = true
+		ok              bool
+		err             error
+		snap            *vsv1.VolumeSnapshot
+		totalSize       = &resource.Quantity{}
+		volumeSnapshots []dpv1alpha1.VolumeSnapshotStatus
 	)
 	for _, w := range c.PersistentVolumeClaimWrappers {
 		key := client.ObjectKey{
 			Namespace: w.PersistentVolumeClaim.Namespace,
-			Name:      utils.GetBackupVolumeSnapshotName(c.ObjectMeta.Name, w.VolumeName),
+			Name:      utils.GetBackupVolumeSnapshotName(c.ObjectMeta.Name, w.VolumeName, c.Index),
 		}
 		// create volume snapshot
 		if err = c.createVolumeSnapshotIfNotExist(actCtx, &w.PersistentVolumeClaim, key); err != nil {
@@ -106,16 +115,33 @@ func (c *CreateVolumeSnapshotAction) Execute(actCtx ActionContext) (*dpv1alpha1.
 		if err != nil {
 			return handleErr(err)
 		}
-
 		if !ok {
-			return sb.startTimestamp(&snap.CreationTimestamp).build(), nil
+			completed = false
 		}
+		snapshotStatus := dpv1alpha1.VolumeSnapshotStatus{
+			Name:       snap.Name,
+			VolumeName: w.VolumeName,
+		}
+		if snap.Status != nil {
+			if snap.Status.RestoreSize != nil {
+				snapshotStatus.Size = snap.Status.RestoreSize.String()
+				totalSize.Add(*snap.Status.RestoreSize)
+			}
+			if snap.Status.BoundVolumeSnapshotContentName != nil {
+				snapshotStatus.ContentName = *snap.Status.BoundVolumeSnapshotContentName
+			}
+		}
+		volumeSnapshots = append(volumeSnapshots, snapshotStatus)
+	}
+
+	if !completed {
+		return sb.startTimestamp(&snap.CreationTimestamp).build(), nil
 	}
 
 	// volume snapshot is ready and status is not error
-	// TODO(ldm): now only support one volume to take snapshot, set its time, size to status
 	return sb.phase(dpv1alpha1.ActionPhaseCompleted).
-		totalSize(snap.Status.RestoreSize.String()).
+		totalSize(totalSize.String()).
+		volumeSnapshots(volumeSnapshots).
 		timeRange(snap.Status.CreationTime, snap.Status.CreationTime).
 		build(), nil
 }

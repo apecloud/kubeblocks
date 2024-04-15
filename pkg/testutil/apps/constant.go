@@ -469,4 +469,25 @@ var (
 			Containers:     []corev1.Container{defaultRedisContainer},
 		},
 	}
+
+	defaultComponentVerSpec = func(compDef string) appsv1alpha1.ComponentVersionSpec {
+		return appsv1alpha1.ComponentVersionSpec{
+			CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
+				{
+					CompDefs: []string{compDef},
+					Releases: []string{"8.0.30-r1"},
+				},
+			},
+			Releases: []appsv1alpha1.ComponentVersionRelease{
+				{
+					Name:           "8.0.30-r1",
+					Changes:        "init release",
+					ServiceVersion: "8.0.30",
+					Images: map[string]string{
+						defaultMySQLContainer.Name: defaultMySQLContainer.Image,
+					},
+				},
+			},
+		}
+	}
 )

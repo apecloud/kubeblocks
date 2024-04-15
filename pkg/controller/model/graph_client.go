@@ -66,6 +66,9 @@ type GraphWriter interface {
 	// FindAll finds all objects that have same type with obj in the underlying DAG.
 	// obey the GraphOption if provided.
 	FindAll(dag *graph.DAG, obj interface{}, opts ...GraphOption) []client.Object
+
+	// FindMatchedVertex finds the matched vertex in the underlying DAG.
+	FindMatchedVertex(dag *graph.DAG, object client.Object) graph.Vertex
 }
 
 type GraphClient interface {
@@ -82,7 +85,7 @@ func (r *realGraphClient) Root(dag *graph.DAG, objOld, objNew client.Object, act
 	var root *ObjectVertex
 	// find root vertex if already exists
 	if len(dag.Vertices()) > 0 {
-		if vertex := r.findMatchedVertex(dag, objNew); vertex != nil {
+		if vertex := r.FindMatchedVertex(dag, objNew); vertex != nil {
 			root, _ = vertex.(*ObjectVertex)
 		}
 	}
@@ -150,7 +153,7 @@ func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, actio
 }
 
 func (r *realGraphClient) IsAction(dag *graph.DAG, obj client.Object, action *Action) bool {
-	vertex := r.findMatchedVertex(dag, obj)
+	vertex := r.FindMatchedVertex(dag, obj)
 	if vertex == nil {
 		return false
 	}
@@ -165,7 +168,7 @@ func (r *realGraphClient) IsAction(dag *graph.DAG, obj client.Object, action *Ac
 }
 
 func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object) {
-	objectVertex := r.findMatchedVertex(dag, object)
+	objectVertex := r.FindMatchedVertex(dag, object)
 	if objectVertex == nil {
 		return
 	}
@@ -173,7 +176,7 @@ func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, depende
 		if d == nil {
 			continue
 		}
-		v := r.findMatchedVertex(dag, d)
+		v := r.FindMatchedVertex(dag, d)
 		if v != nil {
 			dag.Connect(objectVertex, v)
 		}
@@ -212,7 +215,7 @@ func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, 
 		opt.ApplyTo(graphOpts)
 	}
 
-	vertex := r.findMatchedVertex(dag, objNew)
+	vertex := r.FindMatchedVertex(dag, objNew)
 	switch {
 	case vertex != nil:
 		objVertex, _ := vertex.(*ObjectVertex)
@@ -232,7 +235,7 @@ func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, 
 	}
 }
 
-func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object) graph.Vertex {
+func (r *realGraphClient) FindMatchedVertex(dag *graph.DAG, object client.Object) graph.Vertex {
 	keyLookFor, err := GetGVKName(object)
 	if err != nil {
 		panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", object, object.GetName(), err))

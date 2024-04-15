@@ -53,7 +53,8 @@ func NewFakeActionSet(testCtx *testutil.TestContext) *dpv1alpha1.ActionSet {
 }
 
 func NewFakeBackupPolicy(testCtx *testutil.TestContext,
-	change func(backupPolicy *dpv1alpha1.BackupPolicy)) *dpv1alpha1.BackupPolicy {
+	change func(backupPolicy *dpv1alpha1.BackupPolicy),
+	doNotExpectAvailable ...bool) *dpv1alpha1.BackupPolicy {
 	bp := NewBackupPolicyFactory(testCtx.DefaultNamespace, BackupPolicyName).
 		SetBackupRepoName(BackupRepoName).
 		SetTarget(constant.AppInstanceLabelKey, ClusterName,
@@ -79,6 +80,9 @@ func NewFakeBackupPolicy(testCtx *testutil.TestContext,
 		},
 	}
 	Expect(testCtx.CreateObj(testCtx.Ctx, secret)).Should(Succeed())
+	if len(doNotExpectAvailable) > 0 && doNotExpectAvailable[0] {
+		return bp
+	}
 	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(bp),
 		func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 			g.Expect(bp.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
@@ -265,6 +269,36 @@ func MockBackupStatusMethod(backup *dpv1alpha1.Backup, backupMethodName, targetV
 			Volumes: []string{targetVolume},
 			VolumeMounts: []corev1.VolumeMount{
 				{Name: targetVolume, MountPath: "/"},
+			},
+		},
+	}
+}
+
+func MockBackupStatusTarget(backup *dpv1alpha1.Backup, podSelectionStrategy dpv1alpha1.PodSelectionStrategy) {
+	backup.Status.Target = &dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{
+			PodSelector: &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						constant.AppInstanceLabelKey:    ClusterName,
+						constant.KBAppComponentLabelKey: ComponentName,
+					},
+				},
+				Strategy: podSelectionStrategy,
+			},
+		},
+	}
+}
+
+func MockBackupVSStatusActions(backup *dpv1alpha1.Backup) {
+	backup.Status.Actions = []dpv1alpha1.ActionStatus{
+		{
+			Name: "create-volumesnapshot",
+			VolumeSnapshots: []dpv1alpha1.VolumeSnapshotStatus{
+				{
+					Name:       "test-volumesnapshot",
+					VolumeName: DataVolumeName,
+				},
 			},
 		},
 	}

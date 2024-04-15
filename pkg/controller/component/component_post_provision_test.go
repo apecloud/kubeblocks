@@ -136,7 +136,7 @@ var _ = Describe("Component PostProvision Test", func() {
 				},
 			}
 			synthesizeComp.LifecycleActions.PostProvision = &postProvision
-			need, err := needDoPostProvision(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
+			need, err := NeedDoPostProvision(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeFalse())
 			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, cluster, comp, synthesizeComp, dag)
@@ -144,7 +144,7 @@ var _ = Describe("Component PostProvision Test", func() {
 
 			By("mock component status ready, should do postProvision action")
 			comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
-			need, err = needDoPostProvision(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
+			need, err = NeedDoPostProvision(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeTrue())
 

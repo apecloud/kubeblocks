@@ -155,7 +155,12 @@ type BackupStatus struct {
 	// Records the target information for this backup.
 	//
 	// +optional
-	Target *BackupTarget `json:"target,omitempty"`
+	Target *BackupStatusTarget `json:"target,omitempty"`
+
+	// Records the targets information for this backup.
+	//
+	// +optional
+	Targets []BackupStatusTarget `json:"targets,omitempty"`
 
 	// Records the backup method information for this backup.
 	// Refer to BackupMethod for more details.
@@ -244,6 +249,9 @@ type ActionStatus struct {
 	// +optional
 	Name string `json:"name,omitempty"`
 
+	// Records the target pod name which has been backed up.
+	TargetPodName string `json:"targetPodName,omitempty"`
+
 	// The current phase of the action.
 	//
 	// +optional
@@ -298,6 +306,13 @@ type ActionStatus struct {
 	VolumeSnapshots []VolumeSnapshotStatus `json:"volumeSnapshots,omitempty"`
 }
 
+type BackupStatusTarget struct {
+	BackupTarget `json:",inline"`
+
+	// Records the selected pods by the target info during backup.
+	SelectedTargetPods []string `json:"selectedTargetPods,omitempty"`
+}
+
 type VolumeSnapshotStatus struct {
 	// The name of the volume snapshot.
 	//
@@ -318,6 +333,9 @@ type VolumeSnapshotStatus struct {
 	//
 	// +optional
 	Size string `json:"size,omitempty"`
+
+	// Associates this volumeSnapshot with its corresponding target.
+	TargetName string `json:"targetName,omitempty"`
 }
 
 type ActionPhase string

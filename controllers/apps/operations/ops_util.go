@@ -502,7 +502,7 @@ func syncOverrideByOpsForScaleReplicas(reqCtx intctrlutil.RequestCtx, cli client
 		opsRes.OpsRequest.Status.Components[compName] = componentStatus
 	}
 	// checks if the number of replicas applied by the current opsRequest matches the desired number of replicas for the component.
-	// if not matched, set the OverrideB info in the opsRequest.status.components.
+	// if not matched, set the Override info in the opsRequest.status.components.
 	switch opsRes.OpsRequest.Spec.Type {
 	case appsv1alpha1.HorizontalScalingType:
 		for _, opsComp := range opsRes.OpsRequest.Spec.HorizontalScalingList {

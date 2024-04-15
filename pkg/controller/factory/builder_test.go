@@ -233,14 +233,14 @@ var _ = Describe("builder", func() {
 		It("builds RSM correctly", func() {
 			clusterDef, cluster, synthesizedComponent := newClusterObjs(nil)
 
-			rsm, err := BuildRSM(cluster, synthesizedComponent)
+			rsm, err := BuildRSM(synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 
 			By("set replicas = 0")
 			newComponent := *synthesizedComponent
 			newComponent.Replicas = 0
-			rsm, err = BuildRSM(cluster, &newComponent)
+			rsm, err = BuildRSM(&newComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 			Expect(*rsm.Spec.Replicas).Should(Equal(int32(0)))
@@ -256,7 +256,7 @@ var _ = Describe("builder", func() {
 			}
 			cluster.Spec.ComponentSpecs[0].Replicas = 2
 			replComponent := newAllFieldsSynthesizedComponent(clusterDef, cluster)
-			rsm, err = BuildRSM(cluster, replComponent)
+			rsm, err = BuildRSM(replComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 			Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(2))
@@ -295,7 +295,7 @@ var _ = Describe("builder", func() {
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
 			cluster.Spec.ComponentSpecs[0].Replicas = 3
 			csComponent := newAllFieldsSynthesizedComponent(clusterDef, cluster)
-			rsm, err = BuildRSM(cluster, csComponent)
+			rsm, err = BuildRSM(csComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 

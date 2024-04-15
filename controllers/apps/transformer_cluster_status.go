@@ -53,9 +53,9 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	case origCluster.IsUpdating():
 		transCtx.Logger.Info(fmt.Sprintf("update cluster status after applying resources, generation: %d", cluster.Generation))
 		updateObservedGeneration()
-		graphCli.Status(dag, origCluster, cluster)
+		t.markClusterDagStatusAction(graphCli, dag, origCluster, cluster)
 	case origCluster.IsStatusUpdating():
-		defer func() { graphCli.Status(dag, origCluster, cluster) }()
+		defer func() { t.markClusterDagStatusAction(graphCli, dag, origCluster, cluster) }()
 		// reconcile the phase and conditions of the Cluster.status
 		if err := t.reconcileClusterStatus(transCtx, cluster); err != nil {
 			return err
@@ -67,6 +67,17 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	return nil
+}
+
+func (t *clusterStatusTransformer) markClusterDagStatusAction(graphCli model.GraphClient, dag *graph.DAG, origCluster, cluster *appsv1alpha1.Cluster) {
+	if vertex := graphCli.FindMatchedVertex(dag, cluster); vertex != nil {
+		// check if the component needs to do other action.
+		ov, _ := vertex.(*model.ObjectVertex)
+		if ov.Action != model.ActionNoopPtr() {
+			return
+		}
+	}
+	graphCli.Status(dag, origCluster, cluster)
 }
 
 func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.Cluster) {

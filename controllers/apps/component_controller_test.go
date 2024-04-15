@@ -33,6 +33,7 @@ import (
 	"github.com/golang/mock/gomock"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -131,6 +132,7 @@ var _ = Describe("Component Controller", func() {
 	const (
 		clusterDefName = "test-clusterdef"
 		compDefName    = "test-compdef"
+		compVerName    = "test-compver"
 		clusterName    = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
 		leader         = "leader"
 		follower       = "follower"
@@ -151,6 +153,7 @@ var _ = Describe("Component Controller", func() {
 	var (
 		clusterDefObj *appsv1alpha1.ClusterDefinition
 		compDefObj    *appsv1alpha1.ComponentDefinition
+		compVerObj    *appsv1alpha1.ComponentVersion
 		clusterObj    *appsv1alpha1.Cluster
 		clusterKey    types.NamespacedName
 		compObj       *appsv1alpha1.Component
@@ -227,6 +230,12 @@ var _ = Describe("Component Controller", func() {
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
+			Create(&testCtx).
+			GetObject()
+
+		By("Create a componentDefinition obj")
+		compVerObj = testapps.NewComponentVersionFactory(compVerName).
+			SetDefaultSpec(compDefName).
 			Create(&testCtx).
 			GetObject()
 
@@ -329,20 +338,25 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 	}
 
-	// createCompObjNoWait := func(compName, compDefName string, processor func(*testapps.MockComponentFactory)) {
+	// createCompObj := func(compName, compDefName, serviceVersion string, processor func(*testapps.MockComponentFactory)) {
 	//	By("Creating a component")
-	//	factory := testapps.NewComponentFactory(testCtx.DefaultNamespace, component.FullName(clusterName, compName), compDefName).
+	//	factory := testapps.NewComponentFactory(testCtx.DefaultNamespace, component.FullName(clusterObj.Name, compName), compDefName).
+	//		AddLabelsInMap(map[string]string{
+	//			constant.AppInstanceLabelKey:     clusterObj.Name,
+	//			constant.KBAppClusterUIDLabelKey: string(clusterObj.UID),
+	//		}).
+	//		SetServiceVersion(serviceVersion).
 	//		SetReplicas(1)
 	//	if processor != nil {
 	//		processor(factory)
 	//	}
 	//	compObj = factory.Create(&testCtx).GetObject()
 	//	compKey = client.ObjectKeyFromObject(compObj)
-	// }
-
-	// createCompObj := func(compName, compDefName string, processor func(*testapps.MockComponentFactory)) {
-	//	createCompObjNoWait(compName, compDefName, processor)
-	//	waitCompObjCreating(compName, compDefName)
+	//
+	//	Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+	//		g.Expect(comp.Status.ObservedGeneration).To(BeEquivalentTo(comp.Generation))
+	//		g.Expect(comp.Status.Phase).To(Equal(appsv1alpha1.CreatingClusterCompPhase))
+	//	})).Should(Succeed())
 	// }
 
 	changeCompReplicas := func(clusterName types.NamespacedName, replicas int32, comp *appsv1alpha1.ClusterComponentSpec) {
@@ -1056,7 +1070,6 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
 			// g.Expect(comp.Finalizers).Should(ContainElements(constant.DBComponentFinalizerName))
 			g.Expect(comp.Finalizers).Should(ContainElements(constant.DBClusterFinalizerName))
-			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.ComponentDefinitionLabelKey, comp.Spec.CompDef))
 			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
 			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterObj.Name))
 			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
@@ -2324,6 +2337,87 @@ var _ = Describe("Component Controller", func() {
 
 		It("test restore cluster from backup", func() {
 			testRestoreClusterFromBackup(consensusCompName, consensusCompDefName)
+		})
+	})
+
+	Context("reconcile component with definition and version", func() {
+		BeforeEach(func() {
+			cleanEnv()
+			createAllWorkloadTypesClusterDef()
+		})
+
+		testImageUnchangedAfterNewReleasePublished := func(release appsv1alpha1.ComponentVersionRelease) {
+			prevRelease := compVerObj.Spec.Releases[0]
+
+			By("check new release")
+			Expect(prevRelease.Images).Should(HaveLen(len(release.Images)))
+			Expect(maps.Keys(prevRelease.Images)).Should(BeEquivalentTo(maps.Keys(release.Images)))
+			Expect(maps.Values(prevRelease.Images)).ShouldNot(BeEquivalentTo(maps.Values(release.Images)))
+
+			// createCompObj(defaultCompName, compDefObj.Name, compVerObj.Spec.Releases[0].ServiceVersion, nil)
+			createClusterObjV2(defaultCompName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+				f.SetServiceVersion(prevRelease.ServiceVersion)
+			})
+
+			By("check the labels and image in rsm")
+			rsmKey := compKey
+			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				// check comp-def and service-version labels
+				g.Expect(rsm.Annotations).ShouldNot(BeEmpty())
+				g.Expect(rsm.Annotations).Should(HaveKeyWithValue(constant.AppComponentLabelKey, compObj.Spec.CompDef))
+				g.Expect(rsm.Annotations).Should(HaveKeyWithValue(constant.KBAppServiceVersionKey, compObj.Spec.ServiceVersion))
+				// check the image
+				c := rsm.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(BeEquivalentTo(prevRelease.Images[c.Name]))
+			})).Should(Succeed())
+
+			By("publish a new release")
+			compVerKey := client.ObjectKeyFromObject(compVerObj)
+			Expect(testapps.GetAndChangeObj(&testCtx, compVerKey, func(compVer *appsv1alpha1.ComponentVersion) {
+				compVer.Spec.Releases = append(compVer.Spec.Releases, release)
+				compVer.Spec.CompatibilityRules[0].Releases = append(compVer.Spec.CompatibilityRules[0].Releases, release.Name)
+			})()).Should(Succeed())
+
+			By("trigger component reconcile")
+			now := time.Now().Format(time.RFC3339)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
+				comp.Annotations["now"] = now
+			})()).Should(Succeed())
+
+			By("wait rsm updated and check the labels and image in rsm not changed")
+			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				// check the rsm is updated
+				g.Expect(rsm.Annotations).ShouldNot(BeEmpty())
+				g.Expect(rsm.Annotations).Should(HaveKeyWithValue("now", now))
+				// check comp-def and service-version labels unchanged
+				g.Expect(rsm.Annotations).Should(HaveKeyWithValue(constant.AppComponentLabelKey, compObj.Spec.CompDef))
+				g.Expect(rsm.Annotations).Should(HaveKeyWithValue(constant.KBAppServiceVersionKey, compObj.Spec.ServiceVersion))
+				// check the image unchanged
+				c := rsm.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(BeEquivalentTo(prevRelease.Images[c.Name]))
+			})).Should(Succeed())
+		}
+
+		It("publish new release with different service version", func() {
+			release := appsv1alpha1.ComponentVersionRelease{
+				Name:           "8.0.30-r2",
+				ServiceVersion: "8.0.31", // different service version
+				Images: map[string]string{
+					testapps.DefaultMySQLContainerName: "mysql:8.0.31", // new image
+				},
+			}
+			testImageUnchangedAfterNewReleasePublished(release)
+		})
+
+		It("publish new release with same service version", func() {
+			release := appsv1alpha1.ComponentVersionRelease{
+				Name:           "8.0.30-r2",
+				ServiceVersion: "8.0.30", // same service version
+				Images: map[string]string{
+					testapps.DefaultMySQLContainerName: "mysql:8.0.31", // new image
+				},
+			}
+			testImageUnchangedAfterNewReleasePublished(release)
 		})
 	})
 })

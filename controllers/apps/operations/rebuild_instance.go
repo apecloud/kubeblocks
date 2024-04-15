@@ -529,13 +529,15 @@ func (r rebuildInstanceOpsHandler) createPostReadyRestore(reqCtx intctrlutil.Req
 	insHelper *instanceHelper,
 	restoreName string) error {
 	labels := r.getWellKnownLabels(insHelper.synthesizedComp)
-	// TODO: compatible rsm labels.
+	// TODO: compatible rsm pod label.
 	if insHelper.targetPod.Labels[constant.StatefulSetPodNameLabelKey] == insHelper.targetPod.Name {
+		// TODO: Remove it when the kb not manages the StatefulSet.
 		labels[constant.StatefulSetPodNameLabelKey] = insHelper.targetPod.Name
 	}
 	podSelector := metav1.LabelSelector{
 		MatchLabels: labels,
 	}
+	// TODO: support to rebuild instance from backup when the PodSelectionStrategy of source target is All .
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.buildRestoreMetaObject(opsRequest, restoreName),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -549,7 +551,10 @@ func (r rebuildInstanceOpsHandler) createPostReadyRestore(reqCtx intctrlutil.Req
 					Target: dpv1alpha1.ExecActionTarget{PodSelector: podSelector},
 				},
 				JobAction: &dpv1alpha1.JobAction{
-					Target: dpv1alpha1.JobActionTarget{PodSelector: podSelector},
+					Target: dpv1alpha1.JobActionTarget{PodSelector: dpv1alpha1.PodSelector{
+						LabelSelector: &podSelector,
+						Strategy:      dpv1alpha1.PodSelectionStrategyAny,
+					}},
 				},
 			},
 		},

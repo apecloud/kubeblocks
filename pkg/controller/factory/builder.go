@@ -242,30 +242,6 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		}
 	}
 
-	// get restore password if exists during recovery.
-	getRestorePassword := func() string {
-		valueString := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
-		if len(valueString) == 0 {
-			return ""
-		}
-		backupMap := map[string]map[string]string{}
-		err := json.Unmarshal([]byte(valueString), &backupMap)
-		if err != nil {
-			return ""
-		}
-		backupSource, ok := backupMap[synthesizedComp.Name]
-		if !ok {
-			return ""
-		}
-		password, ok := backupSource[constant.ConnectionPassword]
-		if !ok {
-			return ""
-		}
-		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-		password, _ = e.Decrypt([]byte(password))
-		return password
-	}
-
 	// TODO: do JIT value generation for lower CPU resources
 	// 1st pass replace variables
 	uuidVal := uuid.New()
@@ -276,7 +252,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	uuidHex := hex.EncodeToString(uuidBytes)
 	randomPassword := randomString(8)
 	strongRandomPasswd := strongRandomString(16)
-	restorePassword := getRestorePassword()
+	restorePassword := GetRestorePassword(cluster, synthesizedComp)
 	// check if a connection password is specified during recovery.
 	// if exists, replace the random password
 	if restorePassword != "" {
@@ -308,6 +284,30 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	}
 	replaceData(m)
 	return connCredential
+}
+
+// GetRestorePassword gets restore password if exists during recovery.
+func GetRestorePassword(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) string {
+	valueString := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
+	if len(valueString) == 0 {
+		return ""
+	}
+	backupMap := map[string]map[string]string{}
+	err := json.Unmarshal([]byte(valueString), &backupMap)
+	if err != nil {
+		return ""
+	}
+	backupSource, ok := backupMap[synthesizedComp.Name]
+	if !ok {
+		return ""
+	}
+	password, ok := backupSource[constant.ConnectionPassword]
+	if !ok {
+		return ""
+	}
+	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	password, _ = e.Decrypt([]byte(password))
+	return password
 }
 
 func BuildPVC(cluster *appsv1alpha1.Cluster,

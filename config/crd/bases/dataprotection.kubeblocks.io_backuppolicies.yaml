@@ -289,6 +289,12 @@ spec:
                           required:
                           - secretName
                           type: object
+                        name:
+                          description: Specifies a mandatory and unique identifier
+                            for each target when using the "targets" field. The backup
+                            data for the current target is stored in a uniquely named
+                            subdirectory.
+                          type: string
                         podSelector:
                           description: Used to find the target pod. The volumes of
                             the target pod will be backed up.
@@ -338,9 +344,11 @@ spec:
                               default: Any
                               description: "Specifies the strategy to select the target
                                 pod when multiple pods are selected. Valid values
-                                are: Any: select any one pod that match the labelsSelector.
-                                \n - `Any`: select any one pod that match the labelsSelector.
-                                - `All`: select all pods that match the labelsSelector."
+                                are: \n - `Any`: select any one pod that match the
+                                labelsSelector. - `All`: select all pods that match
+                                the labelsSelector. The backup data for the current
+                                pod will be stored in a subdirectory named after the
+                                pod."
                               enum:
                               - Any
                               - All
@@ -473,6 +481,188 @@ spec:
                             type: string
                           type: array
                       type: object
+                    targets:
+                      description: Specifies multiple target information for backup
+                        operations. This includes details such as the target pod and
+                        cluster connection credentials. All specified targets will
+                        be backed up collectively.
+                      items:
+                        properties:
+                          connectionCredential:
+                            description: Specifies the connection credential to connect
+                              to the target database cluster.
+                            properties:
+                              hostKey:
+                                description: Specifies the map key of the host in
+                                  the connection credential secret.
+                                type: string
+                              passwordKey:
+                                default: password
+                                description: Specifies the map key of the password
+                                  in the connection credential secret. This password
+                                  will be saved in the backup annotation for full
+                                  backup. You can use the environment variable DP_ENCRYPTION_KEY
+                                  to specify encryption key.
+                                type: string
+                              portKey:
+                                description: Specifies the map key of the port in
+                                  the connection credential secret.
+                                type: string
+                              secretName:
+                                description: Refers to the Secret object that contains
+                                  the connection credential.
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              usernameKey:
+                                default: username
+                                description: Specifies the map key of the user in
+                                  the connection credential secret.
+                                type: string
+                            required:
+                            - secretName
+                            type: object
+                          name:
+                            description: Specifies a mandatory and unique identifier
+                              for each target when using the "targets" field. The
+                              backup data for the current target is stored in a uniquely
+                              named subdirectory.
+                            type: string
+                          podSelector:
+                            description: Used to find the target pod. The volumes
+                              of the target pod will be backed up.
+                            properties:
+                              matchExpressions:
+                                description: matchExpressions is a list of label selector
+                                  requirements. The requirements are ANDed.
+                                items:
+                                  description: A label selector requirement is a selector
+                                    that contains values, a key, and an operator that
+                                    relates the key and values.
+                                  properties:
+                                    key:
+                                      description: key is the label key that the selector
+                                        applies to.
+                                      type: string
+                                    operator:
+                                      description: operator represents a key's relationship
+                                        to a set of values. Valid operators are In,
+                                        NotIn, Exists and DoesNotExist.
+                                      type: string
+                                    values:
+                                      description: values is an array of string values.
+                                        If the operator is In or NotIn, the values
+                                        array must be non-empty. If the operator is
+                                        Exists or DoesNotExist, the values array must
+                                        be empty. This array is replaced during a
+                                        strategic merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                  - key
+                                  - operator
+                                  type: object
+                                type: array
+                              matchLabels:
+                                additionalProperties:
+                                  type: string
+                                description: matchLabels is a map of {key,value} pairs.
+                                  A single {key,value} in the matchLabels map is equivalent
+                                  to an element of matchExpressions, whose key field
+                                  is "key", the operator is "In", and the values array
+                                  contains only "value". The requirements are ANDed.
+                                type: object
+                              strategy:
+                                default: Any
+                                description: "Specifies the strategy to select the
+                                  target pod when multiple pods are selected. Valid
+                                  values are: \n - `Any`: select any one pod that
+                                  match the labelsSelector. - `All`: select all pods
+                                  that match the labelsSelector. The backup data for
+                                  the current pod will be stored in a subdirectory
+                                  named after the pod."
+                                enum:
+                                - Any
+                                - All
+                                type: string
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          resources:
+                            description: Specifies the kubernetes resources to back
+                              up.
+                            properties:
+                              excluded:
+                                description: excluded is a slice of namespaced-scoped
+                                  resource type names to exclude in the kubernetes
+                                  resources. The default value is empty.
+                                items:
+                                  type: string
+                                type: array
+                              included:
+                                description: included is a slice of namespaced-scoped
+                                  resource type names to include in the kubernetes
+                                  resources. The default value is empty.
+                                items:
+                                  type: string
+                                type: array
+                              selector:
+                                description: A metav1.LabelSelector to filter the
+                                  target kubernetes resources that need to be backed
+                                  up. If not set, will do not back up any kubernetes
+                                  resources.
+                                properties:
+                                  matchExpressions:
+                                    description: matchExpressions is a list of label
+                                      selector requirements. The requirements are
+                                      ANDed.
+                                    items:
+                                      description: A label selector requirement is
+                                        a selector that contains values, a key, and
+                                        an operator that relates the key and values.
+                                      properties:
+                                        key:
+                                          description: key is the label key that the
+                                            selector applies to.
+                                          type: string
+                                        operator:
+                                          description: operator represents a key's
+                                            relationship to a set of values. Valid
+                                            operators are In, NotIn, Exists and DoesNotExist.
+                                          type: string
+                                        values:
+                                          description: values is an array of string
+                                            values. If the operator is In or NotIn,
+                                            the values array must be non-empty. If
+                                            the operator is Exists or DoesNotExist,
+                                            the values array must be empty. This array
+                                            is replaced during a strategic merge patch.
+                                          items:
+                                            type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
+                                  matchLabels:
+                                    additionalProperties:
+                                      type: string
+                                    description: matchLabels is a map of {key,value}
+                                      pairs. A single {key,value} in the matchLabels
+                                      map is equivalent to an element of matchExpressions,
+                                      whose key field is "key", the operator is "In",
+                                      and the values array contains only "value".
+                                      The requirements are ANDed.
+                                    type: object
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            type: object
+                          serviceAccountName:
+                            description: Specifies the service account to run the
+                              backup workload.
+                            type: string
+                        type: object
+                      type: array
                   required:
                   - name
                   type: object
@@ -562,6 +752,11 @@ spec:
                     required:
                     - secretName
                     type: object
+                  name:
+                    description: Specifies a mandatory and unique identifier for each
+                      target when using the "targets" field. The backup data for the
+                      current target is stored in a uniquely named subdirectory.
+                    type: string
                   podSelector:
                     description: Used to find the target pod. The volumes of the target
                       pod will be backed up.
@@ -609,10 +804,11 @@ spec:
                       strategy:
                         default: Any
                         description: "Specifies the strategy to select the target
-                          pod when multiple pods are selected. Valid values are: Any:
-                          select any one pod that match the labelsSelector. \n - `Any`:
-                          select any one pod that match the labelsSelector. - `All`:
-                          select all pods that match the labelsSelector."
+                          pod when multiple pods are selected. Valid values are: \n
+                          - `Any`: select any one pod that match the labelsSelector.
+                          - `All`: select all pods that match the labelsSelector.
+                          The backup data for the current pod will be stored in a
+                          subdirectory named after the pod."
                         enum:
                         - Any
                         - All
@@ -689,6 +885,181 @@ spec:
                     description: Specifies the service account to run the backup workload.
                     type: string
                 type: object
+              targets:
+                description: Specifies multiple target information for backup operations.
+                  This includes details such as the target pod and cluster connection
+                  credentials. All specified targets will be backed up collectively.
+                  optional
+                items:
+                  properties:
+                    connectionCredential:
+                      description: Specifies the connection credential to connect
+                        to the target database cluster.
+                      properties:
+                        hostKey:
+                          description: Specifies the map key of the host in the connection
+                            credential secret.
+                          type: string
+                        passwordKey:
+                          default: password
+                          description: Specifies the map key of the password in the
+                            connection credential secret. This password will be saved
+                            in the backup annotation for full backup. You can use
+                            the environment variable DP_ENCRYPTION_KEY to specify
+                            encryption key.
+                          type: string
+                        portKey:
+                          description: Specifies the map key of the port in the connection
+                            credential secret.
+                          type: string
+                        secretName:
+                          description: Refers to the Secret object that contains the
+                            connection credential.
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                        usernameKey:
+                          default: username
+                          description: Specifies the map key of the user in the connection
+                            credential secret.
+                          type: string
+                      required:
+                      - secretName
+                      type: object
+                    name:
+                      description: Specifies a mandatory and unique identifier for
+                        each target when using the "targets" field. The backup data
+                        for the current target is stored in a uniquely named subdirectory.
+                      type: string
+                    podSelector:
+                      description: Used to find the target pod. The volumes of the
+                        target pod will be backed up.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: A label selector requirement is a selector
+                              that contains values, a key, and an operator that relates
+                              the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: operator represents a key's relationship
+                                  to a set of values. Valid operators are In, NotIn,
+                                  Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: values is an array of string values.
+                                  If the operator is In or NotIn, the values array
+                                  must be non-empty. If the operator is Exists or
+                                  DoesNotExist, the values array must be empty. This
+                                  array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: matchLabels is a map of {key,value} pairs.
+                            A single {key,value} in the matchLabels map is equivalent
+                            to an element of matchExpressions, whose key field is
+                            "key", the operator is "In", and the values array contains
+                            only "value". The requirements are ANDed.
+                          type: object
+                        strategy:
+                          default: Any
+                          description: "Specifies the strategy to select the target
+                            pod when multiple pods are selected. Valid values are:
+                            \n - `Any`: select any one pod that match the labelsSelector.
+                            - `All`: select all pods that match the labelsSelector.
+                            The backup data for the current pod will be stored in
+                            a subdirectory named after the pod."
+                          enum:
+                          - Any
+                          - All
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    resources:
+                      description: Specifies the kubernetes resources to back up.
+                      properties:
+                        excluded:
+                          description: excluded is a slice of namespaced-scoped resource
+                            type names to exclude in the kubernetes resources. The
+                            default value is empty.
+                          items:
+                            type: string
+                          type: array
+                        included:
+                          description: included is a slice of namespaced-scoped resource
+                            type names to include in the kubernetes resources. The
+                            default value is empty.
+                          items:
+                            type: string
+                          type: array
+                        selector:
+                          description: A metav1.LabelSelector to filter the target
+                            kubernetes resources that need to be backed up. If not
+                            set, will do not back up any kubernetes resources.
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: A label selector requirement is a selector
+                                  that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: operator represents a key's relationship
+                                      to a set of values. Valid operators are In,
+                                      NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: values is an array of string values.
+                                      If the operator is In or NotIn, the values array
+                                      must be non-empty. If the operator is Exists
+                                      or DoesNotExist, the values array must be empty.
+                                      This array is replaced during a strategic merge
+                                      patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: matchLabels is a map of {key,value} pairs.
+                                A single {key,value} in the matchLabels map is equivalent
+                                to an element of matchExpressions, whose key field
+                                is "key", the operator is "In", and the values array
+                                contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                    serviceAccountName:
+                      description: Specifies the service account to run the backup
+                        workload.
+                      type: string
+                  type: object
+                type: array
               useKopia:
                 default: false
                 description: "Specifies whether backup data should be stored in a
@@ -702,8 +1073,10 @@ spec:
                 type: boolean
             required:
             - backupMethods
-            - target
             type: object
+            x-kubernetes-validations:
+            - message: either spec.target or spec.targets
+              rule: has(self.target) || has(self.targets)
           status:
             description: BackupPolicyStatus defines the observed state of BackupPolicy
             properties:

@@ -86,7 +86,7 @@ type RestoreSpec struct {
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 }
 
-// BackupRef describes the backup name and namespace.
+// BackupRef describes the backup info.
 type BackupRef struct {
 	// Specifies the backup name.
 	//
@@ -97,6 +97,9 @@ type BackupRef struct {
 	//
 	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
+
+	// Specifies the source target for restoration, identified by its name.
+	SourceTargetName string `json:"sourceTargetName,omitempty"`
 }
 
 type RestoreKubeResources struct {
@@ -119,6 +122,12 @@ type IncludeResource struct {
 }
 
 type PrepareDataConfig struct {
+
+	// Specifies the restore policy, which is required when the pod selection strategy for the source target is 'All'.
+	// This field is ignored if the pod selection strategy is 'Any'.
+	// optional
+	RequiredPolicyForAllPodSelection *RequiredPolicyForAllPodSelection `json:"requiredPolicyForAllPodSelection,omitempty"`
+
 	// Specifies the configuration when using `persistentVolumeClaim.spec.dataSourceRef` method for restoring.
 	// Describes the source volume of the backup targetVolumes and the mount path in the restoring container.
 	//
@@ -187,11 +196,36 @@ type ReadyConfig struct {
 }
 
 type JobAction struct {
-	// Defines the pod that needs to be executed for the job action.
-	// A pod that meets the conditions will be selected for execution.
+
+	// Specifies the restore policy, which is required when the pod selection strategy for the source target is 'All'.
+	// This field is ignored if the pod selection strategy is 'Any'.
+	// optional
+	RequiredPolicyForAllPodSelection *RequiredPolicyForAllPodSelection `json:"requiredPolicyForAllPodSelection,omitempty"`
+
+	// Defines the pods that needs to be executed for the job action.
 	//
 	// +kubebuilder:validation:Required
 	Target JobActionTarget `json:"target"`
+}
+
+type RequiredPolicyForAllPodSelection struct {
+	// Specifies the data restore policy. Options include:
+	// - OneToMany: Enables restoration of all volumes from a single data copy of the original target instance.
+	// The 'sourceOfOneToMany' field must be set when using this policy.
+	// - OneToOne: Restricts data restoration such that each data piece can only be restored to a single target instance.
+	// This is the default policy. When the number of target instances specified for restoration surpasses the count of original backup target instances.
+	// +kubebuilder:default=OneToOne
+	// +kubebuilder:validation:Required
+	DataRestorePolicy DataRestorePolicy `json:"dataRestorePolicy"`
+
+	// Specifies the name of the source target pod. This field is mandatory when the DataRestorePolicy is configured to 'OneToMany'.
+	SourceOfOneToMany *SourceOfOneToMany `json:"sourceOfOneToMany,omitempty"`
+}
+
+type SourceOfOneToMany struct {
+	// Specifies the name of the source target pod.
+	// +kubebuilder:validation:Required
+	TargetPodName string `json:"targetPodName"`
 }
 
 type ExecAction struct {
@@ -214,7 +248,7 @@ type JobActionTarget struct {
 	// This includes mounting required volumes and injecting built-in environment variables of the selected pod.
 	//
 	// +kubebuilder:validation:Required
-	PodSelector metav1.LabelSelector `json:"podSelector"`
+	PodSelector PodSelector `json:"podSelector"`
 
 	// Defines which volumes of the selected pod need to be mounted on the restoring pod.
 	//

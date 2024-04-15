@@ -64,6 +64,7 @@ type Request struct {
 	ToolConfigSecret     *corev1.Secret
 	WorkerServiceAccount string
 	SnapshotVolumes      bool
+	Target               *dpv1alpha1.BackupTarget
 }
 
 func (r *Request) GetBackupType() string {
@@ -77,96 +78,88 @@ func (r *Request) GetBackupType() string {
 }
 
 // BuildActions builds the actions for the backup.
-func (r *Request) BuildActions() ([]action.Action, error) {
-	var actions []action.Action
+func (r *Request) BuildActions() (map[string][]action.Action, error) {
+	var actions = map[string][]action.Action{}
 
-	appendIgnoreNil := func(elems ...action.Action) {
+	appendIgnoreNil := func(podActions []action.Action, elems ...action.Action) []action.Action {
 		for _, elem := range elems {
 			if elem == nil || reflect.ValueOf(elem).IsNil() {
 				continue
 			}
-			actions = append(actions, elem)
+			podActions = append(podActions, elem)
 		}
+		return podActions
 	}
 
-	// build pre-backup actions
-	preBackupActions, err := r.buildPreBackupActions()
-	if err != nil {
-		return nil, err
-	}
-	appendIgnoreNil(preBackupActions...)
-
-	// build backup data action
 	for i := range r.TargetPods {
-		backupDataAction, err := r.buildBackupDataAction(r.TargetPods[i], fmt.Sprintf("%s-%d", BackupDataJobNamePrefix, i))
+		var podActions []action.Action
+
+		// 1. build pre-backup actions
+		if err := r.buildPreBackupActions(&podActions, r.TargetPods[i], i); err != nil {
+			return nil, err
+		}
+
+		// 2. build backup data action
+		backupDataAction, err := r.buildBackupDataAction(r.TargetPods[i], fmt.Sprintf("%s-%s%d", BackupDataJobNamePrefix, r.getActionTargetPrefix(), i))
 		if err != nil {
 			return nil, err
 		}
-		appendIgnoreNil(backupDataAction)
-	}
+		podActions = appendIgnoreNil(podActions, backupDataAction)
 
-	// build create volume snapshot action
-	for i := range r.TargetPods {
-		createVolumeSnapshotAction, err := r.buildCreateVolumeSnapshotAction(r.TargetPods[i], fmt.Sprintf("createVolumeSnapshot-%d", i))
+		// 3. build create volume snapshot action
+		createVolumeSnapshotAction, err := r.buildCreateVolumeSnapshotAction(r.TargetPods[i], fmt.Sprintf("createVolumeSnapshot-%s%d", r.getActionTargetPrefix(), i), i)
 		if err != nil {
 			return nil, err
 		}
-		appendIgnoreNil(createVolumeSnapshotAction)
+		podActions = appendIgnoreNil(podActions, createVolumeSnapshotAction)
+
+		// 4. build post-backup actions
+		if err = r.buildPostBackupActions(&podActions, r.TargetPods[i], i); err != nil {
+			return nil, err
+		}
+		actions[r.TargetPods[i].Name] = podActions
 	}
 
-	// build backup kubernetes resources action
-	backupKubeResourcesAction, err := r.buildBackupKubeResourcesAction()
-	if err != nil {
-		return nil, err
-	}
-
-	// build post-backup actions
-	postBackupActions, err := r.buildPostBackupActions()
-	if err != nil {
-		return nil, err
-	}
-
-	appendIgnoreNil(backupKubeResourcesAction)
-	appendIgnoreNil(postBackupActions...)
+	// TODO: build backup kubernetes resources action
 	return actions, nil
 }
 
-func (r *Request) buildPreBackupActions() ([]action.Action, error) {
+func (r *Request) getActionTargetPrefix() string {
+	if r.Target != nil && r.Target.Name != "" {
+		return r.Target.Name + "-"
+	}
+	return ""
+}
+
+func (r *Request) buildPreBackupActions(podActions *[]action.Action, targetPod *corev1.Pod, index int) error {
 	if !r.backupActionSetExists() ||
 		len(r.ActionSet.Spec.Backup.PreBackup) == 0 {
-		return nil, nil
+		return nil
 	}
-
-	var actions []action.Action
 	for i, preBackup := range r.ActionSet.Spec.Backup.PreBackup {
-		for j := range r.TargetPods {
-			a, err := r.buildAction(r.TargetPods[j], fmt.Sprintf("%s-%d-%d", prebackupJobNamePrefix, i, j), &preBackup)
-			if err != nil {
-				return nil, err
-			}
-			actions = append(actions, a)
+		a, err := r.buildAction(targetPod, fmt.Sprintf("%s-%s%d-%d", prebackupJobNamePrefix, r.getActionTargetPrefix(), i, index), &preBackup)
+		if err != nil {
+			return err
 		}
+		*podActions = append(*podActions, a)
 	}
-	return actions, nil
+	return nil
 }
 
-func (r *Request) buildPostBackupActions() ([]action.Action, error) {
+func (r *Request) buildPostBackupActions(podActions *[]action.Action, targetPod *corev1.Pod, index int) error {
 	if !r.backupActionSetExists() ||
 		len(r.ActionSet.Spec.Backup.PostBackup) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	var actions []action.Action
 	for i, postBackup := range r.ActionSet.Spec.Backup.PostBackup {
-		for j := range r.TargetPods {
-			a, err := r.buildAction(r.TargetPods[j], fmt.Sprintf("%s-%d-%d", postbackupJobNamePrefix, i, j), &postBackup)
-			if err != nil {
-				return nil, err
-			}
-			actions = append(actions, a)
+		a, err := r.buildAction(targetPod, fmt.Sprintf("%s-%s%d-%d", postbackupJobNamePrefix, r.getActionTargetPrefix(), i, index), &postBackup)
+		if err != nil {
+			return err
 		}
+		*podActions = append(*podActions, a)
 	}
-	return actions, nil
+	return nil
 }
 
 func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (action.Action, error) {
@@ -197,7 +190,7 @@ func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (act
 		}
 		r.InjectManagerContainer(podSpec, backupDataAct.SyncProgress, r.buildContinuousSyncProgressCommand())
 		return &action.StatefulSetAction{
-			Name: r.Name,
+			Name: name,
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: r.Namespace,
 				Name:      r.Name,
@@ -212,7 +205,7 @@ func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (act
 	return nil, fmt.Errorf("unsupported backup type %s", r.ActionSet.Spec.BackupType)
 }
 
-func (r *Request) buildCreateVolumeSnapshotAction(targetPod *corev1.Pod, name string) (action.Action, error) {
+func (r *Request) buildCreateVolumeSnapshotAction(targetPod *corev1.Pod, name string, index int) (action.Action, error) {
 	if r.BackupMethod == nil ||
 		!boolptr.IsSetToTrue(r.BackupMethod.SnapshotVolumes) {
 		return nil, nil
@@ -238,7 +231,9 @@ func (r *Request) buildCreateVolumeSnapshotAction(targetPod *corev1.Pod, name st
 	}
 
 	return &action.CreateVolumeSnapshotAction{
-		Name: name,
+		Name:          name,
+		Index:         index,
+		TargetPodName: targetPod.Name,
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: r.Backup.Namespace,
 			Name:      r.Backup.Name,
@@ -247,11 +242,6 @@ func (r *Request) buildCreateVolumeSnapshotAction(targetPod *corev1.Pod, name st
 		Owner:                         r.Backup,
 		PersistentVolumeClaimWrappers: pvcs,
 	}, nil
-}
-
-// TODO(ldm): implement this
-func (r *Request) buildBackupKubeResourcesAction() (action.Action, error) {
-	return nil, nil
 }
 
 func (r *Request) buildAction(targetPod *corev1.Pod,
@@ -340,8 +330,9 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 				Value: targetPod.Labels[constant.RoleLabelKey],
 			},
 			{
-				Name:  dptypes.DPBackupBasePath,
-				Value: BuildBackupPath(r.Backup, r.BackupRepo.Spec.PathPrefix, r.BackupPolicy.Spec.PathPrefix),
+				Name: dptypes.DPBackupBasePath,
+				Value: BuildBackupPathByTarget(r.Backup, r.Target,
+					r.BackupRepo.Spec.PathPrefix, r.BackupPolicy.Spec.PathPrefix, targetPod.Name),
 			},
 			{
 				Name:  dptypes.DPBackupInfoFile,
@@ -352,7 +343,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 				Value: r.Spec.RetentionPeriod.String(),
 			},
 		}
-		envVars = append(envVars, utils.BuildEnvByCredential(targetPod, r.BackupPolicy.Spec.Target.ConnectionCredential)...)
+		envVars = append(envVars, utils.BuildEnvByCredential(targetPod, r.Target.ConnectionCredential)...)
 		if r.ActionSet != nil {
 			envVars = append(envVars, r.ActionSet.Spec.Env...)
 		}

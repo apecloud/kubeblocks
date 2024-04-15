@@ -96,7 +96,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	buildPodSpecVolumeMounts(synthesizeComp)
 
 	// build rsm workload
-	protoRSM, err := factory.BuildRSM(cluster, synthesizeComp)
+	protoRSM, err := factory.BuildRSM(synthesizeComp)
 	if err != nil {
 		return err
 	}
@@ -235,17 +235,6 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 		}
 	}
 
-	// buildWorkLoadAnnotations builds the annotations for Deployment/StatefulSet
-	buildWorkLoadAnnotations := func(obj client.Object) {
-		workloadAnnotations := obj.GetAnnotations()
-		if workloadAnnotations == nil {
-			workloadAnnotations = map[string]string{}
-		}
-		// record the cluster generation to check if the sts is latest
-		workloadAnnotations[constant.KubeBlocksGenerationKey] = synthesizeComp.ClusterGeneration
-		obj.SetAnnotations(workloadAnnotations)
-	}
-
 	updateUpdateStrategy := func(rsmObj, rsmProto *workloads.ReplicatedStateMachine) {
 		var objMaxUnavailable *intstr.IntOrString
 		if rsmObj.Spec.UpdateStrategy.RollingUpdate != nil {
@@ -286,6 +275,9 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	rsmObjCopy := oldRsm.DeepCopy()
 	rsmProto := newRsm
 
+	// If the service version and component definition are not updated, we should not update the images in workload.
+	checkNRollbackProtoImages(rsmObjCopy, rsmProto)
+
 	// remove original monitor annotations
 	if len(rsmObjCopy.Annotations) > 0 {
 		maps.DeleteFunc(rsmObjCopy.Annotations, func(k, v string) bool {
@@ -294,7 +286,6 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	}
 	mergeMetadataMap(rsmObjCopy.Annotations, &rsmProto.Annotations)
 	rsmObjCopy.Annotations = rsmProto.Annotations
-	buildWorkLoadAnnotations(rsmObjCopy)
 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the rsm will be updated.
@@ -329,6 +320,56 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 		return nil
 	}
 	return rsmObjCopy
+}
+
+func checkNRollbackProtoImages(rsmObj, rsmProto *workloads.ReplicatedStateMachine) {
+	if rsmObj.Annotations == nil || rsmProto.Annotations == nil {
+		return
+	}
+
+	annotationUpdated := func(key string) bool {
+		using, ok1 := rsmObj.Annotations[key]
+		proto, ok2 := rsmProto.Annotations[key]
+		if !ok1 || !ok2 {
+			return true
+		}
+		if len(using) == 0 || len(proto) == 0 {
+			return true
+		}
+		return using != proto
+	}
+
+	compDefUpdated := func() bool {
+		return annotationUpdated(constant.AppComponentLabelKey)
+	}
+
+	serviceVersionUpdated := func() bool {
+		return annotationUpdated(constant.KBAppServiceVersionKey)
+	}
+
+	if compDefUpdated() || serviceVersionUpdated() {
+		return
+	}
+
+	// otherwise, roll-back the images in proto
+	images := make([]map[string]string, 2)
+	for i, cc := range [][]corev1.Container{rsmObj.Spec.Template.Spec.InitContainers, rsmObj.Spec.Template.Spec.Containers} {
+		images[i] = make(map[string]string)
+		for _, c := range cc {
+			images[i][c.Name] = c.Image
+		}
+	}
+	rollback := func(idx int, c *corev1.Container) {
+		if image, ok := images[idx][c.Name]; ok {
+			c.Image = image
+		}
+	}
+	for i := range rsmProto.Spec.Template.Spec.InitContainers {
+		rollback(0, &rsmProto.Spec.Template.Spec.InitContainers[i])
+	}
+	for i := range rsmProto.Spec.Template.Spec.Containers {
+		rollback(1, &rsmProto.Spec.Template.Spec.Containers[i])
+	}
 }
 
 // expandVolume handles rsm workload expand volume

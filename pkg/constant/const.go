@@ -107,7 +107,7 @@ const (
 	KBManagedByKey                           = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey          = "apps.kubeblocks.io/vct-name"
-	KBAppServiceVersionLabelKey              = "apps.kubeblocks.io/service-version"
+	KBAppServiceVersionKey                   = "apps.kubeblocks.io/service-version"
 	WorkloadTypeLabelKey                     = "apps.kubeblocks.io/workload-type"
 	KBAppPodNameLabelKey                     = "apps.kubeblocks.io/pod-name"
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"

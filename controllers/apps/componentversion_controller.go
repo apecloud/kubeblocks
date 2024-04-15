@@ -434,8 +434,11 @@ func compatibleCompVersions4Definition(ctx context.Context, cli client.Reader, c
 
 	compVersions := make([]*appsv1alpha1.ComponentVersion, 0)
 	for i, compVersion := range compVersionList.Items {
+		if compVersion.Generation != compVersion.Status.ObservedGeneration {
+			return nil, fmt.Errorf("the matched ComponentVersion is not up to date: %s", compVersion.Name)
+		}
 		if compVersion.Status.Phase != appsv1alpha1.AvailablePhase {
-			return nil, fmt.Errorf("matched ComponentVersion %s is not available", compVersion.Name)
+			return nil, fmt.Errorf("the matched ComponentVersion is unavailable: %s", compVersion.Name)
 		}
 		compVersions = append(compVersions, &compVersionList.Items[i])
 	}

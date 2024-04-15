@@ -310,12 +310,16 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 	return nil
 }
 
-func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, _ *dcs.Cluster, host string) error {
-	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`,
-		host, mgr.Config.GetDBPort())
+func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+	addr := mgr.GetMemberAddrWithName(ctx, cluster, memberName)
+	if addr == "" {
+		mgr.Logger.Info(fmt.Sprintf("member %s already deleted", memberName))
+		return nil
+	}
 
-	// only leader can delete member, so don't need to get pool
-	_, err := mgr.ExecWithHost(ctx, sql, "")
+	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`, addr, mgr.Config.GetDBPort())
+
+	_, err := mgr.ExecLeader(ctx, sql, cluster)
 	if err != nil {
 		mgr.Logger.Error(err, fmt.Sprintf("exec sql:%s failed", sql))
 		return err

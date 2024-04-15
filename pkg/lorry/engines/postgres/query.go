@@ -145,7 +145,7 @@ func (mgr *Manager) ExecOthers(ctx context.Context, sql string, host string) (re
 	return conn.Exec(ctx, sql)
 }
 
-func (mgr *Manager) ExecLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result int64, err error) {
+func (mgr *Manager) ExecLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (int64, error) {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		leaderAddr, err := mgr.GetLeaderAddr(ctx)

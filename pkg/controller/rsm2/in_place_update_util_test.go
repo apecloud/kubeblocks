@@ -21,6 +21,7 @@ package rsm2
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -28,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/version"
 
@@ -41,13 +43,21 @@ var _ = Describe("instance util test", func() {
 	Context("filterInPlaceFields", func() {
 		It("should work well", func() {
 			pod := buildRandomPod()
+			restartTime := (metav1.Time{Time: time.Now()}).Format(time.RFC3339)
+			pod.Annotations[constant.RestartAnnotationKey] = restartTime
+			reconfigureKey := "config.kubeblocks.io/restart-foo-bar-config"
+			reconfigureValue := "7cdb79ffdb"
+			pod.Annotations[reconfigureKey] = reconfigureValue
 			podTemplate := &corev1.PodTemplateSpec{
 				ObjectMeta: pod.ObjectMeta,
 				Spec:       pod.Spec,
 			}
 
 			result := filterInPlaceFields(podTemplate)
-			Expect(result.Annotations).Should(BeNil())
+			Expect(result.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
+			Expect(result.Annotations[constant.RestartAnnotationKey]).Should(Equal(restartTime))
+			Expect(result.Annotations).Should(HaveKey(reconfigureKey))
+			Expect(result.Annotations[reconfigureKey]).Should(Equal(reconfigureValue))
 			Expect(result.Labels).Should(BeNil())
 			Expect(result.Spec.ActiveDeadlineSeconds).Should(BeNil())
 			Expect(result.Spec.Tolerations).Should(BeNil())
@@ -189,6 +199,31 @@ var _ = Describe("instance util test", func() {
 			policy, err = getPodUpdatePolicy(rsm, pod5)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(NoOpsPolicy))
+		})
+	})
+
+	Context("filterInPlaceFields", func() {
+		It("should work well", func() {
+			pod := buildRandomPod()
+			restartTime := (metav1.Time{Time: time.Now()}).Format(time.RFC3339)
+			pod.Annotations[constant.RestartAnnotationKey] = restartTime
+			podTemplateSpec := &corev1.PodTemplateSpec{
+				ObjectMeta: pod.ObjectMeta,
+				Spec:       pod.Spec,
+			}
+			result := filterInPlaceFields(podTemplateSpec)
+			Expect(result).ShouldNot(BeNil())
+			Expect(result.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
+			Expect(result.Annotations[constant.RestartAnnotationKey]).Should(Equal(restartTime))
+			Expect(result.Labels).Should(BeNil())
+			Expect(result.Spec.ActiveDeadlineSeconds).Should(BeNil())
+			Expect(result.Spec.Tolerations).Should(BeNil())
+			for _, container := range result.Spec.InitContainers {
+				Expect(container.Image).Should(BeEmpty())
+			}
+			for _, container := range result.Spec.Containers {
+				Expect(container.Image).Should(BeEmpty())
+			}
 		})
 	})
 })

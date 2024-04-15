@@ -21,7 +21,6 @@ package rsm2
 
 import (
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,7 +28,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -410,31 +408,6 @@ var _ = Describe("instance util test", func() {
 			BaseSort(instanceNameList, getNameNOrdinalFunc, nil, false)
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
-		})
-	})
-
-	Context("filterInPlaceFields", func() {
-		It("should work well", func() {
-			pod := buildRandomPod()
-			restartTime := (metav1.Time{Time: time.Now()}).Format(time.RFC3339)
-			pod.Annotations[constant.RestartAnnotationKey] = restartTime
-			podTemplateSpec := &corev1.PodTemplateSpec{
-				ObjectMeta: pod.ObjectMeta,
-				Spec:       pod.Spec,
-			}
-			result := filterInPlaceFields(podTemplateSpec)
-			Expect(result).ShouldNot(BeNil())
-			Expect(result.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
-			Expect(result.Annotations[constant.RestartAnnotationKey]).Should(Equal(restartTime))
-			Expect(result.Labels).Should(BeNil())
-			Expect(result.Spec.ActiveDeadlineSeconds).Should(BeNil())
-			Expect(result.Spec.Tolerations).Should(BeNil())
-			for _, container := range result.Spec.InitContainers {
-				Expect(container.Image).Should(BeEmpty())
-			}
-			for _, container := range result.Spec.Containers {
-				Expect(container.Image).Should(BeEmpty())
-			}
 		})
 	})
 })

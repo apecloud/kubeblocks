@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -62,7 +63,24 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", nil, handleComponentStatusProgress)
+	compOpsHelper := newComponentOpsHelper([]appsv1alpha1.ComponentOps{})
+	handleUpgradeProgress := func(reqCtx intctrlutil.RequestCtx,
+		cli client.Client,
+		opsRes *OpsResource,
+		pgRes progressResource,
+		compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, u.podApplyCompOps)
+	}
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade",
+		nil, handleUpgradeProgress)
+}
+
+func (u upgradeOpsHandler) podApplyCompOps(
+	pod *corev1.Pod,
+	compOps ComponentOpsInteface,
+	opsStartTime metav1.Time,
+	templateName string) bool {
+	return !pod.CreationTimestamp.Before(&opsStartTime)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

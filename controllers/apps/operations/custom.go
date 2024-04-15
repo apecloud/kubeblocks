@@ -74,13 +74,13 @@ func (c CustomOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		opsRequestPhase      = opsRes.OpsRequest.Status.Phase
 		customSpec           = opsRes.OpsRequest.Spec.CustomSpec
 		workflowContext      = NewWorkflowContext(reqCtx, cli, opsRes)
-		compCount            = len(customSpec.CustomOpsComponents)
+		compCount            = len(customSpec.CustomOpsItems)
 		completedActionCount int
 		compFailedCount      int
 		compCompleteCount    int
 	)
 	// TODO: support Parallelism
-	for _, v := range customSpec.CustomOpsComponents {
+	for _, v := range customSpec.CustomOpsItems {
 		// 1. init component action progress and preCheck if the conditions for executing ops are met.
 		passed := c.initCompActionStatusAndPreCheck(reqCtx, cli, opsRes, v)
 		if !passed {
@@ -124,17 +124,17 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	rule *appsv1alpha1.Rule,
-	compCustomOSpec appsv1alpha1.CustomOpsComponent) error {
+	compCustomItem appsv1alpha1.CustomOpsItem) error {
 	opsSpec := opsRes.OpsRequest.Spec
 	if opsSpec.Force {
 		return nil
 	}
-	componentObjName := constant.GenerateClusterComponentName(opsSpec.ClusterRef, compCustomOSpec.ComponentName)
+	componentObjName := constant.GenerateClusterComponentName(opsSpec.ClusterRef, compCustomItem.ComponentName)
 	comp := &appsv1alpha1.Component{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: componentObjName, Namespace: opsRes.OpsRequest.Namespace}, comp); err != nil {
 		return err
 	}
-	params := covertParametersToMap(compCustomOSpec.Parameters)
+	params := covertParametersToMap(compCustomItem.Parameters)
 	// get the built-in objects and covert the json tag
 	getBuiltInObjs := func() (map[string]interface{}, error) {
 		b, err := json.Marshal(map[string]interface{}{
@@ -174,19 +174,19 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	compCustomSpec appsv1alpha1.CustomOpsComponent) bool {
+	compCustomItem appsv1alpha1.CustomOpsItem) bool {
 	if opsRes.OpsRequest.Status.Components == nil {
 		opsRes.OpsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}
-	compStatus := opsRes.OpsRequest.Status.Components[compCustomSpec.ComponentName]
-	compStatus.Phase = opsRes.Cluster.Status.Components[compCustomSpec.ComponentName].Phase
+	compStatus := opsRes.OpsRequest.Status.Components[compCustomItem.ComponentName]
+	compStatus.Phase = opsRes.Cluster.Status.Components[compCustomItem.ComponentName].Phase
 	if len(compStatus.ProgressDetails) == 0 {
 		// 1. do preChecks
 		for _, v := range opsRes.OpsDef.Spec.PreConditions {
 			if v.Rule != nil {
-				if err := c.checkExpression(reqCtx, cli, opsRes, v.Rule, compCustomSpec); err != nil {
+				if err := c.checkExpression(reqCtx, cli, opsRes, v.Rule, compCustomItem); err != nil {
 					compStatus.PreCheckResult = &appsv1alpha1.PreCheckResult{Pass: false, Message: err.Error()}
-					opsRes.OpsRequest.Status.Components[compCustomSpec.ComponentName] = compStatus
+					opsRes.OpsRequest.Status.Components[compCustomItem.ComponentName] = compStatus
 					opsRes.Recorder.Event(opsRes.OpsRequest, corev1.EventTypeWarning, "PreCheckFailed", err.Error())
 					return false
 				}
@@ -200,7 +200,7 @@ func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.Req
 				ActionName: opsRes.OpsDef.Spec.Actions[i].Name,
 			})
 		}
-		opsRes.OpsRequest.Status.Components[compCustomSpec.ComponentName] = compStatus
+		opsRes.OpsRequest.Status.Components[compCustomItem.ComponentName] = compStatus
 	}
 	return true
 }
@@ -228,7 +228,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 	opsRes.OpsDef = opsDef
 	// 1. validate OpenApV3Schema
 	parametersSchema := opsDef.Spec.ParametersSchema
-	for _, v := range customSpec.CustomOpsComponents {
+	for _, v := range customSpec.CustomOpsItems {
 		// covert to type map[string]interface{}
 		params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, covertParametersToMap(v.Parameters))
 		if err != nil {

@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -166,8 +167,21 @@ func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *wo
 		Env:                  instance.Env,
 		Volumes:              instance.Volumes,
 		VolumeMounts:         instance.VolumeMounts,
-		VolumeClaimTemplates: instance.VolumeClaimTemplates,
+		VolumeClaimTemplates: toPersistentVolumeClaims(instance.VolumeClaimTemplates),
 	}
+}
+
+func toPersistentVolumeClaims(vcts []appsv1alpha1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
+	var pvcs []corev1.PersistentVolumeClaim
+	for _, v := range vcts {
+		pvcs = append(pvcs, corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: v.Name,
+			},
+			Spec: v.Spec.ToV1PersistentVolumeClaimSpec(),
+		})
+	}
+	return pvcs
 }
 
 // parseITSConvertorArgs parses the args of ITS convertor.

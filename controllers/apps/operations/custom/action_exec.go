@@ -33,7 +33,7 @@ type ExecAction struct {
 	OpsRequest     *appsv1alpha1.OpsRequest
 	Cluster        *appsv1alpha1.Cluster
 	OpsDef         *appsv1alpha1.OpsDefinition
-	CompCustomSpec *appsv1alpha1.CustomOpsComponent
+	CustomOpsItem  *appsv1alpha1.CustomOpsItem
 	Comp           *appsv1alpha1.ClusterComponentSpec
 	progressDetail appsv1alpha1.ProgressStatusDetail
 }
@@ -41,14 +41,14 @@ type ExecAction struct {
 func NewExecAction(opsRequest *appsv1alpha1.OpsRequest,
 	cluster *appsv1alpha1.Cluster,
 	opsDef *appsv1alpha1.OpsDefinition,
-	comCustomSpec *appsv1alpha1.CustomOpsComponent,
+	customOpsItem *appsv1alpha1.CustomOpsItem,
 	comp *appsv1alpha1.ClusterComponentSpec,
 	progressDetail appsv1alpha1.ProgressStatusDetail) *ExecAction {
 	return &ExecAction{
 		OpsRequest:     opsRequest,
 		Cluster:        cluster,
 		OpsDef:         opsDef,
-		CompCustomSpec: comCustomSpec,
+		CustomOpsItem:  customOpsItem,
 		Comp:           comp,
 		progressDetail: progressDetail,
 	}
@@ -68,7 +68,7 @@ func (e *ExecAction) Execute(actionCtx ActionContext) (*ActionStatus, error) {
 	if targetPodTemplate == nil {
 		return nil, intctrlutil.NewFatalError("can not found the targetPodTemplate by " + podTemplateName)
 	}
-	targetPods, err := getTargetPods(actionCtx.ReqCtx.Ctx, actionCtx.Client, e.Cluster, targetPodTemplate.PodSelector, e.CompCustomSpec.ComponentName)
+	targetPods, err := getTargetPods(actionCtx.ReqCtx.Ctx, actionCtx.Client, e.Cluster, targetPodTemplate.PodSelector, e.CustomOpsItem.ComponentName)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (e *ExecAction) buildExecPodSpec(actionCtx ActionContext,
 	targetPod *corev1.Pod) (*corev1.PodSpec, error) {
 	// inject component and componentDef envs
 	env, err := buildActionPodEnv(actionCtx.ReqCtx, actionCtx.Client, e.Cluster, e.OpsDef,
-		e.OpsRequest, e.Comp, e.CompCustomSpec, targetPodTemplate, targetPod)
+		e.OpsRequest, e.Comp, e.CustomOpsItem, targetPodTemplate, targetPod)
 	if err != nil {
 		return nil, err
 	}

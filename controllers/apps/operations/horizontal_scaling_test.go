@@ -131,7 +131,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, 1, nil)
 			By("mock two pods are deleted")
-			for i := 0; i < 2; i++ {
+			for i := 1; i < 3; i++ {
 				pod := &podList[i]
 				pod.Kind = constant.PodKind
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
@@ -156,7 +156,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, 1, nil)
 
 			By("mock one pod has been deleted")
-			pod := &podList[0]
+			pod := &podList[2]
 			pod.Kind = constant.PodKind
 			testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
@@ -165,12 +165,14 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			cancelOpsRequest(reqCtx, opsRes, time.Now().Add(-1*time.Second))
 
 			By("re-create the deleted pod")
-			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 0)
-			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "leader", "ReadWrite")
+			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 2)
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "ReadOnly")
 
 			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
 			mockConsensusCompToRunning(opsRes)
 			checkCancelledSucceed(reqCtx, opsRes)
+			Expect(findStatusProgressDetail(opsRes.OpsRequest.Status.Components[consensusComp].ProgressDetails,
+				getProgressObjectKey(constant.PodKind, podName)).Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 		})
 
 		It("test canceling HScale opsRequest which scales out replicas of component", func() {
@@ -192,6 +194,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
 			mockConsensusCompToRunning(opsRes)
 			checkCancelledSucceed(reqCtx, opsRes)
+			Expect(findStatusProgressDetail(opsRes.OpsRequest.Status.Components[consensusComp].ProgressDetails,
+				getProgressObjectKey(constant.PodKind, pod.Name)).Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 		})
 
 		It("force run horizontal scaling opsRequests ", func() {

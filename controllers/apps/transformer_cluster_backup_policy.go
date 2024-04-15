@@ -207,11 +207,7 @@ func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplates() (*appsv1alph
 // transformBackupPolicy transforms backup policy template to backup policy.
 func (r *clusterBackupPolicyTransformer) transformBackupPolicy(comp *appsv1alpha1.ClusterComponentSpec) (*dpv1alpha1.BackupPolicy, *dpv1alpha1.BackupPolicy) {
 	cluster := r.OrigCluster
-	compDefName := comp.ComponentDefRef
-	if compDefName == "" {
-		compDefName = comp.ComponentDef
-	}
-	backupPolicyName := generateBackupPolicyName(cluster.Name, compDefName, r.tplIdentifier)
+	backupPolicyName := generateBackupPolicyName(cluster.Name, r.compDefName(comp, nil), r.tplIdentifier)
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	if err := r.Client.Get(r.Context, client.ObjectKey{
 		Namespace: cluster.Namespace,
@@ -267,7 +263,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupSchedule(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   cluster.Namespace,
-			Labels:      r.buildLabels(),
+			Labels:      r.buildLabels(nil, backupPolicy),
 			Annotations: r.buildAnnotations(),
 		},
 		Spec: dpv1alpha1.BackupScheduleSpec{
@@ -318,7 +314,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp *appsv1alpha1.Clu
 		backupPolicy.Labels = map[string]string{}
 	}
 	mergeMap(backupPolicy.Annotations, r.buildAnnotations())
-	mergeMap(backupPolicy.Labels, r.buildLabels())
+	mergeMap(backupPolicy.Labels, r.buildLabels(comp, nil))
 
 	// update backup repo of the backup policy.
 	if r.Cluster.Spec.Backup != nil && r.Cluster.Spec.Backup.RepoName != "" {
@@ -362,7 +358,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupPolicy(comp *appsv1alpha1.Cl
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        backupPolicyName,
 			Namespace:   cluster.Namespace,
-			Labels:      r.buildLabels(),
+			Labels:      r.buildLabels(comp, nil),
 			Annotations: r.buildAnnotations(),
 		},
 	}
@@ -488,11 +484,12 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 	}
 	// build the target connection credential
 	cc := dpv1alpha1.ConnectionCredential{}
-	if len(targetTpl.Account) > 0 {
+	switch {
+	case len(comp.ComponentDef) > 0 && len(targetTpl.Account) > 0:
 		cc.SecretName = constant.GenerateAccountSecretName(clusterName, comp.Name, targetTpl.Account)
 		cc.PasswordKey = constant.AccountPasswdForSecret
 		cc.UsernameKey = constant.AccountNameForSecret
-	} else if comp.ComponentDefRef != "" && comp.ComponentDef == "" {
+	case len(comp.ComponentDef) == 0 && len(comp.ComponentDefRef) > 0:
 		// TODO: remove HACK code in version 0.9, only no componentDef can using connect credential
 		cc.SecretName = constant.GenerateDefaultConnCredential(clusterName)
 		ccKey := targetTpl.ConnectionCredentialKey
@@ -549,7 +546,7 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        generateBackupScheduleName(cluster.Name, r.backupPolicy.ComponentDefRef, r.tplIdentifier),
 				Namespace:   cluster.Namespace,
-				Labels:      r.buildLabels(),
+				Labels:      r.buildLabels(nil, backupPolicy),
 				Annotations: r.buildAnnotations(),
 			},
 			Spec: dpv1alpha1.BackupScheduleSpec{
@@ -625,15 +622,28 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 // getClusterComponentSpec returns the first component name of the componentDefRef.
 func (r *clusterBackupPolicyTransformer) getClusterComponentSpec() *appsv1alpha1.ClusterComponentSpec {
 	if !r.backupPolicy.IsSharding {
-		for _, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {
-			if v.ComponentDefRef == r.backupPolicy.ComponentDefRef || slices.Contains(r.backupPolicy.ComponentDefs, v.ComponentDef) {
+		for i, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {
+			if len(v.ComponentDef) > 0 {
+				if slices.Contains(r.backupPolicy.ComponentDefs, v.ComponentDef) {
+					return &r.clusterTransformContext.Cluster.Spec.ComponentSpecs[i]
+				}
+				continue
+			}
+			if v.ComponentDefRef == r.backupPolicy.ComponentDefRef {
 				return &v
 			}
 		}
 		return nil
 	}
 	for _, v := range r.clusterTransformContext.Cluster.Spec.ShardingSpecs {
-		if v.Template.ComponentDefRef == r.backupPolicy.ComponentDefRef || slices.Contains(r.backupPolicy.ComponentDefs, v.Template.ComponentDef) {
+		if len(v.Template.ComponentDef) > 0 {
+			if slices.Contains(r.backupPolicy.ComponentDefs, v.Template.ComponentDef) {
+				r.shardingSpec = &v
+				return &v.Template
+			}
+			continue
+		}
+		if v.Template.ComponentDefRef == r.backupPolicy.ComponentDefRef {
 			r.shardingSpec = &v
 			return &v.Template
 		}
@@ -659,12 +669,41 @@ func (r *clusterBackupPolicyTransformer) buildAnnotations() map[string]string {
 	return annotations
 }
 
-func (r *clusterBackupPolicyTransformer) buildLabels() map[string]string {
+func (r *clusterBackupPolicyTransformer) buildLabels(comp *appsv1alpha1.ClusterComponentSpec,
+	policy *dpv1alpha1.BackupPolicy) map[string]string {
 	return map[string]string{
 		constant.AppInstanceLabelKey:          r.OrigCluster.Name,
-		constant.KBAppComponentDefRefLabelKey: r.backupPolicy.ComponentDefRef,
+		constant.KBAppComponentDefRefLabelKey: r.compDefName(comp, policy),
 		constant.AppManagedByLabelKey:         constant.AppName,
 	}
+}
+
+func (r *clusterBackupPolicyTransformer) compDefName(comp *appsv1alpha1.ClusterComponentSpec,
+	policy *dpv1alpha1.BackupPolicy) string {
+	switch {
+	case comp != nil:
+		return r.compDefNameFromSpec(comp)
+	case policy != nil:
+		return r.compDefNameFromPolicy(policy)
+	default:
+		panic("runtime error - unexpected way to get component definition name")
+	}
+}
+
+func (r *clusterBackupPolicyTransformer) compDefNameFromSpec(comp *appsv1alpha1.ClusterComponentSpec) string {
+	compDefName := comp.ComponentDef
+	if compDefName == "" {
+		compDefName = comp.ComponentDefRef
+	}
+	return compDefName
+}
+
+func (r *clusterBackupPolicyTransformer) compDefNameFromPolicy(policy *dpv1alpha1.BackupPolicy) string {
+	compDefName := ""
+	if policy.Labels != nil {
+		compDefName = policy.Labels[constant.KBAppComponentDefRefLabelKey]
+	}
+	return compDefName
 }
 
 // buildTargetPodLabels builds the target labels for the backup policy that will be

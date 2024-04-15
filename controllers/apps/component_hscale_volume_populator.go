@@ -334,8 +334,15 @@ func (d *backupDataClone) ClearTmpResources() ([]client.Object, error) {
 
 func (d *backupDataClone) backup() ([]client.Object, error) {
 	objs := make([]client.Object, 0)
+	componentDef := func() string {
+		name := d.component.CompDefName
+		if name == "" {
+			name = d.component.ClusterCompDefName
+		}
+		return name
+	}()
 	backupPolicyTplName := d.component.HorizontalScalePolicy.BackupPolicyTemplateName
-	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, d.component.ClusterCompDefName, backupPolicyTplName)
+	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, componentDef, backupPolicyTplName)
 	if err != nil {
 		return nil, err
 	}

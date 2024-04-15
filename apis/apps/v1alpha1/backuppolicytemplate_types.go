@@ -26,7 +26,6 @@ import (
 type BackupPolicyTemplateSpec struct {
 	// Specifies a reference to the ClusterDefinition name. This is an immutable attribute that cannot be changed after creation.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
 	ClusterDefRef string `json:"clusterDefinitionRef"`
@@ -53,6 +52,10 @@ type BackupPolicy struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
+
+	// Specifies that this componentDef is a shading component definition.
+	// +optional
+	IsSharding bool `json:"isSharding,omitempty"`
 
 	// References to componentDefinitions.
 	// Must comply with the IANA Service Naming rule.

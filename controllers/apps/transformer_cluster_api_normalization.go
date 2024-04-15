@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"maps"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -165,7 +166,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompLabelsInheritedFromCluster
 	clusterLabels := filterReservedLabels(cluster.Labels)
 	labels := make(map[string]map[string]string)
 	for _, compSpec := range transCtx.ComponentSpecs {
-		labels[compSpec.Name] = clusterLabels
+		labels[compSpec.Name] = maps.Clone(clusterLabels)
 	}
 	for name, shardingCompSpecs := range transCtx.ShardingComponentSpecs {
 		for _, compSpec := range shardingCompSpecs {
@@ -180,7 +181,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompAnnotationsInheritedFromCl
 	clusterAnnotations := filterReservedAnnotations(cluster.Annotations)
 	annotations := make(map[string]map[string]string)
 	for _, compSpec := range transCtx.ComponentSpecs {
-		annotations[compSpec.Name] = clusterAnnotations
+		annotations[compSpec.Name] = maps.Clone(clusterAnnotations)
 	}
 	return annotations
 }

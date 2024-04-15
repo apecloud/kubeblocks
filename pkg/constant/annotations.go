@@ -40,3 +40,7 @@ func GetKBReservedAnnotationKeys() []string {
 		KBAppServiceVersionKey,
 	}
 }
+
+const (
+	HorizontalScaleBackupPolicyTemplateKey = "apps.kubeblocks.io/horizontal-scale-backup-policy-template"
+)

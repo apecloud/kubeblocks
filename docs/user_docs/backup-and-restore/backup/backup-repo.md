@@ -152,8 +152,6 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
 2. Create BackupRepo.
 
-      `kubectl` is another option to create BackupRepo, but the commands do not include parameter and default repository verification compared with kbcli, which is not convenient. It is recommended to use kbcli.
-
       <Tabs>
 
       <TabItem value="S3" label="S3" default>

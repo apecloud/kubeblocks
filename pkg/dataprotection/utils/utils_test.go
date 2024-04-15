@@ -20,12 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/version"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -79,5 +81,32 @@ func TestGetKubeVersion(t *testing.T) {
 				assert.NoError(t, err)
 			}
 		})
+	}
+}
+
+func TestGetBackupStatusTarget(t *testing.T) {
+	sourceTargetName := "test-target"
+	backupTarget := dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{
+			Name: sourceTargetName,
+		},
+		SelectedTargetPods: []string{"pod-0"},
+	}
+	backup := &dpv1alpha1.Backup{
+		Status: dpv1alpha1.BackupStatus{
+			Target: &backupTarget,
+		},
+	}
+	target := GetBackupStatusTarget(backup, "")
+	assert.Equal(t, *target, backupTarget)
+
+	backup.Status.Target = nil
+	backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{backupTarget}
+	target = GetBackupStatusTarget(backup, sourceTargetName)
+	assert.Equal(t, *target, backupTarget)
+
+	target = GetBackupStatusTarget(backup, "test")
+	if target != nil {
+		assert.Error(t, errors.New("backup status target should be empty"))
 	}
 }

@@ -22,6 +22,7 @@ package restore
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -183,16 +184,23 @@ func (r *restoreJobBuilder) attachBackupRepo() *restoreJobBuilder {
 }
 
 // addCommonEnv adds the common envs for each restore job.
-func (r *restoreJobBuilder) addCommonEnv() *restoreJobBuilder {
+func (r *restoreJobBuilder) addCommonEnv(sourceTargetPodName string) *restoreJobBuilder {
 	backup := r.backupSet.Backup
 	backupName := backup.Name
 	// add backupName env
 	r.env = []corev1.EnvVar{{Name: dptypes.DPBackupName, Value: backupName}}
-	// add mount path env of backup dir
-	filePath := backup.Status.Path
+	// add common env
+	filePath := r.backupSet.Backup.Status.Path
 	if filePath != "" {
+		// append targetName in backup path
+		if r.restore.Spec.Backup.SourceTargetName != "" {
+			filePath = filepath.Join("/", filePath, r.restore.Spec.Backup.SourceTargetName)
+		}
+		// append sourceTargetPodName in backup path
+		if sourceTargetPodName != "" {
+			filePath = filepath.Join("/", filePath, sourceTargetPodName)
+		}
 		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBackupBasePath, Value: filePath})
-		// TODO: add continuous file path env
 	}
 	// add time env
 	actionSetEnv := r.backupSet.ActionSet.Spec.Env

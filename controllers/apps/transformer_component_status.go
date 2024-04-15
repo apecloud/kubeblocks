@@ -108,8 +108,14 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
+	if vertex := graphCli.FindMatchedVertex(dag, comp); vertex != nil {
+		// check if the component needs to do other action.
+		ov, _ := vertex.(*model.ObjectVertex)
+		if ov.Action != model.ActionNoopPtr() {
+			return nil
+		}
+	}
 	graphCli.Status(dag, transCtx.ComponentOrig, comp)
-
 	return nil
 }
 

@@ -26,6 +26,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -118,6 +119,9 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(intctrlutil.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
+		}
+		if apierrors.IsConflict(err) {
+			return intctrlutil.Requeue(reqCtx.Log, err.Error())
 		}
 		c := planBuilder.(*componentPlanBuilder)
 		sendWarningEventWithError(r.Recorder, c.transCtx.Component, corev1.EventTypeWarning, err)

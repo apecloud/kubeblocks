@@ -447,6 +447,22 @@ cluster connection credential.</p>
 </tr>
 <tr>
 <td>
+<code>targets</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
+[]BackupTarget
+</a>
+</em>
+</td>
+<td>
+<p>Specifies multiple target information for backup operations. This includes details
+such as the target pod and cluster connection credentials. All specified targets
+will be backed up collectively.
+optional</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>backupMethods</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">
@@ -1287,6 +1303,17 @@ string
 </tr>
 <tr>
 <td>
+<code>targetPodName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Records the target pod name which has been backed up.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>phase</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.ActionPhase">
@@ -1699,6 +1726,21 @@ BackupTarget
 <p>Specifies the target information to back up, it will override the target in backup policy.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>targets</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
+[]BackupTarget
+</a>
+</em>
+</td>
+<td>
+<p>Specifies multiple target information for backup operations. This includes details
+such as the target pod and cluster connection credentials. All specified targets
+will be backed up collectively.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPhase">BackupPhase
@@ -1823,6 +1865,22 @@ cluster connection credential.</p>
 </tr>
 <tr>
 <td>
+<code>targets</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
+[]BackupTarget
+</a>
+</em>
+</td>
+<td>
+<p>Specifies multiple target information for backup operations. This includes details
+such as the target pod and cluster connection credentials. All specified targets
+will be backed up collectively.
+optional</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>backupMethods</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">
@@ -1932,7 +1990,7 @@ It refers to the BackupPolicy&rsquo;s generation, which is updated on mutation b
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreSpec">RestoreSpec</a>)
 </p>
 <div>
-<p>BackupRef describes the backup name and namespace.</p>
+<p>BackupRef describes the backup info.</p>
 </div>
 <table>
 <thead>
@@ -1962,6 +2020,17 @@ string
 </td>
 <td>
 <p>Specifies the backup namespace.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceTargetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the source target for restoration, identified by its name.</p>
 </td>
 </tr>
 </tbody>
@@ -2670,14 +2739,28 @@ this is the time range of recoverable data.</p>
 <td>
 <code>target</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
-BackupTarget
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatusTarget">
+BackupStatusTarget
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Records the target information for this backup.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targets</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatusTarget">
+[]BackupStatusTarget
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the targets information for this backup.</p>
 </td>
 </tr>
 <tr>
@@ -2751,10 +2834,10 @@ EncryptionConfig
 </tr>
 </tbody>
 </table>
-<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupStatusTarget">BackupStatusTarget
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicySpec">BackupPolicySpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatus">BackupStatus</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatus">BackupStatus</a>)
 </p>
 <div>
 </div>
@@ -2766,6 +2849,61 @@ EncryptionConfig
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>BackupTarget</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
+BackupTarget
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>BackupTarget</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selectedTargetPods</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Records the selected pods by the target info during backup.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicySpec">BackupPolicySpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatusTarget">BackupStatusTarget</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies a mandatory and unique identifier for each target when using the &ldquo;targets&rdquo; field.
+The backup data for the current target is stored in a uniquely named subdirectory.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>podSelector</code><br/>
@@ -3022,6 +3160,26 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.DataRestorePolicy">DataRestorePolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.RequiredPolicyForAllPodSelection">RequiredPolicyForAllPodSelection</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;OneToMany&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;OneToOne&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.EncryptionConfig">EncryptionConfig
 </h3>
 <p>
@@ -3262,6 +3420,21 @@ Kubernetes meta/v1.LabelSelector
 <tbody>
 <tr>
 <td>
+<code>requiredPolicyForAllPodSelection</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.RequiredPolicyForAllPodSelection">
+RequiredPolicyForAllPodSelection
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the restore policy, which is required when the pod selection strategy for the source target is &lsquo;All&rsquo;.
+This field is ignored if the pod selection strategy is &lsquo;Any&rsquo;.
+optional</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>target</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.JobActionTarget">
@@ -3270,8 +3443,7 @@ JobActionTarget
 </em>
 </td>
 <td>
-<p>Defines the pod that needs to be executed for the job action.
-A pod that meets the conditions will be selected for execution.</p>
+<p>Defines the pods that needs to be executed for the job action.</p>
 </td>
 </tr>
 </tbody>
@@ -3356,8 +3528,8 @@ ActionErrorMode
 <td>
 <code>podSelector</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
+<a href="#dataprotection.kubeblocks.io/v1alpha1.PodSelector">
+PodSelector
 </a>
 </em>
 </td>
@@ -3490,7 +3662,7 @@ selected for backup target</p>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.PodSelector">PodSelector
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.JobActionTarget">JobActionTarget</a>)
 </p>
 <div>
 </div>
@@ -3529,10 +3701,11 @@ PodSelectionStrategy
 </td>
 <td>
 <p>Specifies the strategy to select the target pod when multiple pods are selected.
-Valid values are: Any: select any one pod that match the labelsSelector.</p>
+Valid values are:</p>
 <ul>
 <li><code>Any</code>: select any one pod that match the labelsSelector.</li>
-<li><code>All</code>: select all pods that match the labelsSelector.</li>
+<li><code>All</code>: select all pods that match the labelsSelector. The backup data for the current pod
+will be stored in a subdirectory named after the pod.</li>
 </ul>
 </td>
 </tr>
@@ -3553,6 +3726,21 @@ Valid values are: Any: select any one pod that match the labelsSelector.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>requiredPolicyForAllPodSelection</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.RequiredPolicyForAllPodSelection">
+RequiredPolicyForAllPodSelection
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the restore policy, which is required when the pod selection strategy for the source target is &lsquo;All&rsquo;.
+This field is ignored if the pod selection strategy is &lsquo;Any&rsquo;.
+optional</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>dataSourceRef</code><br/>
@@ -3810,6 +3998,53 @@ ReadinessProbe
 <p>Defines a periodic probe of the service readiness.
 The controller will perform postReadyHooks of BackupScript.spec.restore
 after the service readiness when readinessProbe is configured.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.RequiredPolicyForAllPodSelection">RequiredPolicyForAllPodSelection
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.JobAction">JobAction</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.PrepareDataConfig">PrepareDataConfig</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>dataRestorePolicy</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.DataRestorePolicy">
+DataRestorePolicy
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the data restore policy. Options include:
+- OneToMany: Enables restoration of all volumes from a single data copy of the original target instance.
+The &lsquo;sourceOfOneToMany&rsquo; field must be set when using this policy.
+- OneToOne: Restricts data restoration such that each data piece can only be restored to a single target instance.
+This is the default policy. When the number of target instances specified for restoration surpasses the count of original backup target instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceOfOneToMany</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.SourceOfOneToMany">
+SourceOfOneToMany
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the name of the source target pod. This field is mandatory when the DataRestorePolicy is configured to &lsquo;OneToMany&rsquo;.</p>
 </td>
 </tr>
 </tbody>
@@ -4784,6 +5019,34 @@ If not specified, the pod will be dispatched by the default scheduler.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.SourceOfOneToMany">SourceOfOneToMany
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.RequiredPolicyForAllPodSelection">RequiredPolicyForAllPodSelection</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>targetPodName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the source target pod.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.SyncProgress">SyncProgress
 </h3>
 <p>
@@ -5002,6 +5265,17 @@ string
 <td>
 <em>(Optional)</em>
 <p>The size of the volume snapshot.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Associates this volumeSnapshot with its corresponding target.</p>
 </td>
 </tr>
 </tbody>

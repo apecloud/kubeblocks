@@ -132,25 +132,21 @@ func HandleBackupRepo(request *dpbackup.Request) error {
 // it will return the pod which name is podName. Otherwise, it will return the
 // pods which are selected by BackupPolicy selector and strategy.
 func GetTargetPods(reqCtx intctrlutil.RequestCtx,
-	cli client.Client, podName string,
-	backupMethod *dpv1alpha1.BackupMethod,
+	cli client.Client,
+	selectedPodNames []string,
 	backupPolicy *dpv1alpha1.BackupPolicy,
-) ([]*corev1.Pod, error) {
-	if backupMethod == nil {
+	target *dpv1alpha1.BackupTarget,
+	backupType dpv1alpha1.BackupType) ([]*corev1.Pod, error) {
+	if target == nil {
 		return nil, nil
 	}
 	existPodSelector := func(selector *dpv1alpha1.PodSelector) bool {
 		return selector != nil && selector.LabelSelector != nil
 	}
-	var selector *dpv1alpha1.PodSelector
-	if backupMethod.Target != nil && existPodSelector(backupMethod.Target.PodSelector) {
-		selector = backupMethod.Target.PodSelector
-	} else {
-		// using global target policy.
-		selector = backupPolicy.Spec.Target.PodSelector
-		if !existPodSelector(selector) {
-			return nil, nil
-		}
+	// using global target policy.
+	selector := target.PodSelector
+	if !existPodSelector(selector) {
+		return nil, nil
 	}
 	labelSelector, err := metav1.LabelSelectorAsSelector(selector.LabelSelector)
 	if err != nil {
@@ -167,33 +163,45 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 		return nil, fmt.Errorf("failed to find target pods by backup policy %s/%s",
 			backupPolicy.Namespace, backupPolicy.Name)
 	}
-
+	sort.Sort(intctrlutil.ByPodName(pods.Items))
 	var targetPods []*corev1.Pod
-	if podName != "" && selector.Strategy == dpv1alpha1.PodSelectionStrategyAny {
+	if len(selectedPodNames) == 0 || backupType == dpv1alpha1.BackupTypeContinuous {
+		switch selector.Strategy {
+		case dpv1alpha1.PodSelectionStrategyAny:
+			// always selecting the first pod
+			pod := dputils.GetFirstIndexRunningPod(pods)
+			if pod != nil {
+				targetPods = append(targetPods, pod)
+			}
+		case dpv1alpha1.PodSelectionStrategyAll:
+			for i := range pods.Items {
+				targetPods = append(targetPods, &pods.Items[i])
+			}
+		}
+		return targetPods, nil
+	}
+	// if already selected target pods and backupType is not Continuous, we should re-use them.
+	switch selector.Strategy {
+	case dpv1alpha1.PodSelectionStrategyAny:
 		for _, pod := range pods.Items {
-			if pod.Name == podName {
+			if pod.Name == selectedPodNames[0] {
 				targetPods = append(targetPods, &pod)
 				break
 			}
 		}
-		if len(targetPods) > 0 {
-			return targetPods, nil
-		}
-	}
-	sort.Sort(intctrlutil.ByPodName(pods.Items))
-	// if pod selection strategy is Any, always return first pod
-	switch selector.Strategy {
-	case dpv1alpha1.PodSelectionStrategyAny:
-		pod := dputils.GetFirstIndexRunningPod(pods)
-		if pod != nil {
-			targetPods = append(targetPods, pod)
-		}
 	case dpv1alpha1.PodSelectionStrategyAll:
+		podMap := map[string]corev1.Pod{}
 		for i := range pods.Items {
-			targetPods = append(targetPods, &pods.Items[i])
+			podMap[pods.Items[i].Name] = pods.Items[i]
+		}
+		for _, podName := range selectedPodNames {
+			pod, ok := podMap[podName]
+			if !ok {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found the target pod "%s"`, podName))
+			}
+			targetPods = append(targetPods, &pod)
 		}
 	}
-
 	return targetPods, nil
 }
 
@@ -217,7 +225,7 @@ func getCluster(ctx context.Context,
 }
 
 func getClusterLabelKeys() []string {
-	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
+	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey, constant.KBAppShardingNameLabelKey}
 }
 
 // sendWarningEventForError sends warning event for backup controller error

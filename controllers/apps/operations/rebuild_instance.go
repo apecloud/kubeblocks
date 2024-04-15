@@ -529,10 +529,8 @@ func (r rebuildInstanceOpsHandler) createPostReadyRestore(reqCtx intctrlutil.Req
 	insHelper *instanceHelper,
 	restoreName string) error {
 	labels := r.getWellKnownLabels(insHelper.synthesizedComp)
-	// TODO: compatible rsm pod label.
-	if insHelper.targetPod.Labels[constant.StatefulSetPodNameLabelKey] == insHelper.targetPod.Name {
-		// TODO: Remove it when the kb not manages the StatefulSet.
-		labels[constant.StatefulSetPodNameLabelKey] = insHelper.targetPod.Name
+	if insHelper.targetPod.Labels[constant.KBAppPodNameLabelKey] == insHelper.targetPod.Name {
+		labels[constant.KBAppPodNameLabelKey] = insHelper.targetPod.Name
 	}
 	podSelector := metav1.LabelSelector{
 		MatchLabels: labels,

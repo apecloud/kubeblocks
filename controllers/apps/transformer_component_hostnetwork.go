@@ -66,12 +66,11 @@ func isHostNetworkEnabled(transCtx *componentTransformContext) bool {
 	if synthesizedComp.PodSpec.HostNetwork {
 		return true
 	}
-	// TODO: use component.annotations
-	cluster := transCtx.Cluster
-	if cluster.Annotations == nil {
+	comp := transCtx.Component
+	if comp.Annotations == nil {
 		return false
 	}
-	comps, ok := cluster.Annotations[constant.HostNetworkAnnotationKey]
+	comps, ok := comp.Annotations[constant.HostNetworkAnnotationKey]
 	if !ok {
 		return false
 	}

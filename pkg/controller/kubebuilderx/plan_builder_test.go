@@ -263,7 +263,7 @@ var _ = Describe("plan builder test", func() {
 				currentTree.SetRoot(rsm)
 				desiredTree.SetRoot(rsm)
 				Expect(desiredTree.Add(pod, headlessSvc, svc, env)).Should(Succeed())
-				vertices := buildOrderedVertices(currentTree, desiredTree)
+				vertices := buildOrderedVertices(ctx, currentTree, desiredTree)
 
 				// compare vertices
 				Expect(vertices).Should(HaveLen(len(verticesExpected)))

@@ -39,7 +39,7 @@ func Setup(scheme *runtime.Scheme, cli client.Client, kubeConfig, contexts strin
 	if len(contexts) == 0 {
 		return nil, nil
 	}
-	clients, caches, err := newClientsNCaches(scheme, kubeConfig, contexts)
+	clients, caches, err := newClientNCache(scheme, kubeConfig, contexts)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func Setup(scheme *runtime.Scheme, cli client.Client, kubeConfig, contexts strin
 	}, nil
 }
 
-func newClientsNCaches(scheme *runtime.Scheme, kubeConfig, contexts string) (map[string]client.Client, map[string]cache.Cache, error) {
+func newClientNCache(scheme *runtime.Scheme, kubeConfig, contexts string) (map[string]client.Client, map[string]cache.Cache, error) {
 	clients := make(map[string]client.Client)
 	caches := make(map[string]cache.Cache)
 	for _, context := range strings.Split(contexts, ",") {

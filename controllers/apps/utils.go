@@ -95,29 +95,44 @@ func mergeMap(dst, src map[string]string) {
 	}
 }
 
-// func placement(obj client.Object) string {
-//	if obj.GetAnnotations() == nil {
-//		return ""
-//	}
-//	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
-// }
-//
-// func inLocalContext() model.GraphOption {
-//	return model.WithClientOption(multicluster.InLocalContext())
-// }
-//
-// func inUniversalContext() model.GraphOption {
-//	return model.WithClientOption(multicluster.InUniversalContext())
-// }
+func placement(obj client.Object) string {
+	if obj == nil || obj.GetAnnotations() == nil {
+		return ""
+	}
+	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
+}
+
+func intoContext(ctx context.Context, placement string) context.Context {
+	return multicluster.IntoContext(ctx, placement)
+}
+
+func inDataContext4C() *multicluster.ClientOption {
+	return multicluster.InDataContext()
+}
+
+func inDataContextUnspecified4C() *multicluster.ClientOption {
+	return multicluster.InDataContextUnspecified()
+}
+
+func inUniversalContext4C() *multicluster.ClientOption {
+	return multicluster.InUniversalContext()
+}
+
+func inDataContext4G() model.GraphOption {
+	return model.WithClientOption(multicluster.InDataContext())
+}
+
+func inUniversalContext4G() model.GraphOption {
+	return model.WithClientOption(multicluster.InUniversalContext())
+}
 
 func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
-	// if v.ClientOpt != nil {
-	//	opt, ok := v.ClientOpt.(*multicluster.ClientOption)
-	//	if ok {
-	//		return opt
-	//	}
-	//	panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
-	//}
-	// return multicluster.InGlobalContext()
-	return nil
+	if v.ClientOpt != nil {
+		opt, ok := v.ClientOpt.(*multicluster.ClientOption)
+		if ok {
+			return opt
+		}
+		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
+	}
+	return multicluster.InControlContext()
 }

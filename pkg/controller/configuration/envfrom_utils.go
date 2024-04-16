@@ -121,7 +121,7 @@ func fetchConfigmap(localObjs []client.Object, cmName, namespace string, cli cli
 	if localObject != nil {
 		return localObject.(*corev1.ConfigMap), nil
 	}
-	if err := cli.Get(ctx, cmKey, cmObj); err != nil {
+	if err := cli.Get(ctx, cmKey, cmObj, inDataContext()); err != nil {
 		return nil, err
 	}
 	return cmObj, nil
@@ -133,7 +133,7 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 		Namespace: originKey.Namespace,
 	}
 	cm := &corev1.ConfigMap{}
-	err := cli.Get(ctx, cmKey, cm)
+	err := cli.Get(ctx, cmKey, cm, inDataContext())
 	if err == nil {
 		return cm, nil
 	}
@@ -147,7 +147,7 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 	if err := intctrlutil.SetOwnerReference(cluster, cm); err != nil {
 		return nil, err
 	}
-	return cm, cli.Create(ctx, cm)
+	return cm, cli.Create(ctx, cm, inDataContext())
 }
 
 func CheckEnvFrom(container *corev1.Container, cmName string) bool {
@@ -211,6 +211,7 @@ func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1
 	return updateEnvFromConfigmap(client.ObjectKeyFromObject(cmObj), envMap, cli, ctx)
 }
 
+// TODO(leon)
 func updateEnvFromConfigmap(origObj client.ObjectKey, envMap map[string]string, cli client.Client, ctx context.Context) error {
 	cmKey := client.ObjectKey{
 		Name:      core.GenerateEnvFromName(origObj.Name),

@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/handler"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -168,13 +169,20 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
 	ctx := &handler.FinderContext{
 		Context: context.Background(),
 		Reader:  r.Client,
 		Scheme:  *r.Scheme,
 	}
 
+	if multiClusterMgr == nil {
+		return r.setupWithManager(mgr, ctx)
+	}
+	return r.setupWithMultiClusterManager(mgr, multiClusterMgr, ctx)
+}
+
+func (r *ReplicatedStateMachineReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
 	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) {
 		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
@@ -211,4 +219,30 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Owns(&corev1.Pod{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
+}
+
+func (r *ReplicatedStateMachineReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
+	multiClusterMgr multicluster.Manager, ctx *handler.FinderContext) error {
+	nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
+	delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
+	ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
+	stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
+	// pod owned by legacy StatefulSet
+	stsPodHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
+	// TODO: modify handler.getObjectFromKey to support running Job in data clusters
+	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
+
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+		For(&workloads.ReplicatedStateMachine{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
+		})
+
+	multiClusterMgr.Watch(b, &appsv1.StatefulSet{}, stsHandler).
+		Watch(b, &corev1.Pod{}, stsPodHandler).
+		Watch(b, &batchv1.Job{}, jobHandler).
+		Own(b, &corev1.Pod{}, &workloads.ReplicatedStateMachine{}).
+		Own(b, &corev1.PersistentVolumeClaim{}, &workloads.ReplicatedStateMachine{})
+
+	return b.Complete(r)
 }

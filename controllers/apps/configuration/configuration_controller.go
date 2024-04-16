@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -196,14 +197,19 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.Configuration{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
 		}).
-		Owns(&corev1.ConfigMap{}).
-		Complete(r)
+		Owns(&corev1.ConfigMap{})
+
+	if multiClusterMgr != nil {
+		multiClusterMgr.Own(b, &corev1.ConfigMap{}, &appsv1alpha1.Configuration{})
+	}
+
+	return b.Complete(r)
 }
 
 func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ConfigurationStatus, item appsv1alpha1.ConfigurationItemDetail) *appsv1alpha1.ConfigurationItemDetailStatus {

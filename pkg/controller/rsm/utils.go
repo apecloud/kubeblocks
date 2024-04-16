@@ -45,7 +45,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -134,33 +133,6 @@ func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	}
 
 	return rolePriorityMap
-}
-
-// updatePodRoleLabel updates pod role label when internal container role changed
-func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	rsm workloads.ReplicatedStateMachine, pod *corev1.Pod, roleName string, version string) error {
-	ctx := reqCtx.Ctx
-	roleMap := composeRoleMap(rsm)
-	// role not defined in CR, ignore it
-	roleName = strings.ToLower(roleName)
-
-	// update pod role label
-	patch := client.MergeFrom(pod.DeepCopy())
-	role, ok := roleMap[roleName]
-	switch ok {
-	case true:
-		pod.Labels[RoleLabelKey] = role.Name
-		pod.Labels[rsmAccessModeLabelKey] = string(role.AccessMode)
-	case false:
-		delete(pod.Labels, RoleLabelKey)
-		delete(pod.Labels, rsmAccessModeLabelKey)
-	}
-
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
-	}
-	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	return cli.Patch(ctx, pod, patch)
 }
 
 func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
@@ -815,31 +787,4 @@ func IsOwnedByRsm(obj client.Object) bool {
 		}
 	}
 	return false
-}
-
-// func placement(rsm workloads.ReplicatedStateMachine) string {
-//	if rsm.Annotations == nil {
-//		return ""
-//	}
-//	return rsm.Annotations[constant.KBAppMultiClusterPlacementKey]
-// }
-//
-// func inLocalContext() model.GraphOption {
-//	return model.WithClientOption(multicluster.InLocalContext())
-// }
-//
-// func inLocalContextOneshot() model.GraphOption {
-//	return model.WithClientOption(multicluster.InLocalContextOneshot())
-// }
-
-func ClientOption(v *model.ObjectVertex) *multicluster.ClientOption {
-	// if v.ClientOpt != nil {
-	//	opt, ok := v.ClientOpt.(*multicluster.ClientOption)
-	//	if ok {
-	//		return opt
-	//	}
-	//	panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
-	// }
-	// return multicluster.InGlobalContext()
-	return nil
 }

@@ -99,7 +99,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: recorder,
-	}).SetupWithManager(k8sManager)
+	}).SetupWithManager(k8sManager, nil)
 	Expect(err).ToNot(HaveOccurred())
 
 	appsv1alpha1.RegisterWebhookManager(k8sManager)

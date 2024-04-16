@@ -837,9 +837,6 @@ spec:
                   default naming rules."
                 items:
                   properties:
-                    RuntimeClassName:
-                      description: Defines RuntimeClass to override.
-                      type: string
                     annotations:
                       additionalProperties:
                         type: string

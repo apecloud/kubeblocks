@@ -95,7 +95,7 @@ type ComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// Specifies the scheduling constraints for the component's workload.
+	// Specifies the scheduling constraints for the component.
 	// If specified, it will override the cluster-wide affinity.
 	//
 	// +optional
@@ -106,6 +106,11 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Specifies the scheduling policy for the component.
+	//
+	// +optional
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// Specifies the TLS configuration for the component.
 	//

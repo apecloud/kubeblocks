@@ -21,6 +21,7 @@ package component
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	"strconv"
 	"strings"
 
@@ -184,9 +185,9 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
 	}
 
-	// build affinity and tolerations
-	if err := buildAffinitiesAndTolerations(comp, synthesizeComp); err != nil {
-		reqCtx.Log.Error(err, "build affinities and tolerations failed.")
+	// build scheduling policy for workload
+	if err = buildSchedulingPolicy(synthesizeComp, comp); err != nil {
+		reqCtx.Log.Error(err, "failed to build scheduling policy")
 		return nil, err
 	}
 
@@ -296,16 +297,24 @@ func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *
 	}
 }
 
-// buildAffinitiesAndTolerations builds affinities and tolerations for component.
-func buildAffinitiesAndTolerations(comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) error {
-	podAffinity, err := BuildPodAffinity(synthesizeComp.ClusterName, synthesizeComp.Name, comp.Spec.Affinity)
-	if err != nil {
-		return err
+func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	var (
+		schedulingPolicy = comp.Spec.SchedulingPolicy
+		err              error
+	)
+	if schedulingPolicy == nil {
+		schedulingPolicy, err = scheduling.BuildSchedulingPolicy4Component(synthesizedComp.ClusterName,
+			synthesizedComp.Name, comp.Spec.Affinity, comp.Spec.Tolerations)
+		if err != nil {
+			return err
+		}
 	}
-	synthesizeComp.PodSpec.Affinity = podAffinity
-	synthesizeComp.PodSpec.TopologySpreadConstraints =
-		BuildPodTopologySpreadConstraints(synthesizeComp.ClusterName, synthesizeComp.Name, comp.Spec.Affinity)
-	synthesizeComp.PodSpec.Tolerations = comp.Spec.Tolerations
+	synthesizedComp.PodSpec.SchedulerName = schedulingPolicy.SchedulerName
+	synthesizedComp.PodSpec.NodeSelector = schedulingPolicy.NodeSelector
+	synthesizedComp.PodSpec.NodeName = schedulingPolicy.NodeName
+	synthesizedComp.PodSpec.Affinity = schedulingPolicy.Affinity
+	synthesizedComp.PodSpec.Tolerations = schedulingPolicy.Tolerations
+	synthesizedComp.PodSpec.TopologySpreadConstraints = schedulingPolicy.TopologySpreadConstraints
 	return nil
 }
 

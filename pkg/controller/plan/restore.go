@@ -22,6 +22,7 @@ package plan
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -261,18 +262,15 @@ func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStat
 }
 
 func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent) (dpv1alpha1.SchedulingSpec, error) {
-	var err error
-	schedulingSpec := dpv1alpha1.SchedulingSpec{}
-	compSpec := r.Cluster.Spec.GetComponentByName(comp.Name)
-	affinity := component.BuildAffinity(r.Cluster, compSpec)
-	if schedulingSpec.Affinity, err = component.BuildPodAffinity(r.Cluster.Name, comp.Name, affinity); err != nil {
-		return schedulingSpec, err
+	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(r.Cluster, r.Cluster.Spec.GetComponentByName(comp.Name))
+	if err != nil {
+		return dpv1alpha1.SchedulingSpec{}, err
 	}
-	schedulingSpec.TopologySpreadConstraints = component.BuildPodTopologySpreadConstraints(r.Cluster.Name, comp.Name, affinity)
-	if schedulingSpec.Tolerations, err = component.BuildTolerations(r.Cluster, compSpec); err != nil {
-		return schedulingSpec, err
-	}
-	return schedulingSpec, nil
+	return dpv1alpha1.SchedulingSpec{
+		Affinity:                  schedulingPolicy.Affinity,
+		Tolerations:               schedulingPolicy.Tolerations,
+		TopologySpreadConstraints: schedulingPolicy.TopologySpreadConstraints,
+	}, nil
 }
 
 func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedComponent, stage dpv1alpha1.RestoreStage) metav1.ObjectMeta {

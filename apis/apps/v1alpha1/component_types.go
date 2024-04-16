@@ -95,17 +95,36 @@ type ComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// Specifies the scheduling constraints for the component's workload.
+	// If specified, the pod will be dispatched by specified scheduler.
+	// If not specified, the pod will be dispatched by default scheduler.
+	//
+	// +optional
+	SchedulerName string `json:"schedulerName,omitempty"`
+
+	// Specifies the scheduling constraints for the component.
 	// If specified, it will override the cluster-wide affinity.
 	//
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
+
+	// Specifies the scheduling constraints for the component.
+	// If specified, it will override the cluster-wide affinity.
+	//
+	// +optional
+	Affinity2 *corev1.Affinity `json:"affinity2,omitempty"`
 
 	// Specify the tolerations for the component's workload.
 	// If specified, they will override the cluster-wide toleration settings.
 	//
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// TopologySpreadConstraints describes how a group of pods ought to spread across topology
+	// domains. Scheduler will schedule pods in a way which abides by the constraints.
+	// All topologySpreadConstraints are ANDed.
+	//
+	// +optional
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 
 	// Specifies the TLS configuration for the component.
 	//

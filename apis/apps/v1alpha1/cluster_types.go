@@ -96,16 +96,33 @@ type ClusterSpec struct {
 	// +optional
 	Services []ClusterService `json:"services,omitempty"`
 
+	// If specified, the pod will be dispatched by specified scheduler.
+	// If not specified, the pod will be dispatched by default scheduler.
+	//
+	// +optional
+	SchedulerName string `json:"schedulerName,omitempty"`
+
 	// A group of affinity scheduling rules.
 	//
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
+	// If specified, the cluster's scheduling constraints.
+	//
+	// +optional
+	Affinity2 *corev1.Affinity `json:"affinity2,omitempty"`
+
 	// Attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
 	//
-	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// TopologySpreadConstraints describes how a group of pods ought to spread across topology
+	// domains. Scheduler will schedule pods in a way which abides by the constraints.
+	// All topologySpreadConstraints are ANDed.
+	//
+	// +optional
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 
 	// Cluster backup configuration.
 	//
@@ -541,6 +558,12 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// If specified, the pod will be dispatched by specified scheduler.
+	// If not specified, the pod will be dispatched by default scheduler.
+	//
+	// +optional
+	SchedulerName string `json:"schedulerName,omitempty"`
 
 	// Specifies the resources requests and limits of the workload.
 	//

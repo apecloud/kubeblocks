@@ -64,6 +64,10 @@ func (c *controller) Prepare(reader TreeLoader) Controller {
 		return c
 	}
 	c.tree, c.err = c.oldTree.DeepCopy()
+
+	// init placement
+	c.ctx = intoContext(c.ctx, placement(c.oldTree.GetRoot()))
+
 	return c
 }
 

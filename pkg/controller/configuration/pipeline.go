@@ -361,6 +361,7 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 	})
 }
 
+// TODO(leon)
 func (p *updatePipeline) Sync() *updatePipeline {
 	return p.Wrap(func() error {
 		if p.ConfigConstraintObj != nil && !p.isDone() {

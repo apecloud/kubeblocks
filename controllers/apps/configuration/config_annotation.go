@@ -122,7 +122,7 @@ func updateConfigPhaseWithResult(cli client.Client, ctx intctrlutil.RequestCtx, 
 		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
 	}
 
-	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
+	if err := cli.Patch(ctx.Ctx, config, patch, inDataContextUnspecified()); err != nil {
 		return intctrlutil.RequeueWithError(err, ctx.Log, "")
 	}
 	if result.Retry {
@@ -183,7 +183,7 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 
 	// delete reconfigure-policy
 	delete(config.ObjectMeta.Annotations, constant.UpgradePolicyAnnotationKey)
-	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
+	if err := cli.Patch(ctx.Ctx, config, patch, inDataContextUnspecified()); err != nil {
 		return false, err
 	}
 

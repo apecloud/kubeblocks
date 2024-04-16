@@ -303,9 +303,9 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 		Name:      service.Name,
 	}
 	obj := &corev1.Service{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj); err != nil {
+	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj, inDataContext4C()); err != nil {
 		if apierrors.IsNotFound(err) {
-			graphCli.Create(dag, service)
+			graphCli.Create(dag, service, inDataContext4G())
 			return nil
 		}
 		return err
@@ -322,7 +322,7 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 	resolveServiceDefaultFields(&obj.Spec, &objCopy.Spec)
 
 	if !reflect.DeepEqual(obj, objCopy) {
-		graphCli.Update(dag, obj, objCopy)
+		graphCli.Update(dag, obj, objCopy, inDataContext4G())
 	}
 	return nil
 }

@@ -78,6 +78,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	if err != nil {
 		return err
 	}
+	r.tplCount = len(backupPolicyTPLs.Items)
 	backupPolicyNames := map[string]struct{}{}
 	backupScheduleNames := map[string]struct{}{}
 	// Note: In a cluster with multiple components referencing the same componentDefinition,

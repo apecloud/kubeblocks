@@ -32,9 +32,14 @@ import (
 )
 
 func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
-	ctx context.Context, cli client.Reader, _ func(T, PT, L, PL), namespace string, labels client.MatchingLabels) ([]PT, error) {
+	ctx context.Context, cli client.Reader, _ func(T, PT, L, PL), namespace string, labels client.MatchingLabels, opts ...client.ListOption) ([]PT, error) {
+	if opts == nil {
+		opts = make([]client.ListOption, 0)
+	}
+	opts = append(opts, []client.ListOption{labels, client.InNamespace(namespace)}...)
+
 	var objList L
-	if err := cli.List(ctx, PL(&objList), labels, client.InNamespace(namespace)); err != nil {
+	if err := cli.List(ctx, PL(&objList), opts...); err != nil {
 		return nil, err
 	}
 
@@ -44,10 +49,6 @@ func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 		objs = append(objs, &items[i])
 	}
 	return objs, nil
-}
-
-func ListRSMOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*workloads.ReplicatedStateMachine, error) {
-	return ListObjWithLabelsInNamespace(ctx, cli, generics.RSMSignature, namespace, labels)
 }
 
 // GetObjectListByComponentName gets k8s workload list with component

@@ -37,6 +37,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ControllerRevisionHashLabel is the label used to indicate the hash value of a ControllerRevision's Data.
@@ -182,6 +183,10 @@ func getUpdateRevisions(revisions map[string]string) (map[string]string, error) 
 }
 
 func buildUpdateRevisions(updateRevisions map[string]string) (map[string]string, error) {
+	maxPlainRevisionCount := viper.GetInt(MaxPlainRevisionCount)
+	if len(updateRevisions) <= maxPlainRevisionCount {
+		return updateRevisions, nil
+	}
 	revisionsJSON, err := json.Marshal(updateRevisions)
 	if err != nil {
 		return nil, err

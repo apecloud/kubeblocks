@@ -61,12 +61,21 @@ func supportPodVerticalScaling() bool {
 func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	template := src.DeepCopy()
 	// filter annotations
-	// keep Restart annotation
 	var annotations map[string]string
 	if len(template.Annotations) > 0 {
+		annotations = make(map[string]string)
+		// keep Restart annotation
 		if restart, ok := template.Annotations[constant.RestartAnnotationKey]; ok {
-			annotations = make(map[string]string, 1)
 			annotations[constant.RestartAnnotationKey] = restart
+		}
+		// keep Reconfigure annotation
+		for k, v := range template.Annotations {
+			if strings.HasPrefix(k, constant.UpgradeRestartAnnotationKey) {
+				annotations[k] = v
+			}
+		}
+		if len(annotations) == 0 {
+			annotations = nil
 		}
 	}
 	template.Annotations = annotations

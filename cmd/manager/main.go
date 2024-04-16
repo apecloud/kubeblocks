@@ -346,9 +346,10 @@ func main() {
 
 	if viper.GetBool(appsFlagKey.viperName()) {
 		if err = (&appscontrollers.ClusterReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("cluster-controller"),
+			Client:          client,
+			Scheme:          mgr.GetScheme(),
+			Recorder:        mgr.GetEventRecorderFor("cluster-controller"),
+			MultiClusterMgr: multiClusterMgr,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 			os.Exit(1)
@@ -367,7 +368,7 @@ func main() {
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Component")
 			os.Exit(1)
 		}
@@ -421,7 +422,7 @@ func main() {
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 			os.Exit(1)
 		}
@@ -430,7 +431,7 @@ func main() {
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
 			os.Exit(1)
 		}
@@ -448,7 +449,7 @@ func main() {
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("event-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Event")
 			os.Exit(1)
 		}
@@ -489,7 +490,7 @@ func main() {
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
 			os.Exit(1)
 		}

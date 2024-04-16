@@ -1076,7 +1076,8 @@ spec:
             type: object
             x-kubernetes-validations:
             - message: either spec.target or spec.targets
-              rule: has(self.target) || has(self.targets)
+              rule: (has(self.target) && !has(self.targets)) || (has(self.targets)
+                && !has(self.target))
           status:
             description: BackupPolicyStatus defines the observed state of BackupPolicy
             properties:

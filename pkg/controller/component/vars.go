@@ -478,7 +478,7 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 	}
 
 	objKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: objName}
-	if err := cli.Get(ctx, objKey, obj); err != nil {
+	if err := cli.Get(ctx, objKey, obj, inDataContext()); err != nil {
 		if apierrors.IsNotFound(err) && _optional() {
 			return nil, nil, nil
 		}
@@ -800,7 +800,7 @@ func resolvePodVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp
 					Name:      constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, compName),
 				}
 				rsm := &workloads.ReplicatedStateMachine{}
-				err := cli.Get(ctx, key, rsm)
+				err := cli.Get(ctx, key, rsm, inDataContext())
 				if err != nil {
 					return nil, err
 				}
@@ -835,7 +835,7 @@ func clusterServiceGetter(ctx context.Context, cli client.Reader, namespace, clu
 		Name:      constant.GenerateClusterServiceName(clusterName, name),
 	}
 	obj := &corev1.Service{}
-	err := cli.Get(ctx, key, obj)
+	err := cli.Get(ctx, key, obj, inDataContext())
 	return &resolvedServiceObj{service: obj}, err
 }
 
@@ -846,7 +846,7 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 		Name:      svcName,
 	}
 	obj := &corev1.Service{}
-	err := cli.Get(ctx, key, obj)
+	err := cli.Get(ctx, key, obj, inDataContext())
 	if err == nil {
 		return &resolvedServiceObj{service: obj}, nil
 	}
@@ -857,7 +857,7 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 	// fall-back to list services and find the matched prefix
 	svcList := &corev1.ServiceList{}
 	matchingLabels := client.MatchingLabels(constant.GetComponentWellKnownLabels(clusterName, compName))
-	err = cli.List(ctx, svcList, matchingLabels)
+	err = cli.List(ctx, svcList, matchingLabels, inDataContext())
 	if err != nil {
 		return nil, err
 	}
@@ -880,7 +880,7 @@ func headlessCompServiceGetter(ctx context.Context, cli client.Reader, namespace
 		Name:      constant.GenerateDefaultComponentHeadlessServiceName(clusterName, compName),
 	}
 	obj := &corev1.Service{}
-	err := cli.Get(ctx, key, obj)
+	err := cli.Get(ctx, key, obj, inDataContext())
 	return &resolvedServiceObj{service: obj}, err
 }
 
@@ -893,7 +893,7 @@ func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesi
 				Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name),
 			}
 			obj := &corev1.Secret{}
-			err := cli.Get(ctx, key, obj)
+			err := cli.Get(ctx, key, obj, inDataContext())
 			return obj, err
 		}
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)

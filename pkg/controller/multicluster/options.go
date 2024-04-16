@@ -23,19 +23,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func InLocalContext() *ClientOption {
-	return &ClientOption{}
-}
-
-func InLocalContextUnspecified() *ClientOption {
+func InControlContext() *ClientOption {
 	return &ClientOption{
-		unspecified: true,
+		control: true,
 	}
 }
 
-func InLocalContextOneshot() *ClientOption {
+func InDataContext() *ClientOption {
+	return &ClientOption{}
+}
+
+func InDataContextUnspecified() *ClientOption {
 	return &ClientOption{
-		oneshot: true,
+		unspecified: true,
 	}
 }
 
@@ -45,16 +45,10 @@ func InUniversalContext() *ClientOption {
 	}
 }
 
-func InGlobalContext() *ClientOption {
-	return &ClientOption{
-		global: true,
-	}
-}
-
 type ClientOption struct {
-	global      bool
-	universal   bool
-	unspecified bool
+	control     bool // control plane
+	universal   bool // both control and data planes
+	unspecified bool // data planes, but don't know which ones exactly
 	oneshot     bool
 }
 

@@ -73,14 +73,14 @@ func getOwningNamespacedObjects(ctx context.Context,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (owningObjects, error) {
 	inNS := client.InNamespace(namespace)
-	return getOwningObjectsWithOptions(ctx, cli, kinds, inNS, labels)
+	return getOwningObjectsWithOptions(ctx, cli, kinds, inNS, labels, inUniversalContext4C())
 }
 
 func getOwningNonNamespacedObjects(ctx context.Context,
 	cli client.Reader,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (owningObjects, error) {
-	return getOwningObjectsWithOptions(ctx, cli, kinds, labels)
+	return getOwningObjectsWithOptions(ctx, cli, kinds, labels, inUniversalContext4C())
 }
 
 func getOwningObjectsWithOptions(ctx context.Context,

@@ -46,6 +46,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
@@ -591,13 +592,18 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 		return err
 	}
+
+	// TODO: Move memberLeave to the RSM controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
+	podsToMemberLeave := make([]*corev1.Pod, 0)
+	genPodNamesByDefault := generatePodNames(r.synthesizeComp)
 	for _, pod := range pods {
-		subs := strings.Split(pod.Name, "-")
-		if ordinal, err := strconv.ParseInt(subs[len(subs)-1], 10, 32); err != nil {
-			return err
-		} else if int32(ordinal) < r.synthesizeComp.Replicas {
+		// if the pod not exists in the generated pod names, it should be a member that needs to leave
+		if slices.Contains(genPodNamesByDefault, pod.Name) {
 			continue
 		}
+		podsToMemberLeave = append(podsToMemberLeave, pod)
+	}
+	for _, pod := range podsToMemberLeave {
 		lorryCli, err1 := lorry.NewClient(*pod)
 		if err1 != nil {
 			if err == nil {
@@ -628,6 +634,34 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 	}
 	return err // TODO: use requeue-after
+}
+
+func (r *componentWorkloadOps) genPodName() {
+	templateReplicas := func(template appsv1alpha1.InstanceTemplate) int32 {
+		replicas := int32(1)
+		if template.Replicas != nil {
+			replicas = *template.Replicas
+		}
+		return replicas
+	}
+
+	templateReplicasCnt := int32(0)
+	for _, template := range r.synthesizeComp.Instances {
+		if len(template.Name) > 0 {
+			templateReplicasCnt += templateReplicas(template)
+		}
+	}
+
+	podNames := make([]string, 0)
+	workloadName := constant.GenerateRSMNamePattern(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	for _, template := range r.synthesizeComp.Instances {
+		templateNames := rsm2.GenerateInstanceNamesFromTemplate(workloadName, template.Name, templateReplicas(template), r.synthesizeComp.OfflineInstances)
+		podNames = append(podNames, templateNames...)
+	}
+	if templateReplicasCnt < r.synthesizeComp.Replicas {
+		names := rsm2.GenerateInstanceNamesFromTemplate(workloadName, "", r.synthesizeComp.Replicas-templateReplicasCnt, r.synthesizeComp.OfflineInstances)
+		podNames = append(podNames, names...)
+	}
 }
 
 func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) error {

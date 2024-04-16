@@ -289,6 +289,15 @@ type ToolConfig struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name,omitempty"`
 
+	// Specifies whether to make the tool image into the container image of sidecar.
+	// Some tool images are very large, especially C++ tools, which can depends on a lot of library, e.g: *.so,
+	// In this case, the tool image can be used as a sidecar container image.
+	//
+	// If set to 'True', the tool image will be used as the container image of the sidecar.
+	// kubeblocks-tools will be used as the container image of the sidecar.
+	// +optional
+	AsContainerImage *bool `json:"asContainerImage,omitempty"`
+
 	// Specifies the tool container image.
 	//
 	// +optional

@@ -533,6 +533,16 @@ spec:
                       description: ToolConfig specifies the settings of an init container
                         that prepare tools for dynamic reload.
                       properties:
+                        asContainerImage:
+                          description: "Specifies whether to make the tool image into
+                            the container image of sidecar. Some tool images are very
+                            large, especially C++ tools, which can depends on a lot
+                            of library, e.g: *.so, In this case, the tool image can
+                            be used as a sidecar container image. \n If set to 'True',
+                            the tool image will be used as the container image of
+                            the sidecar. kubeblocks-tools will be used as the container
+                            image of the sidecar."
+                          type: boolean
                         command:
                           description: Specifies the command to be executed by the
                             init container.
@@ -1063,6 +1073,16 @@ spec:
                       description: ToolConfig specifies the settings of an init container
                         that prepare tools for dynamic reload.
                       properties:
+                        asContainerImage:
+                          description: "Specifies whether to make the tool image into
+                            the container image of sidecar. Some tool images are very
+                            large, especially C++ tools, which can depends on a lot
+                            of library, e.g: *.so, In this case, the tool image can
+                            be used as a sidecar container image. \n If set to 'True',
+                            the tool image will be used as the container image of
+                            the sidecar. kubeblocks-tools will be used as the container
+                            image of the sidecar."
+                          type: boolean
                         command:
                           description: Specifies the command to be executed by the
                             init container.

@@ -21892,6 +21892,22 @@ string
 </tr>
 <tr>
 <td>
+<code>asContainerImage</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to make the tool image into the container image of sidecar.
+Some tool images are very large, especially C++ tools, which can depends on a lot of library, e.g: *.so,
+In this case, the tool image can be used as a sidecar container image.</p>
+<p>If set to &lsquo;True&rsquo;, the tool image will be used as the container image of the sidecar.
+kubeblocks-tools will be used as the container image of the sidecar.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>image</code><br/>
 <em>
 string

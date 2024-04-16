@@ -58,6 +58,9 @@ type CfgManagerBuildParams struct {
 	CMConfigVolumes           []corev1.Volume
 	ConfigLazyRenderedVolumes map[string]corev1.VolumeMount
 
+	// support custom config manager sidecar
+	ConfigManagerReloadPath string `json:"configManagerReloadPath"`
+
 	// support host network
 	ContainerPort int32 `json:"containerPort"`
 }

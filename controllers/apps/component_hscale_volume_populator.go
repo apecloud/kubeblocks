@@ -332,7 +332,6 @@ func (d *backupDataClone) ClearTmpResources() ([]client.Object, error) {
 }
 
 func (d *backupDataClone) backup() ([]client.Object, error) {
-	objs := make([]client.Object, 0)
 	componentDef := func() string {
 		name := d.component.CompDefName
 		if name == "" {

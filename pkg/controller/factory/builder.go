@@ -50,8 +50,8 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// BuildRSM builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
-func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+// BuildRSM builds a ReplicatedStateMachine object from SynthesizedComponent.
+func BuildRSM(synthesizedComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
 	var (
 		clusterDefName     = synthesizedComp.ClusterDefName
 		clusterCompDefName = synthesizedComp.ClusterCompDefName
@@ -63,7 +63,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	// build labels
 	labels := constant.GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, compName)
 	compDefLabel := constant.GetComponentDefLabel(compDefName)
-	if len(clusterDefName) > 0 {
+	if len(compDefName) == 0 {
 		// TODO(xingran): for backward compatibility in kubeBlocks version 0.8.0, it will be removed in the future.
 		labels = constant.GetKBWellKnownLabels(clusterDefName, clusterName, compName)
 		compDefLabel = constant.GetClusterCompDefLabel(clusterCompDefName)
@@ -71,8 +71,13 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	mergeLabels := intctrlutil.MergeMetadataMaps(labels, compDefLabel, synthesizedComp.Labels)
 
 	// build annotations
-	mergeAnnotations := intctrlutil.MergeMetadataMaps(constant.GetKBGenerationAnnotation(synthesizedComp.ClusterGeneration),
-		getMonitorAnnotations(synthesizedComp), synthesizedComp.Annotations)
+	mergeAnnotations := intctrlutil.MergeMetadataMaps(
+		constant.GetKBGenerationAnnotation(synthesizedComp.ClusterGeneration),
+		getMonitorAnnotations(synthesizedComp),
+		compDefLabel,
+		constant.GetServiceVersionAnnotation(synthesizedComp.ServiceVersion),
+		synthesizedComp.Annotations,
+	)
 
 	replicasStr := strconv.Itoa(int(synthesizedComp.Replicas))
 	podBuilder := builder.NewPodBuilder("", "").
@@ -102,8 +107,9 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	}
 	rsmBuilder.SetVolumeClaimTemplates(vcts...)
 
-	if common.IsCompactMode(cluster.Annotations) {
-		rsmBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey, cluster.Annotations[constant.FeatureReconciliationInCompactModeAnnotationKey])
+	if common.IsCompactMode(synthesizedComp.Annotations) {
+		rsmBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
+			synthesizedComp.Annotations[constant.FeatureReconciliationInCompactModeAnnotationKey])
 	}
 
 	// convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
@@ -242,30 +248,6 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		}
 	}
 
-	// get restore password if exists during recovery.
-	getRestorePassword := func() string {
-		valueString := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
-		if len(valueString) == 0 {
-			return ""
-		}
-		backupMap := map[string]map[string]string{}
-		err := json.Unmarshal([]byte(valueString), &backupMap)
-		if err != nil {
-			return ""
-		}
-		backupSource, ok := backupMap[synthesizedComp.Name]
-		if !ok {
-			return ""
-		}
-		password, ok := backupSource[constant.ConnectionPassword]
-		if !ok {
-			return ""
-		}
-		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-		password, _ = e.Decrypt([]byte(password))
-		return password
-	}
-
 	// TODO: do JIT value generation for lower CPU resources
 	// 1st pass replace variables
 	uuidVal := uuid.New()
@@ -276,7 +258,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	uuidHex := hex.EncodeToString(uuidBytes)
 	randomPassword := randomString(8)
 	strongRandomPasswd := strongRandomString(16)
-	restorePassword := getRestorePassword()
+	restorePassword := GetRestorePassword(cluster, synthesizedComp)
 	// check if a connection password is specified during recovery.
 	// if exists, replace the random password
 	if restorePassword != "" {
@@ -308,6 +290,30 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	}
 	replaceData(m)
 	return connCredential
+}
+
+// GetRestorePassword gets restore password if exists during recovery.
+func GetRestorePassword(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) string {
+	valueString := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
+	if len(valueString) == 0 {
+		return ""
+	}
+	backupMap := map[string]map[string]string{}
+	err := json.Unmarshal([]byte(valueString), &backupMap)
+	if err != nil {
+		return ""
+	}
+	backupSource, ok := backupMap[synthesizedComp.Name]
+	if !ok {
+		return ""
+	}
+	password, ok := backupSource[constant.ConnectionPassword]
+	if !ok {
+		return ""
+	}
+	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	password, _ = e.Decrypt([]byte(password))
+	return password
 }
 
 func BuildPVC(cluster *appsv1alpha1.Cluster,

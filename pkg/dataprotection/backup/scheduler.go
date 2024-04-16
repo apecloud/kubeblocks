@@ -183,7 +183,7 @@ spec:
   backupMethod: %s
   retentionPeriod: %s
 EOF
-`, s.BackupSchedule.Name, s.generateBackupName(), s.BackupSchedule.Namespace,
+`, s.BackupSchedule.Name, s.generateBackupName(schedulePolicy), s.BackupSchedule.Namespace,
 		s.BackupPolicy.Name, schedulePolicy.BackupMethod,
 		schedulePolicy.RetentionPeriod)
 
@@ -266,12 +266,14 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 	return s.Client.Patch(s.Ctx, cronJob, patch)
 }
 
-func (s *Scheduler) generateBackupName() string {
-	target := s.BackupPolicy.Spec.Target
+func (s *Scheduler) generateBackupName(schedulePolicy *dpv1alpha1.SchedulePolicy) string {
+	var backupNamePrefix string
+	targets := dputils.GetBackupTargets(s.BackupPolicy, dputils.GetBackupMethodByName(schedulePolicy.BackupMethod, s.BackupPolicy))
+	if len(targets) > 0 {
+		// if cluster name can be found in target labels, use it as backup name prefix
+		backupNamePrefix = targets[0].PodSelector.MatchLabels[constant.AppInstanceLabelKey]
 
-	// if cluster name can be found in target labels, use it as backup name prefix
-	backupNamePrefix := target.PodSelector.MatchLabels[constant.AppInstanceLabelKey]
-
+	}
 	// if cluster name can not be found, use backup schedule name as backup name prefix
 	if backupNamePrefix == "" {
 		backupNamePrefix = s.BackupSchedule.Name
@@ -366,8 +368,11 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 		// reconcile the config job if finished
 		return s.reconcileReconfigure(s.BackupSchedule)
 	}
-
-	targetPodSelector := s.BackupPolicy.Spec.Target.PodSelector
+	targets := dputils.GetBackupTargets(s.BackupPolicy, dputils.GetBackupMethodByName(schedulePolicy.BackupMethod, s.BackupPolicy))
+	if len(targets) == 0 {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`spec.target and spec.targets can not be empty in backupPOlicy "%s"`, s.BackupPolicy.Name))
+	}
+	targetPodSelector := targets[0].PodSelector
 	ops := appsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: s.BackupSchedule.Name + "-",

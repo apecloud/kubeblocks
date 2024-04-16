@@ -40,6 +40,11 @@ func NewComponentFactory(namespace, name, componentDefinition string) *MockCompo
 	return f
 }
 
+func (factory *MockComponentFactory) SetServiceVersion(serviceVersion string) *MockComponentFactory {
+	factory.Get().Spec.ServiceVersion = serviceVersion
+	return factory
+}
+
 func (factory *MockComponentFactory) SetAffinity(affinity *appsv1alpha1.Affinity) *MockComponentFactory {
 	factory.Get().Spec.Affinity = affinity
 	return factory

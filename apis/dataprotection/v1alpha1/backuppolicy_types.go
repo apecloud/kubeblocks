@@ -22,6 +22,7 @@ import (
 )
 
 // BackupPolicySpec defines the desired state of BackupPolicy
+// +kubebuilder:validation:XValidation:rule="(has(self.target) && !has(self.targets)) || (has(self.targets) && !has(self.target))",message="either spec.target or spec.targets"
 type BackupPolicySpec struct {
 	// Specifies the name of BackupRepo where the backup data will be stored.
 	// If not set, data will be stored in the default backup repository.
@@ -46,8 +47,13 @@ type BackupPolicySpec struct {
 	// Specifies the target information to back up, such as the target pod, the
 	// cluster connection credential.
 	//
-	// +kubebuilder:validation:Required
-	Target *BackupTarget `json:"target"`
+	Target *BackupTarget `json:"target,omitempty"`
+
+	// Specifies multiple target information for backup operations. This includes details
+	// such as the target pod and cluster connection credentials. All specified targets
+	// will be backed up collectively.
+	// optional
+	Targets []BackupTarget `json:"targets,omitempty"`
 
 	// Defines the backup methods.
 	//
@@ -75,6 +81,10 @@ type BackupPolicySpec struct {
 }
 
 type BackupTarget struct {
+	// Specifies a mandatory and unique identifier for each target when using the "targets" field.
+	// The backup data for the current target is stored in a uniquely named subdirectory.
+	Name string `json:"name,omitempty"`
+
 	// Used to find the target pod. The volumes of the target pod will be backed up.
 	//
 	// +kube:validation:Required
@@ -101,10 +111,11 @@ type PodSelector struct {
 	*metav1.LabelSelector `json:",inline"`
 
 	// Specifies the strategy to select the target pod when multiple pods are selected.
-	// Valid values are: Any: select any one pod that match the labelsSelector.
+	// Valid values are:
 	//
 	// - `Any`: select any one pod that match the labelsSelector.
-	// - `All`: select all pods that match the labelsSelector.
+	// - `All`: select all pods that match the labelsSelector. The backup data for the current pod
+	// will be stored in a subdirectory named after the pod.
 	//
 	// +kubebuilder:default=Any
 	Strategy PodSelectionStrategy `json:"strategy,omitempty"`
@@ -220,6 +231,11 @@ type BackupMethod struct {
 	//
 	// +optional
 	Target *BackupTarget `json:"target,omitempty"`
+
+	// Specifies multiple target information for backup operations. This includes details
+	// such as the target pod and cluster connection credentials. All specified targets
+	// will be backed up collectively.
+	Targets []BackupTarget `json:"targets,omitempty"`
 }
 
 // TargetVolumeInfo specifies the volumes and their mounts of the targeted application

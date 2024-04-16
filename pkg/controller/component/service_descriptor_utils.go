@@ -58,20 +58,22 @@ func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader
 	for _, serviceRefDecl := range compDef.Spec.ServiceRefDeclarations {
 		serviceRef, ok := serviceRefs[serviceRefDecl.Name]
 		if !ok {
+			if IsGenerated(comp) {
+				continue
+			}
 			return fmt.Errorf("service-ref for %s is not defined", serviceRefDecl.Name)
 		}
 
 		var (
-			namespace   = synthesizedComp.Namespace
-			clusterName = synthesizedComp.ClusterName
-			sd          *appsv1alpha1.ServiceDescriptor
-			err         error
+			namespace = synthesizedComp.Namespace
+			sd        *appsv1alpha1.ServiceDescriptor
+			err       error
 		)
 		switch {
 		case serviceRef.Cluster != "":
-			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, clusterName, *serviceRef, serviceRefDecl, true)
+			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, *serviceRef, serviceRefDecl, true)
 		case serviceRef.ClusterRef != nil:
-			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, clusterName, *serviceRef, serviceRefDecl, false)
+			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, *serviceRef, serviceRefDecl, false)
 		case serviceRef.ServiceDescriptor != "":
 			sd, err = handleServiceRefFromServiceDescriptor(ctx, cli, namespace, *serviceRef, serviceRefDecl)
 		}
@@ -87,12 +89,8 @@ func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader
 	return nil
 }
 
-func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespace, clusterName string,
+func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespace string,
 	serviceRef appsv1alpha1.ServiceRef, serviceRefDecl appsv1alpha1.ServiceRefDeclaration, legacy bool) (*appsv1alpha1.ServiceDescriptor, error) {
-	if serviceRef.Cluster == clusterName {
-		return nil, fmt.Errorf("cluster %s cannot reference itself", clusterName)
-	}
-
 	resolver := referencedVars
 	if legacy {
 		resolver = referencedVars4Legacy

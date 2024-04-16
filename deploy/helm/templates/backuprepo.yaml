@@ -23,6 +23,7 @@ metadata:
   {{- end }}
 spec:
   storageProviderRef: {{ $spName }}
+  accessMethod: {{ .Values.backupRepo.accessMethod | default "Tool" }}
   pvReclaimPolicy: {{ .Values.backupRepo.pvReclaimPolicy | default "Retain" }}
   volumeCapacity: {{ .Values.backupRepo.volumeCapacity | default "100Gi" }}
   config:

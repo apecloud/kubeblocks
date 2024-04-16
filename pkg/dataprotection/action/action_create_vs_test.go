@@ -104,7 +104,7 @@ var _ = Describe("CreateVolumeSnapshotAction Test", func() {
 			By("check volume snapshot be created")
 			key := client.ObjectKey{
 				Namespace: testCtx.DefaultNamespace,
-				Name:      dputils.GetBackupVolumeSnapshotName(actionName, volumeName),
+				Name:      dputils.GetBackupVolumeSnapshotName(actionName, volumeName, 0),
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, key, &vsv1.VolumeSnapshot{}, true)).Should(Succeed())
 		})

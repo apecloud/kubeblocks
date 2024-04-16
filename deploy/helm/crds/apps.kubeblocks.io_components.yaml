@@ -23,7 +23,11 @@ spec:
   - additionalPrinterColumns:
     - description: component definition
       jsonPath: .spec.compDef
-      name: COMPONENT-DEFINITION
+      name: DEFINITION
+      type: string
+    - description: service version
+      jsonPath: .spec.serviceVersion
+      name: SERVICE-VERSION
       type: string
     - description: status phase
       jsonPath: .status.phase

@@ -22,7 +22,6 @@ package highavailability
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -39,7 +38,6 @@ type Ha struct {
 	dbManager         engines.DBManager
 	dcs               dcs3.DCS
 	logger            logr.Logger
-	deleteLock        sync.Mutex
 	disableDNSChecker bool
 }
 

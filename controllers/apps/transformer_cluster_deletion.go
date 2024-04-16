@@ -176,6 +176,9 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 		&dpv1alpha1.BackupScheduleList{},
 		&dpv1alpha1.RestoreList{},
 		&batchv1.JobList{},
+		// The owner of the configuration in version 0.9 has been adjusted to component cr.
+		// for compatible with version 0.8
+		&appsv1alpha1.ConfigurationList{},
 	}
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},

@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ComponentSpec defines the desired state of Component
+// ComponentSpec defines the desired state of Component.
 type ComponentSpec struct {
 	// Specifies the name of the referenced ComponentDefinition.
 	//
@@ -29,7 +29,7 @@ type ComponentSpec struct {
 	// +kubebuilder:validation:MaxLength=64
 	CompDef string `json:"compDef"`
 
-	// ServiceVersion specifies the version of the service provisioned by the component.
+	// ServiceVersion specifies the version of the service expected to be provisioned by this component.
 	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	//
 	// +kubebuilder:validation:MaxLength=32
@@ -38,91 +38,185 @@ type ComponentSpec struct {
 
 	// References the class defined in ComponentClassDefinition.
 	//
+	// Deprecated since v0.9.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+	//
 	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
-	// Define service references for the current component. Based on the referenced services, they can be categorized into two types:
-	// - Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
-	// - Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
+	// Defines a list of ServiceRef for a Component, allowing it to connect and interact with other services.
+	// These services can be external or managed by the same KubeBlocks operator, categorized as follows:
 	//
-	// Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
-	// It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.
+	// 1. External Services:
+	//
+	//    - Not managed by KubeBlocks. These could be services outside KubeBlocks or non-Kubernetes services.
+	//    - Connection requires a ServiceDescriptor providing details for service binding.
+	//
+	// 2. KubeBlocks Services:
+	//
+	//    - Managed within the same KubeBlocks environment.
+	//    - Service binding is achieved by specifying cluster names in the service references,
+	//      with configurations handled by the KubeBlocks operator.
+	//
+	// ServiceRef maintains cluster-level semantic consistency; references with the same `serviceRef.name`
+	// within the same cluster are treated as identical.
+	// Only bindings to the same cluster or ServiceDescriptor are allowed within a cluster.
+	//
+	// Example:
+	// ```yaml
+	// serviceRefs:
+	//   - name: "redis-sentinel"
+	//     serviceDescriptor:
+	//       name: "external-redis-sentinel"
+	//   - name: "postgres-cluster"
+	//     cluster:
+	//       name: "my-postgres-cluster"
+	// ```
+	// The example above includes references to an external Redis Sentinel service and a PostgreSQL cluster managed by KubeBlocks.
+	//
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
-	// Requests and limits of workload resources.
+	// Specifies the resources required by the Component.
+	// It allows defining the CPU, memory requirements and limits for the Component's containers.
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// Information for statefulset.spec.volumeClaimTemplates.
+	// Specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component.
+	// Each template specifies the desired characteristics of a persistent volume, such as storage class,
+	// size, and access modes.
+	// These templates are used to dynamically provision persistent volumes for the Component when it is deployed.
+	//
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// To override services defined in referenced ComponentDefinition.
+	// Overrides services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
+	// by clients.
 	//
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
 
-	// Specifies the desired number of replicas for the component's workload.
+	// Each component supports running multiple replicas to provide high availability and persistence.
+	// This field can be used to specify the desired number of replicas.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
-	// Defines the configuration for the component.
+	// Reserved field for future use.
 	//
 	// +optional
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
 
-	// A switch to enable monitoring and is set as false by default.
-	// KubeBlocks provides an extension mechanism to support component level monitoring,
-	// which will scrape metrics auto or manually from servers in component and export
-	// metrics to Time Series Database.
+	// Indicates whether monitoring is enabled.
 	//
 	// +kubebuilder:default=false
 	// +optional
 	Monitor bool `json:"monitor,omitempty"`
 
-	// Indicates which log file takes effect in the database cluster,
-	// element is the log type which is defined in ComponentDefinition logConfig.name.
+	// Specifies which types of logs should be collected for the Cluster.
+	// The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.
+	//
+	// The elements in the `enabledLogs` array correspond to the names of the LogConfig entries.
+	// For example, if the `componentDefinition.spec.logConfigs` defines LogConfig entries with
+	// names "slow_query_log" and "error_log",
+	// you can enable the collection of these logs by including their names in the `enabledLogs` array:
+	// enabledLogs: ["slow_query_log", "error_log"]
 	//
 	// +listType=set
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
-	// The name of the ServiceAccount that running component depends on.
+	// Specifies the name of the ServiceAccount required by the running Component.
+	// This ServiceAccount is used to grant necessary permissions for the Component's Pods to interact
+	// with other Kubernetes resources, such as modifying pod labels or sending events.
+	//
+	// Defaults:
+	// If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
+	// bound to a default role defined during KubeBlocks installation.
+	//
+	// Future Changes:
+	// Future versions might change the default ServiceAccount creation strategy to one per Component,
+	// potentially revising the naming to "kb-{cluster.name}-{component.name}".
+	//
+	// Users can override the automatic ServiceAccount assignment by explicitly setting the name of
+	// an existed ServiceAccount in this field.
 	//
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// Specifies the scheduling constraints for the component's workload.
-	// If specified, it will override the cluster-wide affinity.
+	// Specifies a group of affinity scheduling rules for the Component.
+	// It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
 	//
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
-	// Specify the tolerations for the component's workload.
-	// If specified, they will override the cluster-wide toleration settings.
+	// Allows the Component to be scheduled onto nodes with matching taints.
+	// It is an array of tolerations that are attached to the Component's Pods.
+	//
+	// Each toleration consists of a `key`, `value`, `effect`, and `operator`.
+	// The `key`, `value`, and `effect` define the taint that the toleration matches.
+	// The `operator` specifies how the toleration matches the taint.
+	//
+	// If a node has a taint that matches a toleration, the Component's pods can be scheduled onto that node.
+	// This allows the Component's Pods to run on nodes that have been tainted to prevent regular Pods from being scheduled.
 	//
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// Specifies the TLS configuration for the component.
+	// Specifies the TLS configuration for the component, including:
+	//
+	// - A boolean flag that indicates whether the component should use Transport Layer Security (TLS) for secure communication.
+	// - An optional field that specifies the configuration for the TLS certificates issuer when TLS is enabled.
+	//   It allows defining the issuer name and the reference to the secret containing the TLS certificates and key.
+	//	 The secret should contain the CA certificate, TLS certificate, and private key in the specified keys.
 	//
 	// +optional
 	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
 
-	// Overrides values in default Template.
+	// Allows for the customization of configuration values for each instance within a component.
+	// An Instance represent a single replica (Pod and associated K8s resources like PVCs, Services, and ConfigMaps).
+	// While instances typically share a common configuration as defined in the ClusterComponentSpec,
+	// they can require unique settings in various scenarios:
+	//
+	// For example:
+	// - A database component might require different resource allocations for primary and secondary instances,
+	//   with primaries needing more resources.
+	// - During a rolling upgrade, a component may first update the image for one or a few instances,
+	//   and then update the remaining instances after verifying that the updated instances are functioning correctly.
+	//
+	// InstanceTemplate allows for specifying these unique configurations per instance.
+	// Each instance's name is constructed using the pattern: $(component.name)-$(template.name)-$(ordinal),
+	// starting with an ordinal of 0.
+	// It is crucial to maintain unique names for each InstanceTemplate to avoid conflicts.
+	//
+	// The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the Component.
+	// Any remaining replicas will be generated using the default template and will follow the default naming rules.
+	//
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Specifies instances to be scaled in with dedicated names in the list.
+	// Specifies the names of instances to be transitioned to offline status.
+	//
+	// Marking an instance as offline results in the following:
+	//
+	// 1. The associated pod is stopped, and its PersistentVolumeClaim (PVC) is retained for potential
+	//    future reuse or data recovery, but it is no longer actively used.
+	// 2. The ordinal number assigned to this instance is preserved, ensuring it remains unique
+	//    and avoiding conflicts with new instances.
+	//
+	// Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
+	// ordinal consistency within the cluster.
+	// Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
+	// The cluster administrator must manually manage the cleanup and removal of these resources when they are no longer needed.
+	//
 	//
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
@@ -173,7 +267,9 @@ type ComponentStatus struct {
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// Component is the Schema for the components API
+// Component is a derived sub-object of a user-submitted Cluster object.
+// It is an internal object, and users should not modify Component objects;
+// they are intended only for observing the status of Components within the system.
 type Component struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -184,7 +280,7 @@ type Component struct {
 
 // +kubebuilder:object:root=true
 
-// ComponentList contains a list of Component
+// ComponentList contains a list of Component.
 type ComponentList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

@@ -29,9 +29,13 @@ type Payload struct {
 	Data map[string]any `json:"-"`
 }
 
-// ConfigurationItemDetail represents a specific configuration item within a configuration template.
+// ConfigurationItemDetail corresponds to settings of a configuration template (a ConfigMap).
 type ConfigurationItemDetail struct {
-	// Defines the unique identifier of the configuration template. It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters, hyphens, and periods. The name must start and end with an alphanumeric character.
+	// Defines the unique identifier of the configuration template.
+	//
+	// It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
+	// hyphens, and periods.
+	// The name must start and end with an alphanumeric character.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
@@ -43,23 +47,39 @@ type ConfigurationItemDetail struct {
 	// +optional
 	Version string `json:"version,omitempty"`
 
-	// Holds the configuration-related rerender. Preserves unknown fields and is optional.
+	// External controllers can trigger a configuration rerender by modifying this field.
+	//
+	// Note: Currently, the `payload` field is opaque and its content is not interpreted by the system.
+	// Modifying this field will cause a rerender, regardless of the specific content of this field.
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Payload Payload `json:"payload,omitempty"`
 
-	// Used to set the configuration template. It is optional.
+	// Specifies the name of the configuration template (a ConfigMap), ConfigConstraint, and other miscellaneous options.
+	//
+	// The configuration template is a ConfigMap that contains multiple configuration files.
+	// Each configuration file is stored as a key-value pair within the ConfigMap.
+	//
+	// ConfigConstraint allows defining constraints and validation rules for configuration parameters.
+	// It ensures that the configuration adheres to certain requirements and limitations.
 	//
 	// +optional
 	ConfigSpec *ComponentConfigSpec `json:"configSpec"`
 
-	// Specifies the configuration template. It is optional.
+	// Specifies the user-defined configuration template.
+	//
+	// When provided, the `importTemplateRef` overrides the default configuration template
+	// specified in `configSpec.templateRef`.
+	// This allows users to customize the configuration template according to their specific requirements.
 	//
 	// +optional
 	ImportTemplateRef *ConfigTemplateExtension `json:"importTemplateRef"`
 
-	// Used to set the parameters to be updated. It is optional.
+	// Specifies the user-defined configuration parameters.
+	//
+	// When provided, the parameter values in `configFileParams` override the default configuration parameters.
+	// This allows users to override the default configuration according to their specific needs.
 	//
 	// +optional
 	ConfigFileParams map[string]ConfigParams `json:"configFileParams,omitempty"`
@@ -67,20 +87,29 @@ type ConfigurationItemDetail struct {
 
 // ConfigurationSpec defines the desired state of a Configuration resource.
 type ConfigurationSpec struct {
-
-	// Specifies the name of the cluster that this configuration is associated with.
+	// Specifies the name of the Cluster that this configuration is associated with.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
 
-	// Represents the name of the cluster component that this configuration pertains to.
+	// Represents the name of the Component that this configuration pertains to.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ComponentName string `json:"componentName"`
 
-	// An array of ConfigurationItemDetail objects that describe user-defined configuration templates.
+	// ConfigItemDetails is an array of ConfigurationItemDetail objects.
+	//
+	// Each ConfigurationItemDetail corresponds to a configuration template,
+	// which is a ConfigMap that contains multiple configuration files.
+	// Each configuration file is stored as a key-value pair within the ConfigMap.
+	//
+	// The ConfigurationItemDetail includes information such as:
+	//
+	// - The configuration template (a ConfigMap)
+	// - The corresponding ConfigConstraint (constraints and validation rules for the configuration)
+	// - Volume mounts (for mounting the configuration files)
 	//
 	// +optional
 	// +patchMergeKey=name
@@ -164,8 +193,7 @@ type ConfigurationItemDetailStatus struct {
 	ReconcileDetail *ReconcileDetail `json:"reconcileDetail,omitempty"`
 }
 
-// Represents the observed state of a Configuration resource.
-
+// ConfigurationStatus represents the observed state of a Configuration resource.
 type ConfigurationStatus struct {
 	// This is a placeholder for additional fields that describe the observed state of the cluster.
 	// Important: Run "make" to regenerate code after modifying this file
@@ -196,10 +224,12 @@ type ConfigurationStatus struct {
 	ConfigurationItemStatus []ConfigurationItemDetailStatus `json:"configurationStatus"`
 }
 
+// Configuration represents the complete set of configurations for a specific Component of a Cluster.
+// This includes templates for each configuration file, their corresponding ConfigConstraints, volume mounts,
+// and other relevant details.
+//
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-
-// Configuration is the Schema for the configurations API
 type Configuration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

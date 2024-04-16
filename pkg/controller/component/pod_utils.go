@@ -35,8 +35,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-func ListPodOwnedByComponent(ctx context.Context, cli client.Reader, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
-	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
+func ListPodOwnedByComponent(ctx context.Context, cli client.Reader, namespace string, labels client.MatchingLabels, opts ...client.ListOption) ([]*corev1.Pod, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels, opts...)
 }
 
 // GetComponentPodList gets the pod list by cluster and componentName
@@ -80,6 +80,7 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 		return false, nil
 	}
 
+	// TODO: depends on the workload (RSM)
 	// check whether the underlying workload(sts) has sent the latest template to pods
 	sts := &appsv1.StatefulSet{}
 	if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
@@ -91,7 +92,7 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 	if sts.Status.ObservedGeneration != sts.Generation {
 		return false, nil
 	}
-	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels)
+	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels, inDataContext())
 	if err != nil {
 		return false, err
 	}

@@ -136,8 +136,8 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	}()
 
 	// get the component's underlying pods
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli,
-		r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
+	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
+		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
 	if err != nil {
 		return err
 	}
@@ -316,7 +316,7 @@ func (r *componentStatusHandler) isAllConfigSynced() (bool, error) {
 			Namespace: r.cluster.Namespace,
 			Name:      cfgcore.GetComponentCfgName(r.cluster.Name, r.synthesizeComp.Name, configSpec.Name),
 		}
-		if err := r.cli.Get(r.reqCtx.Ctx, cmKey, cmObj); err != nil {
+		if err := r.cli.Get(r.reqCtx.Ctx, cmKey, cmObj, inDataContext4C()); err != nil {
 			return false, err
 		}
 		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != appsv1alpha1.CFinishedPhase {
@@ -389,8 +389,9 @@ func (r *componentStatusHandler) hasVolumeExpansionRunning() (bool, bool, error)
 // getRunningVolumes gets the running volumes of the rsm.
 func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string,
 	rsmObj *workloads.ReplicatedStateMachine) ([]*corev1.PersistentVolumeClaim, error) {
-	pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature,
-		r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
+	labels := constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name)
+	pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
+		generics.PersistentVolumeClaimSignature, r.cluster.Namespace, labels, inDataContext4C())
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
@@ -497,7 +498,8 @@ func (r *componentStatusHandler) updatePrimaryIndex() error {
 	if r.synthesizeComp.RoleArbitrator == nil || *r.synthesizeComp.RoleArbitrator != appsv1alpha1.LorryRoleArbitrator {
 		return nil
 	}
-	podList, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
+	podList, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
+		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
 	if err != nil {
 		return err
 	}
@@ -542,7 +544,7 @@ func (r *componentStatusHandler) updatePrimaryIndex() error {
 		if !ok || pi != primaryPodName {
 			origPod := pod.DeepCopy()
 			pod.Annotations[constant.PrimaryAnnotationKey] = primaryPodName
-			graphCli.Do(r.dag, origPod, pod, model.ActionUpdatePtr(), nil)
+			graphCli.Do(r.dag, origPod, pod, model.ActionUpdatePtr(), nil, inDataContext4G())
 		}
 	}
 	return nil

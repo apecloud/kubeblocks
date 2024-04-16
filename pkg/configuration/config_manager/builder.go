@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -205,12 +206,12 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		if err := controllerutil.SetOwnerReference(manager.Cluster, cmObj, scheme); err != nil {
 			return err
 		}
-		return cli.Create(ctx, cmObj)
+		return cli.Create(ctx, cmObj, inDataContext())
 	}
 	updateConfigCM := func(cm *corev1.ConfigMap, newConfig string) error {
 		patch := client.MergeFrom(cm.DeepCopy())
 		cm.Data[configManagerConfig] = newConfig
-		return cli.Patch(ctx, cm, patch)
+		return cli.Patch(ctx, cm, patch, inDataContext())
 	}
 
 	config, err := cfgutil.ToYamlConfig(configInfo)
@@ -222,7 +223,7 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		Namespace: manager.Cluster.GetNamespace(),
 		Name:      fmt.Sprintf("%s%s-%s-config-manager-config", configManagerCMPrefix, manager.Cluster.GetName(), manager.ComponentName),
 	}
-	err = cli.Get(ctx, cmKey, cmObj)
+	err = cli.Get(ctx, cmKey, cmObj, inDataContext())
 	switch {
 	default:
 		return err
@@ -357,7 +358,7 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 	if err = cli.Get(ctx, referenceCM, &refCM); err != nil {
 		return err
 	}
-	if err = cli.Get(ctx, scriptCMKey, &sidecarCM); err != nil {
+	if err = cli.Get(ctx, scriptCMKey, &sidecarCM, inDataContext()); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -376,7 +377,7 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 		if err := controllerutil.SetOwnerReference(cluster, &sidecarCM, scheme); err != nil {
 			return err
 		}
-		if err := cli.Create(ctx, &sidecarCM); err != nil {
+		if err := cli.Create(ctx, &sidecarCM, inDataContext()); err != nil {
 			return err
 		}
 	}
@@ -451,4 +452,8 @@ func buildConfigManagerCommonArgs(volumeDirs []corev1.VolumeMount) []string {
 		args = append(args, "--volume-dir", volume.MountPath)
 	}
 	return args
+}
+
+func inDataContext() *multicluster.ClientOption {
+	return multicluster.InDataContext()
 }

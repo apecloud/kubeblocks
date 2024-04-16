@@ -80,6 +80,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, compDefName()).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+		AddAnnotations(constant.KBAppMultiClusterPlacementKey, cluster.Annotations[constant.KBAppMultiClusterPlacementKey]).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).

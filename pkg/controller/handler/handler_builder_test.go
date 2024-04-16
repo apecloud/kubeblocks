@@ -127,13 +127,13 @@ var _ = Describe("handler builder test.", func() {
 				By(fmt.Sprintf("test %s interface", c.name))
 				k8sMock.EXPECT().
 					Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
-					DoAndReturn(func(_ context.Context, objKey client.ObjectKey, stsTmp *appsv1.StatefulSet, _ ...client.ListOptions) error {
+					DoAndReturn(func(_ context.Context, objKey client.ObjectKey, stsTmp *appsv1.StatefulSet, _ ...client.GetOption) error {
 						*stsTmp = *sts
 						return nil
 					}).Times(c.getTimes)
 				k8sMock.EXPECT().
 					Get(gomock.Any(), gomock.Any(), &corev1.Pod{}, gomock.Any()).
-					DoAndReturn(func(_ context.Context, objKey client.ObjectKey, podTmp *corev1.Pod, _ ...client.ListOptions) error {
+					DoAndReturn(func(_ context.Context, objKey client.ObjectKey, podTmp *corev1.Pod, _ ...client.GetOption) error {
 						*podTmp = *pod
 						return nil
 					}).Times(c.getTimes)

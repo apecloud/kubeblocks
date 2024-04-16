@@ -81,11 +81,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	var parent client.Object
 	rb := buildRoleBinding(transCtx.Cluster, serviceAccount.Name)
-	graphCli.Create(dag, rb)
+	graphCli.Create(dag, rb, inDataContext4G())
 	parent = rb
 	if needCRB {
 		crb := factory.BuildClusterRoleBinding(transCtx.Cluster, serviceAccount.Name)
-		graphCli.Create(dag, crb)
+		graphCli.Create(dag, crb, inDataContext4G())
 		graphCli.DependOn(dag, parent, crb)
 		parent = crb
 	}
@@ -139,7 +139,7 @@ func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountNa
 		Name:      serviceAccountName,
 	}
 	sa := &corev1.ServiceAccount{}
-	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa, inDataContext4C()); err != nil {
 		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
 		// the rolebinding is not already present.
 		if errors.IsNotFound(err) {
@@ -159,7 +159,7 @@ func isClusterRoleBindingExist(transCtx *componentTransformContext, serviceAccou
 		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName),
 	}
 	crb := &rbacv1.ClusterRoleBinding{}
-	if err := transCtx.Client.Get(transCtx.Context, namespaceName, crb); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, crb, inDataContext4C()); err != nil {
 		// KubeBlocks will create a cluster role binding only if it has RBAC access priority and
 		// the cluster role binding is not already present.
 		if errors.IsNotFound(err) {
@@ -197,7 +197,7 @@ func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName 
 		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName),
 	}
 	rb := &rbacv1.RoleBinding{}
-	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb, inDataContext4C()); err != nil {
 		// KubeBlocks will create a role binding only if it has RBAC access priority and
 		// the role binding is not already present.
 		if errors.IsNotFound(err) {
@@ -289,6 +289,6 @@ func buildRoleBinding(cluster *appsv1alpha1.Cluster, serviceAccountName string) 
 
 func createServiceAccount(serviceAccount *corev1.ServiceAccount, graphCli model.GraphClient, dag *graph.DAG, parent client.Object) {
 	// serviceAccount must be created before roleBinding and clusterRoleBinding
-	graphCli.Create(dag, serviceAccount)
+	graphCli.Create(dag, serviceAccount, inDataContext4G())
 	graphCli.DependOn(dag, parent, serviceAccount)
 }

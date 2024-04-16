@@ -57,9 +57,3 @@ type gvkNObjKey struct {
 }
 
 type owningObjects map[gvkNObjKey]client.Object
-
-type delegateClient struct {
-	client.Client
-}
-
-var _ client.Reader = delegateClient{}

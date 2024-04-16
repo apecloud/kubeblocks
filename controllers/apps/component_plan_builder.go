@@ -81,7 +81,6 @@ type componentPlanBuilder struct {
 type componentPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
-	cli      client.Client
 	transCtx *componentTransformContext
 }
 
@@ -97,10 +96,7 @@ func (c *componentPlanBuilder) Init() error {
 
 	c.transCtx.Component = comp
 	c.transCtx.ComponentOrig = comp.DeepCopy()
-	c.transformers = append(c.transformers, &componentInitTransformer{
-		Component:     c.transCtx.Component,
-		ComponentOrig: c.transCtx.ComponentOrig,
-	})
+	c.transformers = append(c.transformers, &componentInitTransformer{})
 	return nil
 }
 
@@ -126,7 +122,6 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 	plan := &componentPlan{
 		dag:      dag,
 		walkFunc: c.defaultWalkFuncWithLogging,
-		cli:      c.cli,
 		transCtx: c.transCtx,
 	}
 	return plan, err
@@ -141,9 +136,9 @@ func (p *componentPlan) Execute() error {
 }
 
 // newComponentPlanBuilder returns a componentPlanBuilder powered PlanBuilder
-func newComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
+func newComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client) graph.PlanBuilder {
 	return &componentPlanBuilder{
-		req: req,
+		req: ctx.Req,
 		cli: cli,
 		transCtx: &componentTransformContext{
 			Context:       ctx.Ctx,

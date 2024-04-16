@@ -25,40 +25,57 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// InstanceTemplate allows customization of individual replica configurations within a Component,
+// without altering the base component template defined in ClusterComponentSpec.
+// It enables the application of distinct settings to specific instances (replicas),
+// providing flexibility while maintaining a common configuration baseline.
 type InstanceTemplate struct {
-	// Specifies the name of the template.
-	// Each instance of the template derives its name from the InstanceSet Name, the template's Name and the instance's ordinal.
-	// The constructed instance name follows the pattern $(instance_set.name)-$(template.name)-$(ordinal).
-	// The ordinal starts from 0 by default.
+	// Name specifies the unique name of the instance Pod created using this InstanceTemplate.
+	// This name is constructed by concatenating the component's name, the template's name, and the instance's ordinal
+	// using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
+	// The specified name overrides any default naming conventions or patterns.
 	//
 	// +kubebuilder:validation:MaxLength=54
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Number of replicas of this template.
-	// Default is 1.
+	// Specifies the number of instances (Pods) to create from this InstanceTemplate.
+	// This field allows setting how many replicated instances of the component,
+	// with the specific overrides in the InstanceTemplate, are created.
+	// The default value is 1. A value of 0 disables instance creation.
+	//
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// Defines annotations to override.
-	// Add new or override existing annotations.
+	// Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
+	// Existing keys will have their values overwritten, while new keys will be added to the annotations.
+	//
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 
-	// Defines labels to override.
-	// Add new or override existing labels.
+	// Specifies a map of key-value pairs that will be merged into the Pod's existing labels.
+	// Values for existing keys will be overwritten, and new keys will be added.
+	//
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Defines image to override.
-	// Will override the first container's image of the pod.
+	// Specifies an override for the first container's image in the pod.
+	//
 	// +optional
 	Image *string `json:"image,omitempty"`
 
-	// Defines NodeName to override.
+	// Specifies the name of the node where the Pod should be scheduled.
+	// If set, the Pod will be directly assigned to the specified node, bypassing the Kubernetes scheduler.
+	// This is useful for controlling Pod placement on specific nodes.
+	//
+	// Important considerations:
+	// - `nodeName` bypasses default scheduling constraints (e.g., resource requirements, node selectors, affinity rules).
+	// - It is the user's responsibility to ensure the node is suitable for the Pod.
+	// - If the node is unavailable, the Pod will remain in "Pending" state until the node is available or the Pod is deleted.
+	//
 	// +optional
 	NodeName *string `json:"nodeName,omitempty"`
 
@@ -66,13 +83,15 @@ type InstanceTemplate struct {
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
-	// Defines Tolerations to override.
-	// Add new or override existing tolerations.
+	// Tolerations specifies a list of tolerations to be applied to the Pod, allowing it to tolerate node taints.
+	// This field can be used to add new tolerations or override existing ones.
+	//
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// Defines Resources to override.
-	// Will override the first container's resources of the pod.
+	// Specifies an override for the resource requirements of the first container in the Pod.
+	// This field allows for customizing resource allocation (CPU, memory, etc.) for the container.
+	//
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
@@ -115,25 +134,32 @@ type InstanceSetSpec struct {
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 
-	// Represents a label query over pods that should match the replica count.
-	// It must match the pod template's labels.
+	// Represents a label query over pods that should match the desired replica count indicated by the `replica` field.
+	// It must match the labels defined in the pod template.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	Selector *metav1.LabelSelector `json:"selector"`
 
 	// Refers to the name of the service that governs this StatefulSet.
 	// This service must exist before the StatefulSet and is responsible for
 	// the network identity of the set. Pods get DNS/hostnames that follow a specific pattern.
+	//
+	// Note: This field will be removed in future version.
 	ServiceName string `json:"serviceName"`
 
 	// Defines the behavior of a service spec.
 	// Provides read-write service.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	//
+	// Note: This field will be removed in future version.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Service *corev1.Service `json:"service,omitempty"`
 
 	// Defines Alternative Services selector pattern specifier.
-	// Can be used for creating Readonly service.
+	//
+	// Note: This field will be removed in future version.
+	//
 	// +optional
 	AlternativeServices []corev1.Service `json:"alternativeServices,omitempty"`
 
@@ -159,17 +185,29 @@ type InstanceSetSpec struct {
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Specifies instances to be scaled in with dedicated names in the list.
+	// Specifies the names of instances to be transitioned to offline status.
+	//
+	// Marking an instance as offline results in the following:
+	//
+	// 1. The associated pod is stopped, and its PersistentVolumeClaim (PVC) is retained for potential
+	//    future reuse or data recovery, but it is no longer actively used.
+	// 2. The ordinal number assigned to this instance is preserved, ensuring it remains unique
+	//    and avoiding conflicts with new instances.
+	//
+	// Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
+	// ordinal consistency within the cluster.
+	// Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
+	// The cluster administrator must manually manage the cleanup and removal of these resources when they are no longer needed.
 	//
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
-	// Represents a list of claims that pods are allowed to reference.
-	// The InstanceSet controller is responsible for mapping network identities to
-	// claims in a way that maintains the identity of a pod. Every claim in
-	// this list must have at least one matching (by name) volumeMount in one
-	// container in the template. A claim in this list takes precedence over
-	// any volumes in the template, with the same name.
+	// Specifies a list of PersistentVolumeClaim templates that define the storage requirements for each replica.
+	// Each template specifies the desired characteristics of a persistent volume, such as storage class,
+	// size, and access modes.
+	// These templates are used to dynamically provision persistent volumes for replicas upon their creation.
+	// The final name of each PVC is generated by appending the pod's identifier to the name specified in volumeClaimTemplates[*].name.
+	//
 	// +optional
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
@@ -182,6 +220,8 @@ type InstanceSetSpec struct {
 	// to match the desired scale without waiting, and on scale down will delete
 	// all pods at once.
 	//
+	// Note: This field will be removed in future version.
+	//
 	// +optional
 	PodManagementPolicy appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
 
@@ -189,17 +229,22 @@ type InstanceSetSpec struct {
 	// employed to update Pods in the InstanceSet when a revision is made to
 	// Template.
 	// UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil
+	//
+	// Note: This field will be removed in future version.
 	UpdateStrategy appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// A list of roles defined in the system.
+	//
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
 	// Provides method to probe role.
+	//
 	// +optional
 	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
 
 	// Provides actions to do membership dynamic reconfiguration.
+	//
 	// +optional
 	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
 
@@ -218,6 +263,7 @@ type InstanceSetSpec struct {
 	Paused bool `json:"paused,omitempty"`
 
 	// Credential used to connect to DB engine
+	//
 	// +optional
 	Credential *Credential `json:"credential,omitempty"`
 }

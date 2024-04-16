@@ -36,7 +36,9 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ClusterVersion is the Schema for the ClusterVersions API
+        description: "ClusterVersion is the Schema for the ClusterVersions API. \n
+          Deprecated: ClusterVersion has been replaced by ComponentVersion since v0.9.
+          This struct is maintained for backward compatibility and its use is discouraged."
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -51,7 +53,9 @@ spec:
           metadata:
             type: object
           spec:
-            description: ClusterVersionSpec defines the desired state of ClusterVersion
+            description: "ClusterVersionSpec defines the desired state of ClusterVersion.
+              \n Deprecated since v0.9. This struct is maintained for backward compatibility
+              and its use is discouraged."
             properties:
               clusterDefinitionRef:
                 description: Specifies a reference to the ClusterDefinition.
@@ -61,8 +65,9 @@ spec:
                 description: Contains a list of versioning contexts for the components'
                   containers.
                 items:
-                  description: ClusterComponentVersion is an application version component
-                    spec.
+                  description: "ClusterComponentVersion is an application version
+                    component spec. \n Deprecated since v0.9. This struct is maintained
+                    for backward compatibility and its use is discouraged."
                   properties:
                     componentDefRef:
                       description: Specifies a reference to one of the cluster component
@@ -78,15 +83,26 @@ spec:
                       items:
                         properties:
                           asEnvFrom:
-                            description: An optional field where the list of containers
-                              will be injected into EnvFrom.
+                            description: "Specifies the containers to inject the ConfigMap
+                              parameters as environment variables. \n This is useful
+                              when application images accept parameters through environment
+                              variables and generate the final configuration file
+                              in the startup script based on these variables. \n This
+                              field allows users to specify a list of container names,
+                              and KubeBlocks will inject the environment variables
+                              converted from the ConfigMap into these designated containers.
+                              This provides a flexible way to pass the configuration
+                              items from the ConfigMap to the container without modifying
+                              the image. \n Note: The field name `asEnvFrom` may be
+                              changed to `injectEnvTo` in future versions for better
+                              clarity."
                             items:
                               type: string
                             type: array
                             x-kubernetes-list-type: set
                           constraintRef:
-                            description: An optional field that defines the name of
-                              the referenced configuration constraints object.
+                            description: Specifies the name of the referenced configuration
+                              constraints object.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
@@ -103,15 +119,32 @@ spec:
                             format: int32
                             type: integer
                           keys:
-                            description: Defines a list of keys. If left empty, ConfigConstraint
-                              applies to all keys in the configmap.
+                            description: "Specifies the configuration files within
+                              the ConfigMap that support dynamic updates. \n A configuration
+                              template (provided in the form of a ConfigMap) may contain
+                              templates for multiple configuration files. Each configuration
+                              file corresponds to a key in the ConfigMap. Some of
+                              these configuration files may support dynamic modification
+                              and reloading without requiring a pod restart. \n If
+                              empty or omitted, all configuration files in the ConfigMap
+                              are assumed to support dynamic updates, and ConfigConstraint
+                              applies to all keys."
                             items:
                               type: string
                             type: array
                             x-kubernetes-list-type: set
                           legacyRenderedConfigSpec:
-                            description: An optional field that defines the secondary
-                              rendered config spec.
+                            description: "Specifies the secondary rendered config
+                              spec for pod-specific customization. \n The template
+                              is rendered inside the pod (by the \"config-manager\"
+                              sidecar container) and merged with the main template's
+                              render result to generate the final configuration file.
+                              \n This field is intended to handle scenarios where
+                              different pods within the same Component have varying
+                              configurations. It allows for pod-specific customization
+                              of the configuration. \n Note: This field will be deprecated
+                              in future versions, and the functionality will be moved
+                              to `cluster.spec.componentSpecs[*].instances[*]`."
                             properties:
                               namespace:
                                 default: default
@@ -153,8 +186,15 @@ spec:
                             pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                           reRenderResourceTypes:
-                            description: An optional field defines which resources
-                              change trigger re-render config.
+                            description: "Specifies whether the configuration needs
+                              to be re-rendered after v-scale or h-scale operations
+                              to reflect changes. \n In some scenarios, the configuration
+                              may need to be updated to reflect the changes in resource
+                              allocation or cluster topology. Examples: \n - Redis:
+                              adjust maxmemory after v-scale operation. - MySQL: increase
+                              max connections after v-scale operation. - Zookeeper:
+                              update zoo.cfg with new node addresses after h-scale
+                              operation."
                             items:
                               description: RerenderResourceType defines the resource
                                 requirements for a component.
@@ -3329,7 +3369,9 @@ spec:
             - componentVersions
             type: object
           status:
-            description: ClusterVersionStatus defines the observed state of ClusterVersion
+            description: "ClusterVersionStatus defines the observed state of ClusterVersion.
+              \n Deprecated since v0.9. This struct is maintained for backward compatibility
+              and its use is discouraged."
             properties:
               clusterDefGeneration:
                 description: The generation number of the ClusterDefinition that is

@@ -58,8 +58,8 @@ spec:
               the configuration details for the state machine.
             properties:
               alternativeServices:
-                description: Defines Alternative Services selector pattern specifier.
-                  Can be used for creating Readonly service.
+                description: "Defines Alternative Services selector pattern specifier.
+                  \n Note: This field will be removed in future version."
                 items:
                   description: Service is a named abstraction of software service
                     (for example, mysql) consisting of local port (for example 3306)
@@ -835,12 +835,20 @@ spec:
                   Any remaining replicas will be generated using the default template
                   and will follow the default naming rules."
                 items:
+                  description: InstanceTemplate allows customization of individual
+                    replica configurations within a Component, without altering the
+                    base component template defined in ClusterComponentSpec. It enables
+                    the application of distinct settings to specific instances (replicas),
+                    providing flexibility while maintaining a common configuration
+                    baseline.
                   properties:
                     annotations:
                       additionalProperties:
                         type: string
-                      description: Defines annotations to override. Add new or override
-                        existing annotations.
+                      description: Specifies a map of key-value pairs to be merged
+                        into the Pod's existing annotations. Existing keys will have
+                        their values overwritten, while new keys will be added to
+                        the annotations.
                       type: object
                     env:
                       description: Defines Env to override. Add new or override existing
@@ -962,26 +970,37 @@ spec:
                         type: object
                       type: array
                     image:
-                      description: Defines image to override. Will override the first
-                        container's image of the pod.
+                      description: Specifies an override for the first container's
+                        image in the pod.
                       type: string
                     labels:
                       additionalProperties:
                         type: string
-                      description: Defines labels to override. Add new or override
-                        existing labels.
+                      description: Specifies a map of key-value pairs that will be
+                        merged into the Pod's existing labels. Values for existing
+                        keys will be overwritten, and new keys will be added.
                       type: object
                     name:
-                      description: Specifies the name of the template. Each instance
-                        of the template derives its name from the InstanceSet Name,
-                        the template's Name and the instance's ordinal. The constructed
-                        instance name follows the pattern $(instance_set.name)-$(template.name)-$(ordinal).
-                        The ordinal starts from 0 by default.
+                      description: 'Name specifies the unique name of the instance
+                        Pod created using this InstanceTemplate. This name is constructed
+                        by concatenating the component''s name, the template''s name,
+                        and the instance''s ordinal using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal).
+                        Ordinals start from 0. The specified name overrides any default
+                        naming conventions or patterns.'
                       maxLength: 54
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     nodeName:
-                      description: Defines NodeName to override.
+                      description: "Specifies the name of the node where the Pod should
+                        be scheduled. If set, the Pod will be directly assigned to
+                        the specified node, bypassing the Kubernetes scheduler. This
+                        is useful for controlling Pod placement on specific nodes.
+                        \n Important considerations: - `nodeName` bypasses default
+                        scheduling constraints (e.g., resource requirements, node
+                        selectors, affinity rules). - It is the user's responsibility
+                        to ensure the node is suitable for the Pod. - If the node
+                        is unavailable, the Pod will remain in \"Pending\" state until
+                        the node is available or the Pod is deleted."
                       type: string
                     nodeSelector:
                       additionalProperties:
@@ -990,14 +1009,18 @@ spec:
                       type: object
                     replicas:
                       default: 1
-                      description: Number of replicas of this template. Default is
-                        1.
+                      description: Specifies the number of instances (Pods) to create
+                        from this InstanceTemplate. This field allows setting how
+                        many replicated instances of the component, with the specific
+                        overrides in the InstanceTemplate, are created. The default
+                        value is 1. A value of 0 disables instance creation.
                       format: int32
                       minimum: 0
                       type: integer
                     resources:
-                      description: Defines Resources to override. Will override the
-                        first container's resources of the pod.
+                      description: Specifies an override for the resource requirements
+                        of the first container in the Pod. This field allows for customizing
+                        resource allocation (CPU, memory, etc.) for the container.
                       properties:
                         claims:
                           description: "Claims lists the names of resources, defined
@@ -1046,8 +1069,10 @@ spec:
                           type: object
                       type: object
                     tolerations:
-                      description: Defines Tolerations to override. Add new or override
-                        existing tolerations.
+                      description: Tolerations specifies a list of tolerations to
+                        be applied to the Pod, allowing it to tolerate node taints.
+                        This field can be used to add new tolerations or override
+                        existing ones.
                       items:
                         description: The pod this Toleration is attached to tolerates
                           any taint that matches the triple <key,value,effect> using
@@ -3393,8 +3418,18 @@ spec:
                 minimum: 0
                 type: integer
               offlineInstances:
-                description: Specifies instances to be scaled in with dedicated names
-                  in the list.
+                description: "Specifies the names of instances to be transitioned
+                  to offline status. \n Marking an instance as offline results in
+                  the following: \n 1. The associated pod is stopped, and its PersistentVolumeClaim
+                  (PVC) is retained for potential future reuse or data recovery, but
+                  it is no longer actively used. 2. The ordinal number assigned to
+                  this instance is preserved, ensuring it remains unique and avoiding
+                  conflicts with new instances. \n Setting instances to offline allows
+                  for a controlled scale-in process, preserving their data and maintaining
+                  ordinal consistency within the cluster. Note that offline instances
+                  and their associated resources, such as PVCs, are not automatically
+                  deleted. The cluster administrator must manually manage the cleanup
+                  and removal of these resources when they are no longer needed."
                 items:
                   type: string
                 type: array
@@ -3410,7 +3445,8 @@ spec:
                   When scaling down, the pods are removed in the opposite order. The
                   alternative policy is `Parallel` which will create pods in parallel
                   to match the desired scale without waiting, and on scale down will
-                  delete all pods at once."
+                  delete all pods at once. \n Note: This field will be removed in
+                  future version."
                 type: string
               replicas:
                 default: 1
@@ -3538,8 +3574,8 @@ spec:
                 type: array
               selector:
                 description: 'Represents a label query over pods that should match
-                  the replica count. It must match the pod template''s labels. More
-                  info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                  the desired replica count indicated by the `replica` field. It must
+                  match the labels defined in the pod template. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -3584,8 +3620,9 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               service:
-                description: Defines the behavior of a service spec. Provides read-write
+                description: "Defines the behavior of a service spec. Provides read-write
                   service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+                  \n Note: This field will be removed in future version."
                 properties:
                   apiVersion:
                     description: 'APIVersion defines the versioned schema of this
@@ -4109,10 +4146,11 @@ spec:
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
               serviceName:
-                description: Refers to the name of the service that governs this StatefulSet.
-                  This service must exist before the StatefulSet and is responsible
-                  for the network identity of the set. Pods get DNS/hostnames that
-                  follow a specific pattern.
+                description: "Refers to the name of the service that governs this
+                  StatefulSet. This service must exist before the StatefulSet and
+                  is responsible for the network identity of the set. Pods get DNS/hostnames
+                  that follow a specific pattern. \n Note: This field will be removed
+                  in future version."
                 type: string
               template:
                 description: PodTemplateSpec describes the data a pod should have
@@ -11676,10 +11714,11 @@ spec:
                     type: object
                 type: object
               updateStrategy:
-                description: Indicates the StatefulSetUpdateStrategy that will be
+                description: "Indicates the StatefulSetUpdateStrategy that will be
                   employed to update Pods in the InstanceSet when a revision is made
                   to Template. UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType
-                  if MemberUpdateStrategy is not nil
+                  if MemberUpdateStrategy is not nil \n Note: This field will be removed
+                  in future version."
                 properties:
                   rollingUpdate:
                     description: RollingUpdate is used to communicate parameters when
@@ -11715,13 +11754,13 @@ spec:
                     type: string
                 type: object
               volumeClaimTemplates:
-                description: Represents a list of claims that pods are allowed to
-                  reference. The InstanceSet controller is responsible for mapping
-                  network identities to claims in a way that maintains the identity
-                  of a pod. Every claim in this list must have at least one matching
-                  (by name) volumeMount in one container in the template. A claim
-                  in this list takes precedence over any volumes in the template,
-                  with the same name.
+                description: Specifies a list of PersistentVolumeClaim templates that
+                  define the storage requirements for each replica. Each template
+                  specifies the desired characteristics of a persistent volume, such
+                  as storage class, size, and access modes. These templates are used
+                  to dynamically provision persistent volumes for replicas upon their
+                  creation. The final name of each PVC is generated by appending the
+                  pod's identifier to the name specified in volumeClaimTemplates[*].name.
                 items:
                   description: PersistentVolumeClaim is a user's request for and claim
                     to a persistent volume

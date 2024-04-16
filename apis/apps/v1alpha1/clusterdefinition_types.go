@@ -27,9 +27,13 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-// ClusterDefinitionSpec defines the desired state of ClusterDefinition
+// ClusterDefinitionSpec defines the desired state of ClusterDefinition.
 type ClusterDefinitionSpec struct {
-	// Specifies the well-known application cluster type, such as mysql, redis, or mongodb.
+	// Specifies the well-known database type, such as mysql, redis, or mongodb.
+	//
+	// Deprecated since v0.9.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
 	//
 	// +kubebuilder:validation:MaxLength=24
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
@@ -38,6 +42,12 @@ type ClusterDefinitionSpec struct {
 	Type string `json:"type,omitempty"`
 
 	// Provides the definitions for the cluster components.
+	//
+	// Deprecated since v0.9.
+	// Components should now be individually defined using ComponentDefinition and
+	// collectively referenced via `topology.components`.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
 	//
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +patchMergeKey=name
@@ -65,11 +75,15 @@ type ClusterDefinitionSpec struct {
 	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and `$(SVC_PORT_mysql)` in the
 	//    connection credential value is 3306.
 	//
+	// Deprecated since v0.9.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+	//
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 
-	// Topologies represents the different topologies within the cluster.
+	// Topologies defines all possible topologies within the cluster.
 	//
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
@@ -93,58 +107,88 @@ type ClusterTopology struct {
 	// +kubebuilder:validation:MaxItems=128
 	Components []ClusterTopologyComponent `json:"components"`
 
-	// Orders defines the orders of components within the topology.
+	// Specifies the sequence in which components within a cluster topology are
+	// started, stopped, and upgraded.
+	// This ordering is crucial for maintaining the correct dependencies and operational flow across components.
 	//
 	// +optional
 	Orders *ClusterTopologyOrders `json:"orders,omitempty"`
 
-	// Default indicates whether this topology is the default configuration.
+	// Default indicates whether this topology serves as the default configuration.
+	// When set to true, this topology is automatically used unless another is explicitly specified.
 	//
 	// +optional
 	Default bool `json:"default,omitempty"`
 }
 
-// ClusterTopologyComponent defines a component within a cluster topology.
+// ClusterTopologyComponent defines a Component within a ClusterTopology.
 type ClusterTopologyComponent struct {
-	// Name defines the name of the component.
-	// This name is also part of Service DNS name, following IANA Service Naming rules.
-	// Cannot be updated.
+	// Defines the unique identifier of the component within the cluster topology.
+	// It follows IANA Service naming rules and is used as part of the Service's DNS name.
+	// The name must start with a lowercase letter, can contain lowercase letters, numbers,
+	// and hyphens, and must end with a lowercase letter or number.
+	//
+	// Cannot be updated once set.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=16
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// CompDef specifies the component definition to use, either as a specific name or a name prefix.
-	// Cannot be updated.
+	// Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
+	// defines the Component's characteristics and behavior.
+	//
+	// When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+	// This approach allows:
+	//
+	// 1. Precise selection by providing the exact name of a ComponentDefinition CR.
+	// 2. Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.
+	//
+	// Once set, this field cannot be updated.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=64
 	CompDef string `json:"compDef"`
 }
 
-// ClusterTopologyOrders defines the orders for components within a topology.
+// ClusterTopologyOrders manages the lifecycle of components within a cluster by defining their provisioning,
+// terminating, and updating sequences.
+// It organizes components into stages or groups, where each group indicates a set of components
+// that can be managed concurrently.
+// These groups are processed sequentially, allowing precise control based on component dependencies and requirements.
 type ClusterTopologyOrders struct {
-	// Provision defines the order in which components should be provisioned in the cluster.
-	// Components with the same order can be listed together, separated by commas.
+	// Specifies the order for creating and initializing components.
+	// This is designed for components that depend on one another. Components without dependencies can be grouped together.
+	//
+	// Components that can be provisioned independently or have no dependencies can be listed together in the same stage,
+	// separated by commas.
 	//
 	// +optional
 	Provision []string `json:"provision,omitempty"`
 
-	// Terminate defines the order in which components should be terminated in the cluster.
-	// Components with the same order can be listed together, separated by commas.
+	// Outlines the order for stopping and deleting components.
+	// This sequence is designed for components that require a graceful shutdown or have interdependencies.
+	//
+	// Components that can be terminated independently or have no dependencies can be listed together in the same stage,
+	// separated by commas.
 	//
 	// +optional
 	Terminate []string `json:"terminate,omitempty"`
 
-	// Update defines the order in which components should be updated in the cluster.
-	// Components with the same order can be listed together, separated by commas.
+	// Update determines the order for updating components' specifications, such as image upgrades or resource scaling.
+	// This sequence is designed for components that have dependencies or require specific update procedures.
+	//
+	// Components that can be updated independently or have no dependencies can be listed together in the same stage,
+	// separated by commas.
 	//
 	// +optional
 	Update []string `json:"update,omitempty"`
 }
 
 // SystemAccountSpec specifies information to create system accounts.
+//
+// Deprecated since v0.8, be replaced by `componentDefinition.spec.systemAccounts` and
+// `componentDefinition.spec.lifecycleActions.accountProvision`.
 type SystemAccountSpec struct {
 	// Configures how to obtain the client SDK and execute statements.
 	//
@@ -168,6 +212,8 @@ type SystemAccountSpec struct {
 }
 
 // CmdExecutorConfig specifies how to perform creation and deletion statements.
+//
+// Deprecated since v0.8.
 type CmdExecutorConfig struct {
 	CommandExecutorEnvItem `json:",inline"`
 	CommandExecutorItem    `json:",inline"`
@@ -213,6 +259,8 @@ type PasswordConfig struct {
 }
 
 // SystemAccountConfig specifies how to create and delete system accounts.
+//
+// Deprecated since v0.9.
 type SystemAccountConfig struct {
 	// The unique identifier of a system account.
 	//
@@ -226,6 +274,8 @@ type SystemAccountConfig struct {
 }
 
 // ProvisionPolicy defines the policy details for creating accounts.
+//
+// Deprecated since v0.9.
 type ProvisionPolicy struct {
 	// Specifies the method to provision an account.
 	//
@@ -262,6 +312,8 @@ type ProvisionSecretRef struct {
 }
 
 // ProvisionStatements defines the statements used to create accounts.
+//
+// Deprecated since v0.9.
 type ProvisionStatements struct {
 	// Specifies the statement required to create a new account with the necessary privileges.
 	//
@@ -276,6 +328,7 @@ type ProvisionStatements struct {
 	// Defines the statement required to delete an existing account.
 	// Typically used in conjunction with the creation statement to delete an account before recreating it.
 	// For example, one might use a `drop user if exists` statement followed by a `create user` statement to ensure a fresh account.
+	//
 	// Deprecated: This field is deprecated and the update statement should be used instead.
 	//
 	// +optional
@@ -314,13 +367,17 @@ func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
 }
 
 type ExporterConfig struct {
-	// Defines the port that the exporter uses for the Time Series Database to scrape metrics.
+	// Specifies the port on which the exporter listens for the Time Series Database to scrape metrics.
+	//
+	// It is a required field and accepts either an integer value or a string representation of the port number.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XIntOrString
 	ScrapePort intstr.IntOrString `json:"scrapePort"`
 
-	// Specifies the URL path that the exporter uses for the Time Series Database to scrape metrics.
+	// Specifies the URL path at which the exporter serves metrics data for scraping by the Time Series Database.
+	// The path should be configured on the exporter to respond with metrics in a compatible format.
+	// This field is optional and defaults to "/metrics" if not specified, with a maximum length of 128 characters.
 	//
 	// +kubebuilder:validation:MaxLength=128
 	// +kubebuilder:default="/metrics"
@@ -329,35 +386,47 @@ type ExporterConfig struct {
 }
 
 type MonitorConfig struct {
-	// To enable the built-in monitoring.
-	// When set to true, monitoring metrics will be automatically scraped.
-	// When set to false, the provider is expected to configure the ExporterConfig and manage the Sidecar container.
+	// Determines whether built-in monitoring is enabled.
+	// When true, monitoring metrics are automatically scraped.
+	// If set to false, configuration via `exporterConfig` is required to manage metrics scraping.
+	//
+	// Note: This field has no effect and will be deprecated soon.
 	//
 	// +kubebuilder:default=false
 	// +optional
 	BuiltIn bool `json:"builtIn,omitempty"`
 
-	// Provided by the provider and contains the necessary information for the Time Series Database.
-	// This field is only valid when BuiltIn is set to false.
+	// Specifies the settings for an external Time Series Database exporter, including the scrape path and port.
+	// This configuration is necessary for the Time Series Database to scrape metrics from the specified exporter.
+	//
+	// This field is valid when `builtIn` is set to false.
 	//
 	// +optional
 	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
 type LogConfig struct {
-	// Specifies the type of log, such as 'slow' for a MySQL slow log file.
+	// Specifies a descriptive label for the log type, such as 'slow' for a MySQL slow log file.
+	// It provides a clear identification of the log's purpose and content.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	Name string `json:"name"`
 
-	// Indicates the path to the log file using a pattern, it corresponds to the variable (log path) in the database kernel.
+	// Specifies the paths or patterns identifying where the log files are stored.
+	// This field allows the system to locate and manage log files effectively.
+	//
+	// Examples:
+	//
+	// - /home/postgres/pgdata/pgroot/data/log/postgresql-*
+	// - /data/mysql/log/mysqld-error.log
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=4096
 	FilePathPattern string `json:"filePathPattern"`
 }
 
+// VolumeTypeSpec is deprecated since v0.9, replaced with ComponentVolume.
 type VolumeTypeSpec struct {
 	// Corresponds to the name of the VolumeMounts field in PodSpec.Container.
 	//
@@ -371,6 +440,7 @@ type VolumeTypeSpec struct {
 	Type VolumeType `json:"type,omitempty"`
 }
 
+// VolumeProtectionSpec is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.
 type VolumeProtectionSpec struct {
 	// The high watermark threshold for volume space usage.
 	// If there is any specified volumes who's space usage is over the threshold, the pre-defined "LOCK" action
@@ -390,6 +460,7 @@ type VolumeProtectionSpec struct {
 	Volumes []ProtectedVolume `json:"volumes,omitempty"`
 }
 
+// ProtectedVolume is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.
 type ProtectedVolume struct {
 	// The Name of the volume to protect.
 	//
@@ -405,24 +476,32 @@ type ProtectedVolume struct {
 	HighWatermark *int `json:"highWatermark,omitempty"`
 }
 
+// ServiceRefDeclaration represents a reference to a service that can be either provided by a KubeBlocks Cluster
+// or an external service.
+// It acts as a placeholder for the actual service reference, which is determined later when a Cluster is created.
+//
+// The purpose of ServiceRefDeclaration is to declare a service dependency without specifying the concrete details
+// of the service.
+// It allows for flexibility and abstraction in defining service references within a Component.
+// By using ServiceRefDeclaration, you can define service dependencies in a declarative manner, enabling loose coupling
+// and easier management of service references across different components and clusters.
+//
+// Upon Cluster creation, the ServiceRefDeclaration is bound to an actual service through the ServiceRef field,
+// effectively resolving and connecting to the specified service.
 type ServiceRefDeclaration struct {
-	// Specifies the name of the service reference declaration.
-	//
-	// The service reference may originate from an external service that is not part of KubeBlocks, or from services
-	// provided by other KubeBlocks Cluster objects.
-	// The specific type of service reference is determined by the binding declaration when a Cluster is created.
+	// Specifies the name of the ServiceRefDeclaration.
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Represents a collection of service descriptions for a service reference declaration.
+	// Defines a list of constraints and requirements for services that can be bound to this ServiceRefDeclaration
+	// upon Cluster creation.
+	// Each ServiceRefDeclarationSpec defines a ServiceKind and ServiceVersion,
+	// outlining the acceptable service types and versions that are compatible.
 	//
-	// Each ServiceRefDeclarationSpec defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs are defined,
-	// it implies that the ServiceRefDeclaration can be any one of the specified ServiceRefDeclarationSpecs.
-	//
-	// For instance, when the ServiceRefDeclaration is declared to require an OLTP database, which can be either MySQL
-	// or PostgreSQL, a ServiceRefDeclarationSpec for MySQL and another for PostgreSQL can be defined.
-	// When referencing the service within the cluster, as long as the serviceKind and serviceVersion match either MySQL or PostgreSQL, it can be used.
+	// This flexibility allows a ServiceRefDeclaration to be fulfilled by any one of the provided specs.
+	// For example, if it requires an OLTP database, specs for both MySQL and PostgreSQL are listed,
+	// either MySQL or PostgreSQL services can be used when binding.
 	//
 	// +kubebuilder:validation:Required
 	ServiceRefDeclarationSpecs []ServiceRefDeclarationSpec `json:"serviceRefDeclarationSpecs"`
@@ -445,7 +524,11 @@ type ServiceRefDeclarationSpec struct {
 	ServiceVersion string `json:"serviceVersion"`
 }
 
-// ClusterComponentDefinition provides a workload component specification template. Attributes are designed to work effectively with stateful workloads and day-2 operations behaviors.
+// ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
+// has been replaced by ComponentDefinition.
+//
+// Deprecated: Use ComponentDefinition instead. This type is deprecated as of version 0.8.
+//
 // +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ? (has(self.consensusSpec) || has(self.rsmSpec)) : !has(self.consensusSpec)",message="componentDefs.consensusSpec(deprecated) or componentDefs.rsmSpec(recommended) is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
 type ClusterComponentDefinition struct {
 	// This name could be used as default name of `cluster.spec.componentSpecs.name`, and needs to conform with same
@@ -664,6 +747,7 @@ func (r *ClusterComponentDefinition) GetCommonStatefulSpec() (*StatefulSetSpec, 
 	return nil, nil
 }
 
+// ServiceSpec is deprecated since v0.8.
 type ServiceSpec struct {
 	// The list of ports that are exposed by this service.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
@@ -693,6 +777,7 @@ func (r ServiceSpec) ToSVCSpec() corev1.ServiceSpec {
 	}
 }
 
+// ServicePort is deprecated since v0.8.
 type ServicePort struct {
 	// The name of this port within the service. This must be a DNS_LABEL.
 	// All ports within a ServiceSpec must have unique names. When considering
@@ -747,6 +832,7 @@ func (r *ServicePort) toSVCPort() corev1.ServicePort {
 	}
 }
 
+// HorizontalScalePolicy is deprecated since v0.8.
 type HorizontalScalePolicy struct {
 	// Determines the data synchronization method when a component scales out.
 	// The policy can be one of the following: {None, CloneVolume}. The default policy is `None`.
@@ -772,6 +858,7 @@ type HorizontalScalePolicy struct {
 	VolumeMountsName string `json:"volumeMountsName,omitempty"`
 }
 
+// ClusterDefinitionProbeCMDs is deprecated since v0.8.
 type ClusterDefinitionProbeCMDs struct {
 	// Defines write checks that are executed on the probe sidecar.
 	//
@@ -784,6 +871,7 @@ type ClusterDefinitionProbeCMDs struct {
 	Queries []string `json:"queries,omitempty"`
 }
 
+// ClusterDefinitionProbe is deprecated since v0.8.
 type ClusterDefinitionProbe struct {
 	// How often (in seconds) to perform the probe.
 	//
@@ -809,6 +897,7 @@ type ClusterDefinitionProbe struct {
 	Commands *ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
 }
 
+// ClusterDefinitionProbes is deprecated since v0.8.
 type ClusterDefinitionProbes struct {
 	// Specifies the probe used for checking the running status of the component.
 	//
@@ -839,6 +928,7 @@ type ClusterDefinitionProbes struct {
 	RoleProbeTimeoutAfterPodsReady int32 `json:"roleProbeTimeoutAfterPodsReady,omitempty"`
 }
 
+// StatelessSetSpec is deprecated since v0.7.
 type StatelessSetSpec struct {
 	// Specifies the deployment strategy that will be used to replace existing pods with new ones.
 	//
@@ -847,6 +937,7 @@ type StatelessSetSpec struct {
 	UpdateStrategy appsv1.DeploymentStrategy `json:"updateStrategy,omitempty"`
 }
 
+// StatefulSetSpec is deprecated since v0.7.
 type StatefulSetSpec struct {
 	// Specifies the strategy for updating Pods.
 	// For workloadType=`Consensus`, the update strategy can be one of the following:
@@ -936,6 +1027,7 @@ func (r *StatefulSetSpec) finalStsUpdateStrategy() (appsv1.PodManagementPolicyTy
 	}
 }
 
+// ConsensusSetSpec is deprecated since v0.7.
 type ConsensusSetSpec struct {
 	StatefulSetSpec `json:",inline"`
 
@@ -989,6 +1081,7 @@ func NewConsensusSetSpec() *ConsensusSetSpec {
 	}
 }
 
+// ConsensusMember is deprecated since v0.7.
 type ConsensusMember struct {
 	// Specifies the name of the consensus member.
 	//
@@ -1011,6 +1104,7 @@ type ConsensusMember struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 
+// RSMSpec is deprecated since v0.8.
 type RSMSpec struct {
 	// Specifies a list of roles defined within the system.
 	//
@@ -1038,6 +1132,7 @@ type RSMSpec struct {
 	MemberUpdateStrategy *workloads.MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 }
 
+// ReplicationSetSpec is deprecated since v0.7.
 type ReplicationSetSpec struct {
 	StatefulSetSpec `json:",inline"`
 }
@@ -1064,6 +1159,7 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 	return appsv1.ParallelPodManagement, s
 }
 
+// PostStartAction is deprecated since v0.8.
 type PostStartAction struct {
 	// Specifies the  post-start command to be executed.
 	//
@@ -1077,6 +1173,7 @@ type PostStartAction struct {
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
+// SwitchoverSpec is deprecated since v0.8.
 type SwitchoverSpec struct {
 	// Represents the action of switching over to a specified candidate primary or leader instance.
 	//
@@ -1089,6 +1186,7 @@ type SwitchoverSpec struct {
 	WithoutCandidate *SwitchoverAction `json:"withoutCandidate,omitempty"`
 }
 
+// SwitchoverAction is deprecated since v0.8.
 type SwitchoverAction struct {
 	// Specifies the switchover command.
 	//
@@ -1112,6 +1210,7 @@ type ScriptSpecSelector struct {
 	Name string `json:"name"`
 }
 
+// CommandExecutorEnvItem is deprecated since v0.8.
 type CommandExecutorEnvItem struct {
 	// Specifies the image used to execute the command.
 	//
@@ -1127,6 +1226,7 @@ type CommandExecutorEnvItem struct {
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
+// CommandExecutorItem is deprecated since v0.8.
 type CommandExecutorItem struct {
 	// The command to be executed.
 	//
@@ -1140,6 +1240,7 @@ type CommandExecutorItem struct {
 	Args []string `json:"args,omitempty"`
 }
 
+// CustomLabelSpec is deprecated since v0.8.
 type CustomLabelSpec struct {
 	// The key of the label.
 	//
@@ -1157,6 +1258,7 @@ type CustomLabelSpec struct {
 	Resources []GVKResource `json:"resources,omitempty"`
 }
 
+// GVKResource is deprecated since v0.8.
 type GVKResource struct {
 	// Represents the GVK of a resource, such as "v1/Pod", "apps/v1/StatefulSet", etc.
 	// When a resource matching this is found by the selector, a custom label will be added if it doesn't already exist,
@@ -1186,7 +1288,7 @@ type GVKResource struct {
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ClusterDefinition is the Schema for the clusterdefinitions API
+// ClusterDefinition is the Schema for the ClusterDefinition API
 type ClusterDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -1257,6 +1359,8 @@ const (
 
 // ComponentValueFromType specifies the type of component value from which the data is derived.
 //
+// Deprecated since v0.8.
+//
 // +enum
 // +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
 type ComponentValueFromType string
@@ -1271,6 +1375,8 @@ const (
 )
 
 // ComponentDefRef is used to select the component and its fields to be referenced.
+//
+// Deprecated since v0.8.
 type ComponentDefRef struct {
 	// The name of the componentDef to be selected.
 	//
@@ -1296,6 +1402,8 @@ type ComponentDefRef struct {
 }
 
 // ComponentRefEnv specifies name and value of an env.
+//
+// Deprecated since v0.8.
 type ComponentRefEnv struct {
 	// The name of the env, it must be a C identifier.
 	//
@@ -1314,6 +1422,7 @@ type ComponentRefEnv struct {
 	ValueFrom *ComponentValueFrom `json:"valueFrom,omitempty"`
 }
 
+// ComponentValueFrom is deprecated since v0.8.
 type ComponentValueFrom struct {
 	// Specifies the source to select. It can be one of three types: `FieldRef`, `ServiceRef`, `HeadlessServiceRef`.
 	//

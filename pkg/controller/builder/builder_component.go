@@ -152,3 +152,8 @@ func (builder *ComponentBuilder) SetOfflineInstances(offlineInstances []string) 
 	builder.get().Spec.OfflineInstances = offlineInstances
 	return builder
 }
+
+func (builder *ComponentBuilder) SetRuntimeClassName(runtimeClassName string) *ComponentBuilder {
+	builder.get().Spec.RuntimeClassName = &runtimeClassName
+	return builder
+}

@@ -126,6 +126,10 @@ type ComponentSpec struct {
 	//
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
+
+	// Defines RuntimeClassName for all Pods managed by this component.
+	// +optional
+	RuntimeClassName *string `json:"runtimeClassName,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the cluster.

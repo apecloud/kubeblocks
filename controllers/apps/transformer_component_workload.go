@@ -46,7 +46,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
@@ -634,34 +633,6 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 	}
 	return err // TODO: use requeue-after
-}
-
-func (r *componentWorkloadOps) genPodName() {
-	templateReplicas := func(template appsv1alpha1.InstanceTemplate) int32 {
-		replicas := int32(1)
-		if template.Replicas != nil {
-			replicas = *template.Replicas
-		}
-		return replicas
-	}
-
-	templateReplicasCnt := int32(0)
-	for _, template := range r.synthesizeComp.Instances {
-		if len(template.Name) > 0 {
-			templateReplicasCnt += templateReplicas(template)
-		}
-	}
-
-	podNames := make([]string, 0)
-	workloadName := constant.GenerateRSMNamePattern(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
-	for _, template := range r.synthesizeComp.Instances {
-		templateNames := rsm2.GenerateInstanceNamesFromTemplate(workloadName, template.Name, templateReplicas(template), r.synthesizeComp.OfflineInstances)
-		podNames = append(podNames, templateNames...)
-	}
-	if templateReplicasCnt < r.synthesizeComp.Replicas {
-		names := rsm2.GenerateInstanceNamesFromTemplate(workloadName, "", r.synthesizeComp.Replicas-templateReplicasCnt, r.synthesizeComp.OfflineInstances)
-		podNames = append(podNames, names...)
-	}
 }
 
 func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) error {

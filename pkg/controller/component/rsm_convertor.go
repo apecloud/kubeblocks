@@ -162,7 +162,6 @@ func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *wo
 		NodeName:             instance.NodeName,
 		NodeSelector:         instance.NodeSelector,
 		Tolerations:          instance.Tolerations,
-		RuntimeClassName:     instance.RuntimeClassName,
 		Resources:            instance.Resources,
 		Env:                  instance.Env,
 		Volumes:              instance.Volumes,

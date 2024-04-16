@@ -158,6 +158,10 @@ type ClusterSpec struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Network *ClusterNetwork `json:"network,omitempty"`
+
+	// Defines RuntimeClassName for all Pods managed by this cluster.
+	// +optional
+	RuntimeClassName *string `json:"runtimeClassName,omitempty"`
 }
 
 type ClusterBackup struct {
@@ -351,10 +355,6 @@ type InstanceTemplate struct {
 	// Add new or override existing tolerations.
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// Defines RuntimeClass to override.
-	// +optional
-	RuntimeClassName *string `json:"RuntimeClassName,omitempty"`
 
 	// Defines Resources to override.
 	// Will override the first container's resources of the pod.

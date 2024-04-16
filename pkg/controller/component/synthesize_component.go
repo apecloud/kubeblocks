@@ -210,6 +210,9 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build serviceAccountName
 	buildServiceAccountName(synthesizeComp)
 
+	// build runtimeClassName
+	buildRuntimeClassName(synthesizeComp, comp)
+
 	// build lorryContainer
 	// TODO(xingran): buildLorryContainers relies on synthesizeComp.CharacterType and synthesizeComp.WorkloadType, which will be deprecated in the future.
 	if err := buildLorryContainers(reqCtx, synthesizeComp, clusterCompSpec); err != nil {
@@ -226,6 +229,13 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
 	return synthesizeComp, nil
+}
+
+func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+	if comp.Spec.RuntimeClassName == nil {
+		return
+	}
+	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
 }
 
 func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {

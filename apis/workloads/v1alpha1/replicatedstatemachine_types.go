@@ -71,10 +71,6 @@ type InstanceTemplate struct {
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// Defines RuntimeClass to override.
-	// +optional
-	RuntimeClassName *string `json:"RuntimeClassName,omitempty"`
-
 	// Defines Resources to override.
 	// Will override the first container's resources of the pod.
 	// +optional

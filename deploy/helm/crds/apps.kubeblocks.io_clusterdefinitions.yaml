@@ -38,7 +38,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ClusterDefinition is the Schema for the clusterdefinitions API
+        description: ClusterDefinition is the Schema for the ClusterDefinition API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -53,14 +53,21 @@ spec:
           metadata:
             type: object
           spec:
-            description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
+            description: ClusterDefinitionSpec defines the desired state of ClusterDefinition.
             properties:
               componentDefs:
-                description: Provides the definitions for the cluster components.
+                description: "Provides the definitions for the cluster components.
+                  \n Deprecated since v0.9. Components should now be individually
+                  defined using ComponentDefinition and collectively referenced via
+                  `topology.components`. This field is maintained for backward compatibility
+                  and its use is discouraged. Existing usage should be updated to
+                  the current preferred approach to avoid compatibility issues in
+                  future releases."
                 items:
-                  description: ClusterComponentDefinition provides a workload component
-                    specification template. Attributes are designed to work effectively
-                    with stateful workloads and day-2 operations behaviors.
+                  description: "ClusterComponentDefinition defines a Component within
+                    a ClusterDefinition but is deprecated and has been replaced by
+                    ComponentDefinition. \n Deprecated: Use ComponentDefinition instead.
+                    This type is deprecated as of version 0.8."
                   properties:
                     characterType:
                       description: Defines well-known database component name, such
@@ -71,8 +78,8 @@ spec:
                         the current component. Values will be saved and updated in
                         a configmap and mounted to the current component.
                       items:
-                        description: ComponentDefRef is used to select the component
-                          and its fields to be referenced.
+                        description: "ComponentDefRef is used to select the component
+                          and its fields to be referenced. \n Deprecated since v0.8."
                         properties:
                           componentDefName:
                             description: The name of the componentDef to be selected.
@@ -81,8 +88,8 @@ spec:
                             description: The values that are to be injected as environment
                               variables into each component.
                             items:
-                              description: ComponentRefEnv specifies name and value
-                                of an env.
+                              description: "ComponentRefEnv specifies name and value
+                                of an env. \n Deprecated since v0.8."
                               properties:
                                 name:
                                   description: The name of the env, it must be a C
@@ -167,15 +174,26 @@ spec:
                       items:
                         properties:
                           asEnvFrom:
-                            description: An optional field where the list of containers
-                              will be injected into EnvFrom.
+                            description: "Specifies the containers to inject the ConfigMap
+                              parameters as environment variables. \n This is useful
+                              when application images accept parameters through environment
+                              variables and generate the final configuration file
+                              in the startup script based on these variables. \n This
+                              field allows users to specify a list of container names,
+                              and KubeBlocks will inject the environment variables
+                              converted from the ConfigMap into these designated containers.
+                              This provides a flexible way to pass the configuration
+                              items from the ConfigMap to the container without modifying
+                              the image. \n Note: The field name `asEnvFrom` may be
+                              changed to `injectEnvTo` in future versions for better
+                              clarity."
                             items:
                               type: string
                             type: array
                             x-kubernetes-list-type: set
                           constraintRef:
-                            description: An optional field that defines the name of
-                              the referenced configuration constraints object.
+                            description: Specifies the name of the referenced configuration
+                              constraints object.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
@@ -192,15 +210,32 @@ spec:
                             format: int32
                             type: integer
                           keys:
-                            description: Defines a list of keys. If left empty, ConfigConstraint
-                              applies to all keys in the configmap.
+                            description: "Specifies the configuration files within
+                              the ConfigMap that support dynamic updates. \n A configuration
+                              template (provided in the form of a ConfigMap) may contain
+                              templates for multiple configuration files. Each configuration
+                              file corresponds to a key in the ConfigMap. Some of
+                              these configuration files may support dynamic modification
+                              and reloading without requiring a pod restart. \n If
+                              empty or omitted, all configuration files in the ConfigMap
+                              are assumed to support dynamic updates, and ConfigConstraint
+                              applies to all keys."
                             items:
                               type: string
                             type: array
                             x-kubernetes-list-type: set
                           legacyRenderedConfigSpec:
-                            description: An optional field that defines the secondary
-                              rendered config spec.
+                            description: "Specifies the secondary rendered config
+                              spec for pod-specific customization. \n The template
+                              is rendered inside the pod (by the \"config-manager\"
+                              sidecar container) and merged with the main template's
+                              render result to generate the final configuration file.
+                              \n This field is intended to handle scenarios where
+                              different pods within the same Component have varying
+                              configurations. It allows for pod-specific customization
+                              of the configuration. \n Note: This field will be deprecated
+                              in future versions, and the functionality will be moved
+                              to `cluster.spec.componentSpecs[*].instances[*]`."
                             properties:
                               namespace:
                                 default: default
@@ -242,8 +277,15 @@ spec:
                             pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                           reRenderResourceTypes:
-                            description: An optional field defines which resources
-                              change trigger re-render config.
+                            description: "Specifies whether the configuration needs
+                              to be re-rendered after v-scale or h-scale operations
+                              to reflect changes. \n In some scenarios, the configuration
+                              may need to be updated to reflect the changes in resource
+                              allocation or cluster topology. Examples: \n - Redis:
+                              adjust maxmemory after v-scale operation. - MySQL: increase
+                              max connections after v-scale operation. - Zookeeper:
+                              update zoo.cfg with new node addresses after h-scale
+                              operation."
                             items:
                               description: RerenderResourceType defines the resource
                                 requirements for a component.
@@ -286,6 +328,7 @@ spec:
                           description: Members of the consensus set that have voting
                             rights but are not the leader.
                           items:
+                            description: ConsensusMember is deprecated since v0.7.
                             properties:
                               accessMode:
                                 default: ReadWrite
@@ -444,6 +487,7 @@ spec:
                       description: Used for custom label tags which you want to add
                         to the component resources.
                       items:
+                        description: CustomLabelSpec is deprecated since v0.8.
                         properties:
                           key:
                             description: The key of the label.
@@ -452,6 +496,7 @@ spec:
                             description: The resources that will be patched with the
                               label.
                             items:
+                              description: GVKResource is deprecated since v0.8.
                               properties:
                                 gvk:
                                   description: Represents the GVK of a resource, such
@@ -519,14 +564,17 @@ spec:
                       items:
                         properties:
                           filePathPattern:
-                            description: Indicates the path to the log file using
-                              a pattern, it corresponds to the variable (log path)
-                              in the database kernel.
+                            description: "Specifies the paths or patterns identifying
+                              where the log files are stored. This field allows the
+                              system to locate and manage log files effectively. \n
+                              Examples: \n - /home/postgres/pgdata/pgroot/data/log/postgresql-*
+                              - /data/mysql/log/mysqld-error.log"
                             maxLength: 4096
                             type: string
                           name:
-                            description: Specifies the type of log, such as 'slow'
-                              for a MySQL slow log file.
+                            description: Specifies a descriptive label for the log
+                              type, such as 'slow' for a MySQL slow log file. It provides
+                              a clear identification of the log's purpose and content.
                             maxLength: 128
                             type: string
                         required:
@@ -542,28 +590,37 @@ spec:
                       properties:
                         builtIn:
                           default: false
-                          description: To enable the built-in monitoring. When set
-                            to true, monitoring metrics will be automatically scraped.
-                            When set to false, the provider is expected to configure
-                            the ExporterConfig and manage the Sidecar container.
+                          description: "Determines whether built-in monitoring is
+                            enabled. When true, monitoring metrics are automatically
+                            scraped. If set to false, configuration via `exporterConfig`
+                            is required to manage metrics scraping. \n Note: This
+                            field has no effect and will be deprecated soon."
                           type: boolean
                         exporterConfig:
-                          description: Provided by the provider and contains the necessary
-                            information for the Time Series Database. This field is
-                            only valid when BuiltIn is set to false.
+                          description: "Specifies the settings for an external Time
+                            Series Database exporter, including the scrape path and
+                            port. This configuration is necessary for the Time Series
+                            Database to scrape metrics from the specified exporter.
+                            \n This field is valid when `builtIn` is set to false."
                           properties:
                             scrapePath:
                               default: /metrics
-                              description: Specifies the URL path that the exporter
-                                uses for the Time Series Database to scrape metrics.
+                              description: Specifies the URL path at which the exporter
+                                serves metrics data for scraping by the Time Series
+                                Database. The path should be configured on the exporter
+                                to respond with metrics in a compatible format. This
+                                field is optional and defaults to "/metrics" if not
+                                specified, with a maximum length of 128 characters.
                               maxLength: 128
                               type: string
                             scrapePort:
                               anyOf:
                               - type: integer
                               - type: string
-                              description: Defines the port that the exporter uses
-                                for the Time Series Database to scrape metrics.
+                              description: "Specifies the port on which the exporter
+                                listens for the Time Series Database to scrape metrics.
+                                \n It is a required field and accepts either an integer
+                                value or a string representation of the port number."
                               x-kubernetes-int-or-string: true
                           required:
                           - scrapePort
@@ -9032,6 +9089,7 @@ spec:
                           description: 'The list of ports that are exposed by this
                             service. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies'
                           items:
+                            description: ServicePort is deprecated since v0.8.
                             properties:
                               appProtocol:
                                 description: The application protocol for this port.
@@ -9090,28 +9148,36 @@ spec:
                       description: Used to declare the service reference of the current
                         component.
                       items:
+                        description: "ServiceRefDeclaration represents a reference
+                          to a service that can be either provided by a KubeBlocks
+                          Cluster or an external service. It acts as a placeholder
+                          for the actual service reference, which is determined later
+                          when a Cluster is created. \n The purpose of ServiceRefDeclaration
+                          is to declare a service dependency without specifying the
+                          concrete details of the service. It allows for flexibility
+                          and abstraction in defining service references within a
+                          Component. By using ServiceRefDeclaration, you can define
+                          service dependencies in a declarative manner, enabling loose
+                          coupling and easier management of service references across
+                          different components and clusters. \n Upon Cluster creation,
+                          the ServiceRefDeclaration is bound to an actual service
+                          through the ServiceRef field, effectively resolving and
+                          connecting to the specified service."
                         properties:
                           name:
-                            description: "Specifies the name of the service reference
-                              declaration. \n The service reference may originate
-                              from an external service that is not part of KubeBlocks,
-                              or from services provided by other KubeBlocks Cluster
-                              objects. The specific type of service reference is determined
-                              by the binding declaration when a Cluster is created."
+                            description: Specifies the name of the ServiceRefDeclaration.
                             type: string
                           serviceRefDeclarationSpecs:
-                            description: "Represents a collection of service descriptions
-                              for a service reference declaration. \n Each ServiceRefDeclarationSpec
-                              defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs
-                              are defined, it implies that the ServiceRefDeclaration
-                              can be any one of the specified ServiceRefDeclarationSpecs.
-                              \n For instance, when the ServiceRefDeclaration is declared
-                              to require an OLTP database, which can be either MySQL
-                              or PostgreSQL, a ServiceRefDeclarationSpec for MySQL
-                              and another for PostgreSQL can be defined. When referencing
-                              the service within the cluster, as long as the serviceKind
-                              and serviceVersion match either MySQL or PostgreSQL,
-                              it can be used."
+                            description: "Defines a list of constraints and requirements
+                              for services that can be bound to this ServiceRefDeclaration
+                              upon Cluster creation. Each ServiceRefDeclarationSpec
+                              defines a ServiceKind and ServiceVersion, outlining
+                              the acceptable service types and versions that are compatible.
+                              \n This flexibility allows a ServiceRefDeclaration to
+                              be fulfilled by any one of the provided specs. For example,
+                              if it requires an OLTP database, specs for both MySQL
+                              and PostgreSQL are listed, either MySQL or PostgreSQL
+                              services can be used when binding."
                             items:
                               properties:
                                 serviceKind:
@@ -9629,8 +9695,8 @@ spec:
                           description: Defines the configuration settings for system
                             accounts.
                           items:
-                            description: SystemAccountConfig specifies how to create
-                              and delete system accounts.
+                            description: "SystemAccountConfig specifies how to create
+                              and delete system accounts. \n Deprecated since v0.9."
                             properties:
                               name:
                                 description: The unique identifier of a system account.
@@ -9674,15 +9740,16 @@ spec:
                                           privileges.
                                         type: string
                                       deletion:
-                                        description: 'Defines the statement required
+                                        description: "Defines the statement required
                                           to delete an existing account. Typically
                                           used in conjunction with the creation statement
                                           to delete an account before recreating it.
                                           For example, one might use a `drop user
                                           if exists` statement followed by a `create
                                           user` statement to ensure a fresh account.
-                                          Deprecated: This field is deprecated and
-                                          the update statement should be used instead.'
+                                          \n Deprecated: This field is deprecated
+                                          and the update statement should be used
+                                          instead."
                                         type: string
                                       update:
                                         description: Defines the statement required
@@ -9921,6 +9988,8 @@ spec:
                         volumes:
                           description: The Volumes to be protected.
                           items:
+                            description: ProtectedVolume is deprecated since v0.9,
+                              replaced with ComponentVolume.HighWatermark.
                             properties:
                               highWatermark:
                                 description: Defines the high watermark threshold
@@ -9948,6 +10017,8 @@ spec:
                         the backup function will not be supported, even if a persistent
                         volume has been specified."
                       items:
+                        description: VolumeTypeSpec is deprecated since v0.9, replaced
+                          with ComponentVolume.
                         properties:
                           name:
                             description: Corresponds to the name of the VolumeMounts
@@ -10013,11 +10084,15 @@ spec:
                   attribute; - `$(SVC_PORT_{PORT-NAME})` is ServicePort's port value
                   with specified port name, i.e, a servicePort JSON struct: `{\"name\":
                   \"mysql\", \"targetPort\": \"mysqlContainerPort\", \"port\": 3306}`,
-                  and `$(SVC_PORT_mysql)` in the connection credential value is 3306."
+                  and `$(SVC_PORT_mysql)` in the connection credential value is 3306.
+                  \n Deprecated since v0.9. This field is maintained for backward
+                  compatibility and its use is discouraged. Existing usage should
+                  be updated to the current preferred approach to avoid compatibility
+                  issues in future releases."
                 type: object
               topologies:
-                description: Topologies represents the different topologies within
-                  the cluster.
+                description: Topologies defines all possible topologies within the
+                  cluster.
                 items:
                   description: ClusterTopology represents the definition for a specific
                     cluster topology.
@@ -10025,19 +10100,29 @@ spec:
                     components:
                       description: Components specifies the components in the topology.
                       items:
-                        description: ClusterTopologyComponent defines a component
-                          within a cluster topology.
+                        description: ClusterTopologyComponent defines a Component
+                          within a ClusterTopology.
                         properties:
                           compDef:
-                            description: CompDef specifies the component definition
-                              to use, either as a specific name or a name prefix.
-                              Cannot be updated.
+                            description: "Specifies the name or prefix of the ComponentDefinition
+                              custom resource(CR) that defines the Component's characteristics
+                              and behavior. \n When a prefix is used, the system selects
+                              the ComponentDefinition CR with the latest version that
+                              matches the prefix. This approach allows: \n 1. Precise
+                              selection by providing the exact name of a ComponentDefinition
+                              CR. 2. Flexible and automatic selection of the most
+                              up-to-date ComponentDefinition CR by specifying a prefix.
+                              \n Once set, this field cannot be updated."
                             maxLength: 64
                             type: string
                           name:
-                            description: Name defines the name of the component. This
-                              name is also part of Service DNS name, following IANA
-                              Service Naming rules. Cannot be updated.
+                            description: "Defines the unique identifier of the component
+                              within the cluster topology. It follows IANA Service
+                              naming rules and is used as part of the Service's DNS
+                              name. The name must start with a lowercase letter, can
+                              contain lowercase letters, numbers, and hyphens, and
+                              must end with a lowercase letter or number. \n Cannot
+                              be updated once set."
                             maxLength: 16
                             pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
@@ -10049,8 +10134,9 @@ spec:
                       minItems: 1
                       type: array
                     default:
-                      description: Default indicates whether this topology is the
-                        default configuration.
+                      description: Default indicates whether this topology serves
+                        as the default configuration. When set to true, this topology
+                        is automatically used unless another is explicitly specified.
                       type: boolean
                     name:
                       description: Name is the unique identifier for the cluster topology.
@@ -10058,27 +10144,38 @@ spec:
                       maxLength: 32
                       type: string
                     orders:
-                      description: Orders defines the orders of components within
-                        the topology.
+                      description: Specifies the sequence in which components within
+                        a cluster topology are started, stopped, and upgraded. This
+                        ordering is crucial for maintaining the correct dependencies
+                        and operational flow across components.
                       properties:
                         provision:
-                          description: Provision defines the order in which components
-                            should be provisioned in the cluster. Components with
-                            the same order can be listed together, separated by commas.
+                          description: "Specifies the order for creating and initializing
+                            components. This is designed for components that depend
+                            on one another. Components without dependencies can be
+                            grouped together. \n Components that can be provisioned
+                            independently or have no dependencies can be listed together
+                            in the same stage, separated by commas."
                           items:
                             type: string
                           type: array
                         terminate:
-                          description: Terminate defines the order in which components
-                            should be terminated in the cluster. Components with the
-                            same order can be listed together, separated by commas.
+                          description: "Outlines the order for stopping and deleting
+                            components. This sequence is designed for components that
+                            require a graceful shutdown or have interdependencies.
+                            \n Components that can be terminated independently or
+                            have no dependencies can be listed together in the same
+                            stage, separated by commas."
                           items:
                             type: string
                           type: array
                         update:
-                          description: Update defines the order in which components
-                            should be updated in the cluster. Components with the
-                            same order can be listed together, separated by commas.
+                          description: "Update determines the order for updating components'
+                            specifications, such as image upgrades or resource scaling.
+                            This sequence is designed for components that have dependencies
+                            or require specific update procedures. \n Components that
+                            can be updated independently or have no dependencies can
+                            be listed together in the same stage, separated by commas."
                           items:
                             type: string
                           type: array
@@ -10091,8 +10188,11 @@ spec:
                 minItems: 1
                 type: array
               type:
-                description: Specifies the well-known application cluster type, such
-                  as mysql, redis, or mongodb.
+                description: "Specifies the well-known database type, such as mysql,
+                  redis, or mongodb. \n Deprecated since v0.9. This field is maintained
+                  for backward compatibility and its use is discouraged. Existing
+                  usage should be updated to the current preferred approach to avoid
+                  compatibility issues in future releases."
                 maxLength: 24
                 pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                 type: string

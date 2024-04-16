@@ -218,6 +218,13 @@ func (ha *Ha) Start() {
 		util.WaitForPodReady(false)
 	}
 
+	// Delete duplicate member deletion records.
+	removed := cluster.HaConfig.TryToRemoveDeleteRecord(cluster.GetMemberWithName(ha.dbManager.GetCurrentMemberName()))
+	if removed {
+		ha.logger.Info("Found previous duplicated delete record, remove it")
+		_ = ha.dcs.UpdateHaConfig()
+	}
+
 	ha.logger.Info(fmt.Sprintf("cluster: %v", cluster))
 	isInitialized, err := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
 	for err != nil || !isInitialized {
@@ -359,14 +366,5 @@ func (ha *Ha) isMinimumLag(ctx context.Context, cluster *dcs3.Cluster, member *d
 }
 
 func (ha *Ha) ShutdownWithWait() {
-	cluster, _ := ha.dcs.GetCluster()
-	member := cluster.GetMemberWithName(ha.dbManager.GetCurrentMemberName())
-	if cluster.HaConfig != nil && member != nil {
-		if cluster.HaConfig.IsDeleting(member) {
-			cluster.HaConfig.FinishDeleted(member)
-			_ = ha.dcs.UpdateHaConfig()
-		}
-	}
-
 	ha.dbManager.ShutDownWithWait()
 }

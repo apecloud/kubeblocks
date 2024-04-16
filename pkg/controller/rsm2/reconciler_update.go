@@ -122,7 +122,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	updatingPods := 0
 	updatedPods := 0
 	priorities := rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
-	sortObjects(oldPodList, priorities, false)
+	sortObjects(oldPodList, priorities, true)
 	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
 			break

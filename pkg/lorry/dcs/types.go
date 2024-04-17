@@ -173,6 +173,29 @@ func (c *HaConfig) FinishDeleted(member *Member) {
 	c.DeleteMembers[member.Name] = *memberToDelete
 }
 
+func (c *HaConfig) TryToRemoveDeleteRecord(member *Member) bool {
+	memberToDelete := c.GetDuplicatedMemberToDelete(member)
+	if memberToDelete != nil {
+		delete(c.DeleteMembers, member.Name)
+		return true
+	}
+
+	return false
+}
+
+// GetDuplicatedMemberToDelete get previous duplicated delete record in ha configmap
+func (c *HaConfig) GetDuplicatedMemberToDelete(member *Member) *MemberToDelete {
+	memberToDelete, ok := c.DeleteMembers[member.Name]
+	if !ok {
+		return nil
+	}
+
+	if memberToDelete.UID == member.UID {
+		return nil
+	}
+	return &memberToDelete
+}
+
 func (c *HaConfig) GetMemberToDelete(member *Member) *MemberToDelete {
 	memberToDelete, ok := c.DeleteMembers[member.Name]
 	if !ok {

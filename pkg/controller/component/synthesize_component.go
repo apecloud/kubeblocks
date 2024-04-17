@@ -21,7 +21,6 @@ package component
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	"strconv"
 	"strings"
 
@@ -35,6 +34,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 

@@ -21,11 +21,7 @@ package highavailability
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sort"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -42,7 +38,6 @@ type Ha struct {
 	dbManager         engines.DBManager
 	dcs               dcs3.DCS
 	logger            logr.Logger
-	deleteLock        sync.Mutex
 	disableDNSChecker bool
 }
 
@@ -87,7 +82,6 @@ func (ha *Ha) RunCycle() {
 
 	if cluster.HaConfig.IsDeleting(currentMember) {
 		ha.logger.Info("Current Member is deleted!")
-		_ = ha.DeleteCurrentMember(ha.ctx, cluster)
 		return
 	}
 
@@ -187,10 +181,6 @@ func (ha *Ha) RunCycle() {
 		ha.logger.Info("Refresh leader ttl")
 		_ = ha.dcs.UpdateLease()
 
-		if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(ha.ctx, cluster)) && cluster.Replicas != 0 {
-			ha.DecreaseClusterReplicas(cluster)
-		}
-
 	case !ha.dcs.HasLease():
 		if cluster.Switchover != nil {
 			break
@@ -226,6 +216,13 @@ func (ha *Ha) Start() {
 
 	if !ha.disableDNSChecker {
 		util.WaitForPodReady(false)
+	}
+
+	// Delete duplicate member deletion records.
+	removed := cluster.HaConfig.TryToRemoveDeleteRecord(cluster.GetMemberWithName(ha.dbManager.GetCurrentMemberName()))
+	if removed {
+		ha.logger.Info("Found previous duplicated delete record, remove it")
+		_ = ha.dcs.UpdateHaConfig()
 	}
 
 	ha.logger.Info(fmt.Sprintf("cluster: %v", cluster))
@@ -288,30 +285,6 @@ func (ha *Ha) Start() {
 	}
 }
 
-func (ha *Ha) DecreaseClusterReplicas(cluster *dcs3.Cluster) {
-	hosts := ha.dbManager.GetMemberAddrs(ha.ctx, cluster)
-	sort.Strings(hosts)
-	deleteHost := hosts[len(hosts)-1]
-	ha.logger.Info("Delete member", "name", deleteHost)
-	// The pods in the cluster are managed by a StatefulSet. If the replica count is decreased,
-	// then the last pod will be removed first.
-	//
-	if strings.HasPrefix(deleteHost, ha.dbManager.GetCurrentMemberName()) {
-		ha.logger.Info(fmt.Sprintf("The last pod %s is the primary member and cannot be deleted. waiting "+
-			"for The controller to perform a switchover to a new primary member before this pod can be removed. ", deleteHost))
-		_ = ha.dbManager.Demote(ha.ctx)
-		_ = ha.dcs.ReleaseLease()
-		return
-	}
-	memberName := strings.Split(deleteHost, ".")[0]
-	member := cluster.GetMemberWithName(memberName)
-	if member != nil {
-		ha.logger.Info(fmt.Sprintf("member %s exists, do not delete", memberName))
-		return
-	}
-	_ = ha.dbManager.LeaveMemberFromCluster(ha.ctx, cluster, memberName)
-}
-
 func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs3.Cluster) bool {
 	currentMemberName := ha.dbManager.GetCurrentMemberName()
 	currentMember := cluster.GetMemberWithName(currentMemberName)
@@ -371,56 +344,6 @@ func (ha *Ha) HasOtherHealthyMember(cluster *dcs3.Cluster) bool {
 	}
 
 	return false
-}
-
-func (ha *Ha) DeleteCurrentMember(ctx context.Context, cluster *dcs3.Cluster) error {
-	currentMember := cluster.GetMemberWithName(ha.dbManager.GetCurrentMemberName())
-	if cluster.HaConfig.IsDeleted(currentMember) {
-		return nil
-	}
-
-	ha.deleteLock.Lock()
-	defer ha.deleteLock.Unlock()
-
-	// if current member is leader, take a switchover first
-	if ha.dcs.HasLease() {
-		for cluster.Switchover != nil {
-			ha.logger.Info("cluster is doing switchover, wait for it to finish")
-			return nil
-		}
-
-		leaderMember := cluster.GetLeaderMember()
-		if len(ha.dbManager.HasOtherHealthyMembers(ctx, cluster, leaderMember.Name)) == 0 {
-			message := "cluster has no other healthy members"
-			ha.logger.Info(message)
-			return errors.New(message)
-		}
-
-		err := ha.dcs.CreateSwitchover(leaderMember.Name, "")
-		if err != nil {
-			ha.logger.Error(err, "switchover failed")
-			return err
-		}
-
-		ha.logger.Info("cluster is doing switchover, wait for it to finish")
-		return nil
-	}
-
-	// redistribute the data of the current member among other members if needed
-	err := ha.dbManager.MoveData(ctx, cluster)
-	if err != nil {
-		ha.logger.Error(err, "Move data failed")
-		return err
-	}
-
-	// remove current member from db cluster
-	err = ha.dbManager.LeaveMemberFromCluster(ctx, cluster, ha.dbManager.GetCurrentMemberName())
-	if err != nil {
-		ha.logger.Error(err, "Delete member form cluster failed")
-		return err
-	}
-	cluster.HaConfig.FinishDeleted(currentMember)
-	return ha.dcs.UpdateHaConfig()
 }
 
 func (ha *Ha) isMinimumLag(ctx context.Context, cluster *dcs3.Cluster, member *dcs3.Member) bool {

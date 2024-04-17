@@ -54,7 +54,6 @@ type controller struct {
 }
 
 func (c *controller) Prepare(reader TreeLoader) Controller {
-	c.logger.Info("**************** prepare")
 	c.oldTree, c.err = reader.Load(c.ctx, c.cli, c.req, c.recorder, c.logger)
 	if c.err != nil {
 		return c
@@ -77,7 +76,6 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 	}
 
 	for _, reconciler := range reconcilers {
-		c.logger.Info(fmt.Sprintf("**************** do reconciler %T", reconciler))
 		switch result := reconciler.PreCondition(c.tree); {
 		case result.Err != nil:
 			c.err = result.Err
@@ -96,7 +94,6 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 }
 
 func (c *controller) Commit() error {
-	c.logger.Info("**************** commit start")
 	if c.err != nil {
 		return c.err
 	}
@@ -112,7 +109,6 @@ func (c *controller) Commit() error {
 		return err
 	}
 	err = plan.Execute()
-	c.logger.Info("**************** commit done")
 	return err
 }
 

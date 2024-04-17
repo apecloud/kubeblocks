@@ -253,9 +253,6 @@ spec:
                         description: InstanceTemplate defines values to override in
                           pod template.
                         properties:
-                          RuntimeClassName:
-                            description: Defines RuntimeClass to override.
-                            type: string
                           annotations:
                             additionalProperties:
                               type: string
@@ -4741,6 +4738,10 @@ spec:
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                 type: object
+              runtimeClassName:
+                description: Defines RuntimeClassName for all Pods managed by this
+                  cluster.
+                type: string
               schedulingPolicy:
                 description: Specifies the scheduling policy for the cluster.
                 properties:
@@ -6383,9 +6384,6 @@ spec:
                             description: InstanceTemplate defines values to override
                               in pod template.
                             properties:
-                              RuntimeClassName:
-                                description: Defines RuntimeClass to override.
-                                type: string
                               annotations:
                                 additionalProperties:
                                   type: string

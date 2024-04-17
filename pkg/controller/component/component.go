@@ -104,6 +104,9 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 	if !IsGenerated(compBuilder.GetObject()) {
 		compBuilder.SetServices(compSpec.Services)
 	}
+	if cluster.Spec.RuntimeClassName != nil {
+		compBuilder.SetRuntimeClassName(*cluster.Spec.RuntimeClassName)
+	}
 	return compBuilder.GetObject(), nil
 }
 

@@ -470,6 +470,18 @@ ClusterNetwork
 <p>The configuration of network.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>runtimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines RuntimeClassName for all Pods managed by this cluster.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -1009,6 +1021,18 @@ TLSConfig
 <td>
 <em>(Optional)</em>
 <p>Specifies instances to be scaled in with dedicated names in the list.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>runtimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines RuntimeClassName for all Pods managed by this component.</p>
 </td>
 </tr>
 </table>
@@ -5586,6 +5610,18 @@ ClusterNetwork
 <p>The configuration of network.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>runtimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines RuntimeClassName for all Pods managed by this cluster.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterStatus">ClusterStatus
@@ -7651,6 +7687,18 @@ TLSConfig
 <td>
 <em>(Optional)</em>
 <p>Specifies instances to be scaled in with dedicated names in the list.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>runtimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines RuntimeClassName for all Pods managed by this component.</p>
 </td>
 </tr>
 </tbody>
@@ -10716,18 +10764,6 @@ map[string]string
 <em>(Optional)</em>
 <p>Defines Tolerations to override.
 Add new or override existing tolerations.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>RuntimeClassName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines RuntimeClass to override.</p>
 </td>
 </tr>
 <tr>
@@ -20776,18 +20812,6 @@ map[string]string
 <em>(Optional)</em>
 <p>Defines Tolerations to override.
 Add new or override existing tolerations.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>RuntimeClassName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines RuntimeClass to override.</p>
 </td>
 </tr>
 <tr>

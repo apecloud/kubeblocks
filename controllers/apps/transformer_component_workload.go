@@ -598,13 +598,18 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 		return err
 	}
+
+	// TODO: Move memberLeave to the RSM controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
+	podsToMemberLeave := make([]*corev1.Pod, 0)
+	genPodNamesByDefault := generatePodNames(r.synthesizeComp)
 	for _, pod := range pods {
-		subs := strings.Split(pod.Name, "-")
-		if ordinal, err := strconv.ParseInt(subs[len(subs)-1], 10, 32); err != nil {
-			return err
-		} else if int32(ordinal) < r.synthesizeComp.Replicas {
+		// if the pod not exists in the generated pod names, it should be a member that needs to leave
+		if slices.Contains(genPodNamesByDefault, pod.Name) {
 			continue
 		}
+		podsToMemberLeave = append(podsToMemberLeave, pod)
+	}
+	for _, pod := range podsToMemberLeave {
 		lorryCli, err1 := lorry.NewClient(*pod)
 		if err1 != nil {
 			if err == nil {

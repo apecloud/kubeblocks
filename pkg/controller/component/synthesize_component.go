@@ -264,13 +264,17 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1a
 
 	// Build from ShardingSpecs
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		shardingComps, err := intctrlutil.GenShardingCompSpecList(ctx, cli, cluster, &shardingSpec)
+		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, &shardingSpec)
 		if err != nil {
 			return nil, err
 		}
 		for _, shardingComp := range shardingComps {
-			if len(shardingComp.ComponentDef) > 0 {
-				mapping[shardingComp.Name] = shardingComp.ComponentDef
+			if len(shardingComp.Spec.CompDef) > 0 {
+				compShortName, err := ShortName(cluster.Name, shardingComp.Name)
+				if err != nil {
+					return nil, err
+				}
+				mapping[compShortName] = shardingComp.Spec.CompDef
 			}
 		}
 	}

@@ -72,11 +72,14 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 
 	// if pod is the latest version, we do nothing
 	if intctrlutil.GetPodRevision(pod) == p.rsm.Status.UpdateRevision {
-		if intctrlutil.PodIsReadyWithLabel(*pod) {
-			return ErrContinue
-		} else {
+		if !intctrlutil.PodIsReady(pod) {
 			return ErrWait
 		}
+		isRoleful := func() bool { return len(p.rsm.Spec.Roles) > 0 }()
+		if isRoleful && !intctrlutil.PodIsReadyWithLabel(*pod) {
+			return ErrWait
+		}
+		return ErrContinue
 	}
 
 	// delete the pod to trigger associate StatefulSet to re-create it

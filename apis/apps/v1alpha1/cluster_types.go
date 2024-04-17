@@ -98,11 +98,13 @@ type ClusterSpec struct {
 
 	// A group of affinity scheduling rules.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// Attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
@@ -538,11 +540,13 @@ type ClusterComponentSpec struct {
 
 	// A group of affinity scheduling rules.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// Attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`

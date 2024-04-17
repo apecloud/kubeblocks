@@ -98,12 +98,14 @@ type ComponentSpec struct {
 	// Specifies the scheduling constraints for the component.
 	// If specified, it will override the cluster-wide affinity.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// Specify the tolerations for the component's workload.
 	// If specified, they will override the cluster-wide toleration settings.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 

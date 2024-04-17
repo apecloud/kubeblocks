@@ -37,6 +37,13 @@ func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *gr
 	transCtx, _ := ctx.(*componentTransformContext)
 	comp := transCtx.Component
 
+	if comp.Labels == nil {
+		comp.Labels = map[string]string{}
+	}
+	compDef := comp.Labels[constant.ComponentDefinitionLabelKey]
+	if compDef != comp.Spec.CompDef {
+		comp.Labels[constant.ComponentDefinitionLabelKey] = comp.Spec.CompDef
+	}
 	controllerutil.AddFinalizer(comp, constant.DBComponentFinalizerName)
 
 	if reflect.DeepEqual(transCtx.ComponentOrig.Finalizers, comp.Finalizers) &&

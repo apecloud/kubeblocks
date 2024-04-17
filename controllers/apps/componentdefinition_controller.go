@@ -114,10 +114,10 @@ func (r *ComponentDefinitionReconciler) deletionHandler(rctx intctrlutil.Request
 	return func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(cmpd, corev1.EventTypeWarning, constant.ReasonRefCRUnavailable,
-				"cannot be deleted because of existing referencing Cluster.")
+				"cannot be deleted because of existing referencing Component.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(rctx, r.Client, cmpd, constant.ComponentDefinitionLabelKey,
-			recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+			recordEvent, &appsv1alpha1.ComponentList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil

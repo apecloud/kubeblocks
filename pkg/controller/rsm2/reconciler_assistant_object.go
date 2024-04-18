@@ -51,10 +51,14 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
 
 	// generate objects by current spec
-	svc := rsm1.BuildSvc(*rsm)
-	altSvs := rsm1.BuildAlternativeSvs(*rsm)
-	headLessSvc := rsm1.BuildHeadlessSvc(*rsm)
-	envConfig := rsm1.BuildEnvConfigMap(*rsm)
+	labels := getMatchLabels(rsm.Name)
+	selectors := getSvcSelector(rsm, false)
+	headlessSelectors := getSvcSelector(rsm, true)
+
+	svc := rsm1.BuildSvc(*rsm, labels, selectors)
+	altSvs := rsm1.BuildAlternativeSvs(*rsm, labels)
+	headLessSvc := rsm1.BuildHeadlessSvc(*rsm, labels, headlessSelectors)
+	envConfig := rsm1.BuildEnvConfigMap(*rsm, labels)
 	var objects []client.Object
 	if svc != nil {
 		objects = append(objects, svc)

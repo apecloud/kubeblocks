@@ -250,9 +250,11 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 			return nil, err
 		}
 	}
+	labels := getMatchLabels(parent.Name)
 	pod := builder.NewPodBuilder(parent.Namespace, name).
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
+		AddLabelsInMap(labels).
 		AddControllerRevisionHashLabel(revision).
 		AddLabelsInMap(map[string]string{constant.KBAppPodNameLabelKey: name}).
 		SetPodSpec(*template.Spec.DeepCopy()).
@@ -268,6 +270,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, pod.GetName())
 		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
 			AddLabelsInMap(template.Labels).
+			AddLabelsInMap(labels).
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()

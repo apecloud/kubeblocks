@@ -21,7 +21,6 @@ package rsm2
 
 import (
 	"context"
-
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,19 +30,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type treeLoader struct{}
 
 func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
-	keys := getMatchLabelKeys()
+	ml := getMatchLabels(req.Name)
 	kinds := ownedKinds()
-	tree, err := kubebuilderx.ReadObjectTree[*workloads.ReplicatedStateMachine](ctx, reader, req, keys, kinds...)
+	tree, err := kubebuilderx.ReadObjectTree[*workloads.ReplicatedStateMachine](ctx, reader, req, ml, kinds...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,22 +75,6 @@ func loadCompressedInstanceTemplates(ctx context.Context, reader client.Reader, 
 		}
 	}
 	return nil
-}
-
-func getMatchLabelKeys() []string {
-	if viper.GetBool(rsm1.FeatureGateRSMCompatibilityMode) {
-		return []string{
-			constant.AppManagedByLabelKey,
-			constant.AppNameLabelKey,
-			constant.AppComponentLabelKey,
-			constant.AppInstanceLabelKey,
-			constant.KBAppComponentLabelKey,
-		}
-	}
-	return []string{
-		rsm1.WorkloadsManagedByLabelKey,
-		rsm1.WorkloadsInstanceLabelKey,
-	}
 }
 
 func ownedKinds() []client.ObjectList {

@@ -28,15 +28,15 @@ import (
 )
 
 type ReplicatedStateMachineBuilder struct {
-	BaseBuilder[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, ReplicatedStateMachineBuilder]
+	BaseBuilder[workloads.InstanceSet, *workloads.InstanceSet, ReplicatedStateMachineBuilder]
 }
 
 func NewReplicatedStateMachineBuilder(namespace, name string) *ReplicatedStateMachineBuilder {
 	builder := &ReplicatedStateMachineBuilder{}
 	replicas := int32(1)
 	builder.init(namespace, name,
-		&workloads.ReplicatedStateMachine{
-			Spec: workloads.ReplicatedStateMachineSpec{
+		&workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
 				Replicas: &replicas,
 			},
 		}, builder)

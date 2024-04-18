@@ -93,7 +93,7 @@ func generatedComponent4LegacyCluster(transCtx *componentTransformContext) (bool
 	}
 
 	synthesizedComp := transCtx.SynthesizeComponent
-	rsmObj := &workloads.ReplicatedStateMachine{}
+	rsmObj := &workloads.InstanceSet{}
 	rsmKey := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
 		Name:      constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),

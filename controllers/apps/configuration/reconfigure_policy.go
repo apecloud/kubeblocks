@@ -111,8 +111,8 @@ type reconfigureParams struct {
 	// TODO(xingran): remove this field when test case is refactored.
 	Component *appsv1alpha1.ClusterComponentDefinition
 
-	// List of ReplicatedStateMachine using this config template.
-	RSMUnits []workloads.ReplicatedStateMachine
+	// List of InstanceSet using this config template.
+	RSMUnits []workloads.InstanceSet
 }
 
 var (

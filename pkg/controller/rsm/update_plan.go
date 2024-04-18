@@ -39,11 +39,11 @@ type updatePlan interface {
 }
 
 type realUpdatePlan struct {
-	rsm             workloads.ReplicatedStateMachine
+	rsm             workloads.InstanceSet
 	pods            []corev1.Pod
 	dag             *graph.DAG
 	podsToBeUpdated []*corev1.Pod
-	isPodUpdated    func(*workloads.ReplicatedStateMachine, *corev1.Pod) (bool, error)
+	isPodUpdated    func(*workloads.InstanceSet, *corev1.Pod) (bool, error)
 }
 
 var _ updatePlan = &realUpdatePlan{}
@@ -100,7 +100,7 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	return ErrStop
 }
 
-func (p *realUpdatePlan) defaultIsPodUpdatedFunc(rsm *workloads.ReplicatedStateMachine, pod *corev1.Pod) (bool, error) {
+func (p *realUpdatePlan) defaultIsPodUpdatedFunc(rsm *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
 	return intctrlutil.GetPodRevision(pod) == rsm.Status.UpdateRevision, nil
 }
 
@@ -211,7 +211,7 @@ func (p *realUpdatePlan) Execute() ([]*corev1.Pod, error) {
 	return p.podsToBeUpdated, nil
 }
 
-func newUpdatePlan(rsm workloads.ReplicatedStateMachine, pods []corev1.Pod) updatePlan {
+func newUpdatePlan(rsm workloads.InstanceSet, pods []corev1.Pod) updatePlan {
 	return &realUpdatePlan{
 		rsm:  rsm,
 		pods: pods,
@@ -219,7 +219,7 @@ func newUpdatePlan(rsm workloads.ReplicatedStateMachine, pods []corev1.Pod) upda
 	}
 }
 
-func NewUpdatePlan(rsm workloads.ReplicatedStateMachine, pods []*corev1.Pod, isPodUpdated func(*workloads.ReplicatedStateMachine, *corev1.Pod) (bool, error)) updatePlan {
+func NewUpdatePlan(rsm workloads.InstanceSet, pods []*corev1.Pod, isPodUpdated func(*workloads.InstanceSet, *corev1.Pod) (bool, error)) updatePlan {
 	var podList []corev1.Pod
 	for _, pod := range pods {
 		podList = append(podList, *pod)

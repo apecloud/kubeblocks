@@ -81,21 +81,21 @@ var _ = Describe("object deletion transformer test.", func() {
 			controller := true
 			sts.OwnerReferences = []metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.InstanceSet{}).Name(),
 					Controller: &controller,
 				},
 			}
 			headLessSvc := BuildHeadlessSvc(*rsm)
 			headLessSvc.SetOwnerReferences([]metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.InstanceSet{}).Name(),
 					Controller: &controller,
 				},
 			})
 			envConfig := BuildEnvConfigMap(*rsm)
 			envConfig.SetOwnerReferences([]metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.InstanceSet{}).Name(),
 					Controller: &controller,
 				},
 			})
@@ -111,7 +111,7 @@ var _ = Describe("object deletion transformer test.", func() {
 			action := buildAction(rsm, actionName, jobTypeSwitchover, jobScenarioMembership, "", "")
 			action.SetOwnerReferences([]metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.InstanceSet{}).Name(),
 					Controller: &controller,
 				},
 			})

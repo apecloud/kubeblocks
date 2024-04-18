@@ -83,7 +83,7 @@ func transformPodTemplate(obj client.Object) *corev1.PodTemplateSpec {
 		return &v.Spec.Template
 	case *appv1.Deployment:
 		return &v.Spec.Template
-	case *workloads.ReplicatedStateMachine:
+	case *workloads.InstanceSet:
 		return &v.Spec.Template
 	}
 }

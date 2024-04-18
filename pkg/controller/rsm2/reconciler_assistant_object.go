@@ -48,7 +48,7 @@ func (a *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 }
 
 func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
+	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
 
 	// generate objects by current spec
 	svc := rsm1.BuildSvc(*rsm)

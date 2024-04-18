@@ -38,7 +38,7 @@ import (
 )
 
 // NewFakeRSM creates a fake RSM workload object for testing.
-func NewFakeRSM(name string, replicas int) *workloads.ReplicatedStateMachine {
+func NewFakeRSM(name string, replicas int) *workloads.InstanceSet {
 	template := corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -53,12 +53,12 @@ func NewFakeRSM(name string, replicas int) *workloads.ReplicatedStateMachine {
 	template.Labels = map[string]string{"foo": "bar"}
 	rsmReplicas := int32(replicas)
 	Revision := name + "-d5df5b8d6"
-	return &workloads.ReplicatedStateMachine{
+	return &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: corev1.NamespaceDefault,
 		},
-		Spec: workloads.ReplicatedStateMachineSpec{
+		Spec: workloads.InstanceSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
@@ -66,7 +66,7 @@ func NewFakeRSM(name string, replicas int) *workloads.ReplicatedStateMachine {
 			Template:    template,
 			ServiceName: "governingsvc",
 		},
-		Status: workloads.ReplicatedStateMachineStatus{
+		Status: workloads.InstanceSetStatus{
 			InitReplicas: rsmReplicas,
 			StatefulSetStatus: appsv1.StatefulSetStatus{
 				AvailableReplicas:  rsmReplicas,
@@ -81,14 +81,14 @@ func NewFakeRSM(name string, replicas int) *workloads.ReplicatedStateMachine {
 }
 
 // NewFakeRSMPod creates a fake pod of the RSM workload for testing.
-func NewFakeRSMPod(rsm *workloads.ReplicatedStateMachine, ordinal int) *corev1.Pod {
+func NewFakeRSMPod(rsm *workloads.InstanceSet, ordinal int) *corev1.Pod {
 	pod := &corev1.Pod{}
 	pod.Name = fmt.Sprintf("%s-%d", rsm.Name, ordinal)
 	return pod
 }
 
 // MockRSMReady mocks the RSM workload to ready state.
-func MockRSMReady(rsm *workloads.ReplicatedStateMachine, pods ...*corev1.Pod) {
+func MockRSMReady(rsm *workloads.InstanceSet, pods ...*corev1.Pod) {
 	rsm.Status.InitReplicas = *rsm.Spec.Replicas
 	rsm.Status.ReadyInitReplicas = *rsm.Spec.Replicas
 	rsm.Status.AvailableReplicas = *rsm.Spec.Replicas
@@ -99,7 +99,7 @@ func MockRSMReady(rsm *workloads.ReplicatedStateMachine, pods ...*corev1.Pod) {
 	rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
 	rsm.Status.UpdatedReplicas = rsm.Status.Replicas
 
-	composeRoleMap := func(rsm workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
+	composeRoleMap := func(rsm workloads.InstanceSet) map[string]workloads.ReplicaRole {
 		roleMap := make(map[string]workloads.ReplicaRole, 0)
 		for _, role := range rsm.Spec.Roles {
 			roleMap[strings.ToLower(role.Name)] = role
@@ -123,8 +123,8 @@ func MockRSMReady(rsm *workloads.ReplicatedStateMachine, pods ...*corev1.Pod) {
 	rsm.Status.MembersStatus = membersStatus
 }
 
-func ListAndCheckRSM(testCtx *testutil.TestContext, key types.NamespacedName) *workloads.ReplicatedStateMachineList {
-	rsmList := &workloads.ReplicatedStateMachineList{}
+func ListAndCheckRSM(testCtx *testutil.TestContext, key types.NamespacedName) *workloads.InstanceSetList {
+	rsmList := &workloads.InstanceSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, rsmList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: key.Name,
@@ -135,8 +135,8 @@ func ListAndCheckRSM(testCtx *testutil.TestContext, key types.NamespacedName) *w
 	return rsmList
 }
 
-func ListAndCheckRSMItemsCount(testCtx *testutil.TestContext, key types.NamespacedName, cnt int) *workloads.ReplicatedStateMachineList {
-	rsmList := &workloads.ReplicatedStateMachineList{}
+func ListAndCheckRSMItemsCount(testCtx *testutil.TestContext, key types.NamespacedName, cnt int) *workloads.InstanceSetList {
+	rsmList := &workloads.InstanceSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, rsmList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: key.Name,
@@ -146,8 +146,8 @@ func ListAndCheckRSMItemsCount(testCtx *testutil.TestContext, key types.Namespac
 	return rsmList
 }
 
-func ListAndCheckRSMWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, componentName string) *workloads.ReplicatedStateMachineList {
-	rsmList := &workloads.ReplicatedStateMachineList{}
+func ListAndCheckRSMWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, componentName string) *workloads.InstanceSetList {
+	rsmList := &workloads.InstanceSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, rsmList, client.MatchingLabels{
 			constant.AppInstanceLabelKey:    key.Name,
@@ -159,17 +159,17 @@ func ListAndCheckRSMWithComponent(testCtx *testutil.TestContext, key types.Names
 	return rsmList
 }
 
-func PatchRSMStatus(testCtx *testutil.TestContext, stsName string, status workloads.ReplicatedStateMachineStatus) {
+func PatchRSMStatus(testCtx *testutil.TestContext, stsName string, status workloads.InstanceSetStatus) {
 	objectKey := client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}
-	gomega.Expect(testapps.GetAndChangeObjStatus(testCtx, objectKey, func(newRSM *workloads.ReplicatedStateMachine) {
+	gomega.Expect(testapps.GetAndChangeObjStatus(testCtx, objectKey, func(newRSM *workloads.InstanceSet) {
 		newRSM.Status = status
 	})()).Should(gomega.Succeed())
-	gomega.Eventually(testapps.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newRSM *workloads.ReplicatedStateMachine) {
+	gomega.Eventually(testapps.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newRSM *workloads.InstanceSet) {
 		g.Expect(reflect.DeepEqual(newRSM.Status, status)).Should(gomega.BeTrue())
 	})).Should(gomega.Succeed())
 }
 
-func InitRSMStatus(testCtx testutil.TestContext, rsm *workloads.ReplicatedStateMachine, controllerRevision string) {
+func InitRSMStatus(testCtx testutil.TestContext, rsm *workloads.InstanceSet, controllerRevision string) {
 	gomega.Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 		rsm.Status.InitReplicas = *rsm.Spec.Replicas
 		rsm.Status.Replicas = *rsm.Spec.Replicas

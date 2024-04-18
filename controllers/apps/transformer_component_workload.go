@@ -65,9 +65,9 @@ type componentWorkloadOps struct {
 	dag            *graph.DAG
 
 	// runningRSM is a snapshot of the rsm that is already running
-	runningRSM *workloads.ReplicatedStateMachine
+	runningRSM *workloads.InstanceSet
 	// protoRSM is the rsm object that is rebuilt from scratch during each reconcile process
-	protoRSM *workloads.ReplicatedStateMachine
+	protoRSM *workloads.InstanceSet
 }
 
 var _ graph.Transformer = &componentWorkloadTransformer{}
@@ -128,12 +128,12 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 }
 
 func (t *componentWorkloadTransformer) runningRSMObject(ctx graph.TransformContext,
-	synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+	synthesizeComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
 	rsmKey := types.NamespacedName{
 		Namespace: synthesizeComp.Namespace,
 		Name:      constant.GenerateRSMNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name),
 	}
-	rsm := &workloads.ReplicatedStateMachine{}
+	rsm := &workloads.InstanceSet{}
 	if err := ctx.GetClient().Get(ctx.GetContext(), rsmKey, rsm); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
@@ -144,7 +144,7 @@ func (t *componentWorkloadTransformer) runningRSMObject(ctx graph.TransformConte
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningRSM, protoRSM *workloads.ReplicatedStateMachine) error {
+	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningRSM, protoRSM *workloads.InstanceSet) error {
 	// TODO(xingran): Some RSM workload operations should be moved down to Lorry implementation. Subsequent operations such as horizontal scaling will be removed from the component controller
 	if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningRSM, protoRSM); err != nil {
 		return err
@@ -163,7 +163,7 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, rsm *workloads.ReplicatedStateMachine) error {
+	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, rsm *workloads.InstanceSet) error {
 	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, rsm, dag)
 
 	// handle rsm expand volume
@@ -220,7 +220,7 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 // copyAndMergeRSM merges two RSM objects for updating:
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
-func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesizeComp *component.SynthesizedComponent) *workloads.ReplicatedStateMachine {
+func copyAndMergeRSM(oldRsm, newRsm *workloads.InstanceSet, synthesizeComp *component.SynthesizedComponent) *workloads.InstanceSet {
 	// mergeAnnotations keeps the original annotations.
 	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
 		if targetMap == nil || originalMap == nil {
@@ -237,7 +237,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 		}
 	}
 
-	updateUpdateStrategy := func(rsmObj, rsmProto *workloads.ReplicatedStateMachine) {
+	updateUpdateStrategy := func(rsmObj, rsmProto *workloads.InstanceSet) {
 		var objMaxUnavailable *intstr.IntOrString
 		if rsmObj.Spec.UpdateStrategy.RollingUpdate != nil {
 			objMaxUnavailable = rsmObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
@@ -254,7 +254,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	}
 
 	// be compatible with existed cluster
-	updateService := func(rsmObj, rsmProto *workloads.ReplicatedStateMachine) *corev1.Service {
+	updateService := func(rsmObj, rsmProto *workloads.InstanceSet) *corev1.Service {
 		if rsmProto.Spec.Service != nil {
 			return rsmProto.Spec.Service
 		}
@@ -324,7 +324,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	return rsmObjCopy
 }
 
-func checkNRollbackProtoImages(rsmObj, rsmProto *workloads.ReplicatedStateMachine) {
+func checkNRollbackProtoImages(rsmObj, rsmProto *workloads.InstanceSet) {
 	if rsmObj.Annotations == nil || rsmProto.Annotations == nil {
 		return
 	}
@@ -862,7 +862,7 @@ func (r *componentWorkloadOps) buildProtoRSMWorkloadVertex() *model.ObjectVertex
 }
 
 func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeComp *component.SynthesizedComponent,
-	rsmObj *workloads.ReplicatedStateMachine, dag *graph.DAG) error {
+	rsmObj *workloads.InstanceSet, dag *graph.DAG) error {
 	graphCli := model.NewGraphClient(cli)
 	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
 		labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
@@ -905,7 +905,7 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 	return nil
 }
 
-func buildRSMPlacementAnnotation(comp *appsv1alpha1.Component, rsm *workloads.ReplicatedStateMachine) {
+func buildRSMPlacementAnnotation(comp *appsv1alpha1.Component, rsm *workloads.InstanceSet) {
 	if rsm.Annotations == nil {
 		rsm.Annotations = make(map[string]string)
 	}
@@ -913,7 +913,7 @@ func buildRSMPlacementAnnotation(comp *appsv1alpha1.Component, rsm *workloads.Re
 }
 
 // buildRSMConfigTplAnnotations builds config tpl annotations for rsm
-func buildRSMConfigTplAnnotations(rsm *workloads.ReplicatedStateMachine, synthesizedComp *component.SynthesizedComponent) {
+func buildRSMConfigTplAnnotations(rsm *workloads.InstanceSet, synthesizedComp *component.SynthesizedComponent) {
 	configTplAnnotations := make(map[string]string)
 	for _, configTplSpec := range synthesizedComp.ConfigTemplates {
 		configTplAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(configTplSpec.Name)] = core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, configTplSpec.Name)
@@ -924,7 +924,7 @@ func buildRSMConfigTplAnnotations(rsm *workloads.ReplicatedStateMachine, synthes
 	updateRSMAnnotationsWithTemplate(rsm, configTplAnnotations)
 }
 
-func updateRSMAnnotationsWithTemplate(rsm *workloads.ReplicatedStateMachine, allTemplateAnnotations map[string]string) {
+func updateRSMAnnotationsWithTemplate(rsm *workloads.InstanceSet, allTemplateAnnotations map[string]string) {
 	// full configmap upgrade
 	existLabels := make(map[string]string)
 	annotations := rsm.GetAnnotations()
@@ -953,8 +953,8 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
-	runningRSM *workloads.ReplicatedStateMachine,
-	protoRSM *workloads.ReplicatedStateMachine,
+	runningRSM *workloads.InstanceSet,
+	protoRSM *workloads.InstanceSet,
 	dag *graph.DAG) *componentWorkloadOps {
 	return &componentWorkloadOps{
 		cli:            cli,

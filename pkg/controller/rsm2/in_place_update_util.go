@@ -291,7 +291,7 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func getPodUpdatePolicy(rsm *workloads.ReplicatedStateMachine, pod *corev1.Pod) (PodUpdatePolicy, error) {
+func getPodUpdatePolicy(rsm *workloads.InstanceSet, pod *corev1.Pod) (PodUpdatePolicy, error) {
 	updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
 	if err != nil {
 		return NoOpsPolicy, err
@@ -346,7 +346,7 @@ func getPodUpdatePolicy(rsm *workloads.ReplicatedStateMachine, pod *corev1.Pod) 
 // IsPodUpdated tells whether the pod's spec is as expected in the rsm.
 // This function is meant to replace the old fashion `GetPodRevision(pod) == updateRevision`,
 // as the pod template revision has been redefined in rsm2.
-func IsPodUpdated(rsm *workloads.ReplicatedStateMachine, pod *corev1.Pod) (bool, error) {
+func IsPodUpdated(rsm *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
 	policy, err := getPodUpdatePolicy(rsm, pod)
 	return policy == NoOpsPolicy, err
 }

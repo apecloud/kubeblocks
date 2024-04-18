@@ -62,7 +62,7 @@ func GetComponentPodListWithRole(ctx context.Context, cli client.Reader, cluster
 
 // IsComponentPodsWithLatestRevision checks whether the underlying pod spec matches the one declared in the Cluster/Component.
 func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, rsm *workloads.ReplicatedStateMachine) (bool, error) {
+	cluster *appsv1alpha1.Cluster, rsm *workloads.InstanceSet) (bool, error) {
 	if cluster == nil || rsm == nil {
 		return false, nil
 	}

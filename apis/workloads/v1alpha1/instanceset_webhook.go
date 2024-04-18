@@ -28,9 +28,9 @@ import (
 )
 
 // log is for logging in this package.
-var replicatedstatemachinelog = logf.Log.WithName("replicatedstatemachine-resource")
+var instancesetlog = logf.Log.WithName("instanceset-resource")
 
-func (r *ReplicatedStateMachine) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *InstanceSet) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -38,44 +38,44 @@ func (r *ReplicatedStateMachine) SetupWebhookWithManager(mgr ctrl.Manager) error
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-//+kubebuilder:webhook:path=/mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine,mutating=true,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=create;update,versions=v1alpha1,name=mreplicatedstatemachine.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-workloads-kubeblocks-io-v1alpha1-instanceset,mutating=true,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=instancesets,verbs=create;update,versions=v1alpha1,name=minstanceset.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &ReplicatedStateMachine{}
+var _ webhook.Defaulter = &InstanceSet{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *ReplicatedStateMachine) Default() {
-	replicatedstatemachinelog.Info("default", "name", r.Name)
+func (r *InstanceSet) Default() {
+	instancesetlog.Info("default", "name", r.Name)
 
 	// TODO(user): fill in your defaulting logic.
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine,mutating=false,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=create;update,versions=v1alpha1,name=vreplicatedstatemachine.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-workloads-kubeblocks-io-v1alpha1-instanceset,mutating=false,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=instancesets,verbs=create;update,versions=v1alpha1,name=vinstanceset.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &ReplicatedStateMachine{}
+var _ webhook.Validator = &InstanceSet{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ReplicatedStateMachine) ValidateCreate() (admission.Warnings, error) {
-	replicatedstatemachinelog.Info("validate create", "name", r.Name)
+func (r *InstanceSet) ValidateCreate() (admission.Warnings, error) {
+	instancesetlog.Info("validate create", "name", r.Name)
 
 	return nil, r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ReplicatedStateMachine) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	replicatedstatemachinelog.Info("validate update", "name", r.Name)
+func (r *InstanceSet) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+	instancesetlog.Info("validate update", "name", r.Name)
 
 	return nil, r.validate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ReplicatedStateMachine) ValidateDelete() (admission.Warnings, error) {
-	replicatedstatemachinelog.Info("validate delete", "name", r.Name)
+func (r *InstanceSet) ValidateDelete() (admission.Warnings, error) {
+	instancesetlog.Info("validate delete", "name", r.Name)
 
 	return nil, r.validate()
 }
 
-func (r *ReplicatedStateMachine) validate() error {
+func (r *InstanceSet) validate() error {
 	var allErrs field.ErrorList
 
 	if len(r.Spec.Roles) > 0 {
@@ -105,7 +105,7 @@ func (r *ReplicatedStateMachine) validate() error {
 		return apierrors.NewInvalid(
 			schema.GroupKind{
 				Group: "workloads.kubeblocks.io/v1alpha1",
-				Kind:  "ReplicatedStateMachine",
+				Kind:  "InstanceSet",
 			},
 			r.Name, allErrs)
 	}

@@ -104,7 +104,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			By("do reconcile with Parallel policy")
 			parallelTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
-			parallelRsm, ok := parallelTree.GetRoot().(*workloads.ReplicatedStateMachine)
+			parallelRsm, ok := parallelTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			parallelRsm.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			newTree, err = reconciler.Reconcile(parallelTree)

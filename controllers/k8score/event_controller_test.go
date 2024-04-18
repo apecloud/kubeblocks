@@ -129,7 +129,7 @@ var _ = Describe("Event Controller", func() {
 				SetReplicas(int32(3)).
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				Create(&testCtx).GetObject()
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(rsm), func(tmpRSM *workloads.ReplicatedStateMachine) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(rsm), func(tmpRSM *workloads.InstanceSet) {
 				tmpRSM.Spec.Roles = []workloads.ReplicaRole{
 					{
 						Name:       "leader",

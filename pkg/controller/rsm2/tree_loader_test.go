@@ -57,8 +57,8 @@ var _ = Describe("tree loader test", func() {
 				Expect(controllerutil.SetControllerReference(root, pod, model.GetScheme())).Should(Succeed())
 			}
 			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &workloads.ReplicatedStateMachine{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *workloads.ReplicatedStateMachine, _ ...client.GetOption) error {
+				Get(gomock.Any(), gomock.Any(), &workloads.InstanceSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *workloads.InstanceSet, _ ...client.GetOption) error {
 					*obj = *root
 					return nil
 				}).Times(1)

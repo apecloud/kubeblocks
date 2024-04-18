@@ -103,7 +103,7 @@ func MockConsensusComponentStatefulSet(
 func MockRSMComponent(
 	testCtx *testutil.TestContext,
 	clusterName,
-	rsmCompName string) *workloads.ReplicatedStateMachine {
+	rsmCompName string) *workloads.InstanceSet {
 	rsmName := clusterName + "-" + rsmCompName
 	return NewRSMFactory(testCtx.DefaultNamespace, rsmName, clusterName, rsmCompName).SetReplicas(ConsensusReplicas).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()

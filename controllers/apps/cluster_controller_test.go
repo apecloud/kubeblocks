@@ -383,7 +383,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Wait RSM created")
 		rsmkey := compKey
-		rsm := &workloads.ReplicatedStateMachine{}
+		rsm := &workloads.InstanceSet{}
 		Eventually(testapps.CheckObjExists(&testCtx, rsmkey, rsm, true)).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(cluster.Spec.ComponentSpecs).Should(HaveLen(1))

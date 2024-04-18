@@ -5,19 +5,19 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
-  name: replicatedstatemachines.workloads.kubeblocks.io
+  name: instancesets.workloads.kubeblocks.io
 spec:
   group: workloads.kubeblocks.io
   names:
     categories:
     - kubeblocks
     - all
-    kind: ReplicatedStateMachine
-    listKind: ReplicatedStateMachineList
-    plural: replicatedstatemachines
+    kind: InstanceSet
+    listKind: InstanceSetList
+    plural: instancesets
     shortNames:
-    - rsm
-    singular: replicatedstatemachine
+    - its
+    singular: instanceset
   scope: Namespaced
   versions:
   - additionalPrinterColumns:

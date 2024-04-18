@@ -148,7 +148,7 @@ var _ = Describe("update reconciler test", func() {
 			By("reconcile with Partition=50% and MaxUnavailable=2")
 			partitionTree, err := newTree.DeepCopy()
 			Expect(err).Should(BeNil())
-			root, ok := partitionTree.GetRoot().(*workloads.ReplicatedStateMachine)
+			root, ok := partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			partition := int32(3)
 			maxUnavailable := intstr.FromInt32(2)
@@ -167,7 +167,7 @@ var _ = Describe("update reconciler test", func() {
 			By("update 'bar-hello-0', 'bar-foo-1' revision to the updated value")
 			partitionTree, err = newTree.DeepCopy()
 			Expect(err).Should(BeNil())
-			root, ok = partitionTree.GetRoot().(*workloads.ReplicatedStateMachine)
+			root, ok = partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			root.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
@@ -190,7 +190,7 @@ var _ = Describe("update reconciler test", func() {
 			By("reconcile with UpdateStrategy='OnDelete'")
 			onDeleteTree, err := newTree.DeepCopy()
 			Expect(err).Should(BeNil())
-			root, ok = onDeleteTree.GetRoot().(*workloads.ReplicatedStateMachine)
+			root, ok = onDeleteTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			root.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
 			_, err = reconciler.Reconcile(onDeleteTree)

@@ -495,12 +495,12 @@ func main() {
 	}
 
 	if viper.GetBool(workloadsFlagKey.viperName()) {
-		if err = (&workloadscontrollers.ReplicatedStateMachineReconciler{
+		if err = (&workloadscontrollers.InstanceSetReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
 		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
+			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
 			os.Exit(1)
 		}
 	}
@@ -544,8 +544,8 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&workloadsv1alpha1.ReplicatedStateMachine{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ReplicatedStateMachine")
+		if err = (&workloadsv1alpha1.InstanceSet{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "InstanceSet")
 			os.Exit(1)
 		}
 

@@ -412,7 +412,7 @@ var _ = Describe("utils test", func() {
 	Context("IsOwnedByRsm function", func() {
 		It("should work well", func() {
 			By("call without ownerReferences")
-			rsm := &workloads.ReplicatedStateMachine{}
+			rsm := &workloads.InstanceSet{}
 			Expect(IsOwnedByRsm(rsm)).Should(BeFalse())
 
 			By("call with ownerReference's kind is rsm")

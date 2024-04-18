@@ -54,7 +54,7 @@ type instanceTemplateExt struct {
 }
 
 type rsmExt struct {
-	rsm               *workloads.ReplicatedStateMachine
+	rsm               *workloads.InstanceSet
 	instanceTemplates []*workloads.InstanceTemplate
 }
 
@@ -241,7 +241,7 @@ func generateInstanceNames(parentName, templateName string,
 	return instanceNameList, ordinal
 }
 
-func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.ReplicatedStateMachine, revision string) (*instance, error) {
+func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet, revision string) (*instance, error) {
 	// 1. build a pod from template
 	var err error
 	if len(revision) == 0 {
@@ -383,7 +383,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func validateSpec(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) error {
+func validateSpec(rsm *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) error {
 	replicasInTemplates := int32(0)
 	rsmExt, err := buildRSMExt(rsm, tree)
 	if err != nil {
@@ -409,7 +409,7 @@ func validateSpec(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.Obje
 	return nil
 }
 
-func buildInstanceTemplateRevision(template *instanceTemplateExt, parent *workloads.ReplicatedStateMachine) (string, error) {
+func buildInstanceTemplateRevision(template *instanceTemplateExt, parent *workloads.InstanceSet) (string, error) {
 	podTemplate := filterInPlaceFields(&template.PodTemplateSpec)
 	rsm := builder.NewReplicatedStateMachineBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
@@ -512,7 +512,7 @@ func getInstanceTemplates(instances []workloads.InstanceTemplate, template *core
 	return append(instances, extraTemplates...)
 }
 
-func findTemplateObject(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (*corev1.ConfigMap, error) {
+func findTemplateObject(rsm *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*corev1.ConfigMap, error) {
 	templateMap, err := getInstanceTemplateMap(rsm.Annotations)
 	// error has been checked in prepare stage, there should be no error occurs
 	if err != nil {
@@ -589,7 +589,7 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		})
 }
 
-func buildRSMExt(rsm *workloads.ReplicatedStateMachine, tree *kubebuilderx.ObjectTree) (*rsmExt, error) {
+func buildRSMExt(rsm *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*rsmExt, error) {
 	instancesCompressed, err := findTemplateObject(rsm, tree)
 	if err != nil {
 		return nil, err

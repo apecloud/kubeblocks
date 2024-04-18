@@ -50,7 +50,7 @@ const (
 )
 
 var (
-	rsm         *workloads.ReplicatedStateMachine
+	rsm         *workloads.InstanceSet
 	priorityMap map[string]int
 	reconciler  kubebuilderx.Reconciler
 

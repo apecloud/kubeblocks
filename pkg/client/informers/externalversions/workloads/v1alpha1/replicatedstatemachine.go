@@ -45,14 +45,14 @@ type replicatedStateMachineInformer struct {
 	namespace        string
 }
 
-// NewReplicatedStateMachineInformer constructs a new informer for ReplicatedStateMachine type.
+// NewReplicatedStateMachineInformer constructs a new informer for InstanceSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewReplicatedStateMachineInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewFilteredReplicatedStateMachineInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredReplicatedStateMachineInformer constructs a new informer for ReplicatedStateMachine type.
+// NewFilteredReplicatedStateMachineInformer constructs a new informer for InstanceSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredReplicatedStateMachineInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
@@ -71,7 +71,7 @@ func NewFilteredReplicatedStateMachineInformer(client versioned.Interface, names
 				return client.WorkloadsV1alpha1().ReplicatedStateMachines(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&workloadsv1alpha1.ReplicatedStateMachine{},
+		&workloadsv1alpha1.InstanceSet{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,7 +82,7 @@ func (f *replicatedStateMachineInformer) defaultInformer(client versioned.Interf
 }
 
 func (f *replicatedStateMachineInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&workloadsv1alpha1.ReplicatedStateMachine{}, f.defaultInformer)
+	return f.factory.InformerFor(&workloadsv1alpha1.InstanceSet{}, f.defaultInformer)
 }
 
 func (f *replicatedStateMachineInformer) Lister() v1alpha1.ReplicatedStateMachineLister {

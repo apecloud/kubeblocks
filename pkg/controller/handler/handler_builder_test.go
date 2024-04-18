@@ -86,7 +86,7 @@ var _ = Describe("handler builder test.", func() {
 			handler := NewBuilder(finderCtx).
 				AddFinder(NewInvolvedObjectFinder(&corev1.Pod{})).
 				AddFinder(NewOwnerFinder(&appsv1.StatefulSet{})).
-				AddFinder(NewDelegatorFinder(&workloads.ReplicatedStateMachine{},
+				AddFinder(NewDelegatorFinder(&workloads.InstanceSet{},
 					[]string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey})).
 				Build()
 

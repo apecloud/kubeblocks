@@ -799,7 +799,7 @@ func resolvePodVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp
 					Namespace: synthesizedComp.Namespace,
 					Name:      constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, compName),
 				}
-				rsm := &workloads.ReplicatedStateMachine{}
+				rsm := &workloads.InstanceSet{}
 				err := cli.Get(ctx, key, rsm, inDataContext())
 				if err != nil {
 					return nil, err

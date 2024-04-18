@@ -199,7 +199,7 @@ func opsRequestHasProcessed(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 		return false
 	}
 	// if all pods of all components are with latest revision, ops has processed
-	rsmList := &workloads.ReplicatedStateMachineList{}
+	rsmList := &workloads.InstanceSetList{}
 	if err := cli.List(reqCtx.Ctx, rsmList,
 		client.InNamespace(opsRes.Cluster.Namespace),
 		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {

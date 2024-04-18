@@ -172,7 +172,7 @@ func cleanAction(transCtx *rsmTransformContext, dag *graph.DAG) error {
 	return nil
 }
 
-func isActionDone(rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) bool {
+func isActionDone(rsm *workloads.InstanceSet, action *batchv1.Job) bool {
 	ordinal, _ := getActionOrdinal(action.Name)
 	podName := getPodName(rsm.Name, ordinal)
 	membersStatus := rsm.Status.MembersStatus
@@ -199,7 +199,7 @@ func deleteAction(transCtx *rsmTransformContext, dag *graph.DAG, action *batchv1
 	doActionCleanup(dag, cli, action)
 }
 
-func createNextAction(transCtx *rsmTransformContext, dag *graph.DAG, rsm *workloads.ReplicatedStateMachine, currentAction *batchv1.Job) error {
+func createNextAction(transCtx *rsmTransformContext, dag *graph.DAG, rsm *workloads.InstanceSet, currentAction *batchv1.Job) error {
 	actionInfoList := generateActionInfoList(rsm)
 
 	if len(actionInfoList) == 0 {
@@ -225,7 +225,7 @@ func createNextAction(transCtx *rsmTransformContext, dag *graph.DAG, rsm *worklo
 	return createAction(dag, cli, rsm, nextAction)
 }
 
-func generateActionInfoList(rsm *workloads.ReplicatedStateMachine) []*actionInfo {
+func generateActionInfoList(rsm *workloads.InstanceSet) []*actionInfo {
 	var actionInfoList []*actionInfo
 	memberReadyReplicas := int32(len(rsm.Status.MembersStatus))
 
@@ -255,7 +255,7 @@ func isPreAction(actionType string) bool {
 	return actionType == jobTypeSwitchover || actionType == jobTypeMemberLeaveNotifying
 }
 
-func shouldHaveActions(rsm *workloads.ReplicatedStateMachine) bool {
+func shouldHaveActions(rsm *workloads.InstanceSet) bool {
 	currentReplicas := len(rsm.Status.MembersStatus)
 	expectedReplicas := int(*rsm.Spec.Replicas)
 
@@ -274,7 +274,7 @@ func shouldHaveActions(rsm *workloads.ReplicatedStateMachine) bool {
 	return false
 }
 
-func shouldCreateAction(rsm *workloads.ReplicatedStateMachine, actionType string, checker conditionChecker) bool {
+func shouldCreateAction(rsm *workloads.InstanceSet, actionType string, checker conditionChecker) bool {
 	if checker != nil && !checker() {
 		return false
 	}
@@ -312,7 +312,7 @@ func getActionOrdinal(actionName string) (int, error) {
 // all members with ordinal less than action target pod should be in a good replication state:
 // 1. they should be in membersStatus
 // 2. they should have a leader
-func abnormalAnalysis(rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
+func abnormalAnalysis(rsm *workloads.InstanceSet, action *batchv1.Job) error {
 	membersStatus := rsm.Status.MembersStatus
 	statusMap := make(map[string]workloads.MemberStatus, len(membersStatus))
 	for _, status := range membersStatus {
@@ -353,7 +353,7 @@ func abnormalAnalysis(rsm *workloads.ReplicatedStateMachine, action *batchv1.Job
 	return nil
 }
 
-func generateActionInfos(rsm *workloads.ReplicatedStateMachine, ordinal int, actionTypeList []string) []*actionInfo {
+func generateActionInfos(rsm *workloads.InstanceSet, ordinal int, actionTypeList []string) []*actionInfo {
 	var actionInfos []*actionInfo
 	leaderPodName := getLeaderPodName(rsm.Status.MembersStatus)
 	podName := getPodName(rsm.Name, ordinal)

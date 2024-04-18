@@ -29,13 +29,13 @@ import (
 )
 
 type MockRSMFactory struct {
-	BaseFactory[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, MockRSMFactory]
+	BaseFactory[workloads.InstanceSet, *workloads.InstanceSet, MockRSMFactory]
 }
 
 func NewRSMFactory(namespace, name string, clusterName string, componentName string) *MockRSMFactory {
 	f := &MockRSMFactory{}
 	f.Init(namespace, name,
-		&workloads.ReplicatedStateMachine{
+		&workloads.InstanceSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
 					constant.AppInstanceLabelKey:    clusterName,
@@ -43,7 +43,7 @@ func NewRSMFactory(namespace, name string, clusterName string, componentName str
 					constant.AppManagedByLabelKey:   constant.AppName,
 				},
 			},
-			Spec: workloads.ReplicatedStateMachineSpec{
+			Spec: workloads.InstanceSetSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						constant.AppInstanceLabelKey:    clusterName,

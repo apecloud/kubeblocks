@@ -50,14 +50,14 @@ var _ = Describe("plan builder test", func() {
 
 		var (
 			planBuilder *PlanBuilder
-			rsm         *workloads.ReplicatedStateMachine
+			rsm         *workloads.InstanceSet
 		)
 
 		BeforeEach(func() {
 			bldr := NewPlanBuilder(ctx, k8sMock, nil, nil, nil, logger)
 			planBuilder, _ = bldr.(*PlanBuilder)
 			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
-				AddFinalizers([]string{rsm1.GetFinalizer(&workloads.ReplicatedStateMachine{})}).
+				AddFinalizers([]string{rsm1.GetFinalizer(&workloads.InstanceSet{})}).
 				GetObject()
 		})
 
@@ -68,7 +68,7 @@ var _ = Describe("plan builder test", func() {
 			}
 			k8sMock.EXPECT().
 				Create(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, _ ...client.CreateOption) error {
+				DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.CreateOption) error {
 					Expect(obj).ShouldNot(BeNil())
 					Expect(obj.Namespace).Should(Equal(rsm.Namespace))
 					Expect(obj.Name).Should(Equal(rsm.Name))
@@ -155,14 +155,14 @@ var _ = Describe("plan builder test", func() {
 			}
 			k8sMock.EXPECT().
 				Update(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, _ ...client.UpdateOption) error {
+				DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.UpdateOption) error {
 					Expect(obj).ShouldNot(BeNil())
 					Expect(obj.Finalizers).Should(HaveLen(0))
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
 				Delete(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, _ ...client.DeleteOption) error {
+				DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.DeleteOption) error {
 					Expect(obj).ShouldNot(BeNil())
 					Expect(obj.Namespace).Should(Equal(rsm.Namespace))
 					Expect(obj.Name).Should(Equal(rsm.Name))
@@ -190,7 +190,7 @@ var _ = Describe("plan builder test", func() {
 				k8sMock.EXPECT().Status().Return(statusWriter),
 				statusWriter.EXPECT().
 					Update(gomock.Any(), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, _ ...client.UpdateOption) error {
+					DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.UpdateOption) error {
 						Expect(obj).ShouldNot(BeNil())
 						Expect(obj.Namespace).Should(Equal(rsm.Namespace))
 						Expect(obj.Name).Should(Equal(rsm.Name))
@@ -223,7 +223,7 @@ var _ = Describe("plan builder test", func() {
 		)
 
 		var (
-			rsm         *workloads.ReplicatedStateMachine
+			rsm         *workloads.InstanceSet
 			currentTree *ObjectTree
 			desiredTree *ObjectTree
 		)

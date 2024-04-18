@@ -26,10 +26,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-var _ = Describe("ReplicatedStateMachine Webhook", func() {
+var _ = Describe("InstanceSet Webhook", func() {
 	Context("spec validation", func() {
-		const name = "test-replicated-state-machine"
-		var rsm *ReplicatedStateMachine
+		const name = "test-instance-set"
+		var its *InstanceSet
 
 		BeforeEach(func() {
 			commonLabels := map[string]string{
@@ -40,12 +40,12 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 				constant.KBAppComponentLabelKey: "componentName",
 			}
 			replicas := int32(1)
-			rsm = &ReplicatedStateMachine{
+			its = &InstanceSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: testCtx.DefaultNamespace,
 				},
-				Spec: ReplicatedStateMachineSpec{
+				Spec: InstanceSetSpec{
 					Replicas: &replicas,
 					Selector: &metav1.LabelSelector{
 						MatchLabels: commonLabels,
@@ -78,48 +78,48 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 		})
 
 		It("should return an error if no leader set", func() {
-			rsm.Spec.Roles = []ReplicaRole{
+			its.Spec.Roles = []ReplicaRole{
 				{
 					Name:       "leader",
 					IsLeader:   false,
 					AccessMode: ReadWriteMode,
 				},
 			}
-			err := k8sClient.Create(ctx, rsm)
+			err := k8sClient.Create(ctx, its)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("leader is required"))
 		})
 
 		It("should return an error if servicePort not provided", func() {
-			rsm.Spec.Roles = []ReplicaRole{
+			its.Spec.Roles = []ReplicaRole{
 				{
 					Name:       "leader",
 					IsLeader:   true,
 					AccessMode: ReadWriteMode,
 				},
 			}
-			err := k8sClient.Create(ctx, rsm)
+			err := k8sClient.Create(ctx, its)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("servicePort must provide"))
 		})
 
 		It("should succeed if spec is well defined", func() {
-			rsm.Spec.Roles = []ReplicaRole{
+			its.Spec.Roles = []ReplicaRole{
 				{
 					Name:       "leader",
 					IsLeader:   true,
 					AccessMode: ReadWriteMode,
 				},
 			}
-			rsm.Spec.Service.Spec.Ports = []corev1.ServicePort{
+			its.Spec.Service.Spec.Ports = []corev1.ServicePort{
 				{
 					Name:     "foo",
 					Protocol: "tcp",
 					Port:     12345,
 				},
 			}
-			Expect(k8sClient.Create(ctx, rsm)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, rsm)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, its)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, its)).Should(Succeed())
 		})
 	})
 })

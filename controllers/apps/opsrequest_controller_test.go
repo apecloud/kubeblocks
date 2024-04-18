@@ -164,7 +164,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).ShouldNot(HaveOccurred())
 		}
 		var mysqlSts *appsv1.StatefulSet
-		var mysqlRSM *workloads.ReplicatedStateMachine
+		var mysqlRSM *workloads.InstanceSet
 		rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, mysqlCompName)
 		mysqlRSM = &rsmList.Items[0]
 		mysqlSts = testapps.NewStatefulSetFactory(mysqlRSM.Namespace, mysqlRSM.Name, clusterKey.Name, mysqlCompName).
@@ -203,7 +203,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		// })).Should(Succeed())
 
 		By("mock bring Cluster and changed component back to running status")
-		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(mysqlRSM), func(tmpRSM *workloads.ReplicatedStateMachine) {
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(mysqlRSM), func(tmpRSM *workloads.InstanceSet) {
 			testk8s.MockRSMReady(tmpRSM, pod)
 		})()).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
@@ -296,7 +296,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 
 			wl := componentWorkload()
-			rsm, _ := wl.(*workloads.ReplicatedStateMachine)
+			rsm, _ := wl.(*workloads.InstanceSet)
 			sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, mysqlCompName).
 				SetReplicas(*rsm.Spec.Replicas).GetObject()
 			testapps.CheckedCreateK8sResource(&testCtx, sts)
@@ -505,7 +505,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("check the underlying workload been updated")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-				func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				func(g Gomega, rsm *workloads.InstanceSet) {
 					g.Expect(*rsm.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 			rsm := componentWorkload()
@@ -583,7 +583,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("check the underlying workload been updated")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-				func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				func(g Gomega, rsm *workloads.InstanceSet) {
 					g.Expect(*rsm.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 			rsm := componentWorkload()

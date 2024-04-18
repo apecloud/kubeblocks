@@ -91,7 +91,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	createServiceAccount(serviceAccount, graphCli, dag, parent)
-	rsmList := graphCli.FindAll(dag, &workloads.ReplicatedStateMachine{})
+	rsmList := graphCli.FindAll(dag, &workloads.InstanceSet{})
 	for _, rsm := range rsmList {
 		// serviceAccount must be created before workload
 		graphCli.DependOn(dag, rsm, serviceAccount)

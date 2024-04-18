@@ -45,7 +45,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 }
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
+	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
 	var podList []corev1.Pod

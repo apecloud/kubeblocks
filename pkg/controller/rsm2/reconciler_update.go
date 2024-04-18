@@ -50,7 +50,7 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	if model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
-	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
+	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
 	if err := validateSpec(rsm, tree); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
@@ -58,7 +58,7 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 }
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	rsm, _ := tree.GetRoot().(*workloads.ReplicatedStateMachine)
+	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
 	rsmExt, err := buildRSMExt(rsm, tree)
 	if err != nil {
 		return nil, err
@@ -166,7 +166,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	return tree, nil
 }
 
-func getRSMForUpdatePlan(rsm *workloads.ReplicatedStateMachine) *workloads.ReplicatedStateMachine {
+func getRSMForUpdatePlan(rsm *workloads.InstanceSet) *workloads.InstanceSet {
 	if rsm.Spec.MemberUpdateStrategy != nil {
 		return rsm
 	}

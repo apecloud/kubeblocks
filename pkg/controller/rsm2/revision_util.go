@@ -47,7 +47,7 @@ var Codecs = serializer.NewCodecFactory(model.GetScheme())
 var patchCodec = Codecs.LegacyCodec(workloads.SchemeGroupVersion)
 var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
 
-func NewRevision(rsm *workloads.ReplicatedStateMachine) (*apps.ControllerRevision, error) {
+func NewRevision(rsm *workloads.InstanceSet) (*apps.ControllerRevision, error) {
 	patch, err := getPatch(rsm)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func NewRevision(rsm *workloads.ReplicatedStateMachine) (*apps.ControllerRevisio
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
-func getPatch(rsm *workloads.ReplicatedStateMachine) ([]byte, error) {
+func getPatch(rsm *workloads.InstanceSet) ([]byte, error) {
 	data, err := runtime.Encode(patchCodec, rsm)
 	if err != nil {
 		return nil, err

@@ -223,7 +223,7 @@ func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey s
 			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.StatefulSetSignature)
 		case *appv1.Deployment:
 			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.DeploymentSignature)
-		case *workloads.ReplicatedStateMachine:
+		case *workloads.InstanceSet:
 			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.RSMSignature)
 		default:
 			// ignore other types workload

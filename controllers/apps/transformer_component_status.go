@@ -65,9 +65,9 @@ type componentStatusHandler struct {
 	dag            *graph.DAG
 
 	// runningRSM is a snapshot of the rsm that is already running
-	runningRSM *workloads.ReplicatedStateMachine
+	runningRSM *workloads.InstanceSet
 	// protoRSM is the rsm object that is rebuilt from scratch during each reconcile process
-	protoRSM *workloads.ReplicatedStateMachine
+	protoRSM *workloads.InstanceSet
 	// podsReady indicates if the component's underlying pods are ready
 	podsReady bool
 }
@@ -92,8 +92,8 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 	cluster := transCtx.Cluster
 	synthesizeComp := transCtx.SynthesizeComponent
-	runningRSM, _ := transCtx.RunningWorkload.(*workloads.ReplicatedStateMachine)
-	protoRSM, _ := transCtx.ProtoWorkload.(*workloads.ReplicatedStateMachine)
+	runningRSM, _ := transCtx.RunningWorkload.(*workloads.InstanceSet)
+	protoRSM, _ := transCtx.ProtoWorkload.(*workloads.InstanceSet)
 	switch {
 	case model.IsObjectUpdating(transCtx.ComponentOrig):
 		transCtx.Logger.Info(fmt.Sprintf("update component status after applying resources, generation: %d", comp.Generation))
@@ -388,7 +388,7 @@ func (r *componentStatusHandler) hasVolumeExpansionRunning() (bool, bool, error)
 
 // getRunningVolumes gets the running volumes of the rsm.
 func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string,
-	rsmObj *workloads.ReplicatedStateMachine) ([]*corev1.PersistentVolumeClaim, error) {
+	rsmObj *workloads.InstanceSet) ([]*corev1.PersistentVolumeClaim, error) {
 	labels := constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name)
 	pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
 		generics.PersistentVolumeClaimSignature, r.cluster.Namespace, labels, inDataContext4C())
@@ -582,8 +582,8 @@ func newComponentStatusHandler(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component,
 	synthesizeComp *component.SynthesizedComponent,
-	runningRSM *workloads.ReplicatedStateMachine,
-	protoRSM *workloads.ReplicatedStateMachine,
+	runningRSM *workloads.InstanceSet,
+	protoRSM *workloads.InstanceSet,
 	dag *graph.DAG) *componentStatusHandler {
 	return &componentStatusHandler{
 		cli:            cli,

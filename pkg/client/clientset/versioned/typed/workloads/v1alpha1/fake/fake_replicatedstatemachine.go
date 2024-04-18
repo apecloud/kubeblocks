@@ -37,23 +37,23 @@ type FakeReplicatedStateMachines struct {
 
 var replicatedstatemachinesResource = v1alpha1.SchemeGroupVersion.WithResource("replicatedstatemachines")
 
-var replicatedstatemachinesKind = v1alpha1.SchemeGroupVersion.WithKind("ReplicatedStateMachine")
+var replicatedstatemachinesKind = v1alpha1.SchemeGroupVersion.WithKind("InstanceSet")
 
 // Get takes name of the replicatedStateMachine, and returns the corresponding replicatedStateMachine object, and an error if there is any.
-func (c *FakeReplicatedStateMachines) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {
+func (c *FakeReplicatedStateMachines) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.InstanceSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(replicatedstatemachinesResource, c.ns, name), &v1alpha1.ReplicatedStateMachine{})
+		Invokes(testing.NewGetAction(replicatedstatemachinesResource, c.ns, name), &v1alpha1.InstanceSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ReplicatedStateMachine), err
+	return obj.(*v1alpha1.InstanceSet), err
 }
 
 // List takes label and field selectors, and returns the list of ReplicatedStateMachines that match those selectors.
-func (c *FakeReplicatedStateMachines) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ReplicatedStateMachineList, err error) {
+func (c *FakeReplicatedStateMachines) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.InstanceSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(replicatedstatemachinesResource, replicatedstatemachinesKind, c.ns, opts), &v1alpha1.ReplicatedStateMachineList{})
+		Invokes(testing.NewListAction(replicatedstatemachinesResource, replicatedstatemachinesKind, c.ns, opts), &v1alpha1.InstanceSetList{})
 
 	if obj == nil {
 		return nil, err
@@ -63,8 +63,8 @@ func (c *FakeReplicatedStateMachines) List(ctx context.Context, opts v1.ListOpti
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.ReplicatedStateMachineList{ListMeta: obj.(*v1alpha1.ReplicatedStateMachineList).ListMeta}
-	for _, item := range obj.(*v1alpha1.ReplicatedStateMachineList).Items {
+	list := &v1alpha1.InstanceSetList{ListMeta: obj.(*v1alpha1.InstanceSetList).ListMeta}
+	for _, item := range obj.(*v1alpha1.InstanceSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -80,43 +80,43 @@ func (c *FakeReplicatedStateMachines) Watch(ctx context.Context, opts v1.ListOpt
 }
 
 // Create takes the representation of a replicatedStateMachine and creates it.  Returns the server's representation of the replicatedStateMachine, and an error, if there is any.
-func (c *FakeReplicatedStateMachines) Create(ctx context.Context, replicatedStateMachine *v1alpha1.ReplicatedStateMachine, opts v1.CreateOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {
+func (c *FakeReplicatedStateMachines) Create(ctx context.Context, replicatedStateMachine *v1alpha1.InstanceSet, opts v1.CreateOptions) (result *v1alpha1.InstanceSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(replicatedstatemachinesResource, c.ns, replicatedStateMachine), &v1alpha1.ReplicatedStateMachine{})
+		Invokes(testing.NewCreateAction(replicatedstatemachinesResource, c.ns, replicatedStateMachine), &v1alpha1.InstanceSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ReplicatedStateMachine), err
+	return obj.(*v1alpha1.InstanceSet), err
 }
 
 // Update takes the representation of a replicatedStateMachine and updates it. Returns the server's representation of the replicatedStateMachine, and an error, if there is any.
-func (c *FakeReplicatedStateMachines) Update(ctx context.Context, replicatedStateMachine *v1alpha1.ReplicatedStateMachine, opts v1.UpdateOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {
+func (c *FakeReplicatedStateMachines) Update(ctx context.Context, replicatedStateMachine *v1alpha1.InstanceSet, opts v1.UpdateOptions) (result *v1alpha1.InstanceSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(replicatedstatemachinesResource, c.ns, replicatedStateMachine), &v1alpha1.ReplicatedStateMachine{})
+		Invokes(testing.NewUpdateAction(replicatedstatemachinesResource, c.ns, replicatedStateMachine), &v1alpha1.InstanceSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ReplicatedStateMachine), err
+	return obj.(*v1alpha1.InstanceSet), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeReplicatedStateMachines) UpdateStatus(ctx context.Context, replicatedStateMachine *v1alpha1.ReplicatedStateMachine, opts v1.UpdateOptions) (*v1alpha1.ReplicatedStateMachine, error) {
+func (c *FakeReplicatedStateMachines) UpdateStatus(ctx context.Context, replicatedStateMachine *v1alpha1.InstanceSet, opts v1.UpdateOptions) (*v1alpha1.InstanceSet, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(replicatedstatemachinesResource, "status", c.ns, replicatedStateMachine), &v1alpha1.ReplicatedStateMachine{})
+		Invokes(testing.NewUpdateSubresourceAction(replicatedstatemachinesResource, "status", c.ns, replicatedStateMachine), &v1alpha1.InstanceSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ReplicatedStateMachine), err
+	return obj.(*v1alpha1.InstanceSet), err
 }
 
 // Delete takes name of the replicatedStateMachine and deletes it. Returns an error if one occurs.
 func (c *FakeReplicatedStateMachines) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(replicatedstatemachinesResource, c.ns, name, opts), &v1alpha1.ReplicatedStateMachine{})
+		Invokes(testing.NewDeleteActionWithOptions(replicatedstatemachinesResource, c.ns, name, opts), &v1alpha1.InstanceSet{})
 
 	return err
 }
@@ -125,17 +125,17 @@ func (c *FakeReplicatedStateMachines) Delete(ctx context.Context, name string, o
 func (c *FakeReplicatedStateMachines) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(replicatedstatemachinesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &v1alpha1.ReplicatedStateMachineList{})
+	_, err := c.Fake.Invokes(action, &v1alpha1.InstanceSetList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched replicatedStateMachine.
-func (c *FakeReplicatedStateMachines) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ReplicatedStateMachine, err error) {
+func (c *FakeReplicatedStateMachines) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.InstanceSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicatedstatemachinesResource, c.ns, name, pt, data, subresources...), &v1alpha1.ReplicatedStateMachine{})
+		Invokes(testing.NewPatchSubresourceAction(replicatedstatemachinesResource, c.ns, name, pt, data, subresources...), &v1alpha1.InstanceSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ReplicatedStateMachine), err
+	return obj.(*v1alpha1.InstanceSet), err
 }

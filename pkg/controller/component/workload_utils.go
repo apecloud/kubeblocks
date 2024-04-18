@@ -64,7 +64,7 @@ func GetComponentRSMMinReadySeconds(ctx context.Context,
 	cli client.Client,
 	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {
-	rsmList := &workloads.ReplicatedStateMachineList{}
+	rsmList := &workloads.InstanceSetList{}
 	if err = GetObjectListByComponentName(ctx, cli, cluster, rsmList, componentName); err != nil {
 		return
 	}

@@ -36,17 +36,17 @@ type ReplicatedStateMachinesGetter interface {
 	ReplicatedStateMachines(namespace string) ReplicatedStateMachineInterface
 }
 
-// ReplicatedStateMachineInterface has methods to work with ReplicatedStateMachine resources.
+// ReplicatedStateMachineInterface has methods to work with InstanceSet resources.
 type ReplicatedStateMachineInterface interface {
-	Create(ctx context.Context, replicatedStateMachine *v1alpha1.ReplicatedStateMachine, opts v1.CreateOptions) (*v1alpha1.ReplicatedStateMachine, error)
-	Update(ctx context.Context, replicatedStateMachine *v1alpha1.ReplicatedStateMachine, opts v1.UpdateOptions) (*v1alpha1.ReplicatedStateMachine, error)
-	UpdateStatus(ctx context.Context, replicatedStateMachine *v1alpha1.ReplicatedStateMachine, opts v1.UpdateOptions) (*v1alpha1.ReplicatedStateMachine, error)
+	Create(ctx context.Context, replicatedStateMachine *v1alpha1.InstanceSet, opts v1.CreateOptions) (*v1alpha1.InstanceSet, error)
+	Update(ctx context.Context, replicatedStateMachine *v1alpha1.InstanceSet, opts v1.UpdateOptions) (*v1alpha1.InstanceSet, error)
+	UpdateStatus(ctx context.Context, replicatedStateMachine *v1alpha1.InstanceSet, opts v1.UpdateOptions) (*v1alpha1.InstanceSet, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ReplicatedStateMachine, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ReplicatedStateMachineList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.InstanceSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.InstanceSetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ReplicatedStateMachine, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.InstanceSet, err error)
 	ReplicatedStateMachineExpansion
 }
 
@@ -65,8 +65,8 @@ func newReplicatedStateMachines(c *WorkloadsV1alpha1Client, namespace string) *r
 }
 
 // Get takes name of the replicatedStateMachine, and returns the corresponding replicatedStateMachine object, and an error if there is any.
-func (c *replicatedStateMachines) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {
-	result = &v1alpha1.ReplicatedStateMachine{}
+func (c *replicatedStateMachines) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.InstanceSet, err error) {
+	result = &v1alpha1.InstanceSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicatedstatemachines").
@@ -78,12 +78,12 @@ func (c *replicatedStateMachines) Get(ctx context.Context, name string, options 
 }
 
 // List takes label and field selectors, and returns the list of ReplicatedStateMachines that match those selectors.
-func (c *replicatedStateMachines) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ReplicatedStateMachineList, err error) {
+func (c *replicatedStateMachines) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.InstanceSetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1alpha1.ReplicatedStateMachineList{}
+	result = &v1alpha1.InstanceSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicatedstatemachines").
@@ -110,8 +110,8 @@ func (c *replicatedStateMachines) Watch(ctx context.Context, opts v1.ListOptions
 }
 
 // Create takes the representation of a replicatedStateMachine and creates it.  Returns the server's representation of the replicatedStateMachine, and an error, if there is any.
-func (c *replicatedStateMachines) Create(ctx context.Context, replicatedStateMachine *v1alpha1.ReplicatedStateMachine, opts v1.CreateOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {
-	result = &v1alpha1.ReplicatedStateMachine{}
+func (c *replicatedStateMachines) Create(ctx context.Context, replicatedStateMachine *v1alpha1.InstanceSet, opts v1.CreateOptions) (result *v1alpha1.InstanceSet, err error) {
+	result = &v1alpha1.InstanceSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("replicatedstatemachines").
@@ -123,8 +123,8 @@ func (c *replicatedStateMachines) Create(ctx context.Context, replicatedStateMac
 }
 
 // Update takes the representation of a replicatedStateMachine and updates it. Returns the server's representation of the replicatedStateMachine, and an error, if there is any.
-func (c *replicatedStateMachines) Update(ctx context.Context, replicatedStateMachine *v1alpha1.ReplicatedStateMachine, opts v1.UpdateOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {
-	result = &v1alpha1.ReplicatedStateMachine{}
+func (c *replicatedStateMachines) Update(ctx context.Context, replicatedStateMachine *v1alpha1.InstanceSet, opts v1.UpdateOptions) (result *v1alpha1.InstanceSet, err error) {
+	result = &v1alpha1.InstanceSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("replicatedstatemachines").
@@ -138,8 +138,8 @@ func (c *replicatedStateMachines) Update(ctx context.Context, replicatedStateMac
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *replicatedStateMachines) UpdateStatus(ctx context.Context, replicatedStateMachine *v1alpha1.ReplicatedStateMachine, opts v1.UpdateOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {
-	result = &v1alpha1.ReplicatedStateMachine{}
+func (c *replicatedStateMachines) UpdateStatus(ctx context.Context, replicatedStateMachine *v1alpha1.InstanceSet, opts v1.UpdateOptions) (result *v1alpha1.InstanceSet, err error) {
+	result = &v1alpha1.InstanceSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("replicatedstatemachines").
@@ -180,8 +180,8 @@ func (c *replicatedStateMachines) DeleteCollection(ctx context.Context, opts v1.
 }
 
 // Patch applies the patch and returns the patched replicatedStateMachine.
-func (c *replicatedStateMachines) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ReplicatedStateMachine, err error) {
-	result = &v1alpha1.ReplicatedStateMachine{}
+func (c *replicatedStateMachines) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.InstanceSet, err error) {
+	result = &v1alpha1.InstanceSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("replicatedstatemachines").

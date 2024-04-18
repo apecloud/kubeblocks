@@ -53,7 +53,7 @@ var _ = Describe("revision update reconciler test", func() {
 			By("Reconcile")
 			newTree, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			newRsm, ok := newTree.GetRoot().(*workloads.ReplicatedStateMachine)
+			newRsm, ok := newTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			Expect(newRsm.Status.ObservedGeneration).Should(Equal(rsm.Generation))
 			updateRevisions, err := getUpdateRevisions(newRsm.Status.UpdateRevisions)

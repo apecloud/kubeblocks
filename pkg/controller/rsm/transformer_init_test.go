@@ -43,7 +43,7 @@ var _ = Describe("init transformer test.", func() {
 		}
 
 		dag = graph.NewDAG()
-		transformer = &initTransformer{ReplicatedStateMachine: rsm}
+		transformer = &initTransformer{InstanceSet: rsm}
 	})
 
 	Context("dag init", func() {

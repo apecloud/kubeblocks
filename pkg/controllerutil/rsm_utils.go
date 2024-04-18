@@ -30,7 +30,7 @@ import (
 )
 
 // GetPodListByRSM gets rsm pod list.
-func GetPodListByRSM(ctx context.Context, cli client.Client, rsm *workloads.ReplicatedStateMachine) ([]corev1.Pod, error) {
+func GetPodListByRSM(ctx context.Context, cli client.Client, rsm *workloads.InstanceSet) ([]corev1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsMap(rsm.Spec.Selector)
 	if err != nil {
 		return nil, err

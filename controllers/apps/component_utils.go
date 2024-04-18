@@ -80,7 +80,7 @@ func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster
 	return cli.List(ctx, objectList, opts...)
 }
 
-func DelayUpdateRsmSystemFields(obj v1alpha1.ReplicatedStateMachineSpec, pobj *v1alpha1.ReplicatedStateMachineSpec) {
+func DelayUpdateRsmSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1alpha1.InstanceSetSpec) {
 	DelayUpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
 
 	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
@@ -100,7 +100,7 @@ func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	updateLorryContainer(obj.Containers, pobj.Containers)
 }
 
-func UpdateRsmSystemFields(obj v1alpha1.ReplicatedStateMachineSpec, pobj *v1alpha1.ReplicatedStateMachineSpec) {
+func UpdateRsmSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1alpha1.InstanceSetSpec) {
 	UpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
 	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
 		pobj.RoleProbe.FailureThreshold = obj.RoleProbe.FailureThreshold

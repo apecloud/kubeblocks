@@ -34,7 +34,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-var _ = Describe("ReplicatedStateMachine Controller", func() {
+var _ = Describe("InstanceSet Controller", func() {
 	Context("reconciliation with ReplicaProvider=StatefulSet", func() {
 		var replicaProvider string
 		BeforeEach(func() {
@@ -95,12 +95,12 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 				GetObject()
 			Expect(k8sClient.Create(ctx, rsm)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(rsm),
-				func(g Gomega, set *workloads.ReplicatedStateMachine) {
+				func(g Gomega, set *workloads.InstanceSet) {
 					g.Expect(set.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				}),
 			).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, rsm)).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(rsm), &workloads.ReplicatedStateMachine{}, false)).
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(rsm), &workloads.InstanceSet{}, false)).
 				Should(Succeed())
 		})
 	})

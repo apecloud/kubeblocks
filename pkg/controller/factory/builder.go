@@ -50,8 +50,8 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// BuildRSM builds a ReplicatedStateMachine object from SynthesizedComponent.
-func BuildRSM(synthesizedComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+// BuildRSM builds a InstanceSet object from SynthesizedComponent.
+func BuildRSM(synthesizedComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
 	var (
 		clusterDefName     = synthesizedComp.ClusterDefName
 		clusterCompDefName = synthesizedComp.ClusterCompDefName
@@ -161,7 +161,7 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent) map[
 	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, annotations)
 }
 
-func setDefaultResourceLimits(rsm *workloads.ReplicatedStateMachine) {
+func setDefaultResourceLimits(rsm *workloads.InstanceSet) {
 	for _, cc := range []*[]corev1.Container{&rsm.Spec.Template.Spec.Containers, &rsm.Spec.Template.Spec.InitContainers} {
 		for i := range *cc {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&(*cc)[i])

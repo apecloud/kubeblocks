@@ -136,7 +136,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				Namespace: clusterKey.Namespace,
 				Name:      clusterKey.Name + "-" + statefulMySQLCompName,
 			}
-			Eventually(testapps.CheckObjExists(&testCtx, rsmKey, &workloads.ReplicatedStateMachine{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, rsmKey, &workloads.InstanceSet{}, true)).Should(Succeed())
 
 			involvedObject := corev1.ObjectReference{
 				Name:      rsmKey.Name,

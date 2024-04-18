@@ -343,7 +343,7 @@ func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(target *dpv1alpha
 }
 
 func (r *clusterBackupPolicyTransformer) getCompReplicas() int32 {
-	rsm := &workloads.ReplicatedStateMachine{}
+	rsm := &workloads.InstanceSet{}
 	compSpec := r.getClusterComponentSpec()
 	rsmName := fmt.Sprintf("%s-%s", r.Cluster.Name, compSpec.Name)
 	if err := r.Client.Get(r.Context, client.ObjectKey{Name: rsmName, Namespace: r.Cluster.Namespace}, rsm); err != nil {

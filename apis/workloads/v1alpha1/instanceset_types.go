@@ -27,8 +27,8 @@ import (
 
 type InstanceTemplate struct {
 	// Specifies the name of the template.
-	// Each instance of the template derives its name from the RSM's Name, the template's Name and the instance's ordinal.
-	// The constructed instance name follows the pattern $(rsm.name)-$(template.name)-$(ordinal).
+	// Each instance of the template derives its name from the InstanceSet Name, the template's Name and the instance's ordinal.
+	// The constructed instance name follows the pattern $(instance_set.name)-$(template.name)-$(ordinal).
 	// The ordinal starts from 0 by default.
 	//
 	// +kubebuilder:validation:MaxLength=54
@@ -97,8 +97,8 @@ type InstanceTemplate struct {
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 }
 
-// ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine
-type ReplicatedStateMachineSpec struct {
+// InstanceSetSpec defines the desired state of InstanceSet
+type InstanceSetSpec struct {
 	// Specifies the desired number of replicas of the given Template.
 	// These replicas are instantiations of the same Template, with each having a consistent identity.
 	// Defaults to 1 if unspecified.
@@ -143,17 +143,17 @@ type ReplicatedStateMachineSpec struct {
 	//
 	// Instance is the fundamental unit managed by KubeBlocks.
 	// It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
-	// A RSM manages instances with a total count of Replicas,
+	// An InstanceSet manages instances with a total count of Replicas,
 	// and by default, all these instances are generated from the same template.
 	// The InstanceTemplate provides a way to override values in the default template,
-	// allowing the RSM to manage instances from different templates.
+	// allowing the InstanceSet to manage instances from different templates.
 	//
-	// The naming convention for instances (pods) based on the RSM Name, InstanceTemplate Name, and ordinal.
-	// The constructed instance name follows the pattern: $(rsm.name)-$(template.name)-$(ordinal).
+	// The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
+	// The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
 	// By default, the ordinal starts from 0 for each InstanceTemplate.
 	// It is important to ensure that the Name of each InstanceTemplate is unique.
 	//
-	// The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the RSM.
+	// The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
 	// Any remaining replicas will be generated using the default template and will follow the default naming rules.
 	//
 	// +optional
@@ -165,7 +165,7 @@ type ReplicatedStateMachineSpec struct {
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
 	// Represents a list of claims that pods are allowed to reference.
-	// The ReplicatedStateMachine controller is responsible for mapping network identities to
+	// The InstanceSet controller is responsible for mapping network identities to
 	// claims in a way that maintains the identity of a pod. Every claim in
 	// this list must have at least one matching (by name) volumeMount in one
 	// container in the template. A claim in this list takes precedence over
@@ -186,7 +186,7 @@ type ReplicatedStateMachineSpec struct {
 	PodManagementPolicy appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
 
 	// Indicates the StatefulSetUpdateStrategy that will be
-	// employed to update Pods in the RSM when a revision is made to
+	// employed to update Pods in the InstanceSet when a revision is made to
 	// Template.
 	// UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil
 	UpdateStrategy appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
@@ -213,7 +213,7 @@ type ReplicatedStateMachineSpec struct {
 	// +optional
 	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 
-	// Indicates that the rsm is paused, meaning the reconciliation of this rsm object will be paused.
+	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
 	// +optional
 	Paused bool `json:"paused,omitempty"`
 
@@ -222,8 +222,8 @@ type ReplicatedStateMachineSpec struct {
 	Credential *Credential `json:"credential,omitempty"`
 }
 
-// ReplicatedStateMachineStatus defines the observed state of ReplicatedStateMachine
-type ReplicatedStateMachineStatus struct {
+// InstanceSetStatus defines the observed state of InstanceSet
+type InstanceSetStatus struct {
 	appsv1.StatefulSetStatus `json:",inline"`
 
 	// Defines the initial number of pods (members) when the cluster is first initialized.
@@ -236,7 +236,7 @@ type ReplicatedStateMachineStatus struct {
 	// +optional
 	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
 
-	// When not empty, indicates the version of the Replicated State Machine (RSM) used to generate the underlying workload.
+	// When not empty, indicates the version of the InstanceSet used to generate the underlying workload.
 	//
 	// +optional
 	CurrentGeneration int64 `json:"currentGeneration,omitempty"`
@@ -246,13 +246,13 @@ type ReplicatedStateMachineStatus struct {
 	// +optional
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 
-	// currentRevisions, if not empty, indicates the old version of the RSM used to generate Pods.
+	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
 	//
 	// +optional
 	CurrentRevisions map[string]string `json:"currentRevisions,omitempty"`
 
-	// updateRevisions, if not empty, indicates the new version of the RSM used to generate Pods.
+	// updateRevisions, if not empty, indicates the new version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
 	//
 	// +optional
@@ -262,14 +262,14 @@ type ReplicatedStateMachineStatus struct {
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},shortName=rsm
-// +kubebuilder:printcolumn:name="LEADER",type="string",JSONPath=".status.membersStatus[?(@.role.isLeader==true)].podName",description="leader pod name."
+// +kubebuilder:resource:categories={kubeblocks,all},shortName=its
+// +kubebuilder:printcolumn:name="LEADER",type="string",JSONPath=".status.membersStatus[?(@.role.isLeader==true)].podName",description="leader instance name."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.readyReplicas",description="ready replicas."
 // +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.replicas",description="total replicas."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ReplicatedStateMachine is the Schema for the replicatedstatemachines API.
-type ReplicatedStateMachine struct {
+// InstanceSet is the Schema for the instancesets API.
+type InstanceSet struct {
 	// The metadata for the type, like API version and kind.
 	metav1.TypeMeta `json:",inline"`
 
@@ -278,20 +278,20 @@ type ReplicatedStateMachine struct {
 
 	// Defines the desired state of the state machine. It includes the configuration details for the state machine.
 	//
-	Spec ReplicatedStateMachineSpec `json:"spec,omitempty"`
+	Spec InstanceSetSpec `json:"spec,omitempty"`
 
 	// Represents the current information about the state machine. This data may be out of date.
 	//
-	Status ReplicatedStateMachineStatus `json:"status,omitempty"`
+	Status InstanceSetStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ReplicatedStateMachineList contains a list of ReplicatedStateMachine
-type ReplicatedStateMachineList struct {
+// InstanceSetList contains a list of InstanceSet
+type InstanceSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ReplicatedStateMachine `json:"items"`
+	Items           []InstanceSet `json:"items"`
 }
 
 type ReplicaRole struct {
@@ -366,9 +366,9 @@ type RoleProbe struct {
 	// Upon completion of all actions, the final output should be a single string representing the role name defined in spec.Roles.
 	// The latest [BusyBox](https://busybox.net/) image will be used if Image is not configured.
 	// Environment variables can be used in Command:
-	// - v_KB_RSM_LAST_STDOUT: stdout from the last action, watch for 'v_' prefix
-	// - KB_RSM_USERNAME: username part of the credential
-	// - KB_RSM_PASSWORD: password part of the credential
+	// - v_KB_ITS_LAST_STDOUT: stdout from the last action, watch for 'v_' prefix
+	// - KB_ITS_USERNAME: username part of the credential
+	// - KB_ITS_PASSWORD: password part of the credential
 	//
 	// +optional
 	CustomHandler []Action `json:"customHandler,omitempty"`
@@ -418,13 +418,13 @@ type RoleProbe struct {
 
 type Credential struct {
 	// Defines the user's name for the credential.
-	// The corresponding environment variable will be KB_RSM_USERNAME.
+	// The corresponding environment variable will be KB_ITS_USERNAME.
 	//
 	// +kubebuilder:validation:Required
 	Username CredentialVar `json:"username"`
 
 	// Represents the user's password for the credential.
-	// The corresponding environment variable will be KB_RSM_PASSWORD.
+	// The corresponding environment variable will be KB_ITS_PASSWORD.
 	//
 	// +kubebuilder:validation:Required
 	Password CredentialVar `json:"password"`
@@ -449,11 +449,11 @@ type CredentialVar struct {
 
 type MembershipReconfiguration struct {
 	// Specifies the environment variables that can be used in all following Actions:
-	// - KB_RSM_USERNAME: Represents the username part of the credential
-	// - KB_RSM_PASSWORD: Represents the password part of the credential
-	// - KB_RSM_LEADER_HOST: Represents the leader host
-	// - KB_RSM_TARGET_HOST: Represents the target host
-	// - KB_RSM_SERVICE_PORT: Represents the service port
+	// - KB_ITS_USERNAME: Represents the username part of the credential
+	// - KB_ITS_PASSWORD: Represents the password part of the credential
+	// - KB_ITS_LEADER_HOST: Represents the leader host
+	// - KB_ITS_TARGET_HOST: Represents the target host
+	// - KB_ITS_SERVICE_PORT: Represents the service port
 	//
 	// Defines the action to perform a switchover.
 	// If the Image is not configured, the latest [BusyBox](https://busybox.net/) image will be used.
@@ -519,12 +519,12 @@ type MemberStatus struct {
 	// +optional
 	Ready bool `json:"ready,omitempty"`
 
-	// Indicates whether it is required for the replica set manager (rsm) to have at least one primary pod ready.
+	// Indicates whether it is required for the InstanceSet to have at least one primary instance ready.
 	//
 	// +optional
 	ReadyWithoutPrimary bool `json:"readyWithoutPrimary"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ReplicatedStateMachine{}, &ReplicatedStateMachineList{})
+	SchemeBuilder.Register(&InstanceSet{}, &InstanceSetList{})
 }

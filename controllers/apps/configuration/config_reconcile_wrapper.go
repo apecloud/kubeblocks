@@ -39,7 +39,7 @@ type configReconcileContext struct {
 	BuiltinComponent *component.SynthesizedComponent
 
 	Containers []string
-	RSMList    []workloads.ReplicatedStateMachine
+	RSMList    []workloads.InstanceSet
 
 	reqCtx intctrlutil.RequestCtx
 }

@@ -64,7 +64,7 @@ var _ = Describe("fix meta transformer test.", func() {
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 			root, err := model.FindRootVertex(dag)
 			Expect(err).Should(BeNil())
-			rsmNew, ok := root.Obj.(*workloads.ReplicatedStateMachine)
+			rsmNew, ok := root.Obj.(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			Expect(rsmNew.Finalizers).ShouldNot(BeNil())
 			Expect(slices.Contains(rsmNew.Finalizers, GetFinalizer(rsmNew))).Should(BeTrue())

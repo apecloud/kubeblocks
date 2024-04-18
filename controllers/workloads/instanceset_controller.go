@@ -45,16 +45,16 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// ReplicatedStateMachineReconciler reconciles a ReplicatedStateMachine object
-type ReplicatedStateMachineReconciler struct {
+// InstanceSetReconciler reconciles a InstanceSet object
+type InstanceSetReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/finalizers,verbs=update
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
@@ -67,14 +67,14 @@ type ReplicatedStateMachineReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the ReplicatedStateMachine object against the actual cluster state, and then
+// the InstanceSet object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithValues("ReplicatedStateMachine", req.NamespacedName)
+func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("InstanceSet", req.NamespacedName)
 
 	provider, err := rsm2.CurrentReplicaProvider(ctx, r.Client, req.NamespacedName)
 	if err != nil {
@@ -101,7 +101,7 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 		Recorder: r.Recorder,
 	}
 
-	reqCtx.Log.V(1).Info("reconcile", "ReplicatedStateMachine", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "InstanceSet", req.NamespacedName)
 
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(model.RequeueError); ok {
@@ -113,7 +113,7 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	// the RSM reconciliation loop is a two-phase model: plan Build and plan Execute
+	// the InstanceSet reconciliation loop is a two-phase model: plan Build and plan Execute
 	// Init stage
 	planBuilder := rsm.NewRSMPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
@@ -169,7 +169,7 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
 	ctx := &handler.FinderContext{
 		Context: context.Background(),
 		Reader:  r.Client,
@@ -182,10 +182,10 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager, mu
 	return r.setupWithMultiClusterManager(mgr, multiClusterMgr, ctx)
 }
 
-func (r *ReplicatedStateMachineReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
+func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
 	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) {
 		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
-		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
+		delegatorFinder := handler.NewDelegatorFinder(&workloads.InstanceSet{}, nameLabels)
 		ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
 		stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
@@ -193,7 +193,7 @@ func (r *ReplicatedStateMachineReconciler) setupWithManager(mgr ctrl.Manager, ct
 		stsPodHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
 
 		return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-			For(&workloads.ReplicatedStateMachine{}).
+			For(&workloads.InstanceSet{}).
 			WithOptions(controller.Options{
 				MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 			}).
@@ -206,10 +206,10 @@ func (r *ReplicatedStateMachineReconciler) setupWithManager(mgr ctrl.Manager, ct
 	}
 
 	stsOwnerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
-	rsmOwnerFinder := handler.NewOwnerFinder(&workloads.ReplicatedStateMachine{})
-	podHandler := handler.NewBuilder(ctx).AddFinder(stsOwnerFinder).AddFinder(rsmOwnerFinder).Build()
+	itsOwnerFinder := handler.NewOwnerFinder(&workloads.InstanceSet{})
+	podHandler := handler.NewBuilder(ctx).AddFinder(stsOwnerFinder).AddFinder(itsOwnerFinder).Build()
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&workloads.ReplicatedStateMachine{}).
+		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
@@ -221,10 +221,10 @@ func (r *ReplicatedStateMachineReconciler) setupWithManager(mgr ctrl.Manager, ct
 		Complete(r)
 }
 
-func (r *ReplicatedStateMachineReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
+func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
 	multiClusterMgr multicluster.Manager, ctx *handler.FinderContext) error {
 	nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
-	delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
+	delegatorFinder := handler.NewDelegatorFinder(&workloads.InstanceSet{}, nameLabels)
 	ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
 	stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 	// pod owned by legacy StatefulSet
@@ -233,7 +233,7 @@ func (r *ReplicatedStateMachineReconciler) setupWithMultiClusterManager(mgr ctrl
 	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 
 	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&workloads.ReplicatedStateMachine{}).
+		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		})
@@ -241,8 +241,8 @@ func (r *ReplicatedStateMachineReconciler) setupWithMultiClusterManager(mgr ctrl
 	multiClusterMgr.Watch(b, &appsv1.StatefulSet{}, stsHandler).
 		Watch(b, &corev1.Pod{}, stsPodHandler).
 		Watch(b, &batchv1.Job{}, jobHandler).
-		Own(b, &corev1.Pod{}, &workloads.ReplicatedStateMachine{}).
-		Own(b, &corev1.PersistentVolumeClaim{}, &workloads.ReplicatedStateMachine{})
+		Own(b, &corev1.Pod{}, &workloads.InstanceSet{}).
+		Own(b, &corev1.PersistentVolumeClaim{}, &workloads.InstanceSet{})
 
 	return b.Complete(r)
 }

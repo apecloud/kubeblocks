@@ -1362,7 +1362,7 @@ var _ = Describe("Component Controller", func() {
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.InstanceSet) {
 			envVars, _ := buildEnvVarsNData(nil, targetEnvVars, false)
 			targetEnvVarsMapping := map[string]corev1.EnvVar{}
 			for i, v := range envVars {
@@ -1407,7 +1407,7 @@ var _ = Describe("Component Controller", func() {
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.InstanceSet) {
 			g.Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(replicasLimit.MaxReplicas * 2))
 		})).Should(Succeed())
 
@@ -1433,7 +1433,7 @@ var _ = Describe("Component Controller", func() {
 				Namespace: compObj.Namespace,
 				Name:      compObj.Name,
 			}
-			Consistently(testapps.CheckObjExists(&testCtx, rsmKey, &workloads.ReplicatedStateMachine{}, false)).Should(Succeed())
+			Consistently(testapps.CheckObjExists(&testCtx, rsmKey, &workloads.InstanceSet{}, false)).Should(Succeed())
 		}
 
 		By("create component w/ replicas limit set - ok")
@@ -1445,7 +1445,7 @@ var _ = Describe("Component Controller", func() {
 				Namespace: compObj.Namespace,
 				Name:      compObj.Name,
 			}
-			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.InstanceSet) {
 				g.Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(replicas))
 			})).Should(Succeed())
 		}
@@ -1479,7 +1479,7 @@ var _ = Describe("Component Controller", func() {
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.InstanceSet) {
 			g.Expect(rsm.Spec.Roles).Should(HaveExactElements(targetRoles))
 		})).Should(Succeed())
 	}
@@ -1528,7 +1528,7 @@ var _ = Describe("Component Controller", func() {
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.InstanceSet) {
 			podSpec := rsm.Spec.Template.Spec
 			g.Expect(podSpec.Volumes).Should(ContainElements(targetVolume))
 			for _, c := range podSpec.Containers {
@@ -1573,7 +1573,7 @@ var _ = Describe("Component Controller", func() {
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.InstanceSet) {
 			podSpec := rsm.Spec.Template.Spec
 			// node affinity
 			g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(labelKey))
@@ -1632,7 +1632,7 @@ var _ = Describe("Component Controller", func() {
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.InstanceSet) {
 			g.Expect(rsm.Spec.Template.Spec.ServiceAccountName).To(Equal(saName))
 		})).Should(Succeed())
 
@@ -1728,7 +1728,7 @@ var _ = Describe("Component Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
-		var rsm *workloads.ReplicatedStateMachine
+		var rsm *workloads.InstanceSet
 		Eventually(func(g Gomega) {
 			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 			g.Expect(rsmList.Items).ShouldNot(BeEmpty())
@@ -1781,7 +1781,7 @@ var _ = Describe("Component Controller", func() {
 		}).Should(Succeed())
 
 		// trigger rsm to reconcile as the underlying sts is not created
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sts), func(rsm *workloads.ReplicatedStateMachine) {
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sts), func(rsm *workloads.InstanceSet) {
 			rsm.Annotations["time"] = time.Now().Format(time.RFC3339)
 		})()).Should(Succeed())
 		By("Checking pods' annotations")
@@ -1899,7 +1899,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 		By("the restore container has been removed from init containers")
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&rsm), func(g Gomega, tmpRSM *workloads.InstanceSet) {
 			g.Expect(tmpRSM.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 		})).Should(Succeed())
 
@@ -2002,7 +2002,7 @@ var _ = Describe("Component Controller", func() {
 			viper.Set(constant.KBToolsImage, oldToolsImage)
 		}()
 
-		underlyingWorkload := func() *workloads.ReplicatedStateMachine {
+		underlyingWorkload := func() *workloads.InstanceSet {
 			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 			return &rsmList.Items[0]
 		}
@@ -2376,7 +2376,7 @@ var _ = Describe("Component Controller", func() {
 
 			By("check the labels and image in rsm")
 			rsmKey := compKey
-			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.InstanceSet) {
 				// check comp-def and service-version labels
 				g.Expect(rsm.Annotations).ShouldNot(BeEmpty())
 				g.Expect(rsm.Annotations).Should(HaveKeyWithValue(constant.AppComponentLabelKey, compObj.Spec.CompDef))
@@ -2400,7 +2400,7 @@ var _ = Describe("Component Controller", func() {
 			})()).Should(Succeed())
 
 			By("wait rsm updated and check the labels and image in rsm not changed")
-			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.InstanceSet) {
 				// check the rsm is updated
 				g.Expect(rsm.Annotations).ShouldNot(BeEmpty())
 				g.Expect(rsm.Annotations).Should(HaveKeyWithValue("now", now))

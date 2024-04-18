@@ -34,7 +34,7 @@ var _ = Describe("revision util test", func() {
 			stsJSON := `
 {
     "apiVersion": "workloads.kubeblocks.io/v1alpha1",
-    "kind": "ReplicatedStateMachine",
+    "kind": "InstanceSet",
     "metadata": {
         "annotations": {
             "config.kubeblocks.io/tpl-redis-metrics-config": "redis-test-redis-redis-metrics-config",
@@ -961,7 +961,7 @@ var _ = Describe("revision util test", func() {
     }
 }
 `
-			rsm := &workloads.ReplicatedStateMachine{}
+			rsm := &workloads.InstanceSet{}
 			err := json.Unmarshal([]byte(stsJSON), rsm)
 			Expect(err).Should(Succeed())
 			cr, err := NewRevision(rsm)

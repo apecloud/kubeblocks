@@ -91,10 +91,10 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	createServiceAccount(serviceAccount, graphCli, dag, parent)
-	rsmList := graphCli.FindAll(dag, &workloads.InstanceSet{})
-	for _, rsm := range rsmList {
+	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
+	for _, its := range itsList {
 		// serviceAccount must be created before workload
-		graphCli.DependOn(dag, rsm, serviceAccount)
+		graphCli.DependOn(dag, its, serviceAccount)
 	}
 
 	return nil

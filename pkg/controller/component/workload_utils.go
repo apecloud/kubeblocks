@@ -59,8 +59,8 @@ func GetObjectListByComponentName(ctx context.Context, cli client.Reader, cluste
 	return cli.List(ctx, objectList, client.MatchingLabels(matchLabels), inNamespace)
 }
 
-// GetComponentRSMMinReadySeconds gets the statefulSet minReadySeconds of the component.
-func GetComponentRSMMinReadySeconds(ctx context.Context,
+// GetComponentMinReadySeconds gets the underlying workload's minReadySeconds of the component.
+func GetComponentMinReadySeconds(ctx context.Context,
 	cli client.Client,
 	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {

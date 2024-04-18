@@ -45,8 +45,8 @@ import (
 // GetComponentPods gets all pods of the component.
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
-	for i := range params.RSMUnits {
-		pods, err := intctrlutil.GetPodListByRSM(params.Ctx.Ctx, params.Client, &params.RSMUnits[i])
+	for i := range params.InstanceSetUnits {
+		pods, err := intctrlutil.GetPodListByRSM(params.Ctx.Ctx, params.Client, &params.InstanceSetUnits[i])
 		if err != nil {
 			return nil, err
 		}
@@ -72,11 +72,11 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 }
 
 func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
-	if len(params.RSMUnits) > 1 {
-		return nil, core.MakeError("component require only one rsm, actual %d components", len(params.RSMUnits))
+	if len(params.InstanceSetUnits) > 1 {
+		return nil, core.MakeError("component require only one rsm, actual %d components", len(params.InstanceSetUnits))
 	}
 
-	if len(params.RSMUnits) == 0 {
+	if len(params.InstanceSetUnits) == 0 {
 		return nil, nil
 	}
 
@@ -224,7 +224,7 @@ func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey s
 		case *appv1.Deployment:
 			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.DeploymentSignature)
 		case *workloads.InstanceSet:
-			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.RSMSignature)
+			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.InstanceSetSignature)
 		default:
 			// ignore other types workload
 		}

@@ -87,8 +87,8 @@ func NewFakeRSMPod(rsm *workloads.InstanceSet, ordinal int) *corev1.Pod {
 	return pod
 }
 
-// MockRSMReady mocks the RSM workload to ready state.
-func MockRSMReady(rsm *workloads.InstanceSet, pods ...*corev1.Pod) {
+// MockInstanceSetReady mocks the RSM workload to ready state.
+func MockInstanceSetReady(rsm *workloads.InstanceSet, pods ...*corev1.Pod) {
 	rsm.Status.InitReplicas = *rsm.Spec.Replicas
 	rsm.Status.ReadyInitReplicas = *rsm.Spec.Replicas
 	rsm.Status.AvailableReplicas = *rsm.Spec.Replicas
@@ -146,7 +146,7 @@ func ListAndCheckRSMItemsCount(testCtx *testutil.TestContext, key types.Namespac
 	return rsmList
 }
 
-func ListAndCheckRSMWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, componentName string) *workloads.InstanceSetList {
+func ListAndCheckInstanceSetWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, componentName string) *workloads.InstanceSetList {
 	rsmList := &workloads.InstanceSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, rsmList, client.MatchingLabels{

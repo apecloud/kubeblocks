@@ -96,7 +96,7 @@ func generatedComponent4LegacyCluster(transCtx *componentTransformContext) (bool
 	rsmObj := &workloads.InstanceSet{}
 	rsmKey := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
-		Name:      constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+		Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
 	}
 	if err := transCtx.Client.Get(transCtx.Context, rsmKey, rsmObj); err != nil {
 		return false, client.IgnoreNotFound(err)

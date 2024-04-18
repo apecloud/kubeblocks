@@ -797,7 +797,7 @@ func resolvePodVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp
 			} else {
 				key := types.NamespacedName{
 					Namespace: synthesizedComp.Namespace,
-					Name:      constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, compName),
+					Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, compName),
 				}
 				rsm := &workloads.InstanceSet{}
 				err := cli.Get(ctx, key, rsm, inDataContext())

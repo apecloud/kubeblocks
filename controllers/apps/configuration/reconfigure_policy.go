@@ -112,7 +112,7 @@ type reconfigureParams struct {
 	Component *appsv1alpha1.ClusterComponentDefinition
 
 	// List of InstanceSet using this config template.
-	RSMUnits []workloads.InstanceSet
+	InstanceSetUnits []workloads.InstanceSet
 }
 
 var (
@@ -164,9 +164,9 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	}
 
 	var maxUnavailable *intstr.IntOrString
-	for _, rsm := range param.RSMUnits {
-		if rsm.Spec.UpdateStrategy.RollingUpdate != nil {
-			maxUnavailable = rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
+	for _, its := range param.InstanceSetUnits {
+		if its.Spec.UpdateStrategy.RollingUpdate != nil {
+			maxUnavailable = its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
 		}
 		if maxUnavailable != nil {
 			break
@@ -298,7 +298,7 @@ func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) 
 
 func fromWorkloadObjects(params reconfigureParams) []client.Object {
 	r := make([]client.Object, 0)
-	for _, unit := range params.RSMUnits {
+	for _, unit := range params.InstanceSetUnits {
 		r = append(r, &unit)
 	}
 	return r

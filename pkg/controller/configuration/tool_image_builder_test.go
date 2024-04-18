@@ -57,7 +57,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 
 	Context("ToolsImageBuilderTest", func() {
 		It("TestScriptSpec", func() {
-			rsm, err := factory.BuildRSM(clusterComponent)
+			rsm, err := factory.BuildInstanceSet(clusterComponent)
 			Expect(err).Should(Succeed())
 
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{

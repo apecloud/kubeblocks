@@ -80,9 +80,9 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
-					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3,
+					fromPodObjectList(newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 3,
 						withReadyPod(0, 1))),
-					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3,
+					fromPodObjectList(newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 3,
 						withReadyPod(0, 3))),
 				}),
 				testutil.WithAnyTimes()))
@@ -144,7 +144,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(
-					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3,
+					fromPodObjectList(newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 3,
 						withReadyPod(0, 1), func(pod *corev1.Pod, index int) {
 							if index == 0 {
 								if pod.Labels == nil {

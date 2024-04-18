@@ -96,7 +96,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	buildPodSpecVolumeMounts(synthesizeComp)
 
 	// build rsm workload
-	protoRSM, err := factory.BuildRSM(synthesizeComp)
+	protoRSM, err := factory.BuildInstanceSet(synthesizeComp)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (t *componentWorkloadTransformer) runningRSMObject(ctx graph.TransformConte
 	synthesizeComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
 	rsmKey := types.NamespacedName{
 		Namespace: synthesizeComp.Namespace,
-		Name:      constant.GenerateRSMNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name),
+		Name:      constant.GenerateWorkloadNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name),
 	}
 	rsm := &workloads.InstanceSet{}
 	if err := ctx.GetClient().Get(ctx.GetContext(), rsmKey, rsm); err != nil {
@@ -309,11 +309,11 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.InstanceSet, synthesizeComp *comp
 	}
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
-	DelayUpdateRsmSystemFields(oldRsm.Spec, &rsmObjCopy.Spec)
+	DelayUpdateInstanceSetSystemFields(oldRsm.Spec, &rsmObjCopy.Spec)
 
 	isSpecUpdated := !reflect.DeepEqual(&oldRsm.Spec, &rsmObjCopy.Spec)
 	if isSpecUpdated {
-		UpdateRsmSystemFields(rsmProto.Spec, &rsmObjCopy.Spec)
+		UpdateInstanceSetSystemFields(rsmProto.Spec, &rsmObjCopy.Spec)
 	}
 
 	isLabelsUpdated := !reflect.DeepEqual(oldRsm.Labels, rsmObjCopy.Labels)

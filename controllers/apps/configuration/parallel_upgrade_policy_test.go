@@ -79,7 +79,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(fromPodObjectList(
-					newMockPodsWithRSM(&mockParam.RSMUnits[0], 3),
+					newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 3),
 				))))
 
 			status, err := parallelPolicy.Upgrade(mockParam)
@@ -147,7 +147,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(
-					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3))), testutil.WithTimes(2),
+					fromPodObjectList(newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 3))), testutil.WithTimes(2),
 			))
 
 			status, err := parallelPolicy.Upgrade(mockParam)
@@ -187,7 +187,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 						VolumeName: "test_volume",
 					}}}))
 
-			setPods := newMockPodsWithRSM(&mockParam.RSMUnits[0], 5)
+			setPods := newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 5)
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(fromPodObjectList(setPods)), testutil.WithAnyTimes(),
 			))

@@ -72,7 +72,7 @@ var EventSignature = func(_ corev1.Event, _ *corev1.Event, _ corev1.EventList, _
 var ConfigMapSignature = func(_ corev1.ConfigMap, _ *corev1.ConfigMap, _ corev1.ConfigMapList, _ *corev1.ConfigMapList) {}
 var EndpointsSignature = func(_ corev1.Endpoints, _ *corev1.Endpoints, _ corev1.EndpointsList, _ *corev1.EndpointsList) {}
 
-var RSMSignature = func(_ workloads.InstanceSet, _ *workloads.InstanceSet, _ workloads.InstanceSetList, _ *workloads.InstanceSetList) {
+var InstanceSetSignature = func(_ workloads.InstanceSet, _ *workloads.InstanceSet, _ workloads.InstanceSetList, _ *workloads.InstanceSetList) {
 }
 var StatefulSetSignature = func(_ appsv1.StatefulSet, _ *appsv1.StatefulSet, _ appsv1.StatefulSetList, _ *appsv1.StatefulSetList) {
 }

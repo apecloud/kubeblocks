@@ -50,8 +50,8 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// BuildRSM builds a InstanceSet object from SynthesizedComponent.
-func BuildRSM(synthesizedComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
+// BuildInstanceSet builds a InstanceSet object from SynthesizedComponent.
+func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
 	var (
 		clusterDefName     = synthesizedComp.ClusterDefName
 		clusterCompDefName = synthesizedComp.ClusterCompDefName
@@ -91,12 +91,12 @@ func BuildRSM(synthesizedComp *component.SynthesizedComponent) (*workloads.Insta
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
 	}
 
-	rsmName := constant.GenerateRSMNamePattern(clusterName, compName)
-	rsmBuilder := builder.NewInstanceSetBuilder(namespace, rsmName).
+	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
+	itsBuilder := builder.NewInstanceSetBuilder(namespace, itsName).
 		AddLabelsInMap(mergeLabels).
 		AddAnnotationsInMap(mergeAnnotations).
 		AddMatchLabelsInMap(labels).
-		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
+		SetServiceName(constant.GenerateServiceNamePattern(itsName)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
 		SetTemplate(template)
@@ -105,31 +105,31 @@ func BuildRSM(synthesizedComp *component.SynthesizedComponent) (*workloads.Insta
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
 		vcts = append(vcts, vctToPVC(vct))
 	}
-	rsmBuilder.SetVolumeClaimTemplates(vcts...)
+	itsBuilder.SetVolumeClaimTemplates(vcts...)
 
 	if common.IsCompactMode(synthesizedComp.Annotations) {
-		rsmBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
+		itsBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
 			synthesizedComp.Annotations[constant.FeatureReconciliationInCompactModeAnnotationKey])
 	}
 
-	// convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
-	rsmObj, err := component.BuildRSMFrom(synthesizedComp, rsmBuilder.GetObject())
+	// convert componentDef attributes to workload attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
+	itsObj, err := component.BuildWorkloadFrom(synthesizedComp, itsBuilder.GetObject())
 	if err != nil {
 		return nil, err
 	}
 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	// TODO(xingran): synthesizedComp.VolumeTypes has been removed, and the following code needs to be refactored.
-	if len(rsmObj.Spec.VolumeClaimTemplates) > 0 && len(rsmObj.GetLabels()) > 0 {
-		for index, vct := range rsmObj.Spec.VolumeClaimTemplates {
+	if len(itsObj.Spec.VolumeClaimTemplates) > 0 && len(itsObj.GetLabels()) > 0 {
+		for index, vct := range itsObj.Spec.VolumeClaimTemplates {
 			BuildPersistentVolumeClaimLabels(synthesizedComp, &vct, vct.Name)
-			rsmObj.Spec.VolumeClaimTemplates[index] = vct
+			itsObj.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
 
-	setDefaultResourceLimits(rsmObj)
+	setDefaultResourceLimits(itsObj)
 
-	return rsmObj, nil
+	return itsObj, nil
 }
 
 func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
@@ -161,8 +161,8 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent) map[
 	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, annotations)
 }
 
-func setDefaultResourceLimits(rsm *workloads.InstanceSet) {
-	for _, cc := range []*[]corev1.Container{&rsm.Spec.Template.Spec.Containers, &rsm.Spec.Template.Spec.InitContainers} {
+func setDefaultResourceLimits(its *workloads.InstanceSet) {
+	for _, cc := range []*[]corev1.Container{&its.Spec.Template.Spec.Containers, &its.Spec.Template.Spec.InitContainers} {
 		for i := range *cc {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&(*cc)[i])
 		}

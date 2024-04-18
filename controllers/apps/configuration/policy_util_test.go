@@ -91,7 +91,7 @@ func withMockRSM(replicas int, labels map[string]string) ParamsOps {
 	return func(params *reconfigureParams) {
 		rand, _ := password.Generate(12, 8, 0, true, false)
 		stsName := "test_" + rand
-		params.RSMUnits = []workloads.InstanceSet{
+		params.InstanceSetUnits = []workloads.InstanceSet{
 			newMockRSM(replicas, stsName, labels),
 		}
 	}

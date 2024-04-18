@@ -30,8 +30,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-// BuildRSMFrom builds a new Component object based on SynthesizedComponent.
-func BuildRSMFrom(synthesizeComp *SynthesizedComponent, protoRSM *workloads.InstanceSet) (*workloads.InstanceSet, error) {
+// BuildWorkloadFrom builds a new Component object based on SynthesizedComponent.
+func BuildWorkloadFrom(synthesizeComp *SynthesizedComponent, protoRSM *workloads.InstanceSet) (*workloads.InstanceSet, error) {
 	if synthesizeComp == nil {
 		return nil, nil
 	}

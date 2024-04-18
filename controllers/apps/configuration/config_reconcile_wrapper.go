@@ -38,8 +38,8 @@ type configReconcileContext struct {
 	ConfigMap        *corev1.ConfigMap
 	BuiltinComponent *component.SynthesizedComponent
 
-	Containers []string
-	RSMList    []workloads.InstanceSet
+	Containers      []string
+	InstanceSetList []workloads.InstanceSet
 
 	reqCtx intctrlutil.RequestCtx
 }
@@ -62,18 +62,18 @@ func (c *configReconcileContext) GetRelatedObjects() error {
 	return c.Cluster().
 		ComponentAndComponentDef().
 		ComponentSpec().
-		RSM().
+		Workload().
 		SynthesizedComponent().
 		Complete()
 }
 
-func (c *configReconcileContext) RSM() *configReconcileContext {
+func (c *configReconcileContext) Workload() *configReconcileContext {
 	stsFn := func() (err error) {
-		c.RSMList, c.Containers, err = retrieveRelatedComponentsByConfigmap(
+		c.InstanceSetList, c.Containers, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
 			c.Context,
 			c.Name,
-			generics.RSMSignature,
+			generics.InstanceSetSignature,
 			client.ObjectKeyFromObject(c.ConfigMap),
 			client.InNamespace(c.Namespace),
 			c.MatchingLabels)

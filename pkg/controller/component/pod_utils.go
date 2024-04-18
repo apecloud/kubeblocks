@@ -62,28 +62,28 @@ func GetComponentPodListWithRole(ctx context.Context, cli client.Reader, cluster
 
 // IsComponentPodsWithLatestRevision checks whether the underlying pod spec matches the one declared in the Cluster/Component.
 func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, rsm *workloads.InstanceSet) (bool, error) {
-	if cluster == nil || rsm == nil {
+	cluster *appsv1alpha1.Cluster, its *workloads.InstanceSet) (bool, error) {
+	if cluster == nil || its == nil {
 		return false, nil
 	}
-	// check whether component spec has been sent to rsm
-	rsmComponentGeneration := rsm.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	// check whether component spec has been sent to the underlying workload
+	itsComponentGeneration := its.GetAnnotations()[constant.KubeBlocksGenerationKey]
 	if cluster.Status.ObservedGeneration != cluster.Generation ||
-		rsmComponentGeneration != strconv.FormatInt(cluster.Generation, 10) {
+		itsComponentGeneration != strconv.FormatInt(cluster.Generation, 10) {
 		return false, nil
 	}
-	// check whether rsm spec has been sent to the underlying workload(sts)
-	if rsm.Status.ObservedGeneration != rsm.Generation {
+	// check whether its spec has been sent to the underlying workload
+	if its.Status.ObservedGeneration != its.Generation {
 		return false, nil
 	}
-	if rsm.Status.CurrentGeneration != rsm.Generation {
+	if its.Status.CurrentGeneration != its.Generation {
 		return false, nil
 	}
 
-	// TODO: depends on the workload (RSM)
+	// TODO: depends on the workload (InstanceSet)
 	// check whether the underlying workload(sts) has sent the latest template to pods
 	sts := &appsv1.StatefulSet{}
-	if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(its), sts); err != nil {
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -92,7 +92,7 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 	if sts.Status.ObservedGeneration != sts.Generation {
 		return false, nil
 	}
-	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels, inDataContext())
+	pods, err := ListPodOwnedByComponent(ctx, cli, its.Namespace, its.Spec.Selector.MatchLabels, inDataContext())
 	if err != nil {
 		return false, err
 	}

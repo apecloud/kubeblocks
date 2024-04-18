@@ -105,10 +105,10 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 
 			acc := 0
 			mockPods := [][]corev1.Pod{
-				newMockPodsWithRSM(&mockParam.RSMUnits[0], 2),
-				newMockPodsWithRSM(&mockParam.RSMUnits[0], 5,
+				newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 2),
+				newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 5,
 					mockLeaderLabel),
-				newMockPodsWithRSM(&mockParam.RSMUnits[0], 3,
+				newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 3,
 					withReadyPod(0, 0),
 					withAvailablePod(0, 3),
 					mockLeaderLabel),
@@ -184,7 +184,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 						},
 					},
 				}
-				pods = newMockPodsWithRSM(&mockParam.RSMUnits[0], defaultReplica)
+				pods = newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], defaultReplica)
 			}
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(

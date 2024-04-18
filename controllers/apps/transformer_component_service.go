@@ -35,8 +35,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 var (
@@ -62,7 +62,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	synthesizeComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
-		// component controller does not handle the default headless service; the default headless service is managed by the RSM.
+		// component controller does not handle the default headless service; the default headless service is managed by the InstanceSet.
 		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
@@ -225,7 +225,7 @@ func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
 	}
 
 	podNames := make([]string, 0)
-	workloadName := constant.GenerateRSMNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
+	workloadName := constant.GenerateWorkloadNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
 	for _, template := range synthesizeComp.Instances {
 		templateNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, template.Name, templateReplicas(template), synthesizeComp.OfflineInstances)
 		podNames = append(podNames, templateNames...)

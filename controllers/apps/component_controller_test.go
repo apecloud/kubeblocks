@@ -332,7 +332,7 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	mockCompRunning := func(compName string) {
-		rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), compName)
+		rsmList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), compName)
 		Expect(rsmList.Items).Should(HaveLen(1))
 		rsm := rsmList.Items[0]
 		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterObj.Name, compName).
@@ -344,7 +344,7 @@ var _ = Describe("Component Controller", func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
 		Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
-			testk8s.MockRSMReady(&rsm, pods...)
+			testk8s.MockInstanceSetReady(&rsm, pods...)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetComponentPhase(&testCtx, types.NamespacedName{
 			Namespace: clusterObj.Namespace,
@@ -509,7 +509,7 @@ var _ = Describe("Component Controller", func() {
 		mockComponentPVCsAndBound(comp, int(comp.Replicas), true, storageClassName)
 
 		By("Checking rsm replicas right")
-		rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, comp.Name)
+		rsmList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, comp.Name)
 		Expect(int(*rsmList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
 
 		By("Creating mock pods in StatefulSet")
@@ -535,7 +535,7 @@ var _ = Describe("Component Controller", func() {
 		checkUpdatedStsReplicas := func() {
 			By("Checking updated sts replicas")
 			Eventually(func() int32 {
-				rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, comp.Name)
+				rsmList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, comp.Name)
 				return *rsmList.Items[0].Spec.Replicas
 			}).Should(BeEquivalentTo(updatedReplicas))
 		}
@@ -888,7 +888,7 @@ var _ = Describe("Component Controller", func() {
 			mockPods = testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
 		}
 		Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-			testk8s.MockRSMReady(rsm, mockPods...)
+			testk8s.MockInstanceSetReady(rsm, mockPods...)
 		})).ShouldNot(HaveOccurred())
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			testk8s.MockStatefulSetReady(sts)
@@ -1708,7 +1708,7 @@ var _ = Describe("Component Controller", func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
 		Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-			testk8s.MockRSMReady(rsm, mockPods...)
+			testk8s.MockInstanceSetReady(rsm, mockPods...)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 	}
@@ -1803,7 +1803,7 @@ var _ = Describe("Component Controller", func() {
 		for i := range pods {
 			podList = append(podList, &pods[i])
 		}
-		testk8s.MockRSMReady(rsm, podList...)
+		testk8s.MockInstanceSetReady(rsm, podList...)
 		Expect(k8sClient.Status().Patch(ctx, rsm, rsmPatch)).Should(Succeed())
 
 		stsPatch := client.MergeFrom(sts.DeepCopy())
@@ -1894,7 +1894,7 @@ var _ = Describe("Component Controller", func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
 		Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
-			testk8s.MockRSMReady(&rsm, mockPods...)
+			testk8s.MockInstanceSetReady(&rsm, mockPods...)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 

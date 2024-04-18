@@ -265,7 +265,8 @@ func (r *RestoreReconciler) handleRunningPhase(reqCtx intctrlutil.RequestCtx, re
 	if err == nil {
 		saName := restore.Spec.ServiceAccountName
 		if saName == "" {
-			saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace)
+			// TODO: update the mcMgr param
+			saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace, nil)
 		}
 		restoreMgr.WorkerServiceAccount = saName
 	}

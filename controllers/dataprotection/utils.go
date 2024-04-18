@@ -42,6 +42,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
 	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
@@ -291,7 +292,30 @@ func RecorderEventAndRequeue(reqCtx intctrlutil.RequestCtx, recorder record.Even
 	return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 }
 
-func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string) (string, error) {
+func UniversalContext(ctx context.Context, mcMgr multicluster.Manager) context.Context {
+	if mcMgr == nil {
+		return ctx
+	}
+	return multicluster.IntoContext(ctx, strings.Join(mcMgr.GetContexts(), ","))
+}
+
+func checkResourceUniversallyAvailable(ctx context.Context, cli client.Client, objKey client.ObjectKey, obj client.Object, mcMgr multicluster.Manager) error {
+	if mcMgr != nil {
+		for _, dataCluster := range mcMgr.GetContexts() {
+			getCtx := multicluster.IntoContext(ctx, dataCluster)
+			err := cli.Get(getCtx, objKey, obj, multicluster.Oneshot())
+			if err != nil {
+				return fmt.Errorf("get %s from the %s data cluster error: %w", objKey.String(), dataCluster, err)
+			}
+		}
+	}
+	if err := cli.Get(ctx, objKey, obj, multicluster.InControlContext()); err != nil {
+		return fmt.Errorf("get %s from the control cluster error: %w", objKey.String(), err)
+	}
+	return nil
+}
+
+func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string, mcMgr multicluster.Manager) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is empty")
 	}
@@ -301,10 +325,11 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 	}
 	sa := &corev1.ServiceAccount{}
 	saKey := client.ObjectKey{Namespace: namespace, Name: saName}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, saKey, sa)
-	if err != nil {
+	err := checkResourceUniversallyAvailable(reqCtx.Ctx, cli, saKey, sa, mcMgr)
+	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
+	saExists := err == nil
 
 	clusterRoleName := viper.GetString(dptypes.CfgKeyWorkerClusterRoleName)
 	if clusterRoleName == "" {
@@ -322,7 +347,9 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		}
 	}
 
-	if exists {
+	ctx := UniversalContext(reqCtx.Ctx, mcMgr)
+
+	if saExists {
 		// SA exists, check if annotations are consistent
 		saCopy := sa.DeepCopy()
 		if len(extraAnnotations) > 0 && sa.Annotations == nil {
@@ -333,7 +360,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 			}
 		}
 		if !reflect.DeepEqual(sa, saCopy) {
-			err := cli.Patch(reqCtx.Ctx, sa, client.MergeFrom(saCopy))
+			err := cli.Patch(ctx, sa, client.MergeFrom(saCopy), multicluster.InUniversalContext())
 			if err != nil {
 				return "", fmt.Errorf("failed to patch worker service account: %w", err)
 			}
@@ -356,7 +383,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 			Name:     clusterRoleName,
 			APIGroup: "rbac.authorization.k8s.io",
 		}
-		if err := cli.Create(reqCtx.Ctx, rb); err != nil {
+		if err := cli.Create(ctx, rb, multicluster.InUniversalContext()); err != nil {
 			return client.IgnoreAlreadyExists(err)
 		}
 		return nil
@@ -367,7 +394,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		sa.Name = saName
 		sa.Namespace = namespace
 		sa.Annotations = extraAnnotations
-		if err := cli.Create(reqCtx.Ctx, sa); err != nil {
+		if err := cli.Create(ctx, sa, multicluster.InUniversalContext()); err != nil {
 			return client.IgnoreAlreadyExists(err)
 		}
 		return nil

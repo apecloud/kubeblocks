@@ -67,7 +67,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		mgr.Logger.Info("init InstanceSet commands failed", "error", err.Error())
 		return nil, err
 	}
-	err = mgr.InitComponentDefintionActions()
+	err = mgr.InitComponentDefinitionActions()
 	if err != nil {
 		mgr.Logger.Info("init component definition commands failed", "error", err.Error())
 		return nil, err
@@ -76,7 +76,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 }
 
 func (mgr *Manager) InitInstanceSetActions() error {
-	actionSvcList := viper.GetString("KB_ITS_ACTION_SVC_LIST")
+	actionSvcList := viper.GetString("KB_RSM_ACTION_SVC_LIST")
 	if actionSvcList == "" || actionSvcList == "null" {
 		return nil
 	}
@@ -102,7 +102,7 @@ func (mgr *Manager) InitInstanceSetActions() error {
 	return nil
 }
 
-func (mgr *Manager) InitComponentDefintionActions() error {
+func (mgr *Manager) InitComponentDefinitionActions() error {
 	actionJSON := viper.GetString(constant.KBEnvActionCommands)
 	if actionJSON != "" {
 		err := json.Unmarshal([]byte(actionJSON), &mgr.actionCommands)

@@ -110,12 +110,12 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of
   apiVersion: apps.kubeblocks.io/v1alpha1
   kind: Cluster
   metadata:
-    name: redis
+    name: mycluster
     namespace: demo
     labels: 
       helm.sh/chart: redis-cluster-0.6.0-alpha.36
       app.kubernetes.io/version: "7.0.6"
-      app.kubernetes.io/instance: redis
+      app.kubernetes.io/instance: mycluster
   spec:
     clusterVersionRef: redis-7.0.6
     terminationPolicy: Delete  
@@ -169,7 +169,7 @@ For the details of different parameters, you can refer to API docs.
 Run the following command to see the created Redis cluster object:
 
 ```bash
-kubectl get cluster redis -n demo -o yaml
+kubectl get cluster mycluster -n demo -o yaml
 ```
 
 <details>
@@ -193,7 +193,7 @@ metadata:
     clusterdefinition.kubeblocks.io/name: redis
     clusterversion.kubeblocks.io/name: redis-7.0.6
     helm.sh/chart: redis-cluster-0.6.0-alpha.36
-  name: redis
+  name: mycluster
   namespace: demo
   resourceVersion: "12967"
   uid: 25ae9193-60ae-4521-88eb-70ea4c3d97ef
@@ -220,7 +220,7 @@ spec:
       requests:
         cpu: "0.5"
         memory: 0.5Gi
-    serviceAccountName: kb-redis
+    serviceAccountName: kb-mycluster
     switchPolicy:
       type: Noop
     volumeClaimTemplates:

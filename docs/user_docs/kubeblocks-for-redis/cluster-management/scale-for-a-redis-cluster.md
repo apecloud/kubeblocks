@@ -16,7 +16,8 @@ You can vertically scale a cluster by changing resource requirements and limits 
 
 :::note
 
-During the vertical scaling process, a concurrent restart is triggered and the leader pod may change after the restarting.
+- During the vertical scaling process, a concurrent restart is triggered and the leader pod may change after the restarting.
+- From v0.9.0, after vertical scaling is executed, KubeBlocks will automatically adjust part of the parameters of the database instance to more appropriate values. It is recommended to back up and record your custom parameter settings so that you can restore them if needed.
 
 :::
 
@@ -25,39 +26,23 @@ During the vertical scaling process, a concurrent restart is triggered and the l
 Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list <name>
+kubectl get cluster mycluster
 ```
 
 ***Example***
 
 ```bash
-kbcli cluster list redis-cluster
+kubectl get cluster mycluster
 >
-NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS         CREATED-TIME
-redis-cluster        default          redis                     redis-7.0.6              Delete                    Running        Apr 10,2023 16:21 UTC+0800
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+mycluster   redis                redis-7.0.6    Delete               Running   4d18h
 ```
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
+1. Change configuration. There are 2 ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
-   Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ***Example***
-
-   ```bash
-   kbcli cluster vscale redis-cluster \
-   --components="redis" \
-   --memory="4Gi" --cpu="2" \
-   ```
-
-   - `--components` describes the component name ready for vertical scaling.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-  
-   **Option 2.** Create an OpsRequest
+   **Option 1.** Create an OpsRequest
   
    Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -68,7 +53,7 @@ redis-cluster        default          redis                     redis-7.0.6     
    metadata:
      name: ops-vertical-scaling
    spec:
-     clusterRef: redis-cluster
+     clusterRef: mycluster
      type: VerticalScaling 
      verticalScaling:
      - componentName: redis
@@ -81,7 +66,7 @@ redis-cluster        default          redis                     redis-7.0.6     
    EOF
    ```
   
-   **Option 3.** Change the YAML file of the cluster
+   **Option 2.** Change the YAML file of the cluster
 
    Change the configuration of `spec.componentSpecs.resources` in the YAML file.
 
@@ -93,7 +78,7 @@ redis-cluster        default          redis                     redis-7.0.6     
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: redis-cluster
+     name: mycluster
      namespace: default
    spec:
      clusterDefinitionRef: redis
@@ -125,22 +110,17 @@ redis-cluster        default          redis                     redis-7.0.6     
    Check the cluster status to identify the vertical scaling status.
 
    ```bash
-   kbcli cluster list <name>
+   kubectl get cluster mycluster
    ```
 
    ***Example***
 
    ```bash
-   kbcli cluster list redis-cluster
+   kubectl get cluster mycluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   redis-cluster        default          redis                     redis-7.0.6              Delete                    VerticalScaling        Apr 10,2023 16:27 UTC+0800
+   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+   mycluster   redis                redis-7.0.6    Delete               Updating  4d18h
    ```
-
-   - STATUS=VerticalScaling: it means the vertical scaling is in progress.
-   - STATUS=Running: it means the vertical scaling operation has been applied.
-   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal.
-     > To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.
 
     :::note
 
@@ -151,49 +131,41 @@ redis-cluster        default          redis                     redis-7.0.6     
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe redis-cluster
+    kubectl describe cluster mycluster
     ```
 
 ## Horizontal scaling
 
 Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale up from three pods to five pods. The scaling process includes the backup and restoration of data.
 
+:::note
+
+ From v0.9.0, after horizontal scaling is performed, KubeBlocks will automatically adjust part of the parameters of the database instance to more appropriate values. It is recommended to back up and record your custom parameter settings so that you can restore them if needed.
+
+ :::
+
 ### Before you start
 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list <name>
+kubectl get cluster mycluster
 ```
 
 ***Example***
 
 ```bash
-kbcli cluster list redis-cluster
+kubectl get cluster mycluster
 >
-NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS         CREATED-TIME
-redis-cluster        default          redis                     redis-7.0.6              Delete                    Running        Apr 10,2023 16:50 UTC+0800
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+mycluster   redis                redis-7.0.6    Delete               Running   4d18h
 ```
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply horizontal scaling.
+1. Change configuration. There are 2 ways to apply horizontal scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
-   Configure the parameters `--components` and `--replicas`, and run the command.
-
-   ***Example***
-
-   ```bash
-   kbcli cluster hscale redis-cluster \
-   --components="redis" --replicas=2
-   ```
-
-   - `--components` describes the component name ready for vertical scaling.
-   - `--replicas` describes the replica amount of a specified component.
-
-   **Option 2.** Create an OpsRequest
+   **Option 1.** Create an OpsRequest
 
    Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -204,7 +176,7 @@ redis-cluster        default          redis                     redis-7.0.6     
    metadata:
      name: ops-horizontal-scaling
    spec:
-     clusterRef: redis-cluster
+     clusterRef: mycluster
      type: HorizontalScaling
      horizontalScaling:
      - componentName: redis
@@ -212,7 +184,7 @@ redis-cluster        default          redis                     redis-7.0.6     
    EOF
    ```
 
-   **Option 3.** Change the YAML file of the cluster
+   **Option 2.** Change the YAML file of the cluster
 
    Change the value of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
@@ -222,7 +194,7 @@ redis-cluster        default          redis                     redis-7.0.6     
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: redis-cluster
+     name: mycluster
      namespace: default
    spec:
      clusterDefinitionRef: redis
@@ -247,20 +219,8 @@ redis-cluster        default          redis                     redis-7.0.6     
    Check the cluster STATUS to identify the horizontal scaling status.
 
    ```bash
-   kbcli cluster list <name>
+   kubectl get cluster mycluster
    ```
-
-   ***Example***
-
-   ```bash
-   kbcli cluster list redis-cluster
-   >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                   CREATED-TIME
-   redis-cluster        default          redis                     redis-7.0.6              Delete                    HorizontalScaling        Apr 10,2023 16:58 UTC+0800
-   ```
-
-   - STATUS=HorizontalScaling: it means horizontal scaling is in progress.
-   - STATUS=Running: it means horizontal scaling has been applied.
 
 ### Handle the snapshot exception
 

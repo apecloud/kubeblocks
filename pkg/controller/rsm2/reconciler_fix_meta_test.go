@@ -25,7 +25,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 var _ = Describe("fix meta reconciler test", func() {
@@ -42,7 +41,7 @@ var _ = Describe("fix meta reconciler test", func() {
 			newTree, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(newTree.GetRoot().GetFinalizers()).Should(HaveLen(1))
-			Expect(newTree.GetRoot().GetFinalizers()[0]).Should(Equal(rsm1.FinalizerName))
+			Expect(newTree.GetRoot().GetFinalizers()[0]).Should(Equal(finalizer))
 
 			By("Reconcile with finalizer")
 			Expect(reconciler.PreCondition(newTree)).Should(Equal(kubebuilderx.ResultUnsatisfied))

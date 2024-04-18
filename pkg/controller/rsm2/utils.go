@@ -27,6 +27,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -77,4 +80,29 @@ func CurrentReplicaProvider(ctx context.Context, cli client.Reader, objectKey cl
 	default:
 		return getDefaultProvider(), nil
 	}
+}
+
+func getMatchLabels(name string) map[string]string {
+	return map[string]string{
+		rsm1.WorkloadsManagedByLabelKey: managedBy,
+		rsm1.WorkloadsInstanceLabelKey:  name,
+	}
+}
+
+func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[string]string {
+	selectors := make(map[string]string)
+
+	if !headless {
+		for _, role := range rsm.Spec.Roles {
+			if role.IsLeader && len(role.Name) > 0 {
+				selectors[constant.RoleLabelKey] = role.Name
+				break
+			}
+		}
+	}
+
+	for k, v := range rsm.Spec.Selector.MatchLabels {
+		selectors[k] = v
+	}
+	return selectors
 }

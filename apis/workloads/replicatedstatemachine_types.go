@@ -519,5 +519,5 @@ type MemberStatus struct {
 
 func init() {
 	panic("uncomment me")
-	//SchemeBuilder.Register(&ReplicatedStateMachine{}, &ReplicatedStateMachineList{})
+	// SchemeBuilder.Register(&ReplicatedStateMachine{}, &ReplicatedStateMachineList{})
 }

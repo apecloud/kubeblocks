@@ -7595,8 +7595,7 @@ spec:
                             type: boolean
                           readyWithoutPrimary:
                             description: Indicates whether it is required for the
-                              replica set manager (rsm) to have at least one primary
-                              pod ready.
+                              InstanceSet to have at least one primary instance ready.
                             type: boolean
                           role:
                             description: Defines the role of the replica in the cluster.

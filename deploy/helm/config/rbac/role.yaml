@@ -932,7 +932,7 @@ rules:
 - apiGroups:
   - workloads.kubeblocks.io
   resources:
-  - replicatedstatemachines
+  - instancesets
   verbs:
   - create
   - delete
@@ -944,13 +944,13 @@ rules:
 - apiGroups:
   - workloads.kubeblocks.io
   resources:
-  - replicatedstatemachines/finalizers
+  - instancesets/finalizers
   verbs:
   - update
 - apiGroups:
   - workloads.kubeblocks.io
   resources:
-  - replicatedstatemachines/status
+  - instancesets/status
   verbs:
   - get
   - patch

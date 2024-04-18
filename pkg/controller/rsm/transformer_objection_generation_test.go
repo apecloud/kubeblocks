@@ -164,7 +164,7 @@ var _ = Describe("object generation transformer test.", func() {
 
 	Context("well-known service labels", func() {
 		It("should work well", func() {
-			svc := BuildSvc(*rsm)
+			svc := BuildSvc(*rsm, getLabels(rsm), getSvcSelector(rsm, false))
 			Expect(svc).ShouldNot(BeNil())
 			for k, ev := range service.Labels {
 				v, ok := svc.Labels[k]

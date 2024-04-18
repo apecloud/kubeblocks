@@ -51,10 +51,14 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
 	// generate objects by current spec
-	svc := rsm.BuildSvc(*its)
-	altSvs := rsm.BuildAlternativeSvs(*its)
-	headLessSvc := rsm.BuildHeadlessSvc(*its)
-	envConfig := rsm.BuildEnvConfigMap(*its)
+	labels := getMatchLabels(its.Name)
+	selectors := getSvcSelector(its, false)
+	headlessSelectors := getSvcSelector(its, true)
+
+	svc := rsm.BuildSvc(*its, labels, selectors)
+	altSvs := rsm.BuildAlternativeSvs(*its, labels)
+	headLessSvc := rsm.BuildHeadlessSvc(*its, labels, headlessSelectors)
+	envConfig := rsm.BuildEnvConfigMap(*its, labels)
 	var objects []client.Object
 	if svc != nil {
 		objects = append(objects, svc)
@@ -64,7 +68,7 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	}
 	objects = append(objects, headLessSvc, envConfig)
 	for _, object := range objects {
-		if err := rsm.SetOwnership(its, object, model.GetScheme(), rsm.GetFinalizer(object)); err != nil {
+		if err := rsm.SetOwnership(its, object, model.GetScheme(), finalizer); err != nil {
 			return nil, err
 		}
 	}

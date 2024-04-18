@@ -36,7 +36,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 type transformContext struct {
@@ -166,9 +165,12 @@ func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredT
 			}
 		}
 	}
+	finalizer := currentTree.GetFinalizer()
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
-			v := model.NewObjectVertex(nil, oldSnapshot[name], model.ActionDeletePtr(), inDataContext4G())
+			object := oldSnapshot[name]
+			keepFinalizer(object, finalizer)
+			v := model.NewObjectVertex(nil, object, model.ActionDeletePtr(), inDataContext4G())
 			findAndAppend(v)
 		}
 	}
@@ -186,6 +188,21 @@ func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredT
 	// handle object dependencies
 	handleDependencies()
 	return vertices
+}
+
+func keepFinalizer(object client.Object, finalizer string) {
+	var finalizers []string
+	if len(finalizer) > 0 {
+		finalizers = append(finalizers, finalizer)
+	}
+	object.SetFinalizers(finalizers)
+}
+
+func getRemainingFinalizer(obj client.Object) string {
+	if len(obj.GetFinalizers()) > 0 {
+		return obj.GetFinalizers()[0]
+	}
+	return ""
 }
 
 // Plan implementation
@@ -252,8 +269,8 @@ func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVerte
 }
 
 func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	finalizer := rsm1.GetFinalizer(vertex.Obj)
-	if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
+	finalizer := getRemainingFinalizer(vertex.Obj)
+	if len(finalizer) > 0 && controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 		err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {
 			b.transCtx.logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))

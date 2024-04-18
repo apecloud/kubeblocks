@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -141,12 +142,16 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
+	comp2CompDef, err := buildComp2CompDefs(reqCtx.Ctx, cli, cluster, clusterCompSpec)
+	if err != nil {
+		return nil, err
+	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
 		Namespace:          comp.Namespace,
 		ClusterName:        clusterName,
 		ClusterUID:         clusterUID,
-		Comp2CompDefs:      buildComp2CompDefs(cluster, clusterCompSpec),
+		Comp2CompDefs:      comp2CompDef,
 		Name:               compName,
 		FullCompName:       comp.Name,
 		CompDefName:        compDef.Name,
@@ -248,25 +253,43 @@ func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Compone
 	return strconv.FormatInt(cluster.Generation, 10)
 }
 
-func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) map[string]string {
+func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (map[string]string, error) {
 	if cluster == nil {
-		return nil
-	}
-	if len(cluster.Spec.ComponentSpecs) == 0 {
-		if clusterCompSpec == nil || len(clusterCompSpec.ComponentDef) == 0 {
-			return nil
-		}
-		return map[string]string{
-			clusterCompSpec.Name: clusterCompSpec.ComponentDef,
-		}
+		return nil, nil
 	}
 	mapping := make(map[string]string)
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if len(comp.ComponentDef) > 0 {
-			mapping[comp.Name] = comp.ComponentDef
+
+	// Build from ComponentSpecs
+	if len(cluster.Spec.ComponentSpecs) == 0 {
+		if clusterCompSpec != nil && len(clusterCompSpec.ComponentDef) > 0 {
+			mapping[clusterCompSpec.Name] = clusterCompSpec.ComponentDef
+		}
+	} else {
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			if len(comp.ComponentDef) > 0 {
+				mapping[comp.Name] = comp.ComponentDef
+			}
 		}
 	}
-	return mapping
+
+	// Build from ShardingSpecs
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, &shardingSpec)
+		if err != nil {
+			return nil, err
+		}
+		for _, shardingComp := range shardingComps {
+			if len(shardingComp.Spec.CompDef) > 0 {
+				compShortName, err := ShortName(cluster.Name, shardingComp.Name)
+				if err != nil {
+					return nil, err
+				}
+				mapping[compShortName] = shardingComp.Spec.CompDef
+			}
+		}
+	}
+
+	return mapping, nil
 }
 
 // buildLabelsAndAnnotations builds labels and annotations for synthesizedComponent.

@@ -247,7 +247,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func BuildSvc(rsm workloads.ReplicatedStateMachine, labels,selectors map[string]string) *corev1.Service {
+func BuildSvc(rsm workloads.ReplicatedStateMachine, labels, selectors map[string]string) *corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}

@@ -177,8 +177,10 @@ func makePodUpdateReady(newRevision string, roleful bool, pods ...*corev1.Pod) {
 }
 
 func mockUnderlyingSts(rsm workloads.ReplicatedStateMachine, generation int64) *apps.StatefulSet {
-	headLessSvc := BuildHeadlessSvc(rsm)
-	sts := buildSts(&rsm, headLessSvc.Name)
+	labels := getLabels(&rsm)
+	headlessSelectors := getSvcSelector(&rsm, true)
+	headLessSvc := BuildHeadlessSvc(rsm, labels, headlessSelectors)
+	sts := buildSts(&rsm, headLessSvc.Name, labels)
 	sts.Generation = generation
 	sts.Status.ObservedGeneration = generation
 	sts.Status.Replicas = *sts.Spec.Replicas

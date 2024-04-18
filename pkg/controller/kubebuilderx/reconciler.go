@@ -177,6 +177,6 @@ func (t *ObjectTree) GetFinalizer() string {
 
 func NewObjectTree() *ObjectTree {
 	return &ObjectTree{
-		children:  make(model.ObjectSnapshot),
+		children: make(model.ObjectSnapshot),
 	}
 }

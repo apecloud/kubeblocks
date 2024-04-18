@@ -83,14 +83,6 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 	return tree, nil
 }
 
-func getMatchLabels(root client.Object, labelKeys []string) client.MatchingLabels {
-	labels := make(map[string]string, len(labelKeys))
-	for _, key := range labelKeys {
-		labels[key] = root.GetLabels()[key]
-	}
-	return labels
-}
-
 func placement(obj client.Object) string {
 	if obj == nil || obj.GetAnnotations() == nil {
 		return ""

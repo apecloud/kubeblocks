@@ -50,7 +50,7 @@ const (
 	componentPhaseTransition = "ComponentPhaseTransition"
 )
 
-// componentStatusTransformer computes the current status: read the underlying rsm status and update the component status
+// componentStatusTransformer computes the current status: read the underlying workload status and update the component status
 type componentStatusTransformer struct {
 	client.Client
 }
@@ -64,10 +64,10 @@ type componentStatusHandler struct {
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
 
-	// runningRSM is a snapshot of the rsm that is already running
-	runningRSM *workloads.InstanceSet
-	// protoRSM is the rsm object that is rebuilt from scratch during each reconcile process
-	protoRSM *workloads.InstanceSet
+	// runningITS is a snapshot of the ITS that is already running
+	runningITS *workloads.InstanceSet
+	// protoITS is the ITS object that is rebuilt from scratch during each reconcile process
+	protoITS *workloads.InstanceSet
 	// podsReady indicates if the component's underlying pods are ready
 	podsReady bool
 }
@@ -92,15 +92,15 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 	cluster := transCtx.Cluster
 	synthesizeComp := transCtx.SynthesizeComponent
-	runningRSM, _ := transCtx.RunningWorkload.(*workloads.InstanceSet)
-	protoRSM, _ := transCtx.ProtoWorkload.(*workloads.InstanceSet)
+	runningITS, _ := transCtx.RunningWorkload.(*workloads.InstanceSet)
+	protoITS, _ := transCtx.ProtoWorkload.(*workloads.InstanceSet)
 	switch {
 	case model.IsObjectUpdating(transCtx.ComponentOrig):
 		transCtx.Logger.Info(fmt.Sprintf("update component status after applying resources, generation: %d", comp.Generation))
 		comp.Status.ObservedGeneration = comp.Generation
 	case model.IsObjectStatusUpdating(transCtx.ComponentOrig):
 		// reconcile the component status and sync the component status to cluster status
-		csh := newComponentStatusHandler(reqCtx, t.Client, cluster, comp, synthesizeComp, runningRSM, protoRSM, dag)
+		csh := newComponentStatusHandler(reqCtx, t.Client, cluster, comp, synthesizeComp, runningITS, protoITS, dag)
 		if err := csh.reconcileComponentStatus(); err != nil {
 			return err
 		}
@@ -121,18 +121,18 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 
 // reconcileComponentStatus reconciles component status.
 func (r *componentStatusHandler) reconcileComponentStatus() error {
-	if r.runningRSM == nil {
+	if r.runningITS == nil {
 		return nil
 	}
 
-	// check if the rsm is deleting
+	// check if the ITS is deleting
 	isDeleting := func() bool {
-		return !r.runningRSM.DeletionTimestamp.IsZero()
+		return !r.runningITS.DeletionTimestamp.IsZero()
 	}()
 
-	// check if the rsm replicas is zero
+	// check if the ITS replicas is zero
 	isZeroReplica := func() bool {
-		return (r.runningRSM.Spec.Replicas == nil || *r.runningRSM.Spec.Replicas == 0) && r.synthesizeComp.Replicas == 0
+		return (r.runningITS.Spec.Replicas == nil || *r.runningITS.Spec.Replicas == 0) && r.synthesizeComp.Replicas == 0
 	}()
 
 	// get the component's underlying pods
@@ -145,8 +145,8 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 		return len(pods) > 0
 	}()
 
-	// check if the rsm is running
-	isRSMRunning, err := r.isRSMRunning()
+	// check if the ITS is running
+	isITSRunning, err := r.isInstanceSetRunning()
 	if err != nil {
 		return err
 	}
@@ -193,8 +193,8 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	}()
 
 	r.reqCtx.Log.Info(
-		fmt.Sprintf("component status conditions, isRSMRunning: %v, isAllConfigSynced: %v, hasRunningVolumeExpansion: %v, hasFailure: %v,  isInCreatingPhase: %v, isComponentAvailable: %v",
-			isRSMRunning, isAllConfigSynced, hasRunningVolumeExpansion, hasFailure, isInCreatingPhase, isComponentAvailable))
+		fmt.Sprintf("component status conditions, isInstanceSetRunning: %v, isAllConfigSynced: %v, hasRunningVolumeExpansion: %v, hasFailure: %v,  isInCreatingPhase: %v, isComponentAvailable: %v",
+			isITSRunning, isAllConfigSynced, hasRunningVolumeExpansion, hasFailure, isInCreatingPhase, isComponentAvailable))
 
 	r.podsReady = false
 	switch {
@@ -206,7 +206,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	case isZeroReplica:
 		r.setComponentStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "component is Stopped")
 		r.podsReady = true
-	case isRSMRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
+	case isITSRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
 		r.setComponentStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "component is Running")
 		r.podsReady = true
 	case !hasFailure && isInCreatingPhase:
@@ -234,7 +234,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 // 2. with latest revision
 // 3. and with leader role label set
 func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool, error) {
-	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
+	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningITS); err != nil {
 		return false, err
 	} else if !isLatestRevision {
 		return false, nil
@@ -247,7 +247,7 @@ func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool,
 		if !ok {
 			return false
 		}
-		for _, replicaRole := range r.runningRSM.Spec.Roles {
+		for _, replicaRole := range r.runningITS.Spec.Roles {
 			if roleName == replicaRole.Name && replicaRole.IsLeader {
 				return true
 			}
@@ -257,7 +257,7 @@ func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool,
 
 	hasPodAvailable := false
 	for _, pod := range pods {
-		if !podutils.IsPodAvailable(pod, r.runningRSM.Spec.MinReadySeconds, metav1.Time{Time: time.Now()}) {
+		if !podutils.IsPodAvailable(pod, r.runningITS.Spec.MinReadySeconds, metav1.Time{Time: time.Now()}) {
 			continue
 		}
 		if shouldCheckRole && hasLeaderRoleLabel(pod) {
@@ -270,20 +270,20 @@ func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool,
 	return hasPodAvailable, nil
 }
 
-// isRunning checks if the component underlying rsm workload is running.
-func (r *componentStatusHandler) isRSMRunning() (bool, error) {
-	if r.runningRSM == nil {
+// isRunning checks if the component underlying workload is running.
+func (r *componentStatusHandler) isInstanceSetRunning() (bool, error) {
+	if r.runningITS == nil {
 		return false, nil
 	}
-	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
+	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningITS); err != nil {
 		return false, err
 	} else if !isLatestRevision {
-		r.reqCtx.Log.Info("rsm underlying workload is not the latest revision")
+		r.reqCtx.Log.Info("underlying workload is not the latest revision")
 		return false, nil
 	}
 
-	// whether rsm is ready
-	return rsmcore.IsRSMReady(r.runningRSM), nil
+	// whether the ITS is ready
+	return rsmcore.IsInstanceSetReady(r.runningITS), nil
 }
 
 // isAllConfigSynced checks if all configTemplates are synced.
@@ -328,19 +328,19 @@ func (r *componentStatusHandler) isAllConfigSynced() (bool, error) {
 
 // isScaleOutFailed checks if the component scale out failed.
 func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
-	if r.runningRSM == nil {
+	if r.runningITS == nil {
 		return false, nil
 	}
-	if r.runningRSM.Spec.Replicas == nil {
+	if r.runningITS.Spec.Replicas == nil {
 		return false, nil
 	}
-	if r.synthesizeComp.Replicas <= *r.runningRSM.Spec.Replicas {
+	if r.synthesizeComp.Replicas <= *r.runningITS.Spec.Replicas {
 		return false, nil
 	}
 
-	// stsObj is the underlying rsm workload which is already running in the component.
-	stsObj := rsmcore.ConvertRSMToSTS(r.runningRSM)
-	stsProto := rsmcore.ConvertRSMToSTS(r.protoRSM)
+	// stsObj is the underlying workload which is already running in the component.
+	stsObj := rsmcore.ConvertInstanceSetToSTS(r.runningITS)
+	stsProto := rsmcore.ConvertInstanceSetToSTS(r.protoITS)
 	backupKey := types.NamespacedName{
 		Namespace: stsObj.Namespace,
 		Name:      constant.GenerateResourceNameWithScalingSuffix(stsObj.Name),
@@ -354,7 +354,7 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 	} else if status == backupStatusFailed {
 		return true, nil
 	}
-	for i := *r.runningRSM.Spec.Replicas; i < r.synthesizeComp.Replicas; i++ {
+	for i := *r.runningITS.Spec.Replicas; i < r.synthesizeComp.Replicas; i++ {
 		if status, err := d.CheckRestoreStatus(i); err != nil {
 			return false, err
 		} else if status == dpv1alpha1.RestorePhaseFailed {
@@ -370,8 +370,8 @@ func (r *componentStatusHandler) hasVolumeExpansionRunning() (bool, bool, error)
 		running bool
 		failed  bool
 	)
-	for _, vct := range r.runningRSM.Spec.VolumeClaimTemplates {
-		volumes, err := r.getRunningVolumes(r.reqCtx, r.cli, vct.Name, r.runningRSM)
+	for _, vct := range r.runningITS.Spec.VolumeClaimTemplates {
+		volumes, err := r.getRunningVolumes(r.reqCtx, r.cli, vct.Name, r.runningITS)
 		if err != nil {
 			return false, false, err
 		}
@@ -386,9 +386,9 @@ func (r *componentStatusHandler) hasVolumeExpansionRunning() (bool, bool, error)
 	return running, failed, nil
 }
 
-// getRunningVolumes gets the running volumes of the rsm.
+// getRunningVolumes gets the running volumes of the ITS.
 func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string,
-	rsmObj *workloads.InstanceSet) ([]*corev1.PersistentVolumeClaim, error) {
+	itsObj *workloads.InstanceSet) ([]*corev1.PersistentVolumeClaim, error) {
 	labels := constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name)
 	pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
 		generics.PersistentVolumeClaimSignature, r.cluster.Namespace, labels, inDataContext4C())
@@ -399,7 +399,7 @@ func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx
 		return nil, err
 	}
 	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
-	prefix := fmt.Sprintf("%s-%s", vctName, rsmObj.Name)
+	prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
 	for _, pvc := range pvcs {
 		if strings.HasPrefix(pvc.Name, prefix) {
 			matchedPVCs = append(matchedPVCs, pvc)
@@ -411,7 +411,7 @@ func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx
 // hasFailedPod checks if the component has failed pod.
 // TODO(xingran): remove the dependency of the component's workload type.
 func (r *componentStatusHandler) hasFailedPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, error) {
-	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
+	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningITS); err != nil {
 		return false, nil, err
 	} else if !isLatestRevision {
 		return false, nil, nil
@@ -582,8 +582,8 @@ func newComponentStatusHandler(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component,
 	synthesizeComp *component.SynthesizedComponent,
-	runningRSM *workloads.InstanceSet,
-	protoRSM *workloads.InstanceSet,
+	runningITS *workloads.InstanceSet,
+	protoITS *workloads.InstanceSet,
 	dag *graph.DAG) *componentStatusHandler {
 	return &componentStatusHandler{
 		cli:            cli,
@@ -591,8 +591,8 @@ func newComponentStatusHandler(reqCtx intctrlutil.RequestCtx,
 		cluster:        cluster,
 		comp:           comp,
 		synthesizeComp: synthesizeComp,
-		runningRSM:     runningRSM,
-		protoRSM:       protoRSM,
+		runningITS:     runningITS,
+		protoITS:       protoITS,
 		dag:            dag,
 		podsReady:      false,
 	}

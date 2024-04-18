@@ -51,12 +51,12 @@ import (
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 )
 
-// componentWorkloadTransformer handles component rsm workload generation
+// componentWorkloadTransformer handles component workload generation
 type componentWorkloadTransformer struct {
 	client.Client
 }
 
-// componentWorkloadOps handles component rsm workload ops
+// componentWorkloadOps handles component workload ops
 type componentWorkloadOps struct {
 	cli            client.Client
 	reqCtx         intctrlutil.RequestCtx
@@ -64,10 +64,10 @@ type componentWorkloadOps struct {
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
 
-	// runningRSM is a snapshot of the rsm that is already running
-	runningRSM *workloads.InstanceSet
-	// protoRSM is the rsm object that is rebuilt from scratch during each reconcile process
-	protoRSM *workloads.InstanceSet
+	// runningITS is a snapshot of the InstanceSet that is already running
+	runningITS *workloads.InstanceSet
+	// protoITS is the InstanceSet object that is rebuilt from scratch during each reconcile process
+	protoITS *workloads.InstanceSet
 }
 
 var _ graph.Transformer = &componentWorkloadTransformer{}
@@ -86,92 +86,92 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		Recorder: transCtx.EventRecorder,
 	}
 
-	runningRSM, err := t.runningRSMObject(ctx, synthesizeComp)
+	runningITS, err := t.runningInstanceSetObject(ctx, synthesizeComp)
 	if err != nil {
 		return err
 	}
-	transCtx.RunningWorkload = runningRSM
+	transCtx.RunningWorkload = runningITS
 
 	// build synthesizeComp podSpec volumeMounts
 	buildPodSpecVolumeMounts(synthesizeComp)
 
-	// build rsm workload
-	protoRSM, err := factory.BuildInstanceSet(synthesizeComp)
+	// build workload
+	protoITS, err := factory.BuildInstanceSet(synthesizeComp)
 	if err != nil {
 		return err
 	}
-	if runningRSM != nil {
-		*protoRSM.Spec.Selector = *runningRSM.Spec.Selector
-		protoRSM.Spec.Template.Labels = runningRSM.Spec.Template.Labels
+	if runningITS != nil {
+		*protoITS.Spec.Selector = *runningITS.Spec.Selector
+		protoITS.Spec.Template.Labels = runningITS.Spec.Template.Labels
 	}
-	transCtx.ProtoWorkload = protoRSM
+	transCtx.ProtoWorkload = protoITS
 
-	buildRSMPlacementAnnotation(transCtx.Component, protoRSM)
+	buildInstanceSetPlacementAnnotation(transCtx.Component, protoITS)
 
-	// build configuration template annotations to rsm workload
-	buildRSMConfigTplAnnotations(protoRSM, synthesizeComp)
+	// build configuration template annotations to workload
+	buildInstanceSetConfigTplAnnotations(protoITS, synthesizeComp)
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	if runningRSM == nil {
-		if protoRSM != nil {
-			graphCli.Create(dag, protoRSM)
+	if runningITS == nil {
+		if protoITS != nil {
+			graphCli.Create(dag, protoITS)
 			return nil
 		}
 	} else {
-		if protoRSM == nil {
-			graphCli.Delete(dag, runningRSM)
+		if protoITS == nil {
+			graphCli.Delete(dag, runningITS)
 		} else {
-			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, runningRSM, protoRSM)
+			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, runningITS, protoITS)
 		}
 	}
 	return err
 }
 
-func (t *componentWorkloadTransformer) runningRSMObject(ctx graph.TransformContext,
+func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.TransformContext,
 	synthesizeComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
-	rsmKey := types.NamespacedName{
+	itsKey := types.NamespacedName{
 		Namespace: synthesizeComp.Namespace,
 		Name:      constant.GenerateWorkloadNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name),
 	}
-	rsm := &workloads.InstanceSet{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), rsmKey, rsm); err != nil {
+	its := &workloads.InstanceSet{}
+	if err := ctx.GetClient().Get(ctx.GetContext(), itsKey, its); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return rsm, nil
+	return its, nil
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningRSM, protoRSM *workloads.InstanceSet) error {
-	// TODO(xingran): Some RSM workload operations should be moved down to Lorry implementation. Subsequent operations such as horizontal scaling will be removed from the component controller
-	if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningRSM, protoRSM); err != nil {
+	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	// TODO(xingran): Some workload operations should be moved down to Lorry implementation. Subsequent operations such as horizontal scaling will be removed from the component controller
+	if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
 		return err
 	}
 
-	objCopy := copyAndMergeRSM(runningRSM, protoRSM, synthesizeComp)
+	objCopy := copyAndMergeITS(runningITS, protoITS, synthesizeComp)
 	if objCopy != nil && !cli.IsAction(dag, objCopy, model.ActionNoopPtr()) {
 		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 	}
 
 	// to work around that the scaled PVC will be deleted at object action.
-	if err := updateVolumes(reqCtx, t.Client, synthesizeComp, runningRSM, dag); err != nil {
+	if err := updateVolumes(reqCtx, t.Client, synthesizeComp, runningITS, dag); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, rsm *workloads.InstanceSet) error {
-	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, rsm, dag)
+	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
+	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
 
-	// handle rsm expand volume
+	// handle expand volume
 	if err := cwo.expandVolume(); err != nil {
 		return err
 	}
 
-	// handle rsm workload horizontal scale
+	// handle workload horizontal scale
 	if err := cwo.horizontalScale(); err != nil {
 		return err
 	}
@@ -217,10 +217,10 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 	synthesizeComp.PodSpec = podSpec
 }
 
-// copyAndMergeRSM merges two RSM objects for updating:
+// copyAndMergeITS merges two ITS objects for updating:
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
-func copyAndMergeRSM(oldRsm, newRsm *workloads.InstanceSet, synthesizeComp *component.SynthesizedComponent) *workloads.InstanceSet {
+func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *component.SynthesizedComponent) *workloads.InstanceSet {
 	// mergeAnnotations keeps the original annotations.
 	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
 		if targetMap == nil || originalMap == nil {
@@ -237,101 +237,101 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.InstanceSet, synthesizeComp *comp
 		}
 	}
 
-	updateUpdateStrategy := func(rsmObj, rsmProto *workloads.InstanceSet) {
+	updateUpdateStrategy := func(itsObj, itsProto *workloads.InstanceSet) {
 		var objMaxUnavailable *intstr.IntOrString
-		if rsmObj.Spec.UpdateStrategy.RollingUpdate != nil {
-			objMaxUnavailable = rsmObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
+		if itsObj.Spec.UpdateStrategy.RollingUpdate != nil {
+			objMaxUnavailable = itsObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
 		}
-		rsmObj.Spec.UpdateStrategy = rsmProto.Spec.UpdateStrategy
-		if objMaxUnavailable == nil && rsmObj.Spec.UpdateStrategy.RollingUpdate != nil {
+		itsObj.Spec.UpdateStrategy = itsProto.Spec.UpdateStrategy
+		if objMaxUnavailable == nil && itsObj.Spec.UpdateStrategy.RollingUpdate != nil {
 			// HACK: This field is alpha-level (since v1.24) and is only honored by servers that enable the
 			// MaxUnavailableStatefulSet feature.
 			// When we get a nil MaxUnavailable from k8s, we consider that the field is not supported by the server,
 			// and set the MaxUnavailable as nil explicitly to avoid the workload been updated unexpectedly.
 			// Ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
-			rsmObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
+			itsObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
 		}
 	}
 
 	// be compatible with existed cluster
-	updateService := func(rsmObj, rsmProto *workloads.InstanceSet) *corev1.Service {
-		if rsmProto.Spec.Service != nil {
-			return rsmProto.Spec.Service
+	updateService := func(itsObj, itsProto *workloads.InstanceSet) *corev1.Service {
+		if itsProto.Spec.Service != nil {
+			return itsProto.Spec.Service
 		}
-		if rsmObj.Spec.Service == nil {
+		if itsObj.Spec.Service == nil {
 			return nil
 		}
-		defaultServiceName := rsmObj.Name
+		defaultServiceName := itsObj.Name
 		for _, svc := range synthesizeComp.ComponentServices {
 			if svc.PodService != nil && *svc.PodService || svc.DisableAutoProvision != nil && *svc.DisableAutoProvision {
 				continue
 			}
 			serviceName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, svc.ServiceName)
 			if defaultServiceName == serviceName {
-				return rsmObj.Spec.Service
+				return itsObj.Spec.Service
 			}
 		}
 		return nil
 	}
 
-	rsmObjCopy := oldRsm.DeepCopy()
-	rsmProto := newRsm
+	itsObjCopy := oldITS.DeepCopy()
+	itsProto := newITS
 
 	// If the service version and component definition are not updated, we should not update the images in workload.
-	checkNRollbackProtoImages(rsmObjCopy, rsmProto)
+	checkNRollbackProtoImages(itsObjCopy, itsProto)
 
 	// remove original monitor annotations
-	if len(rsmObjCopy.Annotations) > 0 {
-		maps.DeleteFunc(rsmObjCopy.Annotations, func(k, v string) bool {
+	if len(itsObjCopy.Annotations) > 0 {
+		maps.DeleteFunc(itsObjCopy.Annotations, func(k, v string) bool {
 			return strings.HasPrefix(k, "monitor.kubeblocks.io")
 		})
 	}
-	mergeMetadataMap(rsmObjCopy.Annotations, &rsmProto.Annotations)
-	rsmObjCopy.Annotations = rsmProto.Annotations
+	mergeMetadataMap(itsObjCopy.Annotations, &itsProto.Annotations)
+	itsObjCopy.Annotations = itsProto.Annotations
 
 	// keep the original template annotations.
-	// if annotations exist and are replaced, the rsm will be updated.
-	mergeMetadataMap(rsmObjCopy.Spec.Template.Annotations, &rsmProto.Spec.Template.Annotations)
-	rsmObjCopy.Spec.Template = *rsmProto.Spec.Template.DeepCopy()
-	rsmObjCopy.Spec.Replicas = rsmProto.Spec.Replicas
-	rsmObjCopy.Spec.Service = updateService(rsmObjCopy, rsmProto)
-	rsmObjCopy.Spec.AlternativeServices = rsmProto.Spec.AlternativeServices
-	rsmObjCopy.Spec.Roles = rsmProto.Spec.Roles
-	rsmObjCopy.Spec.RoleProbe = rsmProto.Spec.RoleProbe
-	rsmObjCopy.Spec.MembershipReconfiguration = rsmProto.Spec.MembershipReconfiguration
-	rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
-	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
-	rsmObjCopy.Spec.Instances = rsmProto.Spec.Instances
-	rsmObjCopy.Spec.OfflineInstances = rsmProto.Spec.OfflineInstances
+	// if annotations exist and are replaced, the its will be updated.
+	mergeMetadataMap(itsObjCopy.Spec.Template.Annotations, &itsProto.Spec.Template.Annotations)
+	itsObjCopy.Spec.Template = *itsProto.Spec.Template.DeepCopy()
+	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
+	itsObjCopy.Spec.Service = updateService(itsObjCopy, itsProto)
+	itsObjCopy.Spec.AlternativeServices = itsProto.Spec.AlternativeServices
+	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
+	itsObjCopy.Spec.RoleProbe = itsProto.Spec.RoleProbe
+	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
+	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
+	itsObjCopy.Spec.Credential = itsProto.Spec.Credential
+	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
+	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 
-	if rsmProto.Spec.UpdateStrategy.Type != "" || rsmProto.Spec.UpdateStrategy.RollingUpdate != nil {
-		updateUpdateStrategy(rsmObjCopy, rsmProto)
+	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
+		updateUpdateStrategy(itsObjCopy, itsProto)
 	}
 
-	intctrlutil.ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
-	DelayUpdateInstanceSetSystemFields(oldRsm.Spec, &rsmObjCopy.Spec)
+	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
+	DelayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
 
-	isSpecUpdated := !reflect.DeepEqual(&oldRsm.Spec, &rsmObjCopy.Spec)
+	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
 	if isSpecUpdated {
-		UpdateInstanceSetSystemFields(rsmProto.Spec, &rsmObjCopy.Spec)
+		UpdateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)
 	}
 
-	isLabelsUpdated := !reflect.DeepEqual(oldRsm.Labels, rsmObjCopy.Labels)
-	isAnnotationsUpdated := !reflect.DeepEqual(oldRsm.Annotations, rsmObjCopy.Annotations)
+	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
+	isAnnotationsUpdated := !reflect.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
 	if !isSpecUpdated && !isLabelsUpdated && !isAnnotationsUpdated {
 		return nil
 	}
-	return rsmObjCopy
+	return itsObjCopy
 }
 
-func checkNRollbackProtoImages(rsmObj, rsmProto *workloads.InstanceSet) {
-	if rsmObj.Annotations == nil || rsmProto.Annotations == nil {
+func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
+	if itsObj.Annotations == nil || itsProto.Annotations == nil {
 		return
 	}
 
 	annotationUpdated := func(key string) bool {
-		using, ok1 := rsmObj.Annotations[key]
-		proto, ok2 := rsmProto.Annotations[key]
+		using, ok1 := itsObj.Annotations[key]
+		proto, ok2 := itsProto.Annotations[key]
 		if !ok1 || !ok2 {
 			return true
 		}
@@ -355,7 +355,7 @@ func checkNRollbackProtoImages(rsmObj, rsmProto *workloads.InstanceSet) {
 
 	// otherwise, roll-back the images in proto
 	images := make([]map[string]string, 2)
-	for i, cc := range [][]corev1.Container{rsmObj.Spec.Template.Spec.InitContainers, rsmObj.Spec.Template.Spec.Containers} {
+	for i, cc := range [][]corev1.Container{itsObj.Spec.Template.Spec.InitContainers, itsObj.Spec.Template.Spec.Containers} {
 		images[i] = make(map[string]string)
 		for _, c := range cc {
 			images[i][c.Name] = c.Image
@@ -366,17 +366,17 @@ func checkNRollbackProtoImages(rsmObj, rsmProto *workloads.InstanceSet) {
 			c.Image = image
 		}
 	}
-	for i := range rsmProto.Spec.Template.Spec.InitContainers {
-		rollback(0, &rsmProto.Spec.Template.Spec.InitContainers[i])
+	for i := range itsProto.Spec.Template.Spec.InitContainers {
+		rollback(0, &itsProto.Spec.Template.Spec.InitContainers[i])
 	}
-	for i := range rsmProto.Spec.Template.Spec.Containers {
-		rollback(1, &rsmProto.Spec.Template.Spec.Containers[i])
+	for i := range itsProto.Spec.Template.Spec.Containers {
+		rollback(1, &itsProto.Spec.Template.Spec.Containers[i])
 	}
 }
 
-// expandVolume handles rsm workload expand volume
+// expandVolume handles workload expand volume
 func (r *componentWorkloadOps) expandVolume() error {
-	for _, vct := range r.runningRSM.Spec.VolumeClaimTemplates {
+	for _, vct := range r.runningITS.Spec.VolumeClaimTemplates {
 		var proto *corev1.PersistentVolumeClaimTemplate
 		for i, v := range r.synthesizeComp.VolumeClaimTemplates {
 			if v.Name == vct.Name {
@@ -396,9 +396,9 @@ func (r *componentWorkloadOps) expandVolume() error {
 	return nil
 }
 
-// horizontalScale handles rsm workload horizontal scale
+// horizontalScale handles workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
-	sts := rsmcore.ConvertRSMToSTS(r.runningRSM)
+	sts := rsmcore.ConvertInstanceSetToSTS(r.runningITS)
 	if sts.Status.ReadyReplicas == r.synthesizeComp.Replicas {
 		return nil
 	}
@@ -500,8 +500,8 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 		return nil
 	}
 	graphCli := model.NewGraphClient(r.cli)
-	graphCli.Noop(r.dag, r.protoRSM)
-	stsProto := rsmcore.ConvertRSMToSTS(r.protoRSM)
+	graphCli.Noop(r.dag, r.protoITS)
+	stsProto := rsmcore.ConvertInstanceSetToSTS(r.protoITS)
 	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
 	if err != nil {
 		return err
@@ -516,11 +516,11 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 		}
 	}
 	if succeed {
-		// pvcs are ready, rsm.replicas should be updated
-		graphCli.Update(r.dag, nil, r.protoRSM)
+		// pvcs are ready, ITS.replicas should be updated
+		graphCli.Update(r.dag, nil, r.protoITS)
 		return r.postScaleOut(stsObj)
 	} else {
-		graphCli.Noop(r.dag, r.protoRSM)
+		graphCli.Noop(r.dag, r.protoITS)
 		// update objs will trigger reconcile, no need to requeue error
 		objs1, objs2, err := d.CloneData(d)
 		if err != nil {
@@ -571,7 +571,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 				return false
 			}
 
-			for _, replicaRole := range r.runningRSM.Spec.Roles {
+			for _, replicaRole := range r.runningITS.Spec.Roles {
 				if roleName == replicaRole.Name && replicaRole.IsLeader {
 					return true
 				}
@@ -599,7 +599,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		return err
 	}
 
-	// TODO: Move memberLeave to the RSM controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
+	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
 	podsToMemberLeave := make([]*corev1.Pod, 0)
 	genPodNamesByDefault := generatePodNames(r.synthesizeComp)
 	for _, pod := range pods {
@@ -665,11 +665,11 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) erro
 }
 
 func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
-	for i := *r.runningRSM.Spec.Replicas - 1; i >= 0; i-- {
+	for i := *r.runningITS.Spec.Replicas - 1; i >= 0; i-- {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
 			Namespace: r.cluster.Namespace,
-			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.runningRSM.Name, i),
+			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.runningITS.Name, i),
 		}
 		pvcNotFound := false
 		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, inDataContext4C()); err != nil {
@@ -812,7 +812,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 	}
 
 	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
-		lastVertex := r.buildProtoRSMWorkloadVertex()
+		lastVertex := r.buildProtoITSWorkloadVertex()
 		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
 			lastVertex = addStepMap[step](lastVertex, step)
 		}
@@ -850,11 +850,11 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 	return nil
 }
 
-// buildProtoRSMWorkloadVertex builds protoRSM workload vertex
-func (r *componentWorkloadOps) buildProtoRSMWorkloadVertex() *model.ObjectVertex {
+// buildProtoITSWorkloadVertex builds protoITS workload vertex
+func (r *componentWorkloadOps) buildProtoITSWorkloadVertex() *model.ObjectVertex {
 	for _, vertex := range r.dag.Vertices() {
 		v, _ := vertex.(*model.ObjectVertex)
-		if v.Obj == r.protoRSM {
+		if v.Obj == r.protoITS {
 			return v
 		}
 	}
@@ -862,12 +862,12 @@ func (r *componentWorkloadOps) buildProtoRSMWorkloadVertex() *model.ObjectVertex
 }
 
 func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeComp *component.SynthesizedComponent,
-	rsmObj *workloads.InstanceSet, dag *graph.DAG) error {
+	itsObj *workloads.InstanceSet, dag *graph.DAG) error {
 	graphCli := model.NewGraphClient(cli)
 	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
 		labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 		pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
-			generics.PersistentVolumeClaimSignature, rsmObj.Namespace, labels, inDataContext4C())
+			generics.PersistentVolumeClaimSignature, itsObj.Namespace, labels, inDataContext4C())
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil, nil
@@ -875,7 +875,7 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 			return nil, err
 		}
 		matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
-		prefix := fmt.Sprintf("%s-%s", vctName, rsmObj.Name)
+		prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
 		for _, pvc := range pvcs {
 			if strings.HasPrefix(pvc.Name, prefix) {
 				matchedPVCs = append(matchedPVCs, pvc)
@@ -905,15 +905,15 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 	return nil
 }
 
-func buildRSMPlacementAnnotation(comp *appsv1alpha1.Component, rsm *workloads.InstanceSet) {
-	if rsm.Annotations == nil {
-		rsm.Annotations = make(map[string]string)
+func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *workloads.InstanceSet) {
+	if its.Annotations == nil {
+		its.Annotations = make(map[string]string)
 	}
-	rsm.Annotations[constant.KBAppMultiClusterPlacementKey] = placement(comp)
+	its.Annotations[constant.KBAppMultiClusterPlacementKey] = placement(comp)
 }
 
-// buildRSMConfigTplAnnotations builds config tpl annotations for rsm
-func buildRSMConfigTplAnnotations(rsm *workloads.InstanceSet, synthesizedComp *component.SynthesizedComponent) {
+// buildInstanceSetConfigTplAnnotations builds config tpl annotations for ITS
+func buildInstanceSetConfigTplAnnotations(its *workloads.InstanceSet, synthesizedComp *component.SynthesizedComponent) {
 	configTplAnnotations := make(map[string]string)
 	for _, configTplSpec := range synthesizedComp.ConfigTemplates {
 		configTplAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(configTplSpec.Name)] = core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, configTplSpec.Name)
@@ -921,13 +921,13 @@ func buildRSMConfigTplAnnotations(rsm *workloads.InstanceSet, synthesizedComp *c
 	for _, scriptTplSpec := range synthesizedComp.ScriptTemplates {
 		configTplAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(scriptTplSpec.Name)] = core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, scriptTplSpec.Name)
 	}
-	updateRSMAnnotationsWithTemplate(rsm, configTplAnnotations)
+	updateInstanceSetAnnotationsWithTemplate(its, configTplAnnotations)
 }
 
-func updateRSMAnnotationsWithTemplate(rsm *workloads.InstanceSet, allTemplateAnnotations map[string]string) {
+func updateInstanceSetAnnotationsWithTemplate(its *workloads.InstanceSet, allTemplateAnnotations map[string]string) {
 	// full configmap upgrade
 	existLabels := make(map[string]string)
-	annotations := rsm.GetAnnotations()
+	annotations := its.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
@@ -946,23 +946,23 @@ func updateRSMAnnotationsWithTemplate(rsm *workloads.InstanceSet, allTemplateAnn
 	for key, val := range allTemplateAnnotations {
 		annotations[key] = val
 	}
-	rsm.SetAnnotations(annotations)
+	its.SetAnnotations(annotations)
 }
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
-	runningRSM *workloads.InstanceSet,
-	protoRSM *workloads.InstanceSet,
+	runningITS *workloads.InstanceSet,
+	protoITS *workloads.InstanceSet,
 	dag *graph.DAG) *componentWorkloadOps {
 	return &componentWorkloadOps{
 		cli:            cli,
 		reqCtx:         reqCtx,
 		cluster:        cluster,
 		synthesizeComp: synthesizeComp,
-		runningRSM:     runningRSM,
-		protoRSM:       protoRSM,
+		runningITS:     runningITS,
+		protoITS:       protoITS,
 		dag:            dag,
 	}
 }

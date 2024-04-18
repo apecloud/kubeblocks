@@ -92,7 +92,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
 		}).
 		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).
-		Watches(&workloadsv1alpha1.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForRSM)).
+		Watches(&workloadsv1alpha1.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstanceSet)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
@@ -379,14 +379,14 @@ func (r *OpsRequestReconciler) parseRunningOpsRequests(ctx context.Context, obje
 	return r.getRunningOpsRequestsFromCluster(cluster)
 }
 
-func (r *OpsRequestReconciler) parseRunningOpsRequestsForRSM(ctx context.Context, object client.Object) []reconcile.Request {
-	rsm := object.(*workloadsv1alpha1.InstanceSet)
-	clusterName := rsm.Labels[constant.AppInstanceLabelKey]
+func (r *OpsRequestReconciler) parseRunningOpsRequestsForInstanceSet(ctx context.Context, object client.Object) []reconcile.Request {
+	its := object.(*workloadsv1alpha1.InstanceSet)
+	clusterName := its.Labels[constant.AppInstanceLabelKey]
 	if clusterName == "" {
 		return nil
 	}
 	cluster := &appsv1alpha1.Cluster{}
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: rsm.Namespace}, cluster); err != nil {
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: its.Namespace}, cluster); err != nil {
 		return nil
 	}
 	return r.getRunningOpsRequestsFromCluster(cluster)

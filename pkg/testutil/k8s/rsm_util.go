@@ -123,7 +123,7 @@ func MockInstanceSetReady(rsm *workloads.InstanceSet, pods ...*corev1.Pod) {
 	rsm.Status.MembersStatus = membersStatus
 }
 
-func ListAndCheckRSM(testCtx *testutil.TestContext, key types.NamespacedName) *workloads.InstanceSetList {
+func ListAndCheckInstanceSet(testCtx *testutil.TestContext, key types.NamespacedName) *workloads.InstanceSetList {
 	rsmList := &workloads.InstanceSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, rsmList, client.MatchingLabels{
@@ -135,7 +135,7 @@ func ListAndCheckRSM(testCtx *testutil.TestContext, key types.NamespacedName) *w
 	return rsmList
 }
 
-func ListAndCheckRSMItemsCount(testCtx *testutil.TestContext, key types.NamespacedName, cnt int) *workloads.InstanceSetList {
+func ListAndCheckInstanceSetItemsCount(testCtx *testutil.TestContext, key types.NamespacedName, cnt int) *workloads.InstanceSetList {
 	rsmList := &workloads.InstanceSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, rsmList, client.MatchingLabels{

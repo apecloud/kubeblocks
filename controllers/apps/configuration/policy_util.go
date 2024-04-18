@@ -46,7 +46,7 @@ import (
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.InstanceSetUnits {
-		pods, err := intctrlutil.GetPodListByRSM(params.Ctx.Ctx, params.Client, &params.InstanceSetUnits[i])
+		pods, err := intctrlutil.GetPodListByInstanceSet(params.Ctx.Ctx, params.Client, &params.InstanceSetUnits[i])
 		if err != nil {
 			return nil, err
 		}
@@ -73,7 +73,7 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 
 func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.InstanceSetUnits) > 1 {
-		return nil, core.MakeError("component require only one rsm, actual %d components", len(params.InstanceSetUnits))
+		return nil, core.MakeError("component require only one InstanceSet, actual %d components", len(params.InstanceSetUnits))
 	}
 
 	if len(params.InstanceSetUnits) == 0 {
@@ -86,7 +86,7 @@ func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	if params.SynthesizedComponent != nil {
-		rsmcore.SortPods(pods, rsmcore.ComposeRolePriorityMap(component.ConvertSynthesizeCompRoleToRSMRole(params.SynthesizedComponent)), true)
+		rsmcore.SortPods(pods, rsmcore.ComposeRolePriorityMap(component.ConvertSynthesizeCompRoleToInstanceSetRole(params.SynthesizedComponent)), true)
 	}
 	return pods, nil
 }

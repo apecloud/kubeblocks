@@ -78,7 +78,7 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 	// cluster initialization done, handle dynamic membership reconfiguration
 
 	// rsm is ready
-	if IsRSMReady(rsm) {
+	if IsInstanceSetReady(rsm) {
 		return cleanAction(transCtx, dag)
 	}
 

@@ -654,10 +654,10 @@ func CopyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer s
 	return nil
 }
 
-// IsRSMReady gives rsm level 'ready' state:
+// IsInstanceSetReady gives rsm level 'ready' state:
 // 1. all replicas exist
 // 2. all members have role set
-func IsRSMReady(rsm *workloads.InstanceSet) bool {
+func IsInstanceSetReady(rsm *workloads.InstanceSet) bool {
 	if rsm == nil {
 		return false
 	}
@@ -751,9 +751,9 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 	return annotations
 }
 
-// ConvertRSMToSTS converts a rsm to sts
+// ConvertInstanceSetToSTS converts a rsm to sts
 // TODO(free6om): refactor this func out
-func ConvertRSMToSTS(rsm *workloads.InstanceSet) *appsv1.StatefulSet {
+func ConvertInstanceSetToSTS(rsm *workloads.InstanceSet) *appsv1.StatefulSet {
 	if rsm == nil {
 		return nil
 	}

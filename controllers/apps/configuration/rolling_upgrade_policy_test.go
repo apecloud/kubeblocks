@@ -61,7 +61,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 
 	createReconfigureParam := func(compType appsv1alpha1.WorkloadType, replicas int) reconfigureParams {
 		return newMockReconfigureParams("rollingPolicy", k8sMockClient.Client(),
-			withMockRSM(replicas, nil),
+			withMockInstanceSet(replicas, nil),
 			withConfigSpec("for_test", map[string]string{
 				"key": "value",
 			}),
@@ -105,10 +105,10 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 
 			acc := 0
 			mockPods := [][]corev1.Pod{
-				newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 2),
-				newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 5,
+				newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2),
+				newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 5,
 					mockLeaderLabel),
-				newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], 3,
+				newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3,
 					withReadyPod(0, 0),
 					withAvailablePod(0, 3),
 					mockLeaderLabel),
@@ -184,7 +184,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 						},
 					},
 				}
-				pods = newMockPodsWithRSM(&mockParam.InstanceSetUnits[0], defaultReplica)
+				pods = newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], defaultReplica)
 			}
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(

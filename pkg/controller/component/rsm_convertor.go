@@ -244,7 +244,7 @@ func (c *rsmRolesConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ConvertSynthesizeCompRoleToRSMRole(synthesizeComp), nil
+	return ConvertSynthesizeCompRoleToInstanceSetRole(synthesizeComp), nil
 }
 
 // rsmRoleProbeConvertor converts the ComponentDefinition.Spec.LifecycleActions.RoleProbe into InstanceSet.Spec.RoleProbe.
@@ -339,8 +339,8 @@ func (c *rsmMembershipReconfigurationConvertor) convert(args ...any) (any, error
 	return "", nil // TODO
 }
 
-// ConvertSynthesizeCompRoleToRSMRole converts the component.SynthesizedComponent.Roles to workloads.ReplicaRole.
-func ConvertSynthesizeCompRoleToRSMRole(synthesizedComp *SynthesizedComponent) []workloads.ReplicaRole {
+// ConvertSynthesizeCompRoleToInstanceSetRole converts the component.SynthesizedComponent.Roles to workloads.ReplicaRole.
+func ConvertSynthesizeCompRoleToInstanceSetRole(synthesizedComp *SynthesizedComponent) []workloads.ReplicaRole {
 	if synthesizedComp.Roles == nil {
 		return nil
 	}

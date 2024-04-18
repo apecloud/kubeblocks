@@ -37,7 +37,7 @@ func init() {
 func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	params.Ctx.Log.V(1).Info("simple policy begin....")
 
-	return restartAndCheckComponent(params, GetRSMRollingUpgradeFuncs(), fromWorkloadObjects(params))
+	return restartAndCheckComponent(params, GetInstanceSetRollingUpgradeFuncs(), fromWorkloadObjects(params))
 }
 
 func (s *simplePolicy) GetPolicyName() string {

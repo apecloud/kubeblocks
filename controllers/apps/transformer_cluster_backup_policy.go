@@ -344,13 +344,13 @@ func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(target *dpv1alpha
 }
 
 func (r *clusterBackupPolicyTransformer) getCompReplicas() int32 {
-	rsm := &workloads.ReplicatedStateMachine{}
+	its := &workloads.InstanceSet{}
 	compSpec := r.getClusterComponentSpec()
-	rsmName := fmt.Sprintf("%s-%s", r.Cluster.Name, compSpec.Name)
-	if err := r.Client.Get(r.Context, client.ObjectKey{Name: rsmName, Namespace: r.Cluster.Namespace}, rsm); err != nil {
+	name := fmt.Sprintf("%s-%s", r.Cluster.Name, compSpec.Name)
+	if err := r.Client.Get(r.Context, client.ObjectKey{Name: name, Namespace: r.Cluster.Namespace}, its); err != nil {
 		return compSpec.Replicas
 	}
-	return *rsm.Spec.Replicas
+	return *its.Spec.Replicas
 }
 
 // buildBackupPolicy builds a new backup policy by the backup policy template.

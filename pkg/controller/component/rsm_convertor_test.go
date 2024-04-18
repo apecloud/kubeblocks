@@ -27,8 +27,8 @@ import (
 	workloadsalpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-var _ = Describe("Test RSM Convertor", func() {
-	Context("rsm convertors", func() {
+var _ = Describe("Test InstanceSet Convertor", func() {
+	Context("InstanceSet convertors", func() {
 		var (
 			synComp *SynthesizedComponent
 		)
@@ -52,7 +52,7 @@ var _ = Describe("Test RSM Convertor", func() {
 			}
 		})
 		It("convert", func() {
-			convertor := &rsmRoleProbeConvertor{}
+			convertor := &itsRoleProbeConvertor{}
 			res, err := convertor.convert(synComp)
 			Expect(err).Should(Succeed())
 			probe := res.(*workloadsalpha1.RoleProbe)

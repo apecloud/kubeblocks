@@ -60,9 +60,9 @@ import (
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/metrics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -132,9 +132,9 @@ func init() {
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
-	viper.SetDefault(rsm2.FeatureGateRSMReplicaProvider, string(rsm2.PodProvider))
-	viper.SetDefault(rsm2.MaxPlainRevisionCount, 1024)
-	viper.SetDefault(rsm2.FeatureGateIgnorePodVerticalScaling, false)
+	viper.SetDefault(instanceset.FeatureGateRSMReplicaProvider, string(instanceset.PodProvider))
+	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
+	viper.SetDefault(instanceset.FeatureGateIgnorePodVerticalScaling, false)
 	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 }
@@ -495,12 +495,12 @@ func main() {
 	}
 
 	if viper.GetBool(workloadsFlagKey.viperName()) {
-		if err = (&workloadscontrollers.ReplicatedStateMachineReconciler{
+		if err = (&workloadscontrollers.InstanceSetReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
 		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
+			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
 			os.Exit(1)
 		}
 	}
@@ -544,8 +544,8 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&workloadsv1alpha1.ReplicatedStateMachine{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ReplicatedStateMachine")
+		if err = (&workloadsv1alpha1.InstanceSet{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "InstanceSet")
 			os.Exit(1)
 		}
 

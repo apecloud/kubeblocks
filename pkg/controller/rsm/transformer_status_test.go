@@ -39,7 +39,7 @@ import (
 
 var _ = Describe("object status transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			AddMatchLabelsInMap(selectors).
 			SetServiceName(headlessSvcName).
@@ -87,7 +87,7 @@ var _ = Describe("object status transformer test.", func() {
 			Expect(err).Should(BeNil())
 			Expect(root.Action).ShouldNot(BeNil())
 			Expect(*root.Action).Should(Equal(model.STATUS))
-			rsmNew, ok := root.Obj.(*workloads.ReplicatedStateMachine)
+			rsmNew, ok := root.Obj.(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			Expect(rsmNew.Generation).Should(Equal(generation))
 			Expect(rsmNew.Status.ObservedGeneration).Should(Equal(generation))
@@ -133,7 +133,7 @@ var _ = Describe("object status transformer test.", func() {
 			Expect(err).Should(BeNil())
 			Expect(root.Action).ShouldNot(BeNil())
 			Expect(*root.Action).Should(Equal(model.STATUS))
-			rsmNew, ok := root.Obj.(*workloads.ReplicatedStateMachine)
+			rsmNew, ok := root.Obj.(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			Expect(rsmNew.Status.ObservedGeneration).Should(Equal(generation))
 			// the only difference between rsm.status.StatefulSetStatus and sts.status is ObservedGeneration

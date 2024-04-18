@@ -46,7 +46,7 @@ const (
 	WorkloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
 	WorkloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
 
-	KindReplicatedStateMachine = "ReplicatedStateMachine"
+	KindReplicatedStateMachine = "InstanceSet"
 
 	RoleLabelKey          = "kubeblocks.io/role"
 	rsmAccessModeLabelKey = "rsm.workloads.kubeblocks.io/access-mode"
@@ -108,8 +108,8 @@ type rsmTransformContext struct {
 	Client client.Reader
 	record.EventRecorder
 	logr.Logger
-	rsm     *workloads.ReplicatedStateMachine
-	rsmOrig *workloads.ReplicatedStateMachine
+	rsm     *workloads.InstanceSet
+	rsmOrig *workloads.InstanceSet
 }
 
 func (c *rsmTransformContext) GetContext() context.Context {
@@ -144,7 +144,7 @@ var _ graph.TransformContext = &rsmTransformContext{}
 // here is what we should do:
 // add annotation 'prometheus.io/scrape' with an HeadlessServiceScope suffix to the RSM object's annotations field.
 //
-//	kind: ReplicatedStateMachine
+//	kind: InstanceSet
 //	metadata:
 //	  annotations:
 //	    prometheus.io/scrape.headless.rsm: true

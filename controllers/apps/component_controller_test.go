@@ -332,19 +332,19 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	mockCompRunning := func(compName string) {
-		rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), compName)
-		Expect(rsmList.Items).Should(HaveLen(1))
-		rsm := rsmList.Items[0]
-		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterObj.Name, compName).
-			SetReplicas(*rsm.Spec.Replicas).
+		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), compName)
+		Expect(itsList.Items).Should(HaveLen(1))
+		its := itsList.Items[0]
+		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterObj.Name, compName).
+			SetReplicas(*its.Spec.Replicas).
 			Create(&testCtx).
 			GetObject()
 		pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
-		Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
-			testk8s.MockRSMReady(&rsm, pods...)
+		Expect(testapps.ChangeObjStatus(&testCtx, &its, func() {
+			testk8s.MockInstanceSetReady(&its, pods...)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetComponentPhase(&testCtx, types.NamespacedName{
 			Namespace: clusterObj.Namespace,
@@ -392,8 +392,8 @@ var _ = Describe("Component Controller", func() {
 
 	checkSingleWorkload := func(compDefName string, expects func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment)) {
 		Eventually(func(g Gomega) {
-			l := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-			sts := rsm.ConvertRSMToSTS(&l.Items[0])
+			l := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
+			sts := rsm.ConvertInstanceSetToSTS(&l.Items[0])
 			expects(g, sts, nil)
 		}).Should(Succeed())
 	}
@@ -508,9 +508,9 @@ var _ = Describe("Component Controller", func() {
 		By("Mocking component PVCs to bound")
 		mockComponentPVCsAndBound(comp, int(comp.Replicas), true, storageClassName)
 
-		By("Checking rsm replicas right")
-		rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, comp.Name)
-		Expect(int(*rsmList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
+		By("Checking its replicas right")
+		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, comp.Name)
+		Expect(int(*itsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
 
 		By("Creating mock pods in StatefulSet")
 		pods := mockPodsForTest(clusterObj, int(comp.Replicas))
@@ -535,8 +535,8 @@ var _ = Describe("Component Controller", func() {
 		checkUpdatedStsReplicas := func() {
 			By("Checking updated sts replicas")
 			Eventually(func() int32 {
-				rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, comp.Name)
-				return *rsmList.Items[0].Spec.Replicas
+				itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, comp.Name)
+				return *itsList.Items[0].Spec.Replicas
 			}).Should(BeEquivalentTo(updatedReplicas))
 		}
 
@@ -846,10 +846,10 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		By("Checking the replicas")
-		rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-		rsm := &rsmList.Items[0]
-		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterObj.Name, compName).
-			SetReplicas(*rsm.Spec.Replicas).
+		itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
+		its := &itsList.Items[0]
+		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterObj.Name, compName).
+			SetReplicas(*its.Spec.Replicas).
 			Create(&testCtx).GetObject()
 		Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(replicas))
 
@@ -887,8 +887,8 @@ var _ = Describe("Component Controller", func() {
 		case statefulCompDefName, consensusCompDefName:
 			mockPods = testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
 		}
-		Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-			testk8s.MockRSMReady(rsm, mockPods...)
+		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			testk8s.MockStatefulSetReady(sts)
@@ -1358,17 +1358,17 @@ var _ = Describe("Component Controller", func() {
 				},
 			},
 		}
-		rsmKey := types.NamespacedName{
+		itsKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			envVars, _ := buildEnvVarsNData(nil, targetEnvVars, false)
 			targetEnvVarsMapping := map[string]corev1.EnvVar{}
 			for i, v := range envVars {
 				targetEnvVarsMapping[v.Name] = envVars[i]
 			}
-			for _, cc := range [][]corev1.Container{rsm.Spec.Template.Spec.InitContainers, rsm.Spec.Template.Spec.Containers} {
+			for _, cc := range [][]corev1.Container{its.Spec.Template.Spec.InitContainers, its.Spec.Template.Spec.Containers} {
 				for _, c := range cc {
 					envValueMapping := map[string]corev1.EnvVar{}
 					for i, env := range c.Env {
@@ -1403,12 +1403,12 @@ var _ = Describe("Component Controller", func() {
 		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
 			f.SetReplicas(replicasLimit.MaxReplicas * 2)
 		})
-		rsmKey := types.NamespacedName{
+		itsKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
-			g.Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(replicasLimit.MaxReplicas * 2))
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(replicasLimit.MaxReplicas * 2))
 		})).Should(Succeed())
 
 		By("set replicas limit")
@@ -1429,11 +1429,11 @@ var _ = Describe("Component Controller", func() {
 				g.Expect(comp.Status.Conditions[0].Status).Should(BeEquivalentTo(metav1.ConditionFalse))
 				g.Expect(comp.Status.Conditions[0].Message).Should(ContainSubstring(replicasOutOfLimitError(replicas, *replicasLimit).Error()))
 			})).Should(Succeed())
-			rsmKey := types.NamespacedName{
+			itsKey := types.NamespacedName{
 				Namespace: compObj.Namespace,
 				Name:      compObj.Name,
 			}
-			Consistently(testapps.CheckObjExists(&testCtx, rsmKey, &workloads.ReplicatedStateMachine{}, false)).Should(Succeed())
+			Consistently(testapps.CheckObjExists(&testCtx, itsKey, &workloads.InstanceSet{}, false)).Should(Succeed())
 		}
 
 		By("create component w/ replicas limit set - ok")
@@ -1441,12 +1441,12 @@ var _ = Describe("Component Controller", func() {
 			createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
 				f.SetReplicas(replicas)
 			})
-			rsmKey := types.NamespacedName{
+			itsKey := types.NamespacedName{
 				Namespace: compObj.Namespace,
 				Name:      compObj.Name,
 			}
-			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
-				g.Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(replicas))
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(replicas))
 			})).Should(Succeed())
 		}
 	}
@@ -1475,12 +1475,12 @@ var _ = Describe("Component Controller", func() {
 				IsLeader:   false,
 			},
 		}
-		rsmKey := types.NamespacedName{
+		itsKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
-			g.Expect(rsm.Spec.Roles).Should(HaveExactElements(targetRoles))
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Roles).Should(HaveExactElements(targetRoles))
 		})).Should(Succeed())
 	}
 
@@ -1524,12 +1524,12 @@ var _ = Describe("Component Controller", func() {
 			MountPath: constant.MountPath,
 			ReadOnly:  true,
 		}
-		rsmKey := types.NamespacedName{
+		itsKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
-			podSpec := rsm.Spec.Template.Spec
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			podSpec := its.Spec.Template.Spec
 			g.Expect(podSpec.Volumes).Should(ContainElements(targetVolume))
 			for _, c := range podSpec.Containers {
 				g.Expect(c.VolumeMounts).Should(ContainElements(targetVolumeMount))
@@ -1569,12 +1569,12 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		By("Checking the Affinity, the TopologySpreadConstraints and Tolerations")
-		rsmKey := types.NamespacedName{
+		itsKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
-			podSpec := rsm.Spec.Template.Spec
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			podSpec := its.Spec.Template.Spec
 			// node affinity
 			g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(labelKey))
 			// pod anti-affinity
@@ -1628,12 +1628,12 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		By("check the service account used in Pod")
-		rsmKey := types.NamespacedName{
+		itsKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
-			g.Expect(rsm.Spec.Template.Spec.ServiceAccountName).To(Equal(saName))
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Template.Spec.ServiceAccountName).To(Equal(saName))
 		})).Should(Succeed())
 
 		By("check the RBAC resources created")
@@ -1699,16 +1699,16 @@ var _ = Describe("Component Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compDefName)
 
 		By("Checking statefulSet number")
-		rsmList := testk8s.ListAndCheckRSMItemsCount(&testCtx, clusterKey, 1)
-		rsm := &rsmList.Items[0]
-		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, compName).
-			SetReplicas(*rsm.Spec.Replicas).Create(&testCtx).GetObject()
+		itsList := testk8s.ListAndCheckInstanceSetItemsCount(&testCtx, clusterKey, 1)
+		its := &itsList.Items[0]
+		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterKey.Name, compName).
+			SetReplicas(*its.Spec.Replicas).Create(&testCtx).GetObject()
 		mockPods := testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
-		Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-			testk8s.MockRSMReady(rsm, mockPods...)
+		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 	}
@@ -1728,16 +1728,16 @@ var _ = Describe("Component Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
-		var rsm *workloads.ReplicatedStateMachine
+		var its *workloads.InstanceSet
 		Eventually(func(g Gomega) {
-			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-			g.Expect(rsmList.Items).ShouldNot(BeEmpty())
-			rsm = &rsmList.Items[0]
+			itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
+			g.Expect(itsList.Items).ShouldNot(BeEmpty())
+			its = &itsList.Items[0]
 		}).Should(Succeed())
-		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, compName).
-			AddAppComponentLabel(rsm.Labels[constant.KBAppComponentLabelKey]).
-			AddAppInstanceLabel(rsm.Labels[constant.AppInstanceLabelKey]).
-			SetReplicas(*rsm.Spec.Replicas).Create(&testCtx).GetObject()
+		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterKey.Name, compName).
+			AddAppComponentLabel(its.Labels[constant.KBAppComponentLabelKey]).
+			AddAppInstanceLabel(its.Labels[constant.AppInstanceLabelKey]).
+			SetReplicas(*its.Spec.Replicas).Create(&testCtx).GetObject()
 		By("Creating mock pods in StatefulSet, and set controller reference")
 		pods := mockPodsForTest(clusterObj, replicas)
 		for i, pod := range pods {
@@ -1780,9 +1780,9 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(followerCount).Should(Equal(2))
 		}).Should(Succeed())
 
-		// trigger rsm to reconcile as the underlying sts is not created
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sts), func(rsm *workloads.ReplicatedStateMachine) {
-			rsm.Annotations["time"] = time.Now().Format(time.RFC3339)
+		// trigger its to reconcile as the underlying sts is not created
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sts), func(its *workloads.InstanceSet) {
+			its.Annotations["time"] = time.Now().Format(time.RFC3339)
 		})()).Should(Succeed())
 		By("Checking pods' annotations")
 		Eventually(func(g Gomega) {
@@ -1794,17 +1794,17 @@ var _ = Describe("Component Controller", func() {
 				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*sts.Spec.Replicas))))
 			}
 		}).Should(Succeed())
-		rsmPatch := client.MergeFrom(rsm.DeepCopy())
-		By("Updating RSM's status")
-		rsm.Status.UpdateRevision = "mock-version"
+		itsPatch := client.MergeFrom(its.DeepCopy())
+		By("Updating ITS status")
+		its.Status.UpdateRevision = "mock-version"
 		pods, err := intctrlutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).Should(BeNil())
 		var podList []*corev1.Pod
 		for i := range pods {
 			podList = append(podList, &pods[i])
 		}
-		testk8s.MockRSMReady(rsm, podList...)
-		Expect(k8sClient.Status().Patch(ctx, rsm, rsmPatch)).Should(Succeed())
+		testk8s.MockInstanceSetReady(its, podList...)
+		Expect(k8sClient.Status().Patch(ctx, its, itsPatch)).Should(Succeed())
 
 		stsPatch := client.MergeFrom(sts.DeepCopy())
 		By("Updating StatefulSet's status")
@@ -1883,24 +1883,24 @@ var _ = Describe("Component Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
-		rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-		rsm := rsmList.Items[0]
-		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, compName).
-			SetReplicas(*rsm.Spec.Replicas).
+		itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
+		its := itsList.Items[0]
+		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterKey.Name, compName).
+			SetReplicas(*its.Spec.Replicas).
 			Create(&testCtx).GetObject()
 		By("mock pod/sts are available and wait for component enter running phase")
 		mockPods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
-		Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
-			testk8s.MockRSMReady(&rsm, mockPods...)
+		Expect(testapps.ChangeObjStatus(&testCtx, &its, func() {
+			testk8s.MockInstanceSetReady(&its, mockPods...)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 		By("the restore container has been removed from init containers")
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
-			g.Expect(tmpRSM.Spec.Template.Spec.InitContainers).Should(BeEmpty())
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&its), func(g Gomega, tmpIts *workloads.InstanceSet) {
+			g.Expect(tmpIts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 		})).Should(Succeed())
 
 		By("clean up annotations after cluster running")
@@ -2002,9 +2002,9 @@ var _ = Describe("Component Controller", func() {
 			viper.Set(constant.KBToolsImage, oldToolsImage)
 		}()
 
-		underlyingWorkload := func() *workloads.ReplicatedStateMachine {
-			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-			return &rsmList.Items[0]
+		underlyingWorkload := func() *workloads.InstanceSet {
+			itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
+			return &itsList.Items[0]
 		}
 
 		initWorkloadGeneration := underlyingWorkload().GetGeneration()
@@ -2374,15 +2374,15 @@ var _ = Describe("Component Controller", func() {
 				f.SetServiceVersion(prevRelease.ServiceVersion)
 			})
 
-			By("check the labels and image in rsm")
-			rsmKey := compKey
-			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			By("check the labels and image in its")
+			itsKey := compKey
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				// check comp-def and service-version labels
-				g.Expect(rsm.Annotations).ShouldNot(BeEmpty())
-				g.Expect(rsm.Annotations).Should(HaveKeyWithValue(constant.AppComponentLabelKey, compObj.Spec.CompDef))
-				g.Expect(rsm.Annotations).Should(HaveKeyWithValue(constant.KBAppServiceVersionKey, compObj.Spec.ServiceVersion))
+				g.Expect(its.Annotations).ShouldNot(BeEmpty())
+				g.Expect(its.Annotations).Should(HaveKeyWithValue(constant.AppComponentLabelKey, compObj.Spec.CompDef))
+				g.Expect(its.Annotations).Should(HaveKeyWithValue(constant.KBAppServiceVersionKey, compObj.Spec.ServiceVersion))
 				// check the image
-				c := rsm.Spec.Template.Spec.Containers[0]
+				c := its.Spec.Template.Spec.Containers[0]
 				g.Expect(c.Image).To(BeEquivalentTo(prevRelease.Images[c.Name]))
 			})).Should(Succeed())
 
@@ -2399,16 +2399,16 @@ var _ = Describe("Component Controller", func() {
 				comp.Annotations["now"] = now
 			})()).Should(Succeed())
 
-			By("wait rsm updated and check the labels and image in rsm not changed")
-			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
-				// check the rsm is updated
-				g.Expect(rsm.Annotations).ShouldNot(BeEmpty())
-				g.Expect(rsm.Annotations).Should(HaveKeyWithValue("now", now))
+			By("wait its updated and check the labels and image in its not changed")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the its is updated
+				g.Expect(its.Annotations).ShouldNot(BeEmpty())
+				g.Expect(its.Annotations).Should(HaveKeyWithValue("now", now))
 				// check comp-def and service-version labels unchanged
-				g.Expect(rsm.Annotations).Should(HaveKeyWithValue(constant.AppComponentLabelKey, compObj.Spec.CompDef))
-				g.Expect(rsm.Annotations).Should(HaveKeyWithValue(constant.KBAppServiceVersionKey, compObj.Spec.ServiceVersion))
+				g.Expect(its.Annotations).Should(HaveKeyWithValue(constant.AppComponentLabelKey, compObj.Spec.CompDef))
+				g.Expect(its.Annotations).Should(HaveKeyWithValue(constant.KBAppServiceVersionKey, compObj.Spec.ServiceVersion))
 				// check the image unchanged
-				c := rsm.Spec.Template.Spec.Containers[0]
+				c := its.Spec.Template.Spec.Containers[0]
 				g.Expect(c.Image).To(BeEquivalentTo(prevRelease.Images[c.Name]))
 			})).Should(Succeed())
 		}

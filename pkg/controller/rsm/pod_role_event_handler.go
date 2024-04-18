@@ -136,7 +136,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		}
 
 		name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
-		rsm := &workloads.ReplicatedStateMachine{}
+		rsm := &workloads.InstanceSet{}
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
 			return "", err
 		}
@@ -197,7 +197,7 @@ func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) 
 
 // updatePodRoleLabel updates pod role label when internal container role changed
 func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	rsm workloads.ReplicatedStateMachine, pod *corev1.Pod, roleName string, version string) error {
+	rsm workloads.InstanceSet, pod *corev1.Pod, roleName string, version string) error {
 	ctx := reqCtx.Ctx
 	roleMap := composeRoleMap(rsm)
 	// role not defined in CR, ignore it

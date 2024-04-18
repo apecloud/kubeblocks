@@ -381,17 +381,17 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
 
-		By("Wait RSM created")
-		rsmkey := compKey
-		rsm := &workloads.ReplicatedStateMachine{}
-		Eventually(testapps.CheckObjExists(&testCtx, rsmkey, rsm, true)).Should(Succeed())
+		By("Wait InstanceSet created")
+		itsKey := compKey
+		its := &workloads.InstanceSet{}
+		Eventually(testapps.CheckObjExists(&testCtx, itsKey, its, true)).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(cluster.Spec.ComponentSpecs).Should(HaveLen(1))
 			clusterJSON, err := json.Marshal(cluster.Spec.ComponentSpecs[0].Instances)
 			g.Expect(err).Should(BeNil())
-			rsmJSON, err := json.Marshal(rsm.Spec.Instances)
+			itsJSON, err := json.Marshal(its.Spec.Instances)
 			g.Expect(err).Should(BeNil())
-			g.Expect(clusterJSON).Should(Equal(rsmJSON))
+			g.Expect(clusterJSON).Should(Equal(itsJSON))
 		})).Should(Succeed())
 	}
 

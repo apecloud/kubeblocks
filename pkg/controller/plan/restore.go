@@ -202,9 +202,9 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	}
 	jobActionLabels := constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name)
 	if comp.WorkloadType == appsv1alpha1.Consensus || comp.WorkloadType == appsv1alpha1.Replication {
-		// TODO: use rsm constant
-		rsmAccessModeLabelKey := "rsm.workloads.kubeblocks.io/access-mode"
-		jobActionLabels[rsmAccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
+		// TODO: use ITS constant
+		itsAccessModeLabelKey := "rsm.workloads.kubeblocks.io/access-mode"
+		jobActionLabels[itsAccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
 	}
 	sourceTargetName := compObj.Annotations[constant.BackupSourceTargetAnnotationKey]
 	restore := &dpv1alpha1.Restore{

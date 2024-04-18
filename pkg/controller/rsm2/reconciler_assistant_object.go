@@ -64,7 +64,7 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	}
 	objects = append(objects, headLessSvc, envConfig)
 	for _, object := range objects {
-		if err := rsm1.SetOwnership(rsm, object, model.GetScheme(), rsm1.GetFinalizer(object)); err != nil {
+		if err := rsm1.SetOwnership(rsm, object, model.GetScheme(), finalizer); err != nil {
 			return nil, err
 		}
 	}

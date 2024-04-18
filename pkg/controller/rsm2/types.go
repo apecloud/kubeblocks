@@ -44,4 +44,6 @@ const (
 	revisionsZSTDKey         = "zstd"
 
 	FeatureGateIgnorePodVerticalScaling = "IGNORE_POD_VERTICAL_SCALING"
+
+	finalizer = "instanceset.workloads.kubeblocks.io/finalizer"
 )

@@ -59,11 +59,11 @@ func init() {
 // PlanBuilder implementation
 
 func (b *PlanBuilder) Init() error {
-	rsm := &workloads.ReplicatedStateMachine{}
+	rsm := &workloads.InstanceSet{}
 	if err := b.cli.Get(b.transCtx.Context, b.req.NamespacedName, rsm); err != nil {
 		return err
 	}
-	b.AddTransformer(&initTransformer{ReplicatedStateMachine: rsm})
+	b.AddTransformer(&initTransformer{InstanceSet: rsm})
 	return nil
 }
 

@@ -181,16 +181,16 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).ShouldNot(HaveOccurred())
 		}
 		var mysqlSts *appsv1.StatefulSet
-		var mysqlRSM *workloads.ReplicatedStateMachine
-		rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, mysqlCompName)
-		mysqlRSM = &rsmList.Items[0]
-		mysqlSts = testapps.NewStatefulSetFactory(mysqlRSM.Namespace, mysqlRSM.Name, clusterKey.Name, mysqlCompName).
-			SetReplicas(*mysqlRSM.Spec.Replicas).Create(&testCtx).GetObject()
+		var mysqlIts *workloads.InstanceSet
+		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, mysqlCompName)
+		mysqlIts = &itsList.Items[0]
+		mysqlSts = testapps.NewStatefulSetFactory(mysqlIts.Namespace, mysqlIts.Name, clusterKey.Name, mysqlCompName).
+			SetReplicas(*mysqlIts.Spec.Replicas).Create(&testCtx).GetObject()
 		Expect(testapps.ChangeObjStatus(&testCtx, mysqlSts, func() {
 			testk8s.MockStatefulSetReady(mysqlSts)
 		})).ShouldNot(HaveOccurred())
-		Expect(testapps.ChangeObjStatus(&testCtx, mysqlRSM, func() {
-			testk8s.MockRSMReady(mysqlRSM, pod)
+		Expect(testapps.ChangeObjStatus(&testCtx, mysqlIts, func() {
+			testk8s.MockInstanceSetReady(mysqlIts, pod)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
@@ -231,8 +231,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		// })).Should(Succeed())
 
 		By("mock bring Cluster and changed component back to running status")
-		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(mysqlRSM), func(tmpRSM *workloads.ReplicatedStateMachine) {
-			testk8s.MockRSMReady(tmpRSM, pod)
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(mysqlIts), func(tmpIts *workloads.InstanceSet) {
+			testk8s.MockInstanceSetReady(tmpIts, pod)
 		})()).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
@@ -260,9 +260,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			targetRequests = scalingCtx.target.resource.Requests
 		}
 
-		rsmList = testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, mysqlCompName)
-		mysqlRSM = &rsmList.Items[0]
-		Expect(reflect.DeepEqual(mysqlRSM.Spec.Template.Spec.Containers[0].Resources.Requests, targetRequests)).Should(BeTrue())
+		itsList = testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, mysqlCompName)
+		mysqlIts = &itsList.Items[0]
+		Expect(reflect.DeepEqual(mysqlIts.Spec.Template.Spec.Containers[0].Resources.Requests, targetRequests)).Should(BeTrue())
 
 		By("check OpsRequest reclaimed after ttl")
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
@@ -342,8 +342,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		componentWorkload := func() client.Object {
-			rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, mysqlCompName)
-			return &rsmList.Items[0]
+			itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, mysqlCompName)
+			return &itsList.Items[0]
 		}
 
 		mockCompRunning := func(replicas int32) {
@@ -357,14 +357,14 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 
 			wl := componentWorkload()
-			rsm, _ := wl.(*workloads.ReplicatedStateMachine)
-			sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, mysqlCompName).
-				SetReplicas(*rsm.Spec.Replicas).GetObject()
+			its, _ := wl.(*workloads.InstanceSet)
+			sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterKey.Name, mysqlCompName).
+				SetReplicas(*its.Spec.Replicas).GetObject()
 			testapps.CheckedCreateK8sResource(&testCtx, sts)
 
 			mockPods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, mysqlCompName)
-			Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-				testk8s.MockRSMReady(rsm, mockPods...)
+			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+				testk8s.MockInstanceSetReady(its, mockPods...)
 			})).ShouldNot(HaveOccurred())
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				testk8s.MockStatefulSetReady(sts)
@@ -566,11 +566,11 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("check the underlying workload been updated")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-				func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
-					g.Expect(*rsm.Spec.Replicas).Should(Equal(replicas))
+				func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(*its.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
-			rsm := componentWorkload()
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(rsm), func(sts *appsv1.StatefulSet) {
+			its := componentWorkload()
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(sts *appsv1.StatefulSet) {
 				sts.Spec.Replicas = &replicas
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
@@ -644,11 +644,11 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("check the underlying workload been updated")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-				func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
-					g.Expect(*rsm.Spec.Replicas).Should(Equal(replicas))
+				func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(*its.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
-			rsm := componentWorkload()
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(rsm), func(sts *appsv1.StatefulSet) {
+			its := componentWorkload()
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(sts *appsv1.StatefulSet) {
 				sts.Spec.Replicas = &replicas
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),

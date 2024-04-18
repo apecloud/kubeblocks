@@ -125,11 +125,11 @@ var _ = Describe("Event Controller", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
 			rsmName := fmt.Sprintf("%s-%s", clusterObj.Name, consensusCompName)
-			rsm := testapps.NewRSMFactory(clusterObj.Namespace, rsmName, clusterObj.Name, consensusCompName).
+			rsm := testapps.NewInstanceSetFactory(clusterObj.Namespace, rsmName, clusterObj.Name, consensusCompName).
 				SetReplicas(int32(3)).
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				Create(&testCtx).GetObject()
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(rsm), func(tmpRSM *workloads.ReplicatedStateMachine) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(rsm), func(tmpRSM *workloads.InstanceSet) {
 				tmpRSM.Spec.Roles = []workloads.ReplicaRole{
 					{
 						Name:       "leader",

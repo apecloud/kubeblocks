@@ -215,7 +215,7 @@ const (
 const (
 	DeploymentKind            = "Deployment"
 	StatefulSetKind           = "StatefulSet"
-	RSMKind                   = "ReplicatedStateMachine"
+	InstanceSetKind           = "InstanceSet"
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJobKind               = "CronJob"

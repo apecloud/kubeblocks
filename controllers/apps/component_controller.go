@@ -57,6 +57,15 @@ type ComponentReconciler struct {
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/finalizers,verbs=update
 
+// owned workload API
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets/finalizers,verbs=update
+
 // owned K8s core API resources controller-gen RBAC marker
 // full access on core API resources
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete;deletecollection
@@ -201,7 +210,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Watches(&workloads.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
+		Watches(&workloads.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
@@ -231,7 +240,7 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Watches(&workloads.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
+		Watches(&workloads.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&dpv1alpha1.Backup{}).
 		Owns(&dpv1alpha1.Restore{}).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))

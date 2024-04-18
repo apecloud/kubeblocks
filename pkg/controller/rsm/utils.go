@@ -135,7 +135,7 @@ func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	return rolePriorityMap
 }
 
-func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
+func composeRoleMap(rsm workloads.InstanceSet) map[string]workloads.ReplicaRole {
 	roleMap := make(map[string]workloads.ReplicaRole, 0)
 	for _, role := range rsm.Spec.Roles {
 		roleMap[strings.ToLower(role.Name)] = role
@@ -143,7 +143,7 @@ func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.R
 	return roleMap
 }
 
-func SetMembersStatus(rsm *workloads.ReplicatedStateMachine, pods *[]corev1.Pod) {
+func SetMembersStatus(rsm *workloads.InstanceSet, pods *[]corev1.Pod) {
 	// no roles defined
 	if rsm.Spec.Roles == nil {
 		setMembersStatusWithoutRole(rsm, pods)
@@ -180,7 +180,7 @@ func SetMembersStatus(rsm *workloads.ReplicatedStateMachine, pods *[]corev1.Pod)
 	rsm.Status.MembersStatus = newMembersStatus
 }
 
-func setMembersStatusWithoutRole(rsm *workloads.ReplicatedStateMachine, pods *[]corev1.Pod) {
+func setMembersStatusWithoutRole(rsm *workloads.InstanceSet, pods *[]corev1.Pod) {
 	var membersStatus []workloads.MemberStatus
 	for _, pod := range *pods {
 		memberStatus := workloads.MemberStatus{
@@ -238,11 +238,11 @@ func getPodsOfStatefulSet(ctx context.Context, cli client.Reader, stsObj *appsv1
 	return pods, nil
 }
 
-func getHeadlessSvcName(rsm workloads.ReplicatedStateMachine) string {
+func getHeadlessSvcName(rsm workloads.InstanceSet) string {
 	return strings.Join([]string{rsm.Name, "headless"}, "-")
 }
 
-func findSvcPort(rsm *workloads.ReplicatedStateMachine) int {
+func findSvcPort(rsm *workloads.InstanceSet) int {
 	if rsm.Spec.Service == nil || len(rsm.Spec.Service.Spec.Ports) == 0 {
 		return 0
 	}
@@ -311,7 +311,7 @@ func getPodOrdinal(podName string) (int, error) {
 }
 
 // ordinal is the ordinal of pod which this action applies to
-func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
+func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.InstanceSet, action *batchv1.Job) error {
 	if err := SetOwnership(rsm, action, model.GetScheme(), GetFinalizer(action)); err != nil {
 		return err
 	}
@@ -319,7 +319,7 @@ func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.Replicat
 	return nil
 }
 
-func buildAction(rsm *workloads.ReplicatedStateMachine, actionName, actionType, actionScenario string, leader, target string) *batchv1.Job {
+func buildAction(rsm *workloads.InstanceSet, actionName, actionType, actionScenario string, leader, target string) *batchv1.Job {
 	env := buildActionEnv(rsm, leader, target)
 	template := buildActionPodTemplate(rsm, env, actionType)
 	labels := getLabels(rsm)
@@ -333,7 +333,7 @@ func buildAction(rsm *workloads.ReplicatedStateMachine, actionName, actionType, 
 		GetObject()
 }
 
-func buildActionPodTemplate(rsm *workloads.ReplicatedStateMachine, env []corev1.EnvVar, actionType string) *corev1.PodTemplateSpec {
+func buildActionPodTemplate(rsm *workloads.InstanceSet, env []corev1.EnvVar, actionType string) *corev1.PodTemplateSpec {
 	credential := rsm.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
 	if credential != nil {
@@ -371,7 +371,7 @@ func buildActionPodTemplate(rsm *workloads.ReplicatedStateMachine, env []corev1.
 	return template
 }
 
-func buildActionEnv(rsm *workloads.ReplicatedStateMachine, leader, target string) []corev1.EnvVar {
+func buildActionEnv(rsm *workloads.InstanceSet, leader, target string) []corev1.EnvVar {
 	svcName := getHeadlessSvcName(*rsm)
 	leaderHost := fmt.Sprintf("%s.%s", leader, svcName)
 	targetHost := fmt.Sprintf("%s.%s", target, svcName)
@@ -520,7 +520,7 @@ func emitActionEvent(transCtx *rsmTransformContext, eventType, reason, message s
 }
 
 func GetFinalizer(obj client.Object) string {
-	if _, ok := obj.(*workloads.ReplicatedStateMachine); ok {
+	if _, ok := obj.(*workloads.InstanceSet); ok {
 		return FinalizerName
 	}
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
@@ -529,7 +529,7 @@ func GetFinalizer(obj client.Object) string {
 	return FinalizerName
 }
 
-func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
+func getLabels(rsm *workloads.InstanceSet) map[string]string {
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		labels := make(map[string]string, 0)
 		keys := []string{
@@ -552,7 +552,7 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 	}
 }
 
-func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[string]string {
+func getSvcSelector(rsm *workloads.InstanceSet, headless bool) map[string]string {
 	selectors := make(map[string]string, 0)
 
 	if !headless {
@@ -654,10 +654,10 @@ func CopyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer s
 	return nil
 }
 
-// IsRSMReady gives rsm level 'ready' state:
+// IsInstanceSetReady gives rsm level 'ready' state:
 // 1. all replicas exist
 // 2. all members have role set
-func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
+func IsInstanceSetReady(rsm *workloads.InstanceSet) bool {
 	if rsm == nil {
 		return false
 	}
@@ -751,9 +751,9 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 	return annotations
 }
 
-// ConvertRSMToSTS converts a rsm to sts
+// ConvertInstanceSetToSTS converts a rsm to sts
 // TODO(free6om): refactor this func out
-func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet {
+func ConvertInstanceSetToSTS(rsm *workloads.InstanceSet) *appsv1.StatefulSet {
 	if rsm == nil {
 		return nil
 	}
@@ -776,7 +776,7 @@ func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet 
 }
 
 func GetEnvConfigMapName(rsmName string) string {
-	return fmt.Sprintf("%s-rsm-env", rsmName)
+	return fmt.Sprintf("%s-its-env", rsmName)
 }
 
 // IsOwnedByRsm is used to judge if the obj is owned by rsm

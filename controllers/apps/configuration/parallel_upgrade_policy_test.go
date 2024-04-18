@@ -65,7 +65,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
 					return reconfigureClient, nil
 				}),
-				withMockRSM(3, nil),
+				withMockInstanceSet(3, nil),
 				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
@@ -79,7 +79,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(fromPodObjectList(
-					newMockPodsWithRSM(&mockParam.RSMUnits[0], 3),
+					newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3),
 				))))
 
 			status, err := parallelPolicy.Upgrade(mockParam)
@@ -94,7 +94,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
 					return reconfigureClient, nil
 				}),
-				withMockRSM(3, nil),
+				withMockInstanceSet(3, nil),
 				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
@@ -134,7 +134,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
 					return reconfigureClient, nil
 				}),
-				withMockRSM(3, nil),
+				withMockInstanceSet(3, nil),
 				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
@@ -147,7 +147,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(
-					fromPodObjectList(newMockPodsWithRSM(&mockParam.RSMUnits[0], 3))), testutil.WithTimes(2),
+					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3))), testutil.WithTimes(2),
 			))
 
 			status, err := parallelPolicy.Upgrade(mockParam)
@@ -176,7 +176,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
 					return reconfigureClient, nil
 				}),
-				withMockRSM(3, nil),
+				withMockInstanceSet(3, nil),
 				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
@@ -187,7 +187,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 						VolumeName: "test_volume",
 					}}}))
 
-			setPods := newMockPodsWithRSM(&mockParam.RSMUnits[0], 5)
+			setPods := newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 5)
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(fromPodObjectList(setPods)), testutil.WithAnyTimes(),
 			))
@@ -204,7 +204,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 		It("Should failed", func() {
 			// not support type
 			mockParam := newMockReconfigureParams("parallelPolicy", k8sMockClient.Client(),
-				withMockRSM(2, nil),
+				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),

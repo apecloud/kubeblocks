@@ -3310,18 +3310,6 @@ Must comply with the IANA Service Naming rule.</p>
 </tr>
 <tr>
 <td>
-<code>isSharding</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies that this componentDef is a shading component definition.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>componentDefs</code><br/>
 <em>
 []string
@@ -4111,7 +4099,7 @@ RSMSpec
 <td>
 <em>(Optional)</em>
 <p>Defines workload spec of this component.
-From KB 0.7.0, RSM(ReplicatedStateMachineSpec) will be the underlying CR which powers all kinds of workload in KB.
+From KB 0.7.0, RSM(InstanceSetSpec) will be the underlying CR which powers all kinds of workload in KB.
 RSM is an enhanced stateful workload extension dedicated for heavy-state workloads like databases.</p>
 </td>
 </tr>
@@ -20961,12 +20949,12 @@ string
 </div>
 Resource Types:
 <ul><li>
-<a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachine">ReplicatedStateMachine</a>
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceSet">InstanceSet</a>
 </li></ul>
-<h3 id="workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachine">ReplicatedStateMachine
+<h3 id="workloads.kubeblocks.io/v1alpha1.InstanceSet">InstanceSet
 </h3>
 <div>
-<p>ReplicatedStateMachine is the Schema for the replicatedstatemachines API.</p>
+<p>InstanceSet is the Schema for the instancesets API.</p>
 </div>
 <table>
 <thead>
@@ -20989,7 +20977,7 @@ string</td>
 <code>kind</code><br/>
 string
 </td>
-<td><code>ReplicatedStateMachine</code></td>
+<td><code>InstanceSet</code></td>
 </tr>
 <tr>
 <td>
@@ -21010,8 +20998,8 @@ Refer to the Kubernetes API documentation for the fields of the
 <td>
 <code>spec</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">
-ReplicatedStateMachineSpec
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">
+InstanceSetSpec
 </a>
 </em>
 </td>
@@ -21133,15 +21121,15 @@ Kubernetes core/v1.PodTemplateSpec
 <p>Overrides values in default Template.</p>
 <p>Instance is the fundamental unit managed by KubeBlocks.
 It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
-A RSM manages instances with a total count of Replicas,
+An InstanceSet manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
-allowing the RSM to manage instances from different templates.</p>
-<p>The naming convention for instances (pods) based on the RSM Name, InstanceTemplate Name, and ordinal.
-The constructed instance name follows the pattern: $(rsm.name)-$(template.name)-$(ordinal).
+allowing the InstanceSet to manage instances from different templates.</p>
+<p>The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
+The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
 By default, the ordinal starts from 0 for each InstanceTemplate.
 It is important to ensure that the Name of each InstanceTemplate is unique.</p>
-<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the RSM.
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
 </td>
 </tr>
@@ -21169,7 +21157,7 @@ Any remaining replicas will be generated using the default template and will fol
 <td>
 <em>(Optional)</em>
 <p>Represents a list of claims that pods are allowed to reference.
-The ReplicatedStateMachine controller is responsible for mapping network identities to
+The InstanceSet controller is responsible for mapping network identities to
 claims in a way that maintains the identity of a pod. Every claim in
 this list must have at least one matching (by name) volumeMount in one
 container in the template. A claim in this list takes precedence over
@@ -21207,7 +21195,7 @@ Kubernetes apps/v1.StatefulSetUpdateStrategy
 </td>
 <td>
 <p>Indicates the StatefulSetUpdateStrategy that will be
-employed to update Pods in the RSM when a revision is made to
+employed to update Pods in the InstanceSet when a revision is made to
 Template.
 UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
 </td>
@@ -21282,7 +21270,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates that the rsm is paused, meaning the reconciliation of this rsm object will be paused.</p>
+<p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
 </td>
 </tr>
 <tr>
@@ -21306,8 +21294,8 @@ Credential
 <td>
 <code>status</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineStatus">
-ReplicatedStateMachineStatus
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetStatus">
+InstanceSetStatus
 </a>
 </em>
 </td>
@@ -21395,7 +21383,7 @@ string
 <h3 id="workloads.kubeblocks.io/v1alpha1.Credential">Credential
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
 </div>
@@ -21418,7 +21406,7 @@ CredentialVar
 </td>
 <td>
 <p>Defines the user&rsquo;s name for the credential.
-The corresponding environment variable will be KB_RSM_USERNAME.</p>
+The corresponding environment variable will be KB_ITS_USERNAME.</p>
 </td>
 </tr>
 <tr>
@@ -21432,7 +21420,7 @@ CredentialVar
 </td>
 <td>
 <p>Represents the user&rsquo;s password for the credential.
-The corresponding environment variable will be KB_RSM_PASSWORD.</p>
+The corresponding environment variable will be KB_ITS_PASSWORD.</p>
 </td>
 </tr>
 </tbody>
@@ -21484,10 +21472,417 @@ Kubernetes core/v1.EnvVarSource
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSet">InstanceSet</a>)
+</p>
+<div>
+<p>InstanceSetSpec defines the desired state of InstanceSet</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired number of replicas of the given Template.
+These replicas are instantiations of the same Template, with each having a consistent identity.
+Defaults to 1 if unspecified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>minReadySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the minimum number of seconds a newly created pod should be ready
+without any of its container crashing to be considered available.
+Defaults to 0, meaning the pod will be considered available as soon as it is ready.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>Represents a label query over pods that should match the replica count.
+It must match the pod template&rsquo;s labels.
+More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refers to the name of the service that governs this StatefulSet.
+This service must exist before the StatefulSet and is responsible for
+the network identity of the set. Pods get DNS/hostnames that follow a specific pattern.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
+Kubernetes core/v1.Service
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the behavior of a service spec.
+Provides read-write service.
+<a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>alternativeServices</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
+[]Kubernetes core/v1.Service
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Alternative Services selector pattern specifier.
+Can be used for creating Readonly service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
+Kubernetes core/v1.PodTemplateSpec
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides values in default Template.</p>
+<p>Instance is the fundamental unit managed by KubeBlocks.
+It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+An InstanceSet manages instances with a total count of Replicas,
+and by default, all these instances are generated from the same template.
+The InstanceTemplate provides a way to override values in the default template,
+allowing the InstanceSet to manage instances from different templates.</p>
+<p>The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
+The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
+By default, the ordinal starts from 0 for each InstanceTemplate.
+It is important to ensure that the Name of each InstanceTemplate is unique.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies instances to be scaled in with dedicated names in the list.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a list of claims that pods are allowed to reference.
+The InstanceSet controller is responsible for mapping network identities to
+claims in a way that maintains the identity of a pod. Every claim in
+this list must have at least one matching (by name) volumeMount in one
+container in the template. A claim in this list takes precedence over
+any volumes in the template, with the same name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podManagementPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls how pods are created during initial scale up,
+when replacing pods on nodes, or when scaling down.</p>
+<p>The default policy is <code>OrderedReady</code>, where pods are created in increasing order and the controller waits until each pod is ready before
+continuing. When scaling down, the pods are removed in the opposite order.
+The alternative policy is <code>Parallel</code> which will create pods in parallel
+to match the desired scale without waiting, and on scale down will delete
+all pods at once.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
+Kubernetes apps/v1.StatefulSetUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<p>Indicates the StatefulSetUpdateStrategy that will be
+employed to update Pods in the InstanceSet when a revision is made to
+Template.
+UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roles</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.ReplicaRole">
+[]ReplicaRole
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of roles defined in the system.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleProbe</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.RoleProbe">
+RoleProbe
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides method to probe role.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membershipReconfiguration</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.MembershipReconfiguration">
+MembershipReconfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides actions to do membership dynamic reconfiguration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+<li>parallel: force parallel</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>paused</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>credential</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Credential">
+Credential
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Credential used to connect to DB engine</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.InstanceSetStatus">InstanceSetStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSet">InstanceSet</a>)
+</p>
+<div>
+<p>InstanceSetStatus defines the observed state of InstanceSet</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>StatefulSetStatus</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetstatus-v1-apps">
+Kubernetes apps/v1.StatefulSetStatus
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>StatefulSetStatus</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>initReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Defines the initial number of pods (members) when the cluster is first initialized.
+This value is set to spec.Replicas at the time of object creation and remains constant thereafter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readyInitReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the number of pods (members) that have already reached the MembersStatus during the cluster initialization stage.
+This value remains constant once it equals InitReplicas.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>When not empty, indicates the version of the InstanceSet used to generate the underlying workload.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membersStatus</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.MemberStatus">
+[]MemberStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides the status of each member in the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
+key is the pod name, value is the revision.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>updateRevisions, if not empty, indicates the new version of the InstanceSet used to generate the underlying workload.
+key is the pod name, value is the revision.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
 </div>
@@ -21508,8 +21903,8 @@ string
 </td>
 <td>
 <p>Specifies the name of the template.
-Each instance of the template derives its name from the RSM&rsquo;s Name, the template&rsquo;s Name and the instance&rsquo;s ordinal.
-The constructed instance name follows the pattern $(rsm.name)-$(template.name)-$(ordinal).
+Each instance of the template derives its name from the InstanceSet Name, the template&rsquo;s Name and the instance&rsquo;s ordinal.
+The constructed instance name follows the pattern $(instance_set.name)-$(template.name)-$(ordinal).
 The ordinal starts from 0 by default.</p>
 </td>
 </tr>
@@ -21684,7 +22079,7 @@ Add new or override existing volume claim templates.</p>
 <h3 id="workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">ClusterComponentStatus</a>, <a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineStatus">ReplicatedStateMachineStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">ClusterComponentStatus</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetStatus">InstanceSetStatus</a>)
 </p>
 <div>
 </div>
@@ -21742,7 +22137,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates whether it is required for the replica set manager (rsm) to have at least one primary pod ready.</p>
+<p>Indicates whether it is required for the InstanceSet to have at least one primary instance ready.</p>
 </td>
 </tr>
 </tbody>
@@ -21750,7 +22145,7 @@ bool
 <h3 id="workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">MemberUpdateStrategy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
 <p>MemberUpdateStrategy defines Cluster Component update strategy.</p>
@@ -21773,7 +22168,7 @@ bool
 <h3 id="workloads.kubeblocks.io/v1alpha1.MembershipReconfiguration">MembershipReconfiguration
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
 </div>
@@ -21797,11 +22192,11 @@ Action
 <td>
 <em>(Optional)</em>
 <p>Specifies the environment variables that can be used in all following Actions:
-- KB_RSM_USERNAME: Represents the username part of the credential
-- KB_RSM_PASSWORD: Represents the password part of the credential
-- KB_RSM_LEADER_HOST: Represents the leader host
-- KB_RSM_TARGET_HOST: Represents the target host
-- KB_RSM_SERVICE_PORT: Represents the service port</p>
+- KB_ITS_USERNAME: Represents the username part of the credential
+- KB_ITS_PASSWORD: Represents the password part of the credential
+- KB_ITS_LEADER_HOST: Represents the leader host
+- KB_ITS_TARGET_HOST: Represents the target host
+- KB_ITS_SERVICE_PORT: Represents the service port</p>
 <p>Defines the action to perform a switchover.
 If the Image is not configured, the latest <a href="https://busybox.net/">BusyBox</a> image will be used.</p>
 </td>
@@ -21871,7 +22266,7 @@ If the Image is not configured, the Image from the previous non-nil action will 
 <h3 id="workloads.kubeblocks.io/v1alpha1.ReplicaRole">ReplicaRole
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus</a>, <a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus</a>)
 </p>
 <div>
 </div>
@@ -21933,417 +22328,10 @@ bool
 </tr>
 </tbody>
 </table>
-<h3 id="workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachine">ReplicatedStateMachine</a>)
-</p>
-<div>
-<p>ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>replicas</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the desired number of replicas of the given Template.
-These replicas are instantiations of the same Template, with each having a consistent identity.
-Defaults to 1 if unspecified.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>minReadySeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the minimum number of seconds a newly created pod should be ready
-without any of its container crashing to be considered available.
-Defaults to 0, meaning the pod will be considered available as soon as it is ready.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>selector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<p>Represents a label query over pods that should match the replica count.
-It must match the pod template&rsquo;s labels.
-More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Refers to the name of the service that governs this StatefulSet.
-This service must exist before the StatefulSet and is responsible for
-the network identity of the set. Pods get DNS/hostnames that follow a specific pattern.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>service</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-Kubernetes core/v1.Service
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the behavior of a service spec.
-Provides read-write service.
-<a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
-</td>
-</tr>
-<tr>
-<td>
-<code>alternativeServices</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-[]Kubernetes core/v1.Service
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines Alternative Services selector pattern specifier.
-Can be used for creating Readonly service.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>template</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
-Kubernetes core/v1.PodTemplateSpec
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>instances</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">
-[]InstanceTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Overrides values in default Template.</p>
-<p>Instance is the fundamental unit managed by KubeBlocks.
-It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
-A RSM manages instances with a total count of Replicas,
-and by default, all these instances are generated from the same template.
-The InstanceTemplate provides a way to override values in the default template,
-allowing the RSM to manage instances from different templates.</p>
-<p>The naming convention for instances (pods) based on the RSM Name, InstanceTemplate Name, and ordinal.
-The constructed instance name follows the pattern: $(rsm.name)-$(template.name)-$(ordinal).
-By default, the ordinal starts from 0 for each InstanceTemplate.
-It is important to ensure that the Name of each InstanceTemplate is unique.</p>
-<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the RSM.
-Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>offlineInstances</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies instances to be scaled in with dedicated names in the list.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeClaimTemplates</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
-[]Kubernetes core/v1.PersistentVolumeClaim
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents a list of claims that pods are allowed to reference.
-The ReplicatedStateMachine controller is responsible for mapping network identities to
-claims in a way that maintains the identity of a pod. Every claim in
-this list must have at least one matching (by name) volumeMount in one
-container in the template. A claim in this list takes precedence over
-any volumes in the template, with the same name.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>podManagementPolicy</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
-Kubernetes apps/v1.PodManagementPolicyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Controls how pods are created during initial scale up,
-when replacing pods on nodes, or when scaling down.</p>
-<p>The default policy is <code>OrderedReady</code>, where pods are created in increasing order and the controller waits until each pod is ready before
-continuing. When scaling down, the pods are removed in the opposite order.
-The alternative policy is <code>Parallel</code> which will create pods in parallel
-to match the desired scale without waiting, and on scale down will delete
-all pods at once.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updateStrategy</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<p>Indicates the StatefulSetUpdateStrategy that will be
-employed to update Pods in the RSM when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>roles</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.ReplicaRole">
-[]ReplicaRole
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of roles defined in the system.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>roleProbe</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RoleProbe">
-RoleProbe
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides method to probe role.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>membershipReconfiguration</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.MembershipReconfiguration">
-MembershipReconfiguration
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides actions to do membership dynamic reconfiguration.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>memberUpdateStrategy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">
-MemberUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Members(Pods) update strategy.</p>
-<ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
-<li>parallel: force parallel</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>paused</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates that the rsm is paused, meaning the reconciliation of this rsm object will be paused.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>credential</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.Credential">
-Credential
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Credential used to connect to DB engine</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineStatus">ReplicatedStateMachineStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachine">ReplicatedStateMachine</a>)
-</p>
-<div>
-<p>ReplicatedStateMachineStatus defines the observed state of ReplicatedStateMachine</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>StatefulSetStatus</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetstatus-v1-apps">
-Kubernetes apps/v1.StatefulSetStatus
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>StatefulSetStatus</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>initReplicas</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<p>Defines the initial number of pods (members) when the cluster is first initialized.
-This value is set to spec.Replicas at the time of object creation and remains constant thereafter.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>readyInitReplicas</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the number of pods (members) that have already reached the MembersStatus during the cluster initialization stage.
-This value remains constant once it equals InitReplicas.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>currentGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>When not empty, indicates the version of the Replicated State Machine (RSM) used to generate the underlying workload.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>membersStatus</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.MemberStatus">
-[]MemberStatus
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides the status of each member in the cluster.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>currentRevisions</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>currentRevisions, if not empty, indicates the old version of the RSM used to generate Pods.
-key is the pod name, value is the revision.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updateRevisions</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>updateRevisions, if not empty, indicates the new version of the RSM used to generate Pods.
-key is the pod name, value is the revision.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.RoleProbe">RoleProbe
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.ReplicatedStateMachineSpec">ReplicatedStateMachineSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
 <p>RoleProbe defines how to observe role</p>
@@ -22387,9 +22375,9 @@ Actions defined here are executed in series.
 Upon completion of all actions, the final output should be a single string representing the role name defined in spec.Roles.
 The latest <a href="https://busybox.net/">BusyBox</a> image will be used if Image is not configured.
 Environment variables can be used in Command:
-- v_KB_RSM_LAST<em>STDOUT: stdout from the last action, watch for &lsquo;v</em>&rsquo; prefix
-- KB_RSM_USERNAME: username part of the credential
-- KB_RSM_PASSWORD: password part of the credential</p>
+- v_KB_ITS_LAST<em>STDOUT: stdout from the last action, watch for &lsquo;v</em>&rsquo; prefix
+- KB_ITS_USERNAME: username part of the credential
+- KB_ITS_PASSWORD: password part of the credential</p>
 </td>
 </tr>
 <tr>

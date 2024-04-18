@@ -99,13 +99,13 @@ func MockConsensusComponentStatefulSet(
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
 }
 
-// MockRSMComponent mocks the component rsm, just using in envTest
-func MockRSMComponent(
+// MockInstanceSetComponent mocks the ITS component, just using in envTest
+func MockInstanceSetComponent(
 	testCtx *testutil.TestContext,
 	clusterName,
-	rsmCompName string) *workloads.ReplicatedStateMachine {
-	rsmName := clusterName + "-" + rsmCompName
-	return NewRSMFactory(testCtx.DefaultNamespace, rsmName, clusterName, rsmCompName).SetReplicas(ConsensusReplicas).
+	itsCompName string) *workloads.InstanceSet {
+	itsName := clusterName + "-" + itsCompName
+	return NewInstanceSetFactory(testCtx.DefaultNamespace, itsName, clusterName, itsCompName).SetReplicas(ConsensusReplicas).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
 }
 

@@ -98,7 +98,7 @@ func (b *PlanBuilder) AddParallelTransformer(_ ...graph.Transformer) graph.PlanB
 func (b *PlanBuilder) Build() (graph.Plan, error) {
 	vertices := buildOrderedVertices(b.transCtx.GetContext(), b.currentTree, b.desiredTree)
 	plan := &Plan{
-		walkFunc: b.rsmWalkFunc,
+		walkFunc: b.defaultWalkFunc,
 		vertices: vertices,
 	}
 	return plan, nil
@@ -219,7 +219,7 @@ func (p *Plan) Execute() error {
 
 // Do the real works
 
-func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
+func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 	vertex, ok := v.(*model.ObjectVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", v)

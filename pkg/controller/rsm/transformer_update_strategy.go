@@ -142,7 +142,7 @@ func doSwitchoverIfNeeded(transCtx *rsmTransformContext, dag *graph.DAG, pods []
 	return false, nil
 }
 
-func createSwitchoverAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) error {
+func createSwitchoverAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.InstanceSet, pods []corev1.Pod) error {
 	leader := getLeaderPodName(rsm.Status.MembersStatus)
 	targetOrdinal := selectSwitchoverTarget(rsm, pods)
 	target := getPodName(rsm.Name, targetOrdinal)
@@ -155,7 +155,7 @@ func createSwitchoverAction(dag *graph.DAG, cli model.GraphClient, rsm *workload
 	return createAction(dag, cli, rsm, action)
 }
 
-func selectSwitchoverTarget(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) int {
+func selectSwitchoverTarget(rsm *workloads.InstanceSet, pods []corev1.Pod) int {
 	var podUpdated, podUpdatedWithLabel string
 	for _, pod := range pods {
 		if intctrlutil.GetPodRevision(&pod) != rsm.Status.UpdateRevision {
@@ -185,7 +185,7 @@ func selectSwitchoverTarget(rsm *workloads.ReplicatedStateMachine, pods []corev1
 	return ordinal
 }
 
-func shouldSwitchover(rsm *workloads.ReplicatedStateMachine, podsToBeUpdated []*corev1.Pod, allPods []corev1.Pod) bool {
+func shouldSwitchover(rsm *workloads.InstanceSet, podsToBeUpdated []*corev1.Pod, allPods []corev1.Pod) bool {
 	if len(allPods) < 2 {
 		// replicas is less than 2, no need to switchover
 		return false

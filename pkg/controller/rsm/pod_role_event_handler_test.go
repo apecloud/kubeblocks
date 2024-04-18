@@ -79,8 +79,8 @@ var _ = Describe("pod role label event handler test", func() {
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &workloads.ReplicatedStateMachine{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, rsm *workloads.ReplicatedStateMachine, _ ...client.GetOption) error {
+				Get(gomock.Any(), gomock.Any(), &workloads.InstanceSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, rsm *workloads.InstanceSet, _ ...client.GetOption) error {
 					rsm.Namespace = objKey.Namespace
 					rsm.Name = objKey.Name
 					rsm.Spec.Roles = []workloads.ReplicaRole{role}

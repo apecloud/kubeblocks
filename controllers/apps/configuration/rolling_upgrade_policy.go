@@ -51,7 +51,7 @@ func init() {
 }
 
 func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
-	return performRollingUpgrade(params, GetRSMRollingUpgradeFuncs())
+	return performRollingUpgrade(params, GetInstanceSetRollingUpgradeFuncs())
 }
 
 func (r *rollingUpgradePolicy) GetPolicyName() string {

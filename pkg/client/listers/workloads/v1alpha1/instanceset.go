@@ -25,61 +25,61 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// ReplicatedStateMachineLister helps list ReplicatedStateMachines.
+// InstanceSetLister helps list InstanceSets.
 // All objects returned here must be treated as read-only.
-type ReplicatedStateMachineLister interface {
-	// List lists all ReplicatedStateMachines in the indexer.
+type InstanceSetLister interface {
+	// List lists all InstanceSets in the indexer.
 	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.InstanceSet, err error)
-	// ReplicatedStateMachines returns an object that can list and get ReplicatedStateMachines.
-	ReplicatedStateMachines(namespace string) ReplicatedStateMachineNamespaceLister
-	ReplicatedStateMachineListerExpansion
+	// InstanceSets returns an object that can list and get InstanceSets.
+	InstanceSets(namespace string) InstanceSetNamespaceLister
+	InstanceSetListerExpansion
 }
 
-// replicatedStateMachineLister implements the ReplicatedStateMachineLister interface.
-type replicatedStateMachineLister struct {
+// instanceSetLister implements the InstanceSetLister interface.
+type instanceSetLister struct {
 	indexer cache.Indexer
 }
 
-// NewReplicatedStateMachineLister returns a new ReplicatedStateMachineLister.
-func NewReplicatedStateMachineLister(indexer cache.Indexer) ReplicatedStateMachineLister {
-	return &replicatedStateMachineLister{indexer: indexer}
+// NewInstanceSetLister returns a new InstanceSetLister.
+func NewInstanceSetLister(indexer cache.Indexer) InstanceSetLister {
+	return &instanceSetLister{indexer: indexer}
 }
 
-// List lists all ReplicatedStateMachines in the indexer.
-func (s *replicatedStateMachineLister) List(selector labels.Selector) (ret []*v1alpha1.InstanceSet, err error) {
+// List lists all InstanceSets in the indexer.
+func (s *instanceSetLister) List(selector labels.Selector) (ret []*v1alpha1.InstanceSet, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1alpha1.InstanceSet))
 	})
 	return ret, err
 }
 
-// ReplicatedStateMachines returns an object that can list and get ReplicatedStateMachines.
-func (s *replicatedStateMachineLister) ReplicatedStateMachines(namespace string) ReplicatedStateMachineNamespaceLister {
-	return replicatedStateMachineNamespaceLister{indexer: s.indexer, namespace: namespace}
+// InstanceSets returns an object that can list and get InstanceSets.
+func (s *instanceSetLister) InstanceSets(namespace string) InstanceSetNamespaceLister {
+	return instanceSetNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
-// ReplicatedStateMachineNamespaceLister helps list and get ReplicatedStateMachines.
+// InstanceSetNamespaceLister helps list and get InstanceSets.
 // All objects returned here must be treated as read-only.
-type ReplicatedStateMachineNamespaceLister interface {
-	// List lists all ReplicatedStateMachines in the indexer for a given namespace.
+type InstanceSetNamespaceLister interface {
+	// List lists all InstanceSets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.InstanceSet, err error)
 	// Get retrieves the InstanceSet from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.InstanceSet, error)
-	ReplicatedStateMachineNamespaceListerExpansion
+	InstanceSetNamespaceListerExpansion
 }
 
-// replicatedStateMachineNamespaceLister implements the ReplicatedStateMachineNamespaceLister
+// instanceSetNamespaceLister implements the InstanceSetNamespaceLister
 // interface.
-type replicatedStateMachineNamespaceLister struct {
+type instanceSetNamespaceLister struct {
 	indexer   cache.Indexer
 	namespace string
 }
 
-// List lists all ReplicatedStateMachines in the indexer for a given namespace.
-func (s replicatedStateMachineNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.InstanceSet, err error) {
+// List lists all InstanceSets in the indexer for a given namespace.
+func (s instanceSetNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.InstanceSet, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1alpha1.InstanceSet))
 	})
@@ -87,13 +87,13 @@ func (s replicatedStateMachineNamespaceLister) List(selector labels.Selector) (r
 }
 
 // Get retrieves the InstanceSet from the indexer for a given namespace and name.
-func (s replicatedStateMachineNamespaceLister) Get(name string) (*v1alpha1.InstanceSet, error) {
+func (s instanceSetNamespaceLister) Get(name string) (*v1alpha1.InstanceSet, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("replicatedstatemachine"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("instanceset"), name)
 	}
 	return obj.(*v1alpha1.InstanceSet), nil
 }

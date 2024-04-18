@@ -15,31 +15,6 @@ rules:
 - apiGroups:
   - apps
   resources:
-  - deployments
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - deployments/status
-  verbs:
-  - get
-- apiGroups:
-  - apps
-  resources:
   - statefulsets
   verbs:
   - create
@@ -524,6 +499,7 @@ rules:
   resources:
   - pods
   verbs:
+  - create
   - delete
   - deletecollection
   - get
@@ -550,6 +526,12 @@ rules:
   verbs:
   - get
   - list
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  verbs:
+  - get
 - apiGroups:
   - ""
   resources:
@@ -951,6 +933,32 @@ rules:
   - workloads.kubeblocks.io
   resources:
   - instancesets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - replicatedstatemachines
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - replicatedstatemachines/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - replicatedstatemachines/status
   verbs:
   - get
   - patch

@@ -32,43 +32,43 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// ReplicatedStateMachineInformer provides access to a shared informer and lister for
-// ReplicatedStateMachines.
-type ReplicatedStateMachineInformer interface {
+// InstanceSetInformer provides access to a shared informer and lister for
+// InstanceSets.
+type InstanceSetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ReplicatedStateMachineLister
+	Lister() v1alpha1.InstanceSetLister
 }
 
-type replicatedStateMachineInformer struct {
+type instanceSetInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewReplicatedStateMachineInformer constructs a new informer for InstanceSet type.
+// NewInstanceSetInformer constructs a new informer for InstanceSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewReplicatedStateMachineInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredReplicatedStateMachineInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewInstanceSetInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredInstanceSetInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredReplicatedStateMachineInformer constructs a new informer for InstanceSet type.
+// NewFilteredInstanceSetInformer constructs a new informer for InstanceSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredReplicatedStateMachineInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredInstanceSetInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.WorkloadsV1alpha1().ReplicatedStateMachines(namespace).List(context.TODO(), options)
+				return client.WorkloadsV1alpha1().InstanceSets(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.WorkloadsV1alpha1().ReplicatedStateMachines(namespace).Watch(context.TODO(), options)
+				return client.WorkloadsV1alpha1().InstanceSets(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&workloadsv1alpha1.InstanceSet{},
@@ -77,14 +77,14 @@ func NewFilteredReplicatedStateMachineInformer(client versioned.Interface, names
 	)
 }
 
-func (f *replicatedStateMachineInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredReplicatedStateMachineInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *instanceSetInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredInstanceSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *replicatedStateMachineInformer) Informer() cache.SharedIndexInformer {
+func (f *instanceSetInformer) Informer() cache.SharedIndexInformer {
 	return f.factory.InformerFor(&workloadsv1alpha1.InstanceSet{}, f.defaultInformer)
 }
 
-func (f *replicatedStateMachineInformer) Lister() v1alpha1.ReplicatedStateMachineLister {
-	return v1alpha1.NewReplicatedStateMachineLister(f.Informer().GetIndexer())
+func (f *instanceSetInformer) Lister() v1alpha1.InstanceSetLister {
+	return v1alpha1.NewInstanceSetLister(f.Informer().GetIndexer())
 }

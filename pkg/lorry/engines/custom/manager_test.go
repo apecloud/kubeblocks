@@ -40,7 +40,7 @@ var _ = Describe("ETCD DBManager", func() {
 	// Set up relevant viper config variables
 	Context("new db manager", func() {
 		It("with right configurations", func() {
-			viper.Set("KB_RSM_ACTION_SVC_LIST", "[3502]")
+			viper.Set("KB_ITS_ACTION_SVC_LIST", "[3502]")
 			properties := engines.Properties{}
 			dbManger, err := NewManager(properties)
 			Expect(err).Should(Succeed())
@@ -48,7 +48,7 @@ var _ = Describe("ETCD DBManager", func() {
 		})
 
 		It("with wrong configurations", func() {
-			viper.Set("KB_RSM_ACTION_SVC_LIST", "wrong-setting")
+			viper.Set("KB_ITS_ACTION_SVC_LIST", "wrong-setting")
 			properties := engines.Properties{}
 			dbManger, err := NewManager(properties)
 			Expect(err).Should(HaveOccurred())
@@ -93,6 +93,6 @@ func setUpHost() *httptest.Server {
 	addr := s.Listener.Addr().String()
 	index := strings.LastIndex(addr, ":")
 	portStr := addr[index+1:]
-	viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
+	viper.Set("KB_ITS_ACTION_SVC_LIST", "["+portStr+"]")
 	return s
 }

@@ -29,15 +29,15 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-// GetPodListByInstanceSet gets rsm pod list.
-func GetPodListByInstanceSet(ctx context.Context, cli client.Client, rsm *workloads.InstanceSet) ([]corev1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsMap(rsm.Spec.Selector)
+// GetPodListByInstanceSet gets ITS pod list.
+func GetPodListByInstanceSet(ctx context.Context, cli client.Client, its *workloads.InstanceSet) ([]corev1.Pod, error) {
+	selector, err := metav1.LabelSelectorAsMap(its.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,
-		&client.ListOptions{Namespace: rsm.Namespace},
+		&client.ListOptions{Namespace: its.Namespace},
 		client.MatchingLabels(selector)); err != nil {
 		return nil, err
 	}

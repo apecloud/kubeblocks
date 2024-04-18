@@ -47,8 +47,8 @@ var _ = Describe("handler builder test.", func() {
 			namespace := "foo"
 			clusterName := "bar"
 			componentName := "test"
-			rsmName := fmt.Sprintf("%s-%s", clusterName, componentName)
-			stsName := rsmName
+			name := fmt.Sprintf("%s-%s", clusterName, componentName)
+			stsName := name
 			podName := stsName + "-0"
 			eventName := podName + ".123456"
 			labels := map[string]string{
@@ -58,7 +58,7 @@ var _ = Describe("handler builder test.", func() {
 				constant.AppInstanceLabelKey:    clusterName,
 				constant.KBAppComponentLabelKey: componentName,
 			}
-			rsm := builder.NewInstanceSetBuilder(namespace, rsmName).
+			its := builder.NewInstanceSetBuilder(namespace, name).
 				AddLabelsInMap(labels).
 				GetObject()
 			sts := builder.NewStatefulSetBuilder(namespace, stsName).
@@ -142,8 +142,8 @@ var _ = Describe("handler builder test.", func() {
 				Expect(shutdown).Should(BeFalse())
 				request, ok := item.(reconcile.Request)
 				Expect(ok).Should(BeTrue())
-				Expect(request.Namespace).Should(Equal(rsm.Namespace))
-				Expect(request.Name).Should(Equal(rsm.Name))
+				Expect(request.Namespace).Should(Equal(its.Namespace))
+				Expect(request.Name).Should(Equal(its.Name))
 				queue.Done(item)
 				queue.Forget(item)
 			}

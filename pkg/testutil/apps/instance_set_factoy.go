@@ -28,12 +28,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-type MockRSMFactory struct {
-	BaseFactory[workloads.InstanceSet, *workloads.InstanceSet, MockRSMFactory]
+type MockInstanceSetFactory struct {
+	BaseFactory[workloads.InstanceSet, *workloads.InstanceSet, MockInstanceSetFactory]
 }
 
-func NewRSMFactory(namespace, name string, clusterName string, componentName string) *MockRSMFactory {
-	f := &MockRSMFactory{}
+func NewInstanceSetFactory(namespace, name string, clusterName string, componentName string) *MockInstanceSetFactory {
+	f := &MockInstanceSetFactory{}
 	f.Init(namespace, name,
 		&workloads.InstanceSet{
 			ObjectMeta: metav1.ObjectMeta{
@@ -68,18 +68,18 @@ func NewRSMFactory(namespace, name string, clusterName string, componentName str
 	return f
 }
 
-func (factory *MockRSMFactory) SetReplicas(replicas int32) *MockRSMFactory {
+func (factory *MockInstanceSetFactory) SetReplicas(replicas int32) *MockInstanceSetFactory {
 	factory.Get().Spec.Replicas = &replicas
 	return factory
 }
 
-func (factory *MockRSMFactory) AddVolume(volume corev1.Volume) *MockRSMFactory {
+func (factory *MockInstanceSetFactory) AddVolume(volume corev1.Volume) *MockInstanceSetFactory {
 	volumes := &factory.Get().Spec.Template.Spec.Volumes
 	*volumes = append(*volumes, volume)
 	return factory
 }
 
-func (factory *MockRSMFactory) AddConfigmapVolume(volumeName string, configmapName string) *MockRSMFactory {
+func (factory *MockInstanceSetFactory) AddConfigmapVolume(volumeName string, configmapName string) *MockInstanceSetFactory {
 	volume := corev1.Volume{
 		Name: volumeName,
 		VolumeSource: corev1.VolumeSource{
@@ -92,13 +92,13 @@ func (factory *MockRSMFactory) AddConfigmapVolume(volumeName string, configmapNa
 	return factory
 }
 
-func (factory *MockRSMFactory) AddVolumeClaimTemplate(pvc corev1.PersistentVolumeClaim) *MockRSMFactory {
+func (factory *MockInstanceSetFactory) AddVolumeClaimTemplate(pvc corev1.PersistentVolumeClaim) *MockInstanceSetFactory {
 	volumeClaimTpls := &factory.Get().Spec.VolumeClaimTemplates
 	*volumeClaimTpls = append(*volumeClaimTpls, pvc)
 	return factory
 }
 
-func (factory *MockRSMFactory) AddContainer(container corev1.Container) *MockRSMFactory {
+func (factory *MockInstanceSetFactory) AddContainer(container corev1.Container) *MockInstanceSetFactory {
 	containers := &factory.Get().Spec.Template.Spec.Containers
 	*containers = append(*containers, container)
 	return factory

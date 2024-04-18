@@ -62,9 +62,9 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		DBManagerBase:  *managerBase,
 	}
 
-	err = mgr.InitASMActions()
+	err = mgr.InitInstanceSetActions()
 	if err != nil {
-		mgr.Logger.Info("init RSM commands failed", "error", err.Error())
+		mgr.Logger.Info("init InstanceSet commands failed", "error", err.Error())
 		return nil, err
 	}
 	err = mgr.InitComponentDefintionActions()
@@ -75,8 +75,8 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	return mgr, nil
 }
 
-func (mgr *Manager) InitASMActions() error {
-	actionSvcList := viper.GetString("KB_RSM_ACTION_SVC_LIST")
+func (mgr *Manager) InitInstanceSetActions() error {
+	actionSvcList := viper.GetString("KB_ITS_ACTION_SVC_LIST")
 	if actionSvcList == "" || actionSvcList == "null" {
 		return nil
 	}

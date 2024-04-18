@@ -446,7 +446,7 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 
 	// if rsm spec is not nil, convert rsm role first.
 	if clusterCompDef.RSMSpec != nil {
-		return c.convertRsmRole(clusterCompDef)
+		return c.convertInstanceSetRole(clusterCompDef)
 	}
 
 	switch clusterCompDef.WorkloadType {
@@ -477,7 +477,7 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 	}
 }
 
-func (c *compDefRolesConvertor) convertRsmRole(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (any, error) {
+func (c *compDefRolesConvertor) convertInstanceSetRole(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (any, error) {
 	if clusterCompDef.RSMSpec == nil {
 		return nil, nil
 	}

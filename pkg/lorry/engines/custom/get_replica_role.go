@@ -79,7 +79,7 @@ func (mgr *Manager) GetReplicaRoleThroughASMAction(ctx context.Context, cluster 
 	)
 
 	for _, port := range *mgr.actionSvcPorts {
-		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_RSM_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
+		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_ITS_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
 		lastOutput, err = mgr.callAction(ctx, u)
 		if err != nil {
 			return "", err

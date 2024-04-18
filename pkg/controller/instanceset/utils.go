@@ -29,7 +29,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -84,8 +84,8 @@ func CurrentReplicaProvider(ctx context.Context, cli client.Reader, objectKey cl
 
 func getMatchLabels(name string) map[string]string {
 	return map[string]string{
-		rsm1.WorkloadsManagedByLabelKey: managedBy,
-		rsm1.WorkloadsInstanceLabelKey:  name,
+		rsm.WorkloadsManagedByLabelKey: managedBy,
+		rsm.WorkloadsInstanceLabelKey:  name,
 	}
 }
 

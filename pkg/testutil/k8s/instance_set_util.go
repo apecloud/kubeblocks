@@ -37,8 +37,8 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-// NewFakeRSM creates a fake RSM workload object for testing.
-func NewFakeRSM(name string, replicas int) *workloads.InstanceSet {
+// NewFakeInstanceSet creates a fake ITS workload object for testing.
+func NewFakeInstanceSet(name string, replicas int) *workloads.InstanceSet {
 	template := corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -51,7 +51,7 @@ func NewFakeRSM(name string, replicas int) *workloads.InstanceSet {
 	}
 
 	template.Labels = map[string]string{"foo": "bar"}
-	rsmReplicas := int32(replicas)
+	itsReplicas := int32(replicas)
 	Revision := name + "-d5df5b8d6"
 	return &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -62,17 +62,17 @@ func NewFakeRSM(name string, replicas int) *workloads.InstanceSet {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
-			Replicas:    &rsmReplicas,
+			Replicas:    &itsReplicas,
 			Template:    template,
 			ServiceName: "governingsvc",
 		},
 		Status: workloads.InstanceSetStatus{
-			InitReplicas: rsmReplicas,
+			InitReplicas: itsReplicas,
 			StatefulSetStatus: appsv1.StatefulSetStatus{
-				AvailableReplicas:  rsmReplicas,
+				AvailableReplicas:  itsReplicas,
 				ObservedGeneration: 0,
-				ReadyReplicas:      rsmReplicas,
-				UpdatedReplicas:    rsmReplicas,
+				ReadyReplicas:      itsReplicas,
+				UpdatedReplicas:    itsReplicas,
 				CurrentRevision:    Revision,
 				UpdateRevision:     Revision,
 			},
@@ -80,34 +80,34 @@ func NewFakeRSM(name string, replicas int) *workloads.InstanceSet {
 	}
 }
 
-// NewFakeRSMPod creates a fake pod of the RSM workload for testing.
-func NewFakeRSMPod(rsm *workloads.InstanceSet, ordinal int) *corev1.Pod {
+// NewFakeInstanceSetPod creates a fake pod of the ITS workload for testing.
+func NewFakeInstanceSetPod(its *workloads.InstanceSet, ordinal int) *corev1.Pod {
 	pod := &corev1.Pod{}
-	pod.Name = fmt.Sprintf("%s-%d", rsm.Name, ordinal)
+	pod.Name = fmt.Sprintf("%s-%d", its.Name, ordinal)
 	return pod
 }
 
-// MockInstanceSetReady mocks the RSM workload to ready state.
-func MockInstanceSetReady(rsm *workloads.InstanceSet, pods ...*corev1.Pod) {
-	rsm.Status.InitReplicas = *rsm.Spec.Replicas
-	rsm.Status.ReadyInitReplicas = *rsm.Spec.Replicas
-	rsm.Status.AvailableReplicas = *rsm.Spec.Replicas
-	rsm.Status.ObservedGeneration = rsm.Generation
-	rsm.Status.CurrentGeneration = rsm.Generation
-	rsm.Status.Replicas = *rsm.Spec.Replicas
-	rsm.Status.ReadyReplicas = *rsm.Spec.Replicas
-	rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
-	rsm.Status.UpdatedReplicas = rsm.Status.Replicas
+// MockInstanceSetReady mocks the ITS workload to ready state.
+func MockInstanceSetReady(its *workloads.InstanceSet, pods ...*corev1.Pod) {
+	its.Status.InitReplicas = *its.Spec.Replicas
+	its.Status.ReadyInitReplicas = *its.Spec.Replicas
+	its.Status.AvailableReplicas = *its.Spec.Replicas
+	its.Status.ObservedGeneration = its.Generation
+	its.Status.CurrentGeneration = its.Generation
+	its.Status.Replicas = *its.Spec.Replicas
+	its.Status.ReadyReplicas = *its.Spec.Replicas
+	its.Status.CurrentRevision = its.Status.UpdateRevision
+	its.Status.UpdatedReplicas = its.Status.Replicas
 
-	composeRoleMap := func(rsm workloads.InstanceSet) map[string]workloads.ReplicaRole {
+	composeRoleMap := func(its workloads.InstanceSet) map[string]workloads.ReplicaRole {
 		roleMap := make(map[string]workloads.ReplicaRole, 0)
-		for _, role := range rsm.Spec.Roles {
+		for _, role := range its.Spec.Roles {
 			roleMap[strings.ToLower(role.Name)] = role
 		}
 		return roleMap
 	}
 	var membersStatus []workloads.MemberStatus
-	roleMap := composeRoleMap(*rsm)
+	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
 		roleName := strings.ToLower(pod.Labels[constant.RoleLabelKey])
 		role, ok := roleMap[roleName]
@@ -120,62 +120,62 @@ func MockInstanceSetReady(rsm *workloads.InstanceSet, pods ...*corev1.Pod) {
 		}
 		membersStatus = append(membersStatus, memberStatus)
 	}
-	rsm.Status.MembersStatus = membersStatus
+	its.Status.MembersStatus = membersStatus
 }
 
 func ListAndCheckInstanceSet(testCtx *testutil.TestContext, key types.NamespacedName) *workloads.InstanceSetList {
-	rsmList := &workloads.InstanceSetList{}
+	itsList := &workloads.InstanceSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
-		g.Expect(testCtx.Cli.List(testCtx.Ctx, rsmList, client.MatchingLabels{
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, itsList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: key.Name,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
-		g.Expect(rsmList.Items).ShouldNot(gomega.BeNil())
-		g.Expect(rsmList.Items).ShouldNot(gomega.BeEmpty())
+		g.Expect(itsList.Items).ShouldNot(gomega.BeNil())
+		g.Expect(itsList.Items).ShouldNot(gomega.BeEmpty())
 	}).Should(gomega.Succeed())
-	return rsmList
+	return itsList
 }
 
 func ListAndCheckInstanceSetItemsCount(testCtx *testutil.TestContext, key types.NamespacedName, cnt int) *workloads.InstanceSetList {
-	rsmList := &workloads.InstanceSetList{}
+	itsList := &workloads.InstanceSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
-		g.Expect(testCtx.Cli.List(testCtx.Ctx, rsmList, client.MatchingLabels{
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, itsList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: key.Name,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
-		g.Expect(len(rsmList.Items)).Should(gomega.Equal(cnt))
+		g.Expect(len(itsList.Items)).Should(gomega.Equal(cnt))
 	}).Should(gomega.Succeed())
-	return rsmList
+	return itsList
 }
 
 func ListAndCheckInstanceSetWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, componentName string) *workloads.InstanceSetList {
-	rsmList := &workloads.InstanceSetList{}
+	itsList := &workloads.InstanceSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
-		g.Expect(testCtx.Cli.List(testCtx.Ctx, rsmList, client.MatchingLabels{
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, itsList, client.MatchingLabels{
 			constant.AppInstanceLabelKey:    key.Name,
 			constant.KBAppComponentLabelKey: componentName,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
-		g.Expect(rsmList.Items).ShouldNot(gomega.BeNil())
-		g.Expect(rsmList.Items).ShouldNot(gomega.BeEmpty())
+		g.Expect(itsList.Items).ShouldNot(gomega.BeNil())
+		g.Expect(itsList.Items).ShouldNot(gomega.BeEmpty())
 	}).Should(gomega.Succeed())
-	return rsmList
+	return itsList
 }
 
-func PatchRSMStatus(testCtx *testutil.TestContext, stsName string, status workloads.InstanceSetStatus) {
+func PatchInstanceSetStatus(testCtx *testutil.TestContext, stsName string, status workloads.InstanceSetStatus) {
 	objectKey := client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}
-	gomega.Expect(testapps.GetAndChangeObjStatus(testCtx, objectKey, func(newRSM *workloads.InstanceSet) {
-		newRSM.Status = status
+	gomega.Expect(testapps.GetAndChangeObjStatus(testCtx, objectKey, func(newITS *workloads.InstanceSet) {
+		newITS.Status = status
 	})()).Should(gomega.Succeed())
-	gomega.Eventually(testapps.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newRSM *workloads.InstanceSet) {
-		g.Expect(reflect.DeepEqual(newRSM.Status, status)).Should(gomega.BeTrue())
+	gomega.Eventually(testapps.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newITS *workloads.InstanceSet) {
+		g.Expect(reflect.DeepEqual(newITS.Status, status)).Should(gomega.BeTrue())
 	})).Should(gomega.Succeed())
 }
 
-func InitRSMStatus(testCtx testutil.TestContext, rsm *workloads.InstanceSet, controllerRevision string) {
-	gomega.Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-		rsm.Status.InitReplicas = *rsm.Spec.Replicas
-		rsm.Status.Replicas = *rsm.Spec.Replicas
-		rsm.Status.UpdateRevision = controllerRevision
-		rsm.Status.CurrentRevision = controllerRevision
-		rsm.Status.ObservedGeneration = rsm.Generation
-		rsm.Status.CurrentGeneration = rsm.Generation
+func InitInstanceSetStatus(testCtx testutil.TestContext, its *workloads.InstanceSet, controllerRevision string) {
+	gomega.Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+		its.Status.InitReplicas = *its.Spec.Replicas
+		its.Status.Replicas = *its.Spec.Replicas
+		its.Status.UpdateRevision = controllerRevision
+		its.Status.CurrentRevision = controllerRevision
+		its.Status.ObservedGeneration = its.Generation
+		its.Status.CurrentGeneration = its.Generation
 	})).Should(gomega.Succeed())
 }

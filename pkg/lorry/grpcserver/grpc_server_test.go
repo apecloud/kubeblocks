@@ -68,8 +68,8 @@ var _ = Describe("GRPC Server", func() {
 			index := strings.LastIndex(addr, ":")
 			portStr := addr[index+1:]
 			// set up the environment
-			viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
-			viper.Set("KB_RSM_ROLE_UPDATE_MECHANISM", "ReadinessProbeEventUpdate")
+			viper.Set("KB_ITS_ACTION_SVC_LIST", "["+portStr+"]")
+			viper.Set("KB_ITS_ROLE_UPDATE_MECHANISM", "ReadinessProbeEventUpdate")
 
 			customManager, err := custom.NewManager(nil)
 			Expect(err).Should(BeNil())

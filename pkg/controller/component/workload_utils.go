@@ -64,12 +64,12 @@ func GetComponentMinReadySeconds(ctx context.Context,
 	cli client.Client,
 	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {
-	rsmList := &workloads.InstanceSetList{}
-	if err = GetObjectListByComponentName(ctx, cli, cluster, rsmList, componentName); err != nil {
+	itsList := &workloads.InstanceSetList{}
+	if err = GetObjectListByComponentName(ctx, cli, cluster, itsList, componentName); err != nil {
 		return
 	}
-	if len(rsmList.Items) > 0 {
-		minReadySeconds = rsmList.Items[0].Spec.MinReadySeconds
+	if len(itsList.Items) > 0 {
+		minReadySeconds = itsList.Items[0].Spec.MinReadySeconds
 		return
 	}
 	return minReadySeconds, err

@@ -799,12 +799,12 @@ func resolvePodVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp
 					Namespace: synthesizedComp.Namespace,
 					Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, compName),
 				}
-				rsm := &workloads.InstanceSet{}
-				err := cli.Get(ctx, key, rsm, inDataContext())
+				its := &workloads.InstanceSet{}
+				err := cli.Get(ctx, key, its, inDataContext())
 				if err != nil {
 					return nil, err
 				}
-				return &rsm.Spec.Template.Spec, nil
+				return &its.Spec.Template.Spec, nil
 			}
 		}
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)

@@ -260,6 +260,7 @@ type ReplicatedStateMachineStatus struct {
 }
 
 // +genclient
+// +kubebuilder:skip
 
 // ReplicatedStateMachine is the Schema for the replicatedstatemachines API.
 type ReplicatedStateMachine struct {

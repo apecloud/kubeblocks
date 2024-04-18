@@ -8686,10 +8686,10 @@ spec:
                       type: object
                     rsmSpec:
                       description: Defines workload spec of this component. From KB
-                        0.7.0, RSM(ReplicatedStateMachineSpec) will be the underlying
-                        CR which powers all kinds of workload in KB. RSM is an enhanced
-                        stateful workload extension dedicated for heavy-state workloads
-                        like databases.
+                        0.7.0, RSM(InstanceSetSpec) will be the underlying CR which
+                        powers all kinds of workload in KB. RSM is an enhanced stateful
+                        workload extension dedicated for heavy-state workloads like
+                        databases.
                       properties:
                         memberUpdateStrategy:
                           description: "Describes the strategy for updating Members
@@ -8814,11 +8814,11 @@ spec:
                               type: object
                             switchoverAction:
                               description: "Specifies the environment variables that
-                                can be used in all following Actions: - KB_RSM_USERNAME:
-                                Represents the username part of the credential - KB_RSM_PASSWORD:
-                                Represents the password part of the credential - KB_RSM_LEADER_HOST:
-                                Represents the leader host - KB_RSM_TARGET_HOST: Represents
-                                the target host - KB_RSM_SERVICE_PORT: Represents
+                                can be used in all following Actions: - KB_ITS_USERNAME:
+                                Represents the username part of the credential - KB_ITS_PASSWORD:
+                                Represents the password part of the credential - KB_ITS_LEADER_HOST:
+                                Represents the leader host - KB_ITS_TARGET_HOST: Represents
+                                the target host - KB_ITS_SERVICE_PORT: Represents
                                 the service port \n Defines the action to perform
                                 a switchover. If the Image is not configured, the
                                 latest [BusyBox](https://busybox.net/) image will
@@ -8865,10 +8865,10 @@ spec:
                                 be a single string representing the role name defined
                                 in spec.Roles. The latest [BusyBox](https://busybox.net/)
                                 image will be used if Image is not configured. Environment
-                                variables can be used in Command: - v_KB_RSM_LAST_STDOUT:
+                                variables can be used in Command: - v_KB_ITS_LAST_STDOUT:
                                 stdout from the last action, watch for ''v_'' prefix
-                                - KB_RSM_USERNAME: username part of the credential
-                                - KB_RSM_PASSWORD: password part of the credential'
+                                - KB_ITS_USERNAME: username part of the credential
+                                - KB_ITS_PASSWORD: password part of the credential'
                               items:
                                 properties:
                                   args:

@@ -54,7 +54,7 @@ func (o *syncPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 		return makeReturnedStatus(ESNone), nil
 	}
 
-	funcs := GetRSMRollingUpgradeFuncs()
+	funcs := GetInstanceSetRollingUpgradeFuncs()
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err

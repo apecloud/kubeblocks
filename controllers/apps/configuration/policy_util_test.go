@@ -47,12 +47,12 @@ var (
 	stsSchemaKind    = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 )
 
-func newMockRSM(replicas int, name string, labels map[string]string) workloads.ReplicatedStateMachine {
+func newMockInstanceSet(replicas int, name string, labels map[string]string) workloads.InstanceSet {
 	uid, _ := password.Generate(12, 12, 0, true, false)
 	serviceName, _ := password.Generate(12, 0, 0, true, false)
-	return workloads.ReplicatedStateMachine{
+	return workloads.InstanceSet{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "ReplicatedStateMachine",
+			Kind:       "InstanceSet",
 			APIVersion: "workloads.kubeblocks.io/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -60,7 +60,7 @@ func newMockRSM(replicas int, name string, labels map[string]string) workloads.R
 			Namespace: defaultNamespace,
 			UID:       types.UID(uid),
 		},
-		Spec: workloads.ReplicatedStateMachineSpec{
+		Spec: workloads.InstanceSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -87,12 +87,12 @@ func newMockRSM(replicas int, name string, labels map[string]string) workloads.R
 
 type ParamsOps func(params *reconfigureParams)
 
-func withMockRSM(replicas int, labels map[string]string) ParamsOps {
+func withMockInstanceSet(replicas int, labels map[string]string) ParamsOps {
 	return func(params *reconfigureParams) {
 		rand, _ := password.Generate(12, 8, 0, true, false)
 		stsName := "test_" + rand
-		params.RSMUnits = []workloads.ReplicatedStateMachine{
-			newMockRSM(replicas, stsName, labels),
+		params.InstanceSetUnits = []workloads.InstanceSet{
+			newMockInstanceSet(replicas, stsName, labels),
 		}
 	}
 }
@@ -220,11 +220,11 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 	return params
 }
 
-func newMockPodsWithRSM(rsm *workloads.ReplicatedStateMachine, replicas int, options ...PodOptions) []corev1.Pod {
+func newMockPodsWithInstanceSet(its *workloads.InstanceSet, replicas int, options ...PodOptions) []corev1.Pod {
 	pods := make([]corev1.Pod, replicas)
 	for i := 0; i < replicas; i++ {
-		pods[i] = newMockPod(rsm.Name+"-"+fmt.Sprint(i), &rsm.Spec.Template.Spec)
-		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(rsm, stsSchemaKind)}
+		pods[i] = newMockPod(its.Name+"-"+fmt.Sprint(i), &its.Spec.Template.Spec)
+		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(its, stsSchemaKind)}
 		pods[i].Status.PodIP = "1.1.1.1"
 	}
 	for _, customFn := range options {

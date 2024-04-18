@@ -37,45 +37,45 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	mockclient "github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
 
 var _ = Describe("plan builder test", func() {
-	Context("rsmWalkFunc function", func() {
+	Context("defaultWalkFunc function", func() {
 		const (
 			namespace = "foo"
 			name      = "bar"
+			finalizer = "test"
 		)
 
 		var (
 			planBuilder *PlanBuilder
-			rsm         *workloads.ReplicatedStateMachine
+			its         *workloads.InstanceSet
 		)
 
 		BeforeEach(func() {
 			bldr := NewPlanBuilder(ctx, k8sMock, nil, nil, nil, logger)
 			planBuilder, _ = bldr.(*PlanBuilder)
-			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
-				AddFinalizers([]string{rsm1.GetFinalizer(&workloads.ReplicatedStateMachine{})}).
+			its = builder.NewInstanceSetBuilder(namespace, name).
+				AddFinalizers([]string{finalizer}).
 				GetObject()
 		})
 
 		It("should create object", func() {
 			v := &model.ObjectVertex{
-				Obj:    rsm,
+				Obj:    its,
 				Action: model.ActionCreatePtr(),
 			}
 			k8sMock.EXPECT().
 				Create(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, _ ...client.CreateOption) error {
+				DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.CreateOption) error {
 					Expect(obj).ShouldNot(BeNil())
-					Expect(obj.Namespace).Should(Equal(rsm.Namespace))
-					Expect(obj.Name).Should(Equal(rsm.Name))
-					Expect(obj.Finalizers).Should(Equal(rsm.Finalizers))
+					Expect(obj.Namespace).Should(Equal(its.Namespace))
+					Expect(obj.Name).Should(Equal(its.Name))
+					Expect(obj.Finalizers).Should(Equal(its.Finalizers))
 					return nil
 				}).Times(1)
-			Expect(planBuilder.rsmWalkFunc(v)).Should(Succeed())
+			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
 		})
 
 		It("should update sts object", func() {
@@ -99,7 +99,7 @@ var _ = Describe("plan builder test", func() {
 					Expect(obj.Spec.UpdateStrategy).Should(Equal(sts.Spec.UpdateStrategy))
 					return nil
 				}).Times(1)
-			Expect(planBuilder.rsmWalkFunc(v)).Should(Succeed())
+			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
 		})
 
 		It("should update svc object", func() {
@@ -120,7 +120,7 @@ var _ = Describe("plan builder test", func() {
 					Expect(obj.Spec).Should(Equal(svc.Spec))
 					return nil
 				}).Times(1)
-			Expect(planBuilder.rsmWalkFunc(v)).Should(Succeed())
+			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
 		})
 
 		It("should update pvc object", func() {
@@ -145,42 +145,42 @@ var _ = Describe("plan builder test", func() {
 					Expect(obj.Spec.Resources).Should(Equal(pvc.Spec.Resources))
 					return nil
 				}).Times(1)
-			Expect(planBuilder.rsmWalkFunc(v)).Should(Succeed())
+			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
 		})
 
 		It("should delete object", func() {
 			v := &model.ObjectVertex{
-				Obj:    rsm,
+				Obj:    its,
 				Action: model.ActionDeletePtr(),
 			}
 			k8sMock.EXPECT().
 				Update(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, _ ...client.UpdateOption) error {
+				DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.UpdateOption) error {
 					Expect(obj).ShouldNot(BeNil())
 					Expect(obj.Finalizers).Should(HaveLen(0))
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
 				Delete(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, _ ...client.DeleteOption) error {
+				DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.DeleteOption) error {
 					Expect(obj).ShouldNot(BeNil())
-					Expect(obj.Namespace).Should(Equal(rsm.Namespace))
-					Expect(obj.Name).Should(Equal(rsm.Name))
+					Expect(obj.Namespace).Should(Equal(its.Namespace))
+					Expect(obj.Name).Should(Equal(its.Name))
 					Expect(obj.Finalizers).Should(HaveLen(0))
 					return nil
 				}).Times(1)
-			Expect(planBuilder.rsmWalkFunc(v)).Should(Succeed())
+			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
 		})
 
 		It("should update object status", func() {
-			rsm.Generation = 2
-			rsm.Status.ObservedGeneration = 2
-			rsmOrig := rsm.DeepCopy()
-			rsmOrig.Status.ObservedGeneration = 1
+			its.Generation = 2
+			its.Status.ObservedGeneration = 2
+			itsOrig := its.DeepCopy()
+			itsOrig.Status.ObservedGeneration = 1
 
 			v := &model.ObjectVertex{
-				Obj:    rsm,
-				OriObj: rsmOrig,
+				Obj:    its,
+				OriObj: itsOrig,
 				Action: model.ActionStatusPtr(),
 			}
 			ct := gomock.NewController(GinkgoT())
@@ -190,20 +190,20 @@ var _ = Describe("plan builder test", func() {
 				k8sMock.EXPECT().Status().Return(statusWriter),
 				statusWriter.EXPECT().
 					Update(gomock.Any(), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, _ ...client.UpdateOption) error {
+					DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.UpdateOption) error {
 						Expect(obj).ShouldNot(BeNil())
-						Expect(obj.Namespace).Should(Equal(rsm.Namespace))
-						Expect(obj.Name).Should(Equal(rsm.Name))
-						Expect(obj.Status.ObservedGeneration).Should(Equal(rsm.Status.ObservedGeneration))
+						Expect(obj.Namespace).Should(Equal(its.Namespace))
+						Expect(obj.Name).Should(Equal(its.Name))
+						Expect(obj.Status.ObservedGeneration).Should(Equal(its.Status.ObservedGeneration))
 						return nil
 					}).Times(1),
 			)
-			Expect(planBuilder.rsmWalkFunc(v)).Should(Succeed())
+			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
 		})
 
 		It("should return error if no action set", func() {
 			v := &model.ObjectVertex{}
-			err := planBuilder.rsmWalkFunc(v)
+			err := planBuilder.defaultWalkFunc(v)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("vertex action can't be nil"))
 		})
@@ -212,7 +212,7 @@ var _ = Describe("plan builder test", func() {
 			v := &model.ObjectVertex{
 				Action: model.ActionNoopPtr(),
 			}
-			Expect(planBuilder.rsmWalkFunc(v)).Should(Succeed())
+			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
 		})
 	})
 
@@ -223,13 +223,13 @@ var _ = Describe("plan builder test", func() {
 		)
 
 		var (
-			rsm         *workloads.ReplicatedStateMachine
+			its         *workloads.InstanceSet
 			currentTree *ObjectTree
 			desiredTree *ObjectTree
 		)
 
 		BeforeEach(func() {
-			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+			its = builder.NewInstanceSetBuilder(namespace, name).
 				AddLabels(constant.AppComponentLabelKey, name).
 				SetReplicas(3).
 				GetObject()
@@ -250,18 +250,18 @@ var _ = Describe("plan builder test", func() {
 				pod := builder.NewPodBuilder(namespace, name).GetObject()
 				headlessSvc := builder.NewHeadlessServiceBuilder(namespace, name+"-headless").GetObject()
 				svc := builder.NewServiceBuilder(namespace, name).GetObject()
-				env := builder.NewConfigMapBuilder(namespace, name+"-rsm-env").GetObject()
+				env := builder.NewConfigMapBuilder(namespace, name+"-its-env").GetObject()
 
 				var verticesExpected []*model.ObjectVertex
-				verticesExpected = append(verticesExpected, newVertex(rsm.DeepCopy(), rsm, model.ActionStatusPtr()))
+				verticesExpected = append(verticesExpected, newVertex(its.DeepCopy(), its, model.ActionStatusPtr()))
 				verticesExpected = append(verticesExpected, newVertex(nil, pod, model.ActionCreatePtr()))
 				verticesExpected = append(verticesExpected, newVertex(nil, headlessSvc, model.ActionCreatePtr()))
 				verticesExpected = append(verticesExpected, newVertex(nil, svc, model.ActionCreatePtr()))
 				verticesExpected = append(verticesExpected, newVertex(nil, env, model.ActionCreatePtr()))
 
 				// build ordered vertices
-				currentTree.SetRoot(rsm)
-				desiredTree.SetRoot(rsm)
+				currentTree.SetRoot(its)
+				desiredTree.SetRoot(its)
 				Expect(desiredTree.Add(pod, headlessSvc, svc, env)).Should(Succeed())
 				vertices := buildOrderedVertices(ctx, currentTree, desiredTree)
 

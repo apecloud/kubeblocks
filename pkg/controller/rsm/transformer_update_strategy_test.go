@@ -38,7 +38,7 @@ import (
 
 var _ = Describe("update strategy transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			SetReplicas(3).
 			SetRoles(roles).

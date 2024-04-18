@@ -171,7 +171,7 @@ func handleComponentStatusProgress(
 	if podList, err = intctrlcomp.GetComponentPodList(reqCtx.Ctx, cli, *opsRes.Cluster, clusterComponent.Name); err != nil {
 		return
 	}
-	completedCount, err = handleRSMProgress(reqCtx, cli, opsRes, podList, pgRes, compStatus)
+	completedCount, err = handleInstanceSetProgress(reqCtx, cli, opsRes, podList, pgRes, compStatus)
 	expectReplicas := clusterComponent.Replicas
 	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
 		// only rollback the actual re-created pod during cancelling.
@@ -180,14 +180,14 @@ func handleComponentStatusProgress(
 	return expectReplicas, completedCount, err
 }
 
-// handleRSMProgress handles the component progressDetails which using RSM workloads.
-func handleRSMProgress(reqCtx intctrlutil.RequestCtx,
+// handleInstanceSetProgress handles the component progressDetails which using InstanceSet workloads.
+func handleInstanceSetProgress(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
-	minReadySeconds, err := intctrlcomp.GetComponentRSMMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
+	minReadySeconds, err := intctrlcomp.GetComponentMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
 	if err != nil {
 		return 0, err
 	}
@@ -463,7 +463,7 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 	podList *corev1.PodList,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	var componentName = pgRes.clusterComponent.Name
-	minReadySeconds, err := intctrlcomp.GetComponentRSMMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
+	minReadySeconds, err := intctrlcomp.GetComponentMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
 	if err != nil {
 		return 0, err
 	}
@@ -510,7 +510,7 @@ func handleScaleDownProgress(
 			})
 	}
 	var componentName = pgRes.clusterComponent.Name
-	minReadySeconds, err := intctrlcomp.GetComponentRSMMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
+	minReadySeconds, err := intctrlcomp.GetComponentMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
 	if err != nil {
 		return 0, err
 	}

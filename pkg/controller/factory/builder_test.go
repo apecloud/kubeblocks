@@ -255,21 +255,21 @@ var _ = Describe("builder", func() {
 			Expect(credential.StringData["RANDOM_PASSWD"]).Should(Equal(originalPassword))
 		})
 
-		It("builds RSM correctly", func() {
+		It("builds InstanceSet correctly", func() {
 			clusterDef, cluster, synthesizedComponent := newClusterObjs(nil)
 
-			rsm, err := BuildRSM(synthesizedComponent)
+			its, err := BuildInstanceSet(synthesizedComponent)
 			Expect(err).Should(BeNil())
-			Expect(rsm).ShouldNot(BeNil())
+			Expect(its).ShouldNot(BeNil())
 
 			By("set replicas = 0")
 			newComponent := *synthesizedComponent
 			newComponent.Replicas = 0
-			rsm, err = BuildRSM(&newComponent)
+			its, err = BuildInstanceSet(&newComponent)
 			Expect(err).Should(BeNil())
-			Expect(rsm).ShouldNot(BeNil())
-			Expect(*rsm.Spec.Replicas).Should(Equal(int32(0)))
-			Expect(rsm.Spec.VolumeClaimTemplates[0].Labels[constant.VolumeTypeLabelKey]).
+			Expect(its).ShouldNot(BeNil())
+			Expect(*its.Spec.Replicas).Should(Equal(int32(0)))
+			Expect(its.Spec.VolumeClaimTemplates[0].Labels[constant.VolumeTypeLabelKey]).
 				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
 
 			By("set workload type to Replication")
@@ -281,13 +281,13 @@ var _ = Describe("builder", func() {
 			}
 			cluster.Spec.ComponentSpecs[0].Replicas = 2
 			replComponent := newAllFieldsSynthesizedComponent(clusterDef, nil, cluster)
-			rsm, err = BuildRSM(replComponent)
+			its, err = BuildInstanceSet(replComponent)
 			Expect(err).Should(BeNil())
-			Expect(rsm).ShouldNot(BeNil())
-			Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(2))
+			Expect(its).ShouldNot(BeNil())
+			Expect(*its.Spec.Replicas).Should(BeEquivalentTo(2))
 			// test extra envs
-			Expect(rsm.Spec.Template.Spec.Containers).ShouldNot(BeEmpty())
-			for _, container := range rsm.Spec.Template.Spec.Containers {
+			Expect(its.Spec.Template.Spec.Containers).ShouldNot(BeEmpty())
+			for _, container := range its.Spec.Template.Spec.Containers {
 				isContainEnv := false
 				for _, env := range container.Env {
 					if env.Name == "mock-key" && env.Value == "mock-value" {
@@ -299,19 +299,19 @@ var _ = Describe("builder", func() {
 			}
 
 			// test roles
-			Expect(rsm.Spec.Roles).Should(HaveLen(2))
+			Expect(its.Spec.Roles).Should(HaveLen(2))
 			for _, roleName := range []string{constant.Primary, constant.Secondary} {
-				Expect(slices.IndexFunc(rsm.Spec.Roles, func(role workloads.ReplicaRole) bool {
+				Expect(slices.IndexFunc(its.Spec.Roles, func(role workloads.ReplicaRole) bool {
 					return role.Name == roleName
 				})).Should(BeNumerically(">", -1))
 			}
 
 			// test role probe
-			Expect(rsm.Spec.RoleProbe).ShouldNot(BeNil())
+			Expect(its.Spec.RoleProbe).ShouldNot(BeNil())
 
 			// test member update strategy
-			Expect(rsm.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
-			Expect(*rsm.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.SerialUpdateStrategy))
+			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
+			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.SerialUpdateStrategy))
 
 			By("set workload type to Consensus")
 			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Consensus
@@ -320,20 +320,20 @@ var _ = Describe("builder", func() {
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
 			cluster.Spec.ComponentSpecs[0].Replicas = 3
 			csComponent := newAllFieldsSynthesizedComponent(clusterDef, nil, cluster)
-			rsm, err = BuildRSM(csComponent)
+			its, err = BuildInstanceSet(csComponent)
 			Expect(err).Should(BeNil())
-			Expect(rsm).ShouldNot(BeNil())
+			Expect(its).ShouldNot(BeNil())
 
 			// test roles
-			Expect(rsm.Spec.Roles).Should(HaveLen(1))
-			Expect(rsm.Spec.Roles[0].Name).Should(Equal(appsv1alpha1.DefaultLeader.Name))
+			Expect(its.Spec.Roles).Should(HaveLen(1))
+			Expect(its.Spec.Roles[0].Name).Should(Equal(appsv1alpha1.DefaultLeader.Name))
 
 			// test role probe
-			Expect(rsm.Spec.RoleProbe).ShouldNot(BeNil())
+			Expect(its.Spec.RoleProbe).ShouldNot(BeNil())
 
 			// test member update strategy
-			Expect(rsm.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
-			Expect(*rsm.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
+			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
+			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
 		})
 
 		It("builds BackupJob correctly", func() {

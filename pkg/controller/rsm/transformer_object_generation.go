@@ -247,7 +247,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func BuildSvc(rsm workloads.ReplicatedStateMachine, labels, selectors map[string]string) *corev1.Service {
+func BuildSvc(rsm workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
@@ -262,7 +262,7 @@ func BuildSvc(rsm workloads.ReplicatedStateMachine, labels, selectors map[string
 		GetObject()
 }
 
-func BuildAlternativeSvs(rsm workloads.ReplicatedStateMachine, svcLabels map[string]string) []*corev1.Service {
+func BuildAlternativeSvs(rsm workloads.InstanceSet, svcLabels map[string]string) []*corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
@@ -292,7 +292,7 @@ func BuildAlternativeSvs(rsm workloads.ReplicatedStateMachine, svcLabels map[str
 	return services
 }
 
-func BuildHeadlessSvc(rsm workloads.ReplicatedStateMachine, labels, selectors map[string]string) *corev1.Service {
+func BuildHeadlessSvc(rsm workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
 	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, rsm.Annotations)
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
 		AddLabelsInMap(labels).
@@ -320,7 +320,7 @@ func BuildHeadlessSvc(rsm workloads.ReplicatedStateMachine, labels, selectors ma
 	return hdlBuilder.GetObject()
 }
 
-func buildSts(rsm *workloads.ReplicatedStateMachine, headlessSvcName string, labels map[string]string) *apps.StatefulSet {
+func buildSts(rsm *workloads.InstanceSet, headlessSvcName string, labels map[string]string) *apps.StatefulSet {
 	envConfigName := GetEnvConfigMapName(rsm.Name)
 	template := BuildPodTemplate(rsm, envConfigName)
 	annotations := ParseAnnotationsOfScope(RootScope, rsm.Annotations)
@@ -339,7 +339,7 @@ func buildSts(rsm *workloads.ReplicatedStateMachine, headlessSvcName string, lab
 		GetObject()
 }
 
-func BuildEnvConfigMap(rsm workloads.ReplicatedStateMachine, labels map[string]string) *corev1.ConfigMap {
+func BuildEnvConfigMap(rsm workloads.InstanceSet, labels map[string]string) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
 	annotations := ParseAnnotationsOfScope(ConfigMapScope, rsm.Annotations)
 	return builder.NewConfigMapBuilder(rsm.Namespace, GetEnvConfigMapName(rsm.Name)).
@@ -348,7 +348,7 @@ func BuildEnvConfigMap(rsm workloads.ReplicatedStateMachine, labels map[string]s
 		SetData(envData).GetObject()
 }
 
-func BuildPodTemplate(rsm *workloads.ReplicatedStateMachine, envConfigName string) *corev1.PodTemplateSpec {
+func BuildPodTemplate(rsm *workloads.InstanceSet, envConfigName string) *corev1.PodTemplateSpec {
 	template := rsm.Spec.Template.DeepCopy()
 	// inject env ConfigMap into workload pods only
 	for i := range template.Spec.Containers {
@@ -367,7 +367,7 @@ func BuildPodTemplate(rsm *workloads.ReplicatedStateMachine, envConfigName strin
 	return template
 }
 
-func injectRoleProbeContainer(rsm *workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
+func injectRoleProbeContainer(rsm *workloads.InstanceSet, template *corev1.PodTemplateSpec) {
 	roleProbe := rsm.Spec.RoleProbe
 	if roleProbe == nil {
 		return
@@ -436,7 +436,7 @@ func buildActionSvcPorts(template *corev1.PodTemplateSpec, actions []workloads.A
 	return actionSvcPorts
 }
 
-func injectRoleProbeBaseContainer(rsm *workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
+func injectRoleProbeBaseContainer(rsm *workloads.InstanceSet, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role probe base container
 	roleProbe := rsm.Spec.RoleProbe
 	if roleProbe == nil {
@@ -646,7 +646,7 @@ func injectRoleProbeBaseContainer(rsm *workloads.ReplicatedStateMachine, templat
 	template.Spec.Containers = append(template.Spec.Containers, *container)
 }
 
-func injectCustomRoleProbeContainer(rsm *workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+func injectCustomRoleProbeContainer(rsm *workloads.InstanceSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
 	if rsm.Spec.RoleProbe == nil {
 		return
 	}
@@ -705,7 +705,7 @@ func injectCustomRoleProbeContainer(rsm *workloads.ReplicatedStateMachine, templ
 	}
 }
 
-func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string {
+func buildEnvConfigData(set workloads.InstanceSet) map[string]string {
 	envData := map[string]string{}
 	svcName := getHeadlessSvcName(set)
 	uid := string(set.UID)

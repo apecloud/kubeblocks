@@ -102,7 +102,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 	}
 
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			SetServiceName(headlessSvcName).
 			AddMatchLabelsInMap(selectors).

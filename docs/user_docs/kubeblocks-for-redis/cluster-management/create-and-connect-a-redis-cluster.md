@@ -21,26 +21,8 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create and connect a cluster by kbcli.
-* Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* Install KubeBlocks: You can install KubeBlocks by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
 * Make sure the Redis add-on is enabled.
-  
-  <Tabs>
-
-  <TabItem value="kbcli" label="kbcli" default>
-  
-  ```bash
-  kbcli addon list
-  >
-  NAME                      TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
-  ...
-  redis                     Helm   Enabled                   true
-  ...
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
 
   ```bash
   kubectl get addons.extensions.kubeblocks.io redis
@@ -49,25 +31,7 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
   redis   Helm   Enabled   96m
   ```
 
-  </TabItem>
-
-  </Tabs>
-
 * View all the database types and versions available for creating a cluster.
-
-  <Tabs>
-
-  <TabItem value="kbcli" label="kbcli" default>
-
-  ```bash
-  kbcli clusterdefinition list
-
-  kbcli clusterversion list
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
 
   Make sure the `redis` cluster definition is installed with `kubectl get clusterdefinitions redis`.
 
@@ -87,9 +51,6 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
   redis-7.0.6   redis                Available   96m
   ```
 
-  </TabItem>
-  </Tabs>
-
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
   ```bash
@@ -104,6 +65,7 @@ KubeBlocks supports creating two types of Redis clusters: Standalone and Replica
 
 <Tabs>
 
+<<<<<<< HEAD
 <TabItem value="kbcli" label="kbcli" default>
 
 Create a Standalone.
@@ -137,6 +99,8 @@ kbcli cluster create redis --mode replication --availability-policy none <cluste
 
 </TabItem>
 
+=======
+>>>>>>> 25dfea9eb (docs: update redis create docs)
 <TabItem value="kubectl" label="kubectl">
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Standalone.
@@ -200,11 +164,7 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of
 * `spec.componentSpecs.volumeClaimTemplates` is the list of volume claim templates that define the volume claim templates for the component.
 * `spec.terminationPolicy` is the policy of the cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` will block delete operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
 
-KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=redis -n demo`.
-
-```bash
-kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=redis -n demo
-```
+For the details of different parameters, you can refer to API docs.
 
 Run the following command to see the created Redis cluster object:
 
@@ -313,19 +273,58 @@ status:
 
 </TabItem>
 
+<TabItem value="helm" label="Helm">
+
+This tutorial takes creating a Redis cluster from the addon repository cloned from the [KubeBlocks addons repository](https://github.com/apecloud/kubeblocks-addons/tree/main) as an example.
+
+1. Clone the KubeBlocks addon repository.
+
+    ```bash
+    git clone https://github.com/apecloud/kubeblocks-addons.git
+    ```
+
+ 2. (Optional) If you want to create a cluster with custom specifications, you can view the values available for configuring.
+
+    ```bash
+    helm show values ./addons/redis
+    ```
+
+ 3. Create a Redis cluster.
+
+    ```bash
+    helm install mycluster ./addons/redis-cluster --namespace=demo
+    ```
+
+    If you need to customize the cluster specifications, use `--set` to specify the parameters. But only part of the parameters can be customized and you can view these parameters by running the command in step 2.
+
+    ```bash
+    helm install mycluster ./addons/redis-cluster --namespace=demo --set cpu=4,mode=replication
+    ```
+
+ 4. Verify whether this cluster is created successfully.
+
+
+    ```bash
+    helm list -n demo
+    >
+    NAME   	   NAMESPACE	 REVISION	  UPDATED                             	STATUS  	CHART              	APP VERSION
+    mycluster   demo     	 1       	  2024-04-18 15:23:44.063714 +0800 CST	deployed	redis-cluster-0.9.0	7.0.6
+    ```
+
+    ```bash
+    kubectl get cluster -n demo
+    >
+    NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+    mycluster   redis                redis-7.0.6    Delete               Running   5m34s
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## Connect to a Redis Cluster
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster connect <clustername>  --namespace <name>
-```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl">
 

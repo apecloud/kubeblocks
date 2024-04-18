@@ -53,7 +53,7 @@ var _ = Describe("plan builder test", func() {
 			planBuilder := NewRSMPlanBuilder(reqCtx, cli, req)
 			rsmBuilder, _ = planBuilder.(*PlanBuilder)
 
-			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+			rsm = builder.NewInstanceSetBuilder(namespace, name).
 				AddFinalizers([]string{GetFinalizer(&workloads.InstanceSet{})}).
 				GetObject()
 		})

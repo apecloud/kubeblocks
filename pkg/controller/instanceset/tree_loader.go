@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"context"
@@ -34,7 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -81,7 +81,7 @@ func loadCompressedInstanceTemplates(ctx context.Context, reader client.Reader, 
 }
 
 func getMatchLabelKeys() []string {
-	if viper.GetBool(rsm1.FeatureGateRSMCompatibilityMode) {
+	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) {
 		return []string{
 			constant.AppManagedByLabelKey,
 			constant.AppNameLabelKey,
@@ -91,8 +91,8 @@ func getMatchLabelKeys() []string {
 		}
 	}
 	return []string{
-		rsm1.WorkloadsManagedByLabelKey,
-		rsm1.WorkloadsInstanceLabelKey,
+		rsm.WorkloadsManagedByLabelKey,
+		rsm.WorkloadsInstanceLabelKey,
 	}
 }
 

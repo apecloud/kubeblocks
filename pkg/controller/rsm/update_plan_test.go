@@ -33,7 +33,7 @@ import (
 
 var _ = Describe("update plan test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).SetRoles(roles).GetObject()
+		rsm = builder.NewInstanceSetBuilder(namespace, name).SetRoles(roles).GetObject()
 		rsm.Status.UpdateRevision = newRevision
 	})
 

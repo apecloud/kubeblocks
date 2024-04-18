@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
@@ -47,22 +47,22 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 	if model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
-	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if err := validateSpec(rsm, tree); err != nil {
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	if err := validateSpec(its, tree); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
 	return kubebuilderx.ResultSatisfied
 }
 
 func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
-	rsmExt, err := buildRSMExt(rsm, tree)
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	itsExt, err := buildInstanceSetExt(its, tree)
 	if err != nil {
 		return nil, err
 	}
 
 	// 1. build desired name to template map
-	nameToTemplateMap, err := buildInstanceName2TemplateMap(rsmExt)
+	nameToTemplateMap, err := buildInstanceName2TemplateMap(itsExt)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	// default OrderedReady policy
 	createCount, deleteCount := 1, 1
 	shouldReady := true
-	if rsm.Spec.PodManagementPolicy == appsv1.ParallelPodManagement {
+	if its.Spec.PodManagementPolicy == appsv1.ParallelPodManagement {
 		createCount = len(createNameSet)
 		deleteCount = len(deleteNameSet)
 		shouldReady = false
@@ -116,7 +116,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if shouldReady && predecessor != nil && !isHealthy(predecessor) {
 			break
 		}
-		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], rsm, "")
+		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], its, "")
 		if err != nil {
 			return nil, err
 		}
@@ -155,9 +155,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			break
 		}
 		if shouldReady && !isRunningAndReady(pod) {
-			tree.EventRecorder.Eventf(rsm, corev1.EventTypeWarning, "RSM %s/%s is waiting for Pod %s to be Running and Ready",
-				rsm.Namespace,
-				rsm.Name,
+			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Pod %s to be Running and Ready",
+				its.Namespace,
+				its.Name,
 				pod.Name)
 		}
 		if err := tree.Delete(pod); err != nil {

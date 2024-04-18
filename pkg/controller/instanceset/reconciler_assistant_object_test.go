@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -28,11 +28,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 var _ = Describe("assistant object reconciler test", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		its = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			SetReplicas(3).
 			AddMatchLabelsInMap(selectors).
@@ -45,9 +46,9 @@ var _ = Describe("assistant object reconciler test", func() {
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
 			By("PreCondition")
-			rsm.Generation = 1
+			its.Generation = 1
 			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(rsm)
+			tree.SetRoot(its)
 			reconciler = NewAssistantObjectReconciler()
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
@@ -58,7 +59,7 @@ var _ = Describe("assistant object reconciler test", func() {
 			objects := tree.GetSecondaryObjects()
 			Expect(objects).Should(HaveLen(2))
 			svc := builder.NewHeadlessServiceBuilder(namespace, name+"-headless").GetObject()
-			cm := builder.NewConfigMapBuilder(namespace, name+"-rsm-env").GetObject()
+			cm := builder.NewConfigMapBuilder(namespace, rsm.GetEnvConfigMapName(name)).GetObject()
 			for _, object := range []client.Object{svc, cm} {
 				name, err := model.GetGVKName(object)
 				Expect(err).Should(BeNil())

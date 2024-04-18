@@ -33,7 +33,7 @@ import (
 
 var _ = Describe("fix meta transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			SetReplicas(3).
 			GetObject()

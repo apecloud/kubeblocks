@@ -40,7 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -87,20 +87,20 @@ type InstanceSetReconciler struct {
 func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("InstanceSet", req.NamespacedName)
 
-	provider, err := rsm2.CurrentReplicaProvider(ctx, r.Client, req.NamespacedName)
+	provider, err := instanceset.CurrentReplicaProvider(ctx, r.Client, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if provider == rsm2.PodProvider {
+	if provider == instanceset.PodProvider {
 		err = kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
-			Prepare(rsm2.NewTreeLoader()).
-			Do(rsm2.NewFixMetaReconciler()).
-			Do(rsm2.NewDeletionReconciler()).
-			Do(rsm2.NewStatusReconciler()).
-			Do(rsm2.NewRevisionUpdateReconciler()).
-			Do(rsm2.NewAssistantObjectReconciler()).
-			Do(rsm2.NewReplicasAlignmentReconciler()).
-			Do(rsm2.NewUpdateReconciler()).
+			Prepare(instanceset.NewTreeLoader()).
+			Do(instanceset.NewFixMetaReconciler()).
+			Do(instanceset.NewDeletionReconciler()).
+			Do(instanceset.NewStatusReconciler()).
+			Do(instanceset.NewRevisionUpdateReconciler()).
+			Do(instanceset.NewAssistantObjectReconciler()).
+			Do(instanceset.NewReplicasAlignmentReconciler()).
+			Do(instanceset.NewUpdateReconciler()).
 			Commit()
 		return ctrl.Result{}, err
 	}

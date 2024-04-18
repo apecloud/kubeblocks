@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"time"
@@ -39,7 +39,7 @@ import (
 
 var _ = Describe("update reconciler test", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		its = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			SetReplicas(3).
 			AddMatchLabelsInMap(selectors).
@@ -53,29 +53,29 @@ var _ = Describe("update reconciler test", func() {
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
 			By("PreCondition")
-			rsm.Generation = 1
+			its.Generation = 1
 			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(rsm)
+			tree.SetRoot(its)
 			reconciler = NewUpdateReconciler()
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
 			By("prepare current tree")
 			// desired: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
 			replicas := int32(7)
-			rsm.Spec.Replicas = &replicas
-			rsm.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Replicas = &replicas
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			nameHello := "hello"
 			instanceHello := workloads.InstanceTemplate{
 				Name: nameHello,
 			}
-			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceHello)
+			its.Spec.Instances = append(its.Spec.Instances, instanceHello)
 			generateNameFoo := "foo"
 			replicasFoo := int32(2)
 			instanceFoo := workloads.InstanceTemplate{
 				Name:     generateNameFoo,
 				Replicas: &replicasFoo,
 			}
-			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceFoo)
+			its.Spec.Instances = append(its.Spec.Instances, instanceFoo)
 
 			// prepare for update
 			By("fix meta")
@@ -130,7 +130,7 @@ var _ = Describe("update reconciler test", func() {
 				if labels == nil {
 					labels = make(map[string]string)
 				}
-				updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+				updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
 				Expect(err).Should(BeNil())
 				labels[appsv1.ControllerRevisionHashLabelKey] = updateRevisions[pod.Name]
 			}

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -27,7 +27,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // assistantObjectReconciler manages non-workload objects, such as Service, ConfigMap, etc.
@@ -48,13 +48,13 @@ func (a *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 }
 
 func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
 	// generate objects by current spec
-	svc := rsm1.BuildSvc(*rsm)
-	altSvs := rsm1.BuildAlternativeSvs(*rsm)
-	headLessSvc := rsm1.BuildHeadlessSvc(*rsm)
-	envConfig := rsm1.BuildEnvConfigMap(*rsm)
+	svc := rsm.BuildSvc(*its)
+	altSvs := rsm.BuildAlternativeSvs(*its)
+	headLessSvc := rsm.BuildHeadlessSvc(*its)
+	envConfig := rsm.BuildEnvConfigMap(*its)
 	var objects []client.Object
 	if svc != nil {
 		objects = append(objects, svc)
@@ -64,7 +64,7 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	}
 	objects = append(objects, headLessSvc, envConfig)
 	for _, object := range objects {
-		if err := rsm1.SetOwnership(rsm, object, model.GetScheme(), rsm1.GetFinalizer(object)); err != nil {
+		if err := rsm.SetOwnership(its, object, model.GetScheme(), rsm.GetFinalizer(object)); err != nil {
 			return nil, err
 		}
 	}
@@ -80,7 +80,7 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	oldSnapshot := make(map[model.GVKNObjKey]client.Object)
 	svcList := tree.List(&corev1.Service{})
 	cmList := tree.List(&corev1.ConfigMap{})
-	cmListFiltered, err := filterTemplate(cmList, rsm.Annotations)
+	cmListFiltered, err := filterTemplate(cmList, its.Annotations)
 	if err != nil {
 		return nil, err
 	}

@@ -43,7 +43,7 @@ var _ = Describe("utils test", func() {
 	var priorityMap map[string]int
 
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builder.NewInstanceSetBuilder(namespace, name).
 			SetService(&corev1.Service{}).
 			SetRoles(roles).
 			GetObject()

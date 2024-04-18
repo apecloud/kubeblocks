@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"encoding/json"
@@ -43,7 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 type instanceTemplateExt struct {
@@ -53,8 +53,8 @@ type instanceTemplateExt struct {
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 }
 
-type rsmExt struct {
-	rsm               *workloads.InstanceSet
+type instanceSetExt struct {
+	its               *workloads.InstanceSet
 	instanceTemplates []*workloads.InstanceTemplate
 }
 
@@ -189,12 +189,12 @@ func ValidateDupInstanceNames[T any](instances []T, getNameFunc func(item T) str
 	return nil
 }
 
-func buildInstanceName2TemplateMap(rsmExt *rsmExt) (map[string]*instanceTemplateExt, error) {
-	instanceTemplateList := buildInstanceTemplateExts(rsmExt)
+func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instanceTemplateExt, error) {
+	instanceTemplateList := buildInstanceTemplateExts(itsExt)
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
 	for _, template := range instanceTemplateList {
-		instanceNames := GenerateInstanceNamesFromTemplate(rsmExt.rsm.Name, template.Name, template.Replicas, rsmExt.rsm.Spec.OfflineInstances)
+		instanceNames := GenerateInstanceNamesFromTemplate(itsExt.its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances)
 		instanceNameList = append(instanceNameList, instanceNames...)
 		for _, name := range instanceNames {
 			allNameTemplateMap[name] = template
@@ -383,14 +383,14 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func validateSpec(rsm *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) error {
+func validateSpec(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) error {
 	replicasInTemplates := int32(0)
-	rsmExt, err := buildRSMExt(rsm, tree)
+	itsExt, err := buildInstanceSetExt(its, tree)
 	if err != nil {
 		return err
 	}
 	templateNames := sets.New[string]()
-	for _, template := range rsmExt.instanceTemplates {
+	for _, template := range itsExt.instanceTemplates {
 		replicas := int32(1)
 		if template.Replicas != nil {
 			replicas = *template.Replicas
@@ -402,8 +402,8 @@ func validateSpec(rsm *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) err
 		templateNames.Insert(template.Name)
 	}
 	// sum of spec.templates[*].replicas should not greater than spec.replicas
-	if replicasInTemplates > *rsm.Spec.Replicas {
-		return fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *rsm.Spec.Replicas)
+	if replicasInTemplates > *its.Spec.Replicas {
+		return fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *its.Spec.Replicas)
 	}
 
 	return nil
@@ -411,26 +411,26 @@ func validateSpec(rsm *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) err
 
 func buildInstanceTemplateRevision(template *instanceTemplateExt, parent *workloads.InstanceSet) (string, error) {
 	podTemplate := filterInPlaceFields(&template.PodTemplateSpec)
-	rsm := builder.NewReplicatedStateMachineBuilder(parent.Namespace, parent.Name).
+	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
 		AddAnnotationsInMap(parent.Annotations).
 		AddMatchLabelsInMap(parent.Labels).
 		SetTemplate(*podTemplate).
 		GetObject()
 
-	cr, err := NewRevision(rsm)
+	cr, err := NewRevision(its)
 	if err != nil {
 		return "", err
 	}
 	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
-func buildInstanceTemplateExts(rsmExt *rsmExt) []*instanceTemplateExt {
-	envConfigName := rsm1.GetEnvConfigMapName(rsmExt.rsm.Name)
-	defaultTemplate := rsm1.BuildPodTemplate(rsmExt.rsm, envConfigName)
+func buildInstanceTemplateExts(itsExt *instanceSetExt) []*instanceTemplateExt {
+	envConfigName := rsm.GetEnvConfigMapName(itsExt.its.Name)
+	defaultTemplate := rsm.BuildPodTemplate(itsExt.its, envConfigName)
 	makeInstanceTemplateExt := func() *instanceTemplateExt {
 		var claims []corev1.PersistentVolumeClaim
-		for _, template := range rsmExt.rsm.Spec.VolumeClaimTemplates {
+		for _, template := range itsExt.its.Spec.VolumeClaimTemplates {
 			claims = append(claims, *template.DeepCopy())
 		}
 		return &instanceTemplateExt{
@@ -440,7 +440,7 @@ func buildInstanceTemplateExts(rsmExt *rsmExt) []*instanceTemplateExt {
 	}
 
 	var instanceTemplateExtList []*instanceTemplateExt
-	for _, template := range rsmExt.instanceTemplates {
+	for _, template := range itsExt.instanceTemplates {
 		templateExt := makeInstanceTemplateExt()
 		buildInstanceTemplateExt(*template, templateExt)
 		instanceTemplateExtList = append(instanceTemplateExtList, templateExt)
@@ -512,18 +512,18 @@ func getInstanceTemplates(instances []workloads.InstanceTemplate, template *core
 	return append(instances, extraTemplates...)
 }
 
-func findTemplateObject(rsm *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*corev1.ConfigMap, error) {
-	templateMap, err := getInstanceTemplateMap(rsm.Annotations)
+func findTemplateObject(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*corev1.ConfigMap, error) {
+	templateMap, err := getInstanceTemplateMap(its.Annotations)
 	// error has been checked in prepare stage, there should be no error occurs
 	if err != nil {
 		return nil, nil
 	}
 	for name, templateName := range templateMap {
-		if name != rsm.Name {
+		if name != its.Name {
 			continue
 		}
 		// find the compressed instance templates, parse them
-		template := builder.NewConfigMapBuilder(rsm.Namespace, templateName).GetObject()
+		template := builder.NewConfigMapBuilder(its.Namespace, templateName).GetObject()
 		templateObj, err := tree.Get(template)
 		if err != nil {
 			return nil, err
@@ -589,16 +589,16 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		})
 }
 
-func buildRSMExt(rsm *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*rsmExt, error) {
-	instancesCompressed, err := findTemplateObject(rsm, tree)
+func buildInstanceSetExt(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*instanceSetExt, error) {
+	instancesCompressed, err := findTemplateObject(its, tree)
 	if err != nil {
 		return nil, err
 	}
 
-	instanceTemplateList := buildInstanceTemplates(*rsm.Spec.Replicas, rsm.Spec.Instances, instancesCompressed)
+	instanceTemplateList := buildInstanceTemplates(*its.Spec.Replicas, its.Spec.Instances, instancesCompressed)
 
-	return &rsmExt{
-		rsm:               rsm,
+	return &instanceSetExt{
+		its:               its,
 		instanceTemplates: instanceTemplateList,
 	}, nil
 }

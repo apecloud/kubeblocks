@@ -39,7 +39,7 @@ import (
 
 var _ = Describe("object status transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			AddMatchLabelsInMap(selectors).
 			SetServiceName(headlessSvcName).

@@ -56,7 +56,7 @@ var _ = Describe("plan builder test", func() {
 		BeforeEach(func() {
 			bldr := NewPlanBuilder(ctx, k8sMock, nil, nil, nil, logger)
 			planBuilder, _ = bldr.(*PlanBuilder)
-			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+			rsm = builder.NewInstanceSetBuilder(namespace, name).
 				AddFinalizers([]string{rsm1.GetFinalizer(&workloads.InstanceSet{})}).
 				GetObject()
 		})
@@ -229,7 +229,7 @@ var _ = Describe("plan builder test", func() {
 		)
 
 		BeforeEach(func() {
-			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+			rsm = builder.NewInstanceSetBuilder(namespace, name).
 				AddLabels(constant.AppComponentLabelKey, name).
 				SetReplicas(3).
 				GetObject()

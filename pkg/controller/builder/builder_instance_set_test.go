@@ -170,7 +170,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 				Replicas: func() *int32 { r := int32(1); return &r }(),
 			},
 		}
-		rsm := NewReplicatedStateMachineBuilder(ns, name).
+		rsm := NewInstanceSetBuilder(ns, name).
 			SetReplicas(replicas).
 			SetMinReadySeconds(minReadySeconds).
 			AddMatchLabel(selectorKey1, selectorValue1).

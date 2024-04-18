@@ -27,12 +27,12 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-type ReplicatedStateMachineBuilder struct {
-	BaseBuilder[workloads.InstanceSet, *workloads.InstanceSet, ReplicatedStateMachineBuilder]
+type InstanceSetBuilder struct {
+	BaseBuilder[workloads.InstanceSet, *workloads.InstanceSet, InstanceSetBuilder]
 }
 
-func NewReplicatedStateMachineBuilder(namespace, name string) *ReplicatedStateMachineBuilder {
-	builder := &ReplicatedStateMachineBuilder{}
+func NewInstanceSetBuilder(namespace, name string) *InstanceSetBuilder {
+	builder := &InstanceSetBuilder{}
 	replicas := int32(1)
 	builder.init(namespace, name,
 		&workloads.InstanceSet{
@@ -43,27 +43,27 @@ func NewReplicatedStateMachineBuilder(namespace, name string) *ReplicatedStateMa
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetReplicas(replicas int32) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetReplicas(replicas int32) *InstanceSetBuilder {
 	builder.get().Spec.Replicas = &replicas
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetMinReadySeconds(minReadySeconds int32) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetMinReadySeconds(minReadySeconds int32) *InstanceSetBuilder {
 	builder.get().Spec.MinReadySeconds = minReadySeconds
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) AddMatchLabel(key, value string) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) AddMatchLabel(key, value string) *InstanceSetBuilder {
 	labels := make(map[string]string, 1)
 	labels[key] = value
 	return builder.AddMatchLabelsInMap(labels)
 }
 
-func (builder *ReplicatedStateMachineBuilder) AddMatchLabels(keyValues ...string) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) AddMatchLabels(keyValues ...string) *InstanceSetBuilder {
 	return builder.AddMatchLabelsInMap(WithMap(keyValues...))
 }
 
-func (builder *ReplicatedStateMachineBuilder) AddMatchLabelsInMap(labels map[string]string) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) AddMatchLabelsInMap(labels map[string]string) *InstanceSetBuilder {
 	selector := builder.get().Spec.Selector
 	if selector == nil {
 		selector = &metav1.LabelSelector{}
@@ -80,49 +80,49 @@ func (builder *ReplicatedStateMachineBuilder) AddMatchLabelsInMap(labels map[str
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetServiceName(serviceName string) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetServiceName(serviceName string) *InstanceSetBuilder {
 	builder.get().Spec.ServiceName = serviceName
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetRoles(roles []workloads.ReplicaRole) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetRoles(roles []workloads.ReplicaRole) *InstanceSetBuilder {
 	builder.get().Spec.Roles = roles
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetTemplate(template corev1.PodTemplateSpec) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetTemplate(template corev1.PodTemplateSpec) *InstanceSetBuilder {
 	builder.get().Spec.Template = template
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) AddVolumeClaimTemplates(templates ...corev1.PersistentVolumeClaim) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) AddVolumeClaimTemplates(templates ...corev1.PersistentVolumeClaim) *InstanceSetBuilder {
 	templateList := builder.get().Spec.VolumeClaimTemplates
 	templateList = append(templateList, templates...)
 	builder.get().Spec.VolumeClaimTemplates = templateList
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetVolumeClaimTemplates(templates ...corev1.PersistentVolumeClaim) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetVolumeClaimTemplates(templates ...corev1.PersistentVolumeClaim) *InstanceSetBuilder {
 	builder.get().Spec.VolumeClaimTemplates = templates
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetPodManagementPolicy(policy apps.PodManagementPolicyType) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetPodManagementPolicy(policy apps.PodManagementPolicyType) *InstanceSetBuilder {
 	builder.get().Spec.PodManagementPolicy = policy
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetUpdateStrategy(strategy apps.StatefulSetUpdateStrategy) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetUpdateStrategy(strategy apps.StatefulSetUpdateStrategy) *InstanceSetBuilder {
 	builder.get().Spec.UpdateStrategy = strategy
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetUpdateStrategyType(strategyType apps.StatefulSetUpdateStrategyType) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetUpdateStrategyType(strategyType apps.StatefulSetUpdateStrategyType) *InstanceSetBuilder {
 	builder.get().Spec.UpdateStrategy.Type = strategyType
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetCustomHandler(handler []workloads.Action) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetCustomHandler(handler []workloads.Action) *InstanceSetBuilder {
 	roleProbe := builder.get().Spec.RoleProbe
 	if roleProbe == nil {
 		roleProbe = &workloads.RoleProbe{}
@@ -132,7 +132,7 @@ func (builder *ReplicatedStateMachineBuilder) SetCustomHandler(handler []workloa
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) AddCustomHandler(handler workloads.Action) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) AddCustomHandler(handler workloads.Action) *InstanceSetBuilder {
 	roleProbe := builder.get().Spec.RoleProbe
 	if roleProbe == nil {
 		roleProbe = &workloads.RoleProbe{}
@@ -144,27 +144,27 @@ func (builder *ReplicatedStateMachineBuilder) AddCustomHandler(handler workloads
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetRoleProbe(roleProbe *workloads.RoleProbe) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetRoleProbe(roleProbe *workloads.RoleProbe) *InstanceSetBuilder {
 	builder.get().Spec.RoleProbe = roleProbe
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetService(service *corev1.Service) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetService(service *corev1.Service) *InstanceSetBuilder {
 	builder.get().Spec.Service = service
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetAlternativeServices(services []corev1.Service) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetAlternativeServices(services []corev1.Service) *InstanceSetBuilder {
 	builder.get().Spec.AlternativeServices = services
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetMembershipReconfiguration(reconfiguration *workloads.MembershipReconfiguration) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetMembershipReconfiguration(reconfiguration *workloads.MembershipReconfiguration) *InstanceSetBuilder {
 	builder.get().Spec.MembershipReconfiguration = reconfiguration
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetMemberUpdateStrategy(strategy *workloads.MemberUpdateStrategy) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.MemberUpdateStrategy) *InstanceSetBuilder {
 	builder.get().Spec.MemberUpdateStrategy = strategy
 	if strategy != nil {
 		builder.SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
@@ -172,17 +172,17 @@ func (builder *ReplicatedStateMachineBuilder) SetMemberUpdateStrategy(strategy *
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetPaused(paused bool) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetPaused(paused bool) *InstanceSetBuilder {
 	builder.get().Spec.Paused = paused
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetCredential(credential workloads.Credential) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetCredential(credential workloads.Credential) *InstanceSetBuilder {
 	builder.get().Spec.Credential = &credential
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetInstances(instances []workloads.InstanceTemplate) *ReplicatedStateMachineBuilder {
+func (builder *InstanceSetBuilder) SetInstances(instances []workloads.InstanceTemplate) *InstanceSetBuilder {
 	builder.get().Spec.Instances = instances
 	return builder
 }

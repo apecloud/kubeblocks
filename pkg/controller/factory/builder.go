@@ -92,7 +92,7 @@ func BuildRSM(synthesizedComp *component.SynthesizedComponent) (*workloads.Insta
 	}
 
 	rsmName := constant.GenerateRSMNamePattern(clusterName, compName)
-	rsmBuilder := builder.NewReplicatedStateMachineBuilder(namespace, rsmName).
+	rsmBuilder := builder.NewInstanceSetBuilder(namespace, rsmName).
 		AddLabelsInMap(mergeLabels).
 		AddAnnotationsInMap(mergeAnnotations).
 		AddMatchLabelsInMap(labels).

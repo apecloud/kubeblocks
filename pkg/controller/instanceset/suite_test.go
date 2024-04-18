@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"encoding/json"
@@ -37,7 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -50,15 +50,15 @@ const (
 )
 
 var (
-	rsm         *workloads.InstanceSet
+	its         *workloads.InstanceSet
 	priorityMap map[string]int
 	reconciler  kubebuilderx.Reconciler
 
-	uid = types.UID("rsm-mock-uid")
+	uid = types.UID("its-mock-uid")
 
 	selectors = map[string]string{
-		constant.AppInstanceLabelKey:    name,
-		rsm1.WorkloadsManagedByLabelKey: rsm1.KindReplicatedStateMachine,
+		constant.AppInstanceLabelKey:   name,
+		rsm.WorkloadsManagedByLabelKey: rsm.KindReplicatedStateMachine,
 	}
 	roles = []workloads.ReplicaRole{
 		{
@@ -198,7 +198,7 @@ func buildRandomPod() *corev1.Pod {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "RSM2 Suite")
+	RunSpecs(t, "InstanceSet Suite")
 }
 
 var _ = BeforeSuite(func() {

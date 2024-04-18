@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"encoding/json"
@@ -40,14 +40,11 @@ var _ = Describe("revision util test", func() {
             "config.kubeblocks.io/tpl-redis-metrics-config": "redis-test-redis-redis-metrics-config",
             "config.kubeblocks.io/tpl-redis-replication-config": "redis-test-redis-redis-replication-config",
             "config.kubeblocks.io/tpl-redis-scripts": "redis-test-redis-redis-scripts",
-            "kubeblocks.io/generation": "1",
-            "monitor.kubeblocks.io/agamotto.headless.rsm": "false",
-            "monitor.kubeblocks.io/scrape.headless.rsm": "false"
+            "kubeblocks.io/generation": "1"
         },
         "creationTimestamp": "2024-01-31T11:27:08Z",
         "finalizers": [
-            "cluster.kubeblocks.io/finalizer",
-            "rsm.workloads.kubeblocks.io/finalizer"
+            "cluster.kubeblocks.io/finalizer"
         ],
         "generation": 1,
         "labels": {
@@ -117,7 +114,6 @@ var _ = Describe("revision util test", func() {
                 "name": "secondary"
             }
         ],
-        "rsmTransformPolicy": "ToSts",
         "selector": {
             "matchLabels": {
                 "app.kubernetes.io/instance": "redis-test",
@@ -961,10 +957,10 @@ var _ = Describe("revision util test", func() {
     }
 }
 `
-			rsm := &workloads.InstanceSet{}
-			err := json.Unmarshal([]byte(stsJSON), rsm)
+			its := &workloads.InstanceSet{}
+			err := json.Unmarshal([]byte(stsJSON), its)
 			Expect(err).Should(Succeed())
-			cr, err := NewRevision(rsm)
+			cr, err := NewRevision(its)
 			Expect(err).Should(Succeed())
 			Expect(cr.Name).Should(Equal("redis-test-redis-7665b47874"))
 		})

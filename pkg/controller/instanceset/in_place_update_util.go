@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"fmt"
@@ -242,7 +242,7 @@ func equalField(old, new any) bool {
 
 func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 	// Only comparing annotations and labels that are relevant to the new spec.
-	// These two fields might be modified by other controllers without the RSM controller knowing.
+	// These two fields might be modified by other controllers without the InstanceSet controller knowing.
 	// For instance, two new annotations have been added by Patroni.
 	// There are two strategies to handle this situation: override or replace.
 	// The recreation approach (recreating pod(s) when any field is updated in the pod template) used by StatefulSet/Deployment/DaemonSet
@@ -291,8 +291,8 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func getPodUpdatePolicy(rsm *workloads.InstanceSet, pod *corev1.Pod) (PodUpdatePolicy, error) {
-	updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdatePolicy, error) {
+	updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return NoOpsPolicy, err
 	}
@@ -301,13 +301,13 @@ func getPodUpdatePolicy(rsm *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return RecreatePolicy, nil
 	}
 
-	rsmExt, err := buildRSMExt(rsm, nil)
+	itsExt, err := buildInstanceSetExt(its, nil)
 	if err != nil {
 		return NoOpsPolicy, err
 	}
-	templateList := buildInstanceTemplateExts(rsmExt)
+	templateList := buildInstanceTemplateExts(itsExt)
 	parentName, _ := ParseParentNameAndOrdinal(pod.Name)
-	templateName, _ := strings.CutPrefix(parentName, rsm.Name)
+	templateName, _ := strings.CutPrefix(parentName, its.Name)
 	if len(templateName) > 0 {
 		templateName, _ = strings.CutPrefix(templateName, "-")
 	}
@@ -317,7 +317,7 @@ func getPodUpdatePolicy(rsm *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 	if index < 0 {
 		return NoOpsPolicy, fmt.Errorf("no corresponding template found for instance %s", pod.Name)
 	}
-	inst, err := buildInstanceByTemplate(pod.Name, templateList[index], rsm, getPodRevision(pod))
+	inst, err := buildInstanceByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
 	if err != nil {
 		return NoOpsPolicy, err
 	}
@@ -343,10 +343,10 @@ func getPodUpdatePolicy(rsm *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 	return NoOpsPolicy, nil
 }
 
-// IsPodUpdated tells whether the pod's spec is as expected in the rsm.
+// IsPodUpdated tells whether the pod's spec is as expected in the InstanceSet.
 // This function is meant to replace the old fashion `GetPodRevision(pod) == updateRevision`,
-// as the pod template revision has been redefined in rsm2.
-func IsPodUpdated(rsm *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	policy, err := getPodUpdatePolicy(rsm, pod)
+// as the pod template revision has been redefined in instanceset.
+func IsPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+	policy, err := getPodUpdatePolicy(its, pod)
 	return policy == NoOpsPolicy, err
 }

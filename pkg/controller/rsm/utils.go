@@ -776,7 +776,7 @@ func ConvertRSMToSTS(rsm *workloads.InstanceSet) *appsv1.StatefulSet {
 }
 
 func GetEnvConfigMapName(rsmName string) string {
-	return fmt.Sprintf("%s-rsm-env", rsmName)
+	return fmt.Sprintf("%s-its-env", rsmName)
 }
 
 // IsOwnedByRsm is used to judge if the obj is owned by rsm

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"context"
@@ -49,7 +49,7 @@ var _ = Describe("tree loader test", func() {
 
 			templateObj, annotation, err := mockCompressedInstanceTemplates(namespace, name)
 			Expect(err).Should(BeNil())
-			root := builder.NewReplicatedStateMachineBuilder(namespace, name).AddAnnotations(templateRefAnnotationKey, annotation).GetObject()
+			root := builder.NewInstanceSetBuilder(namespace, name).AddAnnotations(templateRefAnnotationKey, annotation).GetObject()
 			obj0 := builder.NewPodBuilder(namespace, name+"-0").GetObject()
 			obj1 := builder.NewPodBuilder(namespace, name+"-1").GetObject()
 			obj2 := builder.NewPodBuilder(namespace, name+"-2").GetObject()

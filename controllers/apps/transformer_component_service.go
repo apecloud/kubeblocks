@@ -36,7 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 )
 
 var (
@@ -227,11 +227,11 @@ func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
 	podNames := make([]string, 0)
 	workloadName := constant.GenerateRSMNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
 	for _, template := range synthesizeComp.Instances {
-		templateNames := rsm2.GenerateInstanceNamesFromTemplate(workloadName, template.Name, templateReplicas(template), synthesizeComp.OfflineInstances)
+		templateNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, template.Name, templateReplicas(template), synthesizeComp.OfflineInstances)
 		podNames = append(podNames, templateNames...)
 	}
 	if templateReplicasCnt < synthesizeComp.Replicas {
-		names := rsm2.GenerateInstanceNamesFromTemplate(workloadName, "", synthesizeComp.Replicas-templateReplicasCnt, synthesizeComp.OfflineInstances)
+		names := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", synthesizeComp.Replicas-templateReplicasCnt, synthesizeComp.OfflineInstances)
 		podNames = append(podNames, names...)
 	}
 	return podNames

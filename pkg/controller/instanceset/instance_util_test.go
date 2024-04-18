@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"fmt"
@@ -34,33 +34,33 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 var _ = Describe("instance util test", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		its = builder.NewInstanceSetBuilder(namespace, name).
 			SetService(&corev1.Service{}).
 			SetReplicas(3).
 			SetTemplate(template).
 			SetVolumeClaimTemplates(volumeClaimTemplates...).
 			SetRoles(roles).
 			GetObject()
-		priorityMap = rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
+		priorityMap = rsm.ComposeRolePriorityMap(its.Spec.Roles)
 	})
 
 	Context("sortObjects function", func() {
 		It("should work well", func() {
 			pods := []client.Object{
-				builder.NewPodBuilder(namespace, "pod-0").AddLabels(rsm1.RoleLabelKey, "follower").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-1").AddLabels(rsm1.RoleLabelKey, "logger").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-0").AddLabels(rsm.RoleLabelKey, "follower").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-1").AddLabels(rsm.RoleLabelKey, "logger").GetObject(),
 				builder.NewPodBuilder(namespace, "pod-2").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-3").AddLabels(rsm1.RoleLabelKey, "learner").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-4").AddLabels(rsm1.RoleLabelKey, "candidate").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-5").AddLabels(rsm1.RoleLabelKey, "leader").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-6").AddLabels(rsm1.RoleLabelKey, "learner").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-10").AddLabels(rsm1.RoleLabelKey, "learner").GetObject(),
-				builder.NewPodBuilder(namespace, "foo-20").AddLabels(rsm1.RoleLabelKey, "learner").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-3").AddLabels(rsm.RoleLabelKey, "learner").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-4").AddLabels(rsm.RoleLabelKey, "candidate").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-5").AddLabels(rsm.RoleLabelKey, "leader").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-6").AddLabels(rsm.RoleLabelKey, "learner").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-10").AddLabels(rsm.RoleLabelKey, "learner").GetObject(),
+				builder.NewPodBuilder(namespace, "foo-20").AddLabels(rsm.RoleLabelKey, "learner").GetObject(),
 			}
 			expectedOrder := []string{"pod-4", "pod-2", "foo-20", "pod-3", "pod-6", "pod-10", "pod-1", "pod-0", "pod-5"}
 
@@ -116,25 +116,25 @@ var _ = Describe("instance util test", func() {
 	})
 
 	Context("buildInstanceName2TemplateMap", func() {
-		It("build a rsm with default template only", func() {
-			rsmExt, err := buildRSMExt(rsm, nil)
+		It("build an its with default template only", func() {
+			itsExt, err := buildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(rsmExt)
+			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
-			name0 := rsm.Name + "-0"
+			name0 := its.Name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name0))
-			Expect(nameTemplate).Should(HaveKey(rsm.Name + "-1"))
-			Expect(nameTemplate).Should(HaveKey(rsm.Name + "-2"))
+			Expect(nameTemplate).Should(HaveKey(its.Name + "-1"))
+			Expect(nameTemplate).Should(HaveKey(its.Name + "-2"))
 			nameTemplate[name0].PodTemplateSpec.Spec.Volumes = nil
-			envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
-			defaultTemplate := rsm1.BuildPodTemplate(rsm, envConfigName)
+			envConfigName := rsm.GetEnvConfigMapName(its.Name)
+			defaultTemplate := rsm.BuildPodTemplate(its, envConfigName)
 			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(defaultTemplate.Spec))
 		})
 
-		It("build a rsm with one instance template override", func() {
+		It("build an its with one instance template override", func() {
 			nameOverride := "name-override"
-			nameOverride0 := rsm.Name + "-" + nameOverride + "-0"
+			nameOverride0 := its.Name + "-" + nameOverride + "-0"
 			annotationOverride := map[string]string{
 				"foo": "bar",
 			}
@@ -148,19 +148,19 @@ var _ = Describe("instance util test", func() {
 				Labels:      labelOverride,
 				Image:       &imageOverride,
 			}
-			rsm.Spec.Instances = append(rsm.Spec.Instances, instance)
-			rsmExt, err := buildRSMExt(rsm, nil)
+			its.Spec.Instances = append(its.Spec.Instances, instance)
+			itsExt, err := buildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(rsmExt)
+			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
-			name0 := rsm.Name + "-0"
-			name1 := rsm.Name + "-1"
+			name0 := its.Name + "-0"
+			name1 := its.Name + "-1"
 			Expect(nameTemplate).Should(HaveKey(name0))
 			Expect(nameTemplate).Should(HaveKey(name1))
 			Expect(nameTemplate).Should(HaveKey(nameOverride0))
-			envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
-			expectedTemplate := rsm1.BuildPodTemplate(rsm, envConfigName)
+			envConfigName := rsm.GetEnvConfigMapName(its.Name)
+			expectedTemplate := rsm.BuildPodTemplate(its, envConfigName)
 			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
 			Expect(nameTemplate[name1].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
 			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec).ShouldNot(Equal(expectedTemplate.Spec))
@@ -172,25 +172,25 @@ var _ = Describe("instance util test", func() {
 
 	Context("buildInstanceByTemplate", func() {
 		It("should work well", func() {
-			rsmExt, err := buildRSMExt(rsm, nil)
+			itsExt, err := buildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(rsmExt)
+			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
 			template := nameTemplate[name]
-			replica, err := buildInstanceByTemplate(name, template, rsm, "")
+			replica, err := buildInstanceByTemplate(name, template, its, "")
 			Expect(err).Should(BeNil())
 			Expect(replica.pod).ShouldNot(BeNil())
 			Expect(replica.pvcs).ShouldNot(BeNil())
 			Expect(replica.pvcs).Should(HaveLen(1))
 			Expect(replica.pod.Name).Should(Equal(name))
-			Expect(replica.pod.Namespace).Should(Equal(rsm.Namespace))
+			Expect(replica.pod.Namespace).Should(Equal(its.Namespace))
 			Expect(replica.pod.Spec.Volumes).Should(HaveLen(1))
 			Expect(replica.pod.Spec.Volumes[0].Name).Should(Equal(volumeClaimTemplates[0].Name))
-			envConfigName := rsm1.GetEnvConfigMapName(rsm.Name)
-			expectedTemplate := rsm1.BuildPodTemplate(rsm, envConfigName)
+			envConfigName := rsm.GetEnvConfigMapName(its.Name)
+			expectedTemplate := rsm.BuildPodTemplate(its, envConfigName)
 			Expect(replica.pod.Spec).ShouldNot(Equal(expectedTemplate.Spec))
 			// reset pod.volumes, pod.hostname and pod.subdomain
 			replica.pod.Spec.Volumes = nil
@@ -206,18 +206,18 @@ var _ = Describe("instance util test", func() {
 	Context("validateSpec", func() {
 		It("should work well", func() {
 			By("a valid spec")
-			Expect(validateSpec(rsm, nil)).Should(Succeed())
+			Expect(validateSpec(its, nil)).Should(Succeed())
 
 			By("sum of replicas in instance exceeds spec.replicas")
-			rsm2 := rsm.DeepCopy()
+			its2 := its.DeepCopy()
 			replicas := int32(4)
 			name := "barrrrr"
 			instance := workloads.InstanceTemplate{
 				Name:     name,
 				Replicas: &replicas,
 			}
-			rsm2.Spec.Instances = append(rsm2.Spec.Instances, instance)
-			err := validateSpec(rsm2, nil)
+			its2.Spec.Instances = append(its2.Spec.Instances, instance)
+			err := validateSpec(its2, nil)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("should not greater than replicas in spec"))
 		})
@@ -353,18 +353,18 @@ var _ = Describe("instance util test", func() {
 					Replicas: func() *int32 { r := int32(1); return &r }(),
 				},
 			}
-			rsm := builder.NewReplicatedStateMachineBuilder(namespace, name).
+			its := builder.NewInstanceSetBuilder(namespace, name).
 				AddAnnotations(templateRefAnnotationKey, annotation).
 				SetInstances(instances).
 				GetObject()
 			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(rsm)
+			tree.SetRoot(its)
 			Expect(tree.Add(templateObj)).Should(Succeed())
 
 			By("parse instance templates")
-			template, err := findTemplateObject(rsm, tree)
+			template, err := findTemplateObject(its, tree)
 			Expect(err).Should(BeNil())
-			instanceTemplates := getInstanceTemplates(rsm.Spec.Instances, template)
+			instanceTemplates := getInstanceTemplates(its.Spec.Instances, template)
 			// append templates from mock function
 			instances = append(instances, []workloads.InstanceTemplate{
 				{

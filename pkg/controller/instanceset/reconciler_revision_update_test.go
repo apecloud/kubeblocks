@@ -17,42 +17,52 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-var _ = Describe("deletion reconciler test", func() {
+var _ = Describe("revision update reconciler test", func() {
+	BeforeEach(func() {
+		its = builder.NewInstanceSetBuilder(namespace, name).
+			SetService(&corev1.Service{}).
+			SetReplicas(3).
+			SetTemplate(template).
+			SetVolumeClaimTemplates(volumeClaimTemplates...).
+			SetRoles(roles).
+			GetObject()
+	})
+
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
 			By("PreCondition")
-			rsm := builder.NewReplicatedStateMachineBuilder(namespace, name).GetObject()
+			its.Generation = 1
 			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(rsm)
-			reconciler := NewDeletionReconciler()
-			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultUnsatisfied))
-			t := metav1.NewTime(time.Now())
-			rsm.SetDeletionTimestamp(&t)
+			tree.SetRoot(its)
+			reconciler := NewRevisionUpdateReconciler()
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
 			By("Reconcile")
-			pod := builder.NewPodBuilder(namespace, name+"0").GetObject()
-			Expect(tree.Add(pod)).Should(Succeed())
 			newTree, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			Expect(newTree.GetRoot()).Should(Equal(rsm))
-			newTree, err = reconciler.Reconcile(newTree)
+			newITS, ok := newTree.GetRoot().(*workloads.InstanceSet)
+			Expect(ok).Should(BeTrue())
+			Expect(newITS.Status.ObservedGeneration).Should(Equal(its.Generation))
+			updateRevisions, err := getUpdateRevisions(newITS.Status.UpdateRevisions)
 			Expect(err).Should(BeNil())
-			Expect(newTree.GetRoot()).Should(BeNil())
+			Expect(updateRevisions).Should(HaveLen(3))
+			Expect(updateRevisions).Should(HaveKey(its.Name + "-0"))
+			Expect(updateRevisions).Should(HaveKey(its.Name + "-1"))
+			Expect(updateRevisions).Should(HaveKey(its.Name + "-2"))
+			Expect(newITS.Status.UpdateRevision).Should(Equal(updateRevisions[its.Name+"-2"]))
 		})
 	})
 })

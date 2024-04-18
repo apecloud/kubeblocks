@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"time"
@@ -36,7 +36,7 @@ import (
 
 var _ = Describe("status reconciler test", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		its = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			SetReplicas(3).
 			AddMatchLabelsInMap(selectors).
@@ -50,26 +50,26 @@ var _ = Describe("status reconciler test", func() {
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
 			By("PreCondition")
-			rsm.Generation = 1
+			its.Generation = 1
 			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(rsm)
+			tree.SetRoot(its)
 
 			By("prepare current tree")
 			replicas := int32(7)
-			rsm.Spec.Replicas = &replicas
-			rsm.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Replicas = &replicas
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			nameHello := "hello"
 			instanceHello := workloads.InstanceTemplate{
 				Name: nameHello,
 			}
-			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceHello)
+			its.Spec.Instances = append(its.Spec.Instances, instanceHello)
 			generateNameFoo := "foo"
 			replicasFoo := int32(2)
 			instanceFoo := workloads.InstanceTemplate{
 				Name:     generateNameFoo,
 				Replicas: &replicasFoo,
 			}
-			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceFoo)
+			its.Spec.Instances = append(its.Spec.Instances, instanceFoo)
 
 			// prepare for update
 			By("fix meta")
@@ -97,13 +97,13 @@ var _ = Describe("status reconciler test", func() {
 			Expect(reconciler.PreCondition(newTree)).Should(Equal(kubebuilderx.ResultSatisfied))
 			_, err = reconciler.Reconcile(newTree)
 			Expect(err).Should(BeNil())
-			Expect(rsm.Status.Replicas).Should(BeEquivalentTo(0))
-			Expect(rsm.Status.ReadyReplicas).Should(BeEquivalentTo(0))
-			Expect(rsm.Status.AvailableReplicas).Should(BeEquivalentTo(0))
-			Expect(rsm.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
-			Expect(rsm.Status.CurrentReplicas).Should(BeEquivalentTo(0))
-			Expect(rsm.Status.CurrentRevisions).Should(HaveLen(0))
-			Expect(rsm.Status.CurrentGeneration).Should(BeEquivalentTo(rsm.Generation))
+			Expect(its.Status.Replicas).Should(BeEquivalentTo(0))
+			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(0))
+			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
+			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
+			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(0))
+			Expect(its.Status.CurrentRevisions).Should(HaveLen(0))
+			Expect(its.Status.CurrentGeneration).Should(BeEquivalentTo(its.Generation))
 
 			By("make all pods ready with old revision")
 			condition := corev1.PodCondition{
@@ -124,16 +124,16 @@ var _ = Describe("status reconciler test", func() {
 			}
 			_, err = reconciler.Reconcile(newTree)
 			Expect(err).Should(BeNil())
-			Expect(rsm.Status.Replicas).Should(BeEquivalentTo(replicas))
-			Expect(rsm.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
-			Expect(rsm.Status.AvailableReplicas).Should(BeEquivalentTo(replicas))
-			Expect(rsm.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
-			Expect(rsm.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
-			Expect(rsm.Status.CurrentRevisions).Should(HaveLen(0))
-			Expect(rsm.Status.CurrentGeneration).Should(BeEquivalentTo(rsm.Generation))
+			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
+			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.CurrentRevisions).Should(HaveLen(0))
+			Expect(its.Status.CurrentGeneration).Should(BeEquivalentTo(its.Generation))
 
 			By("make all pods available with latest revision")
-			updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+			updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
 			Expect(err).Should(BeNil())
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
@@ -142,13 +142,13 @@ var _ = Describe("status reconciler test", func() {
 			}
 			_, err = reconciler.Reconcile(newTree)
 			Expect(err).Should(BeNil())
-			Expect(rsm.Status.Replicas).Should(BeEquivalentTo(replicas))
-			Expect(rsm.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
-			Expect(rsm.Status.AvailableReplicas).Should(BeEquivalentTo(replicas))
-			Expect(rsm.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
-			Expect(rsm.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
-			Expect(rsm.Status.CurrentRevisions).Should(Equal(rsm.Status.UpdateRevisions))
-			Expect(rsm.Status.CurrentGeneration).Should(BeEquivalentTo(rsm.Generation))
+			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
+			Expect(its.Status.CurrentGeneration).Should(BeEquivalentTo(its.Generation))
 		})
 	})
 })

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -35,7 +35,7 @@ import (
 
 var _ = Describe("replicas alignment reconciler test", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		its = builder.NewInstanceSetBuilder(namespace, name).
 			SetService(&corev1.Service{}).
 			SetReplicas(3).
 			SetTemplate(template).
@@ -47,9 +47,9 @@ var _ = Describe("replicas alignment reconciler test", func() {
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
 			By("PreCondition")
-			rsm.Generation = 1
+			its.Generation = 1
 			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(rsm)
+			tree.SetRoot(its)
 			reconciler = NewReplicasAlignmentReconciler()
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
@@ -57,20 +57,20 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			// desired: bar-hello-0, bar-foo-0, bar-foo-1, bar-0, bar-1, bar-2, bar-3
 			// current: bar-foo-0, bar-1
 			replicas := int32(7)
-			rsm.Spec.Replicas = &replicas
+			its.Spec.Replicas = &replicas
 			nameHello := "hello"
 			instanceHello := workloads.InstanceTemplate{
 				Name: nameHello,
 			}
-			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceHello)
+			its.Spec.Instances = append(its.Spec.Instances, instanceHello)
 			nameFoo := "foo"
 			replicasFoo := int32(2)
 			instanceFoo := workloads.InstanceTemplate{
 				Name:     nameFoo,
 				Replicas: &replicasFoo,
 			}
-			rsm.Spec.Instances = append(rsm.Spec.Instances, instanceFoo)
-			podFoo0 := builder.NewPodBuilder(namespace, rsm.Name+"-foo-0").GetObject()
+			its.Spec.Instances = append(its.Spec.Instances, instanceFoo)
+			podFoo0 := builder.NewPodBuilder(namespace, its.Name+"-foo-0").GetObject()
 			podBar1 := builder.NewPodBuilder(namespace, "bar-1").GetObject()
 			Expect(tree.Add(podFoo0, podBar1)).Should(Succeed())
 
@@ -104,9 +104,9 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			By("do reconcile with Parallel policy")
 			parallelTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
-			parallelRsm, ok := parallelTree.GetRoot().(*workloads.InstanceSet)
+			parallelITS, ok := parallelTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			parallelRsm.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			parallelITS.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			newTree, err = reconciler.Reconcile(parallelTree)
 			Expect(err).Should(BeNil())
 			// desired: bar-hello-0, bar-foo-0, bar-foo-1, bar-0, bar-1, bar-2, bar-3
@@ -119,8 +119,8 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				currentPodSnapshot[*name] = object
 			}
 
-			podHello := builder.NewPodBuilder(namespace, rsm.Name+"-hello-0").GetObject()
-			podFoo1 := builder.NewPodBuilder(namespace, rsm.Name+"-foo-1").GetObject()
+			podHello := builder.NewPodBuilder(namespace, its.Name+"-hello-0").GetObject()
+			podFoo1 := builder.NewPodBuilder(namespace, its.Name+"-foo-1").GetObject()
 			podBar2 := builder.NewPodBuilder(namespace, "bar-2").GetObject()
 			podBar3 := builder.NewPodBuilder(namespace, "bar-3").GetObject()
 			for _, object := range []client.Object{podHello, podFoo0, podFoo1, podBar0, podBar1, podBar2, podBar3} {

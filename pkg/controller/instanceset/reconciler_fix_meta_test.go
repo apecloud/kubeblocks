@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -25,16 +25,16 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 var _ = Describe("fix meta reconciler test", func() {
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
 			By("PreCondition")
-			rsm := builder.NewReplicatedStateMachineBuilder(namespace, name).GetObject()
+			its := builder.NewInstanceSetBuilder(namespace, name).GetObject()
 			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(rsm)
+			tree.SetRoot(its)
 			reconciler := NewFixMetaReconciler()
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
@@ -42,7 +42,7 @@ var _ = Describe("fix meta reconciler test", func() {
 			newTree, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(newTree.GetRoot().GetFinalizers()).Should(HaveLen(1))
-			Expect(newTree.GetRoot().GetFinalizers()[0]).Should(Equal(rsm1.FinalizerName))
+			Expect(newTree.GetRoot().GetFinalizers()[0]).Should(Equal(rsm.FinalizerName))
 
 			By("Reconcile with finalizer")
 			Expect(reconciler.PreCondition(newTree)).Should(Equal(kubebuilderx.ResultUnsatisfied))

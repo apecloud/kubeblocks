@@ -43,7 +43,7 @@ var _ = Describe("reconciler test", func() {
 			Expect(tree).Should(Equal(expectedTree))
 
 			By("SetRoot & GetRoot")
-			root := builder.NewReplicatedStateMachineBuilder(namespace, name).GetObject()
+			root := builder.NewInstanceSetBuilder(namespace, name).GetObject()
 			tree.SetRoot(root)
 			expectedTree.root = root
 			Expect(tree).Should(Equal(expectedTree))

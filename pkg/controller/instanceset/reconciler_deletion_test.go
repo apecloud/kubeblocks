@@ -17,52 +17,42 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-var _ = Describe("revision update reconciler test", func() {
-	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
-			SetService(&corev1.Service{}).
-			SetReplicas(3).
-			SetTemplate(template).
-			SetVolumeClaimTemplates(volumeClaimTemplates...).
-			SetRoles(roles).
-			GetObject()
-	})
-
+var _ = Describe("deletion reconciler test", func() {
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
 			By("PreCondition")
-			rsm.Generation = 1
+			its := builder.NewInstanceSetBuilder(namespace, name).GetObject()
 			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(rsm)
-			reconciler := NewRevisionUpdateReconciler()
+			tree.SetRoot(its)
+			reconciler := NewDeletionReconciler()
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultUnsatisfied))
+			t := metav1.NewTime(time.Now())
+			its.SetDeletionTimestamp(&t)
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
 			By("Reconcile")
+			pod := builder.NewPodBuilder(namespace, name+"0").GetObject()
+			Expect(tree.Add(pod)).Should(Succeed())
 			newTree, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			newRsm, ok := newTree.GetRoot().(*workloads.InstanceSet)
-			Expect(ok).Should(BeTrue())
-			Expect(newRsm.Status.ObservedGeneration).Should(Equal(rsm.Generation))
-			updateRevisions, err := getUpdateRevisions(newRsm.Status.UpdateRevisions)
+			Expect(newTree.GetRoot()).Should(Equal(its))
+			newTree, err = reconciler.Reconcile(newTree)
 			Expect(err).Should(BeNil())
-			Expect(updateRevisions).Should(HaveLen(3))
-			Expect(updateRevisions).Should(HaveKey(rsm.Name + "-0"))
-			Expect(updateRevisions).Should(HaveKey(rsm.Name + "-1"))
-			Expect(updateRevisions).Should(HaveKey(rsm.Name + "-2"))
-			Expect(newRsm.Status.UpdateRevision).Should(Equal(updateRevisions[rsm.Name+"-2"]))
+			Expect(newTree.GetRoot()).Should(BeNil())
 		})
 	})
 })

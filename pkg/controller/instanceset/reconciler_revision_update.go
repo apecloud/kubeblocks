@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -41,28 +41,28 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 	if tree.GetRoot() == nil || !model.IsObjectUpdating(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
-	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if err := validateSpec(rsm, tree); err != nil {
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	if err := validateSpec(its, tree); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
 	return kubebuilderx.ResultSatisfied
 }
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
-	rsmExt, err := buildRSMExt(rsm, tree)
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	itsExt, err := buildInstanceSetExt(its, tree)
 	if err != nil {
 		return nil, err
 	}
 
 	// 1. build all templates by applying instance template overrides to default pod template
-	instanceTemplateList := buildInstanceTemplateExts(rsmExt)
+	instanceTemplateList := buildInstanceTemplateExts(itsExt)
 
 	// build instance revision list from instance templates
 	var instanceRevisionList []instanceRevision
 	for _, template := range instanceTemplateList {
-		instanceNames := GenerateInstanceNamesFromTemplate(rsm.Name, template.Name, template.Replicas, rsmExt.rsm.Spec.OfflineInstances)
-		revision, err := buildInstanceTemplateRevision(template, rsm)
+		instanceNames := GenerateInstanceNamesFromTemplate(its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances)
+		revision, err := buildInstanceTemplateRevision(template, its)
 		if err != nil {
 			return nil, err
 		}
@@ -88,16 +88,16 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	if err != nil {
 		return nil, err
 	}
-	rsm.Status.UpdateRevisions = revisions
+	its.Status.UpdateRevisions = revisions
 	updateRevision := ""
 	if len(instanceRevisionList) > 0 {
 		updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision
 	}
-	rsm.Status.UpdateRevision = updateRevision
+	its.Status.UpdateRevision = updateRevision
 	// The 'ObservedGeneration' field is used to indicate whether the revisions have been updated.
 	// Computing these revisions in each reconciliation loop can be time-consuming, so we optimize it by
 	// performing the computation only when the 'spec' is updated.
-	rsm.Status.ObservedGeneration = rsm.Generation
+	its.Status.ObservedGeneration = its.Generation
 
 	return tree, nil
 }

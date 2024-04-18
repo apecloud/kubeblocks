@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"encoding/base64"
@@ -47,15 +47,15 @@ var Codecs = serializer.NewCodecFactory(model.GetScheme())
 var patchCodec = Codecs.LegacyCodec(workloads.SchemeGroupVersion)
 var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
 
-func NewRevision(rsm *workloads.InstanceSet) (*apps.ControllerRevision, error) {
-	patch, err := getPatch(rsm)
+func NewRevision(its *workloads.InstanceSet) (*apps.ControllerRevision, error) {
+	patch, err := getPatch(its)
 	if err != nil {
 		return nil, err
 	}
 	collision := int32(0)
-	cr, err := NewControllerRevision(rsm,
+	cr, err := NewControllerRevision(its,
 		controllerKind,
-		rsm.Spec.Template.Labels,
+		its.Spec.Template.Labels,
 		runtime.RawExtension{Raw: patch},
 		1,
 		&collision)
@@ -65,7 +65,7 @@ func NewRevision(rsm *workloads.InstanceSet) (*apps.ControllerRevision, error) {
 	if cr.ObjectMeta.Annotations == nil {
 		cr.ObjectMeta.Annotations = make(map[string]string)
 	}
-	for key, value := range rsm.Annotations {
+	for key, value := range its.Annotations {
 		cr.ObjectMeta.Annotations[key] = value
 	}
 	return cr, nil
@@ -75,8 +75,8 @@ func NewRevision(rsm *workloads.InstanceSet) (*apps.ControllerRevision, error) {
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
-func getPatch(rsm *workloads.InstanceSet) ([]byte, error) {
-	data, err := runtime.Encode(patchCodec, rsm)
+func getPatch(its *workloads.InstanceSet) ([]byte, error) {
+	data, err := runtime.Encode(patchCodec, its)
 	if err != nil {
 		return nil, err
 	}

@@ -36,7 +36,7 @@ import (
 
 var _ = Describe("object generation transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			AddLabels(constant.AppComponentLabelKey, name).
 			SetReplicas(3).

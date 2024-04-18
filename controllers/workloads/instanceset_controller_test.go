@@ -29,7 +29,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -38,11 +38,11 @@ var _ = Describe("InstanceSet Controller", func() {
 	Context("reconciliation with ReplicaProvider=StatefulSet", func() {
 		var replicaProvider string
 		BeforeEach(func() {
-			replicaProvider = viper.GetString(rsm2.FeatureGateRSMReplicaProvider)
-			viper.Set(rsm2.FeatureGateRSMReplicaProvider, string(rsm2.StatefulSetProvider))
+			replicaProvider = viper.GetString(instanceset.FeatureGateRSMReplicaProvider)
+			viper.Set(instanceset.FeatureGateRSMReplicaProvider, string(instanceset.StatefulSetProvider))
 		})
 		AfterEach(func() {
-			viper.Set(rsm2.FeatureGateRSMReplicaProvider, replicaProvider)
+			viper.Set(instanceset.FeatureGateRSMReplicaProvider, replicaProvider)
 		})
 
 		It("should reconcile well", func() {
@@ -87,7 +87,7 @@ var _ = Describe("InstanceSet Controller", func() {
 				Image:   "foo",
 				Command: []string{"bar"},
 			}
-			rsm := builder.NewReplicatedStateMachineBuilder(testCtx.DefaultNamespace, name).
+			rsm := builder.NewInstanceSetBuilder(testCtx.DefaultNamespace, name).
 				AddMatchLabelsInMap(commonLabels).
 				SetService(service).
 				SetTemplate(template).

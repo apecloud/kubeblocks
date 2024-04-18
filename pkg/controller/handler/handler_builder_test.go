@@ -58,7 +58,7 @@ var _ = Describe("handler builder test.", func() {
 				constant.AppInstanceLabelKey:    clusterName,
 				constant.KBAppComponentLabelKey: componentName,
 			}
-			rsm := builder.NewReplicatedStateMachineBuilder(namespace, rsmName).
+			rsm := builder.NewInstanceSetBuilder(namespace, rsmName).
 				AddLabelsInMap(labels).
 				GetObject()
 			sts := builder.NewStatefulSetBuilder(namespace, stsName).

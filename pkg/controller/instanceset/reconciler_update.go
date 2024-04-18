@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // updateReconciler handles the updates of instances based on the UpdateStrategy.
@@ -50,22 +50,22 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	if model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
-	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if err := validateSpec(rsm, tree); err != nil {
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	if err := validateSpec(its, tree); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
 	return kubebuilderx.ResultSatisfied
 }
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
-	rsmExt, err := buildRSMExt(rsm, tree)
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	itsExt, err := buildInstanceSetExt(its, tree)
 	if err != nil {
 		return nil, err
 	}
 
 	// 1. build desired name to template map
-	nameToTemplateMap, err := buildInstanceName2TemplateMap(rsmExt)
+	nameToTemplateMap, err := buildInstanceName2TemplateMap(itsExt)
 	if err != nil {
 		return nil, err
 	}
@@ -86,18 +86,18 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	}
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
-		tree.Logger.Info(fmt.Sprintf("RSM %s/%s instances are not aligned", rsm.Namespace, rsm.Name))
+		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s instances are not aligned", its.Namespace, its.Name))
 		return tree, nil
 	}
 
 	// 3. do update
 	// do nothing if UpdateStrategyType is 'OnDelete'
-	if rsm.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
+	if its.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
 		return tree, nil
 	}
 
 	// handle 'RollingUpdate'
-	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(rsm.Spec.UpdateStrategy.RollingUpdate, len(oldPodList))
+	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(its.Spec.UpdateStrategy.RollingUpdate, len(oldPodList))
 	if err != nil {
 		return nil, err
 	}
@@ -111,8 +111,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 
 	// TODO(free6om): compute updateCount from PodManagementPolicy(Serial/OrderedReady, Parallel, BestEffortParallel).
 	// align MemberUpdateStrategy with PodManagementPolicy if it has nil value.
-	rsmForPlan := getRSMForUpdatePlan(rsm)
-	plan := rsm1.NewUpdatePlan(*rsmForPlan, oldPodList, IsPodUpdated)
+	itsForPlan := getInstanceSetForUpdatePlan(its)
+	plan := rsm.NewUpdatePlan(*itsForPlan, oldPodList, IsPodUpdated)
 	podsToBeUpdated, err := plan.Execute()
 	if err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 
 	updatingPods := 0
 	updatedPods := 0
-	priorities := rsm1.ComposeRolePriorityMap(rsm.Spec.Roles)
+	priorities := rsm.ComposeRolePriorityMap(its.Spec.Roles)
 	sortObjects(oldPodList, priorities, true)
 	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
@@ -132,19 +132,19 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		}
 
 		if !isHealthy(pod) {
-			tree.Logger.Info(fmt.Sprintf("RSM %s/%s blocks on scale-in as the pod %s is not healthy", rsm.Namespace, rsm.Name, pod.Name))
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on scale-in as the pod %s is not healthy", its.Namespace, its.Name, pod.Name))
 			break
 		}
 		if err != nil {
 			return nil, err
 		}
 
-		updatePolicy, err := getPodUpdatePolicy(rsm, pod)
+		updatePolicy, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
 			return nil, err
 		}
 		if updatePolicy == InPlaceUpdatePolicy {
-			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], rsm, getPodRevision(pod))
+			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
 			if err != nil {
 				return nil, err
 			}
@@ -166,17 +166,17 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	return tree, nil
 }
 
-func getRSMForUpdatePlan(rsm *workloads.InstanceSet) *workloads.InstanceSet {
-	if rsm.Spec.MemberUpdateStrategy != nil {
-		return rsm
+func getInstanceSetForUpdatePlan(its *workloads.InstanceSet) *workloads.InstanceSet {
+	if its.Spec.MemberUpdateStrategy != nil {
+		return its
 	}
-	rsmForPlan := rsm.DeepCopy()
+	itsForPlan := its.DeepCopy()
 	updateStrategy := workloads.SerialUpdateStrategy
-	if rsm.Spec.PodManagementPolicy == apps.ParallelPodManagement {
+	if its.Spec.PodManagementPolicy == apps.ParallelPodManagement {
 		updateStrategy = workloads.ParallelUpdateStrategy
 	}
-	rsmForPlan.Spec.MemberUpdateStrategy = &updateStrategy
-	return rsmForPlan
+	itsForPlan.Spec.MemberUpdateStrategy = &updateStrategy
+	return itsForPlan
 }
 
 func parsePartitionNMaxUnavailable(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, replicas int) (int, int, error) {

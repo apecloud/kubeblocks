@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	"fmt"
@@ -103,7 +103,7 @@ var _ = Describe("instance util test", func() {
 			podTemplate := template.DeepCopy()
 			mergeMap(&map[string]string{key: randStr}, &podTemplate.Annotations)
 			mergeMap(&map[string]string{key: randStr}, &podTemplate.Labels)
-			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+			its = builder.NewInstanceSetBuilder(namespace, name).
 				SetUID(uid).
 				AddAnnotations(randStr, randStr).
 				AddLabels(randStr, randStr).
@@ -116,7 +116,7 @@ var _ = Describe("instance util test", func() {
 				SetPodManagementPolicy(appsv1.ParallelPodManagement).
 				GetObject()
 			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(rsm)
+			tree.SetRoot(its)
 			var reconciler kubebuilderx.Reconciler
 			By("update revisions")
 			reconciler = NewRevisionUpdateReconciler()
@@ -136,7 +136,7 @@ var _ = Describe("instance util test", func() {
 			Expect(objects).Should(HaveLen(3))
 			pod1, ok := objects[0].(*corev1.Pod)
 			Expect(ok).Should(BeTrue())
-			policy, err := getPodUpdatePolicy(rsm, pod1)
+			policy, err := getPodUpdatePolicy(its, pod1)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(NoOpsPolicy))
 
@@ -154,8 +154,8 @@ var _ = Describe("instance util test", func() {
 				},
 			})
 			pod2.Labels[appsv1.ControllerRevisionHashLabelKey] = "new-revision"
-			rsm.Status.UpdateRevisions[pod2.Name] = getPodRevision(pod2)
-			policy, err = getPodUpdatePolicy(rsm, pod2)
+			its.Status.UpdateRevisions[pod2.Name] = getPodRevision(pod2)
+			policy, err = getPodUpdatePolicy(its, pod2)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(RecreatePolicy))
 
@@ -163,7 +163,7 @@ var _ = Describe("instance util test", func() {
 			pod3 := pod1.DeepCopy()
 			randStr = rand.String(16)
 			mergeMap(&map[string]string{key: randStr}, &pod3.Annotations)
-			policy, err = getPodUpdatePolicy(rsm, pod3)
+			policy, err = getPodUpdatePolicy(its, pod3)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(InPlaceUpdatePolicy))
 
@@ -177,7 +177,7 @@ var _ = Describe("instance util test", func() {
 				corev1.ResourceCPU: resource.MustParse(fmt.Sprintf("%dm", randInt)),
 			}
 			pod4.Spec.Containers[0].Resources.Requests = requests
-			policy, err = getPodUpdatePolicy(rsm, pod4)
+			policy, err = getPodUpdatePolicy(its, pod4)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(InPlaceUpdatePolicy))
 
@@ -188,7 +188,7 @@ var _ = Describe("instance util test", func() {
 				corev1.ResourceCPU: resource.MustParse(fmt.Sprintf("%dm", randInt)),
 			}
 			pod5.Spec.Containers[0].Resources.Requests = requests
-			policy, err = getPodUpdatePolicy(rsm, pod5)
+			policy, err = getPodUpdatePolicy(its, pod5)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(InPlaceUpdatePolicy))
 
@@ -196,7 +196,7 @@ var _ = Describe("instance util test", func() {
 			ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
 			defer viper.Set(FeatureGateIgnorePodVerticalScaling, ignorePodVerticalScaling)
 			viper.Set(FeatureGateIgnorePodVerticalScaling, true)
-			policy, err = getPodUpdatePolicy(rsm, pod5)
+			policy, err = getPodUpdatePolicy(its, pod5)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(NoOpsPolicy))
 		})

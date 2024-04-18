@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm2
+package instanceset
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -25,7 +25,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // statusReconciler computes the current status
@@ -45,7 +45,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 }
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	rsm, _ := tree.GetRoot().(*workloads.InstanceSet)
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
 	var podList []corev1.Pod
@@ -54,7 +54,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		podList = append(podList, *pod)
 	}
 	// 2. calculate status summary
-	updateRevisions, err := getUpdateRevisions(rsm.Status.UpdateRevisions)
+	updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return nil, err
 	}
@@ -68,12 +68,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		}
 		if isRunningAndReady(pod) {
 			readyReplicas++
-			if isRunningAndAvailable(pod, rsm.Spec.MinReadySeconds) {
+			if isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
 				availableReplicas++
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			isPodUpdated, err := IsPodUpdated(rsm, pod)
+			isPodUpdated, err := IsPodUpdated(its, pod)
 			if err != nil {
 				return nil, err
 			}
@@ -85,25 +85,25 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			}
 		}
 	}
-	rsm.Status.Replicas = replicas
-	rsm.Status.ReadyReplicas = readyReplicas
-	rsm.Status.AvailableReplicas = availableReplicas
-	rsm.Status.CurrentReplicas = currentReplicas
-	rsm.Status.UpdatedReplicas = updatedReplicas
-	rsm.Status.CurrentGeneration = rsm.Generation
+	its.Status.Replicas = replicas
+	its.Status.ReadyReplicas = readyReplicas
+	its.Status.AvailableReplicas = availableReplicas
+	its.Status.CurrentReplicas = currentReplicas
+	its.Status.UpdatedReplicas = updatedReplicas
+	its.Status.CurrentGeneration = its.Generation
 	// all pods have been updated
 	totalReplicas := int32(1)
-	if rsm.Spec.Replicas != nil {
-		totalReplicas = *rsm.Spec.Replicas
+	if its.Spec.Replicas != nil {
+		totalReplicas = *its.Spec.Replicas
 	}
-	if rsm.Status.Replicas == totalReplicas && rsm.Status.UpdatedReplicas == totalReplicas {
-		rsm.Status.CurrentRevisions = rsm.Status.UpdateRevisions
-		rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
-		rsm.Status.CurrentReplicas = totalReplicas
+	if its.Status.Replicas == totalReplicas && its.Status.UpdatedReplicas == totalReplicas {
+		its.Status.CurrentRevisions = its.Status.UpdateRevisions
+		its.Status.CurrentRevision = its.Status.UpdateRevision
+		its.Status.CurrentReplicas = totalReplicas
 	}
 
 	// 3. set members status
-	rsm1.SetMembersStatus(rsm, &podList)
+	rsm.SetMembersStatus(its, &podList)
 
 	return tree, nil
 }

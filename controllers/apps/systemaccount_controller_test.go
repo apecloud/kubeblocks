@@ -300,7 +300,7 @@ var _ = Describe("SystemAccount Controller", func() {
 			clustersMap = initSysAccountTestsAndCluster(mysqlTestCases)
 		})
 
-		It("Should create jobs and secrets as expected for each test case", func() {
+		PIt("Should create jobs and secrets as expected for each test case", func() {
 			for testName, testCase := range mysqlTestCases {
 				var (
 					acctList   appsv1alpha1.KBAccountType

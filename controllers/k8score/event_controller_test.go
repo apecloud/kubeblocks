@@ -38,6 +38,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -92,10 +93,11 @@ var _ = Describe("Event Controller", func() {
 			GetObject()
 	}
 
-	createInvolvedPod := func(name, clusterName, componentName string) *corev1.Pod {
+	createInvolvedPod := func(name, clusterName, componentName, itsName string) *corev1.Pod {
 		return builder.NewPodBuilder(testCtx.DefaultNamespace, name).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			AddLabels(constant.KBAppComponentLabelKey, componentName).
+			AddLabels(rsm.WorkloadsInstanceLabelKey, itsName).
 			SetContainers([]corev1.Container{
 				{
 					Image: "foo",
@@ -124,8 +126,8 @@ var _ = Describe("Event Controller", func() {
 				Create(&testCtx).GetObject()
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
-			rsmName := fmt.Sprintf("%s-%s", clusterObj.Name, consensusCompName)
-			rsm := testapps.NewInstanceSetFactory(clusterObj.Namespace, rsmName, clusterObj.Name, consensusCompName).
+			itsName := fmt.Sprintf("%s-%s", clusterObj.Name, consensusCompName)
+			rsm := testapps.NewInstanceSetFactory(clusterObj.Namespace, itsName, clusterObj.Name, consensusCompName).
 				SetReplicas(int32(3)).
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				Create(&testCtx).GetObject()
@@ -147,8 +149,8 @@ var _ = Describe("Event Controller", func() {
 			})()).Should(Succeed())
 			By("create involved pod")
 			var uid types.UID
-			podName := fmt.Sprintf("%s-%d", rsmName, 0)
-			pod := createInvolvedPod(podName, clusterObj.Name, consensusCompName)
+			podName := fmt.Sprintf("%s-%d", itsName, 0)
+			pod := createInvolvedPod(podName, clusterObj.Name, consensusCompName, itsName)
 			Expect(testCtx.CreateObj(ctx, pod)).Should(Succeed())
 			Eventually(func() error {
 				p := &corev1.Pod{}

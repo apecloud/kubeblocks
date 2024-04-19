@@ -86,9 +86,10 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetAffinity(affinities).
 		SetTolerations(tolerations).
+		SetSidecarContainers(compSpec.Sidecars).
+		SetMonitor(compSpec.MonitorEnabled).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
-		SetMonitor(compSpec.Monitor).
 		SetServiceAccountName(compSpec.ServiceAccountName).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetEnabledLogs(compSpec.EnabledLogs).

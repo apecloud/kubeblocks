@@ -235,11 +235,11 @@ func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
 	})
 }
 
-func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory {
-	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
-		comp.Monitor = monitor
-	})
-}
+// func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory {
+// 	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+// 		comp.Monitor = monitor
+// 	})
+// }
 
 func (factory *MockClusterFactory) SetSwitchPolicy(switchPolicy *appsv1alpha1.ClusterSwitchPolicy) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {

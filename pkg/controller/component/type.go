@@ -27,13 +27,6 @@ import (
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-type MonitorConfig struct {
-	Enable     bool   `json:"enable"`
-	BuiltIn    bool   `json:"builtIn"`
-	ScrapePort int32  `json:"scrapePort,omitempty"`
-	ScrapePath string `json:"scrapePath,omitempty"`
-}
-
 type SynthesizedComponent struct {
 	Namespace            string                                 `json:"namespace,omitempty"`
 	ClusterName          string                                 `json:"clusterName,omitempty"`
@@ -48,7 +41,6 @@ type SynthesizedComponent struct {
 	Resources            corev1.ResourceRequirements            `json:"resources,omitempty"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	Monitor              *MonitorConfig                         `json:"monitor,omitempty"`
 	LogConfigs           []v1alpha1.LogConfig                   `json:"logConfigs,omitempty"`
 	ConfigTemplates      []v1alpha1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
 	ScriptTemplates      []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
@@ -77,6 +69,8 @@ type SynthesizedComponent struct {
 	HostNetwork         *v1alpha1.HostNetwork               `json:"hostNetwork,omitempty"`
 	ComponentServices   []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
 	MinReadySeconds     int32                               `json:"minReadySeconds,omitempty"`
+	Sidecars            []string                            `json:"sidecars,omitempty"`
+	MonitorEnabled      bool                                `json:"monitorEnabled,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.
 	Probes           *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`           // The Probes will be replaced with LifecycleActions.RoleProbe in the future.

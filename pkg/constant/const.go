@@ -329,3 +329,7 @@ const (
 	MigratedAPIVersion = "migrated"
 	ReviewAPIVersion   = "reviewer"
 )
+
+const (
+	FeatureGateIgnoreConfigTemplateDefaultMode = "IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE"
+)

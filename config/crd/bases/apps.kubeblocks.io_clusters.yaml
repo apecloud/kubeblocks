@@ -3039,9 +3039,13 @@ spec:
                       required:
                       - name
                       type: object
-                    monitor:
-                      default: false
-                      description: Indicates whether monitoring is enabled.
+                    monitorEnabled:
+                      description: 'Determines whether the metrics exporter needs
+                        to be published to the service endpoint. If set to true, the
+                        metrics exporter will be published to the service endpoint,
+                        the service will be injected with the following annotations:
+                        - "monitor.kubeblocks.io/path" - "monitor.kubeblocks.io/port"
+                        - "monitor.kubeblocks.io/scheme"'
                       type: boolean
                     name:
                       description: "Specifies the name of the Component. This name
@@ -3336,6 +3340,15 @@ spec:
                         - name
                         type: object
                       type: array
+                    sidecars:
+                      description: Defines the sidecar containers that will be attached
+                        to the component's main container.
+                      items:
+                        type: string
+                      maxItems: 32
+                      minItems: 1
+                      type: array
+                      x-kubernetes-list-type: set
                     switchPolicy:
                       description: "Defines the strategy for switchover and failover
                         when workloadType is Replication. \n Deprecated since v0.9.
@@ -3775,20 +3788,6 @@ spec:
                 - message: two kinds of definition API can not be used simultaneously
                   rule: self.all(x, size(self.filter(c, has(c.componentDef))) == 0)
                     || self.all(x, size(self.filter(c, has(c.componentDef))) == size(self))
-              monitor:
-                description: "The configuration of monitor. \n Deprecated since v0.9.
-                  This field is maintained for backward compatibility and its use
-                  is discouraged. Existing usage should be updated to the current
-                  preferred approach to avoid compatibility issues in future releases."
-                properties:
-                  monitoringInterval:
-                    anyOf:
-                    - type: integer
-                    - type: string
-                    description: Defines the frequency at which monitoring occurs.
-                      If set to 0, monitoring is disabled.
-                    x-kubernetes-int-or-string: true
-                type: object
               network:
                 description: "The configuration of network. \n Deprecated since v0.9.
                   This field is maintained for backward compatibility and its use
@@ -7286,9 +7285,13 @@ spec:
                           required:
                           - name
                           type: object
-                        monitor:
-                          default: false
-                          description: Indicates whether monitoring is enabled.
+                        monitorEnabled:
+                          description: 'Determines whether the metrics exporter needs
+                            to be published to the service endpoint. If set to true,
+                            the metrics exporter will be published to the service
+                            endpoint, the service will be injected with the following
+                            annotations: - "monitor.kubeblocks.io/path" - "monitor.kubeblocks.io/port"
+                            - "monitor.kubeblocks.io/scheme"'
                           type: boolean
                         name:
                           description: "Specifies the name of the Component. This
@@ -7596,6 +7599,15 @@ spec:
                             - name
                             type: object
                           type: array
+                        sidecars:
+                          description: Defines the sidecar containers that will be
+                            attached to the component's main container.
+                          items:
+                            type: string
+                          maxItems: 32
+                          minItems: 1
+                          type: array
+                          x-kubernetes-list-type: set
                         switchPolicy:
                           description: "Defines the strategy for switchover and failover
                             when workloadType is Replication. \n Deprecated since

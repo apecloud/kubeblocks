@@ -80,13 +80,18 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
-func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBuilder {
-	builder.get().Spec.EnabledLogs = logNames
+func (builder *ComponentBuilder) SetSidecarContainers(sidecars []string) *ComponentBuilder {
+	builder.get().Spec.Sidecars = sidecars
 	return builder
 }
 
-func (builder *ComponentBuilder) SetMonitor(monitor bool) *ComponentBuilder {
-	builder.get().Spec.Monitor = monitor
+func (builder *ComponentBuilder) SetMonitor(monitorEnabled *bool) *ComponentBuilder {
+	builder.get().Spec.MonitorEnabled = monitorEnabled
+	return builder
+}
+
+func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBuilder {
+	builder.get().Spec.EnabledLogs = logNames
 	return builder
 }
 

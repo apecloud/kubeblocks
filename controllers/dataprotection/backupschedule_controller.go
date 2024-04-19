@@ -206,7 +206,8 @@ func (r *BackupScheduleReconciler) handleSchedule(
 	if err = r.patchScheduleMetadata(reqCtx, backupSchedule); err != nil {
 		return err
 	}
-	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backupSchedule.Namespace)
+	// TODO: update the mcMgr param
+	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backupSchedule.Namespace, nil)
 	if err != nil {
 		return err
 	}

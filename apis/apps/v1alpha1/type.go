@@ -66,6 +66,9 @@ type ComponentTemplateSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	VolumeName string `json:"volumeName"`
 
+	// Deprecated: DefaultMode is deprecated since 0.9.0 and will be removed in 0.10.0
+	// for scripts, auto set 0555
+	// for configs, auto set 0444
 	// Refers to the mode bits used to set permissions on created files by default.
 	//
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
@@ -76,6 +79,7 @@ type ComponentTemplateSpec struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
@@ -104,6 +108,8 @@ type ConfigTemplateExtension struct {
 	Policy MergedPolicy `json:"policy,omitempty"`
 }
 
+// LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
+// Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0
 type LegacyRenderedTemplateSpec struct {
 	// Extends the configuration template.
 	ConfigTemplateExtension `json:",inline"`
@@ -138,6 +144,7 @@ type ComponentConfigSpec struct {
 	// Note: This field will be deprecated in future versions, and the functionality will be moved to
 	// `cluster.spec.componentSpecs[*].instances[*]`.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +optional
 	LegacyRenderedConfigSpec *LegacyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
 
@@ -148,6 +155,7 @@ type ComponentConfigSpec struct {
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 
+	// Deprecated: AsEnvFrom has been deprecated since 0.9.0 and will be removed in 0.10.0
 	// Specifies the containers to inject the ConfigMap parameters as environment variables.
 	//
 	// This is useful when application images accept parameters through environment variables and
@@ -159,9 +167,24 @@ type ComponentConfigSpec struct {
 	//
 	// Note: The field name `asEnvFrom` may be changed to `injectEnvTo` in future versions for better clarity.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +listType=set
 	// +optional
 	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
+
+	// Specifies the containers to inject the ConfigMap parameters as environment variables.
+	//
+	// This is useful when application images accept parameters through environment variables and
+	// generate the final configuration file in the startup script based on these variables.
+	//
+	// This field allows users to specify a list of container names, and KubeBlocks will inject the environment
+	// variables converted from the ConfigMap into these designated containers. This provides a flexible way to
+	// pass the configuration items from the ConfigMap to the container without modifying the image.
+	//
+	//
+	// +listType=set
+	// +optional
+	InjectEnvTo []string `json:"injectEnvTo,omitempty"`
 
 	// Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
 	//
@@ -179,12 +202,12 @@ type ComponentConfigSpec struct {
 
 // RerenderResourceType defines the resource requirements for a component.
 // +enum
-// +kubebuilder:validation:Enum={resources,replcias,tls}
+// +kubebuilder:validation:Enum={vscale,hscale,tls}
 type RerenderResourceType string
 
 const (
-	ComponentResourceType RerenderResourceType = "resources"
-	ComponentReplicasType RerenderResourceType = "replicas"
+	ComponentVScaleType RerenderResourceType = "vscale"
+	ComponentHScaleType RerenderResourceType = "hscale"
 )
 
 // MergedPolicy defines how to merge external imported templates into component templates.
@@ -1206,3 +1229,25 @@ type MultipleClusterObjectValueFormatFlatten struct {
 	// +required
 	KeyValueDelimiter string `json:"keyValueDelimiter"`
 }
+
+// PrometheusProtocol defines the protocol of prometheus scrape metrics.
+//
+// +enum
+// +kubebuilder:validation:Enum={http,https}
+type PrometheusProtocol string
+
+const (
+	HTTPProtocol  = "http"
+	HTTPSProtocol = "https"
+)
+
+// MonitorKind defines the kind of monitor.
+// +enum
+// +kubebuilder:validation:Enum={metrics,logs,traces}
+type MonitorKind string
+
+const (
+	MetricsKind = "metrics"
+	LogsKind    = "logs"
+	TracesKind  = "traces"
+)

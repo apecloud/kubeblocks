@@ -179,7 +179,9 @@ func CheckAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1al
 
 func (p *pipeline) UpdatePodVolumes() *pipeline {
 	return p.Wrap(func() error {
-		return intctrlutil.CreateOrUpdatePodVolumes(p.ctx.PodSpec, p.renderWrapper.volumes)
+		return intctrlutil.CreateOrUpdatePodVolumes(p.ctx.PodSpec,
+			p.renderWrapper.volumes,
+			configSetFromComponent(p.ctx.SynthesizedComponent.ConfigTemplates))
 	})
 }
 

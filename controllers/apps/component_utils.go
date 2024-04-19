@@ -163,3 +163,12 @@ func getImageName(image string) string {
 		return ""
 	}
 }
+
+func HasSidecar(compDef *appsv1alpha1.ComponentDefinition, sidecar string) bool {
+	for _, spec := range compDef.Spec.SidecarContainerSpecs {
+		if spec.Name == sidecar {
+			return true
+		}
+	}
+	return false
+}

@@ -97,6 +97,16 @@ var (
 					ContainerPort: 12345,
 				},
 			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    resource.MustParse("500m"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    resource.MustParse("300m"),
+					corev1.ResourceMemory: resource.MustParse("512Mi"),
+				},
+			},
 		}).GetObject()
 	template = corev1.PodTemplateSpec{
 		ObjectMeta: pod.ObjectMeta,

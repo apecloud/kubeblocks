@@ -101,6 +101,12 @@ func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[str
 func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *component.SynthesizedComponent,
 	needAllocate func(string, string, int32) bool) (map[string]map[string]int32, error) {
 	ports := map[string]map[string]int32{}
+	insert := func(c, pk string, pv int32) {
+		if _, ok := ports[c]; !ok {
+			ports[c] = map[string]int32{}
+		}
+		ports[c][pk] = pv
+	}
 	for _, c := range synthesizedComp.PodSpec.Containers {
 		for _, p := range c.Ports {
 			portKey := intctrlutil.BuildHostPortName(synthesizedComp.ClusterName, synthesizedComp.Name, c.Name, p.Name)
@@ -109,7 +115,7 @@ func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *com
 				if err != nil {
 					return nil, err
 				}
-				ports[c.Name][p.Name] = port
+				insert(c.Name, p.Name, port)
 			} else {
 				if err := pm.UsePort(portKey, p.ContainerPort); err != nil {
 					return nil, err

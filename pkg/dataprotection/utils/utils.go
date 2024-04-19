@@ -84,12 +84,18 @@ func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {
 	return false, "", ""
 }
 
-func GetAssociatedPodsOfJob(ctx context.Context, cli client.Client, namespace, jobName string) (*corev1.PodList, error) {
+func GetAssociatedPodsOfJob(ctx context.Context, cli client.Client, namespace, jobName string, opts ...client.ListOption) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	// from https://github.com/kubernetes/kubernetes/issues/24709
-	err := cli.List(ctx, podList, client.InNamespace(namespace), client.MatchingLabels{
-		"job-name": jobName,
-	})
+	opts = append(
+		[]client.ListOption{
+			client.InNamespace(namespace),
+			client.MatchingLabels{
+				"job-name": jobName,
+			},
+		},
+		opts...)
+	err := cli.List(ctx, podList, opts...)
 	return podList, err
 }
 

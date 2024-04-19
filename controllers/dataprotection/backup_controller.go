@@ -204,7 +204,8 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		Scheme:     r.Scheme,
 	}
 
-	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace)
+	// TODO: update the mcMgr param
+	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get worker service account: %w", err)
 	}
@@ -434,7 +435,8 @@ func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCt
 	request.TargetPods = targetPods
 	saName := target.ServiceAccountName
 	if saName == "" {
-		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, request.Backup.Namespace)
+		// TODO: update the mcMgr param
+		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, request.Backup.Namespace, nil)
 		if err != nil {
 			return fmt.Errorf("failed to get worker service account: %w", err)
 		}

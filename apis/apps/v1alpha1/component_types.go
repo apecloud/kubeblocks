@@ -162,12 +162,7 @@ type ComponentSpec struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// Specifies the scheduling policy for the component.
-	//
-	// +optional
-	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
-
+	
 	// Specifies the TLS configuration for the component, including:
 	//
 	// - A boolean flag that indicates whether the component should use Transport Layer Security (TLS) for secure communication.

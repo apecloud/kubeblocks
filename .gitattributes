@@ -1,0 +1,12 @@
+# ignore generated files
+apis/storage/v1alpha1/zz_generated.deepcopy.go linguist-generated=true
+apis/extensions/v1alpha1/zz_generated.deepcopy.go linguist-generated=true
+apis/workloads/v1alpha1/zz_generated.deepcopy.go linguist-generated=true
+apis/dataprotection/v1alpha1/zz_generated.deepcopy.go linguist-generated=true
+apis/apps/v1beta1/zz_generated.deepcopy.go linguist-generated=true
+apis/apps/v1alpha1/zz_generated.deepcopy.go linguist-generated=true
+externalapis/preflight/v1beta2/zz_generated.deepcopy.go
+config/crd/**/* linguist-generated=true
+deploy/helm/crds/**/* linguist-generated=true
+pkg/client/**/* linguist-generated=true
+docs/developer_docs/api-reference/cluster.md linguist-generated=true

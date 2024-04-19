@@ -144,14 +144,14 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		AddTransformer(
 			// handle component deletion and pre-terminate
 			&componentDeletionTransformer{},
-			// handle upgrade from the legacy RSM API to the InstanceSet API
-			&upgradeTransformer{},
 			// handle finalizers and referenced definition labels
 			&componentMetaTransformer{},
 			// validate referenced componentDefinition objects, and build synthesized component
 			&componentLoadResourcesTransformer{},
 			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
+			// handle upgrade from the legacy RSM API to the InstanceSet API
+			&upgradeTransformer{},
 			// allocate ports for host-network component
 			&componentHostNetworkTransformer{},
 			// handle component services

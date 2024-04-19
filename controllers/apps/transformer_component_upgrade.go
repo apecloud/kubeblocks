@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -81,7 +82,7 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	ml := client.MatchingLabels{
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.AppInstanceLabelKey:    transCtx.Cluster.Name,
-		constant.KBAppComponentLabelKey: comp.Name,
+		constant.KBAppComponentLabelKey: synthesizeComp.Name,
 	}
 	if err := graphCli.List(transCtx.Context, podList, ml); err == nil {
 		if len(podList.Items) > 0 {
@@ -94,7 +95,7 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 				legacyFound = true
 				pod.OwnerReferences = nil
 				pod.Labels[rsmcore.WorkloadsManagedByLabelKey] = rsmcore.KindInstanceSet
-				pod.Labels[rsmcore.WorkloadsInstanceLabelKey] = constant.GenerateWorkloadNamePattern(transCtx.Cluster.Name, comp.Name)
+				pod.Labels[rsmcore.WorkloadsInstanceLabelKey] = synthesizeComp.Name
 				if revision == "" {
 					revision, err = buildRevision(synthesizeComp)
 					if err != nil {
@@ -113,7 +114,7 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	env := &corev1.ConfigMap{}
 	key := types.NamespacedName{
 		Namespace: comp.Namespace,
-		Name:      rsmcore.GetEnvConfigMapName(constant.GenerateWorkloadNamePattern(transCtx.Cluster.Name, comp.Name)),
+		Name:      fmt.Sprintf("%s-rsm-env", comp.Name),
 	}
 	if err := graphCli.Get(transCtx.Context, key, env); err == nil {
 		legacyFound = true

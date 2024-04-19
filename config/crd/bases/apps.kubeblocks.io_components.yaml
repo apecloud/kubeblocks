@@ -39,7 +39,10 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Component is the Schema for the components API
+        description: Component is a derived sub-object of a user-submitted Cluster
+          object. It is an internal object, and users should not modify Component
+          objects; they are intended only for observing the status of Components within
+          the system.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -54,41 +57,82 @@ spec:
           metadata:
             type: object
           spec:
-            description: ComponentSpec defines the desired state of Component
+            description: ComponentSpec defines the desired state of Component.
             properties:
               affinity:
-                description: Specifies the scheduling constraints for the component.
-                  If specified, it will override the cluster-wide affinity.
+                description: Specifies a group of affinity scheduling rules for the
+                  Component. It allows users to control how the Component's Pods are
+                  scheduled onto nodes in the cluster.
                 properties:
                   nodeLabels:
                     additionalProperties:
                       type: string
-                    description: Indicates that pods must be scheduled to the nodes
-                      with the specified node labels.
+                    description: "Indicates the node labels that must be present on
+                      nodes for pods to be scheduled on them. It is a map where the
+                      keys are the label keys and the values are the corresponding
+                      label values. Pods will only be scheduled on nodes that have
+                      all the specified labels with the corresponding values. \n For
+                      example, if NodeLabels is set to {\"nodeType\": \"ssd\", \"environment\":
+                      \"production\"}, pods will only be scheduled on nodes that have
+                      both the \"nodeType\" label with value \"ssd\" and the \"environment\"
+                      label with value \"production\". \n This field allows users
+                      to control Pod placement based on specific node labels. It can
+                      be used to ensure that Pods are scheduled on nodes with certain
+                      characteristics, such as specific hardware (e.g., SSD), environment
+                      (e.g., production, staging), or any other custom labels assigned
+                      to nodes."
                     type: object
                   podAntiAffinity:
                     default: Preferred
-                    description: Specifies the anti-affinity level of pods within
-                      a component.
+                    description: 'Specifies the anti-affinity level of Pods within
+                      a Component. It determines how pods should be spread across
+                      nodes to improve availability and performance. It can have the
+                      following values: `Preferred` and `Required`. The default value
+                      is `Preferred`.'
                     enum:
                     - Preferred
                     - Required
                     type: string
                   tenancy:
                     default: SharedNode
-                    description: Defines how pods are distributed across nodes.
+                    description: "Determines the level of resource isolation between
+                      Pods. It can have the following values: `SharedNode` and `DedicatedNode`.
+                      \n - SharedNode: Allow that multiple Pods may share the same
+                      node, which is the default behavior of K8s. - DedicatedNode:
+                      Each Pod runs on a dedicated node, ensuring that no two Pods
+                      share the same node. In other words, if a Pod is already running
+                      on a node, no other Pods will be scheduled on that node. Which
+                      provides a higher level of isolation and resource guarantee
+                      for Pods. \n The default value is `SharedNode`."
                     enum:
                     - SharedNode
                     - DedicatedNode
                     type: string
                   topologyKeys:
-                    description: "Represents the key of node labels. \n Nodes with
-                      a label containing this key and identical values are considered
-                      to be in the same topology. This is used as the topology domain
-                      for pod anti-affinity and pod spread constraint. Some well-known
-                      label keys, such as `kubernetes.io/hostname` and `topology.kubernetes.io/zone`,
-                      are often used as TopologyKey, along with any other custom label
-                      key."
+                    description: "Represents the key of node labels used to define
+                      the topology domain for Pod anti-affinity and Pod spread constraints.
+                      \n In K8s, a topology domain is a set of nodes that have the
+                      same value for a specific label key. Nodes with labels containing
+                      any of the specified TopologyKeys and identical values are considered
+                      to be in the same topology domain. \n Note: The concept of topology
+                      in the context of K8s TopologyKeys is different from the concept
+                      of topology in the ClusterDefinition. \n When a Pod has anti-affinity
+                      or spread constraints specified, Kubernetes will attempt to
+                      schedule the Pod on nodes with different values for the specified
+                      TopologyKeys. This ensures that Pods are spread across different
+                      topology domains, promoting high availability and reducing the
+                      impact of node failures. \n Some well-known label keys, such
+                      as `kubernetes.io/hostname` and `topology.kubernetes.io/zone`,
+                      are often used as TopologyKey. These keys represent the hostname
+                      and zone of a node, respectively. By including these keys in
+                      the TopologyKeys list, Pods will be spread across nodes with
+                      different hostnames or zones. \n In addition to the well-known
+                      keys, users can also specify custom label keys as TopologyKeys.
+                      This allows for more flexible and custom topology definitions
+                      based on the specific needs of the application or environment.
+                      \n The TopologyKeys field is a slice of strings, where each
+                      string represents a label key. The order of the keys in the
+                      slice does not matter."
                     items:
                       type: string
                     type: array
@@ -99,19 +143,29 @@ spec:
                 maxLength: 64
                 type: string
               configs:
-                description: Defines the configuration for the component.
+                description: Reserved field for future use.
                 items:
                   properties:
                     asEnvFrom:
-                      description: An optional field where the list of containers
-                        will be injected into EnvFrom.
+                      description: "Specifies the containers to inject the ConfigMap
+                        parameters as environment variables. \n This is useful when
+                        application images accept parameters through environment variables
+                        and generate the final configuration file in the startup script
+                        based on these variables. \n This field allows users to specify
+                        a list of container names, and KubeBlocks will inject the
+                        environment variables converted from the ConfigMap into these
+                        designated containers. This provides a flexible way to pass
+                        the configuration items from the ConfigMap to the container
+                        without modifying the image. \n Note: The field name `asEnvFrom`
+                        may be changed to `injectEnvTo` in future versions for better
+                        clarity."
                       items:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
                     constraintRef:
-                      description: An optional field that defines the name of the
-                        referenced configuration constraints object.
+                      description: Specifies the name of the referenced configuration
+                        constraints object.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
@@ -127,15 +181,30 @@ spec:
                       format: int32
                       type: integer
                     keys:
-                      description: Defines a list of keys. If left empty, ConfigConstraint
-                        applies to all keys in the configmap.
+                      description: "Specifies the configuration files within the ConfigMap
+                        that support dynamic updates. \n A configuration template
+                        (provided in the form of a ConfigMap) may contain templates
+                        for multiple configuration files. Each configuration file
+                        corresponds to a key in the ConfigMap. Some of these configuration
+                        files may support dynamic modification and reloading without
+                        requiring a pod restart. \n If empty or omitted, all configuration
+                        files in the ConfigMap are assumed to support dynamic updates,
+                        and ConfigConstraint applies to all keys."
                       items:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
                     legacyRenderedConfigSpec:
-                      description: An optional field that defines the secondary rendered
-                        config spec.
+                      description: "Specifies the secondary rendered config spec for
+                        pod-specific customization. \n The template is rendered inside
+                        the pod (by the \"config-manager\" sidecar container) and
+                        merged with the main template's render result to generate
+                        the final configuration file. \n This field is intended to
+                        handle scenarios where different pods within the same Component
+                        have varying configurations. It allows for pod-specific customization
+                        of the configuration. \n Note: This field will be deprecated
+                        in future versions, and the functionality will be moved to
+                        `cluster.spec.componentSpecs[*].instances[*]`."
                       properties:
                         namespace:
                           default: default
@@ -177,8 +246,14 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     reRenderResourceTypes:
-                      description: An optional field defines which resources change
-                        trigger re-render config.
+                      description: "Specifies whether the configuration needs to be
+                        re-rendered after v-scale or h-scale operations to reflect
+                        changes. \n In some scenarios, the configuration may need
+                        to be updated to reflect the changes in resource allocation
+                        or cluster topology. Examples: \n - Redis: adjust maxmemory
+                        after v-scale operation. - MySQL: increase max connections
+                        after v-scale operation. - Zookeeper: update zoo.cfg with
+                        new node addresses after h-scale operation."
                       items:
                         description: RerenderResourceType defines the resource requirements
                           for a component.
@@ -210,24 +285,53 @@ spec:
                   type: object
                 type: array
               enabledLogs:
-                description: Indicates which log file takes effect in the database
-                  cluster, element is the log type which is defined in ComponentDefinition
-                  logConfig.name.
+                description: "Specifies which types of logs should be collected for
+                  the Cluster. The log types are defined in the `componentDefinition.spec.logConfigs`
+                  field with the LogConfig entries. \n The elements in the `enabledLogs`
+                  array correspond to the names of the LogConfig entries. For example,
+                  if the `componentDefinition.spec.logConfigs` defines LogConfig entries
+                  with names \"slow_query_log\" and \"error_log\", you can enable
+                  the collection of these logs by including their names in the `enabledLogs`
+                  array: enabledLogs: [\"slow_query_log\", \"error_log\"]"
                 items:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
               instances:
-                description: Overrides values in default Template.
+                description: "Allows for the customization of configuration values
+                  for each instance within a component. An Instance represent a single
+                  replica (Pod and associated K8s resources like PVCs, Services, and
+                  ConfigMaps). While instances typically share a common configuration
+                  as defined in the ClusterComponentSpec, they can require unique
+                  settings in various scenarios: \n For example: - A database component
+                  might require different resource allocations for primary and secondary
+                  instances, with primaries needing more resources. - During a rolling
+                  upgrade, a component may first update the image for one or a few
+                  instances, and then update the remaining instances after verifying
+                  that the updated instances are functioning correctly. \n InstanceTemplate
+                  allows for specifying these unique configurations per instance.
+                  Each instance's name is constructed using the pattern: $(component.name)-$(template.name)-$(ordinal),
+                  starting with an ordinal of 0. It is crucial to maintain unique
+                  names for each InstanceTemplate to avoid conflicts. \n The sum of
+                  replicas across all InstanceTemplates should not exceed the total
+                  number of Replicas specified for the Component. Any remaining replicas
+                  will be generated using the default template and will follow the
+                  default naming rules."
                 items:
-                  description: InstanceTemplate defines values to override in pod
-                    template.
+                  description: InstanceTemplate allows customization of individual
+                    replica configurations within a Component, without altering the
+                    base component template defined in ClusterComponentSpec. It enables
+                    the application of distinct settings to specific instances (replicas),
+                    providing flexibility while maintaining a common configuration
+                    baseline.
                   properties:
                     annotations:
                       additionalProperties:
                         type: string
-                      description: Defines annotations to override. Add new or override
-                        existing annotations.
+                      description: Specifies a map of key-value pairs to be merged
+                        into the Pod's existing annotations. Existing keys will have
+                        their values overwritten, while new keys will be added to
+                        the annotations.
                       type: object
                     env:
                       description: Defines Env to override. Add new or override existing
@@ -349,26 +453,37 @@ spec:
                         type: object
                       type: array
                     image:
-                      description: Defines image to override. Will override the first
-                        container's image of the pod.
+                      description: Specifies an override for the first container's
+                        image in the pod.
                       type: string
                     labels:
                       additionalProperties:
                         type: string
-                      description: Defines labels to override. Add new or override
-                        existing labels.
+                      description: Specifies a map of key-value pairs that will be
+                        merged into the Pod's existing labels. Values for existing
+                        keys will be overwritten, and new keys will be added.
                       type: object
                     name:
-                      description: Specifies the name of the template. Each instance
-                        of the template derives its name from the Component's Name,
-                        the template's Name and the instance's ordinal. The constructed
-                        instance name follows the pattern $(component.name)-$(template.name)-$(ordinal).
-                        The ordinal starts from 0 by default.
+                      description: 'Name specifies the unique name of the instance
+                        Pod created using this InstanceTemplate. This name is constructed
+                        by concatenating the component''s name, the template''s name,
+                        and the instance''s ordinal using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal).
+                        Ordinals start from 0. The specified name overrides any default
+                        naming conventions or patterns.'
                       maxLength: 54
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     nodeName:
-                      description: Defines NodeName to override.
+                      description: "Specifies the name of the node where the Pod should
+                        be scheduled. If set, the Pod will be directly assigned to
+                        the specified node, bypassing the Kubernetes scheduler. This
+                        is useful for controlling Pod placement on specific nodes.
+                        \n Important considerations: - `nodeName` bypasses default
+                        scheduling constraints (e.g., resource requirements, node
+                        selectors, affinity rules). - It is the user's responsibility
+                        to ensure the node is suitable for the Pod. - If the node
+                        is unavailable, the Pod will remain in \"Pending\" state until
+                        the node is available or the Pod is deleted."
                       type: string
                     nodeSelector:
                       additionalProperties:
@@ -377,14 +492,18 @@ spec:
                       type: object
                     replicas:
                       default: 1
-                      description: Number of replicas of this template. Default is
-                        1.
+                      description: Specifies the number of instances (Pods) to create
+                        from this InstanceTemplate. This field allows setting how
+                        many replicated instances of the component, with the specific
+                        overrides in the InstanceTemplate, are created. The default
+                        value is 1. A value of 0 disables instance creation.
                       format: int32
                       minimum: 0
                       type: integer
                     resources:
-                      description: Defines Resources to override. Will override the
-                        first container's resources of the pod.
+                      description: Specifies an override for the resource requirements
+                        of the first container in the Pod. This field allows for customizing
+                        resource allocation (CPU, memory, etc.) for the container.
                       properties:
                         claims:
                           description: "Claims lists the names of resources, defined
@@ -433,8 +552,10 @@ spec:
                           type: object
                       type: object
                     tolerations:
-                      description: Defines Tolerations to override. Add new or override
-                        existing tolerations.
+                      description: Tolerations specifies a list of tolerations to
+                        be applied to the Pod, allowing it to tolerate node taints.
+                        This field can be used to add new tolerations or override
+                        existing ones.
                       items:
                         description: The pod this Toleration is attached to tolerates
                           any taint that matches the triple <key,value,effect> using
@@ -2623,26 +2744,36 @@ spec:
                 type: array
               monitor:
                 default: false
-                description: A switch to enable monitoring and is set as false by
-                  default. KubeBlocks provides an extension mechanism to support component
-                  level monitoring, which will scrape metrics auto or manually from
-                  servers in component and export metrics to Time Series Database.
+                description: Indicates whether monitoring is enabled.
                 type: boolean
               offlineInstances:
-                description: Specifies instances to be scaled in with dedicated names
-                  in the list.
+                description: "Specifies the names of instances to be transitioned
+                  to offline status. \n Marking an instance as offline results in
+                  the following: \n 1. The associated pod is stopped, and its PersistentVolumeClaim
+                  (PVC) is retained for potential future reuse or data recovery, but
+                  it is no longer actively used. 2. The ordinal number assigned to
+                  this instance is preserved, ensuring it remains unique and avoiding
+                  conflicts with new instances. \n Setting instances to offline allows
+                  for a controlled scale-in process, preserving their data and maintaining
+                  ordinal consistency within the cluster. Note that offline instances
+                  and their associated resources, such as PVCs, are not automatically
+                  deleted. The cluster administrator must manually manage the cleanup
+                  and removal of these resources when they are no longer needed."
                 items:
                   type: string
                 type: array
               replicas:
                 default: 1
-                description: Specifies the desired number of replicas for the component's
-                  workload.
+                description: Each component supports running multiple replicas to
+                  provide high availability and persistence. This field can be used
+                  to specify the desired number of replicas.
                 format: int32
                 minimum: 0
                 type: integer
               resources:
-                description: Requests and limits of workload resources.
+                description: Specifies the resources required by the Component. It
+                  allows defining the CPU, memory requirements and limits for the
+                  Component's containers.
                 properties:
                   claims:
                     description: "Claims lists the names of resources, defined in
@@ -3810,51 +3941,71 @@ spec:
                     type: array
                 type: object
               serviceAccountName:
-                description: The name of the ServiceAccount that running component
-                  depends on.
+                description: "Specifies the name of the ServiceAccount required by
+                  the running Component. This ServiceAccount is used to grant necessary
+                  permissions for the Component's Pods to interact with other Kubernetes
+                  resources, such as modifying pod labels or sending events. \n Defaults:
+                  If not specified, KubeBlocks automatically assigns a default ServiceAccount
+                  named \"kb-{cluster.name}\", bound to a default role defined during
+                  KubeBlocks installation. \n Future Changes: Future versions might
+                  change the default ServiceAccount creation strategy to one per Component,
+                  potentially revising the naming to \"kb-{cluster.name}-{component.name}\".
+                  \n Users can override the automatic ServiceAccount assignment by
+                  explicitly setting the name of an existed ServiceAccount in this
+                  field."
                 type: string
               serviceRefs:
-                description: "Define service references for the current component.
-                  Based on the referenced services, they can be categorized into two
-                  types: - Service provided by external sources: These services are
-                  provided by external sources and are not managed by KubeBlocks.
-                  They can be Kubernetes-based or non-Kubernetes services. For external
-                  services, you need to provide an additional ServiceDescriptor object
-                  to establish the service binding. - Service provided by other KubeBlocks
-                  clusters: These services are provided by other KubeBlocks clusters.
-                  You can bind to these services by specifying the name of the hosting
-                  cluster. \n Each type of service reference requires specific configurations
-                  and bindings to establish the connection and interaction with the
-                  respective services. It should be noted that the ServiceRef has
-                  cluster-level semantic consistency, meaning that within the same
-                  Cluster, service references with the same ServiceRef.Name are considered
-                  to be the same service. It is only allowed to bind to the same Cluster
-                  or ServiceDescriptor."
+                description: "Defines a list of ServiceRef for a Component, allowing
+                  it to connect and interact with other services. These services can
+                  be external or managed by the same KubeBlocks operator, categorized
+                  as follows: \n 1. External Services: \n - Not managed by KubeBlocks.
+                  These could be services outside KubeBlocks or non-Kubernetes services.
+                  - Connection requires a ServiceDescriptor providing details for
+                  service binding. \n 2. KubeBlocks Services: \n - Managed within
+                  the same KubeBlocks environment. - Service binding is achieved by
+                  specifying cluster names in the service references, with configurations
+                  handled by the KubeBlocks operator. \n ServiceRef maintains cluster-level
+                  semantic consistency; references with the same `serviceRef.name`
+                  within the same cluster are treated as identical. Only bindings
+                  to the same cluster or ServiceDescriptor are allowed within a cluster.
+                  \n Example: ```yaml serviceRefs: - name: \"redis-sentinel\" serviceDescriptor:
+                  name: \"external-redis-sentinel\" - name: \"postgres-cluster\" cluster:
+                  name: \"my-postgres-cluster\" ``` The example above includes references
+                  to an external Redis Sentinel service and a PostgreSQL cluster managed
+                  by KubeBlocks."
                 items:
                   properties:
                     cluster:
-                      description: "The name of the KubeBlocks cluster being referenced
-                        when a service provided by another KubeBlocks cluster is being
-                        referenced. \n By default, the clusterDefinition.spec.connectionCredential
-                        secret corresponding to the referenced Cluster will be used
-                        to bind to the current component. The connection credential
-                        secret should include and correspond to the following fields:
-                        endpoint, port, username, and password when a KubeBlocks cluster
-                        is being referenced. \n Under this referencing approach, the
-                        ServiceKind and ServiceVersion of service reference declaration
-                        defined in the ClusterDefinition will not be validated. If
-                        both Cluster and ServiceDescriptor are specified, the Cluster
-                        takes precedence."
+                      description: "Specifies the name of the KubeBlocks Cluster being
+                        referenced. This is used when services from another KubeBlocks
+                        Cluster are consumed. \n By default, the referenced KubeBlocks
+                        Cluster's `clusterDefinition.spec.connectionCredential` will
+                        be utilized to bind to the current Component. This credential
+                        should include: `endpoint`, `port`, `username`, and `password`.
+                        \n Note: \n - The `ServiceKind` and `ServiceVersion` specified
+                        in the service reference within the ClusterDefinition are
+                        not validated when using this approach. - If both `cluster`
+                        and `serviceDescriptor` are present, `cluster` will take precedence.
+                        \n Deprecated since v0.9 since `clusterDefinition.spec.connectionCredential`
+                        is deprecated, use `clusterRef` instead. This field is maintained
+                        for backward compatibility and its use is discouraged. Existing
+                        usage should be updated to the current preferred approach
+                        to avoid compatibility issues in future releases."
                       type: string
                     clusterServiceSelector:
-                      description: Specifies the cluster to reference.
+                      description: ClusterRef is used to reference a service provided
+                        by another KubeBlocks Cluster. It specifies the ClusterService
+                        and the account credentials needed for access.
                       properties:
                         cluster:
-                          description: The name of the cluster to reference.
+                          description: The name of the KubeBlocks Cluster being referenced.
                           type: string
                         credential:
-                          description: The credential (SystemAccount) to reference
-                            from the cluster.
+                          description: Specifies the SystemAccount to authenticate
+                            and establish a connection with the referenced Cluster.
+                            The SystemAccount should be defined in `componentDefinition.spec.systemAccounts`
+                            of the Component providing the service in the referenced
+                            Cluster.
                           properties:
                             component:
                               description: The name of the component where the credential
@@ -3869,7 +4020,9 @@ spec:
                           - name
                           type: object
                         service:
-                          description: The service to reference from the cluster.
+                          description: Identifies a ClusterService from the list of
+                            services defined in `cluster.spec.services` of the referenced
+                            Cluster.
                           properties:
                             component:
                               description: "The name of the component where the service
@@ -3901,38 +4054,52 @@ spec:
                       - cluster
                       type: object
                     name:
-                      description: Specifies the identifier of the service reference
+                      description: "Specifies the identifier of the service reference
                         declaration. It corresponds to the serviceRefDeclaration name
-                        defined in the clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name.
+                        defined in either: \n - `componentDefinition.spec.serviceRefDeclarations[*].name`
+                        - `clusterDefinition.spec.componentDefs[*].serviceRefDeclarations[*].name`
+                        (deprecated)"
                       type: string
                     namespace:
                       description: Specifies the namespace of the referenced Cluster
-                        or ServiceDescriptor object. If not specified, the namespace
-                        of the current cluster will be used.
+                        or the namespace of the referenced ServiceDescriptor object.
+                        If not provided, the referenced Cluster and ServiceDescriptor
+                        will be searched in the namespace of the current Cluster by
+                        default.
                       type: string
                     serviceDescriptor:
-                      description: "The service descriptor of the service provided
-                        by external sources. \n When referencing a service provided
-                        by external sources, a ServiceDescriptor object is required
-                        to establish the service binding. The `serviceDescriptor.spec.serviceKind`
-                        and `serviceDescriptor.spec.serviceVersion` should match the
-                        serviceKind and serviceVersion declared in the definition.
-                        \n If both Cluster and ServiceDescriptor are specified, the
-                        Cluster takes precedence."
+                      description: "Specifies the name of the ServiceDescriptor object
+                        that describes the service provided by external sources. \n
+                        When referencing a service provided by external sources, a
+                        ServiceDescriptor object is required to establish the service
+                        binding. The `serviceDescriptor.spec.serviceKind` and `serviceDescriptor.spec.serviceVersion`
+                        should match the serviceKind and serviceVersion declared in
+                        the definition. \n If both `cluster` and `serviceDescriptor`
+                        are specified, the `cluster` takes precedence."
                       type: string
                   required:
                   - name
                   type: object
                 type: array
               serviceVersion:
-                description: ServiceVersion specifies the version of the service provisioned
-                  by the component. The version should follow the syntax and semantics
-                  of the "Semantic Versioning" specification (http://semver.org/).
+                description: ServiceVersion specifies the version of the service expected
+                  to be provisioned by this component. The version should follow the
+                  syntax and semantics of the "Semantic Versioning" specification
+                  (http://semver.org/).
                 maxLength: 32
                 type: string
               services:
-                description: To override services defined in referenced ComponentDefinition.
+                description: Overrides services defined in referenced ComponentDefinition
+                  and exposes endpoints that can be accessed by clients.
                 items:
+                  description: "ComponentService defines a service that would be exposed
+                    as an inter-component service within a Cluster. A Service defined
+                    in the ComponentService is expected to be accessed by other Components
+                    within the same Cluster. \n When a Component needs to use a ComponentService
+                    provided by another Component within the same Cluster, it can
+                    declare a variable in the `componentDefinition.spec.vars` section
+                    and bind it to the specific exposed address of the ComponentService
+                    using the `serviceVarRef` field."
                   properties:
                     annotations:
                       additionalProperties:
@@ -3955,13 +4122,42 @@ spec:
                       maxLength: 25
                       type: string
                     podService:
-                      description: Indicates whether to generate individual services
-                        for each pod. If set to true, a separate service will be created
-                        for each pod in the component.
+                      default: false
+                      description: "Indicates whether to create a corresponding Service
+                        for each Pod of the selected Component. When set to true,
+                        a set of Services will be automatically generated for each
+                        Pod, and the `roleSelector` field will be ignored. \n The
+                        names of the generated Services will follow the same naming
+                        pattern: `$(serviceName)-$(podOrdinal)`. \n The podOrdinal
+                        is zero-based, meaning it starts from 0 for the first Pod
+                        and increments for each subsequent Pod. The total number of
+                        generated Services will be equal to the number of replicas
+                        specified for the Component. \n Example usage: \n ```yaml
+                        name: my-service serviceName: my-service generatePodOrdinalService:
+                        true spec: type: NodePort ports: - name: http port: 80 targetPort:
+                        8080 ``` \n In this example, if the Component has 3 replicas,
+                        three Services will be generated: - my-service-0: Points to
+                        the first Pod (podOrdinal: 0) - my-service-1: Points to the
+                        second Pod (podOrdinal: 1) - my-service-2: Points to the third
+                        Pod (podOrdinal: 2) \n Each generated Service will have the
+                        specified spec configuration and will target its respective
+                        Pod. \n This feature is useful when you need to expose each
+                        Pod of a Component individually, allowing external access
+                        to specific instances of the Component."
                       type: boolean
                     roleSelector:
-                      description: RoleSelector extends the ServiceSpec.Selector by
-                        allowing you to specify defined role as selector for the service.
+                      description: "Extends the above `serviceSpec.selector` by allowing
+                        you to specify defined role as selector for the service. When
+                        `roleSelector` is set, it adds a label selector \"kubeblocks.io/role:
+                        {roleSelector}\" to the `serviceSpec.selector`. Example usage:
+                        \n roleSelector: \"leader\" \n In this example, setting `roleSelector`
+                        to \"leader\" will add a label selector \"kubeblocks.io/role:
+                        leader\" to the `serviceSpec.selector`. This means that the
+                        service will select and route traffic to Pods with the label
+                        \"kubeblocks.io/role\" set to \"leader\". \n Note that if
+                        `generatePodOrdinalService` sets to true, RoleSelector will
+                        be ignored. The `generatePodOrdinalService` flag takes precedence
+                        over `roleSelector` and generates a service for each Pod."
                       type: string
                     serviceName:
                       description: "ServiceName defines the name of the underlying
@@ -4325,14 +4521,33 @@ spec:
                   type: object
                 type: array
               tlsConfig:
-                description: Specifies the TLS configuration for the component.
+                description: "Specifies the TLS configuration for the component, including:
+                  \n - A boolean flag that indicates whether the component should
+                  use Transport Layer Security (TLS) for secure communication. - An
+                  optional field that specifies the configuration for the TLS certificates
+                  issuer when TLS is enabled. It allows defining the issuer name and
+                  the reference to the secret containing the TLS certificates and
+                  key. The secret should contain the CA certificate, TLS certificate,
+                  and private key in the specified keys."
                 properties:
                   enable:
                     default: false
+                    description: A boolean flag that indicates whether the component
+                      should use Transport Layer Security (TLS) for secure communication.
+                      When set to true, the component will be configured to use TLS
+                      encryption for its network connections. This ensures that the
+                      data transmitted between the component and its clients or other
+                      components is encrypted and protected from unauthorized access.
+                      If TLS is enabled, the component may require additional configuration,
+                      such as specifying TLS certificates and keys, to properly set
+                      up the secure communication channel.
                     type: boolean
                   issuer:
-                    description: Issuer defines the TLS certificates issuer for the
-                      cluster.
+                    description: Specifies the configuration for the TLS certificates
+                      issuer. It allows defining the issuer name and the reference
+                      to the secret containing the TLS certificates and key. The secret
+                      should contain the CA certificate, TLS certificate, and private
+                      key in the specified keys. Required when TLS is enabled.
                     properties:
                       name:
                         allOf:
@@ -4343,23 +4558,32 @@ spec:
                           - KubeBlocks
                           - UserProvided
                         default: KubeBlocks
-                        description: The issuer for TLS certificates.
+                        description: "The issuer for TLS certificates. It only allows
+                          two enum values: `KubeBlocks` and `UserProvided`. \n - `KubeBlocks`
+                          indicates that the self-signed TLS certificates generated
+                          by the KubeBlocks Operator will be used. - `UserProvided`
+                          means that the user is responsible for providing their own
+                          CA, Cert, and Key. In this case, the user-provided CA certificate,
+                          server certificate, and private key will be used for TLS
+                          communication."
                         type: string
                       secretRef:
-                        description: SecretRef is the reference to the TLS certificates
-                          secret. It is required when the issuer is set to UserProvided.
+                        description: SecretRef is the reference to the secret that
+                          contains user-provided certificates. It is required when
+                          the issuer is set to `UserProvided`.
                         properties:
                           ca:
-                            description: CA cert key in Secret
+                            description: Key of CA cert in Secret
                             type: string
                           cert:
-                            description: Cert key in Secret
+                            description: Key of Cert in Secret
                             type: string
                           key:
                             description: Key of TLS private key in Secret
                             type: string
                           name:
-                            description: Name of the Secret
+                            description: Name of the Secret that contains user-provided
+                              certificates.
                             type: string
                         required:
                         - ca
@@ -4372,8 +4596,15 @@ spec:
                     type: object
                 type: object
               tolerations:
-                description: Specify the tolerations for the component's workload.
-                  If specified, they will override the cluster-wide toleration settings.
+                description: "Allows the Component to be scheduled onto nodes with
+                  matching taints. It is an array of tolerations that are attached
+                  to the Component's Pods. \n Each toleration consists of a `key`,
+                  `value`, `effect`, and `operator`. The `key`, `value`, and `effect`
+                  define the taint that the toleration matches. The `operator` specifies
+                  how the toleration matches the taint. \n If a node has a taint that
+                  matches a toleration, the Component's pods can be scheduled onto
+                  that node. This allows the Component's Pods to run on nodes that
+                  have been tainted to prevent regular Pods from being scheduled."
                 items:
                   description: The pod this Toleration is attached to tolerates any
                     taint that matches the triple <key,value,effect> using the matching
@@ -4413,15 +4644,29 @@ spec:
                   type: object
                 type: array
               volumeClaimTemplates:
-                description: Information for statefulset.spec.volumeClaimTemplates.
+                description: Specifies a list of PersistentVolumeClaim templates that
+                  define the storage requirements for the Component. Each template
+                  specifies the desired characteristics of a persistent volume, such
+                  as storage class, size, and access modes. These templates are used
+                  to dynamically provision persistent volumes for the Component when
+                  it is deployed.
                 items:
                   properties:
                     name:
-                      description: Refers to `clusterDefinition.spec.componentDefs.containers.volumeMounts.name`.
+                      description: "Refers to the name of a volumeMount defined in
+                        either: \n - `componentDefinition.spec.runtime.containers[*].volumeMounts`
+                        - `clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts`
+                        (deprecated) \n The value of `name` must match the `name`
+                        field of a volumeMount specified in the corresponding `volumeMounts`
+                        array."
                       type: string
                     spec:
-                      description: Defines the desired characteristics of a volume
-                        requested by a pod author.
+                      description: "Defines the desired characteristics of a PersistentVolumeClaim
+                        that will be created for the volume with the mount name specified
+                        in the `name` field. \n When a Pod is created for this ClusterComponent,
+                        a new PVC will be created based on the specification defined
+                        in the `spec` field. The PVC will be associated with the volume
+                        mount specified by the `name` field."
                       properties:
                         accessModes:
                           description: 'Contains the desired access modes the volume
@@ -4492,7 +4737,7 @@ spec:
                           type: string
                         volumeMode:
                           description: Defines what type of volume is required by
-                            the claim.
+                            the claim, either Block or Filesystem.
                           type: string
                       type: object
                   required:

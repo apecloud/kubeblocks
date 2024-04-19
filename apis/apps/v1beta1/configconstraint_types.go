@@ -24,42 +24,86 @@ import (
 
 // ConfigConstraintSpec defines the desired state of ConfigConstraint
 type ConfigConstraintSpec struct {
-	// Specifies the dynamic reload actions supported by the engine. If set, the controller call the scripts defined in the actions for a dynamic parameter upgrade.
-	// The actions are called only when the modified parameter is defined in dynamicParameters part && DynamicReloadAction != nil
+	// Specifies the dynamic reload (dynamic reconfiguration) actions supported by the engine.
+	// When set, the controller executes the scripts defined in these actions to handle dynamic parameter updates.
+	//
+	// Dynamic reloading is triggered only if both of the following conditions are met:
+	//
+	// 1. The modified parameters are listed in the `dynamicParameters` field.
+	//    If `dynamicParameterSelectedPolicy` is set to "all", modifications to `staticParameters`
+	//    can also trigger a reload.
+	// 2. `dynamicReloadAction` is set.
+	//
+	// If `dynamicReloadAction` is not set or the modified parameters are not listed in `dynamicParameters`,
+	// dynamic reloading will not be triggered.
+	//
+	// Example:
+	// ```yaml
+	// reloadOptions:
+	//  tplScriptTrigger:
+	//    namespace: kb-system
+	//    scriptConfigMapRef: mysql-reload-script
+	//    sync: true
+	// ```
 	//
 	// +optional
 	DynamicReloadAction *DynamicReloadAction `json:"dynamicReloadAction,omitempty"`
 
-	// Indicates the dynamic reload action and restart action can be merged to a restart action.
+	// Indicates whether to consolidate dynamic reload and restart actions into a single restart.
 	//
-	// When a batch of parameters updates incur both restart & dynamic reload, it works as:
-	// - set to true, the two actions merged to only one restart action
-	// - set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]
+	// - If true, updates requiring both actions will result in only a restart, merging the actions.
+	// - If false, updates will trigger both actions executed sequentially: first dynamic reload, then restart.
+	//
+	// This flag allows for more efficient handling of configuration changes by potentially eliminating
+	// an unnecessary reload step.
 	//
 	// +optional
 	DynamicActionCanBeMerged *bool `json:"dynamicActionCanBeMerged,omitempty"`
 
-	// Specifies the policy for selecting the parameters of dynamic reload actions.
+	// Configures whether the dynamic reload specified in `dynamicReloadAction` applies only to dynamic parameters or
+	// to all parameters (including static parameters).
+	//
+	// - "dynamic" (default): Only modifications to the dynamic parameters listed in `dynamicParameters`
+	//   will trigger a dynamic reload.
+	// - "all": Modifications to both dynamic parameters listed in `dynamicParameters` and static parameters
+	//   listed in `staticParameters` will trigger a dynamic reload.
+	//   The "all" option is for certain engines that require static parameters to be set
+	//   via SQL statements before they can take effect on restart.
 	//
 	// +optional
 	DynamicParameterSelectedPolicy *DynamicParameterSelectedPolicy `json:"dynamicParameterSelectedPolicy,omitempty"`
 
-	// Tools used by the dynamic reload actions.
-	// Usually it is referenced by the 'init container' for 'cp' it to a binary volume.
+	// Specifies the tools container image used by ShellTrigger for dynamic reload.
+	// If the dynamic reload action is triggered by a ShellTrigger, this field is required.
+	// This image must contain all necessary tools for executing the ShellTrigger scripts.
+	//
+	// Usually the specified image is referenced by the init container,
+	// which is then responsible for copy the tools from the image to a bin volume.
+	// This ensures that the tools are available to the 'config-manager' sidecar.
 	//
 	// +optional
 	ReloadToolsImage *ReloadToolsImage `json:"reloadToolsImage,omitempty"`
 
-	// A set of actions for regenerating local configs.
+	// Specifies a list of actions to execute specified commands based on Pod labels.
 	//
-	// It works when:
-	// - different engine roles have different config, such as redis primary & secondary
-	// - after a role switch, the local config will be regenerated with the help of DownwardActions
+	// It utilizes the K8s Downward API to mount label information as a volume into the pod.
+	// The 'config-manager' sidecar container watches for changes in the role label and dynamically invoke
+	// registered commands (usually execute some SQL statements) when a change is detected.
+	//
+	// It is designed for scenarios where:
+	//
+	// - Replicas with different roles have different configurations, such as Redis primary & secondary replicas.
+	// - After a role switch (e.g., from secondary to primary), some changes in configuration are needed
+	//   to reflect the new role.
 	//
 	// +optional
 	DownwardActions []DownwardAction `json:"downwardActions,omitempty"`
 
-	// A list of ScriptConfig used by the actions defined in dynamic reload and downward actions.
+	// A list of ScriptConfig Object.
+	//
+	// Each ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
+	// The scripts are mounted as volumes and can be referenced and executed by the dynamic reload
+	// and DownwardAction to perform specific tasks or configurations.
 	//
 	// +optional
 	// +patchMergeKey=scriptConfigMapRef
@@ -68,52 +112,69 @@ type ConfigConstraintSpec struct {
 	// +listMapKey=scriptConfigMapRef
 	ScriptConfigs []ScriptConfig `json:"scriptConfigs,omitempty"`
 
-	// Top level key used to get the cue rules to validate the config file.
-	// It must exist in 'ConfigSchema'
+	// Specifies the top-level key in the 'configSchema.cue' that organizes the validation rules for parameters.
+	// This key must exist within the CUE script defined in 'configSchema.cue'.
 	//
 	// +optional
 	ConfigSchemaTopLevelKey string `json:"configSchemaTopLevelKey,omitempty"`
 
-	// List constraints rules for each config parameters.
+	// Defines a list of parameters including their names, default values, descriptions,
+	// types, and constraints (permissible values or the range of valid values).
 	//
 	// +optional
 	ConfigSchema *ConfigSchema `json:"configSchema,omitempty"`
 
-	// A list of StaticParameter. Modifications of static parameters trigger a process restart.
+	// List static parameters.
+	// Modifications to any of these parameters require a restart of the process to take effect.
 	//
 	// +listType=set
 	// +optional
 	StaticParameters []string `json:"staticParameters,omitempty"`
 
-	// A list of DynamicParameter. Modifications of dynamic parameters trigger a reload action without process restart.
+	// List dynamic parameters.
+	// Modifications to these parameters trigger a configuration reload without requiring a process restart.
 	//
 	// +listType=set
 	// +optional
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
-	// Describes parameters that are prohibited to do any modifications.
+	// Lists the parameters that cannot be modified once set.
+	// Attempting to change any of these parameters will be ignored.
 	//
 	// +listType=set
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
-	// Used to match labels on the pod to do a dynamic reload
+	// Used to match labels on the pod to determine whether a dynamic reload should be performed.
+	//
+	// In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
+	// The `dynamicReloadSelector` allows you to specify label selectors to target the desired pods for the reload process.
+	//
+	// If the `dynamicReloadSelector` is not specified or is nil, all pods managed by the workload will be considered for the dynamic
+	// reload.
 	//
 	// +optional
 	DynamicReloadSelector *metav1.LabelSelector `json:"dynamicReloadSelector,omitempty"`
 
-	// Describes the format of the config file.
-	// The controller works as follows:
-	// 1. Parse the config file
-	// 2. Get the modified parameters
-	// 3. Trigger the corresponding action
+	// Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+	// Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.
+	//
+	// Each format may have its own set of parameters that can be configured.
+	// For instance, when using the `ini` format, you can specify the section name.
+	//
+	// Example:
+	// ```
+	// formatterConfig:
+	//  format: ini
+	//  iniConfig:
+	//    sectionName: mysqld
+	// ```
 	//
 	// +kubebuilder:validation:Required
 	FormatterConfig *FormatterConfig `json:"formatterConfig"`
 }
 
-// Represents the observed state of a ConfigConstraint.
-
+// ConfigConstraintStatus represents the observed state of a ConfigConstraint.
 type ConfigConstraintStatus struct {
 
 	// Specifies the status of the configuration template.
@@ -133,58 +194,71 @@ type ConfigConstraintStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
+// ConfigSchema Defines a list of configuration items with their names, default values, descriptions,
+// types, and constraints.
 type ConfigSchema struct {
-	// Transforms the schema from CUE to json for further OpenAPI validation
+	// Hold a string that contains a script written in CUE language that defines a list of configuration items.
+	// Each item is detailed with its name, default value, description, type (e.g. string, integer, float),
+	// and constraints (permissible values or the valid range of values).
+	//
+	// CUE (Configure, Unify, Execute) is a declarative language designed for defining and validating
+	// complex data configurations.
+	// It is particularly useful in environments like K8s where complex configurations and validation rules are common.
+	//
+	// This script functions as a validator for user-provided configurations, ensuring compliance with
+	// the established specifications and constraints.
+	//
+	// +optional
+	CUE string `json:"cue,omitempty"`
+
+	// Generated from the 'cue' field and transformed into a JSON format.
 	//
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:ComponentDefRef=object
 	// +kubebuilder:pruning:PreserveUnknownFields
 	SchemaInJSON *apiext.JSONSchemaProps `json:"schemaInJSON,omitempty"`
-
-	// Enables providers to verify user configurations using the CUE language.
-	//
-	// +optional
-	CUE string `json:"cue,omitempty"`
 }
 
-// Defines the options for reloading a service or application within the Kubernetes cluster.
-// Only one of its members may be specified at a time.
-
+// DynamicReloadAction defines the mechanisms available for dynamically reloading a process within K8s without requiring a restart.
+//
+// Only one of the mechanisms can be specified at a time.
 type DynamicReloadAction struct {
-	// Used to trigger a reload by sending a Unix signal to the process.
+	// Used to trigger a reload by sending a specific Unix signal to the process.
 	//
 	// +optional
 	UnixSignalTrigger *UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
 
-	// Used to perform the reload command in shell script.
+	// Allows to execute a custom shell script to reload the process.
 	//
 	// +optional
 	ShellTrigger *ShellTrigger `json:"shellTrigger,omitempty"`
 
-	// Used to perform the reload command by Go template script.
+	// Enables reloading process using a Go template script.
 	//
 	// +optional
 	TPLScriptTrigger *TPLScriptTrigger `json:"tplScriptTrigger"`
 
-	// Used to automatically perform the reload command when conditions are met.
+	// Automatically perform the reload when specified conditions are met.
 	//
 	// +optional
 	AutoTrigger *AutoTrigger `json:"autoTrigger,omitempty"`
 }
 
+// UnixSignalTrigger is used to trigger a reload by sending a specific Unix signal to the process.
 type UnixSignalTrigger struct {
-	// Represents a valid Unix signal.
-	// Refer to the following URL for a list of all Unix signals: ../../pkg/configuration/configmap/handler.go:allUnixSignals
+	// Specifies a valid Unix signal to be sent.
+	// For a comprehensive list of all Unix signals, see: ../../pkg/configuration/configmap/handler.go:allUnixSignals
 	//
 	// +kubebuilder:validation:Required
 	Signal SignalType `json:"signal"`
 
-	// Represents the name of the process that the Unix signal sent to.
+	// Identifies the name of the process to which the Unix signal will be sent.
 	//
 	// +kubebuilder:validation:Required
 	ProcessName string `json:"processName"`
 }
 
+// ReloadToolsImage specifies the tools container image used by ShellTrigger for dynamic reload.
 type ReloadToolsImage struct {
 	// Represents the name of the volume in the PodTemplate. This is where to mount the generated by the config template.
 	// This volume name must be defined within podSpec.containers[*].volumeMounts.
@@ -193,37 +267,41 @@ type ReloadToolsImage struct {
 	// +kubebuilder:validation:MaxLength=32
 	// VolumeName string `json:"volumeName"`
 
-	// Represents the point where the scripts file will be mounted.
+	// Specifies the directory path in the container where the tools-related files are to be copied.
+	// This field is typically used with an emptyDir volume to ensure a temporary, empty directory is provided at pod creation.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	MountPoint string `json:"mountPoint"`
 
-	// Used to configure the initialization container.
+	// Specifies a list of settings of init containers that prepare tools for dynamic reload.
 	//
 	// +optional
 	ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
 }
 
+// ToolConfig specifies the settings of an init container that prepare tools for dynamic reload.
 type ToolConfig struct {
-	// Specifies the name of the initContainer.
+	// Specifies the name of the init container.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name,omitempty"`
 
-	// Represents the url of the tool container image.
+	// Specifies the tool container image.
 	//
 	// +optional
 	Image string `json:"image,omitempty"`
 
-	// Commands to be executed when init containers.
+	// Specifies the command to be executed by the init container.
 	//
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
 }
 
+// DownwardAction defines an action that triggers specific commands in response to changes in Pod labels.
+// For example, a command might be executed when the 'role' label of the Pod is updated.
 type DownwardAction struct {
 	// Specifies the name of the field. It must be a string of maximum length 63.
 	// The name should match the regex pattern `^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`.
@@ -233,23 +311,25 @@ type DownwardAction struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Specifies the mount point of the scripts file.
+	// Specifies the mount point of the Downward API volume.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	MountPoint string `json:"mountPoint"`
 
-	// Represents a list of downward API volume files.
+	// Represents a list of files under the Downward API volume.
 	//
 	// +kubebuilder:validation:Required
 	Items []corev1.DownwardAPIVolumeFile `json:"items"`
 
-	// The command used to execute for the downward API.
+	// Specifies the command to be triggered when changes are detected in Downward API volume files.
+	// It relies on the inotify mechanism in the config-manager sidecar to monitor file changes.
 	//
 	// +optional
 	Command []string `json:"command,omitempty"`
 }
 
+// ScriptConfig specifies the ConfigMap that contains the script to be executed for reload.
 type ScriptConfig struct {
 	// Specifies the reference to the ConfigMap that contains the script to be executed for reload.
 	//
@@ -266,90 +346,83 @@ type ScriptConfig struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// ShellTrigger allows to execute a custom shell script to reload the process.
 type ShellTrigger struct {
-	// Specifies the list of commands for reload.
+	// Specifies the command to execute in order to reload the process. It should be a valid shell command.
 	//
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
 
-	// Specifies whether to synchronize updates parameters to the config manager.
-	// Specifies two ways of controller to reload the parameter:
-	// - set to 'True', execute the reload action in sync mode, wait for the completion of reload
-	// - set to 'False', execute the reload action in async mode, just update the 'Configmap', no need to wait
+	// Determines whether parameter updates should be synchronized with the config manager.
+	// Specifies the controller's reload strategy:
+	//
+	// - If set to 'True', the controller executes the reload action in synchronous mode,
+	//   pausing execution until the reload completes.
+	// - If set to 'False', the controller executes the reload action in asynchronous mode,
+	//   updating the ConfigMap without waiting for the reload process to finish.
 	//
 	// +optional
 	Sync *bool `json:"sync,omitempty"`
 
-	// Specifies whether to reconfigure dynamic parameters individually or in a batch.
-	// - Set to 'True' to execute the reload action in a batch, incorporating all parameter changes.
-	// - Set to 'False' to execute the reload action for each parameter change individually.
-	// The default value is 'False'.
+	// Specifies whether to process dynamic parameter updates individually or collectively in a batch:
+	//
+	// - Set to 'True' to execute all parameter changes in one batch reload action.
+	// - Set to 'False' to execute a reload action for each individual parameter change.
+	// The default behavior, if not specified, is 'False'.
 	//
 	// +optional
 	BatchReload *bool `json:"batchReload,omitempty"`
 
-	// When `batchReload` is set to 'True', this parameter allows for the optional specification
-	// of the batch input format that is passed into the STDIN of the script.
-	// The format should be provided as a Go template string.
-	// In the template, the updated parameters' key-value map can be referenced using the dollar sign ('$') variable.
-	// Here's an example of an input template:
+	// BatchParametersTemplate provides an optional Go template string to format the batch input data
+	// passed into the STDIN of the script when `batchReload` is set to 'True'.
+	// The template uses the updated parameters' key-value pairs, accessible via the '$' variable.
+	// This allows for custom formatting of the input data.
+	// Example template:
 	//
 	// ```yaml
-	//
 	// batchParametersTemplate: |-
-	//
 	// {{- range $pKey, $pValue := $ }}
-	//
 	// {{ printf "%s:%s" $pKey $pValue }}
-	//
 	// {{- end }}
-	//
 	// ```
 	//
-	// In this example, each updated parameter is iterated over in a sorted order by keys to generate the batch input data as follows:
-	//
+	// This example generates batch input data in a key:value format, sorted by keys.
 	// ```
-	//
 	// key1:value1
-	//
 	// key2:value2
-	//
 	// key3:value3
-	//
 	// ```
 	//
-	// If this parameter is not specified, the default format used for STDIN is as follows:
-	// Each updated parameter generates a line that concatenates the parameter's key and value with a equal sign ('=').
-	// These lines are then sorted by their keys and inserted accordingly. Here's an example of the batch input data using the default template:
-	//
+	// If not specified, the default format is key=value, sorted by keys, for each updated parameter.
 	// ```
-	//
 	// key1=value1
-	//
 	// key2=value2
-	//
 	// key3=value3
-	//
 	// ```
 	//
 	// +optional
 	BatchParametersTemplate string `json:"batchParametersTemplate,omitempty"`
 }
 
+// TPLScriptTrigger Enables reloading process using a Go template script.
 type TPLScriptTrigger struct {
-	// Config for the script.
+	// Specifies the ConfigMap that contains the script to be executed for reload.
 	//
 	ScriptConfig `json:",inline"`
 
-	// Specifies whether to synchronize updates parameters to the config manager.
-	// Specifies two ways of controller to reload the parameter:
-	// - set to 'True', execute the reload action in sync mode, wait for the completion of reload
-	// - set to 'False', execute the reload action in async mode, just update the 'Configmap', no need to wait
+	// Determines whether parameter updates should be synchronized with the config manager.
+	// Specifies the controller's reload strategy:
+	//
+	// - If set to 'True', the controller executes the reload action in synchronous mode,
+	//   pausing execution until the reload completes.
+	// - If set to 'False', the controller executes the reload action in asynchronous mode,
+	//   updating the ConfigMap without waiting for the reload process to finish.
 	//
 	// +optional
 	Sync *bool `json:"sync,omitempty"`
 }
 
+// AutoTrigger automatically perform the reload when specified conditions are met.
 type AutoTrigger struct {
 	// The name of the process.
 	//
@@ -357,9 +430,11 @@ type AutoTrigger struct {
 	ProcessName string `json:"processName,omitempty"`
 }
 
+// FormatterConfig specifies the format of the configuration file and any associated parameters
+// that are specific to the chosen format.
 type FormatterConfig struct {
-	// Represents the additional actions for formatting the config file.
-	// If not specified, the default options will be applied.
+	// Each format may have its own set of parameters that can be configured.
+	// For instance, when using the `ini` format, you can specify the section name.
 	//
 	// +optional
 	FormatterAction `json:",inline"`
@@ -381,30 +456,35 @@ type FormatterConfig struct {
 	Format CfgFileFormat `json:"format"`
 }
 
-// Encapsulates the unique options for a configuration file.
-// It is important to note that only one of its members can be specified at a time.
-
+// FormatterAction configures format-specific options for different configuration file format.
+// Note: Only one of its members should be specified at any given time.
 type FormatterAction struct {
-
-	// A pointer to an IniConfig struct that holds the ini options.
+	// Holds options specific to the 'ini' file format.
 	//
 	// +optional
 	IniConfig *IniConfig `json:"iniConfig,omitempty"`
 
-	// A pointer to an XMLConfig struct that holds the xml options.
+	// Holds options specific to the 'xml' file format.
 	// XMLConfig *XMLConfig `json:"xmlConfig,omitempty"`
 }
 
-// Encapsulates the section name of an ini configuration.
-
+// IniConfig holds options specific to the 'ini' file format.
 type IniConfig struct {
-
 	// A string that describes the name of the ini section.
 	//
 	// +optional
 	SectionName string `json:"sectionName,omitempty"`
 }
 
+// ConfigConstraint manages the parameters across multiple configuration files contained in a single configure template.
+// These configuration files should have the same format (e.g. ini, xml, properties, json).
+//
+// It provides the following functionalities:
+//
+// 1. **Parameter Value Validation**: Validates and ensures compliance of parameter values with defined constraints.
+// 2. **Dynamic Reload on Modification**: Monitors parameter changes and triggers dynamic reloads to apply updates.
+// 3. **Parameter Rendering in Templates**: Injects parameters into templates to generate up-to-date configuration files.
+//
 // +genclient
 // +k8s:openapi-gen=true
 // +genclient:nonNamespaced
@@ -414,8 +494,6 @@ type IniConfig struct {
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cc
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-
-// ConfigConstraint is the Schema for the configconstraint API
 type ConfigConstraint struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -424,9 +502,9 @@ type ConfigConstraint struct {
 	Status ConfigConstraintStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:object:root=true
-
 // ConfigConstraintList contains a list of ConfigConstraints.
+//
+// +kubebuilder:object:root=true
 type ConfigConstraintList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

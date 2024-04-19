@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"slices"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -134,13 +136,14 @@ func (p *pipeline) doMergeImpl(parameters appsv1alpha1.ConfigurationItem) error 
 		item.ConfigFileParams = make(map[string]appsv1alpha1.ConfigParams)
 	}
 	filter := validate.WithKeySelector(configSpec.Keys)
+	paramFilter := createImmutableParamsFilter(p.configConstraint)
 	for _, key := range parameters.Keys {
 		// patch parameters
 		if configSpec.ConfigConstraintRef != "" && filter(key.Key) {
 			if key.FileContent != "" {
 				return cfgcore.MakeError("not allowed to update file content: %s", key.Key)
 			}
-			updateParameters(item, key.Key, key.Parameters)
+			updateParameters(item, key.Key, key.Parameters, paramFilter)
 			p.updatedParameters = append(p.updatedParameters, cfgcore.ParamPairs{
 				Key:           key.Key,
 				UpdatedParams: fromKeyValuePair(key.Parameters),
@@ -222,4 +225,14 @@ func (p *pipeline) Complete() reconfiguringResult {
 		withReturned(p.mergedConfig, p.configPatch),
 		withNoFormatFilesUpdated(p.isFileUpdated),
 	)
+}
+
+func createImmutableParamsFilter(cc *appsv1beta1.ConfigConstraint) validate.ValidatorOptions {
+	var immutableParams []string
+	if cc != nil {
+		immutableParams = cc.Spec.ImmutableParameters
+	}
+	return func(key string) bool {
+		return len(immutableParams) == 0 || !slices.Contains(immutableParams, key)
+	}
 }

@@ -16454,7 +16454,7 @@ If both Cluster and ServiceDescriptor are specified, the Cluster takes precedenc
 </tr>
 <tr>
 <td>
-<code>clusterRef</code><br/>
+<code>clusterServiceSelector</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefClusterSelector">
 ServiceRefClusterSelector

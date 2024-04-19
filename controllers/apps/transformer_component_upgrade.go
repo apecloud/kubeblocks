@@ -21,6 +21,8 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -88,37 +90,43 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return err
 	}
 
-	// update pod labels, ownerReferences
-	podList := &corev1.PodList{}
+	// update pod & pvc & svc labels
+	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.ServiceList{}, &corev1.PodList{}}
 	ml := client.MatchingLabels{
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.AppInstanceLabelKey:    transCtx.Cluster.Name,
 		constant.KBAppComponentLabelKey: synthesizeComp.Name,
 	}
-	if err := graphCli.List(transCtx.Context, podList, ml); err == nil {
-		if len(podList.Items) > 0 {
-			var revision string
-			for i := range podList.Items {
-				pod := &podList.Items[i]
-				if _, ok := pod.Labels[rsmcore.WorkloadsManagedByLabelKey]; ok {
+	inNS := client.InNamespace(comp.Namespace)
+	var revision string
+	for _, list := range objectList {
+		if err := graphCli.List(transCtx.Context, list, ml, inNS); err == nil {
+			items := reflect.ValueOf(list).Elem().FieldByName("Items")
+			l := items.Len()
+			for i := 0; i < l; i++ {
+				object := items.Index(i).Addr().Interface().(client.Object)
+				if _, ok := object.GetLabels()[rsmcore.WorkloadsManagedByLabelKey]; ok {
+					continue
+				}
+				if _, ok := object.(*corev1.Service); ok && !strings.HasSuffix(object.GetName(), "-headless") {
 					continue
 				}
 				legacyFound = true
-				pod.OwnerReferences = nil
-				pod.Labels[rsmcore.WorkloadsManagedByLabelKey] = rsmcore.KindInstanceSet
-				pod.Labels[rsmcore.WorkloadsInstanceLabelKey] = comp.Name
-				if revision == "" {
-					revision, err = buildRevision(synthesizeComp)
-					if err != nil {
-						return err
+				object.SetOwnerReferences([]metav1.OwnerReference{})
+				object.GetLabels()[rsmcore.WorkloadsManagedByLabelKey] = rsmcore.KindInstanceSet
+				object.GetLabels()[rsmcore.WorkloadsInstanceLabelKey] = comp.Name
+				if _, ok := object.(*corev1.Pod); ok {
+					if revision == "" {
+						revision, err = buildRevision(synthesizeComp)
+						if err != nil {
+							return err
+						}
 					}
+					object.GetLabels()[appsv1.ControllerRevisionHashLabelKey] = revision
 				}
-				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
-				parent = graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), parent)
+				parent = graphCli.Do(dag, nil, object, model.ActionUpdatePtr(), parent)
 			}
 		}
-	} else if !apierrors.IsNotFound(err) {
-		return err
 	}
 
 	if legacyFound {

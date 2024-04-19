@@ -1,0 +1,18 @@
+name: PR Label Approved Add
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  approve-label:
+    if: github.event.review.state == 'approved'
+    uses: apecloud/apecloud-cd/.github/workflows/pull-request-label.yml@v0.1.61
+    with:
+      LABEL_NAME: "approved"
+      LABLE_OPS: "ADD"
+      APECD_REF: "v0.1.61"
+    secrets: inherit

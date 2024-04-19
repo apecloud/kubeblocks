@@ -110,7 +110,6 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 
 	// build configuration template annotations to workload
 	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizeComp)
-	buildInstanceSetConfigTplAnnotations(protoITS, synthesizeComp)
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {

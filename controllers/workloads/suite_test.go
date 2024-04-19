@@ -95,7 +95,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	recorder := k8sManager.GetEventRecorderFor("consensus-set-controller")
-	err = (&ReplicatedStateMachineReconciler{
+	err = (&InstanceSetReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: recorder,

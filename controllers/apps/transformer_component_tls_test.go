@@ -162,8 +162,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
-				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-				sts := *rsm.ConvertRSMToSTS(&rsmList.Items[0])
+				itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
+				sts := *rsm.ConvertInstanceSetToSTS(&itsList.Items[0])
 				cd := &appsv1alpha1.ClusterDefinition{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
 				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ConfigSpecs[0].ComponentTemplateSpec)

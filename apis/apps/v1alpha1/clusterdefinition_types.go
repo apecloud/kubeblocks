@@ -550,7 +550,7 @@ type ClusterComponentDefinition struct {
 	ReplicationSpec *ReplicationSetSpec `json:"replicationSpec,omitempty"`
 
 	// Defines workload spec of this component.
-	// From KB 0.7.0, RSM(ReplicatedStateMachineSpec) will be the underlying CR which powers all kinds of workload in KB.
+	// From KB 0.7.0, RSM(InstanceSetSpec) will be the underlying CR which powers all kinds of workload in KB.
 	// RSM is an enhanced stateful workload extension dedicated for heavy-state workloads like databases.
 	//
 	// +optional

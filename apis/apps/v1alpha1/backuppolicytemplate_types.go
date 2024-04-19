@@ -53,10 +53,6 @@ type BackupPolicy struct {
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
-	// Specifies that this componentDef is a shading component definition.
-	// +optional
-	IsSharding bool `json:"isSharding,omitempty"`
-
 	// References to componentDefinitions.
 	// Must comply with the IANA Service Naming rule.
 	//

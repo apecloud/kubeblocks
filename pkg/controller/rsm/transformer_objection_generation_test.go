@@ -36,7 +36,7 @@ import (
 
 var _ = Describe("object generation transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			AddLabels(constant.AppComponentLabelKey, name).
 			SetReplicas(3).
@@ -66,7 +66,7 @@ var _ = Describe("object generation transformer test.", func() {
 			sts := builder.NewStatefulSetBuilder(namespace, name).GetObject()
 			headlessSvc := builder.NewHeadlessServiceBuilder(name, getHeadlessSvcName(*rsm)).GetObject()
 			svc := builder.NewServiceBuilder(name, name).GetObject()
-			env := builder.NewConfigMapBuilder(name, name+"-rsm-env").GetObject()
+			env := builder.NewConfigMapBuilder(name, GetEnvConfigMapName(name)).GetObject()
 			k8sMock.EXPECT().
 				List(gomock.Any(), &apps.StatefulSetList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *apps.StatefulSetList, _ ...client.ListOption) error {
@@ -164,7 +164,7 @@ var _ = Describe("object generation transformer test.", func() {
 
 	Context("well-known service labels", func() {
 		It("should work well", func() {
-			svc := BuildSvc(*rsm)
+			svc := BuildSvc(*rsm, getLabels(rsm), getSvcSelector(rsm, false))
 			Expect(svc).ShouldNot(BeNil())
 			for k, ev := range service.Labels {
 				v, ok := svc.Labels[k]

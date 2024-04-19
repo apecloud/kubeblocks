@@ -83,6 +83,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	backupScheduleNames := map[string]struct{}{}
 	// Note: In a cluster with multiple components referencing the same componentDefinition,
 	// only the backupPolicy associated with the first component will be created.
+	// TODO: create backupPolicy by foreach component and sharding
 	for _, tpl := range backupPolicyTPLs.Items {
 		r.isDefaultTemplate = tpl.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey]
 		r.tplIdentifier = tpl.Spec.Identifier
@@ -343,13 +344,13 @@ func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(target *dpv1alpha
 }
 
 func (r *clusterBackupPolicyTransformer) getCompReplicas() int32 {
-	rsm := &workloads.ReplicatedStateMachine{}
+	its := &workloads.InstanceSet{}
 	compSpec := r.getClusterComponentSpec()
-	rsmName := fmt.Sprintf("%s-%s", r.Cluster.Name, compSpec.Name)
-	if err := r.Client.Get(r.Context, client.ObjectKey{Name: rsmName, Namespace: r.Cluster.Namespace}, rsm); err != nil {
+	name := fmt.Sprintf("%s-%s", r.Cluster.Name, compSpec.Name)
+	if err := r.Client.Get(r.Context, client.ObjectKey{Name: name, Namespace: r.Cluster.Namespace}, its); err != nil {
 		return compSpec.Replicas
 	}
-	return *rsm.Spec.Replicas
+	return *its.Spec.Replicas
 }
 
 // buildBackupPolicy builds a new backup policy by the backup policy template.
@@ -389,7 +390,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 			backupMethod = m
 			delete(oldBackupMethodMap, backupMethod.Name)
 		} else if v.Target != nil {
-			if r.backupPolicy.IsSharding {
+			if r.shardingSpec != nil {
 				backupMethod.Targets = r.buildBackupTargets(backupMethod.Targets, comp)
 			} else {
 				backupMethod.Target = r.buildBackupTarget(backupMethod.Target, *v.Target, comp)
@@ -422,7 +423,7 @@ func (r *clusterBackupPolicyTransformer) doEnvMapping(comp *appsv1alpha1.Cluster
 }
 
 func (r *clusterBackupPolicyTransformer) syncBackupPolicyTargetSpec(backupPolicy *dpv1alpha1.BackupPolicy, comp *appsv1alpha1.ClusterComponentSpec) {
-	if r.backupPolicy.IsSharding {
+	if r.shardingSpec != nil {
 		backupPolicy.Spec.Targets = r.buildBackupTargets(backupPolicy.Spec.Targets, comp)
 	} else {
 		backupPolicy.Spec.Target = r.buildBackupTarget(backupPolicy.Spec.Target, r.backupPolicy.Target, comp)
@@ -471,7 +472,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 		// dataprotection will use its dedicated service account if this field is empty.
 		ServiceAccountName: "",
 	}
-	if r.backupPolicy.IsSharding {
+	if r.shardingSpec != nil {
 		target.Name = comp.Name
 	}
 	// build the target connection credential
@@ -613,20 +614,21 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 
 // getClusterComponentSpec returns the first component name of the componentDefRef.
 func (r *clusterBackupPolicyTransformer) getClusterComponentSpec() *appsv1alpha1.ClusterComponentSpec {
-	if !r.backupPolicy.IsSharding {
-		for i, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {
-			if len(v.ComponentDef) > 0 {
-				if slices.Contains(r.backupPolicy.ComponentDefs, v.ComponentDef) {
-					return &r.clusterTransformContext.Cluster.Spec.ComponentSpecs[i]
-				}
-				continue
+	// 1. get the componentSpec from cluster.spec.componentSpecs firstly.
+	for i, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {
+		if len(v.ComponentDef) > 0 {
+			if slices.Contains(r.backupPolicy.ComponentDefs, v.ComponentDef) {
+				r.shardingSpec = nil
+				return &r.clusterTransformContext.Cluster.Spec.ComponentSpecs[i]
 			}
-			if v.ComponentDefRef == r.backupPolicy.ComponentDefRef {
-				return &v
-			}
+			continue
 		}
-		return nil
+		if v.ComponentDefRef == r.backupPolicy.ComponentDefRef {
+			r.shardingSpec = nil
+			return &v
+		}
 	}
+	// 2. if not found in cluster.spec.componentSpecs, try to find in cluster.spec.shardingSpecs
 	for _, v := range r.clusterTransformContext.Cluster.Spec.ShardingSpecs {
 		if len(v.Template.ComponentDef) > 0 {
 			if slices.Contains(r.backupPolicy.ComponentDefs, v.Template.ComponentDef) {
@@ -711,7 +713,7 @@ func (r *clusterBackupPolicyTransformer) buildTargetPodLabels(targetTpl appsv1al
 		// the role only works when the component has multiple replicas.
 		labels[constant.RoleLabelKey] = targetTpl.Role
 	}
-	if r.backupPolicy.IsSharding {
+	if r.shardingSpec != nil {
 		labels[constant.KBAppShardingNameLabelKey] = r.shardingSpec.Name
 	}
 	return labels

@@ -833,10 +833,6 @@ spec:
                       items:
                         type: string
                       type: array
-                    isSharding:
-                      description: Specifies that this componentDef is a shading component
-                        definition.
-                      type: boolean
                     schedules:
                       description: Define the policy for backup scheduling.
                       items:

@@ -10,9 +10,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+      path: /mutate-workloads-kubeblocks-io-v1alpha1-instanceset
   failurePolicy: Fail
-  name: mreplicatedstatemachine.kb.io
+  name: minstanceset.kb.io
   rules:
   - apiGroups:
     - workloads.kubeblocks.io
@@ -22,7 +22,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - replicatedstatemachines
+    - instancesets
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -156,9 +156,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+      path: /validate-workloads-kubeblocks-io-v1alpha1-instanceset
   failurePolicy: Fail
-  name: vreplicatedstatemachine.kb.io
+  name: vinstanceset.kb.io
   rules:
   - apiGroups:
     - workloads.kubeblocks.io
@@ -168,7 +168,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - replicatedstatemachines
+    - instancesets
   sideEffects: None
 - admissionReviewVersions:
   - v1

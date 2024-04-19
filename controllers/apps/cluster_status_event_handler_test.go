@@ -121,15 +121,15 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 
 			By("watch warning event from workload, but mismatch condition ")
-			rsmKey := types.NamespacedName{
+			key := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
 				Name:      clusterKey.Name + "-" + statefulMySQLCompName,
 			}
-			Eventually(testapps.CheckObjExists(&testCtx, rsmKey, &workloads.ReplicatedStateMachine{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, key, &workloads.InstanceSet{}, true)).Should(Succeed())
 
 			involvedObject := corev1.ObjectReference{
-				Name:      rsmKey.Name,
-				Kind:      constant.RSMKind,
+				Name:      key.Name,
+				Kind:      constant.InstanceSetKind,
 				Namespace: testCtx.DefaultNamespace,
 			}
 			event.InvolvedObject = involvedObject

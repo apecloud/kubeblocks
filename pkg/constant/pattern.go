@@ -83,13 +83,13 @@ func GenerateDefaultServiceAccountName(name string) string {
 	return fmt.Sprintf("%s-%s", KBLowerPrefix, name)
 }
 
-// GenerateRSMNamePattern generates rsm name pattern
-func GenerateRSMNamePattern(clusterName, compName string) string {
+// GenerateWorkloadNamePattern generates the workload name pattern
+func GenerateWorkloadNamePattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
 
-// GenerateRSMServiceNamePattern generates rsm name pattern
-func GenerateRSMServiceNamePattern(rsmName string) string {
+// GenerateServiceNamePattern generates the service name pattern
+func GenerateServiceNamePattern(rsmName string) string {
 	return fmt.Sprintf("%s-headless", rsmName)
 }
 

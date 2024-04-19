@@ -170,13 +170,14 @@ func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformCo
 
 func compOwnedKinds() []client.ObjectList {
 	return []client.ObjectList{
-		&workloads.ReplicatedStateMachineList{},
+		&workloads.InstanceSetList{},
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
 		&batchv1.JobList{},
 		&dpv1alpha1.RestoreList{},
+		&appsv1alpha1.ConfigurationList{},
 	}
 }
 

@@ -401,7 +401,7 @@ var _ = Describe("build service references", func() {
 			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
 				{
 					Name: serviceRefDeclaration.Name,
-					ClusterRef: &appsv1alpha1.ServiceRefClusterSelector{
+					ClusterServiceSelector: &appsv1alpha1.ServiceRefClusterSelector{
 						Cluster: etcdCluster,
 						Service: &appsv1alpha1.ServiceRefServiceSelector{
 							Service: "client",
@@ -451,7 +451,7 @@ var _ = Describe("build service references", func() {
 			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
 				{
 					Name: serviceRefDeclaration.Name,
-					ClusterRef: &appsv1alpha1.ServiceRefClusterSelector{
+					ClusterServiceSelector: &appsv1alpha1.ServiceRefClusterSelector{
 						Cluster: etcdCluster,
 						Service: &appsv1alpha1.ServiceRefServiceSelector{
 							Component: etcdComponent,
@@ -502,7 +502,7 @@ var _ = Describe("build service references", func() {
 			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
 				{
 					Name: serviceRefDeclaration.Name,
-					ClusterRef: &appsv1alpha1.ServiceRefClusterSelector{
+					ClusterServiceSelector: &appsv1alpha1.ServiceRefClusterSelector{
 						Cluster: etcdCluster,
 						Service: &appsv1alpha1.ServiceRefServiceSelector{
 							Component: etcdComponent,
@@ -563,7 +563,7 @@ var _ = Describe("build service references", func() {
 				{
 					Name:      serviceRefDeclaration.Name,
 					Namespace: namespace,
-					ClusterRef: &appsv1alpha1.ServiceRefClusterSelector{
+					ClusterServiceSelector: &appsv1alpha1.ServiceRefClusterSelector{
 						Cluster: etcdCluster,
 						Credential: &appsv1alpha1.ServiceRefCredentialSelector{
 							Component: etcdComponent,
@@ -615,7 +615,7 @@ var _ = Describe("build service references", func() {
 				{
 					Name:      serviceRefDeclaration.Name,
 					Namespace: "external",
-					ClusterRef: &appsv1alpha1.ServiceRefClusterSelector{
+					ClusterServiceSelector: &appsv1alpha1.ServiceRefClusterSelector{
 						Cluster: etcdCluster,
 						Credential: &appsv1alpha1.ServiceRefCredentialSelector{
 							Component: etcdComponent,

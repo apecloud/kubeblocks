@@ -66,7 +66,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	componentKindList := []client.ObjectList{
 		&appv1.DeploymentList{},
 		&appv1.StatefulSetList{},
-		&workloads.ReplicatedStateMachineList{},
+		&workloads.InstanceSetList{},
 	}
 	for _, objectList := range componentKindList {
 		if err := restartComponent(reqCtx, cli, opsRes, componentNameMap, objectList); err != nil {

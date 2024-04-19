@@ -75,15 +75,18 @@ var _ = Describe("pod role label event handler test", func() {
 					p.Namespace = objKey.Namespace
 					p.Name = objKey.Name
 					p.UID = pod.UID
-					p.Labels = map[string]string{constant.AppInstanceLabelKey: name}
+					p.Labels = map[string]string{
+						constant.AppInstanceLabelKey: name,
+						WorkloadsInstanceLabelKey:    name,
+					}
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &workloads.ReplicatedStateMachine{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, rsm *workloads.ReplicatedStateMachine, _ ...client.GetOption) error {
-					rsm.Namespace = objKey.Namespace
-					rsm.Name = objKey.Name
-					rsm.Spec.Roles = []workloads.ReplicaRole{role}
+				Get(gomock.Any(), gomock.Any(), &workloads.InstanceSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, its *workloads.InstanceSet, _ ...client.GetOption) error {
+					its.Namespace = objKey.Namespace
+					its.Name = objKey.Name
+					its.Spec.Roles = []workloads.ReplicaRole{role}
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().

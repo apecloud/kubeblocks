@@ -223,9 +223,6 @@ spec:
                   description: InstanceTemplate defines values to override in pod
                     template.
                   properties:
-                    RuntimeClassName:
-                      description: Defines RuntimeClass to override.
-                      type: string
                     annotations:
                       additionalProperties:
                         type: string
@@ -2693,6 +2690,10 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
+              runtimeClassName:
+                description: Defines RuntimeClassName for all Pods managed by this
+                  component.
+                type: string
               serviceAccountName:
                 description: The name of the ServiceAccount that running component
                   depends on.
@@ -2730,7 +2731,7 @@ spec:
                         both Cluster and ServiceDescriptor are specified, the Cluster
                         takes precedence."
                       type: string
-                    clusterRef:
+                    clusterServiceSelector:
                       description: Specifies the cluster to reference.
                       properties:
                         cluster:

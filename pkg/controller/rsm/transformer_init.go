@@ -26,7 +26,7 @@ import (
 )
 
 type initTransformer struct {
-	*workloads.ReplicatedStateMachine
+	*workloads.InstanceSet
 }
 
 var _ graph.Transformer = &initTransformer{}
@@ -34,11 +34,11 @@ var _ graph.Transformer = &initTransformer{}
 func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// init context
 	transCtx, _ := ctx.(*rsmTransformContext)
-	transCtx.rsm, transCtx.rsmOrig = t.ReplicatedStateMachine, t.ReplicatedStateMachine.DeepCopy()
+	transCtx.rsm, transCtx.rsmOrig = t.InstanceSet, t.InstanceSet.DeepCopy()
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	// stop reconciliation if paused=true
-	if t.ReplicatedStateMachine.Spec.Paused {
+	if t.InstanceSet.Spec.Paused {
 		graphCli.Root(dag, transCtx.rsmOrig, transCtx.rsm, model.ActionNoopPtr())
 		return graph.ErrPrematureStop
 	}

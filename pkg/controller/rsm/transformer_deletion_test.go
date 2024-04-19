@@ -42,7 +42,7 @@ import (
 
 var _ = Describe("object deletion transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			AddMatchLabelsInMap(selectors).
 			SetServiceName(headlessSvcName).
@@ -81,25 +81,27 @@ var _ = Describe("object deletion transformer test.", func() {
 			controller := true
 			sts.OwnerReferences = []metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.InstanceSet{}).Name(),
 					Controller: &controller,
 				},
 			}
-			headLessSvc := BuildHeadlessSvc(*rsm)
+			labels := getLabels(rsm)
+			headlessSelectors := getSvcSelector(rsm, true)
+			headLessSvc := BuildHeadlessSvc(*rsm, labels, headlessSelectors)
 			headLessSvc.SetOwnerReferences([]metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.InstanceSet{}).Name(),
 					Controller: &controller,
 				},
 			})
-			envConfig := BuildEnvConfigMap(*rsm)
+			envConfig := BuildEnvConfigMap(*rsm, labels)
 			envConfig.SetOwnerReferences([]metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.InstanceSet{}).Name(),
 					Controller: &controller,
 				},
 			})
-			envConfigShouldNotBeDeleted := BuildEnvConfigMap(*rsm)
+			envConfigShouldNotBeDeleted := BuildEnvConfigMap(*rsm, labels)
 			envConfigShouldNotBeDeleted.SetOwnerReferences([]metav1.OwnerReference{
 				{
 					Kind:       reflect.TypeOf(v1alpha1.Cluster{}).Name(),
@@ -111,7 +113,7 @@ var _ = Describe("object deletion transformer test.", func() {
 			action := buildAction(rsm, actionName, jobTypeSwitchover, jobScenarioMembership, "", "")
 			action.SetOwnerReferences([]metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.InstanceSet{}).Name(),
 					Controller: &controller,
 				},
 			})

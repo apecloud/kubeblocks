@@ -155,7 +155,7 @@ var (
 
 	observeActions = []workloads.Action{{Command: []string{"cmd"}}}
 
-	rsm *workloads.ReplicatedStateMachine
+	rsm *workloads.InstanceSet
 )
 
 func less(v1, v2 graph.Vertex) bool {
@@ -176,9 +176,11 @@ func makePodUpdateReady(newRevision string, roleful bool, pods ...*corev1.Pod) {
 	}
 }
 
-func mockUnderlyingSts(rsm workloads.ReplicatedStateMachine, generation int64) *apps.StatefulSet {
-	headLessSvc := BuildHeadlessSvc(rsm)
-	sts := buildSts(&rsm, headLessSvc.Name)
+func mockUnderlyingSts(rsm workloads.InstanceSet, generation int64) *apps.StatefulSet {
+	labels := getLabels(&rsm)
+	headlessSelectors := getSvcSelector(&rsm, true)
+	headLessSvc := BuildHeadlessSvc(rsm, labels, headlessSelectors)
+	sts := buildSts(&rsm, headLessSvc.Name, labels)
 	sts.Generation = generation
 	sts.Status.ObservedGeneration = generation
 	sts.Status.Replicas = *sts.Spec.Replicas
@@ -205,7 +207,7 @@ func init() {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "ReplicatedStateMachine Suite")
+	RunSpecs(t, "InstanceSet Suite")
 }
 
 var _ = BeforeSuite(func() {

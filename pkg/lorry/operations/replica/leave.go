@@ -99,5 +99,10 @@ func (s *Leave) Do(ctx context.Context, req *operations.OpsRequest) (*operations
 		return nil, err
 	}
 
+	if cluster.HaConfig.IsDeleting(currentMember) {
+		cluster.HaConfig.FinishDeleted(currentMember)
+		_ = s.dcsStore.UpdateHaConfig()
+	}
+
 	return nil, nil
 }

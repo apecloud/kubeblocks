@@ -35,8 +35,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 )
 
 var (
@@ -62,7 +62,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	synthesizeComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
-		// component controller does not handle the default headless service; the default headless service is managed by the RSM.
+		// component controller does not handle the default headless service; the default headless service is managed by the InstanceSet.
 		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
@@ -118,32 +118,7 @@ func (t *componentServiceTransformer) buildPodService(comp *appsv1alpha1.Compone
 }
 
 func (t *componentServiceTransformer) podsNameNOrdinal(synthesizeComp *component.SynthesizedComponent) (map[string]int, error) {
-	templateReplicas := func(template appsv1alpha1.InstanceTemplate) int32 {
-		replicas := int32(1) // default replicas
-		if template.Replicas != nil {
-			replicas = *template.Replicas
-		}
-		return replicas
-	}
-
-	templateReplicasCnt := int32(0)
-	for _, template := range synthesizeComp.Instances {
-		if len(template.Name) > 0 {
-			templateReplicasCnt += templateReplicas(template)
-		}
-	}
-
-	podNames := make([]string, 0)
-	workloadName := constant.GenerateRSMNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
-	for _, template := range synthesizeComp.Instances {
-		templateNames := rsm2.GenerateInstanceNamesFromTemplate(workloadName, template.Name, templateReplicas(template), synthesizeComp.OfflineInstances)
-		podNames = append(podNames, templateNames...)
-	}
-	if templateReplicasCnt < synthesizeComp.Replicas {
-		names := rsm2.GenerateInstanceNamesFromTemplate(workloadName, "", synthesizeComp.Replicas-templateReplicasCnt, synthesizeComp.OfflineInstances)
-		podNames = append(podNames, names...)
-	}
-
+	podNames := generatePodNames(synthesizeComp)
 	pods := make(map[string]int)
 	for _, name := range podNames {
 		ordinal, err := func() (int, error) {
@@ -231,4 +206,33 @@ func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *com
 	svcName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
 	defaultHeadlessSvcName := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	return svcName == defaultHeadlessSvcName
+}
+
+func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
+	templateReplicas := func(template appsv1alpha1.InstanceTemplate) int32 {
+		replicas := int32(1)
+		if template.Replicas != nil {
+			replicas = *template.Replicas
+		}
+		return replicas
+	}
+
+	templateReplicasCnt := int32(0)
+	for _, template := range synthesizeComp.Instances {
+		if len(template.Name) > 0 {
+			templateReplicasCnt += templateReplicas(template)
+		}
+	}
+
+	podNames := make([]string, 0)
+	workloadName := constant.GenerateWorkloadNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
+	for _, template := range synthesizeComp.Instances {
+		templateNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, template.Name, templateReplicas(template), synthesizeComp.OfflineInstances)
+		podNames = append(podNames, templateNames...)
+	}
+	if templateReplicasCnt < synthesizeComp.Replicas {
+		names := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", synthesizeComp.Replicas-templateReplicasCnt, synthesizeComp.OfflineInstances)
+		podNames = append(podNames, names...)
+	}
+	return podNames
 }

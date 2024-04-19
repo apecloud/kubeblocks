@@ -706,7 +706,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(res).Should(BeEquivalentTo(expectedRoles))
 			})
 
-			It("rsm spec roles convertor", func() {
+			It("InstanceSet spec roles convertor", func() {
 				convertor := &compDefRolesConvertor{}
 				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
 					Roles: []workloads.ReplicaRole{
@@ -857,19 +857,19 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(*actions.RoleProbe).Should(BeEquivalentTo(*expectedRoleProbe))
 			})
 
-			It("rsm spec role probe convertor", func() {
+			It("ITS spec role probe convertor", func() {
 				convertor := &compDefLifecycleActionsConvertor{}
 				mockCommand := []string{
-					"mock-rsm-role-probe-command",
+					"mock-its-role-probe-command",
 				}
 				mockArgs := []string{
-					"mock-rsm-role-probe-args",
+					"mock-its-role-probe-args",
 				}
 				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
 					RoleProbe: &workloads.RoleProbe{
 						CustomHandler: []workloads.Action{
 							{
-								Image:   "mock-rsm-role-probe-image",
+								Image:   "mock-its-role-probe-image",
 								Command: mockCommand,
 								Args:    mockArgs,
 							},
@@ -883,7 +883,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
 				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.WeSQLBuiltinActionHandler))
 				Expect(actions.RoleProbe.CustomHandler).ShouldNot(BeNil())
-				Expect(actions.RoleProbe.CustomHandler.Image).Should(BeEquivalentTo("mock-rsm-role-probe-image"))
+				Expect(actions.RoleProbe.CustomHandler.Image).Should(BeEquivalentTo("mock-its-role-probe-image"))
 				Expect(actions.RoleProbe.CustomHandler.Exec.Command).Should(BeEquivalentTo(mockCommand))
 				Expect(actions.RoleProbe.CustomHandler.Exec.Args).Should(BeEquivalentTo(mockArgs))
 			})

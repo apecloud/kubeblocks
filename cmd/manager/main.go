@@ -134,8 +134,9 @@ func init() {
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
 	viper.SetDefault(instanceset.FeatureGateIgnorePodVerticalScaling, false)
-	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
+	viper.SetDefault(intctrlutil.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
+	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, true)
 }
 
 type flagName string
@@ -283,7 +284,7 @@ func main() {
 	multiClusterKubeConfig = viper.GetString(multiClusterKubeConfigFlagKey.viperName())
 	multiClusterContexts = viper.GetString(multiClusterContextsFlagKey.viperName())
 
-	setupLog.Info("golang runtime metrics.", "featureGate", constant.EnabledRuntimeMetrics())
+	setupLog.Info("golang runtime metrics.", "featureGate", intctrlutil.EnabledRuntimeMetrics())
 	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{

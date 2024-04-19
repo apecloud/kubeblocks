@@ -47,13 +47,13 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 		if err != nil {
 			return core.WrapError(err, "failed to generate env configmap[%s]", cmName)
 		}
-		injectEnvFrom(podSpec.Containers, configSpec.AsEnvFrom, envConfigMap.Name)
-		injectEnvFrom(podSpec.InitContainers, configSpec.AsEnvFrom, envConfigMap.Name)
+		injectEnvFrom(podSpec.Containers, configSpec.ContainersInjectedTo(), envConfigMap.Name)
+		injectEnvFrom(podSpec.InitContainers, configSpec.ContainersInjectedTo(), envConfigMap.Name)
 		return nil
 	}
 
 	for _, template := range component.ConfigTemplates {
-		if len(template.AsEnvFrom) == 0 || template.ConfigConstraintRef == "" {
+		if !template.InjectEnvEnabled() || template.ConfigConstraintRef == "" {
 			continue
 		}
 		cmName := core.GetComponentCfgName(cluster.Name, component.Name, template.Name)
@@ -160,8 +160,8 @@ func CheckEnvFrom(container *corev1.Container, cmName string) bool {
 	return false
 }
 
-func injectEnvFrom(containers []corev1.Container, asEnvFrom []string, cmName string) {
-	sets := cfgutil.NewSet(asEnvFrom...)
+func injectEnvFrom(containers []corev1.Container, injectEnvTo []string, cmName string) {
+	sets := cfgutil.NewSet(injectEnvTo...)
 	for i := range containers {
 		container := &containers[i]
 		if sets.InArray(container.Name) && !CheckEnvFrom(container, cmName) {
@@ -197,7 +197,7 @@ func fromConfigSpec(configSpec appsv1alpha1.ComponentConfigSpec, cm *corev1.Conf
 }
 
 func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1beta1.ConfigConstraintSpec, cli client.Client, ctx context.Context) error {
-	if len(configSpec.AsEnvFrom) == 0 || cc == nil || cc.FormatterConfig == nil {
+	if !configSpec.InjectEnvEnabled() || cc == nil || cc.FormatterConfig == nil {
 		return nil
 	}
 	envMap, err := fromConfigmapFiles(fromConfigSpec(configSpec, cmObj), cmObj, cc.FormatterConfig)

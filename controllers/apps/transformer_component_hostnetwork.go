@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -140,41 +139,9 @@ func updateObjectsWithAllocatedPorts(synthesizedComp *component.SynthesizedCompo
 			}
 		}
 	}
-	if err := updateMonitorPorts(synthesizedComp, ports); err != nil {
-		return err
-	}
 	if err := updateLorrySpecAfterPortsChanged(synthesizedComp); err != nil {
 		return err
 	}
-	return nil
-}
-
-func updateMonitorPorts(synthesizedComp *component.SynthesizedComponent, ports map[string]map[string]int32) error {
-	if !synthesizedComp.Monitor.Enable {
-		return nil
-	}
-
-	portMapping := make(map[int32]int32)
-	for _, c := range synthesizedComp.PodSpec.Containers {
-		containerPorts, ok := ports[c.Name]
-		for _, p := range c.Ports {
-			portMapping[p.ContainerPort] = func() int32 {
-				if ok {
-					port, okk := containerPorts[p.Name]
-					if okk {
-						return port
-					}
-				}
-				return p.ContainerPort
-			}()
-		}
-	}
-
-	newScrapePort, ok := portMapping[synthesizedComp.Monitor.ScrapePort]
-	if !ok {
-		return fmt.Errorf("monitor scrape port %d not found", synthesizedComp.Monitor.ScrapePort)
-	}
-	synthesizedComp.Monitor.ScrapePort = newScrapePort
 	return nil
 }
 

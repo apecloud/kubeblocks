@@ -79,3 +79,14 @@ func (status *ConfigurationStatus) GetItemStatus(name string) *ConfigurationItem
 	}
 	return nil
 }
+
+func (configSpec *ComponentConfigSpec) InjectEnvEnabled() bool {
+	return len(configSpec.AsEnvFrom) > 0 || len(configSpec.InjectEnvTo) > 0
+}
+
+func (configSpec *ComponentConfigSpec) ContainersInjectedTo() []string {
+	if len(configSpec.InjectEnvTo) != 0 {
+		return configSpec.InjectEnvTo
+	}
+	return configSpec.AsEnvFrom
+}

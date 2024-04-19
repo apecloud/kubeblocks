@@ -366,45 +366,6 @@ func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
 	return []Phase{AvailablePhase}
 }
 
-type ExporterConfig struct {
-	// Specifies the port on which the exporter listens for the Time Series Database to scrape metrics.
-	//
-	// It is a required field and accepts either an integer value or a string representation of the port number.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XIntOrString
-	ScrapePort intstr.IntOrString `json:"scrapePort"`
-
-	// Specifies the URL path at which the exporter serves metrics data for scraping by the Time Series Database.
-	// The path should be configured on the exporter to respond with metrics in a compatible format.
-	// This field is optional and defaults to "/metrics" if not specified, with a maximum length of 128 characters.
-	//
-	// +kubebuilder:validation:MaxLength=128
-	// +kubebuilder:default="/metrics"
-	// +optional
-	ScrapePath string `json:"scrapePath,omitempty"`
-}
-
-type MonitorConfig struct {
-	// Determines whether built-in monitoring is enabled.
-	// When true, monitoring metrics are automatically scraped.
-	// If set to false, configuration via `exporterConfig` is required to manage metrics scraping.
-	//
-	// Note: This field has no effect and will be deprecated soon.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	BuiltIn bool `json:"builtIn,omitempty"`
-
-	// Specifies the settings for an external Time Series Database exporter, including the scrape path and port.
-	// This configuration is necessary for the Time Series Database to scrape metrics from the specified exporter.
-	//
-	// This field is valid when `builtIn` is set to false.
-	//
-	// +optional
-	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
-}
-
 type LogConfig struct {
 	// Specifies a descriptive label for the log type, such as 'slow' for a MySQL slow log file.
 	// It provides a clear identification of the log's purpose and content.
@@ -524,6 +485,65 @@ type ServiceRefDeclarationSpec struct {
 	ServiceVersion string `json:"serviceVersion"`
 }
 
+type PrometheusScrapeConfig struct {
+	// Specifies the http/https url path to scrape for metrics.
+	// If empty, Prometheus uses the default value (e.g. `/metrics`).
+	//
+	// +kubebuilder:validation:default="/metrics"
+	// +optional
+	MetricsPath string `json:"metricsPath,omitempty"`
+
+	// Specifies the port name to scrape for metrics.
+	//
+	// +optional
+	MetricsPort string `json:"metricsPort,omitempty"`
+
+	// Specifies the schema to use for scraping.
+	// `http` and `https` are the expected values unless you rewrite the `__scheme__` label via relabeling.
+	// If empty, Prometheus uses the default value `http`.
+	//
+	// +kubebuilder:validation:default="http"
+	// +optional
+	Protocol PrometheusProtocol `json:"protocol,omitempty"`
+}
+
+type MonitorSource struct {
+	// Defines the kind of monitor, such as metrics or logs.
+	// +kubebuilder:validation:Required
+	SidecarKind MonitorKind `json:"kind"`
+
+	// Defines the scrape configuration for the prometheus.
+	//
+	// +optional
+	ScrapeConfig *PrometheusScrapeConfig `json:"scrapeConfig,omitempty"`
+}
+
+type SidecarContainerSource struct {
+	// Defines the function or purpose of the container, such as the monitor type sidecar.
+	//
+	// +optional
+	Monitor *MonitorSource `json:"monitor,omitempty"`
+}
+
+type SidecarContainerSpec struct {
+	corev1.Container `json:",inline"`
+
+	// Define the function or purpose of the container, such as the monitor type sidecar.
+	// In order to allow prometheus to scrape metrics from the sidecar container, the schema, port, and url will be injected into the annotation of the service.
+	//
+	// +optional
+	*SidecarContainerSource `json:",inline"`
+}
+
+type BuiltinMonitorContainerRef struct {
+	// Specifies the name of the built-in metrics exporter container.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	PrometheusScrapeConfig `json:",inline"`
+}
+
 // ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
 // has been replaced by ComponentDefinition.
 //
@@ -582,11 +602,6 @@ type ClusterComponentDefinition struct {
 	//
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
-
-	// Specify the config that how to monitor the component.
-	//
-	// +optional
-	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
 	// Specify the logging files which can be observed and configured by cluster users.
 	//
@@ -705,6 +720,23 @@ type ClusterComponentDefinition struct {
 	//
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
+
+	// Defines the sidecar containers that will be attached to the component's main container.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:MinItems= 1
+	// +kubebuilder:validation:MaxItems= 32
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarContainerSpecs,omitempty"`
+
+	// Defines the built-in metrics exporter container.
+	//
+	// +optional
+	BuiltinMonitorContainer *BuiltinMonitorContainerRef `json:"builtinMonitorContainer,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {

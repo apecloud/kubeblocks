@@ -21,16 +21,24 @@ package controllerutil
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type createVolumeFn func(volumeName string) corev1.Volume
 type updateVolumeFn func(*corev1.Volume) error
+
+var (
+	scriptsDefaultMode int32 = 0555
+	configsDefaultMode int32 = 0444
+)
 
 func findVolumeWithVolumeName(volumes []corev1.Volume, volumeName string) int {
 	for index, itr := range volumes {
@@ -57,13 +65,14 @@ func CreateOrUpdateVolume(volumes []corev1.Volume, volumeName string, createFn c
 	return append(volumes, createFn(volumeName)), nil
 }
 
-func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1alpha1.ComponentTemplateSpec) error {
+func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1alpha1.ComponentTemplateSpec, configSet []string) error {
 	var (
 		err        error
 		podVolumes = podSpec.Volumes
+		volumeKeys = maps.Keys(volumes)
 	)
+
 	// sort the volumes
-	volumeKeys := maps.Keys(volumes)
 	sort.Strings(volumeKeys)
 	// Update PodTemplate Volumes
 	for _, cmName := range volumeKeys {
@@ -77,7 +86,8 @@ func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
-						DefaultMode:          templateSpec.DefaultMode,
+						// TODO: remove ComponentTemplateSpec.DefaultMode
+						DefaultMode: buildVolumeMode(configSet, templateSpec.Name, templateSpec),
 					},
 				},
 			}
@@ -94,4 +104,14 @@ func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1
 	}
 	podSpec.Volumes = podVolumes
 	return nil
+}
+
+func buildVolumeMode(configs []string, name string, configSpec appsv1alpha1.ComponentTemplateSpec) *int32 {
+	if !viper.GetBool(constant.FeatureGateIgnoreConfigTemplateDefaultMode) {
+		return configSpec.DefaultMode
+	}
+	if slices.Contains(configs, name) {
+		return &configsDefaultMode
+	}
+	return &scriptsDefaultMode
 }

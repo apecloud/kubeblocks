@@ -173,6 +173,24 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
+	// Defines the sidecar containers that will be attached to the component's main container.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:MinItems:= 1
+	// +kubebuilder:validation:MaxItems:= 32
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	// +optional
+	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarContainerSpecs,omitempty"`
+
+	// Defines the built-in metrics exporter container.
+	//
+	// +optional
+	BuiltinMonitorContainer *BuiltinMonitorContainerRef `json:"builtinMonitorContainer,omitempty"`
+
 	// Represents user-defined variables that can be used as environment variables for Pods and Actions,
 	// or to render templates of config and script.
 	// These variables are placed in front of the environment variables declared in the Pod if used as
@@ -300,7 +318,7 @@ type ComponentDefinitionSpec struct {
 	// This field is immutable.
 	//
 	// +optional
-	Monitor *MonitorConfig `json:"monitor,omitempty"`
+	// Monitor *MonitorConfig `json:"monitor,omitempty"`
 
 	// Specifies groups of scripts (each group of scripts provided as a single ConfigMap) to be mounted as volumes and
 	// can be invoked in the container's startup command or action's command.

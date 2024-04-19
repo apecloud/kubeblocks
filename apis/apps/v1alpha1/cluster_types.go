@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -191,7 +190,7 @@ type ClusterSpec struct {
 	// This field is maintained for backward compatibility and its use is discouraged.
 	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
 	//
-	//+kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
@@ -216,16 +215,6 @@ type ClusterSpec struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Storage ClusterStorage `json:"storage,omitempty"`
-
-	// The configuration of monitor.
-	//
-	// Deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	Monitor ClusterMonitor `json:"monitor,omitempty"`
 
 	// The configuration of network.
 	//
@@ -660,12 +649,6 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
-	// Indicates whether monitoring is enabled.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	Monitor bool `json:"monitor,omitempty"`
-
 	// Specifies which types of logs should be collected for the Cluster.
 	// The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.
 	//
@@ -835,6 +818,24 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
+
+	// Defines the sidecar containers that will be attached to the component's main container.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=32
+	// +listType=set
+	// +optional
+	Sidecars []string `json:"sidecars,omitempty"`
+
+	// Determines whether the metrics exporter needs to be published to the service endpoint.
+	// If set to true, the metrics exporter will be published to the service endpoint,
+	// the service will be injected with the following annotations:
+	// - "monitor.kubeblocks.io/path"
+	// - "monitor.kubeblocks.io/port"
+	// - "monitor.kubeblocks.io/scheme"
+	//
+	// +optional
+	MonitorEnabled *bool `json:"monitorEnabled,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -1147,15 +1148,6 @@ type ClassDefRef struct {
 	//
 	// +kubebuilder:validation:Required
 	Class string `json:"class"`
-}
-
-// ClusterMonitor is deprecated since v0.9.
-type ClusterMonitor struct {
-	// Defines the frequency at which monitoring occurs. If set to 0, monitoring is disabled.
-	//
-	// +kubebuilder:validation:XIntOrString
-	// +optional
-	MonitoringInterval *intstr.IntOrString `json:"monitoringInterval,omitempty"`
 }
 
 // ClusterNetwork is deprecated since v0.9.

@@ -97,6 +97,8 @@ var _ = BeforeSuite(func() {
 		fmt.Sprintf("[{\"key\":\"%s\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]", testDataPlaneTolerationKey))
 	viper.Set(constant.CfgKeyDataPlaneAffinity,
 		fmt.Sprintf("{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"%s\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}", testDataPlaneNodeAffinityKey))
+	viper.Set(constant.IgnoreUpgradeToInstanceSet, true)
+
 	ctx, cancel = context.WithCancel(context.TODO())
 	logger = logf.FromContext(ctx).WithValues()
 	logger.Info("logger start")

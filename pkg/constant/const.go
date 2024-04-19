@@ -323,3 +323,7 @@ const (
 	MigratedAPIVersion = "migrated"
 	ReviewAPIVersion   = "reviewer"
 )
+
+const (
+	IgnoreUpgradeToInstanceSet = "IGNORE_UPGRADE_TO_INSTANCE_SET"
+)

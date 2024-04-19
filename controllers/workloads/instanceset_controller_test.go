@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package workloads
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -91,7 +89,7 @@ var _ = Describe("InstanceSet Controller", func() {
 				func(g Gomega, set *workloads.InstanceSet) {
 					g.Expect(set.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				}),
-			).WithTimeout(1000 * time.Second).Should(Succeed())
+			).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, its)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(its), &workloads.InstanceSet{}, false)).
 				Should(Succeed())

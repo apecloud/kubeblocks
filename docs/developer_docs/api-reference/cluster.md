@@ -21899,11 +21899,10 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether to make the tool image into the container image of sidecar.
-Some tool images are very large, especially C++ tools, which can depends on a lot of library, e.g: *.so,
-In this case, the tool image can be used as a sidecar container image.</p>
-<p>If set to &lsquo;True&rsquo;, the tool image will be used as the container image of the sidecar.
-kubeblocks-tools will be used as the container image of the sidecar.</p>
+<p>Indicates whether the tool image should be used as the container image for a sidecar.
+This is useful for large tool images, such as those for C++ tools, which may depend on
+numerous libraries (e.g., *.so files).</p>
+<p>If enabled, the tool image is deployed as a sidecar container image.</p>
 </td>
 </tr>
 <tr>

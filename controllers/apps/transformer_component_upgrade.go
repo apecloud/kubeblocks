@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -64,15 +65,27 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return err
 	}
 
+	// remove xxx-rsm-env configmap
+	env := &corev1.ConfigMap{}
+	key := types.NamespacedName{
+		Namespace: comp.Namespace,
+		Name:      fmt.Sprintf("%s-rsm-env", comp.Name),
+	}
+	if err := graphCli.Get(transCtx.Context, key, env); err == nil {
+		legacyFound = true
+		parent = graphCli.Do(dag, nil, env, model.ActionDeletePtr(), parent)
+	} else if !apierrors.IsNotFound(err) {
+		return err
+	}
+
 	// remove the StatefulSet object if found
 	sts := &appsv1.StatefulSet{}
 	if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(comp), sts); err == nil {
 		legacyFound = true
-		// update spec.selector and replicas to make pods orphans
-		sts.Spec.Selector.MatchLabels["apps.kubeblocks.io/upgrade"] = "true"
+		// update replicas to 0
 		sts.Spec.Replicas = func() *int32 { r := int32(0); return &r }()
-		parent = graphCli.Do(dag, nil, sts, model.ActionUpdatePtr(), parent)
 		parent = graphCli.Do(dag, nil, sts, model.ActionDeletePtr(), parent)
+		parent = graphCli.Do(dag, nil, sts, model.ActionUpdatePtr(), parent)
 	} else if !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -95,7 +108,9 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 				legacyFound = true
 				pod.OwnerReferences = nil
 				pod.Labels[rsmcore.WorkloadsManagedByLabelKey] = rsmcore.KindInstanceSet
-				pod.Labels[rsmcore.WorkloadsInstanceLabelKey] = synthesizeComp.Name
+				pod.Labels[rsmcore.WorkloadsInstanceLabelKey] = comp.Name
+				// update label that in the parent's selector to make this pod orphan
+				pod.Labels[constant.AppManagedByLabelKey] = "upgrade"
 				if revision == "" {
 					revision, err = buildRevision(synthesizeComp)
 					if err != nil {
@@ -106,19 +121,6 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 				parent = graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), parent)
 			}
 		}
-	} else if !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	// remove xxx-rsm-env configmap
-	env := &corev1.ConfigMap{}
-	key := types.NamespacedName{
-		Namespace: comp.Namespace,
-		Name:      fmt.Sprintf("%s-rsm-env", comp.Name),
-	}
-	if err := graphCli.Get(transCtx.Context, key, env); err == nil {
-		legacyFound = true
-		parent = graphCli.Do(dag, nil, env, model.ActionDeletePtr(), parent)
 	} else if !apierrors.IsNotFound(err) {
 		return err
 	}

@@ -135,5 +135,6 @@ func buildRevision(synthesizeComp *component.SynthesizedComponent) (string, erro
 	if err != nil {
 		return "", err
 	}
-	return instanceset.BuildInstanceTemplateRevision(&its.Spec.Template, its)
+	template := rsmcore.BuildPodTemplate(its, rsmcore.GetEnvConfigMapName(its.Name))
+	return instanceset.BuildInstanceTemplateRevision(template, its)
 }

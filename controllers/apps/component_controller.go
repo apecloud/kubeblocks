@@ -150,8 +150,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentLoadResourcesTransformer{},
 			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
-			// handle upgrade from the legacy RSM API to the InstanceSet API
-			&upgradeTransformer{},
 			// allocate ports for host-network component
 			&componentHostNetworkTransformer{},
 			// handle component services
@@ -172,6 +170,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentConfigurationTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
+			// handle upgrade from the legacy RSM API to the InstanceSet API
+			&upgradeTransformer{},
 			// handle the component workload
 			&componentWorkloadTransformer{Client: r.Client},
 			// handle RBAC for component workloads

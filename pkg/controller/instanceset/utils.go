@@ -20,17 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
-	"context"
-
-	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	"golang.org/x/exp/slices"
 )
 
 func mergeMap[K comparable, V any](src, dst *map[K]V) {
@@ -57,28 +50,6 @@ func mergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 		} else {
 			*dst = append(*dst, item)
 		}
-	}
-}
-
-func CurrentReplicaProvider(ctx context.Context, cli client.Reader, objectKey client.ObjectKey) (ReplicaProvider, error) {
-	getDefaultProvider := func() ReplicaProvider {
-		provider := defaultReplicaProvider
-		if viper.IsSet(FeatureGateRSMReplicaProvider) {
-			provider = ReplicaProvider(viper.GetString(FeatureGateRSMReplicaProvider))
-			if provider != StatefulSetProvider && provider != PodProvider {
-				provider = defaultReplicaProvider
-			}
-		}
-		return provider
-	}
-	sts := &appsv1.StatefulSet{}
-	switch err := cli.Get(ctx, objectKey, sts); {
-	case err == nil:
-		return StatefulSetProvider, nil
-	case !apierrors.IsNotFound(err):
-		return "", err
-	default:
-		return getDefaultProvider(), nil
 	}
 }
 

@@ -872,11 +872,11 @@ func resolveClusterObjectVars(kind string, objRef appsv1alpha1.ClusterObjectRefe
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolving vars from %s object %s error: %s", kind, objRef.Name, err.Error())
 	}
-	if len(objs) == 0 || isAllNil(objs) {
-		if objOptional() {
-			return nil, nil, nil
-		}
-		return nil, nil, fmt.Errorf("%s object %s is not found when resolving vars", kind, objRef.Name)
+	switch {
+	case objOptional() && isAllNil(objs):
+		return nil, nil, nil
+	case !objOptional() && (len(objs) == 0 || isHasNil(objs)):
+		return nil, nil, fmt.Errorf("has %s object %s not found when resolving vars", kind, objRef.Name)
 	}
 
 	vars1, vars2 := make(map[string]*corev1.EnvVar), make(map[string]*corev1.EnvVar)
@@ -1038,6 +1038,13 @@ func isAllNil(objs map[string]any) bool {
 		return o == nil
 	}
 	return generics.CountFunc(maps.Values(objs), isNil) == len(objs)
+}
+
+func isHasNil(objs map[string]any) bool {
+	isNil := func(o any) bool {
+		return o == nil
+	}
+	return generics.CountFunc(maps.Values(objs), isNil) > 0
 }
 
 func isAllVarsNil(vars map[string]*corev1.EnvVar) bool {

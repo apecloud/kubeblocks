@@ -68,6 +68,10 @@ type ComponentReconciler struct {
 
 // owned K8s core API resources controller-gen RBAC marker
 // full access on core API resources
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
+// +kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
+
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=secrets/finalizers,verbs=update
 
@@ -140,6 +144,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		AddTransformer(
 			// handle component deletion and pre-terminate
 			&componentDeletionTransformer{},
+			// handle upgrade from the legacy RSM API to the InstanceSet API
+			&upgradeTransformer{},
 			// handle finalizers and referenced definition labels
 			&componentMetaTransformer{},
 			// validate referenced componentDefinition objects, and build synthesized component

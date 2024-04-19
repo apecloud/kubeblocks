@@ -58,7 +58,7 @@ var (
 
 	selectors = map[string]string{
 		constant.AppInstanceLabelKey:   name,
-		rsm.WorkloadsManagedByLabelKey: rsm.KindReplicatedStateMachine,
+		rsm.WorkloadsManagedByLabelKey: rsm.KindInstanceSet,
 	}
 	roles = []workloads.ReplicaRole{
 		{

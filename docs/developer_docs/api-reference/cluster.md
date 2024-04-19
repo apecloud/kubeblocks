@@ -343,6 +343,20 @@ Affinity
 </tr>
 <tr>
 <td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>backup</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
@@ -838,7 +852,7 @@ Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the scheduling constraints for the component&rsquo;s workload.
+<p>Specifies the scheduling constraints for the component.
 If specified, it will override the cluster-wide affinity.</p>
 </td>
 </tr>
@@ -855,6 +869,20 @@ If specified, it will override the cluster-wide affinity.</p>
 <em>(Optional)</em>
 <p>Specify the tolerations for the component&rsquo;s workload.
 If specified, they will override the cluster-wide toleration settings.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the component.</p>
 </td>
 </tr>
 <tr>
@@ -4102,6 +4130,20 @@ Affinity
 </tr>
 <tr>
 <td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the component.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
@@ -5239,6 +5281,20 @@ Affinity
 <td>
 <em>(Optional)</em>
 <p>Attached to tolerate any taint that matches the triple <code>key,value,effect</code> using the matching operator <code>operator</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the cluster.</p>
 </td>
 </tr>
 <tr>
@@ -7250,7 +7306,7 @@ Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the scheduling constraints for the component&rsquo;s workload.
+<p>Specifies the scheduling constraints for the component.
 If specified, it will override the cluster-wide affinity.</p>
 </td>
 </tr>
@@ -7267,6 +7323,20 @@ If specified, it will override the cluster-wide affinity.</p>
 <em>(Optional)</em>
 <p>Specify the tolerations for the component&rsquo;s workload.
 If specified, they will override the cluster-wide toleration settings.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the component.</p>
 </td>
 </tr>
 <tr>
@@ -15097,6 +15167,108 @@ Sample duration format:</p>
 <li>minutes: 	30m</li>
 </ul>
 <p>These durations can also be combined, for example: 30d12h30m.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.SchedulingPolicy">SchedulingPolicy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>schedulerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If specified, the pod will be dispatched by specified scheduler.
+If not specified, the pod will be dispatched by default scheduler.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSelector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeSelector is a selector which must be true for the pod to fit on a node.
+Selector which must match a node&rsquo;s labels for the pod to be scheduled on that node.
+More info: <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
+the scheduler simply schedules this pod onto that node, assuming that it fits resource
+requirements.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>affinity</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
+Kubernetes core/v1.Affinity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If specified, the cluster&rsquo;s scheduling constraints.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tolerations</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
+[]Kubernetes core/v1.Toleration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Attached to tolerate any taint that matches the triple <code>key,value,effect</code> using the matching operator <code>operator</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologySpreadConstraints</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core">
+[]Kubernetes core/v1.TopologySpreadConstraint
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TopologySpreadConstraints describes how a group of pods ought to spread across topology
+domains. Scheduler will schedule pods in a way which abides by the constraints.
+All topologySpreadConstraints are ANDed.</p>
 </td>
 </tr>
 </tbody>

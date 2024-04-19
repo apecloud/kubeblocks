@@ -161,7 +161,8 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	saName := restore.Spec.ServiceAccountName
 	if saName == "" {
 		var err error
-		if saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace); err != nil {
+		// TODO: update the mcMgr param
+		if saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace, nil); err != nil {
 			return nil, err
 		}
 	}

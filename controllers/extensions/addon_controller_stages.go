@@ -27,19 +27,15 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	v1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
-
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"golang.org/x/exp/slices"
+	v1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -271,17 +267,15 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 		r.reqCtx.Log.V(1).Info("installableCheckStage", "phase", addon.Status.Phase)
 
 		// check the annotations constraint about Kubeblocks Version
-		if addon.Annotations != nil && len(addon.Annotations[KBVersionValidate]) != 0 {
-			check, err := checkAnnotationsConstraint(addon, r.reconciler, ctx)
-			if err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
-				r.updateResultNErr(&res, err)
-				return
-			}
-			if !check {
-				r.setReconciled()
-				return
-			}
+		check, err := checkAnnotationsConstraint(ctx, r.reconciler, addon)
+		if err != nil {
+			res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
+			r.updateResultNErr(&res, err)
+			return
+		}
+		if !check {
+			r.setReconciled()
+			return
 		}
 
 		if addon.Spec.Installable == nil {
@@ -1105,10 +1099,10 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 	return false
 }
 
-func getKubeBlocksDeploy(r *AddonReconciler, ctx context.Context) (*v1.Deployment, error) {
+func getKubeBlocksDeploy(ctx context.Context, r *AddonReconciler) (*v1.Deployment, error) {
 	deploys := &v1.DeploymentList{}
 	labelSelector := labels.SelectorFromSet(map[string]string{
-		constant.AppNameLabelKey:      apps.KubeBlocks,
+		constant.AppNameLabelKey:      constant.AppName,
 		constant.AppComponentLabelKey: "apps",
 	})
 	if err := r.Client.List(ctx, deploys, client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS)),
@@ -1124,8 +1118,8 @@ func getKubeBlocksDeploy(r *AddonReconciler, ctx context.Context) (*v1.Deploymen
 	return &deploys.Items[0], nil
 }
 
-func getKubeBlocksVersion(r *AddonReconciler, ctx context.Context) (string, error) {
-	deploy, err := getKubeBlocksDeploy(r, ctx)
+func getKubeBlocksVersion(ctx context.Context, r *AddonReconciler) (string, error) {
+	deploy, err := getKubeBlocksDeploy(ctx, r)
 	if err != nil || deploy == nil {
 		return "", err
 	}
@@ -1148,20 +1142,18 @@ func enableOrInstall(addon *extensionsv1alpha1.Addon) bool {
 		addon.Status.Phase == extensionsv1alpha1.AddonDisabled && addon.Spec.InstallSpec != nil && addon.Spec.InstallSpec.Enabled
 }
 
-func checkAnnotationsConstraint(addon *extensionsv1alpha1.Addon, reconciler *AddonReconciler, ctx context.Context) (bool, error) {
-	// check the annotations constraint,
-	log.Log.Info("Current State and Spec ", "status", addon.Status.Phase, "Spec", addon.Spec.InstallSpec)
+// check the annotations constraint when install or enable an addon
+func checkAnnotationsConstraint(ctx context.Context, reconciler *AddonReconciler, addon *extensionsv1alpha1.Addon) (bool, error) {
+	if addon.Annotations == nil || len(addon.Annotations[KBVersionValidate]) == 0 {
+		// there is no constraint
+		return true, nil
+	}
+	// check when installing or enabling
 	if enableOrInstall(addon) {
-		// install or enable an addon, we need to check the Annotations constraint
-		if addon.Annotations == nil || len(addon.Annotations[KBVersionValidate]) == 0 {
-			return true, nil
-		}
-		kbVersion, err := getKubeBlocksVersion(reconciler, ctx)
+		kbVersion, err := getKubeBlocksVersion(ctx, reconciler)
 		if err != nil {
 			return false, err
 		}
-
-		log.Log.Info("kb-version", "kb-version", kbVersion)
 		if ok, err := validateVersion(addon.Annotations[KBVersionValidate], kbVersion); err == nil && !ok {
 			// kb version is mismatch, set the event and modify the status of the addon
 			reconciler.Event(addon, corev1.EventTypeWarning, "Kubeblocks Version Mismatch",

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package scheduling
 
 import (
 	"encoding/json"
@@ -31,8 +31,80 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// BuildAffinity builds affinities for components from cluster and comp spec.
-func BuildAffinity(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.Affinity {
+func BuildSchedulingPolicy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.SchedulingPolicy, error) {
+	if cluster.Spec.SchedulingPolicy != nil || (compSpec != nil && compSpec.SchedulingPolicy != nil) {
+		return buildSchedulingPolicy(cluster, compSpec)
+	}
+	return buildSchedulingPolicy4Legacy(cluster, compSpec)
+}
+
+func BuildSchedulingPolicy4Component(clusterName, compName string, affinity *appsv1alpha1.Affinity,
+	tolerations []corev1.Toleration) (*appsv1alpha1.SchedulingPolicy, error) {
+	return buildSchedulingPolicy4LegacyComponent(clusterName, compName, affinity, tolerations)
+}
+
+func buildSchedulingPolicy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.SchedulingPolicy, error) {
+	schedulingPolicy := cluster.Spec.SchedulingPolicy
+	if compSpec != nil && compSpec.SchedulingPolicy != nil {
+		schedulingPolicy = compSpec.SchedulingPolicy
+	}
+
+	mergeGlobalAffinity := func() error {
+		affinity, err := buildClusterWideAffinity()
+		if err != nil {
+			return err
+		}
+		schedulingPolicy.Affinity = mergeAffinity(schedulingPolicy.Affinity, affinity)
+		return nil
+	}
+
+	mergeGlobalTolerations := func() error {
+		tolerations, err := buildClusterWideTolerations()
+		if err != nil {
+			return err
+		}
+		if len(tolerations) > 0 {
+			if len(schedulingPolicy.Tolerations) == 0 {
+				schedulingPolicy.Tolerations = tolerations
+			} else {
+				schedulingPolicy.Tolerations = append(schedulingPolicy.Tolerations, tolerations...)
+			}
+		}
+		return nil
+	}
+
+	if err := mergeGlobalAffinity(); err != nil {
+		return nil, err
+	}
+	if err := mergeGlobalTolerations(); err != nil {
+		return nil, err
+	}
+	return schedulingPolicy, nil
+}
+
+func buildSchedulingPolicy4Legacy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.SchedulingPolicy, error) {
+	affinity := buildAffinity4Legacy(cluster, compSpec)
+	tolerations, err := buildTolerations4Legacy(cluster, compSpec)
+	if err != nil {
+		return nil, err
+	}
+	return buildSchedulingPolicy4LegacyComponent(cluster.Name, compSpec.Name, affinity, tolerations)
+}
+
+func buildSchedulingPolicy4LegacyComponent(clusterName, compName string, affinity *appsv1alpha1.Affinity,
+	tolerations []corev1.Toleration) (*appsv1alpha1.SchedulingPolicy, error) {
+	podAffinity, err := buildPodAffinity4Legacy(clusterName, compName, affinity)
+	if err != nil {
+		return nil, err
+	}
+	return &appsv1alpha1.SchedulingPolicy{
+		Affinity:                  podAffinity,
+		Tolerations:               tolerations,
+		TopologySpreadConstraints: buildPodTopologySpreadConstraints4Legacy(clusterName, compName, affinity),
+	}, nil
+}
+
+func buildAffinity4Legacy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.Affinity {
 	var affinity *appsv1alpha1.Affinity
 	if cluster.Spec.Affinity != nil {
 		affinity = cluster.Spec.Affinity
@@ -43,23 +115,19 @@ func BuildAffinity(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluster
 	return affinity
 }
 
-// BuildTolerations builds tolerations for components from cluster and comp spec.
-func BuildTolerations(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) ([]corev1.Toleration, error) {
+func buildTolerations4Legacy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) ([]corev1.Toleration, error) {
 	tolerations := cluster.Spec.Tolerations
 	if compSpec != nil && len(compSpec.Tolerations) != 0 {
 		tolerations = compSpec.Tolerations
 	}
-	// build data plane tolerations from config
-	var dpTolerations []corev1.Toleration
-	if val := viper.GetString(constant.CfgKeyDataPlaneTolerations); val != "" {
-		if err := json.Unmarshal([]byte(val), &dpTolerations); err != nil {
-			return nil, err
-		}
+	dpTolerations, err := buildClusterWideTolerations()
+	if err != nil {
+		return nil, err
 	}
 	return append(tolerations, dpTolerations...), nil
 }
 
-func BuildPodTopologySpreadConstraints(clusterName, compName string, compAffinity *appsv1alpha1.Affinity) []corev1.TopologySpreadConstraint {
+func buildPodTopologySpreadConstraints4Legacy(clusterName, compName string, compAffinity *appsv1alpha1.Affinity) []corev1.TopologySpreadConstraint {
 	if compAffinity == nil {
 		return nil
 	}
@@ -88,20 +156,16 @@ func BuildPodTopologySpreadConstraints(clusterName, compName string, compAffinit
 	return topologySpreadConstraints
 }
 
-func BuildPodAffinity(clusterName string, compName string, compAffinity *appsv1alpha1.Affinity) (*corev1.Affinity, error) {
-	affinity := buildNewAffinity(clusterName, compName, compAffinity)
-
-	// read data plane affinity from config and merge it
-	dpAffinity := new(corev1.Affinity)
-	if val := viper.GetString(constant.CfgKeyDataPlaneAffinity); val != "" {
-		if err := json.Unmarshal([]byte(val), &dpAffinity); err != nil {
-			return nil, err
-		}
+func buildPodAffinity4Legacy(clusterName string, compName string, compAffinity *appsv1alpha1.Affinity) (*corev1.Affinity, error) {
+	affinity := buildNewAffinity4Legacy(clusterName, compName, compAffinity)
+	dpAffinity, err := buildClusterWideAffinity()
+	if err != nil {
+		return nil, err
 	}
-	return mergeAffinity(affinity, dpAffinity)
+	return mergeAffinity(affinity, dpAffinity), nil
 }
 
-func buildNewAffinity(clusterName, compName string, compAffinity *appsv1alpha1.Affinity) *corev1.Affinity {
+func buildNewAffinity4Legacy(clusterName, compName string, compAffinity *appsv1alpha1.Affinity) *corev1.Affinity {
 	if compAffinity == nil {
 		return nil
 	}
@@ -176,14 +240,37 @@ func buildNewAffinity(clusterName, compName string, compAffinity *appsv1alpha1.A
 	return affinity
 }
 
+// buildClusterWideAffinity builds data plane affinity from global config
+func buildClusterWideAffinity() (*corev1.Affinity, error) {
+	affinity := new(corev1.Affinity)
+	if val := viper.GetString(constant.CfgKeyDataPlaneAffinity); val != "" {
+		if err := json.Unmarshal([]byte(val), &affinity); err != nil {
+			return nil, err
+		}
+	}
+	return affinity, nil
+}
+
+// buildClusterWideTolerations builds data plane tolerations from global config
+func buildClusterWideTolerations() ([]corev1.Toleration, error) {
+	// build data plane tolerations from config
+	var tolerations []corev1.Toleration
+	if val := viper.GetString(constant.CfgKeyDataPlaneTolerations); val != "" {
+		if err := json.Unmarshal([]byte(val), &tolerations); err != nil {
+			return nil, err
+		}
+	}
+	return tolerations, nil
+}
+
 // mergeAffinity merges affinity from src to dest
-func mergeAffinity(dest, src *corev1.Affinity) (*corev1.Affinity, error) {
+func mergeAffinity(dest, src *corev1.Affinity) *corev1.Affinity {
 	if src == nil {
-		return dest, nil
+		return dest
 	}
 
 	if dest == nil {
-		return src.DeepCopy(), nil
+		return src.DeepCopy()
 	}
 
 	rst := dest.DeepCopy()
@@ -239,5 +326,5 @@ func mergeAffinity(dest, src *corev1.Affinity) (*corev1.Affinity, error) {
 				src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms...)
 		}
 	}
-	return rst, nil
+	return rst
 }

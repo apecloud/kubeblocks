@@ -47,8 +47,13 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	comp := transCtx.Component
 	synthesizeComp := transCtx.SynthesizeComponent
 
+	if model.IsObjectDeleting(comp) {
+		return nil
+	}
+
 	var parent *model.ObjectVertex
 	legacyFound := false
+
 	// remove the RSM object if found
 	rsm := &legacy.ReplicatedStateMachine{}
 	if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(comp), rsm); err == nil {

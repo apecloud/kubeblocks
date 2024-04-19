@@ -19,10 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package model
 
+import "sigs.k8s.io/controller-runtime/pkg/client"
+
 type GraphOptions struct {
 	replaceIfExisting     bool
 	haveDifferentTypeWith bool
 	clientOpt             any
+	propagationPolicy     client.PropagationPolicy
 }
 
 type GraphOption interface {
@@ -61,5 +64,21 @@ func (o *clientOption) ApplyTo(opts *GraphOptions) {
 func WithClientOption(opt any) GraphOption {
 	return &clientOption{
 		opt: opt,
+	}
+}
+
+type propagationPolicyOption struct {
+	propagationPolicy client.PropagationPolicy
+}
+
+func (o *propagationPolicyOption) ApplyTo(opts *GraphOptions) {
+	opts.propagationPolicy = o.propagationPolicy
+}
+
+var _ GraphOption = &propagationPolicyOption{}
+
+func WithPropagationPolicy(policy client.PropagationPolicy) GraphOption {
+	return &propagationPolicyOption{
+		propagationPolicy: policy,
 	}
 }

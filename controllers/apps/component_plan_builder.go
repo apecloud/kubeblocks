@@ -234,7 +234,12 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 	}
 
 	if !model.IsObjectDeleting(vertex.Obj) {
-		err := c.cli.Delete(ctx, vertex.Obj, clientOption(vertex))
+		var opts []client.DeleteOption
+		opts = append(opts, clientOption(vertex))
+		if len(vertex.PropagationPolicy) > 0 {
+			opts = append(opts, vertex.PropagationPolicy)
+		}
+		err := c.cli.Delete(ctx, vertex.Obj, opts...)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}

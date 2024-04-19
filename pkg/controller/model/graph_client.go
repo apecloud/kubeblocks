@@ -138,10 +138,11 @@ func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, actio
 	}
 
 	vertex := &ObjectVertex{
-		OriObj:    objOld,
-		Obj:       objNew,
-		Action:    action,
-		ClientOpt: graphOpts.clientOpt,
+		OriObj:            objOld,
+		Obj:               objNew,
+		Action:            action,
+		ClientOpt:         graphOpts.clientOpt,
+		PropagationPolicy: graphOpts.propagationPolicy,
 	}
 	switch {
 	case parent == nil:

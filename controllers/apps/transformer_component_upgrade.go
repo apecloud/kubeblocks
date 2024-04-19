@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -82,10 +83,7 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	sts := &appsv1.StatefulSet{}
 	if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(comp), sts); err == nil {
 		legacyFound = true
-		// update replicas to 0
-		sts.Spec.Replicas = func() *int32 { r := int32(0); return &r }()
-		parent = graphCli.Do(dag, nil, sts, model.ActionDeletePtr(), parent)
-		parent = graphCli.Do(dag, nil, sts, model.ActionUpdatePtr(), parent)
+		parent = graphCli.Do(dag, nil, sts, model.ActionDeletePtr(), parent, model.WithPropagationPolicy(client.PropagationPolicy(metav1.DeletePropagationOrphan)))
 	} else if !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -109,8 +107,6 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 				pod.OwnerReferences = nil
 				pod.Labels[rsmcore.WorkloadsManagedByLabelKey] = rsmcore.KindInstanceSet
 				pod.Labels[rsmcore.WorkloadsInstanceLabelKey] = comp.Name
-				// update label that in the parent's selector to make this pod orphan
-				pod.Labels[constant.AppManagedByLabelKey] = "upgrade"
 				if revision == "" {
 					revision, err = buildRevision(synthesizeComp)
 					if err != nil {
@@ -126,6 +122,7 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	}
 
 	if legacyFound {
+		comp.Status.ObservedGeneration = 0
 		return graph.ErrPrematureStop
 	}
 	return nil

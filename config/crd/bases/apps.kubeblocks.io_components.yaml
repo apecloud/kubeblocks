@@ -2746,7 +2746,7 @@ spec:
                         both Cluster and ServiceDescriptor are specified, the Cluster
                         takes precedence."
                       type: string
-                    clusterRef:
+                    clusterServiceSelector:
                       description: Specifies the cluster to reference.
                       properties:
                         cluster:

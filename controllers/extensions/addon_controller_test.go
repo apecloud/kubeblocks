@@ -630,6 +630,76 @@ var _ = Describe("Addon controller", func() {
 			})
 			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
 		})
+
+		It("should set status to failed when install an Addon with annotations mismatching", func() {
+			By("By create an addon")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+				newOjb.Annotations = map[string]string{
+					KBVersionValidate: ">=",
+				}
+			})
+
+			By("By checking status.observedGeneration and status.phase=failed")
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				addon := &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Generation).Should(BeEquivalentTo(1))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+				g.Expect(addon.Status.Conditions).Should(HaveLen(1))
+				g.Expect(addon.Status.Conditions[0].Reason).Should(BeEquivalentTo(InstallableRequirementUnmatched))
+			}).Should(Succeed())
+		})
+
+		It("should set status to failed when enable an Addon with annotations mismatching", func() {
+			By("By create an addon")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Type = extensionsv1alpha1.HelmType
+			})
+
+			By("By checking status.observedGeneration and status.phase=disabled")
+			Eventually(func(g Gomega) {
+				doReconcileOnce(g)
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
+			}).Should(Succeed())
+
+			By("By set the constraint in annotations of an addon")
+			defaultInstall := addon.Spec.DefaultInstallValues[0].AddonInstallSpec
+			addon.Spec.InstallSpec = defaultInstall.DeepCopy()
+			addon.Spec.InstallSpec.Enabled = true
+			addon.Annotations = map[string]string{
+				KBVersionValidate: ">=",
+			}
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+
+			By("By failed to enable an addon with disabled status and the constraint is not met")
+			Eventually(func(g Gomega) {
+				addon := &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				doReconcileOnce(g)
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+				g.Expect(addon.Status.Conditions).Should(HaveLen(2))
+				g.Expect(addon.Status.Conditions[1].Reason).Should(BeEquivalentTo(InstallableRequirementUnmatched))
+			}).Should(Succeed())
+
+			By("remove the constraint in annotations of an addon")
+			addon := &extensionsv1alpha1.Addon{}
+			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+			addon.Annotations = map[string]string{}
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+
+			By("By enable an addon with status failed")
+			Eventually(func(g Gomega) {
+				addon := &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				enablingPhaseCheck(2)
+			}).Should(Succeed())
+		})
 	})
 
 	Context("Addon controller SetupWithManager", func() {

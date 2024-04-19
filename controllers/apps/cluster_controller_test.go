@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -631,14 +632,20 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		By("Checking the Affinity and Toleration")
+		schedulingPolicy, err := scheduling.BuildSchedulingPolicy4Component(clusterObj.Name, compName, &affinity, []corev1.Toleration{toleration})
+		Expect(err).Should(BeNil())
+
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
 			Name:      component.FullName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-			g.Expect(*comp.Spec.Affinity).Should(BeEquivalentTo(affinity))
-			g.Expect(comp.Spec.Tolerations).Should(HaveLen(2))
-			g.Expect(comp.Spec.Tolerations[0]).Should(BeEquivalentTo(toleration))
+			g.Expect(comp.Spec.Affinity).Should(BeNil())
+			g.Expect(comp.Spec.Tolerations).Should(HaveLen(0))
+			g.Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
+			g.Expect(comp.Spec.SchedulingPolicy.Affinity).Should(BeEquivalentTo(schedulingPolicy.Affinity))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations).Should(HaveLen(2))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations[0]).Should(BeEquivalentTo(toleration))
 		})).Should(Succeed())
 	}
 
@@ -695,14 +702,20 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		By("Checking the Affinity and Toleration")
+		schedulingPolicy, err := scheduling.BuildSchedulingPolicy4Component(clusterObj.Name, compName, &compAffinity, []corev1.Toleration{compToleration})
+		Expect(err).Should(BeNil())
+
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
 			Name:      component.FullName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-			g.Expect(*comp.Spec.Affinity).Should(BeEquivalentTo(compAffinity))
-			g.Expect(comp.Spec.Tolerations).Should(HaveLen(2))
-			g.Expect(comp.Spec.Tolerations[0]).Should(BeEquivalentTo(compToleration))
+			g.Expect(comp.Spec.Affinity).Should(BeNil())
+			g.Expect(comp.Spec.Tolerations).Should(HaveLen(0))
+			g.Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
+			g.Expect(comp.Spec.SchedulingPolicy.Affinity).Should(BeEquivalentTo(schedulingPolicy.Affinity))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations).Should(HaveLen(2))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations[0]).Should(BeEquivalentTo(compToleration))
 		})).Should(Succeed())
 	}
 

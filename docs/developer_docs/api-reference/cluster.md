@@ -295,6 +295,20 @@ allowing them to be scheduled onto nodes with matching taints.</p>
 </tr>
 <tr>
 <td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>runtimeClassName</code><br/>
 <em>
 string
@@ -1102,6 +1116,20 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 <li>The <code>operator</code> determines how the toleration matches the taint.</li>
 </ul>
 <p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the component.</p>
 </td>
 </tr>
 <tr>
@@ -5277,6 +5305,20 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 </tr>
 <tr>
 <td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the component.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
@@ -6766,6 +6808,20 @@ This field helps control the placement of Pods on nodes within the Cluster.</p>
 <em>(Optional)</em>
 <p>An array that specifies tolerations attached to the Cluster&rsquo;s Pods,
 allowing them to be scheduled onto nodes with matching taints.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the cluster.</p>
 </td>
 </tr>
 <tr>
@@ -9805,6 +9861,20 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 <li>The <code>operator</code> determines how the toleration matches the taint.</li>
 </ul>
 <p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the component.</p>
 </td>
 </tr>
 <tr>
@@ -18663,10 +18733,9 @@ Sample duration format:</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.SchedulingPolicy">SchedulingPolicy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
-<p>SchedulingPolicy the scheduling policy.</p>
 </div>
 <table>
 <thead>
@@ -18685,8 +18754,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>If specified, the Pod will be dispatched by specified scheduler.
-If not specified, the Pod will be dispatched by default scheduler.</p>
+<p>If specified, the pod will be dispatched by specified scheduler.
+If not specified, the pod will be dispatched by default scheduler.</p>
 </td>
 </tr>
 <tr>
@@ -18698,8 +18767,8 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>NodeSelector is a selector which must be true for the Pod to fit on a node.
-Selector which must match a node&rsquo;s labels for the Pod to be scheduled on that node.
+<p>NodeSelector is a selector which must be true for the pod to fit on a node.
+Selector which must match a node&rsquo;s labels for the pod to be scheduled on that node.
 More info: <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
 </td>
 </tr>
@@ -18712,8 +18781,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
-the scheduler simply schedules this Pod onto that node, assuming that it fits resource
+<p>NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
+the scheduler simply schedules this pod onto that node, assuming that it fits resource
 requirements.</p>
 </td>
 </tr>
@@ -18728,7 +18797,7 @@ Kubernetes core/v1.Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.</p>
+<p>If specified, the cluster&rsquo;s scheduling constraints.</p>
 </td>
 </tr>
 <tr>
@@ -18742,14 +18811,7 @@ Kubernetes core/v1.Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>Allows Pods to be scheduled onto nodes with matching taints.
-Each toleration in the array allows the Pod to tolerate node taints based on
-specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>operator</code>.</p>
-<ul>
-<li>The <code>key</code>, <code>value</code>, and <code>effect</code> identify the taint that the toleration matches.</li>
-<li>The <code>operator</code> determines how the toleration matches the taint.</li>
-</ul>
-<p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+<p>Attached to tolerate any taint that matches the triple <code>key,value,effect</code> using the matching operator <code>operator</code>.</p>
 </td>
 </tr>
 <tr>
@@ -18763,8 +18825,8 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 </td>
 <td>
 <em>(Optional)</em>
-<p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
-domains. Scheduler will schedule Pods in a way which abides by the constraints.
+<p>TopologySpreadConstraints describes how a group of pods ought to spread across topology
+domains. Scheduler will schedule pods in a way which abides by the constraints.
 All topologySpreadConstraints are ANDed.</p>
 </td>
 </tr>

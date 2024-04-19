@@ -149,15 +149,22 @@ type ClusterSpec struct {
 	// Defines a set of node affinity scheduling rules for the Cluster's Pods.
 	// This field helps control the placement of Pods on nodes within the Cluster.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// An array that specifies tolerations attached to the Cluster's Pods,
 	// allowing them to be scheduled onto nodes with matching taints.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Specifies the scheduling policy for the cluster.
+	//
+	// +optional
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// Specifies runtimeClassName for all Pods managed by this Cluster.
 	//
@@ -697,6 +704,7 @@ type ClusterComponentSpec struct {
 	// Specifies a group of affinity scheduling rules for the Component.
 	// It allows users to control how the Component's Pods are scheduled onto nodes in the K8s cluster.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
@@ -709,9 +717,15 @@ type ClusterComponentSpec struct {
 	//
 	// Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Specifies the scheduling policy for the component.
+	//
+	// +optional
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// Specifies the resources required by the Component.
 	// It allows defining the CPU, memory requirements and limits for the Component's containers.
@@ -1111,6 +1125,46 @@ type Affinity struct {
 	// +kubebuilder:default=SharedNode
 	// +optional
 	Tenancy TenancyType `json:"tenancy,omitempty"`
+}
+
+type SchedulingPolicy struct {
+	// If specified, the pod will be dispatched by specified scheduler.
+	// If not specified, the pod will be dispatched by default scheduler.
+	//
+	// +optional
+	SchedulerName string `json:"schedulerName,omitempty"`
+
+	// NodeSelector is a selector which must be true for the pod to fit on a node.
+	// Selector which must match a node's labels for the pod to be scheduled on that node.
+	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+	//
+	// +optional
+	// +mapType=atomic
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
+	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
+	// requirements.
+	//
+	// +optional
+	NodeName string `json:"nodeName,omitempty"`
+
+	// If specified, the cluster's scheduling constraints.
+	//
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
+	//
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// TopologySpreadConstraints describes how a group of pods ought to spread across topology
+	// domains. Scheduler will schedule pods in a way which abides by the constraints.
+	// All topologySpreadConstraints are ANDed.
+	//
+	// +optional
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 }
 
 type TLSConfig struct {

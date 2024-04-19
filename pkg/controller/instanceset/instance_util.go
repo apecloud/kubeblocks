@@ -555,7 +555,10 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 			templateExt.Spec.Containers[0].Image = *template.Image
 		}
 		if template.Resources != nil {
-			templateExt.Spec.Containers[0].Resources = *template.Resources
+			src := template.Resources
+			dst := &templateExt.Spec.Containers[0].Resources
+			mergeCPUNMemory(&src.Limits, &dst.Limits)
+			mergeCPUNMemory(&src.Requests, &dst.Requests)
 		}
 		if template.Env != nil {
 			mergeList(&template.Env, &templateExt.Spec.Containers[0].Env,
@@ -590,6 +593,20 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 				return claim.Name == item.Name
 			}
 		})
+}
+
+func mergeCPUNMemory(s, d *corev1.ResourceList) {
+	if s == nil || *s == nil || d == nil {
+		return
+	}
+	for _, k := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
+		if v, ok := (*s)[k]; ok {
+			if *d == nil {
+				*d = make(corev1.ResourceList)
+			}
+			(*d)[k] = v
+		}
+	}
 }
 
 func buildInstanceSetExt(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*instanceSetExt, error) {

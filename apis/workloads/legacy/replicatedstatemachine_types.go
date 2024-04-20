@@ -20,8 +20,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -530,5 +528,5 @@ type MemberStatus struct {
 }
 
 func init() {
-	workloads.SchemeBuilder.Register(&ReplicatedStateMachine{}, &ReplicatedStateMachineList{})
+	SchemeBuilder.Register(&ReplicatedStateMachine{}, &ReplicatedStateMachineList{})
 }

@@ -29,12 +29,21 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("InstanceSet Controller", func() {
-	Context("reconciliation", func() {
+	Context("reconciliation with ReplicaProvider=StatefulSet", func() {
+		var replicaProvider string
+		BeforeEach(func() {
+			replicaProvider = viper.GetString(instanceset.FeatureGateRSMReplicaProvider)
+			viper.Set(instanceset.FeatureGateRSMReplicaProvider, string(instanceset.StatefulSetProvider))
+		})
+		AfterEach(func() {
+			viper.Set(instanceset.FeatureGateRSMReplicaProvider, replicaProvider)
+		})
 		It("should reconcile well", func() {
 			name := "test-instance-set"
 			port := int32(12345)

@@ -20,11 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/golang/mock/gomock"
 	"golang.org/x/exp/slices"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("utils test", func() {
@@ -101,6 +112,54 @@ var _ = Describe("utils test", func() {
 			Expect(dst).Should(HaveKey("foo1"))
 			Expect(dst).Should(HaveKey("foo2"))
 			Expect(dst["foo1"]).Should(Equal("bar1"))
+		})
+	})
+
+	Context("CurrentProvider", func() {
+		It("should work well", func() {
+			if viper.IsSet(FeatureGateRSMReplicaProvider) {
+				provider := viper.GetString(FeatureGateRSMReplicaProvider)
+				defer func() {
+					viper.Set(FeatureGateRSMReplicaProvider, provider)
+				}()
+			}
+
+			controller, k8sMock := testutil.SetupK8sMock()
+			defer controller.Finish()
+			root := builder.NewStatefulSetBuilder("foo", "bar").GetObject()
+
+			By("No StatefulSet found")
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1.StatefulSet, _ ...client.GetOption) error {
+					return apierrors.NewNotFound(schema.GroupResource{}, "bar")
+				}).Times(1)
+			provider, err := CurrentReplicaProvider(context.Background(), k8sMock, client.ObjectKeyFromObject(root))
+			Expect(err).Should(BeNil())
+			Expect(provider).Should(Equal(defaultReplicaProvider))
+
+			By("ReplicaProvider set")
+			viper.Set(FeatureGateRSMReplicaProvider, string(StatefulSetProvider))
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1.StatefulSet, _ ...client.GetOption) error {
+					return apierrors.NewNotFound(schema.GroupResource{}, "bar")
+				}).Times(1)
+			provider, err = CurrentReplicaProvider(context.Background(), k8sMock, client.ObjectKeyFromObject(root))
+			Expect(err).Should(BeNil())
+			Expect(provider).Should(Equal(StatefulSetProvider))
+
+			By("StatefulSet found")
+			viper.Set(FeatureGateRSMReplicaProvider, string(PodProvider))
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1.StatefulSet, _ ...client.GetOption) error {
+					*obj = *root
+					return nil
+				}).Times(1)
+			provider, err = CurrentReplicaProvider(context.Background(), k8sMock, client.ObjectKeyFromObject(root))
+			Expect(err).Should(BeNil())
+			Expect(provider).Should(Equal(StatefulSetProvider))
 		})
 	})
 })

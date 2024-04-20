@@ -148,7 +148,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster enters creating phase")
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).WithTimeout(1000 * time.Second).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		By("mock pod/sts are available and wait for cluster enter running phase")
 		podName := fmt.Sprintf("%s-%s-0", clusterObj.Name, mysqlCompName)
@@ -251,7 +251,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).GetObject()
 		})
 
-		FIt("create cluster by resource, vertical scaling by resource", func() {
+		It("create cluster by resource, vertical scaling by resource", func() {
 			ctx := verticalScalingContext{
 				source: corev1.ResourceRequirements{Requests: _1c1g, Limits: _1c1g},
 				target: corev1.ResourceRequirements{Requests: _2c4g, Limits: _2c4g},

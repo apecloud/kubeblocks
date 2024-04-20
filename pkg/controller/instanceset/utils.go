@@ -60,6 +60,28 @@ func mergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 	}
 }
 
+func CurrentReplicaProvider(ctx context.Context, cli client.Reader, objectKey client.ObjectKey) (ReplicaProvider, error) {
+	getDefaultProvider := func() ReplicaProvider {
+		provider := defaultReplicaProvider
+		if viper.IsSet(FeatureGateRSMReplicaProvider) {
+			provider = ReplicaProvider(viper.GetString(FeatureGateRSMReplicaProvider))
+			if provider != StatefulSetProvider && provider != PodProvider {
+				provider = defaultReplicaProvider
+			}
+		}
+		return provider
+	}
+	sts := &appsv1.StatefulSet{}
+	switch err := cli.Get(ctx, objectKey, sts); {
+	case err == nil:
+		return StatefulSetProvider, nil
+	case !apierrors.IsNotFound(err):
+		return "", err
+	default:
+		return getDefaultProvider(), nil
+	}
+}
+
 func getMatchLabels(name string) map[string]string {
 	return map[string]string{
 		rsm.WorkloadsManagedByLabelKey: managedBy,
@@ -83,26 +105,4 @@ func getSvcSelector(its *workloads.InstanceSet, headless bool) map[string]string
 		selectors[k] = v
 	}
 	return selectors
-}
-
-func CurrentReplicaProvider(ctx context.Context, cli client.Reader, objectKey client.ObjectKey) (ReplicaProvider, error) {
-	getDefaultProvider := func() ReplicaProvider {
-		provider := defaultReplicaProvider
-		if viper.IsSet(FeatureGateRSMReplicaProvider) {
-			provider = ReplicaProvider(viper.GetString(FeatureGateRSMReplicaProvider))
-			if provider != StatefulSetProvider && provider != PodProvider {
-				provider = defaultReplicaProvider
-			}
-		}
-		return provider
-	}
-	sts := &appsv1.StatefulSet{}
-	switch err := cli.Get(ctx, objectKey, sts); {
-	case err == nil:
-		return StatefulSetProvider, nil
-	case !apierrors.IsNotFound(err):
-		return "", err
-	default:
-		return getDefaultProvider(), nil
-	}
 }

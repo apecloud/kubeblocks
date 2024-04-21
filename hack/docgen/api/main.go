@@ -177,8 +177,21 @@ func main() {
 			return "", errors.Wrap(err, "failed to render the result")
 		}
 
-		// remove trailing whitespace from each html line for markdown renderers
-		s := regexp.MustCompile(`(?m)^\s+`).ReplaceAllString(b.String(), "")
+		// remove leading & trailing whitespace from each html line for markdown renderers
+		// however preserving whitespace indent for code blocks, so they're properly formatted
+
+		// remove every line's trailing whitespace & empty line
+		s := regexp.MustCompile(`(?m)\s+$`).ReplaceAllString(b.String(), "")
+		// remove leading whitespace if a line begins with an HTML tag "<...>"
+		s = regexp.MustCompile(`(?m)^\s+<`).ReplaceAllString(s, "<")
+		// remove leading whitespace if the last line ends with an HTML tag "<...>"
+		s = regexp.MustCompile(`>\n\s+`).ReplaceAllString(s, ">\n")
+		// remove leading whitespace if a line ends with an HTML tag "<...>"
+		re := regexp.MustCompile(`(?m)^\s+(.*)>$`)
+		s = re.ReplaceAllStringFunc(s, func(match string) string {
+			match = re.ReplaceAllString(match, "$1>")
+			return match
+		})
 		return s, nil
 	}
 

@@ -1,3 +1,4 @@
+
 ---
 title: Cluster API Reference
 description: Cluster API Reference
@@ -783,12 +784,12 @@ within the same cluster are treated as identical.
 Only bindings to the same cluster or ServiceDescriptor are allowed within a cluster.</p>
 <p>Example:</p>
 <pre><code class="language-yaml">serviceRefs:
-- name: &quot;redis-sentinel&quot;
-serviceDescriptor:
-name: &quot;external-redis-sentinel&quot;
-- name: &quot;postgres-cluster&quot;
-cluster:
-name: &quot;my-postgres-cluster&quot;
+  - name: &quot;redis-sentinel&quot;
+    serviceDescriptor:
+      name: &quot;external-redis-sentinel&quot;
+  - name: &quot;postgres-cluster&quot;
+    cluster:
+      name: &quot;my-postgres-cluster&quot;
 </code></pre>
 <p>The example above includes references to an external Redis Sentinel service and a PostgreSQL cluster managed by KubeBlocks.</p>
 </td>
@@ -992,7 +993,7 @@ While instances typically share a common configuration as defined in the Cluster
 they can require unique settings in various scenarios:</p>
 <p>For example:
 - A database component might require different resource allocations for primary and secondary instances,
-with primaries needing more resources.
+  with primaries needing more resources.
 - During a rolling upgrade, a component may first update the image for one or a few instances,
 and then update the remaining instances after verifying that the updated instances are functioning correctly.</p>
 <p>InstanceTemplate allows for specifying these unique configurations per instance.
@@ -1447,12 +1448,12 @@ a specific log type and its configuration.
 It allows you to specify multiple log types and their respective file paths for the Component instances.</p>
 <p>Examples:</p>
 <pre><code class="language-yaml"> logConfigs:
-- filePathPattern: /data/mysql/log/mysqld-error.log
-name: error
-- filePathPattern: /data/mysql/log/mysqld.log
-name: general
-- filePathPattern: /data/mysql/log/mysqld-slowquery.log
-name: slow
+ - filePathPattern: /data/mysql/log/mysqld-error.log
+   name: error
+ - filePathPattern: /data/mysql/log/mysqld.log
+   name: general
+ - filePathPattern: /data/mysql/log/mysqld-slowquery.log
+   name: slow
 </code></pre>
 <p>This field is immutable.</p>
 </td>
@@ -1611,8 +1612,8 @@ This strategy provides the fastest update time but may lead to a period of reduc
 capacity during the update process.</li>
 <li><code>BestEffortParallel</code>: The replicas are updated in parallel, with the operator making a best-effort attempt
 to update as many replicas as possible concurrently while maintaining the component&rsquo;s availability.
-Unlike the <code>Parallel</code> strategy, the <code>BestEffortParallel</code> strategy aims to ensure that a minimum number
-of replicas remain available during the update process to maintain the component&rsquo;s quorum and functionality.
+ Unlike the <code>Parallel</code> strategy, the <code>BestEffortParallel</code> strategy aims to ensure that a minimum number
+ of replicas remain available during the update process to maintain the component&rsquo;s quorum and functionality.
 For example, consider a component with 5 replicas. To maintain the component&rsquo;s availability and quorum,
 the operator may allow a maximum of 2 replicas to be simultaneously updated. This ensures that at least
 3 replicas (a quorum) remain available and functional during the update process.</li>
@@ -4360,12 +4361,12 @@ within the same cluster are treated as identical.
 Only bindings to the same cluster or ServiceDescriptor are allowed within a cluster.</p>
 <p>Example:</p>
 <pre><code class="language-yaml">serviceRefs:
-- name: &quot;redis-sentinel&quot;
-serviceDescriptor:
-name: &quot;external-redis-sentinel&quot;
-- name: &quot;postgres-cluster&quot;
-cluster:
-name: &quot;my-postgres-cluster&quot;
+  - name: &quot;redis-sentinel&quot;
+    serviceDescriptor:
+      name: &quot;external-redis-sentinel&quot;
+  - name: &quot;postgres-cluster&quot;
+    cluster:
+      name: &quot;my-postgres-cluster&quot;
 </code></pre>
 <p>The example above includes references to an external Redis Sentinel service and a PostgreSQL cluster managed by KubeBlocks.</p>
 </td>
@@ -4624,7 +4625,7 @@ While instances typically share a common configuration as defined in the Cluster
 they can require unique settings in various scenarios:</p>
 <p>For example:
 - A database component might require different resource allocations for primary and secondary instances,
-with primaries needing more resources.
+  with primaries needing more resources.
 - During a rolling upgrade, a component may first update the image for one or a few instances,
 and then update the remaining instances after verifying that the updated instances are functioning correctly.</p>
 <p>InstanceTemplate allows for specifying these unique configurations per instance.
@@ -7187,12 +7188,12 @@ a specific log type and its configuration.
 It allows you to specify multiple log types and their respective file paths for the Component instances.</p>
 <p>Examples:</p>
 <pre><code class="language-yaml"> logConfigs:
-- filePathPattern: /data/mysql/log/mysqld-error.log
-name: error
-- filePathPattern: /data/mysql/log/mysqld.log
-name: general
-- filePathPattern: /data/mysql/log/mysqld-slowquery.log
-name: slow
+ - filePathPattern: /data/mysql/log/mysqld-error.log
+   name: error
+ - filePathPattern: /data/mysql/log/mysqld.log
+   name: general
+ - filePathPattern: /data/mysql/log/mysqld-slowquery.log
+   name: slow
 </code></pre>
 <p>This field is immutable.</p>
 </td>
@@ -7351,8 +7352,8 @@ This strategy provides the fastest update time but may lead to a period of reduc
 capacity during the update process.</li>
 <li><code>BestEffortParallel</code>: The replicas are updated in parallel, with the operator making a best-effort attempt
 to update as many replicas as possible concurrently while maintaining the component&rsquo;s availability.
-Unlike the <code>Parallel</code> strategy, the <code>BestEffortParallel</code> strategy aims to ensure that a minimum number
-of replicas remain available during the update process to maintain the component&rsquo;s quorum and functionality.
+ Unlike the <code>Parallel</code> strategy, the <code>BestEffortParallel</code> strategy aims to ensure that a minimum number
+ of replicas remain available during the update process to maintain the component&rsquo;s quorum and functionality.
 For example, consider a component with 5 replicas. To maintain the component&rsquo;s availability and quorum,
 the operator may allow a maximum of 2 replicas to be simultaneously updated. This ensures that at least
 3 replicas (a quorum) remain available and functional during the update process.</li>
@@ -7665,7 +7666,7 @@ Without this, services that rely on roleSelectors might improperly direct traffi
 </ul>
 <p>Expected output of this action:
 - On Success: The determined role of the replica, which must align with one of the roles specified
-in the component definition.
+  in the component definition.
 - On Failure: An error message, if applicable, indicating why the action failed.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
@@ -7735,11 +7736,11 @@ during the addition of the new member.</p>
 - bash
 - -c
 - |
-ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
-HOST=$(echo $ADDRESS | cut -d ':' -f 1)
-PORT=$(echo $ADDRESS | cut -d ':' -f 2)
-CLIENT=&quot;mysql -u $KB_SERVICE_USER -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e&quot;
-$CLIENT &quot;ALTER SYSTEM ADD SERVER '$KB_NEW_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'&quot;
+   ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
+   HOST=$(echo $ADDRESS | cut -d ':' -f 1)
+   PORT=$(echo $ADDRESS | cut -d ':' -f 2)
+   CLIENT=&quot;mysql -u $KB_SERVICE_USER -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e&quot;
+	  $CLIENT &quot;ALTER SYSTEM ADD SERVER '$KB_NEW_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'&quot;
 </code></pre>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
@@ -7778,11 +7779,11 @@ Data migration is generally not part of this action and should be handled separa
 - bash
 - -c
 - |
-ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
-HOST=$(echo $ADDRESS | cut -d ':' -f 1)
-PORT=$(echo $ADDRESS | cut -d ':' -f 2)
-CLIENT=&quot;mysql -u $KB_SERVICE_USER  -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e&quot;
-$CLIENT &quot;ALTER SYSTEM DELETE SERVER '$KB_LEAVE_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'&quot;
+   ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
+   HOST=$(echo $ADDRESS | cut -d ':' -f 1)
+   PORT=$(echo $ADDRESS | cut -d ':' -f 2)
+   CLIENT=&quot;mysql -u $KB_SERVICE_USER  -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e&quot;
+	  $CLIENT &quot;ALTER SYSTEM DELETE SERVER '$KB_LEAVE_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'&quot;
 </code></pre>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
@@ -8091,11 +8092,11 @@ The total number of generated Services will be equal to the number of replicas s
 serviceName: my-service
 generatePodOrdinalService: true
 spec:
-type: NodePort
-ports:
-- name: http
-port: 80
-targetPort: 8080
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
 </code></pre>
 <p>In this example, if the Component has 3 replicas, three Services will be generated:
 - my-service-0: Points to the first Pod (podOrdinal: 0)
@@ -8193,12 +8194,12 @@ within the same cluster are treated as identical.
 Only bindings to the same cluster or ServiceDescriptor are allowed within a cluster.</p>
 <p>Example:</p>
 <pre><code class="language-yaml">serviceRefs:
-- name: &quot;redis-sentinel&quot;
-serviceDescriptor:
-name: &quot;external-redis-sentinel&quot;
-- name: &quot;postgres-cluster&quot;
-cluster:
-name: &quot;my-postgres-cluster&quot;
+  - name: &quot;redis-sentinel&quot;
+    serviceDescriptor:
+      name: &quot;external-redis-sentinel&quot;
+  - name: &quot;postgres-cluster&quot;
+    cluster:
+      name: &quot;my-postgres-cluster&quot;
 </code></pre>
 <p>The example above includes references to an external Redis Sentinel service and a PostgreSQL cluster managed by KubeBlocks.</p>
 </td>
@@ -8402,7 +8403,7 @@ While instances typically share a common configuration as defined in the Cluster
 they can require unique settings in various scenarios:</p>
 <p>For example:
 - A database component might require different resource allocations for primary and secondary instances,
-with primaries needing more resources.
+  with primaries needing more resources.
 - During a rolling upgrade, a component may first update the image for one or a few instances,
 and then update the remaining instances after verifying that the updated instances are functioning correctly.</p>
 <p>InstanceTemplate allows for specifying these unique configurations per instance.
@@ -9177,10 +9178,10 @@ can also trigger a reload.</li>
 dynamic reloading will not be triggered.</p>
 <p>Example:</p>
 <pre><code class="language-yaml">reloadOptions:
-tplScriptTrigger:
-namespace: kb-system
-scriptConfigMapRef: mysql-reload-script
-sync: true
+ tplScriptTrigger:
+   namespace: kb-system
+   scriptConfigMapRef: mysql-reload-script
+   sync: true
 </code></pre>
 </td>
 </tr>
@@ -9385,9 +9386,9 @@ Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>,
 For instance, when using the <code>ini</code> format, you can specify the section name.</p>
 <p>Example:</p>
 <pre><code>formatterConfig:
-format: ini
-iniConfig:
-sectionName: mysqld
+ format: ini
+ iniConfig:
+   sectionName: mysqld
 </code></pre>
 </td>
 </tr>
@@ -9448,10 +9449,10 @@ can also trigger a reload.</li>
 dynamic reloading will not be triggered.</p>
 <p>Example:</p>
 <pre><code class="language-yaml">reloadOptions:
-tplScriptTrigger:
-namespace: kb-system
-scriptConfigMapRef: mysql-reload-script
-sync: true
+ tplScriptTrigger:
+   namespace: kb-system
+   scriptConfigMapRef: mysql-reload-script
+   sync: true
 </code></pre>
 </td>
 </tr>
@@ -9656,9 +9657,9 @@ Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>,
 For instance, when using the <code>ini</code> format, you can specify the section name.</p>
 <p>Example:</p>
 <pre><code>formatterConfig:
-format: ini
-iniConfig:
-sectionName: mysqld
+ format: ini
+ iniConfig:
+   sectionName: mysqld
 </code></pre>
 </td>
 </tr>
@@ -20525,10 +20526,10 @@ can also trigger a reload.</li>
 dynamic reloading will not be triggered.</p>
 <p>Example:</p>
 <pre><code class="language-yaml">reloadOptions:
-tplScriptTrigger:
-namespace: kb-system
-scriptConfigMapRef: mysql-reload-script
-sync: true
+ tplScriptTrigger:
+   namespace: kb-system
+   scriptConfigMapRef: mysql-reload-script
+   sync: true
 </code></pre>
 </td>
 </tr>
@@ -20733,9 +20734,9 @@ Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>,
 For instance, when using the <code>ini</code> format, you can specify the section name.</p>
 <p>Example:</p>
 <pre><code>formatterConfig:
-format: ini
-iniConfig:
-sectionName: mysqld
+ format: ini
+ iniConfig:
+   sectionName: mysqld
 </code></pre>
 </td>
 </tr>
@@ -20819,10 +20820,10 @@ can also trigger a reload.</li>
 dynamic reloading will not be triggered.</p>
 <p>Example:</p>
 <pre><code class="language-yaml">reloadOptions:
-tplScriptTrigger:
-namespace: kb-system
-scriptConfigMapRef: mysql-reload-script
-sync: true
+ tplScriptTrigger:
+   namespace: kb-system
+   scriptConfigMapRef: mysql-reload-script
+   sync: true
 </code></pre>
 </td>
 </tr>
@@ -21027,9 +21028,9 @@ Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>,
 For instance, when using the <code>ini</code> format, you can specify the section name.</p>
 <p>Example:</p>
 <pre><code>formatterConfig:
-format: ini
-iniConfig:
-sectionName: mysqld
+ format: ini
+ iniConfig:
+   sectionName: mysqld
 </code></pre>
 </td>
 </tr>

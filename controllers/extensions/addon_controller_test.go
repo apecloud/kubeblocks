@@ -657,6 +657,28 @@ var _ = Describe("Addon controller", func() {
 				g.Expect(addon.Spec.Version).Should(Equal("0.9.0"))
 			}).Should(Succeed())
 		})
+
+		It("should have provider and version in spec for Addon after creating, before enabled", func() {
+			By("By create an addon with auto-install and labels contains provider and version information")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Labels = map[string]string{
+					"addon.kubeblocks.io/provider": "apecloud",
+					"addon.kubeblocks.io/version":  "0.9.0",
+				}
+				newOjb.Spec.Installable.AutoInstall = true
+			})
+
+			By("should have provider and version in spec after one reconcile, before enabled")
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Spec.Provider).Should(Equal("apecloud"))
+				g.Expect(addon.Spec.Version).Should(Equal("0.9.0"))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
+			}).Should(Succeed())
+		})
 	})
 
 	Context("Addon controller SetupWithManager", func() {

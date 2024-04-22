@@ -337,6 +337,11 @@ dataProtection:
   # using the default key can potentially lead to the exposure of database passwords
   # if 'get/list' role of the backup CR are compromised.
   encryptionKey: ""
+  encryptionKeySecretKeyRef:
+    name: ""
+    key: ""
+  enableBackupEncryption: false
+  backupEncryptionAlgorithm: ""
   gcFrequencySeconds: 3600
   ## MaxConcurrentReconciles for backup controller.
   reconcileWorkers: ""

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"golang.org/x/exp/slices"
@@ -39,6 +40,7 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -254,6 +256,30 @@ func (r *clusterBackupPolicyTransformer) transformBackupSchedule(
 	return old, backupSchedule
 }
 
+func (r *clusterBackupPolicyTransformer) setDefaultEncryptionConfig(backupPolicy *dpv1alpha1.BackupPolicy) {
+	secretKeyRefJson := viper.GetString(constant.CfgKeyDPBackupEncryptionSecretKeyRef)
+	if secretKeyRefJson == "" {
+		return
+	}
+	secretKeyRef := &corev1.SecretKeySelector{}
+	err := json.Unmarshal([]byte(secretKeyRefJson), secretKeyRef)
+	if err != nil {
+		r.Error(err, "failed to unmarshal secretKeyRef", "json", secretKeyRefJson)
+		return
+	}
+	if secretKeyRef.Name == "" || secretKeyRef.Key == "" {
+		return
+	}
+	algorithm := viper.GetString(constant.CfgKeyDPBackupEncryptionAlgorithm)
+	if algorithm == "" {
+		algorithm = dpv1alpha1.DefaultEncryptionAlgorithm
+	}
+	backupPolicy.Spec.EncryptionConfig = &dpv1alpha1.EncryptionConfig{
+		Algorithm:              algorithm,
+		PassPhraseSecretKeyRef: secretKeyRef,
+	}
+}
+
 func (r *clusterBackupPolicyTransformer) buildBackupSchedule(
 	name string,
 	backupPolicy *dpv1alpha1.BackupPolicy) *dpv1alpha1.BackupSchedule {
@@ -373,6 +399,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupPolicy(comp *appsv1alpha1.Cl
 	bpSpec.PathPrefix = buildBackupPathPrefix(cluster, comp.Name)
 	bpSpec.BackoffLimit = r.backupPolicy.BackoffLimit
 	backupPolicy.Spec = bpSpec
+	r.setDefaultEncryptionConfig(backupPolicy)
 	r.syncBackupPolicyTargetSpec(backupPolicy, comp)
 	return backupPolicy
 }

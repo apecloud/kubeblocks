@@ -250,7 +250,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 			return nil, err
 		}
 	}
-	labels := getMatchLabels(parent.Name)
+	labels := GetMatchLabels(parent.Name)
 	pod := builder.NewPodBuilder(parent.Namespace, name).
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).

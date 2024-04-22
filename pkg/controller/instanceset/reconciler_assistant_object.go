@@ -51,7 +51,7 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
 	// generate objects by current spec
-	labels := getMatchLabels(its.Name)
+	labels := GetMatchLabels(its.Name)
 	selectors := getSvcSelector(its, false)
 	headlessSelectors := getSvcSelector(its, true)
 

@@ -335,14 +335,7 @@ var _ = Describe("Component Controller", func() {
 		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), compName)
 		Expect(itsList.Items).Should(HaveLen(1))
 		its := itsList.Items[0]
-		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterObj.Name, compName).
-			SetReplicas(*its.Spec.Replicas).
-			Create(&testCtx).
-			GetObject()
-		pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
-		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-			testk8s.MockStatefulSetReady(sts)
-		})).ShouldNot(HaveOccurred())
+		pods := testapps.MockInstanceSetPods(&testCtx, &its, clusterObj.Name, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, &its, func() {
 			testk8s.MockInstanceSetReady(&its, pods...)
 		})).ShouldNot(HaveOccurred())
@@ -848,10 +841,7 @@ var _ = Describe("Component Controller", func() {
 		By("Checking the replicas")
 		itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
 		its := &itsList.Items[0]
-		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterObj.Name, compName).
-			SetReplicas(*its.Spec.Replicas).
-			Create(&testCtx).GetObject()
-		Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(replicas))
+		Expect(*its.Spec.Replicas).Should(BeEquivalentTo(replicas))
 
 		By("Mock PVCs in Bound Status")
 		for i := 0; i < replicas; i++ {
@@ -878,20 +868,9 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		By("mock pods/sts of component are available")
-		var mockPods []*corev1.Pod
-		switch compDefName {
-		case statelessCompDefName:
-			// ignore
-		case replicationCompDefName:
-			mockPods = testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
-		case statefulCompDefName, consensusCompDefName:
-			mockPods = testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
-		}
+		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
-		})).ShouldNot(HaveOccurred())
-		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
 
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))

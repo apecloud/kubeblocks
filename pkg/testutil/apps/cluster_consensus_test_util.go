@@ -33,6 +33,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
@@ -211,4 +213,129 @@ func MockConsensusComponentPods(
 		podList[i] = pod
 	}
 	return podList
+}
+
+// MockInstanceSetPods mocks the InstanceSet pods, just using in envTest
+func MockInstanceSetPods(
+	testCtx *testutil.TestContext,
+	its *workloads.InstanceSet,
+	clusterName,
+	consensusCompName string) []*corev1.Pod {
+	getReplicas := func() int {
+		if its == nil || its.Spec.Replicas == nil {
+			return ConsensusReplicas
+		}
+		return int(*its.Spec.Replicas)
+	}
+	leaderRole := func() *workloads.ReplicaRole {
+		for i := range its.Spec.Roles {
+			if its.Spec.Roles[i].IsLeader {
+				return &its.Spec.Roles[i]
+			}
+		}
+		return nil
+	}()
+	noneLeaderRole := func() *workloads.ReplicaRole {
+		for i := range its.Spec.Roles {
+			if !its.Spec.Roles[i].IsLeader {
+				return &its.Spec.Roles[i]
+			}
+		}
+		return nil
+	}()
+	replicas := getReplicas()
+	replicasStr := strconv.Itoa(replicas)
+	podList := make([]*corev1.Pod, replicas)
+	for i := 0; i < replicas; i++ {
+		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
+		var podRole, accessMode string
+		if len(its.Spec.Roles) > 0 {
+			if i == 0 {
+				podRole = leaderRole.Name
+				accessMode = string(leaderRole.AccessMode)
+			} else {
+				podRole = noneLeaderRole.Name
+				accessMode = string(noneLeaderRole.AccessMode)
+			}
+		}
+		pod := MockInstanceSetPod(testCtx, its, clusterName, consensusCompName, podName, podRole, accessMode)
+		annotations := pod.Annotations
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
+		pod.Annotations = annotations
+		podList[i] = pod
+	}
+	return podList
+}
+
+// MockInstanceSetPod mocks to create the pod of the InstanceSet, just using in envTest
+func MockInstanceSetPod(
+	testCtx *testutil.TestContext,
+	its *workloads.InstanceSet,
+	clusterName,
+	consensusCompName,
+	podName,
+	podRole, accessMode string) *corev1.Pod {
+	var stsUpdateRevision string
+	if its != nil {
+		stsUpdateRevision = its.Status.UpdateRevision
+	}
+	ml := instanceset.GetMatchLabels(its.Name)
+	podFactory := NewPodFactory(testCtx.DefaultNamespace, podName).
+		SetOwnerReferences(workloads.GroupVersion.Group+"/"+workloads.GroupVersion.Version, rsm.KindInstanceSet, its).
+		AddAppInstanceLabel(clusterName).
+		AddAppComponentLabel(consensusCompName).
+		AddAppManagedByLabel().
+		AddRoleLabel(podRole).
+		AddConsensusSetAccessModeLabel(accessMode).
+		AddControllerRevisionHashLabel(stsUpdateRevision).
+		AddLabelsInMap(ml).
+		AddVolume(corev1.Volume{
+			Name: DataVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: fmt.Sprintf("%s-%s", DataVolumeName, podName),
+				},
+			},
+		}).
+		AddContainer(corev1.Container{
+			Name:  DefaultMySQLContainerName,
+			Image: ApeCloudMySQLImage,
+			LivenessProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/hello",
+						Port: intstr.FromInt(1024),
+					},
+				},
+				TimeoutSeconds:   1,
+				PeriodSeconds:    1,
+				FailureThreshold: 1,
+			},
+			StartupProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(1024),
+					},
+				},
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{Name: DataVolumeName, MountPath: "/test"},
+			},
+		})
+	if its != nil && its.Labels[constant.AppNameLabelKey] != "" {
+		podFactory.AddAppNameLabel(its.Labels[constant.AppNameLabelKey])
+	}
+	pod := podFactory.CheckedCreate(testCtx).GetObject()
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Status.Conditions = []corev1.PodCondition{
+		{
+			Type:   corev1.PodReady,
+			Status: corev1.ConditionTrue,
+		},
+	}
+	gomega.Expect(testCtx.Cli.Status().Patch(context.Background(), pod, patch)).Should(gomega.Succeed())
+	return pod
 }

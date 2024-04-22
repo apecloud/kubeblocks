@@ -6,9 +6,6 @@ sidebar_position: 1
 sidebar_label: Create and connect
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Create and connect to a MySQL cluster
 
 This tutorial shows how to create and connect to a MySQL cluster.
@@ -17,26 +14,8 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create and connect a MySQL cluster by kbcli.
-* [Install KubeBlocks by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [install KubeBlocks by Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-* Make sure the ApeCloud MySQL add-on is enabled.
-  
-  <Tabs>
-
-  <TabItem value="kbcli" label="kbcli" default>
-  
-  ```bash
-  kbcli addon list
-  >
-  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
-  ...
-  apecloud-mysql                 Helm   Enabled                   true
-  ...
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
+* [Install KubeBlocks by Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* Make sure the ApeCloud MySQL addon is enabled.
 
   ```bash
   kubectl get addons.extensions.kubeblocks.io apecloud-mysql
@@ -45,24 +24,7 @@ This tutorial shows how to create and connect to a MySQL cluster.
   apecloud-mysql   Helm   Enabled   61s
   ```
 
-  </TabItem>
-  </Tabs>
-
 * View all the database types and versions available for creating a cluster.
-
-  <Tabs>
-
-  <TabItem value="kbcli" label="kbcli" default>
-
-  ```bash
-  kbcli clusterdefinition list
-
-  kbcli clusterversion list
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
   
   Make sure the `apecloud-mysql` cluster definition is installed with `kubectl get clusterdefinition apecloud-mysql`.
 
@@ -79,10 +41,6 @@ This tutorial shows how to create and connect to a MySQL cluster.
   kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=apecloud-mysql
   ```
 
-  </TabItem>
-
-  </Tabs>
-
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
   ```bash
@@ -91,44 +49,7 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 ### Create a cluster
 
-KubeBlocks supports creating two types of MySQL clusters: Standalone and RaftGroup Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a RaftGroup Cluster, which creates a cluster with three replicas. And to ensure high availability, all replicas are distributed on different nodes by default.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-Create a Standalone.
-
-```bash
-kbcli cluster create mysql <clustername>
-```
-
-Create a RaftGroup Cluster.
-
-```bash
-kbcli cluster create mysql --mode raftGroup <clustername>
-```
-
-If you only have one node for deploying a RaftGroup Cluster, set the `availability-policy` as `none` when creating a RaftGroup Cluster.
-
-```bash
-kbcli cluster create mysql --mode raftGroup --availability-policy none <clustername>
-```
-
-:::note
-
-* In the production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-* Run the command below to view the flags for creating a MySQL cluster and the default values.
-  
-  ```bash
-  kbcli cluster create mysql -h
-  ```
-
-:::
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+KubeBlocks supports creating two types of MySQL clusters: Standalone and RaftGroup Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a RaftGroup Cluster, which creates a cluster with three replicas. To ensure high availability, all replicas are distributed on different nodes by default.
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a RaftGroup Cluster.
 
@@ -273,25 +194,11 @@ status:
   phase: Running
 ```
 
-</details>
-
-</TabItem>
-
-</Tabs>
-
 ## Connect to a MySQL Cluster
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster connect <clustername>  --namespace <name>
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 You can use `kubectl exec` to exec into a Pod and connect to a database.
 

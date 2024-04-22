@@ -25,9 +25,8 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
 
 ***Before you start***
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md)
 * Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-* Enable the AWS loadbalancer controller add-on.
+* Enable the AWS load balancer controller addon.
 
    ```bash
    kbcli addon list
@@ -37,17 +36,17 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
    addon.extensions.kubeblocks.io/aws-load-balancer-controller enabled
    ```
 
-   If the loadbalancer is not enabled successfully, it may relate to your environment since the loadbalancer add-on relies on the EKS environment.
+   If the load balancer is not enabled successfully, it may relate to your environment since the load balancer addon relies on the EKS environment.
 
    Check your EKS environment and enable this add-on again. For enabling add-on details, refer to [Enable add-ons](./../../overview/supported-addons.md).
 
 ***Steps***
 
-1. Create an ApeCloud MySQL cluster on AWS. Refer to [Create an ApeCloud MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md) for details.
+1. Create a MySQL cluster on AWS. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) for details.
 2. Fill in the cluster name and run the command below to expose the external IP of the cluster.
 
    ```bash
-   kbcli cluster expose mysql-cluster --enable=true --type='vpc'
+   kbcli cluster expose mycluster --enable=true --type='vpc'
    ```
 
    :::note

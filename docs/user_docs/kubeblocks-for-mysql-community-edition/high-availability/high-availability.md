@@ -7,9 +7,7 @@ sidebar_position: 1
 
 # Failure simulation and automatic recovery
 
-As an open-source data management platform, KubeBlocks supports two database forms, ReplicationSet and ConsensusSet. ReplicationSet can be used for single source with multiple replicas, and non-automatic switching database management, such as MySQL and Redis. ConsensusSet can be used for database management with multiple replicas and automatic switching capabilities, such as ApeCloud MySQL RaftGroup with multiple replicas, MongoDB, etc. The ConsensusSet database management capability has been released in KubeBlocks v0.3.0, and ReplicationSet is under development.
-
-This guide takes ApeCloud MySQL as an example to introduce the high availability capability of the database in the form of ConsensusSet. This capability is also applicable to other database engines.
+This guide illustrates the high availability capability of MySQL community edition.
 
 ## Recovery simulation
 
@@ -21,9 +19,9 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 ### Before you start
 
-* Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-* Create an ApeCloud MySQL RaftGroup, refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
-* Run `kubectl get cd apecloud-mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the ApeCloud MySQL RaftGroup (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
+* [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* Create a MySQL RaftGroup, refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster).
+* Run `kubectl get cd apecloud-mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the MySQL RaftGroup (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
 
   ```bash
   probes:
@@ -37,17 +35,17 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 ***Steps:***
 
-1. View the ApeCloud MySQL RaftGroup information. View the leader pod name in `Topology`. In this example, the leader pod's name is mysql-cluster-1.
+1. View the MySQL RaftGroup information. View the leader pod name in `Topology`. In this example, the leader pod's name is mycluster-1.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kubectl get pods
     ```
 
     ![describe_cluster](./../../../img/failure_simulation_describe_cluster.png)
-2. Delete the leader pod `mysql-cluster-mysql-1` to simulate a pod fault.
+2. Delete the leader pod `mycluster-mysql-1` to simulate a pod fault.
 
     ```bash
-    kubectl delete pod mysql-cluster-mysql-1
+    kubectl delete pod mycluster-mysql-1
     ```
 
     ![delete_pod](./../../../img/failure_simulation_delete_pod.png)
@@ -58,51 +56,71 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
     The following example shows that the roles of pods have changed after the old leader pod was deleted and `mysql-cluster-mysql-2` is elected as the new leader pod.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kubectl get pods
     ```
 
     ![describe_cluster_after](./../../../img/failure_simulation_describe_cluster_after.png)
-    It shows that this ApeCloud MySQL RaftGroup can be connected within seconds.
+    It shows that this MySQL RaftGroup can be connected within seconds.
 
     ```bash
-    kbcli cluster connect mysql-cluster
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+    >
+    root
+
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+    >
+    2gvztbvz
+
+    kubectl exec -ti -n demo mycluster-mysql-0 -- bash
+
+    mysql -uroot -p2gvztbvz
     ```
 
     ![connect_cluster_after](./../../../img/failure_simulation_connect_cluster_after.png)
 
    ***How the automatic recovery works***
 
-   After the leader pod is deleted, the ApeCloud MySQL RaftGroup elects a new leader. In this example, `mysql-cluster-mysql-2` is elected as the new leader. KubeBlocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal RaftGroup state. It normally takes 30 seconds from exception to recovery.
+   After the leader pod is deleted, the MySQL RaftGroup elects a new leader. In this example, `mycluster-mysql-2` is elected as the new leader. KubeBlocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal RaftGroup state. It normally takes 30 seconds from exception to recovery.
 
 ### Single follower pod exception
 
 ***Steps:***
 
-1. View the ApeCloud MySQL RaftGroup information and view the follower pod name in `Topology`. In this example, the follower pods are mysql-cluster-mysql-0 and mysql-cluster-mysql-2.
+1. View the MySQL RaftGroup information and view the follower pod name in `Topology`. In this example, the follower pods are mycluster-mysql-0 and mysql-cluster-mysql-2.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kubectl get pods
     ```
 
     ![describe_cluster](./../../../img/failure_simulation_describe_cluster.png)
-2. Delete the follower pod mysql-cluster-mysql-0.
+2. Delete the follower pod mycluster-mysql-0.
 
     ```bash
-    kubectl delete pod mysql-cluster-mysql-0
+    kubectl delete pod mycluster-mysql-0
     ```
 
     ![delete_follower_pod](./../../../img/failure_simulation_delete_follower_pod.png)
 3. View the RaftGroup status and you can find the follower pod is being terminated in `Component.Instance`.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kubectl get pods
     ```
 
     ![describe_cluster_follower](./../../../img/failure_simulation_describe_cluster_follower.png)
 4. Connect to the RaftGroup and you can find this single follower exception doesn't affect the R/W of the cluster.
 
     ```bash
-    kbcli cluster connect mysql-cluster
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+    >
+    root
+
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+    >
+    2gvztbvz
+
+    kubectl exec -ti -n demo mycluster-mysql-0 -- bash
+
+    mysql -uroot -p2gvztbvz
     ```
 
     ![connect_cluster_follower](./../../../img/failure_simulation_connect_cluster_follower.png)
@@ -122,28 +140,38 @@ In this way, whether exceptions occur to one leader and one follower or two foll
 1. View the ApeCloud MySQL RaftGroup information and view the follower pod name in `Topology`. In this example, the follower pods are mysql-cluster-mysql-1 and mysql-cluster-mysql-0.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kubectl get pods
     ```
 
     ![describe_cluster](./../../../img/failure_simulation_describe_cluster_2.png)
 2. Delete these two follower pods.
 
     ```bash
-    kubectl delete pod mysql-cluster-mysql-1 mysql-cluster-mysql-0
+    kubectl delete pod mycluster-mysql-1 mycluster-mysql-0
     ```
 
     ![delete_two_pods](./../../../img/failure_simulation_delete_two_pods.png)
 3. View the RaftGroup status and you can find the follower pods are pending and a new leader pod is selected.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kubectl get pods
     ```
 
     ![describe_two_pods](./../../../img/failure_simulation_describe_two_pods.png)
 4. Run `kbcli cluster connect mysql-cluster` again after a few seconds and you can find the pods in the RaftGroup work normally again in `Component.Instance`.
 
     ```bash
-    kbcli cluster connect mysql-cluster
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+    >
+    root
+
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+    >
+    2gvztbvz
+
+    kubectl exec -ti -n demo mycluster-mysql-0 -- bash
+
+    mysql -uroot -p2gvztbvz
     ```
 
     ![connect_two_pods](./../../../img/failure_simulation_connect_two_pods.png)
@@ -159,7 +187,7 @@ In this way, whether exceptions occur to one leader and one follower or two foll
 1. Run the command below to view the ApeCloud MySQL RaftGroup information and view the pods' names in `Topology`.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kubectl get pods
     ```
 
     ![describe_cluster](./../../../img/failure_simulation_describe_cluster.png)
@@ -173,18 +201,28 @@ In this way, whether exceptions occur to one leader and one follower or two foll
 3. Run the command below to view the deleting process. You can find the pods are pending.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kbcli get pods
     ```
 
     ![describe_three_clusters](./../../../img/failure_simulation_describe_three_pods.png)
 4. Run `kbcli cluster connect mysql-cluster` again after a few seconds and you can find the pods in the RaftGroup work normally again.
 
     ```bash
-    kbcli cluster connect mysql-cluster
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+    >
+    root
+
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+    >
+    2gvztbvz
+
+    kubectl exec -ti -n demo mycluster-mysql-0 -- bash
+
+    mysql -uroot -p2gvztbvz
     ```
 
     ![connect_three_clusters](./../../../img/failure_simulation_connect_three_pods.png)
 
    ***How the automatic recovery works***
 
-   Every time the pod is deleted, recreation is triggered. And then ApeCloud MySQL automatically completes the cluster recovery and the election of a new leader. After the election of the leader is completed, KubeBlocks detects the new leader and updates the access link. This process takes less than 30 seconds.
+   Every time the pod is deleted, recreation is triggered. And then MySQL automatically completes the cluster recovery and the election of a new leader. After the election of the leader is completed, KubeBlocks detects the new leader and updates the access link. This process takes less than 30 seconds.

@@ -6,7 +6,9 @@ sidebar_position: 1
 ---
 
 # MySQL introduction
-MySQL is the world’s most popular open-source database and the second-most-popular database overall. It is used by many of the most accessed applications, such as Facebook, Twitter, Netflix, Uber, Airbnb, Shopify, and Booking.com. 
+
+MySQL is the world’s most popular open-source database and the second-most-popular database overall. It is used by many of the most accessed applications, such as Facebook, Twitter, Netflix, Uber, Airbnb, Shopify, and Booking.com.
+
 KubeBlocks adopts the MySQL distribution provided by ApeCloud, which includes data compression and high availability improvements.
 
 - When there are 3 or more replicas,  a strong consistent high-availability cluster is created with the consensus algorithm protocol to ensure that RPO=0 in the case of a single availability zone failure. Among them, the primary instance provides read/write capacity, and the remaining instances provide read-only services.

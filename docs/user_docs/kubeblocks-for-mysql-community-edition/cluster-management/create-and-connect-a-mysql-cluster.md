@@ -209,7 +209,7 @@ This tutorial takes creating a MySQL cluster from the addon repository cloned fr
 1. Clone the KubeBlocks addon repository.
 
    ```bash
-   git clone https://github.com/apecloud/kubeblocks-addons/tree/main
+   git clone https://github.com/apecloud/kubeblocks-addons.git
    ```
 
 2. (Optional) If you want to create a cluster with custom specifications, you can view the values available for configuring.

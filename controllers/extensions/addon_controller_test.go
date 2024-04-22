@@ -668,7 +668,7 @@ var _ = Describe("Addon controller", func() {
 				newOjb.Spec.Installable.AutoInstall = true
 			})
 
-			By("should have provider and version in spec after one reconcile, before enabled")
+			By("By Checking spec.provider and spec.version of the addon after one reconcile, before enabled")
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				g.Expect(err).To(Not(HaveOccurred()))

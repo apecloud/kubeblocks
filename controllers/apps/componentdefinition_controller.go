@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -46,9 +47,9 @@ type ComponentDefinitionReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -153,7 +154,6 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateHostNetwork,
 		r.validateServices,
 		r.validateConfigs,
-		r.validateScripts,
 		r.validatePolicyRules,
 		r.validateLabels,
 		r.validateReplicasLimit,
@@ -268,16 +268,8 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 }
 
 func (r *ComponentDefinitionReconciler) validateConfigs(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	// if err := appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, rctx, dbClusterDef); err != nil {
-	//	return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
-	// }
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateScripts(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	return nil
+	compDef *appsv1alpha1.ComponentDefinition) error {
+	return appsconfig.ReconcileConfigSpecsForReferencedCR(cli, rctx, compDef)
 }
 
 func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, rctx intctrlutil.RequestCtx,

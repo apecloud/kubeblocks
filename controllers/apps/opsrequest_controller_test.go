@@ -230,7 +230,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	// Scenarios
 
 	// TODO: should focus on OpsRequest control actions, and iterator through all component workload types.
-	Context("with Cluster which has MySQL StatefulSet", func() {
+	Context("with Cluster which has MySQL Component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

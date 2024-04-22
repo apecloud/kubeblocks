@@ -84,7 +84,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(err).Should(BeNil())
 			newTree, err := reconciler.Reconcile(orderedReadyTree)
 			Expect(err).Should(BeNil())
-			// desired: bar-0, bar-1, bar-foo-0
+			// desired: bar-hello-0, bar-foo-0, bar-1
 			pods := newTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(3))
 			currentPodSnapshot := make(model.ObjectSnapshot)
@@ -93,8 +93,8 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				Expect(err).Should(BeNil())
 				currentPodSnapshot[*name] = object
 			}
-			podBar0 := builder.NewPodBuilder(namespace, "bar-0").GetObject()
-			for _, object := range []client.Object{podFoo0, podBar0, podBar1} {
+			podHelloBar0 := builder.NewPodBuilder(namespace, "bar-hello-0").GetObject()
+			for _, object := range []client.Object{podFoo0, podHelloBar0, podBar1} {
 				name, err := model.GetGVKName(object)
 				Expect(err).Should(BeNil())
 				_, ok := currentPodSnapshot[*name]
@@ -123,7 +123,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			podFoo1 := builder.NewPodBuilder(namespace, its.Name+"-foo-1").GetObject()
 			podBar2 := builder.NewPodBuilder(namespace, "bar-2").GetObject()
 			podBar3 := builder.NewPodBuilder(namespace, "bar-3").GetObject()
-			for _, object := range []client.Object{podHello, podFoo0, podFoo1, podBar0, podBar1, podBar2, podBar3} {
+			for _, object := range []client.Object{podHello, podFoo0, podFoo1, podHelloBar0, podBar1, podBar2, podBar3} {
 				name, err := model.GetGVKName(object)
 				Expect(err).Should(BeNil())
 				_, ok := currentPodSnapshot[*name]

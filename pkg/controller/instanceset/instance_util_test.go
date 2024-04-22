@@ -62,7 +62,7 @@ var _ = Describe("instance util test", func() {
 				builder.NewPodBuilder(namespace, "pod-10").AddLabels(rsm.RoleLabelKey, "learner").GetObject(),
 				builder.NewPodBuilder(namespace, "foo-20").AddLabels(rsm.RoleLabelKey, "learner").GetObject(),
 			}
-			expectedOrder := []string{"pod-4", "pod-2", "foo-20", "pod-3", "pod-6", "pod-10", "pod-1", "pod-0", "pod-5"}
+			expectedOrder := []string{"pod-4", "pod-2", "foo-20", "pod-10", "pod-6", "pod-3", "pod-1", "pod-0", "pod-5"}
 
 			sortObjects(pods, priorityMap, false)
 			for i, pod := range pods {
@@ -413,8 +413,8 @@ var _ = Describe("instance util test", func() {
 			getNameNOrdinalFunc := func(i int) (string, int) {
 				return ParseParentNameAndOrdinal(instanceNameList[i])
 			}
-			BaseSort(instanceNameList, getNameNOrdinalFunc, nil, false)
-			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
+			baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
+			podNamesExpected := []string{"foo-bar-0", "foo-bar-2", "foo-1", "foo-2"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
 	})

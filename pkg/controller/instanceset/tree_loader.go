@@ -38,7 +38,7 @@ import (
 type treeLoader struct{}
 
 func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
-	ml := GetMatchLabels(req.Name)
+	ml := getMatchLabels(req.Name)
 	kinds := ownedKinds()
 	tree, err := kubebuilderx.ReadObjectTree[*workloads.InstanceSet](ctx, reader, req, ml, kinds...)
 	if err != nil {

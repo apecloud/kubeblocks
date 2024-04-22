@@ -29,7 +29,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -140,7 +139,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			involvedObject := corev1.ObjectReference{
 				Name:      key.Name,
-				Kind:      constant.InstanceSetKind,
+				Kind:      workloads.Kind,
 				Namespace: testCtx.DefaultNamespace,
 			}
 			event.InvolvedObject = involvedObject

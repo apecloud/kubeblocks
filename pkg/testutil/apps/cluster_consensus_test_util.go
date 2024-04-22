@@ -33,8 +33,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
@@ -282,9 +280,12 @@ func MockInstanceSetPod(
 	if its != nil {
 		stsUpdateRevision = its.Status.UpdateRevision
 	}
-	ml := instanceset.GetMatchLabels(its.Name)
+	ml := map[string]string{
+		"workloads.kubeblocks.io/managed-by": workloads.Kind,
+		"workloads.kubeblocks.io/instance":   its.Name,
+	}
 	podFactory := NewPodFactory(testCtx.DefaultNamespace, podName).
-		SetOwnerReferences(workloads.GroupVersion.Group+"/"+workloads.GroupVersion.Version, rsm.KindInstanceSet, its).
+		SetOwnerReferences(workloads.GroupVersion.String(), workloads.Kind, its).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(consensusCompName).
 		AddAppManagedByLabel().

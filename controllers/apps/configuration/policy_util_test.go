@@ -52,8 +52,8 @@ func newMockInstanceSet(replicas int, name string, labels map[string]string) wor
 	serviceName, _ := password.Generate(12, 0, 0, true, false)
 	return workloads.InstanceSet{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "InstanceSet",
-			APIVersion: "workloads.kubeblocks.io/v1alpha1",
+			Kind:       workloads.Kind,
+			APIVersion: workloads.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

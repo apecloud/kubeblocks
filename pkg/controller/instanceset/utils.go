@@ -54,9 +54,9 @@ func mergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 	}
 }
 
-func GetMatchLabels(name string) map[string]string {
+func getMatchLabels(name string) map[string]string {
 	return map[string]string{
-		rsm.WorkloadsManagedByLabelKey: managedBy,
+		rsm.WorkloadsManagedByLabelKey: workloads.Kind,
 		rsm.WorkloadsInstanceLabelKey:  name,
 	}
 }

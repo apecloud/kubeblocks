@@ -96,9 +96,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	// 3. handle alignment (create new instances and delete useless instances)
 	// create new instances
 	newNameList := newNameSet.List()
-	BaseSort(newNameList, func(i int) (string, int) {
+	baseSort(newNameList, func(i int) (string, int) {
 		return ParseParentNameAndOrdinal(newNameList[i])
-	}, nil, false)
+	}, nil, true)
 	getPredecessor := func(i int) *corev1.Pod {
 		if i <= 0 {
 			return nil
@@ -145,7 +145,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	// delete useless instances
 	priorities := make(map[string]int)
-	sortObjects(oldInstanceList, priorities, true)
+	sortObjects(oldInstanceList, priorities, false)
 	for _, object := range oldInstanceList {
 		pod, _ := object.(*corev1.Pod)
 		if _, ok := deleteNameSet[pod.Name]; !ok {

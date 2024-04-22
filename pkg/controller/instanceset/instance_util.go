@@ -95,7 +95,7 @@ func ParseParentNameAndOrdinal(s string) (string, int) {
 }
 
 // sortObjects sorts objects by their role priority and name
-// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
+// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name > follower2.Name
 // reverse it if reverse==true
 func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, reverse bool) {
 	getRolePriorityFunc := func(i int) int {
@@ -105,10 +105,10 @@ func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, r
 	getNameNOrdinalFunc := func(i int) (string, int) {
 		return ParseParentNameAndOrdinal(objects[i].GetName())
 	}
-	BaseSort(objects, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
+	baseSort(objects, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }
 
-func BaseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePriorityFunc func(i int) int, reverse bool) {
+func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePriorityFunc func(i int) int, reverse bool) {
 	if getRolePriorityFunc == nil {
 		getRolePriorityFunc = func(_ int) int {
 			return 0
@@ -128,7 +128,7 @@ func BaseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 		if name1 != name2 {
 			return name1 < name2
 		}
-		return ordinal1 < ordinal2
+		return ordinal1 > ordinal2
 	})
 }
 

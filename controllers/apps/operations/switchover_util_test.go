@@ -93,7 +93,7 @@ var _ = Describe("Switchover Util", func() {
 			Image:           testapps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+		its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
 			AddFinalizers([]string{constant.DBClusterFinalizerName}).
 			AddContainer(container).
@@ -104,10 +104,10 @@ var _ = Describe("Switchover Util", func() {
 			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
-		for i := int32(0); i < *sts.Spec.Replicas; i++ {
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+		for i := int32(0); i < *its.Spec.Replicas; i++ {
+			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", its.Name, i)).
 				AddContainer(container).
-				AddLabelsInMap(sts.Labels).
+				AddLabelsInMap(its.Labels).
 				AddRoleLabel(defaultRole(i)).
 				Create(&testCtx).GetObject()
 		}
@@ -157,7 +157,7 @@ var _ = Describe("Switchover Util", func() {
 			Image:           testapps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+		its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
 			AddFinalizers([]string{constant.DBClusterFinalizerName}).
 			AddContainer(container).
@@ -168,10 +168,10 @@ var _ = Describe("Switchover Util", func() {
 			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
-		for i := int32(0); i < *sts.Spec.Replicas; i++ {
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+		for i := int32(0); i < *its.Spec.Replicas; i++ {
+			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", its.Name, i)).
 				AddContainer(container).
-				AddLabelsInMap(sts.Labels).
+				AddLabelsInMap(its.Labels).
 				AddRoleLabel(defaultRole(i)).
 				Create(&testCtx).GetObject()
 		}

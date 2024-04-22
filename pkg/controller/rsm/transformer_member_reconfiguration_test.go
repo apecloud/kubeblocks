@@ -69,7 +69,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		action := builder.NewJobBuilder(name, actionName).
 			AddLabelsInMap(map[string]string{
 				constant.AppInstanceLabelKey: rsm.Name,
-				constant.KBManagedByKey:      KindReplicatedStateMachine,
+				constant.KBManagedByKey:      KindInstanceSet,
 				jobScenarioLabel:             jobScenarioMembership,
 				jobTypeLabel:                 actionType,
 				jobHandledLabel:              jobHandledFalse,

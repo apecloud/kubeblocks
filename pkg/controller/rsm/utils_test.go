@@ -171,11 +171,11 @@ var _ = Describe("utils test", func() {
 	Context("getPodsOfStatefulSet function", func() {
 		It("should work well", func() {
 			sts := builder.NewStatefulSetBuilder(namespace, name).
-				AddMatchLabels(constant.KBManagedByKey, KindReplicatedStateMachine).
+				AddMatchLabels(constant.KBManagedByKey, KindInstanceSet).
 				AddMatchLabels(constant.AppInstanceLabelKey, name).
 				GetObject()
 			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
-				AddLabels(constant.KBManagedByKey, KindReplicatedStateMachine).
+				AddLabels(constant.KBManagedByKey, KindInstanceSet).
 				AddLabels(constant.AppInstanceLabelKey, name).
 				GetObject()
 			k8sMock.EXPECT().
@@ -419,7 +419,7 @@ var _ = Describe("utils test", func() {
 			t := true
 			rsm.OwnerReferences = []metav1.OwnerReference{
 				{
-					Kind:       KindReplicatedStateMachine,
+					Kind:       KindInstanceSet,
 					Controller: &t,
 				},
 			}

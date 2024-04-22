@@ -547,7 +547,7 @@ func getLabels(rsm *workloads.InstanceSet) map[string]string {
 		return labels
 	}
 	return map[string]string{
-		WorkloadsManagedByLabelKey: KindReplicatedStateMachine,
+		WorkloadsManagedByLabelKey: KindInstanceSet,
 		WorkloadsInstanceLabelKey:  rsm.Name,
 	}
 }
@@ -782,7 +782,7 @@ func GetEnvConfigMapName(rsmName string) string {
 // IsOwnedByRsm is used to judge if the obj is owned by rsm
 func IsOwnedByRsm(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == KindReplicatedStateMachine && ref.Controller != nil && *ref.Controller {
+		if ref.Kind == KindInstanceSet && ref.Controller != nil && *ref.Controller {
 			return true
 		}
 	}

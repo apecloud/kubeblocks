@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -222,7 +223,15 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 	// The additional removal of DBClusterFinalizerName in the component controller is to backward compatibility.
 	// In versions prior to 0.9.0, the component object's finalizers includes DBClusterFinalizerName.
 	// Therefore, it is necessary to remove DBClusterFinalizerName when the component is scaled-in independently.
-	finalizers := []string{constant.DBComponentFinalizerName, constant.DBClusterFinalizerName}
+	//
+	// Why remove RSM finalizer here:
+	// The RSM API has been replaced by the InstanceSet API starting from version 0.9.0.
+	// An automated upgrade process is performed in the component controller.
+	// As part of the upgrade, the RSM object and some of its secondary objects are deleted.
+	// These secondary objects are protected by the RSM finalizer to ensure their proper cleanup.
+	// By removing the RSM finalizer here, we allow the automated upgrade process to delete the RSM object
+	// and perform the necessary cleanup of its associated resources.
+	finalizers := []string{constant.DBComponentFinalizerName, constant.DBClusterFinalizerName, rsmcore.FinalizerName}
 	for _, finalizer := range finalizers {
 		if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 			err := c.cli.Update(ctx, vertex.Obj, clientOption(vertex))
@@ -233,7 +242,12 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 	}
 
 	if !model.IsObjectDeleting(vertex.Obj) {
-		err := c.cli.Delete(ctx, vertex.Obj, clientOption(vertex))
+		var opts []client.DeleteOption
+		opts = append(opts, clientOption(vertex))
+		if len(vertex.PropagationPolicy) > 0 {
+			opts = append(opts, vertex.PropagationPolicy)
+		}
+		err := c.cli.Delete(ctx, vertex.Obj, opts...)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}

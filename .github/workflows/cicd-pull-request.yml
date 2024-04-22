@@ -208,7 +208,7 @@ jobs:
   pr-check:
     name: make test
     needs: [ trigger-mode, test-parallel, make-test, check-image, check-tools-image, check-datascript-image, check-dataprotection-image, check-helm ]
-    if: ${{ github.event.review.state == 'approved' && always() }}
+    if: ${{ github.event.action == 'labeled' && github.event.label.name == 'approved' && always() }}
     runs-on: ubuntu-latest
     steps:
       - name: test parallel check

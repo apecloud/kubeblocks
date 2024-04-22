@@ -270,9 +270,13 @@ func MockInstanceSetPod(
 	if its != nil {
 		stsUpdateRevision = its.Status.UpdateRevision
 	}
+	name := ""
+	if its != nil {
+		name = its.Name
+	}
 	ml := map[string]string{
 		"workloads.kubeblocks.io/managed-by": workloads.Kind,
-		"workloads.kubeblocks.io/instance":   its.Name,
+		"workloads.kubeblocks.io/instance":   name,
 	}
 	podFactory := NewPodFactory(testCtx.DefaultNamespace, podName).
 		SetOwnerReferences(workloads.GroupVersion.String(), workloads.Kind, its).

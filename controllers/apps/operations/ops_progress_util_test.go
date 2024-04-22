@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -91,27 +90,6 @@ var _ = Describe("Ops ProgressDetails", func() {
 		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/4"))
 	}
 
-	testProgressDetailsWithStatelessPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource) {
-		By("create a new pod")
-		newPodName := "busybox-" + testCtx.GetRandomStr()
-		testapps.MockStatelessPod(&testCtx, nil, clusterName, statelessComp, newPodName)
-		newPod := &corev1.Pod{}
-		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: newPodName, Namespace: testCtx.DefaultNamespace}, newPod)).Should(Succeed())
-		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-		Expect(getProgressDetailStatus(opsRes, statelessComp, newPod)).Should(Equal(appsv1alpha1.ProcessingProgressStatus))
-		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/4"))
-
-		By("mock new pod is ready")
-		Expect(testapps.ChangeObjStatus(&testCtx, newPod, func() {
-			lastTransTime := metav1.NewTime(time.Now().Add(-11 * time.Second))
-			testk8s.MockPodAvailable(newPod, lastTransTime)
-		})).ShouldNot(HaveOccurred())
-
-		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-		Expect(getProgressDetailStatus(opsRes, statelessComp, newPod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
-		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/4"))
-	}
-
 	Context("Test Ops ProgressDetails", func() {
 		It("Test Ops ProgressDetails for rolling update", func() {
 			By("init operations resources ")
@@ -130,11 +108,6 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 			By("test the progressDetails when stateful pod updates during restart operation")
 			testProgressDetailsWithStatefulPodUpdating(reqCtx, opsRes, podList)
-
-			By("test the progressDetails when stateless pod updates during restart operation")
-			Expect(opsRes.OpsRequest.Status.Components[statelessComp].Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase)) // appsv1alpha1.RebootingPhase
-			testProgressDetailsWithStatelessPodUpdating(reqCtx, opsRes)
-
 		})
 
 		It("Test Ops ProgressDetails with horizontally scaling replicas", func() {

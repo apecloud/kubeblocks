@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"reflect"
 	"testing"
 	"time"
@@ -28,7 +29,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -92,26 +92,26 @@ var _ = Describe("Component Utils", func() {
 
 	Context("Component test", func() {
 		It("Component test", func() {
-			By(" init cluster, statefulSet, pods")
+			By(" init cluster, instanceSet, pods")
 			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
-			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
-			_ = testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
+			_ = testapps.MockInstanceSetPods(&testCtx, its, clusterName, consensusCompName)
 
 			By("test GetClusterByObject function")
-			newCluster, _ := GetClusterByObject(ctx, k8sClient, sts)
+			newCluster, _ := GetClusterByObject(ctx, k8sClient, its)
 			Expect(newCluster != nil).Should(BeTrue())
 
 			By("test getObjectListByComponentName function")
-			stsList := &appsv1.StatefulSetList{}
-			_ = component.GetObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)
-			Expect(len(stsList.Items) > 0).Should(BeTrue())
+			itsList := &workloads.InstanceSetList{}
+			_ = component.GetObjectListByComponentName(ctx, k8sClient, *cluster, itsList, consensusCompName)
+			Expect(len(itsList.Items) > 0).Should(BeTrue())
 
 			By("test getObjectListByCustomLabels function")
-			stsList = &appsv1.StatefulSetList{}
+			itsList = &workloads.InstanceSetList{}
 			matchLabel := constant.GetComponentWellKnownLabels(cluster.Name, consensusCompName)
-			_ = getObjectListByCustomLabels(ctx, k8sClient, *cluster, stsList, client.MatchingLabels(matchLabel))
-			Expect(len(stsList.Items) > 0).Should(BeTrue())
+			_ = getObjectListByCustomLabels(ctx, k8sClient, *cluster, itsList, client.MatchingLabels(matchLabel))
+			Expect(len(itsList.Items) > 0).Should(BeTrue())
 
 			By("test GetComponentStsMinReadySeconds")
 			minReadySeconds, _ := component.GetComponentMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)

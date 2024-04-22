@@ -1863,22 +1863,16 @@ var _ = Describe("Component Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
-		its := itsList.Items[0]
-		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterKey.Name, compName).
-			SetReplicas(*its.Spec.Replicas).
-			Create(&testCtx).GetObject()
+		its := &itsList.Items[0]
 		By("mock pod/sts are available and wait for component enter running phase")
-		mockPods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
-		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-			testk8s.MockStatefulSetReady(sts)
-		})).ShouldNot(HaveOccurred())
-		Expect(testapps.ChangeObjStatus(&testCtx, &its, func() {
-			testk8s.MockInstanceSetReady(&its, mockPods...)
+		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compName)
+		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 		By("the restore container has been removed from init containers")
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&its), func(g Gomega, tmpIts *workloads.InstanceSet) {
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(its), func(g Gomega, tmpIts *workloads.InstanceSet) {
 			g.Expect(tmpIts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 		})).Should(Succeed())
 

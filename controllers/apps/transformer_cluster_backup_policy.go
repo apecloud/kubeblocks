@@ -257,14 +257,14 @@ func (r *clusterBackupPolicyTransformer) transformBackupSchedule(
 }
 
 func (r *clusterBackupPolicyTransformer) setDefaultEncryptionConfig(backupPolicy *dpv1alpha1.BackupPolicy) {
-	secretKeyRefJson := viper.GetString(constant.CfgKeyDPBackupEncryptionSecretKeyRef)
-	if secretKeyRefJson == "" {
+	secretKeyRefJSON := viper.GetString(constant.CfgKeyDPBackupEncryptionSecretKeyRef)
+	if secretKeyRefJSON == "" {
 		return
 	}
 	secretKeyRef := &corev1.SecretKeySelector{}
-	err := json.Unmarshal([]byte(secretKeyRefJson), secretKeyRef)
+	err := json.Unmarshal([]byte(secretKeyRefJSON), secretKeyRef)
 	if err != nil {
-		r.Error(err, "failed to unmarshal secretKeyRef", "json", secretKeyRefJson)
+		r.Error(err, "failed to unmarshal secretKeyRef", "json", secretKeyRefJSON)
 		return
 	}
 	if secretKeyRef.Name == "" || secretKeyRef.Key == "" {

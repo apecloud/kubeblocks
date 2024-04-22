@@ -234,11 +234,6 @@ func (builder *ComponentDefinitionBuilder) AddRole(name string, serviceable, wri
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) SetRoleArbitrator(arbitrator *appsv1alpha1.RoleArbitrator) *ComponentDefinitionBuilder {
-	builder.get().Spec.RoleArbitrator = arbitrator
-	return builder
-}
-
 func (builder *ComponentDefinitionBuilder) SetLifecycleAction(name string, val interface{}) *ComponentDefinitionBuilder {
 	obj := &builder.get().Spec.LifecycleActions
 	t := reflect.TypeOf(reflect.ValueOf(obj).Elem())

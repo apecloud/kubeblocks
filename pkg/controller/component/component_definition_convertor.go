@@ -59,7 +59,6 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"systemaccounts":         &compDefSystemAccountsConvertor{},
 		"updatestrategy":         &compDefUpdateStrategyConvertor{},
 		"roles":                  &compDefRolesConvertor{},
-		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
 		"sidecarcontainerspecs":  &compDefSidecarContainersConvertor{},
@@ -511,21 +510,6 @@ func (c *compDefRolesConvertor) convertConsensusRole(clusterCompDef *appsv1alpha
 	}
 
 	return roles, nil
-}
-
-// compDefRoleArbitratorConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.RoleArbitrator.
-type compDefRoleArbitratorConvertor struct{}
-
-func (c *compDefRoleArbitratorConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-
-	// TODO(xingran): it is hacky, should be refactored
-	if clusterCompDef.WorkloadType == appsv1alpha1.Replication && clusterCompDef.CharacterType == constant.RedisCharacterType {
-		roleArbitrator := appsv1alpha1.LorryRoleArbitrator
-		return &roleArbitrator, nil
-	}
-
-	return nil, nil
 }
 
 // compDefServiceRefDeclarationsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceRefDeclarations.

@@ -808,13 +808,6 @@ var _ = Describe("Component Definition Convertor", func() {
 			})
 		})
 
-		It("role arbitrator", func() {
-			convertor := &compDefRoleArbitratorConvertor{}
-			res, err := convertor.convert(clusterCompDef)
-			Expect(err).Should(Succeed())
-			Expect(res).Should(BeNil())
-		})
-
 		// TODO(component)
 		Context("lifecycle actions", func() {
 			It("w/o comp version", func() {

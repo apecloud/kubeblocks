@@ -74,15 +74,15 @@ var _ = Describe("Ops ProgressDetails", func() {
 	}
 
 	testProgressDetailsWithStatefulPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, consensusPodList []corev1.Pod) {
-		By("mock pod of statefulSet updating by deleting the pod")
+		By("mock pod of InstanceSet updating by deleting the pod")
 		pod := &consensusPodList[0]
 		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.ProcessingProgressStatus))
 
-		By("mock one pod of StatefulSet to update successfully")
+		By("mock one pod of InstanceSet to update successfully")
 		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-		testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp,
+		testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
 			pod.Name, "leader", "ReadWrite")
 
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)

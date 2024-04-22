@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/sethvargo/go-password/password"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,7 +43,7 @@ import (
 
 var (
 	defaultNamespace = "default"
-	stsSchemaKind    = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+	stsSchemaKind    = workloads.GroupVersion.WithKind(workloads.Kind)
 )
 
 func newMockInstanceSet(replicas int, name string, labels map[string]string) workloads.InstanceSet {

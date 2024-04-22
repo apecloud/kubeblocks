@@ -82,7 +82,7 @@ var _ = Describe("Component Utils", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.InstanceSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
@@ -130,7 +130,7 @@ var _ = Describe("Component Utils", func() {
 			)
 			pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, compName, podName, role, mode)
 			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
-				SetOwnerReferences("apps/v1", constant.StatefulSetKind, nil).
+				SetOwnerReferences(workloads.GroupVersion.String(), workloads.Kind, nil).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(compName).
 				AddAppManagedByLabel().

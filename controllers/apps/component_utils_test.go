@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"reflect"
 	"testing"
 	"time"
@@ -35,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"

@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -159,7 +160,7 @@ func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 		labels := client.MatchingLabels{
 			core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name): configSpec.TemplateRef,
 		}
-		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1alpha1.ClusterVersionList{}, &appsv1alpha1.ClusterDefinitionList{}); err != nil {
+		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1alpha1.ClusterVersionList{}, &appsv1alpha1.ClusterDefinitionList{}, &appsv1alpha1.ComponentDefinitionList{}); err != nil {
 			return err
 		} else if !ok {
 			continue
@@ -245,6 +246,8 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 		configTemplates, err = getConfigTemplateFromCD(cr, handler2...)
 	case *appsv1alpha1.ClusterVersion:
 		configTemplates = getConfigTemplateFromCV(cr)
+	case *appsv1alpha1.ComponentDefinition:
+		configTemplates = getConfigTemplateFromComponentDef(cr)
 	default:
 		return false, core.MakeError("not support CR type: %v", cr)
 	}
@@ -293,6 +296,19 @@ func getConfigTemplateFromCD(clusterDef *appsv1alpha1.ClusterDefinition, validat
 	return configTemplates, nil
 }
 
+func getConfigTemplateFromComponentDef(componentDef *appsv1alpha1.ComponentDefinition) []appsv1alpha1.ComponentConfigSpec {
+	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
+	// For compatibility with the previous lifecycle management of configurationSpec.TemplateRef,
+	// it is necessary to convert ScriptSpecs to ConfigSpecs,
+	// ensuring that the script-related configmap is not allowed to be deleted.
+	for _, scriptSpec := range componentDef.Spec.Scripts {
+		configTemplates = append(configTemplates, appsv1alpha1.ComponentConfigSpec{
+			ComponentTemplateSpec: scriptSpec,
+		})
+	}
+	return append(configTemplates, componentDef.Spec.Configs...)
+}
+
 func checkConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, obj client.Object) (bool, error) {
 	handler := func(configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 		return validateConfigTemplate(client, ctx, configSpecs)
@@ -303,17 +319,7 @@ func checkConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, obj c
 func updateLabelsByConfigSpec[T generics.Object, PT generics.PObject[T]](cli client.Client, ctx intctrlutil.RequestCtx, obj PT) (bool, error) {
 	handler := func(configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 		patch := client.MergeFrom(PT(obj.DeepCopy()))
-		labels := obj.GetLabels()
-		if labels == nil {
-			labels = map[string]string{}
-		}
-		for _, configSpec := range configSpecs {
-			labels[core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name)] = configSpec.TemplateRef
-			if len(configSpec.ConfigConstraintRef) != 0 {
-				labels[core.GenerateConstraintsUniqLabelKeyWithConfig(configSpec.ConfigConstraintRef)] = configSpec.ConfigConstraintRef
-			}
-		}
-		obj.SetLabels(labels)
+		configuration.BuildConfigConstraintLabels(obj, configSpecs)
 		return true, cli.Patch(ctx.Ctx, obj, patch)
 	}
 	return handleConfigTemplate(obj, handler)

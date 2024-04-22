@@ -43,7 +43,7 @@ import (
 
 var (
 	defaultNamespace = "default"
-	stsSchemaKind    = workloads.GroupVersion.WithKind(workloads.Kind)
+	itsSchemaKind    = workloads.GroupVersion.WithKind(workloads.Kind)
 )
 
 func newMockInstanceSet(replicas int, name string, labels map[string]string) workloads.InstanceSet {
@@ -89,9 +89,9 @@ type ParamsOps func(params *reconfigureParams)
 func withMockInstanceSet(replicas int, labels map[string]string) ParamsOps {
 	return func(params *reconfigureParams) {
 		rand, _ := password.Generate(12, 8, 0, true, false)
-		stsName := "test_" + rand
+		itsName := "test_" + rand
 		params.InstanceSetUnits = []workloads.InstanceSet{
-			newMockInstanceSet(replicas, stsName, labels),
+			newMockInstanceSet(replicas, itsName, labels),
 		}
 	}
 }
@@ -223,7 +223,7 @@ func newMockPodsWithInstanceSet(its *workloads.InstanceSet, replicas int, option
 	pods := make([]corev1.Pod, replicas)
 	for i := 0; i < replicas; i++ {
 		pods[i] = newMockPod(its.Name+"-"+fmt.Sprint(i), &its.Spec.Template.Spec)
-		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(its, stsSchemaKind)}
+		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(its, itsSchemaKind)}
 		pods[i].Status.PodIP = "1.1.1.1"
 	}
 	for _, customFn := range options {

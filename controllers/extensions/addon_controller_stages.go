@@ -1085,10 +1085,23 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 }
 
 func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {
+	// if not set provider and version in spec, set it from labels
 	if addon.Spec.Provider == "" && addon.Labels != nil && len(addon.Labels["addon.kubeblocks.io/provider"]) != 0 {
 		addon.Spec.Provider = addon.Labels["addon.kubeblocks.io/provider"]
 	}
 	if addon.Spec.Version == "" && addon.Labels != nil && len(addon.Labels["addon.kubeblocks.io/version"]) != 0 {
 		addon.Spec.Version = addon.Labels["addon.kubeblocks.io/version"]
+	}
+	// handle the reverse logic
+	if addon.Labels == nil || len(addon.Labels["addon.kubeblocks.io/provider"]) == 0 || len(addon.Labels["addon.kubeblocks.io/version"]) == 0 {
+		if addon.Labels == nil {
+			addon.Labels = make(map[string]string)
+		}
+		if len(addon.Spec.Provider) != 0 {
+			addon.Labels["addon.kubeblocks.io/provider"] = addon.Spec.Provider
+		}
+		if len(addon.Spec.Version) != 0 {
+			addon.Labels["addon.kubeblocks.io/version"] = addon.Spec.Version
+		}
 	}
 }

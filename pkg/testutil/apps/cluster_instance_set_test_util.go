@@ -135,7 +135,7 @@ func MockInstanceSetPods(
 	for i := 0; i < replicas; i++ {
 		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
 		var podRole, accessMode string
-		if len(its.Spec.Roles) > 0 {
+		if its != nil && len(its.Spec.Roles) > 0 {
 			if i == 0 {
 				podRole = leaderRole.Name
 				accessMode = string(leaderRole.AccessMode)

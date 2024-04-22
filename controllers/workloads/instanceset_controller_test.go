@@ -44,9 +44,8 @@ var _ = Describe("InstanceSet Controller", func() {
 		AfterEach(func() {
 			viper.Set(instanceset.FeatureGateRSMReplicaProvider, replicaProvider)
 		})
-
 		It("should reconcile well", func() {
-			name := "test-stateful-replica-set"
+			name := "test-instance-set"
 			port := int32(12345)
 			service := &corev1.Service{
 				Spec: corev1.ServiceSpec{
@@ -87,20 +86,21 @@ var _ = Describe("InstanceSet Controller", func() {
 				Image:   "foo",
 				Command: []string{"bar"},
 			}
-			rsm := builder.NewInstanceSetBuilder(testCtx.DefaultNamespace, name).
+			its := builder.NewInstanceSetBuilder(testCtx.DefaultNamespace, name).
 				AddMatchLabelsInMap(commonLabels).
 				SetService(service).
 				SetTemplate(template).
 				AddCustomHandler(action).
 				GetObject()
-			Expect(k8sClient.Create(ctx, rsm)).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(rsm),
+			viper.Set(constant.KBToolsImage, "kb-tool-image")
+			Expect(k8sClient.Create(ctx, its)).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(its),
 				func(g Gomega, set *workloads.InstanceSet) {
 					g.Expect(set.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				}),
 			).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, rsm)).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(rsm), &workloads.InstanceSet{}, false)).
+			Expect(k8sClient.Delete(ctx, its)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(its), &workloads.InstanceSet{}, false)).
 				Should(Succeed())
 		})
 	})

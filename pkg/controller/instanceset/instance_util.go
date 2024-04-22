@@ -245,7 +245,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	// 1. build a pod from template
 	var err error
 	if len(revision) == 0 {
-		revision, err = buildInstanceTemplateRevision(template, parent)
+		revision, err = BuildInstanceTemplateRevision(&template.PodTemplateSpec, parent)
 		if err != nil {
 			return nil, err
 		}
@@ -412,8 +412,8 @@ func validateSpec(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) err
 	return nil
 }
 
-func buildInstanceTemplateRevision(template *instanceTemplateExt, parent *workloads.InstanceSet) (string, error) {
-	podTemplate := filterInPlaceFields(&template.PodTemplateSpec)
+func BuildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
+	podTemplate := filterInPlaceFields(template)
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
 		AddAnnotationsInMap(parent.Annotations).

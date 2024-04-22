@@ -194,6 +194,9 @@ func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterM
 }
 
 func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
+	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, rsm.WorkloadsManagedByLabelKey, rsm.KindInstanceSet, rsm.WorkloadsInstanceLabelKey)
+	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
+
 	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) {
 		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 		delegatorFinder := handler.NewDelegatorFinder(&workloads.InstanceSet{}, nameLabels)
@@ -211,24 +214,21 @@ func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.
 			Watches(&appsv1.StatefulSet{}, stsHandler).
 			Watches(&batchv1.Job{}, jobHandler).
 			Watches(&corev1.Pod{}, stsPodHandler).
-			Owns(&corev1.Pod{}).
+			Watches(&corev1.Pod{}, podHandler).
 			Owns(&corev1.PersistentVolumeClaim{}).
 			Complete(r)
 	}
 
-	stsOwnerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
-	itsOwnerFinder := handler.NewOwnerFinder(&workloads.InstanceSet{})
-	podHandler := handler.NewBuilder(ctx).AddFinder(stsOwnerFinder).AddFinder(itsOwnerFinder).Build()
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Owns(&appsv1.StatefulSet{}).
-		Owns(&batchv1.Job{}).
 		Watches(&corev1.Pod{}, podHandler).
-		Owns(&corev1.Pod{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&batchv1.Job{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
 

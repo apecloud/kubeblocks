@@ -46,7 +46,7 @@ const (
 	WorkloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
 	WorkloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
 
-	KindReplicatedStateMachine = "InstanceSet"
+	KindInstanceSet = "InstanceSet"
 
 	RoleLabelKey          = "kubeblocks.io/role"
 	rsmAccessModeLabelKey = "rsm.workloads.kubeblocks.io/access-mode"

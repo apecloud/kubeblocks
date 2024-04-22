@@ -1680,12 +1680,7 @@ var _ = Describe("Component Controller", func() {
 		By("Checking statefulSet number")
 		itsList := testk8s.ListAndCheckInstanceSetItemsCount(&testCtx, clusterKey, 1)
 		its := &itsList.Items[0]
-		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterKey.Name, compName).
-			SetReplicas(*its.Spec.Replicas).Create(&testCtx).GetObject()
-		mockPods := testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
-		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-			testk8s.MockStatefulSetReady(sts)
-		})).ShouldNot(HaveOccurred())
+		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compDefName)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
@@ -1713,14 +1708,10 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(itsList.Items).ShouldNot(BeEmpty())
 			its = &itsList.Items[0]
 		}).Should(Succeed())
-		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterKey.Name, compName).
-			AddAppComponentLabel(its.Labels[constant.KBAppComponentLabelKey]).
-			AddAppInstanceLabel(its.Labels[constant.AppInstanceLabelKey]).
-			SetReplicas(*its.Spec.Replicas).Create(&testCtx).GetObject()
 		By("Creating mock pods in StatefulSet, and set controller reference")
 		pods := mockPodsForTest(clusterObj, replicas)
 		for i, pod := range pods {
-			Expect(controllerutil.SetControllerReference(sts, &pod, scheme.Scheme)).Should(Succeed())
+			Expect(controllerutil.SetControllerReference(its, &pod, scheme.Scheme)).Should(Succeed())
 			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			patch := client.MergeFrom(pod.DeepCopy())
 			// mock the status to pass the isReady(pod) check in consensus_set
@@ -1740,7 +1731,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("Checking pods' role are changed accordingly")
 		Eventually(func(g Gomega) {
-			pods, err := intctrlutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := intctrlutil.GetPodListByInstanceSet(ctx, k8sClient, its)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// should have 3 pods
 			g.Expect(pods).Should(HaveLen(3))
@@ -1760,23 +1751,23 @@ var _ = Describe("Component Controller", func() {
 		}).Should(Succeed())
 
 		// trigger its to reconcile as the underlying sts is not created
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sts), func(its *workloads.InstanceSet) {
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
 			its.Annotations["time"] = time.Now().Format(time.RFC3339)
 		})()).Should(Succeed())
 		By("Checking pods' annotations")
 		Eventually(func(g Gomega) {
-			pods, err := intctrlutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := intctrlutil.GetPodListByInstanceSet(ctx, k8sClient, its)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(pods).Should(HaveLen(int(*sts.Spec.Replicas)))
+			g.Expect(pods).Should(HaveLen(int(*its.Spec.Replicas)))
 			for _, pod := range pods {
 				g.Expect(pod.Annotations).ShouldNot(BeNil())
-				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*sts.Spec.Replicas))))
+				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*its.Spec.Replicas))))
 			}
 		}).Should(Succeed())
 		itsPatch := client.MergeFrom(its.DeepCopy())
 		By("Updating ITS status")
 		its.Status.UpdateRevision = "mock-version"
-		pods, err := intctrlutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := intctrlutil.GetPodListByInstanceSet(ctx, k8sClient, its)
 		Expect(err).Should(BeNil())
 		var podList []*corev1.Pod
 		for i := range pods {
@@ -1784,16 +1775,6 @@ var _ = Describe("Component Controller", func() {
 		}
 		testk8s.MockInstanceSetReady(its, podList...)
 		Expect(k8sClient.Status().Patch(ctx, its, itsPatch)).Should(Succeed())
-
-		stsPatch := client.MergeFrom(sts.DeepCopy())
-		By("Updating StatefulSet's status")
-		sts.Status.UpdateRevision = "mock-version"
-		sts.Status.Replicas = int32(replicas)
-		sts.Status.AvailableReplicas = int32(replicas)
-		sts.Status.CurrentReplicas = int32(replicas)
-		sts.Status.ReadyReplicas = int32(replicas)
-		sts.Status.ObservedGeneration = sts.Generation
-		Expect(k8sClient.Status().Patch(ctx, sts, stsPatch)).Should(Succeed())
 
 		By("Checking pods' role are updated in cluster status")
 		Eventually(func(g Gomega) {

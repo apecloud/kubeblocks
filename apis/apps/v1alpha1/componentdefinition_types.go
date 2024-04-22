@@ -461,18 +461,6 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// Defines the strategy for electing the component's active role.
-	//
-	// This field has been deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// This field is immutable.
-	//
-	// +kubebuilder:default=External
-	// +optional
-	RoleArbitrator *RoleArbitrator `json:"roleArbitrator,omitempty"`
-
 	// Defines a set of Actions for customizing the behavior of a Component.
 	//
 	// Each Action defines a customizable hook or procedure, designed to be invoked at predetermined points
@@ -632,18 +620,6 @@ type SystemAccount struct {
 	// +optional
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
-
-// RoleArbitrator defines how to arbitrate the role of replicas.
-//
-// Deprecated since v0.9
-// +enum
-// +kubebuilder:validation:Enum={External,Lorry}
-type RoleArbitrator string
-
-const (
-	ExternalRoleArbitrator RoleArbitrator = "External"
-	LorryRoleArbitrator    RoleArbitrator = "Lorry"
-)
 
 // ReplicaRole represents a role that can be assumed by a component instance.
 type ReplicaRole struct {

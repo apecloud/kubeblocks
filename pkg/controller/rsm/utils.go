@@ -46,7 +46,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type getRole func(int) string
@@ -520,32 +519,10 @@ func emitActionEvent(transCtx *rsmTransformContext, eventType, reason, message s
 }
 
 func GetFinalizer(obj client.Object) string {
-	if _, ok := obj.(*workloads.InstanceSet); ok {
-		return FinalizerName
-	}
-	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-		return constant.DBClusterFinalizerName
-	}
 	return FinalizerName
 }
 
 func getLabels(rsm *workloads.InstanceSet) map[string]string {
-	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-		labels := make(map[string]string, 0)
-		keys := []string{
-			constant.AppManagedByLabelKey,
-			constant.AppNameLabelKey,
-			constant.AppComponentLabelKey,
-			constant.AppInstanceLabelKey,
-			constant.KBAppComponentLabelKey,
-		}
-		for _, key := range keys {
-			if value, ok := rsm.Labels[key]; ok {
-				labels[key] = value
-			}
-		}
-		return labels
-	}
 	return map[string]string{
 		WorkloadsManagedByLabelKey: KindInstanceSet,
 		WorkloadsInstanceLabelKey:  rsm.Name,
@@ -562,20 +539,6 @@ func getSvcSelector(rsm *workloads.InstanceSet, headless bool) map[string]string
 				break
 			}
 		}
-	}
-
-	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-		keys := []string{
-			constant.AppManagedByLabelKey,
-			constant.AppInstanceLabelKey,
-			constant.KBAppComponentLabelKey,
-		}
-		for _, key := range keys {
-			if value, ok := rsm.Labels[key]; ok {
-				selectors[key] = value
-			}
-		}
-		return selectors
 	}
 
 	for k, v := range rsm.Spec.Selector.MatchLabels {

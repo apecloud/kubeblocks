@@ -122,12 +122,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
-			if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-				// filter non-env configmaps
-				if _, ok := oldSnapshot[name].(*corev1.ConfigMap); ok {
-					continue
-				}
-			}
 			cli.Delete(dag, oldSnapshot[name])
 		}
 	}

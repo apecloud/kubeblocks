@@ -55,7 +55,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -383,11 +382,11 @@ var _ = Describe("Component Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 	}
 
-	checkSingleWorkload := func(compDefName string, expects func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment)) {
+	checkSingleWorkload := func(compDefName string, expects func(g Gomega, its *workloads.InstanceSet, deploy *appsv1.Deployment)) {
 		Eventually(func(g Gomega) {
 			l := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
-			sts := rsm.ConvertInstanceSetToSTS(&l.Items[0])
-			expects(g, sts, nil)
+			its := &l.Items[0]
+			expects(g, its, nil)
 		}).Should(Succeed())
 	}
 
@@ -406,9 +405,9 @@ var _ = Describe("Component Controller", func() {
 				g.Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeElementOf(appsv1alpha1.CreatingClusterPhase, appsv1alpha1.UpdatingClusterPhase))
 			})).Should(Succeed())
 
-			checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
-				if sts != nil {
-					g.Expect(int(*sts.Spec.Replicas)).To(BeEquivalentTo(replicas))
+			checkSingleWorkload(compDefName, func(g Gomega, its *workloads.InstanceSet, deploy *appsv1.Deployment) {
+				if its != nil {
+					g.Expect(int(*its.Spec.Replicas)).To(BeEquivalentTo(replicas))
 				} else {
 					g.Expect(int(*deploy.Spec.Replicas)).To(BeEquivalentTo(replicas))
 				}
@@ -505,7 +504,7 @@ var _ = Describe("Component Controller", func() {
 		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, comp.Name)
 		Expect(int(*itsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
 
-		By("Creating mock pods in StatefulSet")
+		By("Creating mock pods in InstanceSet")
 		pods := mockPodsForTest(clusterObj, int(comp.Replicas))
 		for i, pod := range pods {
 			if comp.ComponentDefRef == replicationCompDefName && i == 0 {
@@ -1677,7 +1676,7 @@ var _ = Describe("Component Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compDefName)
 
-		By("Checking statefulSet number")
+		By("Checking instanceSet number")
 		itsList := testk8s.ListAndCheckInstanceSetItemsCount(&testCtx, clusterKey, 1)
 		its := &itsList.Items[0]
 		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compDefName)
@@ -1708,7 +1707,7 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(itsList.Items).ShouldNot(BeEmpty())
 			its = &itsList.Items[0]
 		}).Should(Succeed())
-		By("Creating mock pods in StatefulSet, and set controller reference")
+		By("Creating mock pods in InstanceSet, and set controller reference")
 		pods := mockPodsForTest(clusterObj, replicas)
 		for i, pod := range pods {
 			Expect(controllerutil.SetControllerReference(its, &pod, scheme.Scheme)).Should(Succeed())

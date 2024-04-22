@@ -22,15 +22,13 @@ package apps
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"strings"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -45,12 +43,12 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// upgradeTransformer upgrades the underlying workload from the legacy RSM API to the InstanceSet API.
-type upgradeTransformer struct{}
+// componentWorkloadUpgradeTransformer upgrades the underlying workload from the legacy RSM API to the InstanceSet API.
+type componentWorkloadUpgradeTransformer struct{}
 
-var _ graph.Transformer = &upgradeTransformer{}
+var _ graph.Transformer = &componentWorkloadUpgradeTransformer{}
 
-func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
@@ -107,15 +105,12 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 
 	// update pod & pvc & svc labels
 	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.ServiceList{}, &corev1.PodList{}}
-	ml := client.MatchingLabels{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    transCtx.Cluster.Name,
-		constant.KBAppComponentLabelKey: synthesizeComp.Name,
-	}
+	ml := constant.GetComponentWellKnownLabels(transCtx.Cluster.Name, synthesizeComp.Name)
 	inNS := client.InNamespace(comp.Namespace)
+	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(transCtx.Cluster.Name, synthesizeComp.Name)
 	var revision string
 	for _, list := range objectList {
-		if err := graphCli.List(transCtx.Context, list, ml, inNS); err == nil {
+		if err := graphCli.List(transCtx.Context, list, client.MatchingLabels(ml), inNS); err == nil {
 			items := reflect.ValueOf(list).Elem().FieldByName("Items")
 			l := items.Len()
 			for i := 0; i < l; i++ {
@@ -123,7 +118,7 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 				if _, ok := object.GetLabels()[rsmcore.WorkloadsManagedByLabelKey]; ok {
 					continue
 				}
-				if _, ok := object.(*corev1.Service); ok && !strings.HasSuffix(object.GetName(), "-headless") {
+				if _, ok := object.(*corev1.Service); ok && object.GetName() != defaultHeadlessSvc {
 					continue
 				}
 				legacyFound = true
@@ -145,6 +140,7 @@ func (t *upgradeTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	}
 
 	if legacyFound {
+		// set status.observedGeneration to zero to trigger a creation reconciliation loop of the component controller.
 		comp.Status.ObservedGeneration = 0
 		return graph.ErrPrematureStop
 	}

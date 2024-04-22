@@ -138,12 +138,12 @@ var _ = Describe("update reconciler test", func() {
 
 			By("reconcile with default UpdateStrategy(RollingUpdate, no partition, MaxUnavailable=1)")
 			// order: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
-			// expected: bar-hello-0 being deleted
+			// expected: bar-0 being deleted
 			defaultTree, err := newTree.DeepCopy()
 			Expect(err).Should(BeNil())
 			_, err = reconciler.Reconcile(defaultTree)
 			Expect(err).Should(BeNil())
-			expectUpdatedPods(defaultTree, []string{"bar-hello-0"})
+			expectUpdatedPods(defaultTree, []string{"bar-0"})
 
 			By("reconcile with Partition=50% and MaxUnavailable=2")
 			partitionTree, err := newTree.DeepCopy()
@@ -159,12 +159,12 @@ var _ = Describe("update reconciler test", func() {
 				},
 			}
 			// order: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
-			// expected: bar-hello-0, bar-foo-1 being deleted
+			// expected: bar-0, bar-1 being deleted
 			_, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())
-			expectUpdatedPods(partitionTree, []string{"bar-hello-0", "bar-foo-1"})
+			expectUpdatedPods(partitionTree, []string{"bar-0", "bar-1"})
 
-			By("update 'bar-hello-0', 'bar-foo-1' revision to the updated value")
+			By("update 'bar-0' revision to the updated value")
 			partitionTree, err = newTree.DeepCopy()
 			Expect(err).Should(BeNil())
 			root, ok = partitionTree.GetRoot().(*workloads.InstanceSet)
@@ -175,7 +175,7 @@ var _ = Describe("update reconciler test", func() {
 					MaxUnavailable: &maxUnavailable,
 				},
 			}
-			for _, name := range []string{"bar-hello-0", "bar-foo-1"} {
+			for _, name := range []string{"bar-0", "bar-1"} {
 				pod := builder.NewPodBuilder(namespace, name).GetObject()
 				object, err := partitionTree.Get(pod)
 				Expect(err).Should(BeNil())
@@ -185,7 +185,7 @@ var _ = Describe("update reconciler test", func() {
 			}
 			_, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())
-			expectUpdatedPods(partitionTree, []string{"bar-foo-0"})
+			expectUpdatedPods(partitionTree, []string{"bar-2"})
 
 			By("reconcile with UpdateStrategy='OnDelete'")
 			onDeleteTree, err := newTree.DeepCopy()

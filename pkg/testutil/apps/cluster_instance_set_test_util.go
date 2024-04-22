@@ -25,7 +25,6 @@ import (
 	"strconv"
 
 	"github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,9 +37,6 @@ import (
 
 const (
 	errorLogName      = "error"
-	leader            = "leader"
-	follower          = "follower"
-	learner           = "learner"
 	ConsensusReplicas = 3
 )
 
@@ -99,110 +95,6 @@ func MockInstanceSetComponent(
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
 }
 
-// MockConsensusComponentStsPod mocks to create the pod of the consensus StatefulSet, just using in envTest
-func MockConsensusComponentStsPod(
-	testCtx *testutil.TestContext,
-	sts *appsv1.StatefulSet,
-	clusterName,
-	consensusCompName,
-	podName,
-	podRole, accessMode string) *corev1.Pod {
-	var stsUpdateRevision string
-	if sts != nil {
-		stsUpdateRevision = sts.Status.UpdateRevision
-	}
-	podFactory := NewPodFactory(testCtx.DefaultNamespace, podName).
-		SetOwnerReferences("apps/v1", constant.StatefulSetKind, sts).
-		AddAppInstanceLabel(clusterName).
-		AddAppComponentLabel(consensusCompName).
-		AddAppManagedByLabel().
-		AddRoleLabel(podRole).
-		AddConsensusSetAccessModeLabel(accessMode).
-		AddControllerRevisionHashLabel(stsUpdateRevision).
-		AddVolume(corev1.Volume{
-			Name: DataVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: fmt.Sprintf("%s-%s", DataVolumeName, podName),
-				},
-			},
-		}).
-		AddContainer(corev1.Container{
-			Name:  DefaultMySQLContainerName,
-			Image: ApeCloudMySQLImage,
-			LivenessProbe: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/hello",
-						Port: intstr.FromInt(1024),
-					},
-				},
-				TimeoutSeconds:   1,
-				PeriodSeconds:    1,
-				FailureThreshold: 1,
-			},
-			StartupProbe: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(1024),
-					},
-				},
-			},
-			VolumeMounts: []corev1.VolumeMount{
-				{Name: DataVolumeName, MountPath: "/test"},
-			},
-		})
-	if sts != nil && sts.Labels[constant.AppNameLabelKey] != "" {
-		podFactory.AddAppNameLabel(sts.Labels[constant.AppNameLabelKey])
-	}
-	pod := podFactory.CheckedCreate(testCtx).GetObject()
-	patch := client.MergeFrom(pod.DeepCopy())
-	pod.Status.Conditions = []corev1.PodCondition{
-		{
-			Type:   corev1.PodReady,
-			Status: corev1.ConditionTrue,
-		},
-	}
-	gomega.Expect(testCtx.Cli.Status().Patch(context.Background(), pod, patch)).Should(gomega.Succeed())
-	return pod
-}
-
-// MockConsensusComponentPods mocks the component pods, just using in envTest
-func MockConsensusComponentPods(
-	testCtx *testutil.TestContext,
-	sts *appsv1.StatefulSet,
-	clusterName,
-	consensusCompName string) []*corev1.Pod {
-	getReplicas := func() int {
-		if sts == nil || sts.Spec.Replicas == nil {
-			return ConsensusReplicas
-		}
-		return int(*sts.Spec.Replicas)
-	}
-	replicas := getReplicas()
-	replicasStr := strconv.Itoa(replicas)
-	podList := make([]*corev1.Pod, replicas)
-	for i := 0; i < replicas; i++ {
-		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
-		podRole := "follower"
-		accessMode := "Readonly"
-		if i == 0 {
-			podRole = "leader"
-			accessMode = "ReadWrite"
-		}
-		// mock StatefulSet to create all pods
-		pod := MockConsensusComponentStsPod(testCtx, sts, clusterName, consensusCompName, podName, podRole, accessMode)
-		annotations := pod.Annotations
-		if annotations == nil {
-			annotations = make(map[string]string)
-		}
-		annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
-		pod.Annotations = annotations
-		podList[i] = pod
-	}
-	return podList
-}
-
 // MockInstanceSetPods mocks the InstanceSet pods, just using in envTest
 func MockInstanceSetPods(
 	testCtx *testutil.TestContext,
@@ -216,6 +108,9 @@ func MockInstanceSetPods(
 		return int(*its.Spec.Replicas)
 	}
 	leaderRole := func() *workloads.ReplicaRole {
+		if its == nil {
+			return nil
+		}
 		for i := range its.Spec.Roles {
 			if its.Spec.Roles[i].IsLeader {
 				return &its.Spec.Roles[i]
@@ -224,6 +119,9 @@ func MockInstanceSetPods(
 		return nil
 	}()
 	noneLeaderRole := func() *workloads.ReplicaRole {
+		if its == nil {
+			return nil
+		}
 		for i := range its.Spec.Roles {
 			if !its.Spec.Roles[i].IsLeader {
 				return &its.Spec.Roles[i]

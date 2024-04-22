@@ -128,7 +128,7 @@ var _ = Describe("Component Utils", func() {
 				role        = "leader"
 				mode        = "ReadWrite"
 			)
-			pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, compName, podName, role, mode)
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, compName, podName, role, mode)
 			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
 				SetOwnerReferences(workloads.GroupVersion.String(), workloads.Kind, nil).
 				AddAppInstanceLabel(clusterName).

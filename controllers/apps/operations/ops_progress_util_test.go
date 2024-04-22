@@ -99,7 +99,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("create restart ops and pods of consensus component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp, statelessComp)
-			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("mock restart OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -114,7 +114,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("create horizontalScaling operation to test the progressDetails when scaling down the replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1, nil)
@@ -148,7 +148,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("mock the pod[1] to re-create")
 			pod := &podList[1]
 			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-			testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp,
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
 				pod.Name, "Follower", "ReadWrite")
 			// expect the progress is 2/2
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -174,7 +174,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test the progressDetails when scaling up replicas")
-			testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp,
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
 				targetPod.Name, "leader", "ReadWrite")
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetPod.Name, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)

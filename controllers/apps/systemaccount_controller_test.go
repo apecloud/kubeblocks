@@ -179,7 +179,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, objectKey, compName)
 		its := &itsList.Items[0]
 		podName := fmt.Sprintf("%s-%s-0", objectKey.Name, compName)
-		pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, objectKey.Name, compName,
+		pod := testapps.MockInstanceSetPod(&testCtx, nil, objectKey.Name, compName,
 			podName, "leader", "ReadWrite")
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, pod)

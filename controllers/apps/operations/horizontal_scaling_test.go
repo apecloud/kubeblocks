@@ -81,7 +81,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		commonHScaleConsensusCompTest := func(reqCtx intctrlutil.RequestCtx, replicas int, offlineInstances []string, instances ...appsv1alpha1.InstanceTemplate) (*OpsResource, []corev1.Pod) {
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
 
 			By(fmt.Sprintf("create opsRequest for horizontal scaling of consensus component from 3 to %d", replicas))
 			initClusterAnnotationAndPhaseForOps(opsRes)
@@ -146,7 +146,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("mock two pods are created")
 			for i := 3; i < 5; i++ {
 				podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, i)
-				testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
 			}
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		})
@@ -166,7 +166,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 			By("re-create the deleted pod")
 			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 0)
-			testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "leader", "ReadWrite")
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "leader", "ReadWrite")
 
 			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
 			mockConsensusCompToRunning(opsRes)
@@ -179,7 +179,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 			By("mock one pod is created")
 			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 3)
-			pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
 
 			By("cancel HScale opsRequest after pne pod is created")
 			cancelOpsRequest(reqCtx, opsRes, time.Now().Add(-1*time.Second))
@@ -292,7 +292,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("mock two pods are created")
 			for i := 3; i < 6; i++ {
 				podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, i)
-				testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
 			}
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		})

@@ -89,16 +89,6 @@ func CreateConsensusMysqlClusterVersion(testCtx *testutil.TestContext, clusterDe
 		Create(testCtx).GetObject()
 }
 
-// MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest
-func MockConsensusComponentStatefulSet(
-	testCtx *testutil.TestContext,
-	clusterName,
-	consensusCompName string) *appsv1.StatefulSet {
-	stsName := clusterName + "-" + consensusCompName
-	return NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, consensusCompName).SetReplicas(ConsensusReplicas).
-		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
-}
-
 // MockInstanceSetComponent mocks the ITS component, just using in envTest
 func MockInstanceSetComponent(
 	testCtx *testutil.TestContext,

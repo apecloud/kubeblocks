@@ -29,7 +29,6 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -495,12 +494,12 @@ var _ = Describe("OpsRequest Controller", func() {
 					g.Expect(*its.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 			its := componentWorkload()
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(sts *appsv1.StatefulSet) {
-				sts.Spec.Replicas = &replicas
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = &replicas
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-				func(g Gomega, sts *appsv1.StatefulSet) {
-					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
+				func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(*its.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 
 			By("Checking pvc created")
@@ -573,12 +572,12 @@ var _ = Describe("OpsRequest Controller", func() {
 					g.Expect(*its.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 			its := componentWorkload()
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(sts *appsv1.StatefulSet) {
-				sts.Spec.Replicas = &replicas
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = &replicas
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-				func(g Gomega, sts *appsv1.StatefulSet) {
-					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
+				func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(*its.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 
 			By("mock scale down successfully by deleting one pod ")

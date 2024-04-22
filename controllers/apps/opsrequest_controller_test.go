@@ -297,16 +297,9 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			wl := componentWorkload()
 			its, _ := wl.(*workloads.InstanceSet)
-			sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterKey.Name, mysqlCompName).
-				SetReplicas(*its.Spec.Replicas).GetObject()
-			testapps.CheckedCreateK8sResource(&testCtx, sts)
-
-			mockPods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, mysqlCompName)
+			mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, mysqlCompName)
 			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
-			})).ShouldNot(HaveOccurred())
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-				testk8s.MockStatefulSetReady(sts)
 			})).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))

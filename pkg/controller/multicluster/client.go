@@ -84,8 +84,8 @@ type clientReader struct {
 var _ client.Reader = &clientReader{}
 
 func (c *clientReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	request := func(cli client.Client) error {
-		return cli.Get(ctx, key, obj, opts...)
+	request := func(cc contextCli, o client.Object) error {
+		return cc.cli.Get(ctx, key, o, opts...)
 	}
 	return anyOf(c.mctx, ctx, obj, request, opts)
 }
@@ -215,8 +215,8 @@ type subResourceReader struct {
 var _ client.SubResourceReader = &subResourceReader{}
 
 func (c *subResourceReader) Get(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceGetOption) error {
-	request := func(cli client.Client) error {
-		return cli.SubResource(c.subResource).Get(ctx, obj, subResource, opts...)
+	request := func(cc contextCli, o client.Object) error {
+		return cc.cli.SubResource(c.subResource).Get(ctx, o, subResource, opts...)
 	}
 	return anyOf(c.mctx, ctx, obj, request, opts)
 }
@@ -272,12 +272,39 @@ func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(c
 	return err
 }
 
-func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(client.Client) error, opts any) error {
+func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
+	o := hasClientOption(opts)
+	if o == nil && !o.multiCheck {
+		return anyOf_(mctx, ctx, obj, request, opts)
+	}
+	return anyOfWithMultiCheck(mctx, ctx, obj, request, opts)
+}
+
+func anyOf_(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
 	var err error
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
-		if err = request(cc.cli); err == nil {
+		if e := request(cc, obj); e == nil {
 			return nil
+		} else if err == nil {
+			err = e
 		}
+	}
+	return err
+}
+
+func anyOfWithMultiCheck(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
+	var err error
+	objs := make([]client.Object, 0)
+	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
+		o := obj.DeepCopyObject().(client.Object)
+		if e := request(cc, o); e == nil {
+			objs = append(objs, o)
+		} else if err == nil {
+			err = e
+		}
+	}
+	if len(objs) > 0 {
+		reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(objs[0]).Elem())
 	}
 	return err
 }
@@ -307,7 +334,7 @@ func resolvedClients(mctx mcontext, ctx context.Context, obj client.Object, opts
 	}
 
 	if o.universal {
-		return append([]contextCli{{"", mctx.control}}, dataClients(mctx, fromContext(ctx))...)
+		return removeDuplicate(append([]contextCli{{"", mctx.control}}, dataClients(mctx, fromContext(ctx))...))
 	}
 
 	if o.oneshot {
@@ -339,6 +366,18 @@ func dataClients(mctx mcontext, workers []string) []contextCli {
 	for _, c := range workers {
 		if cli, ok := mctx.workers[c]; ok {
 			l = append(l, contextCli{c, cli})
+		}
+	}
+	return l
+}
+
+func removeDuplicate(clients []contextCli) []contextCli {
+	m := make(map[string]bool)
+	l := make([]contextCli, 0)
+	for i, c := range clients {
+		if !m[c.context] {
+			m[c.context] = true
+			l = append(l, clients[i])
 		}
 	}
 	return l

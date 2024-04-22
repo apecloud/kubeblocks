@@ -59,9 +59,11 @@ func (m *manager) GetContexts() []string {
 }
 
 func (m *manager) Bind(mgr ctrl.Manager) error {
-	for k := range m.caches {
-		if err := mgr.Add(m.caches[k]); err != nil {
-			return fmt.Errorf("failed to bind cache to Manager: %s", err.Error())
+	for k, c := range m.caches {
+		if c != nil {
+			if err := mgr.Add(m.caches[k]); err != nil {
+				return fmt.Errorf("failed to bind cache to Manager: %s", err.Error())
+			}
 		}
 	}
 	return nil
@@ -69,15 +71,19 @@ func (m *manager) Bind(mgr ctrl.Manager) error {
 
 func (m *manager) Own(b *builder.Builder, obj, owner client.Object) Manager {
 	handler := handler.EnqueueRequestForOwner(m.cli.Scheme(), m.cli.RESTMapper(), owner, handler.OnlyControllerOwner())
-	for k := range m.caches {
-		b.WatchesRawSource(source.Kind(m.caches[k], obj), handler)
+	for k, c := range m.caches {
+		if c != nil {
+			b.WatchesRawSource(source.Kind(m.caches[k], obj), handler)
+		}
 	}
 	return m
 }
 
 func (m *manager) Watch(b *builder.Builder, obj client.Object, eventHandler handler.EventHandler) Manager {
-	for k := range m.caches {
-		b.WatchesRawSource(source.Kind(m.caches[k], obj), eventHandler)
+	for k, c := range m.caches {
+		if c != nil {
+			b.WatchesRawSource(source.Kind(m.caches[k], obj), eventHandler)
+		}
 	}
 	return m
 }

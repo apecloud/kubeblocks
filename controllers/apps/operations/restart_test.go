@@ -73,7 +73,7 @@ var _ = Describe("Restart OpsRequest", func() {
 			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 		})
 
-		FIt("Test restart OpsRequest", func() {
+		It("Test restart OpsRequest", func() {
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp, statelessComp)

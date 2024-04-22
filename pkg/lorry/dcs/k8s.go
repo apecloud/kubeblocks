@@ -248,6 +248,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.Name = pod.Name
 		// member.Name = fmt.Sprintf("%s.%s-headless.%s.svc", pod.Name, store.clusterCompName, store.namespace)
 		member.Role = pod.Labels[constant.RoleLabelKey]
+		member.ComponentName = pod.Labels[constant.KBAppComponentLabelKey]
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.LorryPort = getLorryPort(&pod)

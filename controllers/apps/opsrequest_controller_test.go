@@ -163,15 +163,8 @@ var _ = Describe("OpsRequest Controller", func() {
 				testk8s.MockPodAvailable(pod, lastTransTime)
 			})).ShouldNot(HaveOccurred())
 		}
-		var mysqlSts *appsv1.StatefulSet
-		var mysqlIts *workloads.InstanceSet
 		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, mysqlCompName)
-		mysqlIts = &itsList.Items[0]
-		mysqlSts = testapps.NewStatefulSetFactory(mysqlIts.Namespace, mysqlIts.Name, clusterKey.Name, mysqlCompName).
-			SetReplicas(*mysqlIts.Spec.Replicas).Create(&testCtx).GetObject()
-		Expect(testapps.ChangeObjStatus(&testCtx, mysqlSts, func() {
-			testk8s.MockStatefulSetReady(mysqlSts)
-		})).ShouldNot(HaveOccurred())
+		mysqlIts := &itsList.Items[0]
 		Expect(testapps.ChangeObjStatus(&testCtx, mysqlIts, func() {
 			testk8s.MockInstanceSetReady(mysqlIts, pod)
 		})).ShouldNot(HaveOccurred())

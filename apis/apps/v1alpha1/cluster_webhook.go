@@ -127,8 +127,6 @@ func (r *Cluster) validate() error {
 		return nil
 	}
 
-	r.validateClusterVersionRef(&allErrs)
-
 	err := webhookMgr.client.Get(ctx, types.NamespacedName{Name: r.Spec.ClusterDefRef}, clusterDef)
 
 	if err != nil {
@@ -144,19 +142,6 @@ func (r *Cluster) validate() error {
 			r.Name, allErrs)
 	}
 	return nil
-}
-
-// ValidateClusterVersionRef validate spec.clusterVersionRef is legal
-func (r *Cluster) validateClusterVersionRef(allErrs *field.ErrorList) {
-	clusterVersion := &ClusterVersion{}
-	err := webhookMgr.client.Get(context.Background(), types.NamespacedName{
-		Namespace: r.Namespace,
-		Name:      r.Spec.ClusterVersionRef,
-	}, clusterVersion)
-	if err != nil {
-		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.clusterVersionRef"),
-			r.Spec.ClusterDefRef, err.Error()))
-	}
 }
 
 // ValidateComponents validate spec.components is legal
@@ -217,4 +202,13 @@ func (r *Cluster) validateComponentTLSSettings(allErrs *field.ErrorList) {
 			*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].issuer.secretRef", index)), "Secret must provide when issuer name is UserProvided"))
 		}
 	}
+}
+
+func getComponentDefNotFoundMsg(invalidComponentDefNames []string, clusterDefName string) string {
+	return fmt.Sprintf(" %v is not found in ClusterDefinition.spec.componentDefs[*].name of %s", invalidComponentDefNames, clusterDefName)
+}
+
+func newInvalidError(kind, resourceName, path, reason string) error {
+	return apierrors.NewInvalid(schema.GroupKind{Group: APIVersion, Kind: kind}, resourceName,
+		field.ErrorList{field.InternalError(field.NewPath(path), fmt.Errorf(reason))})
 }

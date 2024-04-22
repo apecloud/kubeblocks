@@ -36,7 +36,6 @@ var _ = Describe("cluster webhook", func() {
 		clusterName             string
 		clusterDefinitionName   string
 		secondClusterDefinition string
-		clusterVersionName      string
 	)
 
 	initParams := func() {
@@ -44,13 +43,10 @@ var _ = Describe("cluster webhook", func() {
 		clusterName = "cluster-webhook-mysql-" + randomStr
 		clusterDefinitionName = "cluster-webhook-mysql-definition-" + randomStr
 		secondClusterDefinition = "cluster-webhook-mysql-definition2-" + randomStr
-		clusterVersionName = "cluster-webhook-mysql-clusterversion-" + randomStr
 	}
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -66,8 +62,8 @@ var _ = Describe("cluster webhook", func() {
 
 	Context("When cluster create and update", func() {
 		It("Should webhook validate passed", func() {
-			By("By testing creating a new clusterDefinition when no clusterVersion and clusterDefinition")
-			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			By("By testing creating a new cluster when no clusterDefinition")
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterName)
 			Expect(testCtx.CreateObj(ctx, cluster).Error()).To(ContainSubstring("not found"))
 
 			By("By creating a new clusterDefinition")
@@ -80,14 +76,8 @@ var _ = Describe("cluster webhook", func() {
 			// wait until ClusterDefinition created
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)).Should(Succeed())
 
-			By("By creating a new clusterVersion")
-			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
-			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
-			// wait until ClusterVersion created
-			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)).Should(Succeed())
-
 			By("By creating a new Cluster")
-			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			cluster, _ = createTestCluster(clusterDefinitionName, clusterName)
 			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
 
 			By("By testing update spec.clusterDefinitionRef")
@@ -162,16 +152,11 @@ var _ = Describe("cluster webhook", func() {
 
 			// wait until ClusterDefinition created
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)).Should(Succeed())
-
-			By("By creating a new clusterVersion")
-			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
-			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
-			// wait until ClusterVersion created
-			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)).Should(Succeed())
 		})
+
 		It("should assure tls fields setting properly", func() {
 			By("creating cluster with nil issuer")
-			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterName)
 			cluster.Spec.ComponentSpecs[0].TLS = true
 			Expect(testCtx.CreateObj(ctx, cluster)).ShouldNot(Succeed())
 
@@ -187,7 +172,7 @@ var _ = Describe("cluster webhook", func() {
 			Expect(k8sClient.Delete(ctx, cluster)).Should(Succeed())
 			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), &Cluster{})
 			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
-			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			cluster, _ = createTestCluster(clusterDefinitionName, clusterName)
 			cluster.Spec.ComponentSpecs[0].TLS = true
 			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{
 				Name: IssuerUserProvided,
@@ -203,7 +188,7 @@ var _ = Describe("cluster webhook", func() {
 	})
 })
 
-func createTestCluster(clusterDefinitionName, clusterVersionName, clusterName string) (*Cluster, error) {
+func createTestCluster(clusterDefinitionName, clusterName string) (*Cluster, error) {
 	clusterYaml := fmt.Sprintf(`
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
@@ -212,7 +197,6 @@ metadata:
   namespace: default
 spec:
   clusterDefinitionRef: %s
-  clusterVersionRef: %s
   componentSpecs:
   - name: replicasets
     componentDefRef: replicasets
@@ -227,7 +211,7 @@ spec:
   - name: proxy
     componentDefRef: proxy
     replicas: 1
-`, clusterName, clusterDefinitionName, clusterVersionName)
+`, clusterName, clusterDefinitionName)
 	cluster := &Cluster{}
 	err := yaml.Unmarshal([]byte(clusterYaml), cluster)
 	cluster.Spec.TerminationPolicy = WipeOut

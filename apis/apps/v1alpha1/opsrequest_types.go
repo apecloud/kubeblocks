@@ -54,7 +54,7 @@ type OpsRequestSpec struct {
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
-	// Specifies the cluster version by specifying clusterVersionRef.
+	// Specifies the version by specifying clusterVersionRef.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.upgrade"
 	Upgrade *Upgrade `json:"upgrade,omitempty"`

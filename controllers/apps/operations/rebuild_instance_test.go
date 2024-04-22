@@ -43,7 +43,6 @@ var _ = Describe("OpsUtil functions", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 		rebuildInstanceCount  = 2
 	)
@@ -55,7 +54,7 @@ var _ = Describe("OpsUtil functions", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -97,7 +96,7 @@ var _ = Describe("OpsUtil functions", func() {
 		}
 
 		prepareOpsRes := func(backupName string) *OpsResource {
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
 
 			// fake to create the source pvc.

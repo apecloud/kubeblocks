@@ -34,7 +34,6 @@ import (
 
 var _ = Describe("MySQL data protection function", func() {
 	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 	const scriptConfigName = "test-cluster-mysql-scripts"
 	const mysqlCompDefName = "replicasets"
@@ -53,7 +52,7 @@ var _ = Describe("MySQL data protection function", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -75,11 +74,10 @@ var _ = Describe("MySQL data protection function", func() {
 	// Testcases
 
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		clusterObj        *appsv1alpha1.Cluster
-		clusterKey        types.NamespacedName
-		backupKey         types.NamespacedName
+		clusterDefObj *appsv1alpha1.ClusterDefinition
+		clusterObj    *appsv1alpha1.Cluster
+		clusterKey    types.NamespacedName
+		backupKey     types.NamespacedName
 	)
 
 	createClusterObj := func() {
@@ -94,15 +92,10 @@ var _ = Describe("MySQL data protection function", func() {
 			AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 			Create(&testCtx).GetObject()
 
-		By("Create a clusterVersion obj")
-		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponentVersion(mysqlCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-			Create(&testCtx).GetObject()
-
 		By("Create a cluster obj")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefObj.Name).
+			WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompDefName).
 			SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).

@@ -37,7 +37,6 @@ import (
 var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	var (
 		clusterDefName = ""
-		clusterVerName = ""
 		clusterName    = ""
 		clusterKey     types.NamespacedName
 	)
@@ -45,7 +44,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	setupResourceNames := func() {
 		suffix := testCtx.GetRandomStr()
 		clusterDefName = "test-clusterdef-" + suffix
-		clusterVerName = "test-clusterver-" + suffix
 		clusterName = "test-cluster-" + suffix
 	}
 
@@ -90,16 +88,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Create(&testCtx)
 	}
 
-	createClusterVer := func() {
-		_ = testapps.NewClusterVersionFactory(clusterVerName, clusterDefName).
-			AddComponentVersion(statefulMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-			AddComponentVersion(consensusMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-			AddComponentVersion(statelessCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
-			Create(&testCtx)
-	}
-
 	createCluster := func() *appsv1alpha1.Cluster {
-		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVerName).
+		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
 			AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).
 			AddComponent(consensusMySQLCompName, consensusMySQLCompType).SetReplicas(3).
 			AddComponent(statelessCompName, statelessCompType).SetReplicas(3).
@@ -112,7 +102,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		It("test cluster Failed/Abnormal phase", func() {
 			By("create cluster related resources")
 			createClusterDef()
-			createClusterVer()
 			// cluster := createCluster()
 			createCluster()
 

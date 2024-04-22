@@ -110,7 +110,6 @@ const (
 	WorkloadTypeLabelKey                     = "apps.kubeblocks.io/workload-type"
 	KBAppPodNameLabelKey                     = "apps.kubeblocks.io/pod-name"
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"
-	ClusterVerLabelKey                       = "clusterversion.kubeblocks.io/name"
 	ComponentDefinitionLabelKey              = "componentdefinition.kubeblocks.io/name"
 	ComponentVersionLabelKey                 = "componentversion.kubeblocks.io/name"
 	CMConfigurationSpecProviderLabelKey      = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
@@ -143,7 +142,6 @@ const (
 	BackupPolicyTemplateAnnotationKey           = "apps.kubeblocks.io/backup-policy-template"
 	LastAppliedClusterAnnotationKey             = "apps.kubeblocks.io/last-applied-cluster"
 	PVLastClaimPolicyAnnotationKey              = "apps.kubeblocks.io/pv-last-claim-policy"
-	HaltRecoveryAllowInconsistentCVAnnotKey     = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
 	HaltRecoveryAllowInconsistentResAnnotKey    = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	PrimaryAnnotationKey                        = "rs.apps.kubeblocks.io/primary"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
@@ -165,7 +163,7 @@ const (
 	ServiceDescriptorFinalizerName = "servicedescriptor.kubeblocks.io/finalizer"
 	OpsRequestFinalizerName        = "opsrequest.kubeblocks.io/finalizer"
 
-	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
+	// ConfigurationTplLabelPrefixKey clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
 

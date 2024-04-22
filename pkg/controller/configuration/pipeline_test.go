@@ -42,12 +42,10 @@ import (
 )
 
 var _ = Describe("ConfigurationPipelineTest", func() {
-
 	const testConfigFile = "postgresql.conf"
 
 	var clusterObj *appsv1alpha1.Cluster
 	var componentObj *appsv1alpha1.Component
-	var clusterVersionObj *appsv1alpha1.ClusterVersion
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
@@ -59,7 +57,6 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 		k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 			[]client.Object{
 				clusterDefObj,
-				clusterVersionObj,
 				clusterObj,
 				clusterObj,
 				configMapObj,
@@ -94,9 +91,9 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
 		k8sMockClient = testutil.NewK8sMockClient()
-		clusterObj, clusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
+		clusterObj, clusterDefObj, _ = newAllFieldsClusterObj(nil, false)
 		componentObj = newAllFieldsComponent(clusterObj)
-		synthesizedComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterVersionObj, clusterObj)
+		synthesizedComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterObj)
 		configMapObj = testapps.NewConfigMap("default", mysqlConfigName,
 			testapps.SetConfigMapData(testConfigFile, `
 bgwriter_delay = '200ms'

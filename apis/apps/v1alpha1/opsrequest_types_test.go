@@ -153,9 +153,7 @@ func TestGetUpgradeComponentNameSet(t *testing.T) {
 	if componentNameSet != nil {
 		t.Error(`Expected component name map of upgrade ops is nil`)
 	}
-	ops.Spec.Upgrade = &Upgrade{
-		ClusterVersionRef: "test-version",
-	}
+	ops.Spec.Upgrade = &Upgrade{}
 	ops.Status.Components = map[string]OpsRequestComponentStatus{
 		componentName: {},
 	}

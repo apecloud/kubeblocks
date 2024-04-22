@@ -47,7 +47,6 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 	)
 
@@ -58,7 +57,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -144,7 +143,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 	assureMockReconfigureData := func(policyName string) (*OpsResource, *appsv1alpha1.Configuration, *corev1.ConfigMap) {
 		By("init operations resources ")
-		opsRes, clusterDef, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+		opsRes, clusterDef, clusterObject := initOperationsResources(clusterDefinitionName, clusterName)
 
 		var (
 			cfgObj       *corev1.ConfigMap

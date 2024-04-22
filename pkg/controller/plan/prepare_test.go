@@ -64,36 +64,26 @@ var _ = Describe("Prepare Test", func() {
 	})
 
 	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
-		clusterName        = "test-cluster"
+		clusterDefName = "test-clusterdef"
+		clusterName    = "test-cluster"
 
 		mysqlClusterCompDefName = "mysql-cluster-comp-def"
 		mysqlCompDefName        = "mysql-comp-def"
 		mysqlCompName           = "mysql"
 	)
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		compDefObj        *appsv1alpha1.ComponentDefinition
-		cluster           *appsv1alpha1.Cluster
-		comp              *appsv1alpha1.Component
-		configSpecName    string
+		clusterDefObj  *appsv1alpha1.ClusterDefinition
+		compDefObj     *appsv1alpha1.ComponentDefinition
+		cluster        *appsv1alpha1.Cluster
+		comp           *appsv1alpha1.Component
+		configSpecName string
 	)
 
 	Context("create cluster with component and component definition API, testing render configuration", func() {
-		createAllWorkloadTypesClusterDef := func(noCreateAssociateCV ...bool) {
+		createAllWorkloadTypesClusterDef := func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlClusterCompDefName).
-				Create(&testCtx).GetObject()
-
-			if len(noCreateAssociateCV) > 0 && noCreateAssociateCV[0] {
-				return
-			}
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(mysqlClusterCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 
 			By("Create a componentDefinition obj")
@@ -115,7 +105,7 @@ var _ = Describe("Prepare Test", func() {
 			configSpecName = tpl.Name
 
 			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
 				AddComponentV2(mysqlCompName, compDefObj.Name).
 				SetReplicas(1).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).

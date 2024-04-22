@@ -37,9 +37,7 @@ import (
 )
 
 var _ = Describe("Redis Horizontal Scale function", func() {
-
 	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 
 	const scriptConfigName = "test-cluster-redis-scripts"
@@ -57,7 +55,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest configurations
@@ -78,18 +76,16 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 	// Testcases
 
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		clusterObj        *appsv1alpha1.Cluster
-		clusterKey        types.NamespacedName
+		clusterDefObj *appsv1alpha1.ClusterDefinition
+		clusterObj    *appsv1alpha1.Cluster
+		clusterKey    types.NamespacedName
 	)
 
 	testReplicationRedisHorizontalScale := func() {
 
 		By("Mock a cluster obj with replication workloadType.")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
 			SetReplicas(replicas).AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
@@ -176,13 +172,6 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", testCtx.DefaultNamespace, constant.Secondary).
 				AddInitContainerVolumeMounts(testapps.DefaultRedisInitContainerName, replicationRedisConfigVolumeMounts).
 				AddContainerVolumeMounts(testapps.DefaultRedisContainerName, replicationRedisConfigVolumeMounts).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj with replication workloadType.")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponentVersion(testapps.DefaultRedisCompDefName).
-				AddInitContainerShort(testapps.DefaultRedisInitContainerName, testapps.DefaultRedisImageName).
-				AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 		})
 

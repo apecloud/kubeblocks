@@ -42,7 +42,6 @@ var _ = Describe("Component", func() {
 	Context("has the BuildComponent function", func() {
 		const (
 			clusterDefName           = "test-clusterdef"
-			clusterVersionName       = "test-clusterversion"
 			clusterName              = "test-cluster"
 			mysqlCompDefName         = "replicasets"
 			mysqlCompName            = "mysql"
@@ -53,9 +52,8 @@ var _ = Describe("Component", func() {
 		)
 
 		var (
-			clusterDef     *appsv1alpha1.ClusterDefinition
-			clusterVersion *appsv1alpha1.ClusterVersion
-			cluster        *appsv1alpha1.Cluster
+			clusterDef *appsv1alpha1.ClusterDefinition
+			cluster    *appsv1alpha1.Cluster
 		)
 
 		BeforeEach(func() {
@@ -63,48 +61,13 @@ var _ = Describe("Component", func() {
 				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				AddComponentDef(testapps.StatelessNginxComponent, proxyCompDefName).
 				GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(mysqlCompDefName).
-				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				AddComponentVersion(proxyCompDefName).
-				AddInitContainerShort("nginx-init", testapps.NginxImage).
-				AddContainerShort("nginx", testapps.NginxImage).
-				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name, clusterVersion.Name).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
 				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddComponent(proxyCompName, proxyCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
-		})
-
-		It("should work as expected with various inputs", func() {
-			By("assign every available fields")
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
-			component, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
-			Expect(err).Should(Succeed())
-			Expect(component).ShouldNot(BeNil())
-
-			By("leave clusterVersion.versionCtx empty initContains and containers")
-			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.Containers = nil
-			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
-			component, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
-			Expect(err).Should(Succeed())
-			Expect(component).ShouldNot(BeNil())
-
-			By("new container in clusterVersion not in clusterDefinition")
-			component, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
-			Expect(err).Should(Succeed())
-			Expect(len(component.PodSpec.Containers) >= 3).Should(BeTrue())
-
-			By("new init container in clusterVersion not in clusterDefinition")
-			component, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[1])
-			Expect(err).Should(Succeed())
-			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
 		})
 
 		It("should auto fill first component if it's empty", func() {
@@ -124,16 +87,11 @@ var _ = Describe("Component", func() {
 			cluster.Spec.ComponentSpecs = nil
 
 			By("build first component from simplified fields")
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.Replicas).Should(Equal(*cluster.Spec.Replicas))
 			Expect(synthesizeComp.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
-
-			// By("build second component will be nil")
-			// synthesizeComp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
-			// Expect(err).Should(Succeed())
-			// Expect(synthesizeComp).Should(BeNil())
 		})
 
 		It("build affinity correctly", func() {
@@ -147,7 +105,7 @@ var _ = Describe("Component", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.PodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal("topology.kubernetes.io/zone"))
@@ -169,7 +127,7 @@ var _ = Describe("Component", func() {
 		// 	By("clear cluster's component spec")
 		// 	cluster.Spec.ComponentSpecs = nil
 		// 	By("call build")
-		// 	synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+		// 	synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, nil)
 		// 	Expect(err).Should(Succeed())
 		// 	Expect(synthesizeComp).ShouldNot(BeNil())
 		// 	Expect(synthesizeComp.Monitor.Enable).Should(Equal(false))
@@ -177,7 +135,7 @@ var _ = Describe("Component", func() {
 		// 	interval2 := intstr.Parse("10s")
 		// 	cluster.Spec.Monitor.MonitoringInterval = &interval2
 		// 	By("call build")
-		// 	synthesizeComp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+		// 	synthesizeComp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, nil)
 		// 	Expect(err).Should(Succeed())
 		// 	Expect(synthesizeComp).ShouldNot(BeNil())
 		// 	Expect(synthesizeComp.Monitor.Enable).Should(Equal(true))
@@ -198,7 +156,7 @@ var _ = Describe("Component", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.Services[1].Name).Should(Equal("vpc"))
@@ -250,7 +208,7 @@ var _ = Describe("Component", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).Should(BeNil())
 		})
@@ -281,7 +239,7 @@ var _ = Describe("Component", func() {
 				testapps.NginxImage: serviceDescriptor,
 			}
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.ServiceReferences).ShouldNot(BeNil())
@@ -348,7 +306,7 @@ var _ = Describe("Component", func() {
 			}
 			cluster.Spec.ComponentSpecs[0].Resources.Requests[corev1.ResourceMemory] = _512m
 			cluster.Spec.ComponentSpecs[0].Resources.Limits[corev1.ResourceMemory] = _1024m
-			comp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			comp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
 			for _, vol := range comp.PodSpec.Volumes {
@@ -369,7 +327,7 @@ var _ = Describe("Component", func() {
 			By("without memory resource set")
 			delete(cluster.Spec.ComponentSpecs[0].Resources.Requests, corev1.ResourceMemory)
 			delete(cluster.Spec.ComponentSpecs[0].Resources.Limits, corev1.ResourceMemory)
-			comp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			comp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
 			for _, vol := range comp.PodSpec.Volumes {

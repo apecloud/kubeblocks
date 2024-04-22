@@ -40,13 +40,11 @@ var _ = Describe("OpsRequest webhook", func() {
 		proxyComponentName = "proxy"
 	)
 	var (
-		randomStr                    = testCtx.GetRandomStr()
-		clusterDefinitionName        = "opswebhook-mysql-definition-" + randomStr
-		componentDefinitionName      = "opswk-compdef-" + randomStr
-		clusterVersionName           = "opswebhook-mysql-clusterversion-" + randomStr
-		clusterVersionNameForUpgrade = "opswebhook-mysql-upgrade-" + randomStr
-		clusterName                  = "opswebhook-mysql-" + randomStr
-		opsRequestName               = "opswebhook-mysql-ops-" + randomStr
+		randomStr               = testCtx.GetRandomStr()
+		clusterDefinitionName   = "opswebhook-mysql-definition-" + randomStr
+		componentDefinitionName = "opswk-compdef-" + randomStr
+		clusterName             = "opswebhook-mysql-" + randomStr
+		opsRequestName          = "opswebhook-mysql-ops-" + randomStr
 	)
 
 	int32Ptr := func(i int32) *int32 {
@@ -58,8 +56,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		err := k8sClient.DeleteAllOf(ctx, &OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -132,41 +128,8 @@ var _ = Describe("OpsRequest webhook", func() {
 	testUpgrade := func(cluster *Cluster) {
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName+"-upgrade", UpgradeType)
 
-		By("By testing when spec.upgrade is null")
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("spec.upgrade"))
-
-		By("By creating a new clusterVersion for upgrade")
-		newClusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionNameForUpgrade)
-		Expect(testCtx.CreateObj(ctx, newClusterVersion)).Should(Succeed())
-
-		By("By testing when target cluster version not exist")
-		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName + "-not-exist"}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
-
-		By("Test Cluster Phase")
-		opsRequest.Name = opsRequestName + "-upgrade-cluster-phase"
-		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
-		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
-			FromClusterPhases: []ClusterPhase{RunningClusterPhase},
-			ToClusterPhase:    UpdatingClusterPhase, // original VersionUpgradingPhase,
-		}
-		// TODO: do VersionUpgradingPhase condition value check
-
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("Upgrade is forbidden"))
-		// update cluster phase to Running
-		clusterPatch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Phase = RunningClusterPhase
-		Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
-
-		By("By creating a upgrade opsRequest, it should be succeed")
-		opsRequest.Spec.Upgrade.ClusterVersionRef = newClusterVersion.Name
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
-		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
-			Namespace: opsRequest.Namespace}, opsRequest)).Should(Succeed())
-
-		By("Expect an error for cancelling this opsRequest")
-		opsRequest.Spec.Cancel = true
-		Expect(k8sClient.Update(context.Background(), opsRequest).Error()).Should(ContainSubstring("forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"))
+		By("By testing upgrade not supported")
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not supported"))
 	}
 
 	testVerticalScaling := func(_ *Cluster) {
@@ -226,7 +189,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("test spec immutable")
 		newClusterName := clusterName + "1"
-		newCluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, newClusterName)
+		newCluster, _ := createTestCluster(clusterDefinitionName, newClusterName)
 		Expect(testCtx.CheckedCreateObj(ctx, newCluster)).Should(Succeed())
 
 		testSpecImmutable := func(phase OpsPhase) {
@@ -638,15 +601,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, opsRequest)).To(Succeed())
 	}
 
-	Context("When clusterVersion create and update", func() {
+	Context("When create and update", func() {
 		It("Should webhook validate passed", func() {
-			// wait until ClusterDefinition and ClusterVersion created
+			// wait until ClusterDefinition created
 			By("By create a clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
-			By("By creating a clusterVersion")
-			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
-			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 			By("By creating a componentDefinition")
 			compDef := createTestComponentDefObj(componentDefinitionName)
 			Expect(testCtx.CheckedCreateObj(ctx, compDef)).Should(Succeed())
@@ -657,7 +617,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			By("By testing spec.clusterDef is legal")
 			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
 			By("By create a new cluster ")
-			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterName)
 			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
 
 			testUpgrade(cluster)
@@ -678,13 +638,10 @@ var _ = Describe("OpsRequest webhook", func() {
 		})
 
 		It("test switchover with component definition", func() {
-			// wait until ClusterDefinition and ClusterVersion created
+			// wait until ClusterDefinition created
 			By("By create a clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
-			By("By creating a clusterVersion")
-			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
-			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 			By("By creating a componentDefinition")
 			compDef := createTestComponentDefObj(componentDefinitionName)
 			Expect(testCtx.CheckedCreateObj(ctx, compDef)).Should(Succeed())
@@ -695,7 +652,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			By("By testing spec.clusterDef is legal")
 			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
 			By("By create a new cluster ")
-			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterName)
 			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
 
 			testSwitchoverWithCompDef(clusterDef, compDef, cluster)
@@ -709,9 +666,6 @@ var _ = Describe("OpsRequest webhook", func() {
 			By("By create a clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
-			By("By creating a clusterVersion")
-			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
-			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 
 			opsRequest := createTestOpsRequest(clusterName, opsRequestName, DataScriptType)
 			opsRequest.Spec.ScriptSpec = &ScriptSpec{
@@ -722,7 +676,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			By("By testing spec.clusterDef is legal")
 			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
 			By("By create a new cluster ")
-			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterName)
 			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
 
 			By("By testing dataScript without script, should fail")

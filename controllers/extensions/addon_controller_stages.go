@@ -193,11 +193,6 @@ func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 					r.updateResultNErr(res, err)
 					return
 				}
-				err = setProviderAndVersion(r.reqCtx.Ctx, &r.stageCtx, addon)
-				if err != nil {
-					r.updateResultNErr(res, err)
-					return
-				}
 				r.setReconciled()
 				return
 			}
@@ -976,6 +971,7 @@ func enabledAddonWithDefaultValues(ctx context.Context, stageCtx *stageCtx,
 		if di.AddonInstallSpec.IsEmpty() {
 			addon.Annotations[AddonDefaultIsEmpty] = trueVal
 		}
+		setAddonProviderAndVersion(ctx, stageCtx, addon)
 		if err := stageCtx.reconciler.Client.Update(ctx, addon); err != nil {
 			stageCtx.setRequeueWithErr(err, "")
 			return
@@ -1088,22 +1084,11 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 	return false
 }
 
-func setProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) error {
-	if addon.Spec.Provider == "" {
-		if addon.Labels != nil && len(addon.Labels["addon.kubeblocks.io/provider"]) != 0 {
-			addon.Spec.Provider = addon.Labels["addon.kubeblocks.io/provider"]
-			if err := stageCtx.reconciler.Client.Update(ctx, addon); err != nil {
-				return err
-			}
-		}
+func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {
+	if addon.Spec.Provider == "" && addon.Labels != nil && len(addon.Labels["addon.kubeblocks.io/provider"]) != 0 {
+		addon.Spec.Provider = addon.Labels["addon.kubeblocks.io/provider"]
 	}
-	if addon.Spec.Version == "" {
-		if addon.Labels != nil && len(addon.Labels["addon.kubeblocks.io/version"]) != 0 {
-			addon.Spec.Version = addon.Labels["addon.kubeblocks.io/version"]
-			if err := stageCtx.reconciler.Client.Update(ctx, addon); err != nil {
-				return err
-			}
-		}
+	if addon.Spec.Version == "" && addon.Labels != nil && len(addon.Labels["addon.kubeblocks.io/version"]) != 0 {
+		addon.Spec.Version = addon.Labels["addon.kubeblocks.io/version"]
 	}
-	return nil
 }

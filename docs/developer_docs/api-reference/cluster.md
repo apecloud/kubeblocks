@@ -7121,8 +7121,8 @@ When defining a class in Series, specifying the variable&rsquo;s value is suffic
 definition will be generated through rendering the template.</p>
 <p>For example:</p>
 <pre><code class="language-yaml">template: |
-cpu: &quot;&#123;&#123; or .cpu 1 &#125;&#125;&quot;
-memory: &quot;&#123;&#123; or .memory 4 &#125;&#125;Gi&quot;
+	 cpu: &quot;&#123;&#123; or .cpu 1 &#125;&#125;&quot;
+	 memory: &quot;&#123;&#123; or .memory 4 &#125;&#125;Gi&quot;
 </code></pre>
 </td>
 </tr>

@@ -25,7 +25,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -160,7 +159,7 @@ func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string,
 }
 
 func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateRef, configConstraintRef,
-	namespace, volumeName string, asEnvFrom ...string) *MockComponentDefinitionFactory {
+	namespace, volumeName string, injectEnvTo ...string) *MockComponentDefinitionFactory {
 	config := appsv1alpha1.ComponentConfigSpec{
 		ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 			Name:        name,
@@ -169,7 +168,7 @@ func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateR
 			VolumeName:  volumeName,
 		},
 		ConfigConstraintRef: configConstraintRef,
-		AsEnvFrom:           asEnvFrom,
+		InjectEnvTo:         injectEnvTo,
 	}
 	if f.Get().Spec.Configs == nil {
 		f.Get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)
@@ -206,16 +205,16 @@ func (f *MockComponentDefinitionFactory) AddLogConfig(name, filePathPattern stri
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetMonitor(builtIn bool, scrapePort intstr.IntOrString, scrapePath string) *MockComponentDefinitionFactory {
-	f.Get().Spec.Monitor = &appsv1alpha1.MonitorConfig{
-		BuiltIn: builtIn,
-		Exporter: &appsv1alpha1.ExporterConfig{
-			ScrapePort: scrapePort,
-			ScrapePath: scrapePath,
-		},
-	}
-	return f
-}
+// func (f *MockComponentDefinitionFactory) SetMonitor(builtIn bool, scrapePort intstr.IntOrString, scrapePath string) *MockComponentDefinitionFactory {
+// 	f.Get().Spec.Monitor = &appsv1alpha1.MonitorConfig{
+// 		BuiltIn: builtIn,
+// 		Exporter: &appsv1alpha1.ExporterConfig{
+// 			ScrapePort: scrapePort,
+// 			ScrapePath: scrapePath,
+// 		},
+// 	}
+// 	return f
+// }
 
 func (f *MockComponentDefinitionFactory) AddScriptTemplate(name, configTemplateRef, namespace, volumeName string,
 	mode *int32) *MockComponentDefinitionFactory {

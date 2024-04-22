@@ -126,10 +126,10 @@ var _ = Describe("ConfigEnvFrom test", func() {
 
 		It("SyncEnvConfigmap abnormal test", func() {
 			configSpec := clusterDef.Spec.ComponentDefs[0].ConfigSpecs[0]
-			configSpec.AsEnvFrom = nil
+			configSpec.InjectEnvTo = nil
 			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx)).Should(Succeed())
 
-			configSpec.AsEnvFrom = nil
+			configSpec.InjectEnvTo = nil
 			cmObj := origCMObject.DeepCopy()
 			cmObj.SetName(core.GenerateEnvFromName(origCMObject.Name))
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{

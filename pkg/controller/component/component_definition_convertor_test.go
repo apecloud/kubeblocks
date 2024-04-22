@@ -96,16 +96,16 @@ var _ = Describe("Component Definition Convertor", func() {
 						TimeoutSeconds:   5,
 					},
 				},
-				Monitor: &appsv1alpha1.MonitorConfig{
-					BuiltIn: false,
-					Exporter: &appsv1alpha1.ExporterConfig{
-						ScrapePort: intstr.IntOrString{
-							Type:   intstr.Int,
-							IntVal: 8080,
-						},
-						ScrapePath: "/metrics",
-					},
-				},
+				// Monitor: &appsv1alpha1.MonitorConfig{
+				// 	BuiltIn: false,
+				// 	Exporter: &appsv1alpha1.ExporterConfig{
+				// 		ScrapePort: intstr.IntOrString{
+				// 			Type:   intstr.Int,
+				// 			IntVal: 8080,
+				// 		},
+				// 		ScrapePath: "/metrics",
+				// 	},
+				// },
 				LogConfigs: []appsv1alpha1.LogConfig{
 					{
 						Name:            "error",
@@ -567,14 +567,14 @@ var _ = Describe("Component Definition Convertor", func() {
 			Expect(logConfigs).Should(BeEquivalentTo(clusterCompDef.LogConfigs))
 		})
 
-		It("monitor", func() {
-			convertor := &compDefMonitorConvertor{}
-			res, err := convertor.convert(clusterCompDef)
-			Expect(err).Should(Succeed())
-
-			monitor := res.(*appsv1alpha1.MonitorConfig)
-			Expect(*monitor).Should(BeEquivalentTo(*clusterCompDef.Monitor))
-		})
+		// It("monitor", func() {
+		// 	convertor := &compDefMonitorConvertor{}
+		// 	res, err := convertor.convert(clusterCompDef)
+		// 	Expect(err).Should(Succeed())
+		//
+		// 	monitor := res.(*appsv1alpha1.MonitorConfig)
+		// 	Expect(*monitor).Should(BeEquivalentTo(*clusterCompDef.Monitor))
+		// })
 
 		It("scripts", func() {
 			convertor := &compDefScriptsConvertor{}

@@ -1,0 +1,17 @@
+name: PR Label Approved Remove
+
+on:
+  pull_request_target:
+    types: [ opened, synchronize, reopened ]
+
+env:
+  GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+jobs:
+  approve-label:
+    uses: apecloud/apecloud-cd/.github/workflows/pull-request-label.yml@v0.1.61
+    with:
+      LABEL_NAME: "approved"
+      LABEL_OPS: "REMOVE"
+      APECD_REF: "v0.1.61"
+    secrets: inherit

@@ -79,6 +79,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	cluster := transCtx.Cluster
+	compDef := transCtx.CompDef
 	synthesizeComp := transCtx.SynthesizeComponent
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
@@ -96,7 +97,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	buildPodSpecVolumeMounts(synthesizeComp)
 
 	// build workload
-	protoITS, err := factory.BuildInstanceSet(synthesizeComp)
+	protoITS, err := factory.BuildInstanceSet(synthesizeComp, compDef)
 	if err != nil {
 		return err
 	}

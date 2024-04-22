@@ -105,12 +105,6 @@ type ComponentSpec struct {
 	// +optional
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
 
-	// Indicates whether monitoring is enabled.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	Monitor bool `json:"monitor,omitempty"`
-
 	// Specifies which types of logs should be collected for the Cluster.
 	// The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.
 	//
@@ -221,6 +215,24 @@ type ComponentSpec struct {
 	// Defines RuntimeClassName for all Pods managed by this component.
 	// +optional
 	RuntimeClassName *string `json:"runtimeClassName,omitempty"`
+
+	// Defines the sidecar containers that will be attached to the component's main container.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=32
+	// +listType=set
+	// +optional
+	Sidecars []string `json:"sidecars,omitempty"`
+
+	// Determines whether the metrics exporter needs to be published to the service endpoint.
+	// If set to true, the metrics exporter will be published to the service endpoint,
+	// the service will be injected with the following annotations:
+	// - "monitor.kubeblocks.io/path"
+	// - "monitor.kubeblocks.io/port"
+	// - "monitor.kubeblocks.io/scheme"
+	//
+	// +optional
+	MonitorEnabled *bool `json:"monitorEnabled,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the cluster.

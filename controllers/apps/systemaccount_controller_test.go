@@ -636,13 +636,13 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
 				}).Should(Succeed())
 
-				By("Enable monitor, no more jobs or secrets should be created")
-				// patch cluster, flip comp.Monitor
-				Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-					for _, comp := range cluster.Spec.ComponentSpecs {
-						comp.Monitor = !comp.Monitor
-					}
-				})).Should(Succeed())
+				// By("Enable monitor, no more jobs or secrets should be created")
+				// // patch cluster, flip comp.Monitor
+				// Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+				// 	for _, comp := range cluster.Spec.ComponentSpecs {
+				// 		comp.Monitor = !comp.Monitor
+				// 	}
+				// })).Should(Succeed())
 
 				jobs := &batchv1.JobList{}
 				Eventually(func(g Gomega) {

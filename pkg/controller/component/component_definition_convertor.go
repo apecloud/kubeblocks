@@ -50,7 +50,6 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"services":               &compDefServicesConvertor{},
 		"configs":                &compDefConfigsConvertor{},
 		"logconfigs":             &compDefLogConfigsConvertor{},
-		"monitor":                &compDefMonitorConvertor{},
 		"scripts":                &compDefScriptsConvertor{},
 		"policyrules":            &compDefPolicyRulesConvertor{},
 		"labels":                 &compDefLabelsConvertor{},
@@ -61,6 +60,7 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
+		"sidecarcontainerspecs":  &compDefSidecarContainersConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	if err := covertObject(convertors, &compDef.Spec, clusterCompDef); err != nil {
@@ -314,14 +314,6 @@ type compDefLogConfigsConvertor struct{}
 func (c *compDefLogConfigsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
 	return clusterCompDef.LogConfigs, nil
-}
-
-// compDefMonitorConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Monitor.
-type compDefMonitorConvertor struct{}
-
-func (c *compDefMonitorConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Monitor, nil
 }
 
 // compDefScriptsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Scripts.
@@ -705,4 +697,11 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 		WithoutCandidate:    withoutCandidateAction,
 		ScriptSpecSelectors: mergeScriptSpec(),
 	}
+}
+
+type compDefSidecarContainersConvertor struct{}
+
+func (c *compDefSidecarContainersConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.SidecarContainerSpecs, nil
 }

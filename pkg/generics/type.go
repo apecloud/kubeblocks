@@ -23,7 +23,6 @@ import (
 	"reflect"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -74,9 +73,6 @@ var EndpointsSignature = func(_ corev1.Endpoints, _ *corev1.Endpoints, _ corev1.
 
 var InstanceSetSignature = func(_ workloads.InstanceSet, _ *workloads.InstanceSet, _ workloads.InstanceSetList, _ *workloads.InstanceSetList) {
 }
-var StatefulSetSignature = func(_ appsv1.StatefulSet, _ *appsv1.StatefulSet, _ appsv1.StatefulSetList, _ *appsv1.StatefulSetList) {
-}
-var DeploymentSignature = func(_ appsv1.Deployment, _ *appsv1.Deployment, _ appsv1.DeploymentList, _ *appsv1.DeploymentList) {}
 
 var JobSignature = func(_ batchv1.Job, _ *batchv1.Job, _ batchv1.JobList, _ *batchv1.JobList) {}
 var CronJobSignature = func(_ batchv1.CronJob, _ *batchv1.CronJob, _ batchv1.CronJobList, _ *batchv1.CronJobList) {}

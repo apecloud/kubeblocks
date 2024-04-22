@@ -635,8 +635,8 @@ var _ = Describe("Addon controller", func() {
 			By("By create an addon with auto-install and labels contains provider and version information")
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Labels = map[string]string{
-					"addon.kubeblocks.io/provider": "apecloud",
-					"addon.kubeblocks.io/version":  "0.9.0",
+					AddonProvider: "apecloud",
+					AddonVersion:  "0.9.0",
 				}
 				newOjb.Spec.Installable.AutoInstall = true
 			})
@@ -662,8 +662,8 @@ var _ = Describe("Addon controller", func() {
 			By("By create an addon with auto-install and labels contains provider and version information")
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Labels = map[string]string{
-					"addon.kubeblocks.io/provider": "apecloud",
-					"addon.kubeblocks.io/version":  "0.9.0",
+					AddonProvider: "apecloud",
+					AddonVersion:  "0.9.0",
 				}
 				newOjb.Spec.Installable.AutoInstall = true
 			})
@@ -694,8 +694,8 @@ var _ = Describe("Addon controller", func() {
 				g.Expect(err).To(Not(HaveOccurred()))
 				addon = &extensionsv1alpha1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
-				g.Expect(addon.Labels).Should(HaveKeyWithValue("addon.kubeblocks.io/provider", "apecloud"))
-				g.Expect(addon.Labels).Should(HaveKeyWithValue("addon.kubeblocks.io/version", "0.9.0"))
+				g.Expect(addon.Labels).Should(HaveKeyWithValue(AddonProvider, "apecloud"))
+				g.Expect(addon.Labels).Should(HaveKeyWithValue(AddonVersion, "0.9.0"))
 				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
 			}).Should(Succeed())
 		})

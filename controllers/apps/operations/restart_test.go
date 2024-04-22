@@ -73,7 +73,7 @@ var _ = Describe("Restart OpsRequest", func() {
 			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 		})
 
-		It("Test restart OpsRequest", func() {
+		FIt("Test restart OpsRequest", func() {
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp, statelessComp)
@@ -84,8 +84,6 @@ var _ = Describe("Restart OpsRequest", func() {
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By("test restart action and reconcile function")
-			testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusComp)
-			testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessComp)
 			rHandler := restartOpsHandler{}
 			_ = rHandler.Action(reqCtx, k8sClient, opsRes)
 

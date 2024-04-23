@@ -27,24 +27,10 @@ const (
 
 	RoleLabelKey          = "kubeblocks.io/role"
 	rsmAccessModeLabelKey = "rsm.workloads.kubeblocks.io/access-mode"
-	rsmGenerationLabelKey = "rsm.workloads.kubeblocks.io/controller-generation"
 
 	defaultPodName = "Unknown"
 
 	FinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
-
-	jobHandledLabel             = "rsm.workloads.kubeblocks.io/job-handled"
-	jobTypeLabel                = "rsm.workloads.kubeblocks.io/job-type"
-	jobScenarioLabel            = "rsm.workloads.kubeblocks.io/job-scenario"
-	jobHandledTrue              = "true"
-	jobHandledFalse             = "false"
-	jobTypeSwitchover           = "switchover"
-	jobTypeMemberJoinNotifying  = "member-join"
-	jobTypeMemberLeaveNotifying = "member-leave"
-	jobTypeLogSync              = "log-sync"
-	jobTypePromote              = "promote"
-	jobScenarioMembership       = "membership-reconfiguration"
-	jobScenarioUpdate           = "pod-update"
 
 	roleProbeContainerName       = "kb-role-probe"
 	roleProbeBinaryName          = "lorry"

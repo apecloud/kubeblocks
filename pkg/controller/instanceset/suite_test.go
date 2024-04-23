@@ -261,6 +261,10 @@ func buildRandomPod() *corev1.Pod {
 		GetObject()
 }
 
+func getPodName(parent string, ordinal int) string {
+	return fmt.Sprintf("%s-%d", parent, ordinal)
+}
+
 func init() {
 	model.AddScheme(workloads.AddToScheme)
 }

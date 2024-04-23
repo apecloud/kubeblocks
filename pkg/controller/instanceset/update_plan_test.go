@@ -126,8 +126,8 @@ var _ = Describe("update plan test.", func() {
 			expectedPlan := [][]*corev1.Pod{
 				{pod4},
 				{pod2},
-				{pod3},
 				{pod6},
+				{pod3},
 				{pod1},
 				{pod0},
 				{pod5},
@@ -172,13 +172,13 @@ var _ = Describe("update plan test.", func() {
 				pod.Labels = labels
 			}
 			expectedPlan := [][]*corev1.Pod{
-				{pod0},
-				{pod1},
-				{pod2},
-				{pod3},
-				{pod4},
-				{pod5},
 				{pod6},
+				{pod5},
+				{pod4},
+				{pod3},
+				{pod2},
+				{pod1},
+				{pod0},
 			}
 			checkPlan(expectedPlan, false)
 		})

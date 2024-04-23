@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func BuildSvc(rsm workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
+func buildSvc(rsm workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
@@ -51,7 +51,7 @@ func BuildSvc(rsm workloads.InstanceSet, labels, selectors map[string]string) *c
 		GetObject()
 }
 
-func BuildAlternativeSvs(rsm workloads.InstanceSet, svcLabels map[string]string) []*corev1.Service {
+func buildAlternativeSvs(rsm workloads.InstanceSet, svcLabels map[string]string) []*corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
@@ -81,7 +81,7 @@ func BuildAlternativeSvs(rsm workloads.InstanceSet, svcLabels map[string]string)
 	return services
 }
 
-func BuildHeadlessSvc(rsm workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
+func buildHeadlessSvc(rsm workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
 	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, rsm.Annotations)
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
 		AddLabelsInMap(labels).
@@ -109,7 +109,11 @@ func BuildHeadlessSvc(rsm workloads.InstanceSet, labels, selectors map[string]st
 	return hdlBuilder.GetObject()
 }
 
-func BuildEnvConfigMap(rsm workloads.InstanceSet, labels map[string]string) *corev1.ConfigMap {
+func getHeadlessSvcName(rsm workloads.InstanceSet) string {
+	return strings.Join([]string{rsm.Name, "headless"}, "-")
+}
+
+func buildEnvConfigMap(rsm workloads.InstanceSet, labels map[string]string) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
 	annotations := ParseAnnotationsOfScope(ConfigMapScope, rsm.Annotations)
 	return builder.NewConfigMapBuilder(rsm.Namespace, GetEnvConfigMapName(rsm.Name)).
@@ -414,6 +418,22 @@ func injectRoleProbeBaseContainer(rsm *workloads.InstanceSet, template *corev1.P
 
 	// inject role probe container
 	template.Spec.Containers = append(template.Spec.Containers, *container)
+}
+
+func findSvcPort(rsm *workloads.InstanceSet) int {
+	if rsm.Spec.Service == nil || len(rsm.Spec.Service.Spec.Ports) == 0 {
+		return 0
+	}
+	port := rsm.Spec.Service.Spec.Ports[0]
+	for _, c := range rsm.Spec.Template.Spec.Containers {
+		for _, p := range c.Ports {
+			if port.TargetPort.Type == intstr.String && p.Name == port.TargetPort.StrVal ||
+				port.TargetPort.Type == intstr.Int && p.ContainerPort == port.TargetPort.IntVal {
+				return int(p.ContainerPort)
+			}
+		}
+	}
+	return 0
 }
 
 func injectCustomRoleProbeContainer(rsm *workloads.InstanceSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {

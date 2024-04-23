@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -90,7 +91,7 @@ var _ = Describe("object generation transformer test.", func() {
 
 	Context("well-known service labels", func() {
 		It("should work well", func() {
-			svc := BuildSvc(*its, getLabels(its), getSvcSelector(its, false))
+			svc := buildSvc(*its, getMatchLabels(its.Name), getSvcSelector(its, false))
 			Expect(svc).ShouldNot(BeNil())
 			for k, ev := range service.Labels {
 				v, ok := svc.Labels[k]
@@ -195,7 +196,66 @@ var _ = Describe("object generation transformer test.", func() {
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
 			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(defaultRoleProbeGRPCPort)))
 		})
-
 	})
 
+	Context("getHeadlessSvcName function", func() {
+		It("should work well", func() {
+			Expect(getHeadlessSvcName(*its)).Should(Equal("bar-headless"))
+		})
+	})
+
+	Context("findSvcPort function", func() {
+		It("should work well", func() {
+			By("set port name")
+			its.Spec.Service.Spec.Ports = []corev1.ServicePort{
+				{
+					Name:       "svc-port",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromString("my-service"),
+				},
+			}
+			containerPort := int32(54321)
+			container := corev1.Container{
+				Name: name,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "my-service",
+						Protocol:      corev1.ProtocolTCP,
+						ContainerPort: containerPort,
+					},
+				},
+			}
+			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+				SetContainers([]corev1.Container{container}).
+				GetObject()
+			its.Spec.Template = corev1.PodTemplateSpec{
+				ObjectMeta: pod.ObjectMeta,
+				Spec:       pod.Spec,
+			}
+			Expect(findSvcPort(its)).Should(BeEquivalentTo(containerPort))
+
+			By("set port number")
+			its.Spec.Service.Spec.Ports = []corev1.ServicePort{
+				{
+					Name:       "svc-port",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromInt(int(containerPort)),
+				},
+			}
+			Expect(findSvcPort(its)).Should(BeEquivalentTo(containerPort))
+
+			By("set no matched port")
+			its.Spec.Service.Spec.Ports = []corev1.ServicePort{
+				{
+					Name:       "svc-port",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromInt(int(containerPort - 1)),
+				},
+			}
+			Expect(findSvcPort(its)).Should(BeZero())
+		})
+	})
 })

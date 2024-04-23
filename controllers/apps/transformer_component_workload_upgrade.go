@@ -34,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -118,7 +119,7 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 				}
 				legacyFound = true
 				object.SetOwnerReferences([]metav1.OwnerReference{})
-				object.GetLabels()[instanceset.WorkloadsManagedByLabelKey] = instanceset.KindInstanceSet
+				object.GetLabels()[instanceset.WorkloadsManagedByLabelKey] = workloads.Kind
 				object.GetLabels()[instanceset.WorkloadsInstanceLabelKey] = comp.Name
 				if _, ok := object.(*corev1.Pod); ok {
 					if revision == "" {

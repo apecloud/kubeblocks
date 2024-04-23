@@ -121,7 +121,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
 
 	for _, o := range delObjs {
-		// skip the objects owned by the component and rsm controller
+		// skip the objects owned by the component and InstanceSet controller
 		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
 			continue
 		}

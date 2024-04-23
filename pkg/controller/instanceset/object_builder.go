@@ -37,31 +37,31 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func buildSvc(rsm workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
-	if rsm.Spec.Service == nil {
+func buildSvc(its workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
+	if its.Spec.Service == nil {
 		return nil
 	}
-	annotations := ParseAnnotationsOfScope(ServiceScope, rsm.Annotations)
-	return builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
+	annotations := ParseAnnotationsOfScope(ServiceScope, its.Annotations)
+	return builder.NewServiceBuilder(its.Namespace, its.Name).
 		AddAnnotationsInMap(annotations).
-		AddLabelsInMap(rsm.Spec.Service.Labels).
+		AddLabelsInMap(its.Spec.Service.Labels).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
-		AddPorts(rsm.Spec.Service.Spec.Ports...).
-		SetType(rsm.Spec.Service.Spec.Type).
+		AddPorts(its.Spec.Service.Spec.Ports...).
+		SetType(its.Spec.Service.Spec.Type).
 		GetObject()
 }
 
-func buildAlternativeSvs(rsm workloads.InstanceSet, svcLabels map[string]string) []*corev1.Service {
-	if rsm.Spec.Service == nil {
+func buildAlternativeSvs(its workloads.InstanceSet, svcLabels map[string]string) []*corev1.Service {
+	if its.Spec.Service == nil {
 		return nil
 	}
-	annotations := ParseAnnotationsOfScope(AlternativeServiceScope, rsm.Annotations)
+	annotations := ParseAnnotationsOfScope(AlternativeServiceScope, its.Annotations)
 	var services []*corev1.Service
-	for i := range rsm.Spec.AlternativeServices {
-		service := rsm.Spec.AlternativeServices[i]
+	for i := range its.Spec.AlternativeServices {
+		service := its.Spec.AlternativeServices[i]
 		if len(service.Namespace) == 0 {
-			service.Namespace = rsm.Namespace
+			service.Namespace = its.Namespace
 		}
 		labels := service.Labels
 		if labels == nil {
@@ -82,15 +82,15 @@ func buildAlternativeSvs(rsm workloads.InstanceSet, svcLabels map[string]string)
 	return services
 }
 
-func buildHeadlessSvc(rsm workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
-	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, rsm.Annotations)
-	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
+func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
+	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, its.Annotations)
+	hdlBuilder := builder.NewHeadlessServiceBuilder(its.Namespace, getHeadlessSvcName(its)).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
 		AddAnnotationsInMap(annotations).
 		SetPublishNotReadyAddresses(true)
 
-	for _, container := range rsm.Spec.Template.Spec.Containers {
+	for _, container := range its.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {
 			servicePort := corev1.ServicePort{
 				Protocol: port.Protocol,
@@ -110,21 +110,21 @@ func buildHeadlessSvc(rsm workloads.InstanceSet, labels, selectors map[string]st
 	return hdlBuilder.GetObject()
 }
 
-func getHeadlessSvcName(rsm workloads.InstanceSet) string {
-	return strings.Join([]string{rsm.Name, "headless"}, "-")
+func getHeadlessSvcName(its workloads.InstanceSet) string {
+	return strings.Join([]string{its.Name, "headless"}, "-")
 }
 
-func buildEnvConfigMap(rsm workloads.InstanceSet, labels map[string]string) *corev1.ConfigMap {
-	envData := buildEnvConfigData(rsm)
-	annotations := ParseAnnotationsOfScope(ConfigMapScope, rsm.Annotations)
-	return builder.NewConfigMapBuilder(rsm.Namespace, GetEnvConfigMapName(rsm.Name)).
+func buildEnvConfigMap(its workloads.InstanceSet, labels map[string]string) *corev1.ConfigMap {
+	envData := buildEnvConfigData(its)
+	annotations := ParseAnnotationsOfScope(ConfigMapScope, its.Annotations)
+	return builder.NewConfigMapBuilder(its.Namespace, GetEnvConfigMapName(its.Name)).
 		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
 		SetData(envData).GetObject()
 }
 
-func BuildPodTemplate(rsm *workloads.InstanceSet, envConfigName string) *corev1.PodTemplateSpec {
-	template := rsm.Spec.Template.DeepCopy()
+func BuildPodTemplate(its *workloads.InstanceSet, envConfigName string) *corev1.PodTemplateSpec {
+	template := its.Spec.Template.DeepCopy()
 	// inject env ConfigMap into workload pods only
 	for i := range template.Spec.Containers {
 		template.Spec.Containers[i].EnvFrom = append(template.Spec.Containers[i].EnvFrom,
@@ -137,17 +137,17 @@ func BuildPodTemplate(rsm *workloads.InstanceSet, envConfigName string) *corev1.
 				}})
 	}
 
-	injectRoleProbeContainer(rsm, template)
+	injectRoleProbeContainer(its, template)
 
 	return template
 }
 
-func injectRoleProbeContainer(rsm *workloads.InstanceSet, template *corev1.PodTemplateSpec) {
-	roleProbe := rsm.Spec.RoleProbe
+func injectRoleProbeContainer(its *workloads.InstanceSet, template *corev1.PodTemplateSpec) {
+	roleProbe := its.Spec.RoleProbe
 	if roleProbe == nil {
 		return
 	}
-	credential := rsm.Spec.Credential
+	credential := its.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
 	if credential != nil {
 		credentialEnv = append(credentialEnv,
@@ -166,10 +166,10 @@ func injectRoleProbeContainer(rsm *workloads.InstanceSet, template *corev1.PodTe
 	actionSvcPorts := buildActionSvcPorts(template, roleProbe.CustomHandler)
 
 	actionSvcList, _ := json.Marshal(actionSvcPorts)
-	injectRoleProbeBaseContainer(rsm, template, string(actionSvcList), credentialEnv)
+	injectRoleProbeBaseContainer(its, template, string(actionSvcList), credentialEnv)
 
 	if roleProbe.CustomHandler != nil {
-		injectCustomRoleProbeContainer(rsm, template, actionSvcPorts, credentialEnv)
+		injectCustomRoleProbeContainer(its, template, actionSvcPorts, credentialEnv)
 	}
 }
 
@@ -211,13 +211,13 @@ func buildActionSvcPorts(template *corev1.PodTemplateSpec, actions []workloads.A
 	return actionSvcPorts
 }
 
-func injectRoleProbeBaseContainer(rsm *workloads.InstanceSet, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
+func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role probe base container
-	roleProbe := rsm.Spec.RoleProbe
+	roleProbe := its.Spec.RoleProbe
 	if roleProbe == nil {
 		return
 	}
-	credential := rsm.Spec.Credential
+	credential := its.Spec.Credential
 	image := viper.GetString(constant.KBToolsImage)
 	probeHTTPPort := viper.GetInt("ROLE_SERVICE_HTTP_PORT")
 	if probeHTTPPort == 0 {
@@ -248,7 +248,7 @@ func injectRoleProbeBaseContainer(rsm *workloads.InstanceSet, template *corev1.P
 			})
 	}
 	// find service port of th db engine
-	servicePort := findSvcPort(rsm)
+	servicePort := findSvcPort(its)
 	if servicePort > 0 {
 		env = append(env,
 			corev1.EnvVar{
@@ -421,12 +421,12 @@ func injectRoleProbeBaseContainer(rsm *workloads.InstanceSet, template *corev1.P
 	template.Spec.Containers = append(template.Spec.Containers, *container)
 }
 
-func findSvcPort(rsm *workloads.InstanceSet) int {
-	if rsm.Spec.Service == nil || len(rsm.Spec.Service.Spec.Ports) == 0 {
+func findSvcPort(its *workloads.InstanceSet) int {
+	if its.Spec.Service == nil || len(its.Spec.Service.Spec.Ports) == 0 {
 		return 0
 	}
-	port := rsm.Spec.Service.Spec.Ports[0]
-	for _, c := range rsm.Spec.Template.Spec.Containers {
+	port := its.Spec.Service.Spec.Ports[0]
+	for _, c := range its.Spec.Template.Spec.Containers {
 		for _, p := range c.Ports {
 			if port.TargetPort.Type == intstr.String && p.Name == port.TargetPort.StrVal ||
 				port.TargetPort.Type == intstr.Int && p.ContainerPort == port.TargetPort.IntVal {
@@ -437,8 +437,8 @@ func findSvcPort(rsm *workloads.InstanceSet) int {
 	return 0
 }
 
-func injectCustomRoleProbeContainer(rsm *workloads.InstanceSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
-	if rsm.Spec.RoleProbe == nil {
+func injectCustomRoleProbeContainer(its *workloads.InstanceSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+	if its.Spec.RoleProbe == nil {
 		return
 	}
 
@@ -471,7 +471,7 @@ func injectCustomRoleProbeContainer(rsm *workloads.InstanceSet, template *corev1
 	template.Spec.InitContainers = append(template.Spec.InitContainers, initContainer)
 
 	// inject action containers based on utility images
-	for i, action := range rsm.Spec.RoleProbe.CustomHandler {
+	for i, action := range its.Spec.RoleProbe.CustomHandler {
 		image := action.Image
 		if len(image) == 0 {
 			image = defaultActionImage
@@ -496,25 +496,25 @@ func injectCustomRoleProbeContainer(rsm *workloads.InstanceSet, template *corev1
 	}
 }
 
-func buildEnvConfigData(set workloads.InstanceSet) map[string]string {
+func buildEnvConfigData(its workloads.InstanceSet) map[string]string {
 	envData := map[string]string{}
-	svcName := getHeadlessSvcName(set)
-	uid := string(set.UID)
-	strReplicas := strconv.Itoa(int(*set.Spec.Replicas))
+	svcName := getHeadlessSvcName(its)
+	uid := string(its.UID)
+	strReplicas := strconv.Itoa(int(*its.Spec.Replicas))
 	generateReplicaEnv := func(prefix string) {
 		// avoid to build too many envs
 		// TODO(free6om): don't hard code
 		maxEnv := 128
-		for i := 0; i < int(*set.Spec.Replicas) && i < maxEnv; i++ {
+		for i := 0; i < int(*its.Spec.Replicas) && i < maxEnv; i++ {
 			hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
-			hostNameTplValue := set.Name + "-" + strconv.Itoa(i)
+			hostNameTplValue := its.Name + "-" + strconv.Itoa(i)
 			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 		}
 	}
 	// build member related envs from set.Status.MembersStatus
 	generateMemberEnv := func(prefix string) {
 		followers := ""
-		for _, memberStatus := range set.Status.MembersStatus {
+		for _, memberStatus := range its.Status.MembersStatus {
 			if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName || memberStatus.ReplicaRole == nil {
 				continue
 			}
@@ -533,7 +533,7 @@ func buildEnvConfigData(set workloads.InstanceSet) map[string]string {
 		}
 	}
 
-	prefix := constant.KBPrefix + "_RSM_"
+	prefix := constant.KBPrefix + "_ITS_"
 	envData[prefix+"N"] = strReplicas
 	generateReplicaEnv(prefix)
 	generateMemberEnv(prefix)
@@ -549,14 +549,14 @@ func buildEnvConfigData(set workloads.InstanceSet) map[string]string {
 
 	// have backward compatible handling for CM key with 'compDefName' being part of the key name, prior 0.5.0
 	// and introduce env/cm key naming reference complexity
-	componentDefName := set.Labels[constant.AppComponentLabelKey]
+	componentDefName := its.Labels[constant.AppComponentLabelKey]
 	prefixWithCompDefName := prefix + strings.ToUpper(componentDefName) + "_"
 	envData[prefixWithCompDefName+"N"] = strReplicas
 	generateReplicaEnv(prefixWithCompDefName)
 	generateMemberEnv(prefixWithCompDefName)
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
 
-	lorryHTTPPort, err := controllerutil.GetLorryHTTPPortFromContainers(set.Spec.Template.Spec.Containers)
+	lorryHTTPPort, err := controllerutil.GetLorryHTTPPortFromContainers(its.Spec.Template.Spec.Containers)
 	if err == nil {
 		envData[constant.KBEnvLorryHTTPPort] = strconv.Itoa(int(lorryHTTPPort))
 

@@ -35,5 +35,5 @@ type EventHandler interface {
 var EventHandlerMap = map[string]EventHandler{}
 
 func init() {
-	EventHandlerMap["rsm-event-handler"] = &instanceset.PodRoleEventHandler{}
+	EventHandlerMap["its-event-handler"] = &instanceset.PodRoleEventHandler{}
 }

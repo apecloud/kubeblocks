@@ -72,6 +72,7 @@ type OpsRequestSpec struct {
 	// Restarts the specified components.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
+	// +kubebuilder:validation:MaxItems=1024
 	RestartList []ComponentOps `json:"restart,omitempty"`
 
 	// Switches over the specified components.
@@ -81,6 +82,7 @@ type OpsRequestSpec struct {
 
 	// Note: Quantity struct can not do immutable check by CEL.
 	// Defines what component need to vertical scale the specified compute resources.
+	// +kubebuilder:validation:MaxItems=1024
 	// +optional
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty"`
 
@@ -352,6 +354,7 @@ type CustomOpsSpec struct {
 	// At least one component/shardComponent is required. The components are identified by their name and can be merged or retained.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=1024
 	CustomOpsItems []CustomOpsItem `json:"items"`
 }
 

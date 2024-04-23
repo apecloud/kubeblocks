@@ -755,6 +755,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - storageproviders
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - storageproviders/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - storageproviders/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - extensions.kubeblocks.io
   resources:
   - addons

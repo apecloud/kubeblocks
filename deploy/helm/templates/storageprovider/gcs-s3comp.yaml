@@ -1,5 +1,5 @@
 # gcs-s3comp is a storage provider for [Google Cloud Storage](https://cloud.google.com/storage/), by using its S3-compatible API.
-apiVersion: storage.kubeblocks.io/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: StorageProvider
 metadata:
   name: gcs-s3comp

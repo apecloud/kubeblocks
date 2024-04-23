@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package dataprotection
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -30,15 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
-
-var storageProviderSignature = func(_ storagev1alpha1.StorageProvider, _ *storagev1alpha1.StorageProvider, _ storagev1alpha1.StorageProviderList, _ *storagev1alpha1.StorageProviderList) {
-}
 
 var _ = Describe("StorageProvider controller", func() {
 	cleanEnv := func() {
@@ -49,7 +47,7 @@ var _ = Describe("StorageProvider controller", func() {
 		By("clean resources")
 		// non-namespaced
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, storageProviderSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.StorageProviderSignature, true, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CSIDriverSignature, ml)
 
 		// namespaced
@@ -89,7 +87,7 @@ var _ = Describe("StorageProvider controller", func() {
 		})
 
 		createStorageProviderSpec := func(driverName string) {
-			obj := &storagev1alpha1.StorageProvider{}
+			obj := &dpv1alpha1.StorageProvider{}
 			obj.GenerateName = "storageprovider-"
 			obj.Spec.CSIDriverName = driverName
 			provider := testapps.CreateK8sResource(&testCtx, obj)
@@ -112,26 +110,26 @@ var _ = Describe("StorageProvider controller", func() {
 			}).Should(Succeed())
 		}
 
-		getProvider := func(g Gomega) *storagev1alpha1.StorageProvider {
-			provider := &storagev1alpha1.StorageProvider{}
+		getProvider := func(g Gomega) *dpv1alpha1.StorageProvider {
+			provider := &dpv1alpha1.StorageProvider{}
 			g.ExpectWithOffset(1, testCtx.Cli.Get(ctx, key, provider)).To(Not(HaveOccurred()))
 			return provider
 		}
 
-		shouldReady := func(g Gomega, provider *storagev1alpha1.StorageProvider) {
-			g.ExpectWithOffset(1, provider.Status.Phase).Should(BeEquivalentTo(storagev1alpha1.StorageProviderReady))
+		shouldReady := func(g Gomega, provider *dpv1alpha1.StorageProvider) {
+			g.ExpectWithOffset(1, provider.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.StorageProviderReady))
 
 			val := meta.IsStatusConditionTrue(provider.Status.Conditions,
-				storagev1alpha1.ConditionTypeCSIDriverInstalled)
+				dpv1alpha1.ConditionTypeCSIDriverInstalled)
 			g.ExpectWithOffset(1, val).Should(BeTrue())
 		}
 
-		shouldNotReady := func(g Gomega, provider *storagev1alpha1.StorageProvider) {
-			g.ExpectWithOffset(1, provider.Status.Phase).Should(BeEquivalentTo(storagev1alpha1.StorageProviderNotReady))
+		shouldNotReady := func(g Gomega, provider *dpv1alpha1.StorageProvider) {
+			g.ExpectWithOffset(1, provider.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.StorageProviderNotReady))
 
 			val := meta.IsStatusConditionPresentAndEqual(
 				provider.Status.Conditions,
-				storagev1alpha1.ConditionTypeCSIDriverInstalled,
+				dpv1alpha1.ConditionTypeCSIDriverInstalled,
 				metav1.ConditionUnknown)
 			g.ExpectWithOffset(1, val).Should(BeTrue())
 		}
@@ -154,10 +152,10 @@ var _ = Describe("StorageProvider controller", func() {
 			By("checking status.phase and status.conditions")
 			Eventually(func(g Gomega) {
 				provider := getProvider(g)
-				g.Expect(provider.Status.Phase).Should(BeEquivalentTo(storagev1alpha1.StorageProviderReady))
+				g.Expect(provider.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.StorageProviderReady))
 
 				val := meta.IsStatusConditionTrue(provider.Status.Conditions,
-					storagev1alpha1.ConditionTypeCSIDriverInstalled)
+					dpv1alpha1.ConditionTypeCSIDriverInstalled)
 				g.Expect(val).Should(BeTrue())
 			}).Should(Succeed())
 		})
@@ -190,13 +188,13 @@ var _ = Describe("StorageProvider controller", func() {
 			createStorageProviderSpec("csi3")
 
 			By("checking StorageProvider object")
-			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, provider *storagev1alpha1.StorageProvider) {
-				g.Expect(provider.GetFinalizers()).To(ContainElement(storageFinalizerName))
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, provider *dpv1alpha1.StorageProvider) {
+				g.Expect(provider.GetFinalizers()).To(ContainElement(dptypes.DataProtectionFinalizerName))
 			})).Should(Succeed())
 
 			By("deleting StorageProvider object")
 			Eventually(func(g Gomega) {
-				provider := &storagev1alpha1.StorageProvider{}
+				provider := &dpv1alpha1.StorageProvider{}
 				err := testCtx.Cli.Get(ctx, key, provider)
 				if apierrors.IsNotFound(err) {
 					return

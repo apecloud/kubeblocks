@@ -215,6 +215,13 @@ var _ = BeforeSuite(func() {
 		os.Exit(1)
 	}
 
+	err = (&StorageProviderReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("storage-provider-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	err = mockGCReconciler(k8sManager).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

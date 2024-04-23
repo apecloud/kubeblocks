@@ -27,13 +27,12 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
@@ -91,23 +90,29 @@ func NewFakeBackupPolicy(testCtx *testutil.TestContext,
 }
 
 func NewFakeStorageProvider(testCtx *testutil.TestContext,
-	change func(sp *storagev1alpha1.StorageProvider)) *storagev1alpha1.StorageProvider {
+	change func(sp *dpv1alpha1.StorageProvider)) *dpv1alpha1.StorageProvider {
 	sp := testapps.CreateCustomizedObj(testCtx, "backup/storageprovider.yaml",
-		&storagev1alpha1.StorageProvider{}, func(obj *storagev1alpha1.StorageProvider) {
+		&dpv1alpha1.StorageProvider{}, func(obj *dpv1alpha1.StorageProvider) {
 			obj.Name = StorageProviderName
 			if change != nil {
 				change(obj)
 			}
 		})
-	// the storage provider controller is not running, so set the status manually
-	Expect(testapps.ChangeObjStatus(testCtx, sp, func() {
-		sp.Status.Phase = storagev1alpha1.StorageProviderReady
-		meta.SetStatusCondition(&sp.Status.Conditions, metav1.Condition{
-			Type:   storagev1alpha1.ConditionTypeCSIDriverInstalled,
-			Status: metav1.ConditionTrue,
-			Reason: "CSIDriverInstalled",
-		})
-	})).Should(Succeed())
+	// create the CSIDriver to make the storageProvider happy
+	csiDriver := &storagev1.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: sp.Spec.CSIDriverName,
+		},
+	}
+	err := client.IgnoreAlreadyExists(testCtx.Cli.Create(testCtx.Ctx, csiDriver))
+	Expect(err).ToNot(HaveOccurred())
+
+	// make sure the storageProvider is ready
+	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(sp),
+		func(g Gomega, sp *dpv1alpha1.StorageProvider) {
+			g.Expect(sp.Status.Phase).To(BeEquivalentTo(dpv1alpha1.StorageProviderReady))
+		}),
+	).Should(Succeed())
 	return sp
 }
 

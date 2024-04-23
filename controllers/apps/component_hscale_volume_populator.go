@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -68,8 +68,7 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
-	stsObj *appsv1.StatefulSet,
-	stsProto *appsv1.StatefulSet,
+	itsObj, itsProto *workloads.InstanceSet,
 	backupKey types.NamespacedName) (dataClone, error) {
 	if component == nil {
 		return nil, nil
@@ -81,8 +80,8 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 				cli:       cli,
 				cluster:   cluster,
 				component: component,
-				stsObj:    stsObj,
-				stsProto:  stsProto,
+				itsObj:    itsObj,
+				itsProto:  itsProto,
 				backupKey: backupKey,
 			},
 		}, nil
@@ -94,8 +93,8 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 				cli:       cli,
 				cluster:   cluster,
 				component: component,
-				stsObj:    stsObj,
-				stsProto:  stsProto,
+				itsObj:    itsObj,
+				itsProto:  itsProto,
 				backupKey: backupKey,
 			},
 		}, nil
@@ -109,8 +108,8 @@ type baseDataClone struct {
 	cli       client.Client
 	cluster   *appsv1alpha1.Cluster
 	component *component.SynthesizedComponent
-	stsObj    *appsv1.StatefulSet
-	stsProto  *appsv1.StatefulSet
+	itsObj    *workloads.InstanceSet
+	itsProto  *workloads.InstanceSet
 	backupKey types.NamespacedName
 }
 
@@ -141,7 +140,7 @@ func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, []c
 			status, d.cluster.Name, d.component.Name))
 	}
 	// backup's ready, then start to check restore
-	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
 		restoreStatus, err := realDataClone.CheckRestoreStatus(i)
 		if err != nil {
 			return nil, nil, err
@@ -174,11 +173,11 @@ func (d *baseDataClone) isPVCExists(pvcKey types.NamespacedName) (bool, error) {
 }
 
 func (d *baseDataClone) checkAllPVCsExist() (bool, error) {
-	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
 		for _, vct := range d.component.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
-				Namespace: d.stsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.stsObj.Name, i),
+				Namespace: d.itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.itsObj.Name, i),
 			}
 			// check pvc existence
 			pvcExists, err := d.isPVCExists(pvcKey)
@@ -219,11 +218,11 @@ func (d *baseDataClone) excludeBackupVCTs() []*corev1.PersistentVolumeClaimTempl
 
 func (d *baseDataClone) createPVCs(vcts []*corev1.PersistentVolumeClaimTemplate) ([]client.Object, error) {
 	objs := make([]client.Object, 0)
-	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
 		for _, vct := range vcts {
 			pvcKey := types.NamespacedName{
-				Namespace: d.stsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.stsObj.Name, i),
+				Namespace: d.itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.itsObj.Name, i),
 			}
 			if exist, err := d.isPVCExists(pvcKey); err != nil {
 				return nil, err
@@ -298,7 +297,7 @@ func (d *backupDataClone) Succeed() (bool, error) {
 	if err != nil || !allPVCsExist {
 		return allPVCsExist, err
 	}
-	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
 		restoreStatus, err := d.CheckRestoreStatus(i)
 		if err != nil {
 			return false, err
@@ -347,7 +346,7 @@ func (d *backupDataClone) backup() ([]client.Object, error) {
 	if backupPolicy == nil {
 		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
 	}
-	volumeSnapshotEnabled, err := isVolumeSnapshotEnabled(d.reqCtx.Ctx, d.cli, d.stsObj, backupVCT(d.component))
+	volumeSnapshotEnabled, err := isVolumeSnapshotEnabled(d.reqCtx.Ctx, d.cli, d.itsObj, backupVCT(d.component))
 	if err != nil {
 		return nil, err
 	}
@@ -446,13 +445,13 @@ func backupVCT(component *component.SynthesizedComponent) *corev1.PersistentVolu
 }
 
 func isVolumeSnapshotEnabled(ctx context.Context, cli client.Client,
-	sts *appsv1.StatefulSet, vct *corev1.PersistentVolumeClaimTemplate) (bool, error) {
-	if sts == nil || vct == nil {
+	its *workloads.InstanceSet, vct *corev1.PersistentVolumeClaimTemplate) (bool, error) {
+	if its == nil || vct == nil {
 		return false, nil
 	}
 	pvcKey := types.NamespacedName{
-		Namespace: sts.Namespace,
-		Name:      fmt.Sprintf("%s-%s-%d", vct.Name, sts.Name, 0),
+		Namespace: its.Namespace,
+		Name:      fmt.Sprintf("%s-%s-%d", vct.Name, its.Name, 0),
 	}
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := cli.Get(ctx, pvcKey, &pvc, inDataContext4C()); err != nil {

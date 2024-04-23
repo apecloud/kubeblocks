@@ -25,7 +25,6 @@ import (
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -176,16 +175,6 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 
 func GetEnvConfigMapName(rsmName string) string {
 	return fmt.Sprintf("%s-its-env", rsmName)
-}
-
-// IsOwnedByRsm is used to judge if the obj is owned by rsm
-func IsOwnedByRsm(obj client.Object) bool {
-	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == workloads.Kind && ref.Controller != nil && *ref.Controller {
-			return true
-		}
-	}
-	return false
 }
 
 func composeRoleMap(rsm workloads.InstanceSet) map[string]workloads.ReplicaRole {

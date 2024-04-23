@@ -616,6 +616,10 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Enum=Serial;Parallel
 	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
+
+	// If set to true, the recovery process in the PostReady phase will be performed after the cluster is running successfully.
+	// otherwise, it will be performed after component is running.
+	DoReadyRestoreAfterClusterRunning bool `json:"doReadyRestoreAfterClusterRunning,omitempty"`
 }
 
 // ScriptSecret represents the secret that is used to execute the script.

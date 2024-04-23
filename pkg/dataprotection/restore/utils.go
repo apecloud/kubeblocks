@@ -308,7 +308,11 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }
 
-func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, compSpecs []appsv1alpha1.ClusterComponentSpec, volumeRestorePolicy, restoreTime string, effectiveCommonComponentDef bool) (string, error) {
+func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup,
+	compSpecs []appsv1alpha1.ClusterComponentSpec, volumeRestorePolicy,
+	restoreTime string,
+	effectiveCommonComponentDef,
+	doReadyRestoreAfterClusterRunning bool) (string, error) {
 	componentName := backup.Labels[constant.KBAppComponentLabelKey]
 	if len(componentName) == 0 {
 		if len(compSpecs) != 1 {
@@ -320,6 +324,7 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, compSpecs []appsv
 	restoreInfoMap[constant.BackupNameKeyForRestore] = backup.Name
 	restoreInfoMap[constant.BackupNamespaceKeyForRestore] = backup.Namespace
 	restoreInfoMap[constant.VolumeRestorePolicyKeyForRestore] = volumeRestorePolicy
+	restoreInfoMap[constant.DoReadyRestoreAfterClusterRunning] = strconv.FormatBool(doReadyRestoreAfterClusterRunning)
 	if restoreTime != "" {
 		restoreInfoMap[constant.RestoreTimeKeyForRestore] = restoreTime
 	}

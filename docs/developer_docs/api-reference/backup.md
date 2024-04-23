@@ -32,6 +32,8 @@ Resource Types:
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSchedule">BackupSchedule</a>
 </li><li>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.Restore">Restore</a>
+</li><li>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>
 </li></ul>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.ActionSet">ActionSet
 </h3>
@@ -987,6 +989,170 @@ int32
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreStatus">
 RestoreStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider
+</h3>
+<div>
+<p>StorageProvider comprises specifications that provide guidance on accessing remote storage.
+Currently the supported access methods are via a dedicated CSI driver or the <code>datasafed</code> tool.
+In case of CSI driver, the specification expounds on provisioning PVCs for that driver.
+As for the <code>datasafed</code> tool, the specification provides insights on generating the necessary
+configuration file.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>dataprotection.kubeblocks.io/v1alpha1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>StorageProvider</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProviderSpec">
+StorageProviderSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>csiDriverName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the CSI driver used to access remote storage.
+This field can be empty, it indicates that the storage is not accessible via CSI.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>csiDriverSecretTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template that used to render and generate <code>k8s.io/api/core/v1.Secret</code>
+resources for a specific CSI driver.
+For example, <code>accessKey</code> and <code>secretKey</code> needed by CSI-S3 are stored in this
+<code>Secret</code> resource.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>storageClassTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template utilized to render and generate <code>kubernetes.storage.k8s.io.v1.StorageClass</code>
+resources. The `StorageClass&rsquo; created by this template is aimed at using the CSI driver.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template that renders and generates <code>k8s.io/api/core/v1.PersistentVolumeClaim</code>
+resources. This PVC can reference the <code>StorageClass</code> created from <code>storageClassTemplate</code>,
+allowing Pods to access remote storage by mounting the PVC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>datasafedConfigTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template used to render and generate <code>k8s.io/api/core/v1.Secret</code>.
+This <code>Secret</code> involves the configuration details required by the <code>datasafed</code> tool
+to access remote storage. For example, the <code>Secret</code> should contain <code>endpoint</code>,
+<code>bucket</code>, &lsquo;region&rsquo;, &lsquo;accessKey&rsquo;, &lsquo;secretKey&rsquo;, or something else for S3 storage.
+This field can be empty, it means this kind of storage is not accessible via
+the <code>datasafed</code> tool.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parametersSchema</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParametersSchema">
+ParametersSchema
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes the parameters required for storage.
+The parameters defined here can be referenced in the above templates,
+and <code>kbcli</code> uses this definition for dynamic command-line parameter parsing.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProviderStatus">
+StorageProviderStatus
 </a>
 </em>
 </td>
@@ -3615,6 +3781,51 @@ The default value is empty.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ParametersSchema">ParametersSchema
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProviderSpec">StorageProviderSpec</a>)
+</p>
+<div>
+<p>ParametersSchema describes the parameters needed for a certain storage.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>openAPIV3Schema</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
+Kubernetes api extensions v1.JSONSchemaProps
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the parameters in OpenAPI V3.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialFields</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines which parameters are credential fields, which need to be handled specifically.
+For instance, these should be stored in a <code>Secret</code> instead of a <code>ConfigMap</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
@@ -5048,6 +5259,181 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.StorageProviderPhase">StorageProviderPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProviderStatus">StorageProviderStatus</a>)
+</p>
+<div>
+<p>StorageProviderPhase defines phases of a <code>StorageProvider</code>.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;NotReady&#34;</p></td>
+<td><p>StorageProviderNotReady indicates that the <code>StorageProvider</code> is not ready,
+usually because the specified CSI driver is not yet installed.</p>
+</td>
+</tr><tr><td><p>&#34;Ready&#34;</p></td>
+<td><p>StorageProviderReady indicates that the <code>StorageProvider</code> is ready for use.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.StorageProviderSpec">StorageProviderSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>)
+</p>
+<div>
+<p>StorageProviderSpec defines the desired state of <code>StorageProvider</code>.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>csiDriverName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the CSI driver used to access remote storage.
+This field can be empty, it indicates that the storage is not accessible via CSI.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>csiDriverSecretTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template that used to render and generate <code>k8s.io/api/core/v1.Secret</code>
+resources for a specific CSI driver.
+For example, <code>accessKey</code> and <code>secretKey</code> needed by CSI-S3 are stored in this
+<code>Secret</code> resource.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>storageClassTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template utilized to render and generate <code>kubernetes.storage.k8s.io.v1.StorageClass</code>
+resources. The `StorageClass&rsquo; created by this template is aimed at using the CSI driver.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template that renders and generates <code>k8s.io/api/core/v1.PersistentVolumeClaim</code>
+resources. This PVC can reference the <code>StorageClass</code> created from <code>storageClassTemplate</code>,
+allowing Pods to access remote storage by mounting the PVC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>datasafedConfigTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template used to render and generate <code>k8s.io/api/core/v1.Secret</code>.
+This <code>Secret</code> involves the configuration details required by the <code>datasafed</code> tool
+to access remote storage. For example, the <code>Secret</code> should contain <code>endpoint</code>,
+<code>bucket</code>, &lsquo;region&rsquo;, &lsquo;accessKey&rsquo;, &lsquo;secretKey&rsquo;, or something else for S3 storage.
+This field can be empty, it means this kind of storage is not accessible via
+the <code>datasafed</code> tool.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parametersSchema</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParametersSchema">
+ParametersSchema
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes the parameters required for storage.
+The parameters defined here can be referenced in the above templates,
+and <code>kbcli</code> uses this definition for dynamic command-line parameter parsing.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.StorageProviderStatus">StorageProviderStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>)
+</p>
+<div>
+<p>StorageProviderStatus defines the observed state of <code>StorageProvider</code>.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProviderPhase">
+StorageProviderPhase
+</a>
+</em>
+</td>
+<td>
+<p>The phase of the <code>StorageProvider</code>. Valid phases are <code>NotReady</code> and <code>Ready</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes the current state of the <code>StorageProvider</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.SyncProgress">SyncProgress
 </h3>
 <p>
@@ -5297,6 +5683,8 @@ Currently the supported access methods are via a dedicated CSI driver or the <co
 In case of CSI driver, the specification expounds on provisioning PVCs for that driver.
 As for the <code>datasafed</code> tool, the specification provides insights on generating the necessary
 configuration file.</p>
+<p>Deprecated since v0.9, moving to dataprotection.kubeblocks.io API group,
+will be removed in v0.11.</p>
 </div>
 <table>
 <thead>

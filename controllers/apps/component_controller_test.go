@@ -463,13 +463,13 @@ var _ = Describe("Component Controller", func() {
 		clusterDefName := cluster.Spec.ClusterDefRef
 		componentName := cluster.Spec.ComponentSpecs[0].Name
 		clusterName := cluster.Name
-		stsName := cluster.Name + "-" + componentName
+		itsName := cluster.Name + "-" + componentName
 		pods := make([]corev1.Pod, 0)
 		replicasStr := strconv.Itoa(number)
 		for i := 0; i < number; i++ {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      stsName + "-" + strconv.Itoa(i),
+					Name:      itsName + "-" + strconv.Itoa(i),
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
 						constant.AppManagedByLabelKey:         constant.AppName,
@@ -524,8 +524,8 @@ var _ = Describe("Component Controller", func() {
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeCompReplicas(clusterKey, int32(updatedReplicas), comp)
 
-		checkUpdatedStsReplicas := func() {
-			By("Checking updated sts replicas")
+		checkUpdatedItsReplicas := func() {
+			By("Checking updated its replicas")
 			Eventually(func() int32 {
 				itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, comp.Name)
 				return *itsList.Items[0].Spec.Replicas
@@ -596,9 +596,9 @@ var _ = Describe("Component Controller", func() {
 				Eventually(testapps.List(&testCtx, generics.RestoreSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
 			}
 
-			checkUpdatedStsReplicas()
+			checkUpdatedItsReplicas()
 
-			By("Checking updated sts replicas' PVC and size")
+			By("Checking updated its replicas' PVC and size")
 			for _, vct := range comp.VolumeClaimTemplates {
 				var volumeQuantity resource.Quantity
 				for i := 0; i < updatedReplicas; i++ {
@@ -636,7 +636,7 @@ var _ = Describe("Component Controller", func() {
 				return
 			}
 
-			checkUpdatedStsReplicas()
+			checkUpdatedItsReplicas()
 
 			By("Checking pvcs deleting")
 			Eventually(func(g Gomega) {
@@ -866,7 +866,7 @@ var _ = Describe("Component Controller", func() {
 			}
 		}
 
-		By("mock pods/sts of component are available")
+		By("mock pods of component are available")
 		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
@@ -1749,7 +1749,7 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(followerCount).Should(Equal(2))
 		}).Should(Succeed())
 
-		// trigger its to reconcile as the underlying sts is not created
+		// trigger its to reconcile as the underlying its is not created
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
 			its.Annotations["time"] = time.Now().Format(time.RFC3339)
 		})()).Should(Succeed())
@@ -1844,7 +1844,7 @@ var _ = Describe("Component Controller", func() {
 
 		itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
 		its := &itsList.Items[0]
-		By("mock pod/sts are available and wait for component enter running phase")
+		By("mock pod are available and wait for component enter running phase")
 		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
@@ -1966,11 +1966,11 @@ var _ = Describe("Component Controller", func() {
 		checkWorkloadGenerationAndToolsImage := func(assertion func(any, ...any) AsyncAssertion,
 			workloadGenerationExpected int64, oldImageCntExpected, newImageCntExpected int) {
 			assertion(func(g Gomega) {
-				sts := underlyingWorkload()
-				g.Expect(sts.Generation).Should(Equal(workloadGenerationExpected))
+				its := underlyingWorkload()
+				g.Expect(its.Generation).Should(Equal(workloadGenerationExpected))
 				oldImageCnt := 0
 				newImageCnt := 0
-				for _, c := range sts.Spec.Template.Spec.Containers {
+				for _, c := range its.Spec.Template.Spec.Containers {
 					if c.Image == oldToolsImage {
 						oldImageCnt += 1
 					}

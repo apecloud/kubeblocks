@@ -119,7 +119,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		return nil, err
 	}
 
-	// update sts.spec.volumeClaimTemplates[].metadata.labels
+	// update its.spec.volumeClaimTemplates[].metadata.labels
 	// TODO(xingran): synthesizedComp.VolumeTypes has been removed, and the following code needs to be refactored.
 	if len(itsObj.Spec.VolumeClaimTemplates) > 0 && len(itsObj.GetLabels()) > 0 {
 		for index, vct := range itsObj.Spec.VolumeClaimTemplates {
@@ -206,7 +206,7 @@ func setDefaultResourceLimits(its *workloads.InstanceSet) {
 	}
 }
 
-// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
+// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from component to pvc.
 func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
 	pvcTplName string) {
 	// strict args checking.

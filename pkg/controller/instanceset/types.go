@@ -23,8 +23,8 @@ const (
 	WorkloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
 	WorkloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
 
-	RoleLabelKey          = "kubeblocks.io/role"
-	rsmAccessModeLabelKey = "rsm.workloads.kubeblocks.io/access-mode"
+	RoleLabelKey       = "kubeblocks.io/role"
+	AccessModeLabelKey = "workloads.kubeblocks.io/access-mode"
 
 	defaultPodName = "Unknown"
 
@@ -84,8 +84,8 @@ const (
 //
 // e.g.: Prometheus will start to scrape metrics if a service has annotation 'prometheus.io/scrape'.
 //
-// RSM has encapsulated K8s builtin resources like Service, Headless Service, StatefulSet, ConfigMap etc.
-// AnnotationScope specified a way to tell RSM controller which resource an annotation belongs to.
+// The InstanceSet has encapsulated K8s builtin resources like Service, Headless Service, Pod, ConfigMap etc.
+// AnnotationScope specified a way to tell the InstanceSet controller which resource an annotation belongs to.
 //
 // e.g.:
 // let's say we want to add an annotation 'prometheus.io/scrape' with value 'true' to the underlying headless service.
@@ -95,9 +95,9 @@ const (
 //	kind: InstanceSet
 //	metadata:
 //	  annotations:
-//	    prometheus.io/scrape.headless.rsm: true
+//	    prometheus.io/scrape.headless.its: true
 //
-// the RSM controller will figure out which objects this annotation belongs to, cut the suffix and set it to the right place:
+// the InstanceSet controller will figure out which objects this annotation belongs to, cut the suffix and set it to the right place:
 //
 //	kind: Service
 //	metadata:
@@ -111,16 +111,16 @@ const (
 	RootScope AnnotationScope = ""
 
 	// HeadlessServiceScope specifies the annotation belongs to the encapsulated headless Service.
-	HeadlessServiceScope AnnotationScope = ".headless.rsm"
+	HeadlessServiceScope AnnotationScope = ".headless.its"
 
 	// ServiceScope specifies the annotation belongs to the encapsulated Service.
-	ServiceScope AnnotationScope = ".svc.rsm"
+	ServiceScope AnnotationScope = ".svc.its"
 
 	// AlternativeServiceScope specifies the annotation belongs to the encapsulated alternative Services.
-	AlternativeServiceScope AnnotationScope = ".alternative.rsm"
+	AlternativeServiceScope AnnotationScope = ".alternative.its"
 
 	// ConfigMapScope specifies the annotation belongs to the encapsulated ConfigMap.
-	ConfigMapScope AnnotationScope = ".cm.rsm"
+	ConfigMapScope AnnotationScope = ".cm.its"
 )
 
-const scopeSuffix = ".rsm"
+const scopeSuffix = ".its"

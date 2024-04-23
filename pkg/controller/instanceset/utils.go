@@ -85,41 +85,41 @@ func GetRoleName(pod corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
 
-// IsInstanceSetReady gives rsm level 'ready' state:
-// 1. all replicas exist
-// 2. all members have role set
-func IsInstanceSetReady(rsm *workloads.InstanceSet) bool {
-	if rsm == nil {
+// IsInstanceSetReady gives InstanceSet level 'ready' state:
+// 1. all instances are available
+// 2. and all members have role set (if they are role-ful)
+func IsInstanceSetReady(its *workloads.InstanceSet) bool {
+	if its == nil {
 		return false
 	}
-	// check whether the rsm cluster has been initialized
-	if rsm.Status.ReadyInitReplicas != rsm.Status.InitReplicas {
+	// check whether the cluster has been initialized
+	if its.Status.ReadyInitReplicas != its.Status.InitReplicas {
 		return false
 	}
-	// check whether latest spec has been sent to the underlying workload(sts)
-	if rsm.Status.ObservedGeneration != rsm.Generation || rsm.Status.CurrentGeneration != rsm.Generation {
+	// check whether latest spec has been sent to the underlying workload
+	if its.Status.ObservedGeneration != its.Generation || its.Status.CurrentGeneration != its.Generation {
 		return false
 	}
-	// check whether the underlying workload(sts) is ready
-	if rsm.Spec.Replicas == nil {
+	// check whether the underlying workload is ready
+	if its.Spec.Replicas == nil {
 		return false
 	}
-	replicas := *rsm.Spec.Replicas
-	if rsm.Status.Replicas != replicas ||
-		rsm.Status.ReadyReplicas != replicas ||
-		rsm.Status.UpdatedReplicas != replicas {
+	replicas := *its.Spec.Replicas
+	if its.Status.Replicas != replicas ||
+		its.Status.ReadyReplicas != replicas ||
+		its.Status.UpdatedReplicas != replicas {
 		return false
 	}
 	// check availableReplicas only if minReadySeconds is set
-	if rsm.Spec.MinReadySeconds > 0 && rsm.Status.AvailableReplicas != replicas {
+	if its.Spec.MinReadySeconds > 0 && its.Status.AvailableReplicas != replicas {
 		return false
 	}
 	// check whether role probe has done
-	if rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
+	if its.Spec.Roles == nil || its.Spec.RoleProbe == nil {
 		return true
 	}
-	membersStatus := rsm.Status.MembersStatus
-	if len(membersStatus) != int(*rsm.Spec.Replicas) {
+	membersStatus := its.Status.MembersStatus
+	if len(membersStatus) != int(*its.Spec.Replicas) {
 		return false
 	}
 	hasLeader := false
@@ -173,13 +173,13 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 	return annotations
 }
 
-func GetEnvConfigMapName(rsmName string) string {
-	return fmt.Sprintf("%s-its-env", rsmName)
+func GetEnvConfigMapName(itsName string) string {
+	return fmt.Sprintf("%s-its-env", itsName)
 }
 
-func composeRoleMap(rsm workloads.InstanceSet) map[string]workloads.ReplicaRole {
+func composeRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole {
 	roleMap := make(map[string]workloads.ReplicaRole)
-	for _, role := range rsm.Spec.Roles {
+	for _, role := range its.Spec.Roles {
 		roleMap[strings.ToLower(role.Name)] = role
 	}
 	return roleMap

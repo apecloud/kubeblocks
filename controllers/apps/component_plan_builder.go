@@ -231,7 +231,7 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 	// These secondary objects are protected by the RSM finalizer to ensure their proper cleanup.
 	// By removing the RSM finalizer here, we allow the automated upgrade process to delete the RSM object
 	// and perform the necessary cleanup of its associated resources.
-	finalizers := []string{constant.DBComponentFinalizerName, constant.DBClusterFinalizerName, instanceset.FinalizerName}
+	finalizers := []string{constant.DBComponentFinalizerName, constant.DBClusterFinalizerName, instanceset.LegacyFinalizerName}
 	for _, finalizer := range finalizers {
 		if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 			err := c.cli.Update(ctx, vertex.Obj, clientOption(vertex))

@@ -237,7 +237,7 @@ var _ = Describe("utils test", func() {
 			t := true
 			rsm.OwnerReferences = []metav1.OwnerReference{
 				{
-					Kind:       KindInstanceSet,
+					Kind:       workloads.Kind,
 					Controller: &t,
 				},
 			}

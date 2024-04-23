@@ -207,7 +207,7 @@ func GetEnvConfigMapName(rsmName string) string {
 // IsOwnedByRsm is used to judge if the obj is owned by rsm
 func IsOwnedByRsm(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == KindInstanceSet && ref.Controller != nil && *ref.Controller {
+		if ref.Kind == workloads.Kind && ref.Controller != nil && *ref.Controller {
 			return true
 		}
 	}

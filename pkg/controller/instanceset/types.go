@@ -23,14 +23,12 @@ const (
 	WorkloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
 	WorkloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
 
-	KindInstanceSet = "InstanceSet"
-
 	RoleLabelKey          = "kubeblocks.io/role"
 	rsmAccessModeLabelKey = "rsm.workloads.kubeblocks.io/access-mode"
 
 	defaultPodName = "Unknown"
 
-	FinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
+	LegacyFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
 
 	roleProbeContainerName       = "kb-role-probe"
 	roleProbeBinaryName          = "lorry"

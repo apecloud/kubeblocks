@@ -215,7 +215,6 @@ const (
 const (
 	DeploymentKind            = "Deployment"
 	StatefulSetKind           = "StatefulSet"
-	InstanceSetKind           = "InstanceSet"
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJobKind               = "CronJob"
@@ -332,8 +331,4 @@ const (
 
 const (
 	FeatureGateIgnoreConfigTemplateDefaultMode = "IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE"
-)
-
-const (
-	IgnoreUpgradeToInstanceSet = "IGNORE_UPGRADE_TO_INSTANCE_SET"
 )

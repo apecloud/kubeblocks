@@ -179,13 +179,8 @@ var _ = Describe("SystemAccount Controller", func() {
 		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, objectKey, compName)
 		its := &itsList.Items[0]
 		podName := fmt.Sprintf("%s-%s-0", objectKey.Name, compName)
-		pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, objectKey.Name, compName,
+		pod := testapps.MockInstanceSetPod(&testCtx, nil, objectKey.Name, compName,
 			podName, "leader", "ReadWrite")
-		sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, objectKey.Name, compName).
-			SetReplicas(*its.Spec.Replicas).Create(&testCtx).GetObject()
-		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-			testk8s.MockStatefulSetReady(sts)
-		})).ShouldNot(HaveOccurred())
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, pod)
 		})).ShouldNot(HaveOccurred())

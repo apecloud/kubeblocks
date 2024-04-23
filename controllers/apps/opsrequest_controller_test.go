@@ -30,7 +30,6 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -169,7 +168,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("mock pod/sts are available and wait for cluster enter running phase")
 		podName := fmt.Sprintf("%s-%s-0", clusterObj.Name, mysqlCompName)
-		pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterObj.Name, mysqlCompName,
+		pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterObj.Name, mysqlCompName,
 			podName, "leader", "ReadWrite")
 		// the opsRequest will use startTime to check some condition.
 		// if there is no sleep for 1 second, unstable error may occur.
@@ -180,15 +179,8 @@ var _ = Describe("OpsRequest Controller", func() {
 				testk8s.MockPodAvailable(pod, lastTransTime)
 			})).ShouldNot(HaveOccurred())
 		}
-		var mysqlSts *appsv1.StatefulSet
-		var mysqlIts *workloads.InstanceSet
 		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, mysqlCompName)
-		mysqlIts = &itsList.Items[0]
-		mysqlSts = testapps.NewStatefulSetFactory(mysqlIts.Namespace, mysqlIts.Name, clusterKey.Name, mysqlCompName).
-			SetReplicas(*mysqlIts.Spec.Replicas).Create(&testCtx).GetObject()
-		Expect(testapps.ChangeObjStatus(&testCtx, mysqlSts, func() {
-			testk8s.MockStatefulSetReady(mysqlSts)
-		})).ShouldNot(HaveOccurred())
+		mysqlIts := &itsList.Items[0]
 		Expect(testapps.ChangeObjStatus(&testCtx, mysqlIts, func() {
 			testk8s.MockInstanceSetReady(mysqlIts, pod)
 		})).ShouldNot(HaveOccurred())
@@ -275,7 +267,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	// Scenarios
 
 	// TODO: should focus on OpsRequest control actions, and iterator through all component workload types.
-	Context("with Cluster which has MySQL StatefulSet", func() {
+	Context("with Cluster which has MySQL Component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -358,16 +350,9 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			wl := componentWorkload()
 			its, _ := wl.(*workloads.InstanceSet)
-			sts := testapps.NewStatefulSetFactory(its.Namespace, its.Name, clusterKey.Name, mysqlCompName).
-				SetReplicas(*its.Spec.Replicas).GetObject()
-			testapps.CheckedCreateK8sResource(&testCtx, sts)
-
-			mockPods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, mysqlCompName)
+			mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, mysqlCompName)
 			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
-			})).ShouldNot(HaveOccurred())
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-				testk8s.MockStatefulSetReady(sts)
 			})).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
@@ -570,12 +555,12 @@ var _ = Describe("OpsRequest Controller", func() {
 					g.Expect(*its.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 			its := componentWorkload()
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(sts *appsv1.StatefulSet) {
-				sts.Spec.Replicas = &replicas
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = &replicas
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-				func(g Gomega, sts *appsv1.StatefulSet) {
-					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
+				func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(*its.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 
 			By("Checking pvc created")
@@ -648,12 +633,12 @@ var _ = Describe("OpsRequest Controller", func() {
 					g.Expect(*its.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 			its := componentWorkload()
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(sts *appsv1.StatefulSet) {
-				sts.Spec.Replicas = &replicas
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = &replicas
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-				func(g Gomega, sts *appsv1.StatefulSet) {
-					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
+				func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(*its.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 
 			By("mock scale down successfully by deleting one pod ")
@@ -712,7 +697,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("create one pod")
 			podName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, mysqlCompName, 3)
-			pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterObj.Name, mysqlCompName, podName, "follower", "Readonly")
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterObj.Name, mysqlCompName, podName, "follower", "Readonly")
 
 			By("cancel the opsRequest")
 			Eventually(testapps.ChangeObj(&testCtx, ops, func(opsRequest *appsv1alpha1.OpsRequest) {

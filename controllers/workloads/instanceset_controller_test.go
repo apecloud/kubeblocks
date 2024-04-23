@@ -34,7 +34,7 @@ import (
 )
 
 var _ = Describe("InstanceSet Controller", func() {
-	Context("reconciliation with ReplicaProvider=StatefulSet", func() {
+	Context("reconciliation", func() {
 		It("should reconcile well", func() {
 			name := "test-instance-set"
 			port := int32(12345)

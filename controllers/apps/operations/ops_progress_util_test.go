@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -75,41 +74,20 @@ var _ = Describe("Ops ProgressDetails", func() {
 	}
 
 	testProgressDetailsWithStatefulPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, consensusPodList []corev1.Pod) {
-		By("mock pod of statefulSet updating by deleting the pod")
+		By("mock pod of InstanceSet updating by deleting the pod")
 		pod := &consensusPodList[0]
 		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.ProcessingProgressStatus))
 
-		By("mock one pod of StatefulSet to update successfully")
+		By("mock one pod of InstanceSet to update successfully")
 		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-		testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp,
+		testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
 			pod.Name, "leader", "ReadWrite")
 
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/4"))
-	}
-
-	testProgressDetailsWithStatelessPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource) {
-		By("create a new pod")
-		newPodName := "busybox-" + testCtx.GetRandomStr()
-		testapps.MockStatelessPod(&testCtx, nil, clusterName, statelessComp, newPodName)
-		newPod := &corev1.Pod{}
-		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: newPodName, Namespace: testCtx.DefaultNamespace}, newPod)).Should(Succeed())
-		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-		Expect(getProgressDetailStatus(opsRes, statelessComp, newPod)).Should(Equal(appsv1alpha1.ProcessingProgressStatus))
-		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/4"))
-
-		By("mock new pod is ready")
-		Expect(testapps.ChangeObjStatus(&testCtx, newPod, func() {
-			lastTransTime := metav1.NewTime(time.Now().Add(-11 * time.Second))
-			testk8s.MockPodAvailable(newPod, lastTransTime)
-		})).ShouldNot(HaveOccurred())
-
-		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-		Expect(getProgressDetailStatus(opsRes, statelessComp, newPod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
-		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/4"))
 	}
 
 	Context("Test Ops ProgressDetails", func() {
@@ -121,7 +99,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("create restart ops and pods of consensus component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp, statelessComp)
-			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("mock restart OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -130,18 +108,13 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 			By("test the progressDetails when stateful pod updates during restart operation")
 			testProgressDetailsWithStatefulPodUpdating(reqCtx, opsRes, podList)
-
-			By("test the progressDetails when stateless pod updates during restart operation")
-			Expect(opsRes.OpsRequest.Status.Components[statelessComp].Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase)) // appsv1alpha1.RebootingPhase
-			testProgressDetailsWithStatelessPodUpdating(reqCtx, opsRes)
-
 		})
 
 		It("Test Ops ProgressDetails with horizontally scaling replicas", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("create horizontalScaling operation to test the progressDetails when scaling down the replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1, nil)
@@ -175,7 +148,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("mock the pod[1] to re-create")
 			pod := &podList[1]
 			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-			testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp,
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
 				pod.Name, "Follower", "ReadWrite")
 			// expect the progress is 2/2
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -201,7 +174,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test the progressDetails when scaling up replicas")
-			testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp,
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
 				targetPod.Name, "leader", "ReadWrite")
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetPod.Name, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)

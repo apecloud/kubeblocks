@@ -41,7 +41,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // componentWorkloadUpgradeTransformer upgrades the underlying workload from the legacy RSM API to the InstanceSet API.
@@ -57,10 +56,6 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 	compDef := transCtx.CompDef
 
 	if model.IsObjectDeleting(comp) {
-		return nil
-	}
-
-	if viper.GetBool(constant.IgnoreUpgradeToInstanceSet) {
 		return nil
 	}
 

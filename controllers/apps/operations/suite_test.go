@@ -179,9 +179,9 @@ func initOperationsResources(clusterDefinitionName,
 	return opsRes, clusterDef, clusterObject
 }
 
-func initConsensusPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []corev1.Pod {
+func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []corev1.Pod {
 	// mock the pods of consensusSet component
-	testapps.MockConsensusComponentPods(&testCtx, nil, clusterName, consensusComp)
+	testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)
 	podList, err := intctrlcomp.GetComponentPodList(ctx, cli, *opsRes.Cluster, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.

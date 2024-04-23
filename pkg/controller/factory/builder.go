@@ -45,7 +45,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -157,7 +157,7 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, comp
 	if monitor == nil {
 		return nil
 	}
-	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor, container))
+	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor, container))
 }
 
 func isSupportedMonitor(componentDef *appsv1alpha1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) bool {

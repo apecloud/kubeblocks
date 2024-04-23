@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -27,24 +28,33 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/go-logr/logr"
+	"github.com/golang/mock/gomock"
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 const (
-	namespace = "foo"
-	name      = "bar"
+	namespace   = "foo"
+	name        = "bar"
+	oldRevision = "old-revision"
+	newRevision = "new-revision"
 
 	minReadySeconds = 10
 )
@@ -53,12 +63,18 @@ var (
 	its         *workloads.InstanceSet
 	priorityMap map[string]int
 	reconciler  kubebuilderx.Reconciler
+	controller  *gomock.Controller
+	k8sMock     *mocks.MockClient
+	ctx         context.Context
+	logger      logr.Logger
 
 	uid = types.UID("its-mock-uid")
 
+	headlessSvcName = name + "-headless"
+
 	selectors = map[string]string{
-		constant.AppInstanceLabelKey:   name,
-		rsm.WorkloadsManagedByLabelKey: rsm.KindInstanceSet,
+		constant.AppInstanceLabelKey: name,
+		WorkloadsManagedByLabelKey:   workloads.Kind,
 	}
 	roles = []workloads.ReplicaRole{
 		{
@@ -127,9 +143,49 @@ var (
 			},
 		},
 	}
+
+	service = &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.AppNameLabelKey:        "foo-cluster-definition",
+				constant.AppInstanceLabelKey:    "foo-cluster",
+				constant.KBAppComponentLabelKey: name,
+				constant.AppComponentLabelKey:   name + "def",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "svc",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromString("my-svc"),
+				},
+			},
+		},
+	}
+
+	credential = workloads.Credential{
+		Username: workloads.CredentialVar{Value: "foo"},
+		Password: workloads.CredentialVar{Value: "bar"},
+	}
+
+	observeActions = []workloads.Action{{Command: []string{"cmd"}}}
 )
 
-func init() {
+func makePodUpdateReady(newRevision string, roleful bool, pods ...*corev1.Pod) {
+	readyCondition := corev1.PodCondition{
+		Type:   corev1.PodReady,
+		Status: corev1.ConditionTrue,
+	}
+	for _, pod := range pods {
+		pod.Labels[apps.StatefulSetRevisionLabel] = newRevision
+		if roleful && pod.Labels[RoleLabelKey] == "" {
+			pod.Labels[RoleLabelKey] = "learner"
+		}
+		pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)
+	}
 }
 
 func mockCompressedInstanceTemplates(ns, name string) (*corev1.ConfigMap, string, error) {
@@ -205,6 +261,14 @@ func buildRandomPod() *corev1.Pod {
 		GetObject()
 }
 
+func getPodName(parent string, ordinal int) string {
+	return fmt.Sprintf("%s-%d", parent, ordinal)
+}
+
+func init() {
+	model.AddScheme(workloads.AddToScheme)
+}
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
@@ -212,10 +276,15 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	controller, k8sMock = testutil.SetupK8sMock()
+	ctx = context.Background()
+	logger = logf.FromContext(ctx).WithValues("instance-set", "test")
+
 	go func() {
 		defer GinkgoRecover()
 	}()
 })
 
 var _ = AfterSuite(func() {
+	controller.Finish()
 })

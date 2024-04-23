@@ -38,8 +38,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -140,7 +140,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	if len(snapshot) > 0 {
 		// delete the sub-resources owned by the component before deleting the component
 		for _, object := range snapshot {
-			if rsm.IsOwnedByRsm(object) {
+			if instanceset.IsOwnedByRsm(object) {
 				continue
 			}
 			graphCli.Delete(dag, object)

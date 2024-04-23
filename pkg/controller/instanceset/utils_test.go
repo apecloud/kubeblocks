@@ -20,14 +20,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"fmt"
+	"reflect"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
 var _ = Describe("utils test", func() {
+	BeforeEach(func() {
+		its = builder.NewInstanceSetBuilder(namespace, name).
+			SetService(&corev1.Service{}).
+			SetRoles(roles).
+			GetObject()
+		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
+	})
+
 	Context("mergeList", func() {
 		It("should work well", func() {
 			src := []corev1.Volume{
@@ -101,6 +117,140 @@ var _ = Describe("utils test", func() {
 			Expect(dst).Should(HaveKey("foo1"))
 			Expect(dst).Should(HaveKey("foo2"))
 			Expect(dst["foo1"]).Should(Equal("bar1"))
+		})
+	})
+
+	Context("ComposeRolePriorityMap function", func() {
+		It("should work well", func() {
+			priorityList := []int{
+				leaderPriority,
+				followerReadonlyPriority,
+				followerNonePriority,
+				learnerPriority,
+			}
+			Expect(priorityMap).ShouldNot(BeZero())
+			Expect(priorityMap).Should(HaveLen(len(roles) + 1))
+			for i, role := range roles {
+				Expect(priorityMap[role.Name]).Should(Equal(priorityList[i]))
+			}
+		})
+	})
+
+	Context("SortPods function", func() {
+		It("should work well", func() {
+			pods := []corev1.Pod{
+				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(RoleLabelKey, "follower").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(RoleLabelKey, "logger").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-2").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-3").AddLabels(RoleLabelKey, "learner").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-4").AddLabels(RoleLabelKey, "candidate").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-5").AddLabels(RoleLabelKey, "leader").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-6").AddLabels(RoleLabelKey, "learner").GetObject(),
+			}
+			expectedOrder := []string{"pod-4", "pod-2", "pod-6", "pod-3", "pod-1", "pod-0", "pod-5"}
+
+			SortPods(pods, priorityMap, false)
+			for i, pod := range pods {
+				Expect(pod.Name).Should(Equal(expectedOrder[i]))
+			}
+		})
+	})
+
+	Context("GetRoleName function", func() {
+		It("should work well", func() {
+			pod := builder.NewPodBuilder(namespace, name).AddLabels(RoleLabelKey, "LEADER").GetObject()
+			role := GetRoleName(*pod)
+			Expect(role).Should(Equal("leader"))
+		})
+	})
+
+	Context("AddAnnotationScope function", func() {
+		It("should work well", func() {
+			By("call with a nil map")
+			var annotations map[string]string
+			Expect(AddAnnotationScope(HeadlessServiceScope, annotations)).Should(BeNil())
+
+			By("call with an empty map")
+			annotations = make(map[string]string, 0)
+			scopedAnnotations := AddAnnotationScope(HeadlessServiceScope, annotations)
+			Expect(scopedAnnotations).ShouldNot(BeNil())
+			Expect(scopedAnnotations).Should(HaveLen(0))
+
+			By("call with none empty map")
+			annotations["foo"] = "bar"
+			annotations["foo/bar"] = "foo.bar"
+			annotations["foo.bar/bar"] = "foo.bar.bar"
+			scopedAnnotations = AddAnnotationScope(HeadlessServiceScope, annotations)
+			Expect(scopedAnnotations).ShouldNot(BeNil())
+			Expect(scopedAnnotations).Should(HaveLen(len(annotations)))
+			for k, v := range annotations {
+				nk := fmt.Sprintf("%s%s", k, HeadlessServiceScope)
+				nv, ok := scopedAnnotations[nk]
+				Expect(ok).Should(BeTrue())
+				Expect(nv).Should(Equal(v))
+			}
+		})
+	})
+
+	Context("ParseAnnotationsOfScope function", func() {
+		It("should work well", func() {
+			By("call with a nil map")
+			var scopedAnnotations map[string]string
+			Expect(ParseAnnotationsOfScope(HeadlessServiceScope, scopedAnnotations)).Should(BeNil())
+
+			By("call with an empty map")
+			scopedAnnotations = make(map[string]string, 0)
+			annotations := ParseAnnotationsOfScope(HeadlessServiceScope, scopedAnnotations)
+			Expect(annotations).ShouldNot(BeNil())
+			Expect(annotations).Should(HaveLen(0))
+
+			By("call with RootScope")
+			scopedAnnotations["foo"] = "bar"
+			scopedAnnotations["foo.bar"] = "foo.bar"
+			headlessK := "foo.headless.rsm"
+			scopedAnnotations[headlessK] = headlessK
+			annotations = ParseAnnotationsOfScope(RootScope, scopedAnnotations)
+			Expect(annotations).ShouldNot(BeNil())
+			Expect(annotations).Should(HaveLen(2))
+			delete(scopedAnnotations, headlessK)
+			for k, v := range scopedAnnotations {
+				nv, ok := annotations[k]
+				Expect(ok).Should(BeTrue())
+				Expect(nv).Should(Equal(v))
+			}
+
+			By("call with none RootScope")
+			scopedAnnotations[headlessK] = headlessK
+			annotations = ParseAnnotationsOfScope(HeadlessServiceScope, scopedAnnotations)
+			Expect(annotations).Should(HaveLen(1))
+			Expect(annotations["foo"]).Should(Equal(headlessK))
+		})
+	})
+
+	Context("IsOwnedByRsm function", func() {
+		It("should work well", func() {
+			By("call without ownerReferences")
+			rsm := &workloads.InstanceSet{}
+			Expect(IsOwnedByRsm(rsm)).Should(BeFalse())
+
+			By("call with ownerReference's kind is rsm")
+			t := true
+			rsm.OwnerReferences = []metav1.OwnerReference{
+				{
+					Kind:       workloads.Kind,
+					Controller: &t,
+				},
+			}
+			Expect(IsOwnedByRsm(rsm)).Should(BeTrue())
+
+			By("call with ownerReference's is not rsm")
+			rsm.OwnerReferences = []metav1.OwnerReference{
+				{
+					Kind:       reflect.TypeOf(v1alpha1.Cluster{}).Name(),
+					Controller: &t,
+				},
+			}
+			Expect(IsOwnedByRsm(rsm)).Should(BeFalse())
 		})
 	})
 })

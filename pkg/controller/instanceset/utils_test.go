@@ -21,18 +21,12 @@ package instanceset
 
 import (
 	"fmt"
-	"reflect"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
 var _ = Describe("utils test", func() {
@@ -224,33 +218,6 @@ var _ = Describe("utils test", func() {
 			annotations = ParseAnnotationsOfScope(HeadlessServiceScope, scopedAnnotations)
 			Expect(annotations).Should(HaveLen(1))
 			Expect(annotations["foo"]).Should(Equal(headlessK))
-		})
-	})
-
-	Context("IsOwnedByRsm function", func() {
-		It("should work well", func() {
-			By("call without ownerReferences")
-			rsm := &workloads.InstanceSet{}
-			Expect(IsOwnedByRsm(rsm)).Should(BeFalse())
-
-			By("call with ownerReference's kind is rsm")
-			t := true
-			rsm.OwnerReferences = []metav1.OwnerReference{
-				{
-					Kind:       workloads.Kind,
-					Controller: &t,
-				},
-			}
-			Expect(IsOwnedByRsm(rsm)).Should(BeTrue())
-
-			By("call with ownerReference's is not rsm")
-			rsm.OwnerReferences = []metav1.OwnerReference{
-				{
-					Kind:       reflect.TypeOf(v1alpha1.Cluster{}).Name(),
-					Controller: &t,
-				},
-			}
-			Expect(IsOwnedByRsm(rsm)).Should(BeFalse())
 		})
 	})
 })

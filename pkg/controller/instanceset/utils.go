@@ -23,14 +23,12 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"golang.org/x/exp/slices"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -202,16 +200,6 @@ func ConvertInstanceSetToSTS(rsm *workloads.InstanceSet) *appsv1.StatefulSet {
 
 func GetEnvConfigMapName(rsmName string) string {
 	return fmt.Sprintf("%s-its-env", rsmName)
-}
-
-// IsOwnedByRsm is used to judge if the obj is owned by rsm
-func IsOwnedByRsm(obj client.Object) bool {
-	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == workloads.Kind && ref.Controller != nil && *ref.Controller {
-			return true
-		}
-	}
-	return false
 }
 
 func composeRoleMap(rsm workloads.InstanceSet) map[string]workloads.ReplicaRole {

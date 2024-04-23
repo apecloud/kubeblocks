@@ -84,8 +84,6 @@ var _ = Describe("Backup OpsRequest", func() {
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By("test backup action and reconcile function")
-			testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusComp)
-			testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessComp)
 			bHandler := BackupOpsHandler{}
 			_ = bHandler.Action(reqCtx, k8sClient, opsRes)
 

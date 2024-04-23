@@ -120,7 +120,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("create VerticalScaling ops")
 			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
@@ -150,7 +150,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				pod.Kind = constant.PodKind
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-				testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, pod.Name, "leader", "ReadWrite")
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, pod.Name, "leader", "ReadWrite")
 			}
 
 			By("mock podList[0] rolling update successfully by re-creating it")

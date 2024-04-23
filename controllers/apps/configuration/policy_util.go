@@ -26,7 +26,6 @@ import (
 	"net/netip"
 	"strconv"
 
-	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -219,10 +218,6 @@ func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey s
 	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 	for _, obj := range objs {
 		switch w := obj.(type) {
-		case *appv1.StatefulSet:
-			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.StatefulSetSignature)
-		case *appv1.Deployment:
-			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.DeploymentSignature)
 		case *workloads.InstanceSet:
 			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.InstanceSetSignature)
 		default:

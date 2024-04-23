@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -117,7 +116,7 @@ var _ = Describe("builder", func() {
 		return clusterObj, clusterDefObj, clusterVersionObj, key
 	}
 
-	newStsObj := func() *appsv1.StatefulSet {
+	newItsObj := func() *workloads.InstanceSet {
 		container := corev1.Container{
 			Name: "mysql",
 			VolumeMounts: []corev1.VolumeMount{{
@@ -125,7 +124,7 @@ var _ = Describe("builder", func() {
 				MountPath: "/mnt/config",
 			}},
 		}
-		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
+		return testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
 			AddAppNameLabel("mock-app").
 			AddAppInstanceLabel(clusterName).
 			AddAppComponentLabel(mysqlCompName).
@@ -167,7 +166,7 @@ var _ = Describe("builder", func() {
 	Context("has helper function which builds specific object from cue template", func() {
 		It("builds PVC correctly", func() {
 			snapshotName := "test-snapshot-name"
-			sts := newStsObj()
+			its := newItsObj()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			pvcKey := types.NamespacedName{
 				Namespace: "default",
@@ -175,7 +174,7 @@ var _ = Describe("builder", func() {
 			}
 			pvc := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, snapshotName)
 			Expect(pvc).ShouldNot(BeNil())
-			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
+			Expect(pvc.Spec.AccessModes).Should(Equal(its.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
 			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))
 			Expect(pvc.Spec.StorageClassName).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.StorageClassName))
 			Expect(pvc.Labels[constant.VolumeTypeLabelKey]).ShouldNot(BeEmpty())

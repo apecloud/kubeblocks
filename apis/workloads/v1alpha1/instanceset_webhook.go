@@ -104,8 +104,8 @@ func (r *InstanceSet) validate() error {
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{
-				Group: "workloads.kubeblocks.io/v1alpha1",
-				Kind:  "InstanceSet",
+				Group: GroupVersion.String(),
+				Kind:  Kind,
 			},
 			r.Name, allErrs)
 	}

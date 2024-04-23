@@ -25,7 +25,6 @@ import (
 	"strconv"
 
 	"github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,9 +37,6 @@ import (
 
 const (
 	errorLogName      = "error"
-	leader            = "leader"
-	follower          = "follower"
-	learner           = "learner"
 	ConsensusReplicas = 3
 )
 
@@ -89,16 +85,6 @@ func CreateConsensusMysqlClusterVersion(testCtx *testutil.TestContext, clusterDe
 		Create(testCtx).GetObject()
 }
 
-// MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest
-func MockConsensusComponentStatefulSet(
-	testCtx *testutil.TestContext,
-	clusterName,
-	consensusCompName string) *appsv1.StatefulSet {
-	stsName := clusterName + "-" + consensusCompName
-	return NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, consensusCompName).SetReplicas(ConsensusReplicas).
-		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
-}
-
 // MockInstanceSetComponent mocks the ITS component, just using in envTest
 func MockInstanceSetComponent(
 	testCtx *testutil.TestContext,
@@ -109,26 +95,96 @@ func MockInstanceSetComponent(
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
 }
 
-// MockConsensusComponentStsPod mocks to create the pod of the consensus StatefulSet, just using in envTest
-func MockConsensusComponentStsPod(
+// MockInstanceSetPods mocks the InstanceSet pods, just using in envTest
+func MockInstanceSetPods(
 	testCtx *testutil.TestContext,
-	sts *appsv1.StatefulSet,
+	its *workloads.InstanceSet,
+	clusterName,
+	consensusCompName string) []*corev1.Pod {
+	getReplicas := func() int {
+		if its == nil || its.Spec.Replicas == nil {
+			return ConsensusReplicas
+		}
+		return int(*its.Spec.Replicas)
+	}
+	leaderRole := func() *workloads.ReplicaRole {
+		if its == nil {
+			return nil
+		}
+		for i := range its.Spec.Roles {
+			if its.Spec.Roles[i].IsLeader {
+				return &its.Spec.Roles[i]
+			}
+		}
+		return nil
+	}()
+	noneLeaderRole := func() *workloads.ReplicaRole {
+		if its == nil {
+			return nil
+		}
+		for i := range its.Spec.Roles {
+			if !its.Spec.Roles[i].IsLeader {
+				return &its.Spec.Roles[i]
+			}
+		}
+		return nil
+	}()
+	replicas := getReplicas()
+	replicasStr := strconv.Itoa(replicas)
+	podList := make([]*corev1.Pod, replicas)
+	for i := 0; i < replicas; i++ {
+		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
+		var podRole, accessMode string
+		if its != nil && len(its.Spec.Roles) > 0 {
+			if i == 0 {
+				podRole = leaderRole.Name
+				accessMode = string(leaderRole.AccessMode)
+			} else {
+				podRole = noneLeaderRole.Name
+				accessMode = string(noneLeaderRole.AccessMode)
+			}
+		}
+		pod := MockInstanceSetPod(testCtx, its, clusterName, consensusCompName, podName, podRole, accessMode)
+		annotations := pod.Annotations
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
+		pod.Annotations = annotations
+		podList[i] = pod
+	}
+	return podList
+}
+
+// MockInstanceSetPod mocks to create the pod of the InstanceSet, just using in envTest
+func MockInstanceSetPod(
+	testCtx *testutil.TestContext,
+	its *workloads.InstanceSet,
 	clusterName,
 	consensusCompName,
 	podName,
 	podRole, accessMode string) *corev1.Pod {
 	var stsUpdateRevision string
-	if sts != nil {
-		stsUpdateRevision = sts.Status.UpdateRevision
+	if its != nil {
+		stsUpdateRevision = its.Status.UpdateRevision
+	}
+	name := ""
+	if its != nil {
+		name = its.Name
+	}
+	ml := map[string]string{
+		"workloads.kubeblocks.io/managed-by": workloads.Kind,
+		"workloads.kubeblocks.io/instance":   name,
 	}
 	podFactory := NewPodFactory(testCtx.DefaultNamespace, podName).
-		SetOwnerReferences("apps/v1", constant.StatefulSetKind, sts).
+		SetOwnerReferences(workloads.GroupVersion.String(), workloads.Kind, its).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(consensusCompName).
 		AddAppManagedByLabel().
 		AddRoleLabel(podRole).
 		AddConsensusSetAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
+		AddLabelsInMap(ml).
 		AddVolume(corev1.Volume{
 			Name: DataVolumeName,
 			VolumeSource: corev1.VolumeSource{
@@ -162,8 +218,8 @@ func MockConsensusComponentStsPod(
 				{Name: DataVolumeName, MountPath: "/test"},
 			},
 		})
-	if sts != nil && sts.Labels[constant.AppNameLabelKey] != "" {
-		podFactory.AddAppNameLabel(sts.Labels[constant.AppNameLabelKey])
+	if its != nil && its.Labels[constant.AppNameLabelKey] != "" {
+		podFactory.AddAppNameLabel(its.Labels[constant.AppNameLabelKey])
 	}
 	pod := podFactory.CheckedCreate(testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())
@@ -175,40 +231,4 @@ func MockConsensusComponentStsPod(
 	}
 	gomega.Expect(testCtx.Cli.Status().Patch(context.Background(), pod, patch)).Should(gomega.Succeed())
 	return pod
-}
-
-// MockConsensusComponentPods mocks the component pods, just using in envTest
-func MockConsensusComponentPods(
-	testCtx *testutil.TestContext,
-	sts *appsv1.StatefulSet,
-	clusterName,
-	consensusCompName string) []*corev1.Pod {
-	getReplicas := func() int {
-		if sts == nil || sts.Spec.Replicas == nil {
-			return ConsensusReplicas
-		}
-		return int(*sts.Spec.Replicas)
-	}
-	replicas := getReplicas()
-	replicasStr := strconv.Itoa(replicas)
-	podList := make([]*corev1.Pod, replicas)
-	for i := 0; i < replicas; i++ {
-		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
-		podRole := "follower"
-		accessMode := "Readonly"
-		if i == 0 {
-			podRole = "leader"
-			accessMode = "ReadWrite"
-		}
-		// mock StatefulSet to create all pods
-		pod := MockConsensusComponentStsPod(testCtx, sts, clusterName, consensusCompName, podName, podRole, accessMode)
-		annotations := pod.Annotations
-		if annotations == nil {
-			annotations = make(map[string]string)
-		}
-		annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
-		pod.Annotations = annotations
-		podList[i] = pod
-	}
-	return podList
 }

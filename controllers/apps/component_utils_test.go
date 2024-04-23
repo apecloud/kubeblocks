@@ -28,13 +28,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -82,7 +82,7 @@ var _ = Describe("Component Utils", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
@@ -92,26 +92,26 @@ var _ = Describe("Component Utils", func() {
 
 	Context("Component test", func() {
 		It("Component test", func() {
-			By(" init cluster, statefulSet, pods")
+			By(" init cluster, instanceSet, pods")
 			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
-			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
-			_ = testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
+			_ = testapps.MockInstanceSetPods(&testCtx, its, clusterName, consensusCompName)
 
 			By("test GetClusterByObject function")
-			newCluster, _ := GetClusterByObject(ctx, k8sClient, sts)
+			newCluster, _ := GetClusterByObject(ctx, k8sClient, its)
 			Expect(newCluster != nil).Should(BeTrue())
 
 			By("test getObjectListByComponentName function")
-			stsList := &appsv1.StatefulSetList{}
-			_ = component.GetObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)
-			Expect(len(stsList.Items) > 0).Should(BeTrue())
+			itsList := &workloads.InstanceSetList{}
+			_ = component.GetObjectListByComponentName(ctx, k8sClient, *cluster, itsList, consensusCompName)
+			Expect(len(itsList.Items) > 0).Should(BeTrue())
 
 			By("test getObjectListByCustomLabels function")
-			stsList = &appsv1.StatefulSetList{}
+			itsList = &workloads.InstanceSetList{}
 			matchLabel := constant.GetComponentWellKnownLabels(cluster.Name, consensusCompName)
-			_ = getObjectListByCustomLabels(ctx, k8sClient, *cluster, stsList, client.MatchingLabels(matchLabel))
-			Expect(len(stsList.Items) > 0).Should(BeTrue())
+			_ = getObjectListByCustomLabels(ctx, k8sClient, *cluster, itsList, client.MatchingLabels(matchLabel))
+			Expect(len(itsList.Items) > 0).Should(BeTrue())
 
 			By("test GetComponentStsMinReadySeconds")
 			minReadySeconds, _ := component.GetComponentMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)
@@ -128,9 +128,9 @@ var _ = Describe("Component Utils", func() {
 				role        = "leader"
 				mode        = "ReadWrite"
 			)
-			pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, compName, podName, role, mode)
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, compName, podName, role, mode)
 			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
-				SetOwnerReferences("apps/v1", constant.StatefulSetKind, nil).
+				SetOwnerReferences(workloads.GroupVersion.String(), workloads.Kind, nil).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(compName).
 				AddAppManagedByLabel().

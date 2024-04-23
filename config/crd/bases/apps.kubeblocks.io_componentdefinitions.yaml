@@ -15027,6 +15027,15 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            loadBalancer:
+                              description: "LoadBalancer represents the LoadBalancer
+                                ingress point of the service. \n If multiple ingress
+                                points are available, the first one will be used automatically,
+                                choosing between IP and Hostname."
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
                             multipleClusterObjectOption:
                               description: This option defines the behavior when multiple
                                 component objects match the specified @CompDef. If

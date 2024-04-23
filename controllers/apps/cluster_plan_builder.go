@@ -284,8 +284,8 @@ func (c *clusterPlanBuilder) reconcileCluster(node *model.ObjectVertex) error {
 				return err
 			}
 		}
-	case model.CREATE, model.UPDATE:
-		return fmt.Errorf("cluster can't be created or updated: %s", cluster.Name)
+	case model.CREATE:
+		return fmt.Errorf("cluster can't be created: %s", cluster.Name)
 	}
 	return nil
 }

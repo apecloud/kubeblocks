@@ -37,12 +37,16 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var (
 	ordinalRegexpPattern = `-\d+$`
 	ordinalRegexp        = regexp.MustCompile(ordinalRegexpPattern)
+
+	multiClusterServicePlacementInMirror = "mirror"
+	multiClusterServicePlacementInUnique = "unique"
 )
 
 // componentServiceTransformer handles component services.
@@ -72,7 +76,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			return err
 		}
 		for _, svc := range services {
-			if err = createOrUpdateService(ctx, dag, graphCli, svc, transCtx.ComponentOrig); err != nil {
+			if err = t.createOrUpdateService(ctx, dag, graphCli, &service, svc, transCtx.ComponentOrig); err != nil {
 				return err
 			}
 		}
@@ -87,10 +91,14 @@ func (t *componentServiceTransformer) buildCompService(comp *appsv1alpha1.Compon
 		return nil, nil
 	}
 
-	if service.PodService == nil || !*service.PodService {
-		return t.buildServices(comp, synthesizeComp, []*appsv1alpha1.ComponentService{service})
+	if t.isPodService(service) {
+		return t.buildPodService(comp, synthesizeComp, service)
 	}
-	return t.buildPodService(comp, synthesizeComp, service)
+	return t.buildServices(comp, synthesizeComp, []*appsv1alpha1.ComponentService{service})
+}
+
+func (t *componentServiceTransformer) isPodService(service *appsv1alpha1.ComponentService) bool {
+	return service.PodService != nil && *service.PodService
 }
 
 func (t *componentServiceTransformer) buildPodService(comp *appsv1alpha1.Component,
@@ -209,8 +217,40 @@ func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *com
 	return svcName == defaultHeadlessSvcName
 }
 
-func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
+func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG,
+	graphCli model.GraphClient, compService *appsv1alpha1.ComponentService, service *corev1.Service, owner client.Object) error {
+	var (
+		kind       string
+		podService = t.isPodService(compService)
+	)
 
+	if service.Annotations != nil {
+		kind = service.Annotations[constant.MultiClusterServicePlacementKey]
+		delete(service.Annotations, constant.MultiClusterServicePlacementKey)
+	}
+	if podService && len(kind) > 0 && kind != multiClusterServicePlacementInMirror && kind != multiClusterServicePlacementInUnique {
+		return fmt.Errorf("invalid multi-cluster pod-service placement kind %s for service %s", kind, service.Name)
+	}
+
+	if podService && kind == multiClusterServicePlacementInUnique {
+		return t.createOrUpdateServiceInUnique(ctx, dag, graphCli, service, owner)
+	}
+	return createOrUpdateService(ctx, dag, graphCli, service, owner)
+}
+
+func (t *componentServiceTransformer) createOrUpdateServiceInUnique(ctx graph.TransformContext, dag *graph.DAG,
+	graphCli model.GraphClient, service *corev1.Service, owner client.Object) error {
+	// hack the pod placement strategy.
+	ordinal := func() int {
+		subs := strings.Split(service.GetName(), "-")
+		o, _ := strconv.Atoi(subs[len(subs)-1])
+		return o
+	}
+	multicluster.Assign(ctx.GetContext(), service, ordinal)
+	return createOrUpdateService(ctx, dag, graphCli, service, owner)
+}
+
+func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
 	templateReplicasCnt := int32(0)
 	for _, template := range synthesizeComp.Instances {
 		if len(template.Name) > 0 {

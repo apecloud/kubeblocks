@@ -310,10 +310,6 @@ const (
 )
 
 const (
-	KBAppMultiClusterPlacementKey = "apps.kubeblocks.io/multi-cluster-placement"
-)
-
-const (
 	KBGeneratedVirtualCompDefPrefix = "KB_GENERATED_VIRTUAL_COMP_DEF"
 )
 

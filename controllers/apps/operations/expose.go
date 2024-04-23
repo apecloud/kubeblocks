@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -225,10 +226,15 @@ func (e ExposeOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, 
 }
 
 func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error {
-	componentNameSet := opsResource.OpsRequest.GetComponentNameSet()
+	compOpsSet := map[string]sets.Empty{}
+	for _, v := range opsResource.OpsRequest.Spec.ExposeList {
+		if v.ComponentName != "" {
+			compOpsSet[v.ComponentName] = sets.Empty{}
+		}
+	}
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsResource.Cluster.Spec.ComponentSpecs {
-		if _, ok := componentNameSet[v.Name]; !ok {
+		if _, ok := compOpsSet[v.Name]; !ok {
 			continue
 		}
 		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{

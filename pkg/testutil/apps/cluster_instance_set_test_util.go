@@ -163,7 +163,8 @@ func MockInstanceSetPod(
 	clusterName,
 	consensusCompName,
 	podName,
-	podRole, accessMode string) *corev1.Pod {
+	podRole, accessMode string,
+	resources ...corev1.ResourceRequirements) *corev1.Pod {
 	var stsUpdateRevision string
 	if its != nil {
 		stsUpdateRevision = its.Status.UpdateRevision
@@ -192,32 +193,36 @@ func MockInstanceSetPod(
 					ClaimName: fmt.Sprintf("%s-%s", DataVolumeName, podName),
 				},
 			},
-		}).
-		AddContainer(corev1.Container{
-			Name:  DefaultMySQLContainerName,
-			Image: ApeCloudMySQLImage,
-			LivenessProbe: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/hello",
-						Port: intstr.FromInt(1024),
-					},
-				},
-				TimeoutSeconds:   1,
-				PeriodSeconds:    1,
-				FailureThreshold: 1,
-			},
-			StartupProbe: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(1024),
-					},
-				},
-			},
-			VolumeMounts: []corev1.VolumeMount{
-				{Name: DataVolumeName, MountPath: "/test"},
-			},
 		})
+	container := corev1.Container{
+		Name:  DefaultMySQLContainerName,
+		Image: ApeCloudMySQLImage,
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/hello",
+					Port: intstr.FromInt(1024),
+				},
+			},
+			TimeoutSeconds:   1,
+			PeriodSeconds:    1,
+			FailureThreshold: 1,
+		},
+		StartupProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt(1024),
+				},
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: DataVolumeName, MountPath: "/test"},
+		},
+	}
+	if len(resources) > 0 {
+		container.Resources = resources[0]
+	}
+	podFactory.AddContainer(container)
 	if its != nil && its.Labels[constant.AppNameLabelKey] != "" {
 		podFactory.AddAppNameLabel(its.Labels[constant.AppNameLabelKey])
 	}

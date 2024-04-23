@@ -93,7 +93,19 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("expect for opsRequest is running")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsPhase, _, err := reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", syncOverrideByOpsForScaleReplicas, handleComponentStatusProgress)
+			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
+
+			hs := horizontalScalingOpsHandler{}
+			handleComponentProgress := func(
+				reqCtx intctrlutil.RequestCtx,
+				cli client.Client,
+				opsRes *OpsResource,
+				pgRes progressResource,
+				compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
+				return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, hs.getExpectReplicas)
+			}
+			opsPhase, _, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", syncOverrideByOpsForScaleReplicas, handleComponentProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
@@ -101,10 +113,9 @@ var _ = Describe("OpsUtil functions", func() {
 			compStatus := opsRes.OpsRequest.Status.Components[consensusComp]
 			compStatus.LastFailedTime = metav1.Time{Time: compStatus.LastFailedTime.Add(-1 * componentFailedTimeout).Add(-1 * time.Second)}
 			opsRes.OpsRequest.Status.Components[consensusComp] = compStatus
-			opsPhase, _, err = reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", syncOverrideByOpsForScaleReplicas, handleComponentStatusProgress)
+			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", syncOverrideByOpsForScaleReplicas, handleComponentProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsFailedPhase))
-
 		})
 
 		It("Test opsRequest Queue functions", func() {

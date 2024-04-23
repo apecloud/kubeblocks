@@ -792,8 +792,6 @@ func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }
 
-type ComponentNameSet map[string]struct{}
-
 var (
 	ErrWorkloadTypeIsUnknown   = errors.New("workloadType is unknown")
 	ErrWorkloadTypeIsStateless = errors.New("workloadType should not be stateless")

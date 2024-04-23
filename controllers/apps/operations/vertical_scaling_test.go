@@ -150,7 +150,8 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				pod.Kind = constant.PodKind
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, pod.Name, "leader", "ReadWrite")
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
+					pod.Name, "leader", "ReadWrite", ops.Spec.VerticalScalingList[0].ResourceRequirements)
 			}
 
 			By("mock podList[0] rolling update successfully by re-creating it")
@@ -162,7 +163,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			By("the progress status of pod[0] should be Succeed ")
 			progressDetails := opsRes.OpsRequest.Status.Components[consensusComp].ProgressDetails
-			progressDetail := findStatusProgressDetail(progressDetails, getProgressObjectKey("", podList[0].Name))
+			progressDetail := findStatusProgressDetail(progressDetails, getProgressObjectKey(constant.PodKind, podList[0].Name))
 			Expect(progressDetail.Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 
 			By("cancel verticalScaling opsRequest")
@@ -182,7 +183,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			Expect(opsRequest.Status.Progress).Should(Equal("1/1"))
 			progressDetails = opsRequest.Status.Components[consensusComp].ProgressDetails
 			Expect(len(progressDetails)).Should(Equal(1))
-			progressDetail = findStatusProgressDetail(progressDetails, getProgressObjectKey("", podList[0].Name))
+			progressDetail = findStatusProgressDetail(progressDetails, getProgressObjectKey(constant.PodKind, podList[0].Name))
 			Expect(progressDetail.Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 			Expect(progressDetail.Message).Should(ContainSubstring("with rollback"))
 		})

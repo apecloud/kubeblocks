@@ -129,8 +129,8 @@ var _ = Describe("Ops ProgressDetails", func() {
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			By("mock the pod is terminating, pod[0] is target pod to delete. and mock pod[1] is failed and deleted by stateful controller")
-			for i := 0; i < 2; i++ {
+			By("mock the pod is terminating, pod[1] is target pod to delete. and mock pod[2] is failed and deleted by stateful controller")
+			for i := 1; i < 3; i++ {
 				pod := &podList[i]
 				pod.Kind = constant.PodKind
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
@@ -139,17 +139,15 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 			}
 			By("mock the target pod is deleted and progressDetail status should be succeed")
-			targetPod := &podList[0]
+			targetPod := &podList[1]
 			testk8s.RemovePodFinalizer(ctx, testCtx, targetPod)
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(getProgressDetailStatus(opsRes, consensusComp, targetPod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/2"))
 
-			By("mock the pod[1] to re-create")
-			pod := &podList[1]
+			By("delete the pod[2]")
+			pod := &podList[2]
 			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
-				pod.Name, "Follower", "ReadWrite")
 			// expect the progress is 2/2
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(getProgressDetailStatus(opsRes, consensusComp, targetPod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
@@ -174,8 +172,9 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test the progressDetails when scaling up replicas")
+			targetPod = &podList[2]
 			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
-				targetPod.Name, "leader", "ReadWrite")
+				targetPod.Name, "follower", "ReadWrite")
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetPod.Name, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(getProgressDetailStatus(opsRes, consensusComp, targetPod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
@@ -185,7 +184,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 })
 
 func getProgressDetailStatus(opsRes *OpsResource, componentName string, pod *corev1.Pod) appsv1alpha1.ProgressStatus {
-	objectKey := getProgressObjectKey(pod.Kind, pod.Name)
+	objectKey := getProgressObjectKey(constant.PodKind, pod.Name)
 	progressDetails := opsRes.OpsRequest.Status.Components[componentName].ProgressDetails
 	progressDetail := findStatusProgressDetail(progressDetails, objectKey)
 	var status appsv1alpha1.ProgressStatus

@@ -646,6 +646,9 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
+	// +optional
+	ConfigRefs []ConfigReference `json:"configRefs,omitempty"`
+
 	// Specifies which types of logs should be collected for the Cluster.
 	// The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.
 	//
@@ -1312,6 +1315,25 @@ type ServiceRefCredentialSelector struct {
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+}
+
+// ConfigReference represents a config reference with its source bound.
+type ConfigReference struct {
+	// The name of the config reference.
+	//
+	// +optional
+	Name *string `json:"name,omitempty"`
+
+	// The source of the config reference.
+	ConfigReferenceSource `json:",inline"`
+}
+
+// ConfigReferenceSource represents the source of a config reference.
+type ConfigReferenceSource struct {
+	// ConfigMap source for the config reference.
+	//
+	// +optional
+	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty"`
 }
 
 // +genclient

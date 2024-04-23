@@ -114,8 +114,7 @@ spec:
             - name: DP_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kubeblocks.fullname" . }}-secret
-                  key: dataProtectionEncryptionKey
+                  {{- include "dataprotection.encryptionKeySecretKeyRef" . | nindent 18 }}
             - name: DATASAFED_IMAGE
               value: "{{ .Values.dataProtection.image.registry | default $dataProtectionImageRegistry }}/{{ .Values.dataProtection.image.datasafed.repository }}:{{ .Values.dataProtection.image.datasafed.tag | default "latest" }}"
             - name: GC_FREQUENCY_SECONDS

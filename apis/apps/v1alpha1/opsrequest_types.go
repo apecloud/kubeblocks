@@ -61,71 +61,42 @@ type OpsRequestSpec struct {
 
 	// Defines what component need to horizontal scale the specified replicas.
 	// +optional
-	// +patchMergeKey=componentName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentName
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.horizontalScaling"
-	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty"`
 
 	// Note: Quantity struct can not do immutable check by CEL.
 	// Defines what component and volumeClaimTemplate need to expand the specified storage.
 	// +optional
-	// +patchMergeKey=componentName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentName
-	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty"`
 
 	// Restarts the specified components.
 	// +optional
-	// +patchMergeKey=componentName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentName
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
-	RestartList []ComponentOps `json:"restart,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+	RestartList []ComponentOps `json:"restart,omitempty"`
 
 	// Switches over the specified components.
 	// +optional
-	// +patchMergeKey=componentName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentName
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.switchover"
-	SwitchoverList []Switchover `json:"switchover,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+	SwitchoverList []Switchover `json:"switchover,omitempty"`
 
 	// Note: Quantity struct can not do immutable check by CEL.
 	// Defines what component need to vertical scale the specified compute resources.
 	// +optional
-	// +patchMergeKey=componentName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentName
-	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty"`
 
 	// Deprecated: replace by reconfigures.
 	// Defines the variables that need to input when updating configuration.
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
-	// +kubebuilder:validation:XValidation:rule="self.configurations.size() > 0", message="Value can not be empty"
 	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
 
 	// Defines the variables that need to input when updating configuration.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
 	// +optional
-	// +patchMergeKey=componentName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentName
 	Reconfigures []Reconfigure `json:"reconfigures,omitempty"`
 
 	// Defines services the component needs to expose.
 	// +optional
-	// +patchMergeKey=componentName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentName
-	ExposeList []Expose `json:"expose,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+	ExposeList []Expose `json:"expose,omitempty"`
 
 	// Cluster RestoreFrom backup or point in time.
 	// +optional
@@ -152,24 +123,23 @@ type OpsRequestSpec struct {
 	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
 
 	// Specifies the instances that require re-creation.
-	// +patchMergeKey=componentName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentName
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.rebuildFrom"
-	RebuildFrom []RebuildInstance `json:"rebuildFrom,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+	RebuildFrom []RebuildInstance `json:"rebuildFrom,omitempty"`
 
 	// Specifies a custom operation as defined by OpsDefinition.
 	// +optional
 	CustomSpec *CustomOpsSpec `json:"customSpec,omitempty"`
 }
 
-// ComponentOps represents the common variables required for operations within the scope of a component.
+// ComponentOps represents the common variables required for operations within the scope of a normal component/shard component.
+// +kubebuilder:validation:XValidation:rule="(has(self.componentName) && !has(self.shardingName)) || (has(self.shardingName) && !has(self.componentName))",message="either componentName or shardingName"
 type ComponentOps struct {
 	// Specifies the name of the cluster component.
-	// +kubebuilder:validation:Required
-	ComponentName string `json:"componentName"`
+	ComponentName string `json:"componentName,omitempty"`
+
+	// Specifies the name of the cluster sharding component.
+	ShardingName string `json:"shardingName,omitempty"`
 }
 
 type RebuildInstance struct {
@@ -240,6 +210,27 @@ type VerticalScaling struct {
 	// Defines the computational resource size for vertical scaling.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
+
+	// Specifies the instance template that need to vertical scale.
+	Instances []PartInstanceTemplate `json:"instances,omitempty"`
+}
+
+type PartInstanceTemplate struct {
+	// Refer to the instance template name of the component or sharding.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Defines the computational resource size for vertical scaling.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	corev1.ResourceRequirements `json:",inline"`
+
+	// volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.
+	// +kubebuilder:validation:Required
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 // VolumeExpansion encapsulates the parameters required for a volume expansion operation.
@@ -253,6 +244,9 @@ type VolumeExpansion struct {
 	// +listType=map
 	// +listMapKey=name
 	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Specifies the instance template that need to volume expand.
+	Instances []PartInstanceTemplate `json:"instances,omitempty"`
 }
 
 type OpsRequestVolumeClaimTemplate struct {
@@ -355,20 +349,14 @@ type CustomOpsSpec struct {
 	Parallelism intstr.IntOrString `json:"parallelism,omitempty"`
 
 	// Defines which components need to perform the actions defined by this OpsDefinition.
-	// At least one component is required. The components are identified by their name and can be merged or retained.
+	// At least one component/shardComponent is required. The components are identified by their name and can be merged or retained.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	CustomOpsComponents []CustomOpsComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	CustomOpsItems []CustomOpsItem `json:"items"`
 }
 
-type CustomOpsComponent struct {
-	// Specifies the unique identifier of the cluster component
-	// +kubebuilder:validation:Required
-	ComponentName string `json:"name"`
+type CustomOpsItem struct {
+	ComponentOps `json:",inline"`
 
 	// Represents the parameters for this operation as declared in the opsDefinition.spec.parametersSchema.
 	// +patchMergeKey=name
@@ -428,7 +416,8 @@ const (
 )
 
 type Expose struct {
-	ComponentOps `json:",inline"`
+	// Specifies the name of the cluster component.
+	ComponentName string `json:"componentName,omitempty"`
 
 	// Controls the expose operation.
 	// If set to Enable, the corresponding service will be exposed. Conversely, if set to Disable, the service will be removed.
@@ -437,7 +426,7 @@ type Expose struct {
 	Switch ExposeSwitch `json:"switch"`
 
 	// A list of services that are to be exposed or removed.
-	// If componentNamem is not specified, each `OpsService` in the list must specify ports and selectors.
+	// If componentName is not specified, each `OpsService` in the list must specify ports and selectors.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minitems=0
@@ -696,7 +685,7 @@ type OpsRequestStatus struct {
 	// +optional
 	LastConfiguration LastConfiguration `json:"lastConfiguration,omitempty"`
 
-	// Records the status information of components changed due to the operation request.
+	// Records the status information of components, including the sharding component, that have changed due to the operation request.
 	// +optional
 	Components map[string]OpsRequestComponentStatus `json:"components,omitempty"`
 
@@ -733,7 +722,7 @@ type OpsRequestStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="has(self.objectKey) || has(self.actionName)", message="either objectKey and actionName."
+// +kubebuilder:validation:XValidation:rule="has(self.objectKey) || has(self.actionName)", message="at least one objectKey or actionName."
 
 type ProgressStatusDetail struct {
 	// Specifies the group to which the current object belongs.
@@ -819,11 +808,11 @@ type LastComponentConfiguration struct {
 
 	// Records the last instances of the component.
 	// +optional
-	Instances *[]InstanceTemplate `json:"instances,omitempty"`
+	Instances []InstanceTemplate `json:"instances,omitempty"`
 
 	// Records the last offline instances of the component.
 	// +optional
-	OfflineInstances *[]string `json:"offlineInstances,omitempty"`
+	OfflineInstances []string `json:"offlineInstances,omitempty"`
 }
 
 type LastConfiguration struct {
@@ -998,83 +987,12 @@ func init() {
 	SchemeBuilder.Register(&OpsRequest{}, &OpsRequestList{})
 }
 
-// GetRestartComponentNameSet gets the component name map with restart operation.
-func (r OpsRequestSpec) GetRestartComponentNameSet() ComponentNameSet {
-	set := make(ComponentNameSet)
-	for _, v := range r.RestartList {
-		set[v.ComponentName] = struct{}{}
-	}
-	return set
+func (c ComponentOps) GetComponentName() string {
+	return c.ComponentName
 }
 
-// GetSwitchoverComponentNameSet gets the component name map with switchover operation.
-func (r OpsRequestSpec) GetSwitchoverComponentNameSet() ComponentNameSet {
-	set := make(ComponentNameSet)
-	for _, v := range r.SwitchoverList {
-		set[v.ComponentName] = struct{}{}
-	}
-	return set
-}
-
-// GetVerticalScalingComponentNameSet gets the component name map with vertical scaling operation.
-func (r OpsRequestSpec) GetVerticalScalingComponentNameSet() ComponentNameSet {
-	set := make(ComponentNameSet)
-	for _, v := range r.VerticalScalingList {
-		set[v.ComponentName] = struct{}{}
-	}
-	return set
-}
-
-// ToVerticalScalingListToMap converts OpsRequest.spec.verticalScaling list to map
-func (r OpsRequestSpec) ToVerticalScalingListToMap() map[string]VerticalScaling {
-	verticalScalingMap := make(map[string]VerticalScaling)
-	for _, v := range r.VerticalScalingList {
-		verticalScalingMap[v.ComponentName] = v
-	}
-	return verticalScalingMap
-}
-
-// GetHorizontalScalingComponentNameSet gets the component name map with horizontal scaling operation.
-func (r OpsRequestSpec) GetHorizontalScalingComponentNameSet() ComponentNameSet {
-	set := make(ComponentNameSet)
-	for _, v := range r.HorizontalScalingList {
-		set[v.ComponentName] = struct{}{}
-	}
-	return set
-}
-
-// ToHorizontalScalingListToMap converts OpsRequest.spec.horizontalScaling list to map
-func (r OpsRequestSpec) ToHorizontalScalingListToMap() map[string]HorizontalScaling {
-	verticalScalingMap := make(map[string]HorizontalScaling)
-	for _, v := range r.HorizontalScalingList {
-		verticalScalingMap[v.ComponentName] = v
-	}
-	return verticalScalingMap
-}
-
-// GetVolumeExpansionComponentNameSet gets the component name map with volume expansion operation.
-func (r OpsRequestSpec) GetVolumeExpansionComponentNameSet() ComponentNameSet {
-	set := make(ComponentNameSet)
-	for _, v := range r.VolumeExpansionList {
-		set[v.ComponentName] = struct{}{}
-	}
-	return set
-}
-
-// GetDataScriptComponentNameSet gets the component name map with switchover operation.
-func (r OpsRequestSpec) GetDataScriptComponentNameSet() ComponentNameSet {
-	set := make(ComponentNameSet)
-	set[r.ScriptSpec.ComponentName] = struct{}{}
-	return set
-}
-
-// ToVolumeExpansionListToMap converts volumeExpansionList to map
-func (r OpsRequestSpec) ToVolumeExpansionListToMap() map[string]VolumeExpansion {
-	volumeExpansionMap := make(map[string]VolumeExpansion)
-	for _, v := range r.VolumeExpansionList {
-		volumeExpansionMap[v.ComponentName] = v
-	}
-	return volumeExpansionMap
+func (c ComponentOps) GetShardingName() string {
+	return c.ShardingName
 }
 
 // ToExposeListToMap build expose map
@@ -1084,62 +1002,6 @@ func (r OpsRequestSpec) ToExposeListToMap() map[string]Expose {
 		exposeMap[v.ComponentName] = v
 	}
 	return exposeMap
-}
-
-// GetReconfiguringComponentNameSet gets the component name map with reconfiguring operation.
-func (r OpsRequestSpec) GetReconfiguringComponentNameSet() ComponentNameSet {
-	if r.Reconfigure == nil {
-		return nil
-	}
-	return ComponentNameSet{
-		r.Reconfigure.ComponentName: {},
-	}
-}
-
-func (r OpsRequestSpec) GetExposeComponentNameSet() ComponentNameSet {
-	set := make(ComponentNameSet)
-	for _, v := range r.ExposeList {
-		set[v.ComponentName] = struct{}{}
-	}
-	return set
-}
-
-// GetUpgradeComponentNameSet gets the component name map with upgrade operation.
-func (r *OpsRequest) GetUpgradeComponentNameSet() ComponentNameSet {
-	if r == nil || r.Spec.Upgrade == nil {
-		return nil
-	}
-	set := make(ComponentNameSet)
-	for k := range r.Status.Components {
-		set[k] = struct{}{}
-	}
-	return set
-}
-
-// GetComponentNameSet if the operations are within the scope of component, this function should be implemented
-func (r *OpsRequest) GetComponentNameSet() ComponentNameSet {
-	switch r.Spec.Type {
-	case RestartType:
-		return r.Spec.GetRestartComponentNameSet()
-	case VerticalScalingType:
-		return r.Spec.GetVerticalScalingComponentNameSet()
-	case HorizontalScalingType:
-		return r.Spec.GetHorizontalScalingComponentNameSet()
-	case VolumeExpansionType:
-		return r.Spec.GetVolumeExpansionComponentNameSet()
-	case UpgradeType:
-		return r.GetUpgradeComponentNameSet()
-	case ReconfiguringType:
-		return r.Spec.GetReconfiguringComponentNameSet()
-	case ExposeType:
-		return r.Spec.GetExposeComponentNameSet()
-	case SwitchoverType:
-		return r.Spec.GetSwitchoverComponentNameSet()
-	case DataScriptType:
-		return r.Spec.GetDataScriptComponentNameSet()
-	default:
-		return nil
-	}
 }
 
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {

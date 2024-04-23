@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var (
@@ -209,25 +210,18 @@ func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *com
 }
 
 func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
-	templateReplicas := func(template appsv1alpha1.InstanceTemplate) int32 {
-		replicas := int32(1)
-		if template.Replicas != nil {
-			replicas = *template.Replicas
-		}
-		return replicas
-	}
 
 	templateReplicasCnt := int32(0)
 	for _, template := range synthesizeComp.Instances {
 		if len(template.Name) > 0 {
-			templateReplicasCnt += templateReplicas(template)
+			templateReplicasCnt += intctrlutil.TemplateReplicas(template)
 		}
 	}
 
 	podNames := make([]string, 0)
 	workloadName := constant.GenerateWorkloadNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
 	for _, template := range synthesizeComp.Instances {
-		templateNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, template.Name, templateReplicas(template), synthesizeComp.OfflineInstances)
+		templateNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, template.Name, intctrlutil.TemplateReplicas(template), synthesizeComp.OfflineInstances)
 		podNames = append(podNames, templateNames...)
 	}
 	if templateReplicasCnt < synthesizeComp.Replicas {

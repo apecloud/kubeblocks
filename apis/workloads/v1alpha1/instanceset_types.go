@@ -183,6 +183,10 @@ type InstanceSetSpec struct {
 	// Any remaining replicas will be generated using the default template and will follow the default naming rules.
 	//
 	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies the names of instances to be transitioned to offline status.

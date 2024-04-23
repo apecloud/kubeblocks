@@ -35,7 +35,9 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type restartOpsHandler struct{}
+type restartOpsHandler struct {
+	compOpsHelper componentOpsHelper
+}
 
 var _ OpsHandler = restartOpsHandler{}
 
@@ -62,14 +64,13 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
-	componentNameMap := opsRes.OpsRequest.Spec.GetRestartComponentNameSet()
+	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
 	componentKindList := []client.ObjectList{
-		&appv1.DeploymentList{},
 		&appv1.StatefulSetList{},
 		&workloads.InstanceSetList{},
 	}
 	for _, objectList := range componentKindList {
-		if err := restartComponent(reqCtx, cli, opsRes, componentNameMap, objectList); err != nil {
+		if err := r.restartComponent(reqCtx, cli, opsRes, objectList); err != nil {
 			return err
 		}
 	}
@@ -79,7 +80,16 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", nil, handleComponentStatusProgress)
+	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+	handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
+		cli client.Client,
+		opsRes *OpsResource,
+		pgRes progressResource,
+		compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
+	}
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes,
+		"restart", nil, handleRestartProgress)
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
@@ -88,8 +98,16 @@ func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
+func (r restartOpsHandler) podApplyCompOps(
+	pod *corev1.Pod,
+	compOps ComponentOpsInteface,
+	opsStartTime metav1.Time,
+	templateName string) bool {
+	return !pod.CreationTimestamp.Before(&opsStartTime)
+}
+
 // restartStatefulSet restarts statefulSet workload
-func restartComponent(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, componentNameMap map[string]struct{}, objList client.ObjectList) error {
+func (r restartOpsHandler) restartComponent(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, objList client.ObjectList) error {
 	if err := cli.List(reqCtx.Ctx, objList,
 		client.InNamespace(opsRes.Cluster.Namespace),
 		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
@@ -102,7 +120,7 @@ func restartComponent(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 		// get the underlying object
 		object := items.Index(i).Addr().Interface().(client.Object)
 		template := items.Index(i).FieldByName("Spec").FieldByName("Template").Addr().Interface().(*corev1.PodTemplateSpec)
-		if isRestarted(opsRes, object, componentNameMap, template) {
+		if r.isRestarted(opsRes, object, template) {
 			continue
 		}
 		if err := cli.Update(reqCtx.Ctx, object); err != nil {
@@ -113,10 +131,17 @@ func restartComponent(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 }
 
 // isRestarted checks whether the component has been restarted
-func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map[string]struct{}, podTemplate *corev1.PodTemplateSpec) bool {
+func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object, podTemplate *corev1.PodTemplateSpec) bool {
 	cName := object.GetLabels()[constant.KBAppComponentLabelKey]
-	if _, ok := componentNameMap[cName]; !ok {
-		return true
+	shardingName := object.GetLabels()[constant.KBAppShardingNameLabelKey]
+	if shardingName != "" {
+		if _, ok := r.compOpsHelper.componentOpsSet[getShardingKey(shardingName)]; !ok {
+			return true
+		}
+	} else {
+		if _, ok := r.compOpsHelper.componentOpsSet[cName]; !ok {
+			return true
+		}
 	}
 	if podTemplate.Annotations == nil {
 		podTemplate.Annotations = map[string]string{}

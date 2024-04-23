@@ -4872,7 +4872,7 @@ This overrides the image and env attributes defined in clusterDefinition.spec.co
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentVolumeClaimTemplate">ClusterComponentVolumeClaimTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 </div>
@@ -7932,17 +7932,13 @@ and other administrative tasks.</p>
 </p>
 <div>
 </div>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentNameSet">ComponentNameSet
-(<code>map[string]struct{}</code> alias)</h3>
-<div>
-</div>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentOps">ComponentOps
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Expose">Expose</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsItem">CustomOpsItem</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
-<p>ComponentOps represents the common variables required for operations within the scope of a component.</p>
+<p>ComponentOps represents the common variables required for operations within the scope of a normal component/shard component.</p>
 </div>
 <table>
 <thead>
@@ -7961,6 +7957,17 @@ string
 </td>
 <td>
 <p>Specifies the name of the cluster component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the cluster sharding component.</p>
 </td>
 </tr>
 </tbody>
@@ -11011,7 +11018,7 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent
+<h3 id="apps.kubeblocks.io/v1alpha1.CustomOpsItem">CustomOpsItem
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsSpec">CustomOpsSpec</a>)
@@ -11028,13 +11035,17 @@ string
 <tbody>
 <tr>
 <td>
-<code>name</code><br/>
+<code>ComponentOps</code><br/>
 <em>
-string
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
+ComponentOps
+</a>
 </em>
 </td>
 <td>
-<p>Specifies the unique identifier of the cluster component</p>
+<p>
+(Members of <code>ComponentOps</code> are embedded into this type.)
+</p>
 </td>
 </tr>
 <tr>
@@ -11109,16 +11120,16 @@ the calculated number will be rounded up to 1.</p>
 </tr>
 <tr>
 <td>
-<code>components</code><br/>
+<code>items</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">
-[]CustomOpsComponent
+<a href="#apps.kubeblocks.io/v1alpha1.CustomOpsItem">
+[]CustomOpsItem
 </a>
 </em>
 </td>
 <td>
 <p>Defines which components need to perform the actions defined by this OpsDefinition.
-At least one component is required. The components are identified by their name and can be merged or retained.</p>
+At least one component/shardComponent is required. The components are identified by their name and can be merged or retained.</p>
 </td>
 </tr>
 </tbody>
@@ -11384,17 +11395,13 @@ If the shell is required, it must be explicitly invoked in the command.</p>
 <tbody>
 <tr>
 <td>
-<code>ComponentOps</code><br/>
+<code>componentName</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
-ComponentOps
-</a>
+string
 </em>
 </td>
 <td>
-<p>
-(Members of <code>ComponentOps</code> are embedded into this type.)
-</p>
+<p>Specifies the name of the cluster component.</p>
 </td>
 </tr>
 <tr>
@@ -11422,7 +11429,7 @@ If set to Enable, the corresponding service will be exposed. Conversely, if set 
 </td>
 <td>
 <p>A list of services that are to be exposed or removed.
-If componentNamem is not specified, each <code>OpsService</code> in the list must specify ports and selectors.</p>
+If componentName is not specified, each <code>OpsService</code> in the list must specify ports and selectors.</p>
 </td>
 </tr>
 </tbody>
@@ -12088,8 +12095,8 @@ Add new or override existing volume mounts of the first container in the pod.</p
 <td>
 <code>volumeClaimTemplates</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
-[]Kubernetes core/v1.PersistentVolumeClaim
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVolumeClaimTemplate">
+[]ClusterComponentVolumeClaimTemplate
 </a>
 </em>
 </td>
@@ -12333,7 +12340,7 @@ The resource key is in the list of [pods].</p>
 <code>instances</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
-InstanceTemplate
+[]InstanceTemplate
 </a>
 </em>
 </td>
@@ -12346,7 +12353,7 @@ InstanceTemplate
 <td>
 <code>offlineInstances</code><br/>
 <em>
-string
+[]string
 </em>
 </td>
 <td>
@@ -13940,7 +13947,7 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponent
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the status information of components changed due to the operation request.</p>
+<p>Records the status information of components, including the sharding component, that have changed due to the operation request.</p>
 </td>
 </tr>
 <tr>
@@ -14044,7 +14051,7 @@ map[string]*github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ReconfiguringStatu
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsRequestVolumeClaimTemplate">OpsRequestVolumeClaimTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">PartInstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 </div>
@@ -14524,7 +14531,7 @@ LastComponentConfiguration
 <h3 id="apps.kubeblocks.io/v1alpha1.Parameter">Parameter
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsItem">CustomOpsItem</a>)
 </p>
 <div>
 </div>
@@ -14690,6 +14697,63 @@ The supported property types include:
 - number
 - integer
 - array: Note that only items of string type are supported.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">PartInstanceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refer to the instance template name of the component or sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ResourceRequirements</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ResourceRequirements</code> are embedded into this type.)
+</p>
+<p>Defines the computational resource size for vertical scaling.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OpsRequestVolumeClaimTemplate">
+[]OpsRequestVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<p>volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.</p>
 </td>
 </tr>
 </tbody>
@@ -20186,6 +20250,19 @@ Kubernetes core/v1.ResourceRequirements
 <p>Defines the computational resource size for vertical scaling.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">
+[]PartInstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the instance template that need to vertical scale.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion
@@ -20230,6 +20307,19 @@ ComponentOps
 </td>
 <td>
 <p>volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">
+[]PartInstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the instance template that need to volume expand.</p>
 </td>
 </tr>
 </tbody>

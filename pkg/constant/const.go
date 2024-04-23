@@ -45,7 +45,9 @@ const (
 	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"
 
 	// customized encryption key for encrypting the password of connection credential.
-	CfgKeyDPEncryptionKey = "DP_ENCRYPTION_KEY"
+	CfgKeyDPEncryptionKey                = "DP_ENCRYPTION_KEY"
+	CfgKeyDPBackupEncryptionSecretKeyRef = "DP_BACKUP_ENCRYPTION_SECRET_KEY_REF"
+	CfgKeyDPBackupEncryptionAlgorithm    = "DP_BACKUP_ENCRYPTION_ALGORITHM"
 
 	CfgKBReconcileWorkers = "KUBEBLOCKS_RECONCILE_WORKERS"
 	CfgClientQPS          = "CLIENT_QPS"
@@ -106,6 +108,7 @@ const (
 	KBManagedByKey                           = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey          = "apps.kubeblocks.io/vct-name"
+	KBAppComponentInstanceTemplatelabelKey   = "apps.kubeblocks.io/instance-template"
 	KBAppServiceVersionKey                   = "apps.kubeblocks.io/service-version"
 	WorkloadTypeLabelKey                     = "apps.kubeblocks.io/workload-type"
 	KBAppPodNameLabelKey                     = "apps.kubeblocks.io/pod-name"

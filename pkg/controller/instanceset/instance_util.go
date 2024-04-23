@@ -211,14 +211,14 @@ func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instance
 }
 
 func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string) []string {
-	instanceNames, _ := generateInstanceNames(parentName, templateName, replicas, 0, offlineInstances)
+	instanceNames, _ := GenerateInstanceNames(parentName, templateName, replicas, 0, offlineInstances)
 	return instanceNames
 }
 
-// generateInstanceNames generates instance names based on certain rules:
+// GenerateInstanceNames generates instance names based on certain rules:
 // The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
 // The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
-func generateInstanceNames(parentName, templateName string,
+func GenerateInstanceNames(parentName, templateName string,
 	replicas int32, ordinal int32, offlineInstances []string) ([]string, int32) {
 	usedNames := sets.New(offlineInstances...)
 	var instanceNameList []string
@@ -273,6 +273,9 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
+		if template.Name != "" {
+			pvc.Labels[constant.KBAppComponentInstanceTemplatelabelKey] = template.Name
+		}
 		pvcMap[pvcName] = pvc
 		pvcNameMap[pvcName] = claimTemplate.Name
 	}
@@ -430,12 +433,13 @@ func BuildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 func buildInstanceTemplateExts(itsExt *instanceSetExt) []*instanceTemplateExt {
 	envConfigName := GetEnvConfigMapName(itsExt.its.Name)
 	defaultTemplate := BuildPodTemplate(itsExt.its, envConfigName)
-	makeInstanceTemplateExt := func() *instanceTemplateExt {
+	makeInstanceTemplateExt := func(templateName string) *instanceTemplateExt {
 		var claims []corev1.PersistentVolumeClaim
 		for _, template := range itsExt.its.Spec.VolumeClaimTemplates {
 			claims = append(claims, *template.DeepCopy())
 		}
 		return &instanceTemplateExt{
+			Name:                 templateName,
 			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
 			VolumeClaimTemplates: claims,
 		}
@@ -443,11 +447,10 @@ func buildInstanceTemplateExts(itsExt *instanceSetExt) []*instanceTemplateExt {
 
 	var instanceTemplateExtList []*instanceTemplateExt
 	for _, template := range itsExt.instanceTemplates {
-		templateExt := makeInstanceTemplateExt()
+		templateExt := makeInstanceTemplateExt(template.Name)
 		buildInstanceTemplateExt(*template, templateExt)
 		instanceTemplateExtList = append(instanceTemplateExtList, templateExt)
 	}
-
 	return instanceTemplateExtList
 }
 

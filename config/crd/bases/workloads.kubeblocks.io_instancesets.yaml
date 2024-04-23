@@ -3259,6 +3259,9 @@ spec:
                   - name
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               memberUpdateStrategy:
                 description: "Members(Pods) update strategy. \n - serial: update Members
                   one by one that guarantee minimum component unavailable time. -

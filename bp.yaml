@@ -1,0 +1,61 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicy
+metadata:
+  annotations:
+    apps.kubeblocks.io/backup-policy-template: apecloud-mysql-backup-policy-template
+    dataprotection.kubeblocks.io/is-default-policy: "true"
+  creationTimestamp: "2024-04-15T03:01:52Z"
+  finalizers:
+  - cluster.kubeblocks.io/finalizer
+  - dataprotection.kubeblocks.io/finalizer
+  generation: 1
+  labels:
+    app.kubernetes.io/instance: mysql
+    app.kubernetes.io/managed-by: kubeblocks
+    apps.kubeblocks.io/component-def-ref: mysql
+  name: mysql-mysql-backup-policy
+  namespace: kubeblocks-cloud-ns
+  ownerReferences:
+  - apiVersion: apps.kubeblocks.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Cluster
+    name: mysql
+    uid: cd666271-f535-492d-8b74-d5a5eab36fbb
+  resourceVersion: "15701598"
+  uid: 3903c719-b245-445e-88a9-e1b95fd4a667
+spec:
+  backupMethods:
+  - actionSetName: xtrabackup-for-apecloud-mysql
+    name: xtrabackup
+    snapshotVolumes: false
+    targetVolumes:
+      volumeMounts:
+      - mountPath: /data/mysql
+        name: data
+  - actionSetName: volumesnapshot-for-apecloud-mysql
+    name: volume-snapshot
+    snapshotVolumes: true
+    targetVolumes:
+      volumeMounts:
+      - mountPath: /data/mysql
+        name: data
+      volumes:
+      - data
+  pathPrefix: /mysql-cd666271-f535-492d-8b74-d5a5eab36fbb/mysql
+  target:
+    connectionCredential:
+      passwordKey: password
+      secretName: mysql-conn-credential
+      usernameKey: username
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/instance: mysql
+        app.kubernetes.io/managed-by: kubeblocks
+        apps.kubeblocks.io/component-name: mysql
+        kubeblocks.io/role: follower
+      strategy: Any
+  useKopia: false
+status:
+  observedGeneration: 1
+  phase: Available

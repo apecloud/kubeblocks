@@ -205,7 +205,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("notice opsrequest controller to run")
 		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-		testapps.MockInstanceSetPods(&testCtx, nil, clusterObj.Name, mysqlCompName,
+		testapps.MockInstanceSetPod(&testCtx, nil, clusterObj.Name, mysqlCompName,
 			pod.Name, "leader", "ReadWrite", scalingCtx.target)
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
 			if lopsReq.Annotations == nil {

@@ -123,8 +123,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCancelledPhase))
 			opsProgressDetails := opsRes.OpsRequest.Status.Components[consensusComp].ProgressDetails
-			Expect(len(opsProgressDetails)).Should(Equal(1))
-			Expect(opsProgressDetails[0].Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+			Expect(len(opsProgressDetails)).Should(Equal(2))
 		}
 
 		It("test scaling down replicas", func() {

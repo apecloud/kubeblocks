@@ -21,12 +21,14 @@ package instanceset
 
 import (
 	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
 var _ = Describe("utils test", func() {

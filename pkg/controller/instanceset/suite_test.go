@@ -23,13 +23,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-logr/logr"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/go-logr/logr"
 	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"

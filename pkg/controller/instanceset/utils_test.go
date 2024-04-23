@@ -21,16 +21,18 @@ package instanceset
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"reflect"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
 var _ = Describe("utils test", func() {

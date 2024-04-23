@@ -130,8 +130,7 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 	var err error
 	// If client.object interface object is used as a parameter, it will not return an error when the object is not found.
 	// so we should specify the object type to get the object.
-	switch event.InvolvedObject.Kind {
-	case constant.PodKind:
+	if event.InvolvedObject.Kind == constant.PodKind {
 		pod := &corev1.Pod{}
 		err = cli.Get(ctx, objectKey, pod, inDataContextUnspecified4C())
 		return pod, err

@@ -155,6 +155,7 @@ spec:
                       - message: either componentName or shardingName
                         rule: (has(self.componentName) && !has(self.shardingName))
                           || (has(self.shardingName) && !has(self.componentName))
+                    maxItems: 1024
                     minItems: 1
                     type: array
                   opsDefinitionRef:
@@ -3038,6 +3039,7 @@ spec:
                   - message: either componentName or shardingName
                     rule: (has(self.componentName) && !has(self.shardingName)) ||
                       (has(self.shardingName) && !has(self.componentName))
+                maxItems: 1024
                 type: array
                 x-kubernetes-validations:
                 - message: forbidden to update spec.restart
@@ -3501,6 +3503,7 @@ spec:
                   - message: either componentName or shardingName
                     rule: (has(self.componentName) && !has(self.shardingName)) ||
                       (has(self.shardingName) && !has(self.componentName))
+                maxItems: 1024
                 type: array
               volumeExpansion:
                 description: 'Note: Quantity struct can not do immutable check by

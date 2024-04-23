@@ -45,6 +45,7 @@ var _ = Describe("status reconciler test", func() {
 			SetMinReadySeconds(minReadySeconds).
 			SetRoles(roles).
 			GetObject()
+		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
 	})
 
 	Context("PreCondition & Reconcile", func() {

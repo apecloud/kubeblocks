@@ -295,6 +295,47 @@ type ToolConfig struct {
 	//
 	// If enabled, the tool image is deployed as a sidecar container image.
 	//
+	// Examples:
+	// ```yaml
+	//  reloadToolsImage:
+	//    mountPoint: /kb_tools
+	//    toolConfigs:
+	//      - name: kb-tools
+	//        asContainerImage: true
+	//        image:  apecloud/oceanbase:4.2.0.0-100010032023083021
+	// ```
+	//
+	// generated containers:
+	// ```yaml
+	// initContainers:
+	//  - name: install-config-manager-tool
+	//    image: apecloud/kubeblocks-tools:${version}
+	//    command:
+	//    - cp
+	//    - /bin/config_render
+	//    - /opt/tools
+	//    volumemounts:
+	//    - name: kb-tools
+	//      mountpath: /opt/tools
+	//
+	// containers:
+	//  - name: config-manager
+	//    image: apecloud/oceanbase:4.2.0.0-100010032023083021
+	//    imagePullPolicy: IfNotPresent
+	// 	  command:
+	//    - /opt/tools/reloader
+	//    - --log-level
+	//    - info
+	//    - --operator-update-enable
+	//    - --tcp
+	//    - "9901"
+	//    - --config
+	//    - /opt/config-manager/config-manager.yaml
+	//    volumemounts:
+	//    - name: kb-tools
+	//      mountpath: /opt/tools
+	// ```
+	//
 	// +optional
 	AsContainerImage *bool `json:"asContainerImage,omitempty"`
 
@@ -305,8 +346,8 @@ type ToolConfig struct {
 
 	// Specifies the command to be executed by the init container.
 	//
-	// +kubebuilder:validation:Required
-	Command []string `json:"command"`
+	// +optional
+	Command []string `json:"command,omitempty"`
 }
 
 // DownwardAction defines an action that triggers specific commands in response to changes in Pod labels.

@@ -51,9 +51,9 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 		if skipSetCompOwnership(object) {
 			continue
 		}
-		// add component and cluster finalizers at the same time
-		addComponentFinalizer(object, comp)
-		if err := intctrlutil.SetOwnership(comp, object, rscheme, constant.DBClusterFinalizerName); err != nil {
+		// add finalizer to the object
+		addFinalizer(object, comp)
+		if err := intctrlutil.SetOwnership(comp, object, rscheme, ""); err != nil {
 			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 				continue
 			}
@@ -74,14 +74,14 @@ func skipSetCompOwnership(obj client.Object) bool {
 	}
 }
 
-func addComponentFinalizer(obj client.Object, comp *appsv1alpha1.Component) {
-	if shouldSkipAddingCompFinalizer(obj, comp) {
+func addFinalizer(obj client.Object, comp *appsv1alpha1.Component) {
+	if skipAddCompFinalizer(obj, comp) {
 		return
 	}
 	controllerutil.AddFinalizer(obj, constant.DBComponentFinalizerName)
 }
 
-func shouldSkipAddingCompFinalizer(obj client.Object, comp *appsv1alpha1.Component) bool {
+func skipAddCompFinalizer(obj client.Object, comp *appsv1alpha1.Component) bool {
 	// Due to compatibility reasons, the component controller creates cluster-scoped RoleBinding and ServiceAccount objects in the following two scenarios:
 	// 1. When the user does not specify a ServiceAccount, KubeBlocks automatically creates a ServiceAccount and a RoleBinding with named pattern kb-{cluster.Name}.
 	// 2. When the user specifies a ServiceAccount that does not exist, KubeBlocks will automatically create a ServiceAccount and a RoleBinding with the same name.

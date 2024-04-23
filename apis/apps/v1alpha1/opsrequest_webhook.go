@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -240,12 +241,11 @@ func (r *OpsRequest) validateExpose(_ context.Context, cluster *Cluster) error {
 		return notEmptyError("spec.expose")
 	}
 
-	// compNames := make([]string, len(exposeList))
-	var componentNames []string
+	var compOpsList []ComponentOps
 	counter := 0
 	for _, v := range exposeList {
 		if len(v.ComponentName) > 0 {
-			componentNames = append(componentNames, v.ComponentName)
+			compOpsList = append(compOpsList, ComponentOps{ComponentName: v.ComponentName})
 			continue
 		} else {
 			counter++
@@ -261,7 +261,7 @@ func (r *OpsRequest) validateExpose(_ context.Context, cluster *Cluster) error {
 			}
 		}
 	}
-	return r.checkComponentExistence(cluster, componentNames)
+	return r.checkComponentExistence(cluster, compOpsList)
 }
 
 // validateUpgrade validates spec.restart
@@ -271,11 +271,7 @@ func (r *OpsRequest) validateRestart(cluster *Cluster) error {
 		return notEmptyError("spec.restart")
 	}
 
-	compNames := make([]string, len(restartList))
-	for i, v := range restartList {
-		compNames[i] = v.ComponentName
-	}
-	return r.checkComponentExistence(cluster, compNames)
+	return r.checkComponentExistence(cluster, restartList)
 }
 
 // validateUpgrade validates spec.clusterOps.upgrade
@@ -301,10 +297,12 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 	}
 
 	// validate resources is legal and get component name slice
-	componentNames := make([]string, len(verticalScalingList))
+	compOpsList := make([]ComponentOps, len(verticalScalingList))
 	for i, v := range verticalScalingList {
-		componentNames[i] = v.ComponentName
-
+		compOpsList[i] = v.ComponentOps
+		if err := r.checkInstanceTemplate(cluster, v.ComponentOps, v.Instances); err != nil {
+			return err
+		}
 		if invalidValue, err := validateVerticalResourceList(v.Requests); err != nil {
 			return invalidValueError(invalidValue, err.Error())
 		}
@@ -315,7 +313,7 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 			return invalidValueError(invalidValue, err.Error())
 		}
 	}
-	return r.checkComponentExistence(cluster, componentNames)
+	return r.checkComponentExistence(cluster, compOpsList)
 }
 
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
@@ -391,11 +389,11 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 		return notEmptyError("spec.horizontalScaling")
 	}
 
-	componentNames := make([]string, len(horizontalScalingList))
+	compOpsList := make([]ComponentOps, len(horizontalScalingList))
 	for i, v := range horizontalScalingList {
-		componentNames[i] = v.ComponentName
+		compOpsList[i] = v.ComponentOps
 	}
-	return r.checkComponentExistence(cluster, componentNames)
+	return r.checkComponentExistence(cluster, compOpsList)
 }
 
 // validateVolumeExpansion validates volumeExpansion api when spec.type is VolumeExpansion
@@ -405,11 +403,15 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 		return notEmptyError("spec.volumeExpansion")
 	}
 
-	componentNames := make([]string, len(volumeExpansionList))
+	compOpsList := make([]ComponentOps, len(volumeExpansionList))
 	for i, v := range volumeExpansionList {
-		componentNames[i] = v.ComponentName
+		// TODO: check instances
+		compOpsList[i] = v.ComponentOps
+		if err := r.checkInstanceTemplate(cluster, v.ComponentOps, v.Instances); err != nil {
+			return err
+		}
 	}
-	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
+	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
@@ -421,34 +423,86 @@ func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, 
 	if len(switchoverList) == 0 {
 		return notEmptyError("spec.switchover")
 	}
-	componentNames := make([]string, len(switchoverList))
+	compOpsList := make([]ComponentOps, len(switchoverList))
 	for i, v := range switchoverList {
-		componentNames[i] = v.ComponentName
+		compOpsList[i] = v.ComponentOps
 
 	}
-	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
+	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
 	return validateSwitchoverResourceList(ctx, cli, cluster, switchoverList)
 }
 
-// checkComponentExistence checks whether components to be operated exist in cluster spec.
-func (r *OpsRequest) checkComponentExistence(cluster *Cluster, compNames []string) error {
-	compSpecNameMap := make(map[string]bool)
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		compSpecNameMap[compSpec.Name] = true
-	}
-
-	var notFoundCompNames []string
-	for _, compName := range compNames {
-		if _, ok := compSpecNameMap[compName]; !ok {
-			notFoundCompNames = append(notFoundCompNames, compName)
+func (r *OpsRequest) checkInstanceTemplate(cluster *Cluster, componentOps ComponentOps, inputInstances []PartInstanceTemplate) error {
+	instanceNameMap := make(map[string]sets.Empty)
+	setInstanceMap := func(instances []InstanceTemplate) {
+		for i := range instances {
+			instanceNameMap[instances[i].Name] = sets.Empty{}
 		}
+	}
+	if componentOps.ShardingName != "" {
+		for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+			if shardingSpec.Name != componentOps.ShardingName {
+				continue
+			}
+			setInstanceMap(shardingSpec.Template.Instances)
+		}
+	} else {
+		for _, compSpec := range cluster.Spec.ComponentSpecs {
+			if compSpec.Name != componentOps.ComponentName {
+				continue
+			}
+			setInstanceMap(compSpec.Instances)
+		}
+	}
+	var notFoundInstanceNames []string
+	for _, v := range inputInstances {
+		if _, ok := instanceNameMap[v.Name]; !ok {
+			notFoundInstanceNames = append(notFoundInstanceNames, v.Name)
+		}
+	}
+	if len(notFoundInstanceNames) > 0 {
+		return fmt.Errorf("instance: %v not found in cluster: %s", notFoundInstanceNames, r.Spec.ClusterRef)
+	}
+	return nil
+}
+
+// checkComponentExistence checks whether components to be operated exist in cluster spec.
+func (r *OpsRequest) checkComponentExistence(cluster *Cluster, compOpsList []ComponentOps) error {
+	compSpecNameMap := make(map[string]sets.Empty)
+	shardingMap := make(map[string]sets.Empty)
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		compSpecNameMap[compSpec.Name] = sets.Empty{}
+	}
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		shardingMap[shardingSpec.Name] = sets.Empty{}
+	}
+	var (
+		notFoundCompNames     []string
+		notFoundShardingNames []string
+	)
+	for _, compOps := range compOpsList {
+		if compOps.ComponentName != "" {
+			if _, ok := compSpecNameMap[compOps.ComponentName]; !ok {
+				notFoundCompNames = append(notFoundCompNames, compOps.ComponentName)
+			}
+			continue
+		}
+		if compOps.ShardingName != "" {
+			if _, ok := shardingMap[compOps.ShardingName]; !ok {
+				notFoundShardingNames = append(notFoundShardingNames, compOps.ShardingName)
+			}
+			continue
+		}
+		return fmt.Errorf("shardingName or componentName can not be empty")
 	}
 
 	if len(notFoundCompNames) > 0 {
-		return fmt.Errorf("components: %v not found, you can view the components by command: "+
-			"kbcli cluster describe %s -n %s", notFoundCompNames, cluster.Name, r.Namespace)
+		return fmt.Errorf("components: %v not found, in cluster.spec.componentSpecs", notFoundCompNames)
+	}
+	if len(notFoundShardingNames) > 0 {
+		return fmt.Errorf("shardings: %v not found in cluster.spec.shardingSpecs", notFoundShardingNames)
 	}
 	return nil
 }
@@ -461,41 +515,75 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		requestStorage   resource.Quantity
 	}
 
-	// component name -> vct name -> entity
 	vols := make(map[string]map[string]Entity)
-	for _, comp := range r.Spec.VolumeExpansionList {
-		for _, vct := range comp.VolumeClaimTemplates {
-			if _, ok := vols[comp.ComponentName]; !ok {
-				vols[comp.ComponentName] = make(map[string]Entity)
+	// component name/ sharding name -> vct name -> entity
+	getKey := func(compName, shardingName, templateName string) string {
+		templateKey := ""
+		if templateName != "" {
+			templateKey = "." + templateName
+		}
+		if compName != "" {
+			return fmt.Sprintf("component.%s%s", compName, templateKey)
+		}
+		return fmt.Sprintf("sharding.%s%s", shardingName, templateKey)
+	}
+	setVols := func(vcts []OpsRequestVolumeClaimTemplate, compOps ComponentOps, templateName string) {
+		for _, vct := range vcts {
+			key := getKey(compOps.ComponentName, compOps.ShardingName, templateName)
+			if _, ok := vols[key]; !ok {
+				vols[key] = make(map[string]Entity)
 			}
-			vols[comp.ComponentName][vct.Name] = Entity{false, nil, false, vct.Storage}
+			vols[key][vct.Name] = Entity{false, nil, false, vct.Storage}
+		}
+	}
+
+	for _, comp := range r.Spec.VolumeExpansionList {
+		setVols(comp.VolumeClaimTemplates, comp.ComponentOps, "")
+		for _, ins := range comp.Instances {
+			setVols(ins.VolumeClaimTemplates, comp.ComponentOps, ins.Name)
+		}
+	}
+	fillVol := func(vct ClusterComponentVolumeClaimTemplate, key string) {
+		e, ok := vols[key][vct.Name]
+		if !ok {
+			return
+		}
+		e.existInSpec = true
+		e.storageClassName = vct.Spec.StorageClassName
+		vols[key][vct.Name] = e
+	}
+	fillCompVols := func(compSpec ClusterComponentSpec, compName, shardingName string) {
+		key := getKey(compName, shardingName, "")
+		if _, ok := vols[key]; !ok {
+			return // ignore not-exist component
+		}
+		for _, vct := range compSpec.VolumeClaimTemplates {
+			fillVol(vct, key)
+		}
+		for _, ins := range compSpec.Instances {
+			key = getKey(compName, shardingName, ins.Name)
+			for _, vct := range ins.VolumeClaimTemplates {
+				fillVol(vct, key)
+			}
 		}
 	}
 	// traverse the spec to update volumes
 	for _, comp := range cluster.Spec.ComponentSpecs {
-		if _, ok := vols[comp.Name]; !ok {
-			continue // ignore not-exist component
-		}
-		for _, vct := range comp.VolumeClaimTemplates {
-			e, ok := vols[comp.Name][vct.Name]
-			if !ok {
-				continue
-			}
-			e.existInSpec = true
-			e.storageClassName = vct.Spec.StorageClassName
-			vols[comp.Name][vct.Name] = e
-		}
+		fillCompVols(comp, comp.Name, "")
+	}
+	for _, sharding := range cluster.Spec.ShardingSpecs {
+		fillCompVols(sharding.Template, "", sharding.Name)
 	}
 
 	// check all used storage classes
 	var err error
-	for cname, compVols := range vols {
+	for key, compVols := range vols {
 		for vname := range compVols {
-			e := vols[cname][vname]
+			e := vols[key][vname]
 			if !e.existInSpec {
 				continue
 			}
-			e.storageClassName, err = r.getSCNameByPvcAndCheckStorageSize(ctx, cli, cname, vname, e.requestStorage)
+			e.storageClassName, err = r.getSCNameByPvcAndCheckStorageSize(ctx, cli, key, vname, e.requestStorage)
 			if err != nil {
 				return err
 			}
@@ -504,11 +592,11 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 				continue // ignore the error and take it as not-supported
 			}
 			e.allowExpansion = allowExpansion
-			vols[cname][vname] = e
+			vols[key][vname] = e
 		}
 	}
 
-	for cname, compVols := range vols {
+	for key, compVols := range vols {
 		var (
 			notFound     []string
 			notSupport   []string
@@ -525,17 +613,18 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 				}
 			}
 		}
+		keyStrs := strings.Split(key, ".")
 		if len(notFound) > 0 {
-			return fmt.Errorf("volumeClaimTemplates: %v not found in component: %s, you can view infos by command: "+
-				"kbcli cluster describe %s -n %s", notFound, cname, cluster.Name, r.Namespace)
+			return fmt.Errorf("volumeClaimTemplates: %v not found in %s: %s, you can view infos by command: "+
+				"kubectl get cluster %s -n %s", notFound, keyStrs[0], keyStrs[1], cluster.Name, r.Namespace)
 		}
 		if len(notSupport) > 0 {
 			var notSupportScString string
 			if len(notSupportSc) > 0 {
 				notSupportScString = fmt.Sprintf("storageClass: %v of ", notSupportSc)
 			}
-			return fmt.Errorf(notSupportScString+"volumeClaimTemplate: %s not support volume expansion in component: %s, you can view infos by command: "+
-				"kubectl get sc", notSupport, cname)
+			return fmt.Errorf(notSupportScString+"volumeClaimTemplate: %v not support volume expansion in %s: %s, you can view infos by command: "+
+				"kubectl get sc", notSupport, keyStrs[0], keyStrs[1])
 		}
 	}
 	return nil
@@ -562,31 +651,27 @@ func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
 // getSCNameByPvcAndCheckStorageSize gets the storageClassName by pvc and checks if the storage size is valid.
 func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	cli client.Client,
-	compName,
+	key,
 	vctName string,
 	requestStorage resource.Quantity) (*string, error) {
+	keyStrs := strings.Split(key, ".")
+	matchingLabels := client.MatchingLabels{
+		constant.AppInstanceLabelKey:             r.Spec.ClusterRef,
+		constant.VolumeClaimTemplateNameLabelKey: vctName,
+	}
+	if keyStrs[0] == "component" {
+		matchingLabels[constant.KBAppComponentLabelKey] = keyStrs[1]
+	} else {
+		matchingLabels[constant.KBAppShardingNameLabelKey] = keyStrs[1]
+	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), client.MatchingLabels{
-		constant.AppInstanceLabelKey:    r.Spec.ClusterRef,
-		constant.KBAppComponentLabelKey: compName,
-	}); err != nil {
+	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), matchingLabels); err != nil {
 		return nil, err
 	}
 	if len(pvcList.Items) == 0 {
 		return nil, nil
 	}
-	var pvc *corev1.PersistentVolumeClaim
-	for _, v := range pvcList.Items {
-		// VolumeClaimTemplateNameLabelKeyForLegacy is deprecated: only compatible with version 0.5, will be removed in 0.7?
-		if v.Labels[constant.VolumeClaimTemplateNameLabelKey] == vctName ||
-			v.Labels[constant.VolumeClaimTemplateNameLabelKeyForLegacy] == vctName {
-			pvc = &v
-			break
-		}
-	}
-	if pvc == nil {
-		return nil, nil
-	}
+	pvc := pvcList.Items[0]
 	previousValue := *pvc.Status.Capacity.Storage()
 	if requestStorage.Cmp(previousValue) < 0 {
 		return nil, fmt.Errorf(`requested storage size of volumeClaimTemplate "%s" can not less than status.capacity.storage "%s" `,
@@ -626,7 +711,7 @@ func (r *OpsRequest) validateDataScript(ctx context.Context, cli client.Client, 
 		return notEmptyError("spec.scriptSpec")
 	}
 
-	if err := r.checkComponentExistence(cluster, []string{scriptSpec.ComponentName}); err != nil {
+	if err := r.checkComponentExistence(cluster, []ComponentOps{scriptSpec.ComponentOps}); err != nil {
 		return err
 	}
 

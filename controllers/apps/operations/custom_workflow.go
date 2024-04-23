@@ -53,7 +53,7 @@ func NewWorkflowContext(
 }
 
 // Run actions execution layer.
-func (w *WorkflowContext) Run(compCustomSpec *appsv1alpha1.CustomOpsComponent) (*WorkflowStatus, error) {
+func (w *WorkflowContext) Run(compCustomSpec *appsv1alpha1.CustomOpsItem) (*WorkflowStatus, error) {
 	var (
 		err            error
 		actionStatus   *custom.ActionStatus
@@ -145,16 +145,16 @@ steps:
 }
 
 func (w *WorkflowContext) getAction(action appsv1alpha1.OpsAction,
-	compCustomSpec *appsv1alpha1.CustomOpsComponent,
+	compCustomItem *appsv1alpha1.CustomOpsItem,
 	comp *appsv1alpha1.ClusterComponentSpec,
 	progressDetail appsv1alpha1.ProgressStatusDetail) custom.OpsAction {
 	switch {
 	case action.Workload != nil:
 		return custom.NewWorkloadAction(w.OpsRes.OpsRequest, w.OpsRes.Cluster,
-			w.OpsRes.OpsDef, compCustomSpec, comp, progressDetail)
+			w.OpsRes.OpsDef, compCustomItem, comp, progressDetail)
 	case action.Exec != nil:
 		return custom.NewExecAction(w.OpsRes.OpsRequest, w.OpsRes.Cluster,
-			w.OpsRes.OpsDef, compCustomSpec, comp, progressDetail)
+			w.OpsRes.OpsDef, compCustomItem, comp, progressDetail)
 	case action.ResourceModifier != nil:
 		// TODO: implement it.
 		return nil

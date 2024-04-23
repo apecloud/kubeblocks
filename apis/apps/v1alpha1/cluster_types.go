@@ -468,7 +468,7 @@ type InstanceTemplate struct {
 	// Defines VolumeClaimTemplates to override.
 	// Add new or override existing volume claim templates.
 	// +optional
-	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster.
@@ -800,6 +800,10 @@ type ClusterComponentSpec struct {
 	// Any remaining replicas will be generated using the default template and will follow the default naming rules.
 	//
 	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies the names of instances to be transitioned to offline status.
@@ -1385,6 +1389,15 @@ func (r *Cluster) GetVolumeClaimNames(compName string, claimNames ...string) []s
 func (r ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
 	for _, v := range r.ComponentSpecs {
 		if v.Name == componentName {
+			return &v
+		}
+	}
+	return nil
+}
+
+func (r ClusterSpec) GetShardingByName(shardingName string) *ShardingSpec {
+	for _, v := range r.ShardingSpecs {
+		if v.Name == shardingName {
 			return &v
 		}
 	}

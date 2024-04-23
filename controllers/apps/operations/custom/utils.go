@@ -236,7 +236,7 @@ func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
 	opsDef *appsv1alpha1.OpsDefinition,
 	ops *appsv1alpha1.OpsRequest,
 	comp *appsv1alpha1.ClusterComponentSpec,
-	compCustomSpec *appsv1alpha1.CustomOpsComponent,
+	compCustomItem *appsv1alpha1.CustomOpsItem,
 	targetPodTemplate *appsv1alpha1.TargetPodTemplate,
 	targetPod *corev1.Pod) ([]corev1.EnvVar, error) {
 	var env = []corev1.EnvVar{
@@ -264,7 +264,7 @@ func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// inject params env
-	params := compCustomSpec.Parameters
+	params := compCustomItem.Parameters
 	for i := range params {
 		env = append(env, corev1.EnvVar{Name: params[i].Name, Value: params[i].Value})
 	}

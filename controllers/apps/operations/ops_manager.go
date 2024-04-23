@@ -81,6 +81,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 			}
 			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 		}
+		// TODO: abort last OpsRequest if using 'force' and intersecting with cluster component name or shard name.
 		if opsBehaviour.QueueByCluster || opsBehaviour.QueueBySelf {
 			// if ToClusterPhase is not empty, enqueue OpsRequest to the cluster Annotation.
 			opsRecorde, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, cli, opsRes, opsBehaviour)

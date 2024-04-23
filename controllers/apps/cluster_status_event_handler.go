@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -136,14 +135,6 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 		pod := &corev1.Pod{}
 		err = cli.Get(ctx, objectKey, pod, inDataContextUnspecified4C())
 		return pod, err
-	case constant.StatefulSetKind:
-		sts := &appsv1.StatefulSet{}
-		err = cli.Get(ctx, objectKey, sts, inDataContextUnspecified4C())
-		return sts, err
-	case constant.DeploymentKind:
-		deployment := &appsv1.Deployment{}
-		err = cli.Get(ctx, objectKey, deployment, inDataContextUnspecified4C())
-		return deployment, err
 	}
 	return nil, err
 }

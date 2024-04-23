@@ -45,7 +45,9 @@ const (
 	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"
 
 	// customized encryption key for encrypting the password of connection credential.
-	CfgKeyDPEncryptionKey = "DP_ENCRYPTION_KEY"
+	CfgKeyDPEncryptionKey                = "DP_ENCRYPTION_KEY"
+	CfgKeyDPBackupEncryptionSecretKeyRef = "DP_BACKUP_ENCRYPTION_SECRET_KEY_REF"
+	CfgKeyDPBackupEncryptionAlgorithm    = "DP_BACKUP_ENCRYPTION_ALGORITHM"
 
 	CfgKBReconcileWorkers = "KUBEBLOCKS_RECONCILE_WORKERS"
 	CfgClientQPS          = "CLIENT_QPS"

@@ -43,8 +43,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
@@ -398,7 +398,7 @@ func (r *componentWorkloadOps) expandVolume() error {
 
 // horizontalScale handles workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
-	sts := rsmcore.ConvertInstanceSetToSTS(r.runningITS)
+	sts := instanceset.ConvertInstanceSetToSTS(r.runningITS)
 	if sts.Status.ReadyReplicas == r.synthesizeComp.Replicas {
 		return nil
 	}
@@ -501,7 +501,7 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	}
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Noop(r.dag, r.protoITS)
-	stsProto := rsmcore.ConvertInstanceSetToSTS(r.protoITS)
+	stsProto := instanceset.ConvertInstanceSetToSTS(r.protoITS)
 	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
 	if err != nil {
 		return err

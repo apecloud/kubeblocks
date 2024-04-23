@@ -17,229 +17,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm
+package instanceset
 
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
-
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-	apps "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
-
-type ObjectGenerationTransformer struct{}
-
-var _ graph.Transformer = &ObjectGenerationTransformer{}
-
-func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*rsmTransformContext)
-	rsm := transCtx.rsm
-	rsmOrig := transCtx.rsmOrig
-	cli, _ := transCtx.Client.(model.GraphClient)
-
-	if model.IsObjectDeleting(rsmOrig) {
-		return nil
-	}
-
-	// generate objects by current spec
-	labels := getLabels(rsm)
-	selectors := getSvcSelector(rsm, false)
-	headlessSelectors := getSvcSelector(rsm, true)
-
-	svc := BuildSvc(*rsm, labels, selectors)
-	altSvs := BuildAlternativeSvs(*rsm, labels)
-	headLessSvc := BuildHeadlessSvc(*rsm, labels, headlessSelectors)
-	envConfig := BuildEnvConfigMap(*rsm, labels)
-	sts := buildSts(rsm, headLessSvc.Name, labels)
-
-	var objects []client.Object
-	objects = append(objects, sts)
-	objects = append(objects, headLessSvc, envConfig)
-	if svc != nil {
-		objects = append(objects, svc)
-	}
-	for _, s := range altSvs {
-		objects = append(objects, s)
-	}
-
-	for _, object := range objects {
-		if err := SetOwnership(rsm, object, model.GetScheme(), GetFinalizer(object)); err != nil {
-			return err
-		}
-	}
-
-	// compute create/update/delete set
-	newSnapshot := make(map[model.GVKNObjKey]client.Object)
-	for _, object := range objects {
-		name, err := model.GetGVKName(object)
-		if err != nil {
-			return err
-		}
-		newSnapshot[*name] = object
-	}
-
-	// read cache snapshot
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, labels, ownedKinds()...)
-	if err != nil {
-		return err
-	}
-
-	// now compute the diff between old and target snapshot and generate the plan
-	oldNameSet := sets.KeySet(oldSnapshot)
-	newNameSet := sets.KeySet(newSnapshot)
-
-	createSet := newNameSet.Difference(oldNameSet)
-	updateSet := newNameSet.Intersection(oldNameSet)
-	deleteSet := oldNameSet.Difference(newNameSet)
-
-	createNewObjects := func() {
-		for name := range createSet {
-			cli.Create(dag, newSnapshot[name])
-		}
-	}
-	updateObjects := func() {
-		for name := range updateSet {
-			oldObj := oldSnapshot[name]
-			newObj := copyAndMerge(oldObj, newSnapshot[name])
-			cli.Update(dag, oldObj, newObj)
-		}
-	}
-	deleteOrphanObjects := func() {
-		for name := range deleteSet {
-			cli.Delete(dag, oldSnapshot[name])
-		}
-	}
-	handleDependencies := func() {
-		// objects[0] is the sts object
-		cli.DependOn(dag, objects[0], objects[1:]...)
-	}
-
-	// objects to be created
-	createNewObjects()
-	// objects to be updated
-	updateObjects()
-	// objects to be deleted
-	deleteOrphanObjects()
-	// handle object dependencies
-	handleDependencies()
-
-	return nil
-}
-
-// copyAndMerge merges two objects for updating:
-// 1. new an object targetObj by copying from oldObj
-// 2. merge all fields can be updated from newObj into targetObj
-func copyAndMerge(oldObj, newObj client.Object) client.Object {
-	if reflect.TypeOf(oldObj) != reflect.TypeOf(newObj) {
-		return nil
-	}
-
-	// mergeMetadataMap keeps the original elements.
-	mergeMetadataMap := func(originalMap map[string]string, targetMap map[string]string) map[string]string {
-		if targetMap == nil && originalMap == nil {
-			return nil
-		}
-		if targetMap == nil {
-			targetMap = map[string]string{}
-		}
-		for k, v := range originalMap {
-			// if the element not exist in targetMap, copy it from original.
-			if _, ok := (targetMap)[k]; !ok {
-				(targetMap)[k] = v
-			}
-		}
-		return targetMap
-	}
-
-	getRoleProbeContainerIndex := func(containers []corev1.Container) int {
-		return slices.IndexFunc(containers, func(c corev1.Container) bool {
-			return c.Name == roleProbeContainerName || c.Name == constant.RoleProbeContainerName || c.Name == constant.LorryContainerName
-		})
-	}
-
-	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
-		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
-
-		// for upgrade compatibility from 0.7 to 0.8
-		oldRoleProbeContainerIndex := getRoleProbeContainerIndex(oldSts.Spec.Template.Spec.Containers)
-		newRoleProbeContainerIndex := getRoleProbeContainerIndex(newSts.Spec.Template.Spec.Containers)
-		if oldRoleProbeContainerIndex >= 0 && newRoleProbeContainerIndex >= 0 {
-			newCopySts := newSts.DeepCopy()
-			newCopySts.Spec.Template.Spec.Containers[newRoleProbeContainerIndex] = *oldSts.Spec.Template.Spec.Containers[oldRoleProbeContainerIndex].DeepCopy()
-			for i := range newCopySts.Spec.Template.Spec.Containers {
-				newContainer := &newCopySts.Spec.Template.Spec.Containers[i]
-				for j := range oldSts.Spec.Template.Spec.Containers {
-					oldContainer := oldSts.Spec.Template.Spec.Containers[j]
-					if newContainer.Name == oldContainer.Name {
-						controllerutil.ResolveContainerDefaultFields(oldContainer, newContainer)
-						break
-					}
-				}
-			}
-			for i := range newCopySts.Spec.Template.Spec.InitContainers {
-				newContainer := &newCopySts.Spec.Template.Spec.InitContainers[i]
-				for j := range oldSts.Spec.Template.Spec.InitContainers {
-					oldContainer := oldSts.Spec.Template.Spec.InitContainers[j]
-					if newContainer.Name == oldContainer.Name {
-						controllerutil.ResolveContainerDefaultFields(oldContainer, newContainer)
-						break
-					}
-				}
-			}
-
-			if reflect.DeepEqual(newCopySts.Spec.Template.Spec.Containers, oldSts.Spec.Template.Spec.Containers) &&
-				reflect.DeepEqual(newCopySts.Spec.Template.Spec.InitContainers, oldSts.Spec.Template.Spec.InitContainers) {
-				newSts = newCopySts
-			}
-		}
-		// if annotations exist and are replaced, the StatefulSet will be updated.
-		oldSts.Annotations = mergeMetadataMap(oldSts.Annotations, newSts.Annotations)
-		oldSts.Spec.Template = newSts.Spec.Template
-		oldSts.Spec.Replicas = newSts.Spec.Replicas
-		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
-		return oldSts
-	}
-
-	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
-		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
-		oldSvc.Spec = newSvc.Spec
-		return oldSvc
-	}
-
-	copyAndMergeCm := func(oldCm, newCm *corev1.ConfigMap) client.Object {
-		oldCm.Data = newCm.Data
-		oldCm.BinaryData = newCm.BinaryData
-		return oldCm
-	}
-
-	targetObj := oldObj.DeepCopyObject()
-	switch o := newObj.(type) {
-	case *apps.StatefulSet:
-		return copyAndMergeSts(targetObj.(*apps.StatefulSet), o)
-	case *corev1.Service:
-		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
-	case *corev1.ConfigMap:
-		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
-	default:
-		return newObj
-	}
-}
 
 func BuildSvc(rsm workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
 	if rsm.Spec.Service == nil {
@@ -312,25 +107,6 @@ func BuildHeadlessSvc(rsm workloads.InstanceSet, labels, selectors map[string]st
 		}
 	}
 	return hdlBuilder.GetObject()
-}
-
-func buildSts(rsm *workloads.InstanceSet, headlessSvcName string, labels map[string]string) *apps.StatefulSet {
-	envConfigName := GetEnvConfigMapName(rsm.Name)
-	template := BuildPodTemplate(rsm, envConfigName)
-	annotations := ParseAnnotationsOfScope(RootScope, rsm.Annotations)
-	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
-		AddLabelsInMap(labels).
-		AddLabels(rsmGenerationLabelKey, strconv.FormatInt(rsm.Generation, 10)).
-		AddAnnotationsInMap(annotations).
-		SetSelector(rsm.Spec.Selector).
-		SetServiceName(headlessSvcName).
-		SetReplicas(*rsm.Spec.Replicas).
-		SetMinReadySeconds(rsm.Spec.MinReadySeconds).
-		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
-		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
-		SetTemplate(*template).
-		SetUpdateStrategy(apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType}).
-		GetObject()
 }
 
 func BuildEnvConfigMap(rsm workloads.InstanceSet, labels map[string]string) *corev1.ConfigMap {

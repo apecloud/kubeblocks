@@ -28,7 +28,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 var _ = Describe("assistant object reconciler test", func() {
@@ -59,7 +58,7 @@ var _ = Describe("assistant object reconciler test", func() {
 			objects := tree.GetSecondaryObjects()
 			Expect(objects).Should(HaveLen(2))
 			svc := builder.NewHeadlessServiceBuilder(namespace, name+"-headless").GetObject()
-			cm := builder.NewConfigMapBuilder(namespace, rsm.GetEnvConfigMapName(name)).GetObject()
+			cm := builder.NewConfigMapBuilder(namespace, GetEnvConfigMapName(name)).GetObject()
 			for _, object := range []client.Object{svc, cm} {
 				name, err := model.GetGVKName(object)
 				Expect(err).Should(BeNil())

@@ -43,7 +43,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 type instanceTemplateExt struct {
@@ -429,8 +428,8 @@ func BuildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 }
 
 func buildInstanceTemplateExts(itsExt *instanceSetExt) []*instanceTemplateExt {
-	envConfigName := rsm.GetEnvConfigMapName(itsExt.its.Name)
-	defaultTemplate := rsm.BuildPodTemplate(itsExt.its, envConfigName)
+	envConfigName := GetEnvConfigMapName(itsExt.its.Name)
+	defaultTemplate := BuildPodTemplate(itsExt.its, envConfigName)
 	makeInstanceTemplateExt := func() *instanceTemplateExt {
 		var claims []corev1.PersistentVolumeClaim
 		for _, template := range itsExt.its.Spec.VolumeClaimTemplates {

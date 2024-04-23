@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm
+package instanceset
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -33,8 +33,8 @@ import (
 
 var _ = Describe("update plan test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewInstanceSetBuilder(namespace, name).SetRoles(roles).GetObject()
-		rsm.Status.UpdateRevision = newRevision
+		its = builder.NewInstanceSetBuilder(namespace, name).SetRoles(roles).GetObject()
+		its.Status.UpdateRevision = newRevision
 	})
 
 	Context("plan build&Execute", func() {
@@ -106,7 +106,7 @@ var _ = Describe("update plan test.", func() {
 					makePodUpdateReady(newRevision, roleful, expectedPlan[i-1]...)
 				}
 				pods := buildPodList()
-				plan := newUpdatePlan(*rsm, pods)
+				plan := newUpdatePlan(*its, pods)
 				podUpdateList, err := plan.Execute()
 				Expect(err).Should(BeNil())
 				podList := toPodList(podUpdateList)
@@ -122,7 +122,7 @@ var _ = Describe("update plan test.", func() {
 		It("should work well in a serial plan", func() {
 			By("build a serial plan")
 			strategy := workloads.SerialUpdateStrategy
-			rsm.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.MemberUpdateStrategy = &strategy
 			expectedPlan := [][]*corev1.Pod{
 				{pod4},
 				{pod2},
@@ -138,7 +138,7 @@ var _ = Describe("update plan test.", func() {
 		It("should work well in a parallel plan", func() {
 			By("build a parallel plan")
 			strategy := workloads.ParallelUpdateStrategy
-			rsm.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.MemberUpdateStrategy = &strategy
 			expectedPlan := [][]*corev1.Pod{
 				{pod0, pod1, pod2, pod3, pod4, pod5, pod6},
 			}
@@ -148,7 +148,7 @@ var _ = Describe("update plan test.", func() {
 		It("should work well in a best effort parallel", func() {
 			By("build a best effort parallel plan")
 			strategy := workloads.BestEffortParallelUpdateStrategy
-			rsm.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.MemberUpdateStrategy = &strategy
 			expectedPlan := [][]*corev1.Pod{
 				{pod2, pod3, pod4, pod6},
 				{pod1},
@@ -161,8 +161,8 @@ var _ = Describe("update plan test.", func() {
 		It("should work well with role-less and heterogeneous pods", func() {
 			By("build a serial plan with role-less and heterogeneous pods")
 			strategy := workloads.SerialUpdateStrategy
-			rsm.Spec.MemberUpdateStrategy = &strategy
-			rsm.Spec.Roles = nil
+			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.Roles = nil
 			for _, pod := range []*corev1.Pod{pod0, pod1, pod2, pod3, pod4, pod5, pod6} {
 				labels := pod.Labels
 				if len(labels) == 0 {

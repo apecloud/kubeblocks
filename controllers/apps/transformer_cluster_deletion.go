@@ -37,8 +37,8 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -123,7 +123,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	for _, o := range delObjs {
 		// skip the objects owned by the component and rsm controller
-		if shouldSkipObjOwnedByComp(o, *cluster) || rsm.IsOwnedByRsm(o) {
+		if shouldSkipObjOwnedByComp(o, *cluster) || instanceset.IsOwnedByRsm(o) {
 			continue
 		}
 		graphCli.Delete(dag, o, inUniversalContext4G())

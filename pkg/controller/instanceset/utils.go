@@ -20,12 +20,350 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"fmt"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+
 	"golang.org/x/exp/slices"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubectl/pkg/util/podutils"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+type getRole func(int) string
+type getOrdinal func(int) int
+
+const (
+	leaderPriority            = 1 << 5
+	followerReadWritePriority = 1 << 4
+	followerReadonlyPriority  = 1 << 3
+	followerNonePriority      = 1 << 2
+	learnerPriority           = 1 << 1
+	emptyPriority             = 1 << 0
+	// unknownPriority           = 0
+)
+
+var podNameRegex = regexp.MustCompile(`(.*)-([0-9]+)$`)
+
+// SortPods sorts pods by their role priority
+// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
+// reverse it if reverse==true
+func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
+	getRoleFunc := func(i int) string {
+		return GetRoleName(pods[i])
+	}
+	getOrdinalFunc := func(i int) int {
+		_, ordinal := intctrlutil.GetParentNameAndOrdinal(&pods[i])
+		return ordinal
+	}
+	sortMembers(pods, rolePriorityMap, getRoleFunc, getOrdinalFunc, reverse)
+}
+
+func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {
+	getRoleFunc := func(i int) string {
+		return membersStatus[i].ReplicaRole.Name
+	}
+	getOrdinalFunc := func(i int) int {
+		ordinal, _ := getPodOrdinal(membersStatus[i].PodName)
+		return ordinal
+	}
+	sortMembers(membersStatus, rolePriorityMap, getRoleFunc, getOrdinalFunc, true)
+}
+
+// sortMembers sorts items by role priority and pod ordinal.
+func sortMembers[T any](items []T,
+	rolePriorityMap map[string]int,
+	getRoleFunc getRole, getOrdinalFunc getOrdinal,
+	reverse bool) {
+	sort.SliceStable(items, func(i, j int) bool {
+		if reverse {
+			i, j = j, i
+		}
+		roleI := getRoleFunc(i)
+		roleJ := getRoleFunc(j)
+		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
+			ordinal1 := getOrdinalFunc(i)
+			ordinal2 := getOrdinalFunc(j)
+			return ordinal1 < ordinal2
+		}
+		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
+	})
+}
+
+// ComposeRolePriorityMap generates a priority map based on roles.
+func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
+	rolePriorityMap := make(map[string]int, 0)
+	rolePriorityMap[""] = emptyPriority
+	for _, role := range roles {
+		roleName := strings.ToLower(role.Name)
+		switch {
+		case role.IsLeader:
+			rolePriorityMap[roleName] = leaderPriority
+		case role.CanVote:
+			switch role.AccessMode {
+			case workloads.NoneMode:
+				rolePriorityMap[roleName] = followerNonePriority
+			case workloads.ReadonlyMode:
+				rolePriorityMap[roleName] = followerReadonlyPriority
+			case workloads.ReadWriteMode:
+				rolePriorityMap[roleName] = followerReadWritePriority
+			}
+		default:
+			rolePriorityMap[roleName] = learnerPriority
+		}
+	}
+
+	return rolePriorityMap
+}
+
+func composeRoleMap(rsm workloads.InstanceSet) map[string]workloads.ReplicaRole {
+	roleMap := make(map[string]workloads.ReplicaRole, 0)
+	for _, role := range rsm.Spec.Roles {
+		roleMap[strings.ToLower(role.Name)] = role
+	}
+	return roleMap
+}
+
+func setMembersStatus(rsm *workloads.InstanceSet, pods *[]corev1.Pod) {
+	// no roles defined
+	if rsm.Spec.Roles == nil {
+		setMembersStatusWithoutRole(rsm, pods)
+		return
+	}
+	// compose new status
+	newMembersStatus := make([]workloads.MemberStatus, 0)
+	roleMap := composeRoleMap(*rsm)
+	for _, pod := range *pods {
+		if !intctrlutil.PodIsReadyWithLabel(pod) {
+			continue
+		}
+		readyWithoutPrimary := false
+		roleName := GetRoleName(pod)
+		role, ok := roleMap[roleName]
+		if !ok {
+			continue
+		}
+		if value, ok := pod.Labels[constant.ReadyWithoutPrimaryKey]; ok && value == "true" {
+			readyWithoutPrimary = true
+		}
+		memberStatus := workloads.MemberStatus{
+			PodName:             pod.Name,
+			ReplicaRole:         &role,
+			Ready:               true,
+			ReadyWithoutPrimary: readyWithoutPrimary,
+		}
+		newMembersStatus = append(newMembersStatus, memberStatus)
+	}
+
+	// sort and set
+	rolePriorityMap := ComposeRolePriorityMap(rsm.Spec.Roles)
+	sortMembersStatus(newMembersStatus, rolePriorityMap)
+	rsm.Status.MembersStatus = newMembersStatus
+}
+
+func setMembersStatusWithoutRole(rsm *workloads.InstanceSet, pods *[]corev1.Pod) {
+	var membersStatus []workloads.MemberStatus
+	for _, pod := range *pods {
+		memberStatus := workloads.MemberStatus{
+			PodName: pod.Name,
+			Ready:   podutils.IsPodReady(&pod),
+		}
+		membersStatus = append(membersStatus, memberStatus)
+	}
+	slices.SortStableFunc(membersStatus, func(a, b workloads.MemberStatus) bool {
+		return a.PodName < b.PodName
+	})
+	rsm.Status.MembersStatus = membersStatus
+}
+
+// GetRoleName gets role name of pod 'pod'
+func GetRoleName(pod corev1.Pod) string {
+	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
+}
+
+func getHeadlessSvcName(rsm workloads.InstanceSet) string {
+	return strings.Join([]string{rsm.Name, "headless"}, "-")
+}
+
+func findSvcPort(rsm *workloads.InstanceSet) int {
+	if rsm.Spec.Service == nil || len(rsm.Spec.Service.Spec.Ports) == 0 {
+		return 0
+	}
+	port := rsm.Spec.Service.Spec.Ports[0]
+	for _, c := range rsm.Spec.Template.Spec.Containers {
+		for _, p := range c.Ports {
+			if port.TargetPort.Type == intstr.String && p.Name == port.TargetPort.StrVal ||
+				port.TargetPort.Type == intstr.Int && p.ContainerPort == port.TargetPort.IntVal {
+				return int(p.ContainerPort)
+			}
+		}
+	}
+	return 0
+}
+
+func getPodName(parent string, ordinal int) string {
+	return fmt.Sprintf("%s-%d", parent, ordinal)
+}
+
+func getLeaderPodName(membersStatus []workloads.MemberStatus) string {
+	for _, memberStatus := range membersStatus {
+		if memberStatus.ReplicaRole != nil && memberStatus.ReplicaRole.IsLeader {
+			return memberStatus.PodName
+		}
+	}
+	return ""
+}
+
+func getPodOrdinal(podName string) (int, error) {
+	subMatches := podNameRegex.FindStringSubmatch(podName)
+	if len(subMatches) < 3 {
+		return 0, fmt.Errorf("wrong pod name: %s", podName)
+	}
+	return strconv.Atoi(subMatches[2])
+}
+
+func getLabels(rsm *workloads.InstanceSet) map[string]string {
+	return map[string]string{
+		WorkloadsManagedByLabelKey: KindInstanceSet,
+		WorkloadsInstanceLabelKey:  rsm.Name,
+	}
+}
+
+// IsInstanceSetReady gives rsm level 'ready' state:
+// 1. all replicas exist
+// 2. all members have role set
+func IsInstanceSetReady(rsm *workloads.InstanceSet) bool {
+	if rsm == nil {
+		return false
+	}
+	// check whether the rsm cluster has been initialized
+	if rsm.Status.ReadyInitReplicas != rsm.Status.InitReplicas {
+		return false
+	}
+	// check whether latest spec has been sent to the underlying workload(sts)
+	if rsm.Status.ObservedGeneration != rsm.Generation || rsm.Status.CurrentGeneration != rsm.Generation {
+		return false
+	}
+	// check whether the underlying workload(sts) is ready
+	if rsm.Spec.Replicas == nil {
+		return false
+	}
+	replicas := *rsm.Spec.Replicas
+	if rsm.Status.Replicas != replicas ||
+		rsm.Status.ReadyReplicas != replicas ||
+		rsm.Status.UpdatedReplicas != replicas {
+		return false
+	}
+	// check availableReplicas only if minReadySeconds is set
+	if rsm.Spec.MinReadySeconds > 0 && rsm.Status.AvailableReplicas != replicas {
+		return false
+	}
+	// check whether role probe has done
+	if rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
+		return true
+	}
+	membersStatus := rsm.Status.MembersStatus
+	if len(membersStatus) != int(*rsm.Spec.Replicas) {
+		return false
+	}
+	hasLeader := false
+	for _, status := range membersStatus {
+		if status.ReadyWithoutPrimary {
+			return true
+		}
+		if status.ReplicaRole != nil && status.ReplicaRole.IsLeader {
+			hasLeader = true
+			break
+		}
+	}
+	return hasLeader
+}
+
+// AddAnnotationScope will add AnnotationScope defined by 'scope' to all keys in map 'annotations'.
+func AddAnnotationScope(scope AnnotationScope, annotations map[string]string) map[string]string {
+	if annotations == nil {
+		return nil
+	}
+	scopedAnnotations := make(map[string]string, len(annotations))
+	for k, v := range annotations {
+		scopedAnnotations[fmt.Sprintf("%s%s", k, scope)] = v
+	}
+	return scopedAnnotations
+}
+
+// ParseAnnotationsOfScope parses all annotations with AnnotationScope defined by 'scope'.
+// the AnnotationScope suffix of keys in result map will be trimmed.
+func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string]string) map[string]string {
+	if scopedAnnotations == nil {
+		return nil
+	}
+
+	annotations := make(map[string]string, 0)
+	if scope == RootScope {
+		for k, v := range scopedAnnotations {
+			if strings.HasSuffix(k, scopeSuffix) {
+				continue
+			}
+			annotations[k] = v
+		}
+		return annotations
+	}
+
+	for k, v := range scopedAnnotations {
+		if strings.HasSuffix(k, string(scope)) {
+			annotations[strings.TrimSuffix(k, string(scope))] = v
+		}
+	}
+	return annotations
+}
+
+// ConvertInstanceSetToSTS converts a rsm to sts
+// TODO(free6om): refactor this func out
+func ConvertInstanceSetToSTS(rsm *workloads.InstanceSet) *appsv1.StatefulSet {
+	panic("refactor out me")
+	if rsm == nil {
+		return nil
+	}
+	sts := builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
+		SetUID(rsm.UID).
+		AddLabelsInMap(rsm.Labels).
+		AddAnnotationsInMap(rsm.Annotations).
+		SetReplicas(*rsm.Spec.Replicas).
+		SetSelector(rsm.Spec.Selector).
+		SetServiceName(rsm.Spec.ServiceName).
+		SetTemplate(rsm.Spec.Template).
+		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
+		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
+		SetUpdateStrategy(rsm.Spec.UpdateStrategy).
+		GetObject()
+	sts.Generation = rsm.Generation
+	sts.Status = rsm.Status.StatefulSetStatus
+	sts.Status.ObservedGeneration = rsm.Status.ObservedGeneration
+	return sts
+}
+
+func GetEnvConfigMapName(rsmName string) string {
+	return fmt.Sprintf("%s-its-env", rsmName)
+}
+
+// IsOwnedByRsm is used to judge if the obj is owned by rsm
+func IsOwnedByRsm(obj client.Object) bool {
+	for _, ref := range obj.GetOwnerReferences() {
+		if ref.Kind == KindInstanceSet && ref.Controller != nil && *ref.Controller {
+			return true
+		}
+	}
+	return false
+}
 
 func mergeMap[K comparable, V any](src, dst *map[K]V) {
 	if len(*src) == 0 {
@@ -56,8 +394,8 @@ func mergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 
 func getMatchLabels(name string) map[string]string {
 	return map[string]string{
-		rsm.WorkloadsManagedByLabelKey: workloads.Kind,
-		rsm.WorkloadsInstanceLabelKey:  name,
+		WorkloadsManagedByLabelKey: workloads.Kind,
+		WorkloadsInstanceLabelKey:  name,
 	}
 }
 

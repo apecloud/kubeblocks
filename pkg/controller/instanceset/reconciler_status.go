@@ -25,7 +25,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // statusReconciler computes the current status
@@ -103,7 +102,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	}
 
 	// 3. set members status
-	rsm.SetMembersStatus(its, &podList)
+	setMembersStatus(its, &podList)
 
 	return tree, nil
 }

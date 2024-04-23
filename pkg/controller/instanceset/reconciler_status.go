@@ -111,15 +111,15 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	return tree, nil
 }
 
-func setMembersStatus(rsm *workloads.InstanceSet, pods *[]corev1.Pod) {
+func setMembersStatus(its *workloads.InstanceSet, pods *[]corev1.Pod) {
 	// no roles defined
-	if rsm.Spec.Roles == nil {
-		setMembersStatusWithoutRole(rsm, pods)
+	if its.Spec.Roles == nil {
+		setMembersStatusWithoutRole(its, pods)
 		return
 	}
 	// compose new status
 	newMembersStatus := make([]workloads.MemberStatus, 0)
-	roleMap := composeRoleMap(*rsm)
+	roleMap := composeRoleMap(*its)
 	for _, pod := range *pods {
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
@@ -143,12 +143,12 @@ func setMembersStatus(rsm *workloads.InstanceSet, pods *[]corev1.Pod) {
 	}
 
 	// sort and set
-	rolePriorityMap := ComposeRolePriorityMap(rsm.Spec.Roles)
+	rolePriorityMap := ComposeRolePriorityMap(its.Spec.Roles)
 	sortMembersStatus(newMembersStatus, rolePriorityMap)
-	rsm.Status.MembersStatus = newMembersStatus
+	its.Status.MembersStatus = newMembersStatus
 }
 
-func setMembersStatusWithoutRole(rsm *workloads.InstanceSet, pods *[]corev1.Pod) {
+func setMembersStatusWithoutRole(its *workloads.InstanceSet, pods *[]corev1.Pod) {
 	var membersStatus []workloads.MemberStatus
 	for _, pod := range *pods {
 		memberStatus := workloads.MemberStatus{
@@ -160,7 +160,7 @@ func setMembersStatusWithoutRole(rsm *workloads.InstanceSet, pods *[]corev1.Pod)
 	slices.SortStableFunc(membersStatus, func(a, b workloads.MemberStatus) bool {
 		return a.PodName < b.PodName
 	})
-	rsm.Status.MembersStatus = membersStatus
+	its.Status.MembersStatus = membersStatus
 }
 
 func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {

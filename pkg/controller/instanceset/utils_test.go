@@ -203,7 +203,7 @@ var _ = Describe("utils test", func() {
 			By("call with RootScope")
 			scopedAnnotations["foo"] = "bar"
 			scopedAnnotations["foo.bar"] = "foo.bar"
-			headlessK := "foo.headless.rsm"
+			headlessK := "foo.headless.its"
 			scopedAnnotations[headlessK] = headlessK
 			annotations = ParseAnnotationsOfScope(RootScope, scopedAnnotations)
 			Expect(annotations).ShouldNot(BeNil())

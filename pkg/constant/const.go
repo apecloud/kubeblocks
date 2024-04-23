@@ -292,10 +292,6 @@ const (
 )
 
 const (
-	FeatureGateReplicatedStateMachine = "REPLICATED_STATE_MACHINE" // enable rsm
-)
-
-const (
 	KubernetesClusterDomainEnv = "KUBERNETES_CLUSTER_DOMAIN"
 	DefaultDNSDomain           = "cluster.local"
 )

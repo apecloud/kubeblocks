@@ -255,7 +255,7 @@ func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer st
 			return err
 		}
 	}
-	if !controllerutil.ContainsFinalizer(obj, finalizer) {
+	if len(finalizer) > 0 && !controllerutil.ContainsFinalizer(obj, finalizer) {
 		// pvc objects do not need to add finalizer
 		_, ok := obj.(*corev1.PersistentVolumeClaim)
 		if !ok {

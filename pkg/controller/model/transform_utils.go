@@ -193,9 +193,8 @@ func IsReconciliationPaused(object client.Object) bool {
 	return paused.Interface().(bool)
 }
 
-// ReadCacheSnapshot reads all objects owned by our cluster
+// ReadCacheSnapshot reads all objects owned by root object.
 func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (ObjectSnapshot, error) {
-	// list what kinds of object cluster owns
 	snapshot := make(ObjectSnapshot)
 	inNS := client.InNamespace(root.GetNamespace())
 	for _, list := range kinds {

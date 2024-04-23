@@ -45,6 +45,7 @@ var _ = Describe("status reconciler test", func() {
 			SetMinReadySeconds(minReadySeconds).
 			SetRoles(roles).
 			GetObject()
+		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
 	})
 
 	Context("PreCondition & Reconcile", func() {
@@ -149,6 +150,80 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
 			Expect(its.Status.CurrentGeneration).Should(BeEquivalentTo(its.Generation))
+		})
+	})
+
+	Context("setMembersStatus function", func() {
+		It("should work well", func() {
+			pods := []corev1.Pod{
+				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(RoleLabelKey, "follower").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(RoleLabelKey, "leader").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-2").AddLabels(RoleLabelKey, "follower").GetObject(),
+			}
+			readyCondition := corev1.PodCondition{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}
+			pods[0].Status.Conditions = append(pods[0].Status.Conditions, readyCondition)
+			pods[1].Status.Conditions = append(pods[1].Status.Conditions, readyCondition)
+			oldMembersStatus := []workloads.MemberStatus{
+				{
+					PodName:     "pod-0",
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader"},
+				},
+				{
+					PodName:     "pod-1",
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
+				},
+				{
+					PodName:     "pod-2",
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
+				},
+			}
+			replicas := int32(3)
+			its.Spec.Replicas = &replicas
+			its.Status.MembersStatus = oldMembersStatus
+			setMembersStatus(its, &pods)
+
+			Expect(its.Status.MembersStatus).Should(HaveLen(2))
+			Expect(its.Status.MembersStatus[0].PodName).Should(Equal("pod-1"))
+			Expect(its.Status.MembersStatus[0].ReplicaRole.Name).Should(Equal("leader"))
+			Expect(its.Status.MembersStatus[1].PodName).Should(Equal("pod-0"))
+			Expect(its.Status.MembersStatus[1].ReplicaRole.Name).Should(Equal("follower"))
+		})
+	})
+
+	Context("sortMembersStatus function", func() {
+		It("should work well", func() {
+			// 2(learner)->1(learner)->4(logger)->0(follower)->3(leader)
+			membersStatus := []workloads.MemberStatus{
+				{
+					PodName:     "pod-0",
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
+				},
+				{
+					PodName:     "pod-1",
+					ReplicaRole: &workloads.ReplicaRole{Name: "learner"},
+				},
+				{
+					PodName:     "pod-2",
+					ReplicaRole: &workloads.ReplicaRole{Name: "learner"},
+				},
+				{
+					PodName:     "pod-3",
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader"},
+				},
+				{
+					PodName:     "pod-4",
+					ReplicaRole: &workloads.ReplicaRole{Name: "logger"},
+				},
+			}
+			expectedOrder := []string{"pod-3", "pod-0", "pod-4", "pod-1", "pod-2"}
+
+			sortMembersStatus(membersStatus, priorityMap)
+			for i, status := range membersStatus {
+				Expect(status.PodName).Should(Equal(expectedOrder[i]))
+			}
 		})
 	})
 })

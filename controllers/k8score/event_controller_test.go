@@ -38,7 +38,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -97,7 +97,7 @@ var _ = Describe("Event Controller", func() {
 		return builder.NewPodBuilder(testCtx.DefaultNamespace, name).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			AddLabels(constant.KBAppComponentLabelKey, componentName).
-			AddLabels(rsm.WorkloadsInstanceLabelKey, itsName).
+			AddLabels(instanceset.WorkloadsInstanceLabelKey, itsName).
 			SetContainers([]corev1.Container{
 				{
 					Image: "foo",

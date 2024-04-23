@@ -22,12 +22,13 @@ package dataprotection
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -98,21 +99,15 @@ func NewFakeStorageProvider(testCtx *testutil.TestContext,
 				change(obj)
 			}
 		})
-	// create the CSIDriver to make the storageProvider happy
-	csiDriver := &storagev1.CSIDriver{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: sp.Spec.CSIDriverName,
-		},
-	}
-	err := client.IgnoreAlreadyExists(testCtx.Cli.Create(testCtx.Ctx, csiDriver))
-	Expect(err).ToNot(HaveOccurred())
-
-	// make sure the storageProvider is ready
-	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(sp),
-		func(g Gomega, sp *dpv1alpha1.StorageProvider) {
-			g.Expect(sp.Status.Phase).To(BeEquivalentTo(dpv1alpha1.StorageProviderReady))
-		}),
-	).Should(Succeed())
+	// the storage provider controller is not running, so set the status manually
+	Expect(testapps.ChangeObjStatus(testCtx, sp, func() {
+		sp.Status.Phase = dpv1alpha1.StorageProviderReady
+		meta.SetStatusCondition(&sp.Status.Conditions, metav1.Condition{
+			Type:   dpv1alpha1.ConditionTypeCSIDriverInstalled,
+			Status: metav1.ConditionTrue,
+			Reason: "CSIDriverInstalled",
+		})
+	})).Should(Succeed())
 	return sp
 }
 

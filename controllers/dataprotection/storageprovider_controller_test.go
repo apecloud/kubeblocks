@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -77,9 +78,15 @@ var _ = Describe("StorageProvider controller", func() {
 
 	Context("StorageProvider controller test", func() {
 		var key types.NamespacedName
+		var reconclier *StorageProviderReconciler
 		BeforeEach(func() {
 			cleanEnv()
 			Expect(client.IgnoreAlreadyExists(testCtx.CreateNamespace())).To(Not(HaveOccurred()))
+			reconclier = &StorageProviderReconciler{
+				Client:   k8sManager.GetClient(),
+				Scheme:   k8sManager.GetScheme(),
+				Recorder: k8sManager.GetEventRecorderFor("storage-provider-controller"),
+			}
 		})
 
 		AfterEach(func() {
@@ -134,12 +141,18 @@ var _ = Describe("StorageProvider controller", func() {
 			g.ExpectWithOffset(1, val).Should(BeTrue())
 		}
 
+		reconcileNoError := func() {
+			_, err := reconclier.Reconcile(testCtx.Ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+		}
+
 		It("should reconcile a StorageProvider to Ready status if it doesn't specify csiDriverName", func() {
 			By("creating a StorageProvider with an empty csiDriverName")
 			createStorageProviderSpec("")
 
 			By("checking status.phase and status.conditions")
 			Eventually(func(g Gomega) {
+				reconcileNoError()
 				shouldReady(g, getProvider(g))
 			}).Should(Succeed())
 		})
@@ -151,6 +164,7 @@ var _ = Describe("StorageProvider controller", func() {
 
 			By("checking status.phase and status.conditions")
 			Eventually(func(g Gomega) {
+				reconcileNoError()
 				provider := getProvider(g)
 				g.Expect(provider.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.StorageProviderReady))
 
@@ -165,6 +179,7 @@ var _ = Describe("StorageProvider controller", func() {
 			createStorageProviderSpec("csi2")
 			By("checking status.phase, it should be NotReady because CSI driver is not installed yet")
 			Eventually(func(g Gomega) {
+				reconcileNoError()
 				shouldNotReady(g, getProvider(g))
 			}).Should(Succeed())
 
@@ -172,6 +187,7 @@ var _ = Describe("StorageProvider controller", func() {
 			createCSIDriverObjectSpec("csi2")
 			By("checking status.phase, it should become Ready")
 			Eventually(func(g Gomega) {
+				reconcileNoError()
 				shouldReady(g, getProvider(g))
 			}).Should(Succeed())
 
@@ -179,6 +195,7 @@ var _ = Describe("StorageProvider controller", func() {
 			deleteCSIDriverObject("csi2")
 			By("checking status.phase, it should become NotReady")
 			Eventually(func(g Gomega) {
+				reconcileNoError()
 				shouldNotReady(g, getProvider(g))
 			}).Should(Succeed())
 		})
@@ -189,11 +206,13 @@ var _ = Describe("StorageProvider controller", func() {
 
 			By("checking StorageProvider object")
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, provider *dpv1alpha1.StorageProvider) {
+				reconcileNoError()
 				g.Expect(provider.GetFinalizers()).To(ContainElement(dptypes.DataProtectionFinalizerName))
 			})).Should(Succeed())
 
 			By("deleting StorageProvider object")
 			Eventually(func(g Gomega) {
+				reconcileNoError()
 				provider := &dpv1alpha1.StorageProvider{}
 				err := testCtx.Cli.Get(ctx, key, provider)
 				if apierrors.IsNotFound(err) {

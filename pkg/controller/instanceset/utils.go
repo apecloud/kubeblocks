@@ -69,14 +69,6 @@ func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	return rolePriorityMap
 }
 
-func composeRoleMap(rsm workloads.InstanceSet) map[string]workloads.ReplicaRole {
-	roleMap := make(map[string]workloads.ReplicaRole)
-	for _, role := range rsm.Spec.Roles {
-		roleMap[strings.ToLower(role.Name)] = role
-	}
-	return roleMap
-}
-
 // SortPods sorts pods by their role priority
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name > follower2.Name
 // reverse it if reverse==true
@@ -220,6 +212,14 @@ func IsOwnedByRsm(obj client.Object) bool {
 		}
 	}
 	return false
+}
+
+func composeRoleMap(rsm workloads.InstanceSet) map[string]workloads.ReplicaRole {
+	roleMap := make(map[string]workloads.ReplicaRole)
+	for _, role := range rsm.Spec.Roles {
+		roleMap[strings.ToLower(role.Name)] = role
+	}
+	return roleMap
 }
 
 func mergeMap[K comparable, V any](src, dst *map[K]V) {

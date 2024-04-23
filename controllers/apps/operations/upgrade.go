@@ -71,8 +71,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, u.podApplyCompOps)
 	}
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade",
-		nil, handleUpgradeProgress)
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
 }
 
 func (u upgradeOpsHandler) podApplyCompOps(

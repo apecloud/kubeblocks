@@ -28,7 +28,7 @@ const (
 
 	defaultPodName = "Unknown"
 
-	LegacyFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
+	LegacyRSMFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
 
 	roleProbeContainerName       = "kb-role-probe"
 	roleProbeBinaryName          = "lorry"

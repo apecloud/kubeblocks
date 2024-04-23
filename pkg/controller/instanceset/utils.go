@@ -187,7 +187,6 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 // ConvertInstanceSetToSTS converts a rsm to sts
 // TODO(free6om): refactor this func out
 func ConvertInstanceSetToSTS(rsm *workloads.InstanceSet) *appsv1.StatefulSet {
-	panic("refactor out me")
 	if rsm == nil {
 		return nil
 	}

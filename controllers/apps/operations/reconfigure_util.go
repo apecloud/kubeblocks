@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -219,10 +220,12 @@ func updateFileContent(item *appsv1alpha1.ConfigurationItemDetail, key string, c
 	}
 }
 
-func updateParameters(item *appsv1alpha1.ConfigurationItemDetail, key string, parameters []appsv1alpha1.ParameterPair) {
+func updateParameters(item *appsv1alpha1.ConfigurationItemDetail, key string, parameters []appsv1alpha1.ParameterPair, filter validate.ValidatorOptions) {
 	updatedParams := make(map[string]*string, len(parameters))
 	for _, parameter := range parameters {
-		updatedParams[parameter.Key] = parameter.Value
+		if filter(parameter.Key) {
+			updatedParams[parameter.Key] = parameter.Value
+		}
 	}
 
 	params, ok := item.ConfigFileParams[key]

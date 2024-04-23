@@ -139,8 +139,13 @@ spec:
             - name: DP_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kubeblocks.fullname" . }}-secret
-                  key: dataProtectionEncryptionKey
+                  {{- include "dataprotection.encryptionKeySecretKeyRef" . | nindent 18 }}
+            {{- if .Values.dataProtection.enableBackupEncryption }}
+            - name: DP_BACKUP_ENCRYPTION_SECRET_KEY_REF
+              value: {{ include "dataprotection.encryptionKeySecretKeyRef" . | fromYaml | toJson | quote }}
+            - name: DP_BACKUP_ENCRYPTION_ALGORITHM
+              value: {{ include "dataprotection.backupEncryptionAlgorithm" . }}
+            {{- end }}
             - name: KUBE_PROVIDER
               value: {{ .Values.provider | quote }}
             - name: HOST_PORT_INCLUDE_RANGES

@@ -4137,7 +4137,7 @@ spec:
                             type: object
                           name:
                             description: References the component service name defined
-                              in the ComponentDefinition.Spec.Services[x].Name.
+                              in the `componentDefinition.spec.services[*].name`.
                             maxLength: 25
                             type: string
                           podService:
@@ -4153,15 +4153,15 @@ spec:
                               for load-balancing to endpoints. Endpoints are determined
                               by the selector or if that is not specified, they are
                               determined by manual construction of an Endpoints object
-                              or EndpointSlice objects. If clusterIP is \"None\",
-                              no virtual IP is allocated and the endpoints are published
-                              as a set of endpoints rather than a virtual IP. - `NodePort`
-                              builds on ClusterIP and allocates a port on every node
-                              which routes to the same endpoints as the clusterIP.
-                              - `LoadBalancer` builds on NodePort and creates an external
-                              load-balancer (if supported in the current cloud) which
-                              routes to the same endpoints as the clusterIP. \n More
-                              info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
+                              or EndpointSlice objects. - `NodePort` builds on ClusterIP
+                              and allocates a port on every node which routes to the
+                              same endpoints as the clusterIP. - `LoadBalancer` builds
+                              on NodePort and creates an external load-balancer (if
+                              supported in the current cloud) which routes to the
+                              same endpoints as the clusterIP. \n Note: although K8s
+                              Service type allows the 'ExternalName' type, it is not
+                              a valid option for ClusterComponentService. \n For more
+                              info, see: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
                             enum:
                             - ClusterIP
                             - NodePort
@@ -10401,7 +10401,7 @@ spec:
                                 type: object
                               name:
                                 description: References the component service name
-                                  defined in the ComponentDefinition.Spec.Services[x].Name.
+                                  defined in the `componentDefinition.spec.services[*].name`.
                                 maxLength: 25
                                 type: string
                               podService:
@@ -10418,15 +10418,15 @@ spec:
                                   are determined by the selector or if that is not
                                   specified, they are determined by manual construction
                                   of an Endpoints object or EndpointSlice objects.
-                                  If clusterIP is \"None\", no virtual IP is allocated
-                                  and the endpoints are published as a set of endpoints
-                                  rather than a virtual IP. - `NodePort` builds on
-                                  ClusterIP and allocates a port on every node which
-                                  routes to the same endpoints as the clusterIP. -
-                                  `LoadBalancer` builds on NodePort and creates an
-                                  external load-balancer (if supported in the current
-                                  cloud) which routes to the same endpoints as the
-                                  clusterIP. \n More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
+                                  - `NodePort` builds on ClusterIP and allocates a
+                                  port on every node which routes to the same endpoints
+                                  as the clusterIP. - `LoadBalancer` builds on NodePort
+                                  and creates an external load-balancer (if supported
+                                  in the current cloud) which routes to the same endpoints
+                                  as the clusterIP. \n Note: although K8s Service
+                                  type allows the 'ExternalName' type, it is not a
+                                  valid option for ClusterComponentService. \n For
+                                  more info, see: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
                                 enum:
                                 - ClusterIP
                                 - NodePort

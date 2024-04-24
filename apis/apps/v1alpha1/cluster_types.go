@@ -646,9 +646,6 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
-	// +optional
-	ConfigRefs []ConfigReference `json:"configRefs,omitempty"`
-
 	// Specifies which types of logs should be collected for the Cluster.
 	// The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.
 	//
@@ -719,6 +716,9 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
+
+	// +optional
+	Configs []ClusterComponentConfig `json:"configs,omitempty"`
 
 	// Defines the strategy for switchover and failover when workloadType is Replication.
 	//
@@ -1186,6 +1186,31 @@ type ClusterComponentService struct {
 	PodService *bool `json:"podService,omitempty"`
 }
 
+// ClusterComponentConfig represents a config with its source bound.
+type ClusterComponentConfig struct {
+	// The name of the config.
+	//
+	// +optional
+	Name *string `json:"name,omitempty"`
+
+	// The source of the config.
+	ClusterComponentConfigSource `json:",inline"`
+}
+
+// ClusterComponentConfigSource represents the source of a config.
+type ClusterComponentConfigSource struct {
+	// ConfigMap source for the config.
+	//
+	// +optional
+	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty"`
+
+	// TODO: support more diverse sources:
+	// - Config template of other components within the same cluster
+	// - Config template of components from other clusters
+	// - Secret
+	// - Local file
+}
+
 // ClusterNetwork is deprecated since v0.9.
 type ClusterNetwork struct {
 	// Indicates whether the host network can be accessed. By default, this is set to false.
@@ -1315,25 +1340,6 @@ type ServiceRefCredentialSelector struct {
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
-}
-
-// ConfigReference represents a config reference with its source bound.
-type ConfigReference struct {
-	// The name of the config reference.
-	//
-	// +optional
-	Name *string `json:"name,omitempty"`
-
-	// The source of the config reference.
-	ConfigReferenceSource `json:",inline"`
-}
-
-// ConfigReferenceSource represents the source of a config reference.
-type ConfigReferenceSource struct {
-	// ConfigMap source for the config reference.
-	//
-	// +optional
-	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty"`
 }
 
 // +genclient

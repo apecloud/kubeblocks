@@ -98,8 +98,7 @@ spec:
                   of templateRef that will be rendered into Component instances' configuration
                   files based on the provided templates. The rendered configuration
                   files will be mounted into the component's containers using the
-                  specified volume mount parameters. \n This field is immutable. \n
-                  TODO: support referencing configs from other components or clusters."
+                  specified volume mount parameters. \n This field is immutable."
                 items:
                   properties:
                     asEnvFrom:
@@ -254,7 +253,6 @@ spec:
                       type: string
                   required:
                   - name
-                  - templateRef
                   - volumeName
                   type: object
                 type: array
@@ -12652,7 +12650,6 @@ spec:
                       type: string
                   required:
                   - name
-                  - templateRef
                   - volumeName
                   type: object
                 type: array

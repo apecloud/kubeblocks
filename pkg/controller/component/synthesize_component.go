@@ -212,6 +212,10 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build componentService
 	buildComponentServices(synthesizeComp, compDefObj, comp)
 
+	if err = buildConfigTemplates(synthesizeComp, comp); err != nil {
+		return nil, err
+	}
+
 	// build monitor
 	// buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
 
@@ -439,6 +443,35 @@ func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv
 	for i := range synthesizeComp.ComponentServices {
 		override(&synthesizeComp.ComponentServices[i])
 	}
+}
+
+func buildConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	if comp == nil || len(comp.Spec.Configs) == 0 {
+		return nil
+	}
+
+	templates := make(map[string]*appsv1alpha1.ComponentConfigSpec)
+	for i, template := range synthesizedComp.ConfigTemplates {
+		templates[template.Name] = &synthesizedComp.ConfigTemplates[i]
+	}
+
+	for _, config := range comp.Spec.Configs {
+		if config.Name == nil || len(*config.Name) == 0 {
+			continue // not supported now
+		}
+		template := templates[*config.Name]
+		if template == nil {
+			return fmt.Errorf("the config template %s is not defined in definition", *config.Name)
+		}
+		if config.ConfigMap == nil && len(template.TemplateRef) == 0 {
+			return fmt.Errorf("the config template %s has not provied any content in both definition and cluster", *config.Name)
+		}
+		if config.ConfigMap != nil {
+			// TODO: merge by th key (different file)?
+			template.TemplateRef = config.ConfigMap.Name
+		}
+	}
+	return nil
 }
 
 // buildServiceAccountName builds serviceAccountName for component and podSpec.

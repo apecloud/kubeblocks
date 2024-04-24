@@ -55,6 +55,11 @@ func (builder *ComponentBuilder) SetReplicas(replicas int32) *ComponentBuilder {
 	return builder
 }
 
+func (builder *ComponentBuilder) SetConfigs(configs []appsv1alpha1.ClusterComponentConfig) *ComponentBuilder {
+	builder.get().Spec.Configs = configs
+	return builder
+}
+
 func (builder *ComponentBuilder) SetServiceAccountName(serviceAccountName string) *ComponentBuilder {
 	builder.get().Spec.ServiceAccountName = serviceAccountName
 	return builder

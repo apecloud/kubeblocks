@@ -54,8 +54,8 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
 			By("prepare current tree")
-			// desired: bar-hello-0, bar-foo-0, bar-foo-1, bar-0, bar-1, bar-2, bar-3
-			// current: bar-foo-0, bar-1
+			// desired: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
+			// current: bar-1, bar-foo-0
 			replicas := int32(7)
 			its.Spec.Replicas = &replicas
 			nameHello := "hello"
@@ -84,7 +84,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(err).Should(BeNil())
 			newTree, err := reconciler.Reconcile(orderedReadyTree)
 			Expect(err).Should(BeNil())
-			// desired: bar-hello-0, bar-foo-0, bar-1
+			// desired: bar-0, bar-1, bar-foo-0
 			pods := newTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(3))
 			currentPodSnapshot := make(model.ObjectSnapshot)
@@ -93,8 +93,8 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				Expect(err).Should(BeNil())
 				currentPodSnapshot[*name] = object
 			}
-			podHelloBar0 := builder.NewPodBuilder(namespace, "bar-hello-0").GetObject()
-			for _, object := range []client.Object{podFoo0, podHelloBar0, podBar1} {
+			podBar0 := builder.NewPodBuilder(namespace, "bar-0").GetObject()
+			for _, object := range []client.Object{podFoo0, podBar0, podBar1} {
 				name, err := model.GetGVKName(object)
 				Expect(err).Should(BeNil())
 				_, ok := currentPodSnapshot[*name]
@@ -109,7 +109,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			parallelITS.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			newTree, err = reconciler.Reconcile(parallelTree)
 			Expect(err).Should(BeNil())
-			// desired: bar-hello-0, bar-foo-0, bar-foo-1, bar-0, bar-1, bar-2, bar-3
+			// desired: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
 			pods = newTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(7))
 			currentPodSnapshot = make(model.ObjectSnapshot)
@@ -123,7 +123,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			podFoo1 := builder.NewPodBuilder(namespace, its.Name+"-foo-1").GetObject()
 			podBar2 := builder.NewPodBuilder(namespace, "bar-2").GetObject()
 			podBar3 := builder.NewPodBuilder(namespace, "bar-3").GetObject()
-			for _, object := range []client.Object{podHello, podFoo0, podFoo1, podHelloBar0, podBar1, podBar2, podBar3} {
+			for _, object := range []client.Object{podHello, podFoo0, podFoo1, podBar0, podBar1, podBar2, podBar3} {
 				name, err := model.GetGVKName(object)
 				Expect(err).Should(BeNil())
 				_, ok := currentPodSnapshot[*name]

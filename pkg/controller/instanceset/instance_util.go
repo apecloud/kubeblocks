@@ -45,6 +45,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+type InstanceTemplate interface {
+	GetName() string
+	GetReplicas() *int32
+}
+
 type instanceTemplateExt struct {
 	Name     string
 	Replicas int32
@@ -125,7 +130,7 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 		name1, ordinal1 := getNameNOrdinalFunc(i)
 		name2, ordinal2 := getNameNOrdinalFunc(j)
 		if name1 != name2 {
-			return name1 < name2
+			return name1 > name2
 		}
 		return ordinal1 > ordinal2
 	})
@@ -208,6 +213,32 @@ func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instance
 	}
 
 	return allNameTemplateMap, nil
+}
+
+func GenerateAllInstanceNames(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string) []string {
+	templateReplicas := func(template InstanceTemplate) int32 {
+		if template.GetReplicas() != nil {
+			return *template.GetReplicas()
+		}
+		return 1
+	}
+	totalReplicas := int32(0)
+	instanceNameList := make([]string, 0)
+	for _, template := range templates {
+		replicas := templateReplicas(template)
+		names := GenerateInstanceNamesFromTemplate(parentName, template.GetName(), replicas, offlineInstances)
+		instanceNameList = append(instanceNameList, names...)
+		totalReplicas += replicas
+	}
+	if totalReplicas < replicas {
+		names := GenerateInstanceNamesFromTemplate(parentName, "", replicas-totalReplicas, offlineInstances)
+		instanceNameList = append(instanceNameList, names...)
+	}
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(instanceNameList[i])
+	}
+	baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
+	return instanceNameList
 }
 
 func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string) []string {

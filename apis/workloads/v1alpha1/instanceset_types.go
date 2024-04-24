@@ -575,6 +575,14 @@ type MemberStatus struct {
 	ReadyWithoutPrimary bool `json:"readyWithoutPrimary"`
 }
 
+func (t *InstanceTemplate) GetName() string {
+	return t.Name
+}
+
+func (t *InstanceTemplate) GetReplicas() *int32 {
+	return t.Replicas
+}
+
 func init() {
 	SchemeBuilder.Register(&InstanceSet{}, &InstanceSetList{})
 }

@@ -35,7 +35,7 @@ import (
 
 type ComponentOpsInteface interface {
 	GetComponentName() string
-	GetShardingName() string
+	IsShardingComponent() bool
 }
 
 type componentOpsHelper struct {
@@ -48,25 +48,21 @@ func newComponentOpsHelper[T ComponentOpsInteface](compOpsList []T) componentOps
 	}
 	for i := range compOpsList {
 		compOps := compOpsList[i]
-		compOpsKey := getCompOpsKey(compOps.GetShardingName(), compOps.GetComponentName())
+		compOpsKey := getCompOpsKey(compOps.GetComponentName(), compOps.IsShardingComponent())
 		compOpsHelper.componentOpsSet[compOpsKey] = compOps
 	}
 	return compOpsHelper
 }
 
-func (c componentOpsHelper) isSharding(compOps ComponentOpsInteface) bool {
-	return compOps.GetShardingName() != ""
-}
-
 func (c componentOpsHelper) getOpsComponentAndShardStatus(opsRequest *appsv1alpha1.OpsRequest, comOps ComponentOpsInteface) appsv1alpha1.OpsRequestComponentStatus {
-	compKey := getCompOpsKey(comOps.GetShardingName(), comOps.GetComponentName())
+	compKey := getCompOpsKey(comOps.GetComponentName(), comOps.IsShardingComponent())
 	return opsRequest.Status.Components[compKey]
 }
 
 func (c componentOpsHelper) setOpsComponentAndShardStatus(opsRequest *appsv1alpha1.OpsRequest,
 	opsComStatus appsv1alpha1.OpsRequestComponentStatus,
 	comOps ComponentOpsInteface) {
-	compKey := getCompOpsKey(comOps.GetShardingName(), comOps.GetComponentName())
+	compKey := getCompOpsKey(comOps.GetComponentName(), comOps.IsShardingComponent())
 	opsRequest.Status.Components[compKey] = opsComStatus
 }
 
@@ -200,17 +196,17 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		})
 		return nil
 	}
-	getCompOps := func(shardingName, componentName string) (ComponentOpsInteface, bool) {
+	getCompOps := func(componentName string, isSharding bool) (ComponentOpsInteface, bool) {
 		if len(c.componentOpsSet) == 0 {
-			return appsv1alpha1.ComponentOps{ComponentName: componentName, ShardingName: shardingName}, true
+			return appsv1alpha1.ComponentOps{ComponentName: componentName, IsSharding: isSharding}, true
 		}
-		compOps, ok := c.componentOpsSet[getCompOpsKey(shardingName, componentName)]
+		compOps, ok := c.componentOpsSet[getCompOpsKey(componentName, isSharding)]
 		return compOps, ok
 	}
 	// 1. handle the component status
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
 		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
-		compOps, ok := getCompOps("", compSpec.Name)
+		compOps, ok := getCompOps(compSpec.Name, false)
 		if !ok {
 			continue
 		}
@@ -222,7 +218,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	// 2. handle the sharding status.
 	for i := range opsRes.Cluster.Spec.ShardingSpecs {
 		shardingSpec := opsRes.Cluster.Spec.ShardingSpecs[i]
-		compOps, ok := getCompOps(shardingSpec.Name, "")
+		compOps, ok := getCompOps(shardingSpec.Name, true)
 		if !ok {
 			continue
 		}
@@ -250,7 +246,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		}
 		expectProgressCount += expectCount
 		completedProgressCount += completedCount
-		if !c.isSharding(pgResource.compOps) {
+		if !pgResource.compOps.IsShardingComponent() {
 			lastFailedTime := opsCompStatus.LastFailedTime
 			componentPhase := opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()].Phase
 			if isFailedOrAbnormal(componentPhase) {
@@ -296,9 +292,9 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	return appsv1alpha1.OpsSucceedPhase, 0, nil
 }
 
-func getCompOpsKey(shardingName, componentName string) string {
-	if shardingName != "" {
-		return getShardingKey(shardingName)
+func getCompOpsKey(componentName string, isSharding bool) string {
+	if isSharding {
+		return getShardingKey(componentName)
 	}
 	return componentName
 }

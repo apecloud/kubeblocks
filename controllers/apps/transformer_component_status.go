@@ -39,8 +39,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -283,7 +283,7 @@ func (r *componentStatusHandler) isInstanceSetRunning() (bool, error) {
 	}
 
 	// whether the ITS is ready
-	return rsmcore.IsInstanceSetReady(r.runningITS), nil
+	return instanceset.IsInstanceSetReady(r.runningITS), nil
 }
 
 // isAllConfigSynced checks if all configTemplates are synced.
@@ -338,14 +338,11 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 		return false, nil
 	}
 
-	// stsObj is the underlying workload which is already running in the component.
-	stsObj := rsmcore.ConvertInstanceSetToSTS(r.runningITS)
-	stsProto := rsmcore.ConvertInstanceSetToSTS(r.protoITS)
 	backupKey := types.NamespacedName{
-		Namespace: stsObj.Namespace,
-		Name:      constant.GenerateResourceNameWithScalingSuffix(stsObj.Name),
+		Namespace: r.runningITS.Namespace,
+		Name:      constant.GenerateResourceNameWithScalingSuffix(r.runningITS.Name),
 	}
-	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
+	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, r.runningITS, r.protoITS, backupKey)
 	if err != nil {
 		return false, err
 	}

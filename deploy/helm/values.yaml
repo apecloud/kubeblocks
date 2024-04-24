@@ -27,7 +27,7 @@ image:
 ##
 replicaCount: 1
 
-## MaxConcurrentReconciles for component, rsm and opsRequest controllers.
+## MaxConcurrentReconciles for component, instanceSet and opsRequest controllers.
 ##
 reconcileWorkers: ""
 

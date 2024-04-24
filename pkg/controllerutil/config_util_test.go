@@ -481,3 +481,54 @@ func TestCheckAndPatchPayload(t *testing.T) {
 		})
 	}
 }
+
+func Test_filterImmutableParameters(t *testing.T) {
+	type args struct {
+		parameters      map[string]any
+		immutableParams []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]any
+	}{{
+		name: "test",
+		args: args{
+			parameters: map[string]any{
+				"a": "b",
+				"c": "d",
+			},
+		},
+		want: map[string]any{
+			"a": "b",
+			"c": "d",
+		},
+	}, {
+		name: "test",
+		args: args{
+			parameters: map[string]any{
+				"a": "b",
+				"c": "d",
+			},
+			immutableParams: []string{"a", "d"},
+		},
+		want: map[string]any{
+			"c": "d",
+		},
+	}, {
+		name: "test",
+		args: args{
+			parameters:      map[string]any{},
+			immutableParams: []string{"a", "d"},
+		},
+		want: map[string]any{},
+	},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := filterImmutableParameters(tt.args.parameters, tt.args.immutableParams); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("filterImmutableParameters() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

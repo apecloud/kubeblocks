@@ -7935,7 +7935,7 @@ and other administrative tasks.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentOps">ComponentOps
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsItem">CustomOpsItem</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 <p>ComponentOps represents the common variables required for operations within the scope of a normal component/shard component.</p>
@@ -7961,13 +7961,13 @@ string
 </tr>
 <tr>
 <td>
-<code>shardingName</code><br/>
+<code>isSharding</code><br/>
 <em>
-string
+bool
 </em>
 </td>
 <td>
-<p>Specifies the name of the cluster sharding component.</p>
+<p>Specifies that the componentName refers to the cluster&rsquo;s sharding component.</p>
 </td>
 </tr>
 </tbody>
@@ -11018,7 +11018,7 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.CustomOpsItem">CustomOpsItem
+<h3 id="apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsSpec">CustomOpsSpec</a>)
@@ -11120,10 +11120,10 @@ the calculated number will be rounded up to 1.</p>
 </tr>
 <tr>
 <td>
-<code>items</code><br/>
+<code>components</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.CustomOpsItem">
-[]CustomOpsItem
+<a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">
+[]CustomOpsComponent
 </a>
 </em>
 </td>
@@ -14531,7 +14531,7 @@ LastComponentConfiguration
 <h3 id="apps.kubeblocks.io/v1alpha1.Parameter">Parameter
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsItem">CustomOpsItem</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>)
 </p>
 <div>
 </div>
@@ -16654,17 +16654,6 @@ string
 </tr>
 <tr>
 <td>
-<code>effectiveCommonComponentDef</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<p>Indicates if this backup will be restored for all components which refer to common ComponentDefinition.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>restoreTimeStr</code><br/>
 <em>
 string
@@ -16683,6 +16672,18 @@ string
 </td>
 <td>
 <p>Specifies the volume claim restore policy, support values: [Serial, Parallel]</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>doReadyRestoreAfterClusterRunning</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>If set to true, the recovery process in the PostReady phase will be performed after the cluster is running successfully.
+otherwise, it will be performed after component is running.</p>
 </td>
 </tr>
 </tbody>

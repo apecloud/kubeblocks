@@ -134,22 +134,15 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 	return nil
 }
 
-func (hs horizontalScalingOpsHandler) getExpectReplicas(opsRequest *appsv1alpha1.OpsRequest, shardName, componentName string) *int32 {
-	compStatus := opsRequest.Status.Components[componentName]
+func (hs horizontalScalingOpsHandler) getExpectReplicas(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32 {
+	compStatus := opsRequest.Status.Components[compOps.GetComponentName()]
 	if compStatus.OverrideBy != nil {
 		return compStatus.OverrideBy.Replicas
 	}
 	for _, v := range opsRequest.Spec.HorizontalScalingList {
-		if shardName != "" {
-			if v.ShardingName == shardName {
-				return &v.Replicas
-			}
-			continue
-		}
-		if v.ComponentName == componentName {
+		if v.ComponentName == compOps.GetComponentName() {
 			return &v.Replicas
 		}
-
 	}
 	return nil
 }

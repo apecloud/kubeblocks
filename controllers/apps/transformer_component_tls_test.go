@@ -36,7 +36,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -299,11 +298,11 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 				itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
-				sts := *rsm.ConvertInstanceSetToSTS(&itsList.Items[0])
+				its := itsList.Items[0]
 				cd := &appsv1alpha1.ClusterDefinition{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
-				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ConfigSpecs[0].ComponentTemplateSpec)
-				cmKey := client.ObjectKey{Namespace: sts.Namespace, Name: cmName}
+				cmName := cfgcore.GetInstanceCMName(&its, &cd.Spec.ComponentDefs[0].ConfigSpecs[0].ComponentTemplateSpec)
+				cmKey := client.ObjectKey{Namespace: its.Namespace, Name: cmName}
 				hasTLSSettings := func() bool {
 					cm := &corev1.ConfigMap{}
 					Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())

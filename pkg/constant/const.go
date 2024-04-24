@@ -286,10 +286,6 @@ const (
 )
 
 const (
-	FeatureGateReplicatedStateMachine = "REPLICATED_STATE_MACHINE" // enable rsm
-)
-
-const (
 	KubernetesClusterDomainEnv = "KUBERNETES_CLUSTER_DOMAIN"
 	DefaultDNSDomain           = "cluster.local"
 )
@@ -302,11 +298,12 @@ const (
 )
 
 const (
-	BackupNameKeyForRestore          = "name"
-	BackupNamespaceKeyForRestore     = "namespace"
-	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
-	RestoreTimeKeyForRestore         = "restoreTime"
-	ConnectionPassword               = "connectionPassword"
+	BackupNameKeyForRestore           = "name"
+	BackupNamespaceKeyForRestore      = "namespace"
+	VolumeRestorePolicyKeyForRestore  = "volumeRestorePolicy"
+	DoReadyRestoreAfterClusterRunning = "doReadyRestoreAfterClusterRunning"
+	RestoreTimeKeyForRestore          = "restoreTime"
+	ConnectionPassword                = "connectionPassword"
 )
 
 const (

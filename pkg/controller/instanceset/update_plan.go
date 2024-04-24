@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm
+package instanceset
 
 import (
 	"errors"
@@ -39,7 +39,7 @@ type updatePlan interface {
 }
 
 type realUpdatePlan struct {
-	rsm             workloads.InstanceSet
+	its             workloads.InstanceSet
 	pods            []corev1.Pod
 	dag             *graph.DAG
 	podsToBeUpdated []*corev1.Pod
@@ -76,9 +76,9 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 		err          error
 	)
 	if p.isPodUpdated == nil {
-		isPodUpdated, err = p.defaultIsPodUpdatedFunc(&p.rsm, pod)
+		isPodUpdated, err = p.defaultIsPodUpdatedFunc(&p.its, pod)
 	} else {
-		isPodUpdated, err = p.isPodUpdated(&p.rsm, pod)
+		isPodUpdated, err = p.isPodUpdated(&p.its, pod)
 	}
 	if err != nil {
 		return err
@@ -88,7 +88,7 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 		if !intctrlutil.PodIsReady(pod) {
 			return ErrWait
 		}
-		isRoleful := func() bool { return len(p.rsm.Spec.Roles) > 0 }()
+		isRoleful := func() bool { return len(p.its.Spec.Roles) > 0 }()
 		if isRoleful && !intctrlutil.PodIsReadyWithLabel(*pod) {
 			return ErrWait
 		}
@@ -100,8 +100,8 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	return ErrStop
 }
 
-func (p *realUpdatePlan) defaultIsPodUpdatedFunc(rsm *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	return intctrlutil.GetPodRevision(pod) == rsm.Status.UpdateRevision, nil
+func (p *realUpdatePlan) defaultIsPodUpdatedFunc(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+	return intctrlutil.GetPodRevision(pod) == its.Status.UpdateRevision, nil
 }
 
 // build builds the update plan based on updateStrategy
@@ -110,15 +110,15 @@ func (p *realUpdatePlan) build() {
 	root := &model.ObjectVertex{}
 	p.dag.AddVertex(root)
 
-	if p.rsm.Spec.MemberUpdateStrategy == nil {
+	if p.its.Spec.MemberUpdateStrategy == nil {
 		return
 	}
 
-	rolePriorityMap := ComposeRolePriorityMap(p.rsm.Spec.Roles)
+	rolePriorityMap := ComposeRolePriorityMap(p.its.Spec.Roles)
 	SortPods(p.pods, rolePriorityMap, false)
 
 	// generate plan by MemberUpdateStrategy
-	switch *p.rsm.Spec.MemberUpdateStrategy {
+	switch *p.its.Spec.MemberUpdateStrategy {
 	case workloads.SerialUpdateStrategy:
 		p.buildSerialUpdatePlan()
 	case workloads.ParallelUpdateStrategy:
@@ -211,21 +211,21 @@ func (p *realUpdatePlan) Execute() ([]*corev1.Pod, error) {
 	return p.podsToBeUpdated, nil
 }
 
-func newUpdatePlan(rsm workloads.InstanceSet, pods []corev1.Pod) updatePlan {
+func newUpdatePlan(its workloads.InstanceSet, pods []corev1.Pod) updatePlan {
 	return &realUpdatePlan{
-		rsm:  rsm,
+		its:  its,
 		pods: pods,
 		dag:  graph.NewDAG(),
 	}
 }
 
-func NewUpdatePlan(rsm workloads.InstanceSet, pods []*corev1.Pod, isPodUpdated func(*workloads.InstanceSet, *corev1.Pod) (bool, error)) updatePlan {
+func NewUpdatePlan(its workloads.InstanceSet, pods []*corev1.Pod, isPodUpdated func(*workloads.InstanceSet, *corev1.Pod) (bool, error)) updatePlan {
 	var podList []corev1.Pod
 	for _, pod := range pods {
 		podList = append(podList, *pod)
 	}
 	return &realUpdatePlan{
-		rsm:          rsm,
+		its:          its,
 		pods:         podList,
 		dag:          graph.NewDAG(),
 		isPodUpdated: isPodUpdated,

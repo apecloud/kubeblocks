@@ -395,7 +395,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	opsRes *OpsResource,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	getExpectReplicas func(opsRequest *appsv1alpha1.OpsRequest, shardingName, componentName string) *int32) (int32, int32, error) {
+	getExpectReplicas func(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32) (int32, int32, error) {
 	var (
 		podList          *corev1.PodList
 		clusterComponent = pgRes.clusterComponent
@@ -405,11 +405,11 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	if clusterComponent == nil {
 		return 0, 0, nil
 	}
-	expectReplicas := getExpectReplicas(opsRequest, pgRes.compOps.GetShardingName(), pgRes.fullComponentName)
+	expectReplicas := getExpectReplicas(opsRequest, pgRes.compOps)
 	if expectReplicas == nil {
 		return 0, 0, nil
 	}
-	compOpsKey := getCompOpsKey(pgRes.compOps.GetShardingName(), pgRes.compOps.GetComponentName())
+	compOpsKey := getCompOpsKey(pgRes.compOps.GetComponentName(), pgRes.compOps.IsShardingComponent())
 	lastComponentReplicas := opsRequest.Status.LastConfiguration.Components[compOpsKey].Replicas
 	if lastComponentReplicas == nil {
 		return 0, 0, nil

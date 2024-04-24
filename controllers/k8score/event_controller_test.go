@@ -38,7 +38,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -97,7 +97,7 @@ var _ = Describe("Event Controller", func() {
 		return builder.NewPodBuilder(testCtx.DefaultNamespace, name).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			AddLabels(constant.KBAppComponentLabelKey, componentName).
-			AddLabels(rsm.WorkloadsInstanceLabelKey, itsName).
+			AddLabels(instanceset.WorkloadsInstanceLabelKey, itsName).
 			SetContainers([]corev1.Container{
 				{
 					Image: "foo",
@@ -127,12 +127,12 @@ var _ = Describe("Event Controller", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
 			itsName := fmt.Sprintf("%s-%s", clusterObj.Name, consensusCompName)
-			rsm := testapps.NewInstanceSetFactory(clusterObj.Namespace, itsName, clusterObj.Name, consensusCompName).
+			its := testapps.NewInstanceSetFactory(clusterObj.Namespace, itsName, clusterObj.Name, consensusCompName).
 				SetReplicas(int32(3)).
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				Create(&testCtx).GetObject()
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(rsm), func(tmpRSM *workloads.InstanceSet) {
-				tmpRSM.Spec.Roles = []workloads.ReplicaRole{
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(tmpITS *workloads.InstanceSet) {
+				tmpITS.Spec.Roles = []workloads.ReplicaRole{
 					{
 						Name:       "leader",
 						IsLeader:   true,

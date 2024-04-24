@@ -149,7 +149,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("Waiting for the cluster enters creating phase")
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
-		By("mock pod/sts are available and wait for cluster enter running phase")
+		By("mock pods are available and wait for cluster enter running phase")
 		podName := fmt.Sprintf("%s-%s-0", clusterObj.Name, mysqlCompName)
 		pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterObj.Name, mysqlCompName,
 			podName, "leader", "ReadWrite")

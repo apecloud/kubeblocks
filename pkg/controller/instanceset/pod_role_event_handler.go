@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm
+package instanceset
 
 import (
 	"encoding/json"
@@ -202,9 +202,9 @@ func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) 
 
 // updatePodRoleLabel updates pod role label when internal container role changed
 func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	rsm workloads.InstanceSet, pod *corev1.Pod, roleName string, version string) error {
+	its workloads.InstanceSet, pod *corev1.Pod, roleName string, version string) error {
 	ctx := reqCtx.Ctx
-	roleMap := composeRoleMap(rsm)
+	roleMap := composeRoleMap(its)
 	// role not defined in CR, ignore it
 	roleName = strings.ToLower(roleName)
 
@@ -214,10 +214,10 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	switch ok {
 	case true:
 		pod.Labels[RoleLabelKey] = role.Name
-		pod.Labels[rsmAccessModeLabelKey] = string(role.AccessMode)
+		pod.Labels[AccessModeLabelKey] = string(role.AccessMode)
 	case false:
 		delete(pod.Labels, RoleLabelKey)
-		delete(pod.Labels, rsmAccessModeLabelKey)
+		delete(pod.Labels, AccessModeLabelKey)
 	}
 
 	if pod.Annotations == nil {

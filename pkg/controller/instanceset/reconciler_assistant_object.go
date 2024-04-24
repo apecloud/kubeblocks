@@ -27,7 +27,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // assistantObjectReconciler manages non-workload objects, such as Service, ConfigMap, etc.
@@ -55,10 +55,10 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	selectors := getSvcSelector(its, false)
 	headlessSelectors := getSvcSelector(its, true)
 
-	svc := rsm.BuildSvc(*its, labels, selectors)
-	altSvs := rsm.BuildAlternativeSvs(*its, labels)
-	headLessSvc := rsm.BuildHeadlessSvc(*its, labels, headlessSelectors)
-	envConfig := rsm.BuildEnvConfigMap(*its, labels)
+	svc := buildSvc(*its, labels, selectors)
+	altSvs := buildAlternativeSvs(*its, labels)
+	headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
+	envConfig := buildEnvConfigMap(*its, labels)
 	var objects []client.Object
 	if svc != nil {
 		objects = append(objects, svc)
@@ -68,7 +68,7 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	}
 	objects = append(objects, headLessSvc, envConfig)
 	for _, object := range objects {
-		if err := rsm.SetOwnership(its, object, model.GetScheme(), finalizer); err != nil {
+		if err := intctrlutil.SetOwnership(its, object, model.GetScheme(), finalizer); err != nil {
 			return nil, err
 		}
 	}

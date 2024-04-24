@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm
+package instanceset
 
 import (
 	"context"
@@ -95,7 +95,7 @@ var _ = Describe("pod role label event handler test", func() {
 					Expect(pd).ShouldNot(BeNil())
 					Expect(pd.Labels).ShouldNot(BeNil())
 					Expect(pd.Labels[RoleLabelKey]).Should(Equal(role.Name))
-					Expect(pd.Labels[rsmAccessModeLabelKey]).Should(BeEquivalentTo(role.AccessMode))
+					Expect(pd.Labels[AccessModeLabelKey]).Should(BeEquivalentTo(role.AccessMode))
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().

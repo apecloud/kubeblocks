@@ -61,28 +61,50 @@ type OpsRequestSpec struct {
 
 	// Defines what component need to horizontal scale the specified replicas.
 	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.horizontalScaling"
-	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty"`
+	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Note: Quantity struct can not do immutable check by CEL.
 	// Defines what component and volumeClaimTemplate need to expand the specified storage.
 	// +optional
-	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty"`
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Restarts the specified components.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
-	RestartList []ComponentOps `json:"restart,omitempty"`
+	// +kubebuilder:validation:MaxItems=1024
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	RestartList []ComponentOps `json:"restart,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Switches over the specified components.
 	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.switchover"
-	SwitchoverList []Switchover `json:"switchover,omitempty"`
+	SwitchoverList []Switchover `json:"switchover,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Note: Quantity struct can not do immutable check by CEL.
 	// Defines what component need to vertical scale the specified compute resources.
+	// +kubebuilder:validation:MaxItems=1024
 	// +optional
-	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty"`
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Deprecated: replace by reconfigures.
 	// Defines the variables that need to input when updating configuration.
@@ -92,7 +114,11 @@ type OpsRequestSpec struct {
 	// Defines the variables that need to input when updating configuration.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
 	// +optional
-	Reconfigures []Reconfigure `json:"reconfigures,omitempty"`
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	Reconfigures []Reconfigure `json:"reconfigures,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Defines services the component needs to expose.
 	// +optional
@@ -124,8 +150,12 @@ type OpsRequestSpec struct {
 
 	// Specifies the instances that require re-creation.
 	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.rebuildFrom"
-	RebuildFrom []RebuildInstance `json:"rebuildFrom,omitempty"`
+	RebuildFrom []RebuildInstance `json:"rebuildFrom,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Specifies a custom operation as defined by OpsDefinition.
 	// +optional
@@ -133,13 +163,13 @@ type OpsRequestSpec struct {
 }
 
 // ComponentOps represents the common variables required for operations within the scope of a normal component/shard component.
-// +kubebuilder:validation:XValidation:rule="(has(self.componentName) && !has(self.shardingName)) || (has(self.shardingName) && !has(self.componentName))",message="either componentName or shardingName"
 type ComponentOps struct {
 	// Specifies the name of the cluster component.
-	ComponentName string `json:"componentName,omitempty"`
+	// +kubebuilder:validation:Required
+	ComponentName string `json:"componentName"`
 
-	// Specifies the name of the cluster sharding component.
-	ShardingName string `json:"shardingName,omitempty"`
+	// Specifies that the componentName refers to the cluster's sharding component.
+	IsSharding bool `json:"isSharding,omitempty"`
 }
 
 type RebuildInstance struct {
@@ -352,10 +382,15 @@ type CustomOpsSpec struct {
 	// At least one component/shardComponent is required. The components are identified by their name and can be merged or retained.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	CustomOpsItems []CustomOpsItem `json:"items"`
+	// +kubebuilder:validation:MaxItems=1024
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	CustomOpsItems []CustomOpsComponent `json:"components"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 }
 
-type CustomOpsItem struct {
+type CustomOpsComponent struct {
 	ComponentOps `json:",inline"`
 
 	// Represents the parameters for this operation as declared in the opsDefinition.spec.parametersSchema.
@@ -625,9 +660,6 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Required
 	BackupName string `json:"backupName"`
 
-	// Indicates if this backup will be restored for all components which refer to common ComponentDefinition.
-	EffectiveCommonComponentDef bool `json:"effectiveCommonComponentDef,omitempty"`
-
 	// Defines the point in time to restore.
 	RestoreTimeStr string `json:"restoreTimeStr,omitempty"`
 
@@ -635,6 +667,10 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Enum=Serial;Parallel
 	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
+
+	// If set to true, the recovery process in the PostReady phase will be performed after the cluster is running successfully.
+	// otherwise, it will be performed after component is running.
+	DoReadyRestoreAfterClusterRunning bool `json:"doReadyRestoreAfterClusterRunning,omitempty"`
 }
 
 // ScriptSecret represents the secret that is used to execute the script.
@@ -991,8 +1027,8 @@ func (c ComponentOps) GetComponentName() string {
 	return c.ComponentName
 }
 
-func (c ComponentOps) GetShardingName() string {
-	return c.ShardingName
+func (c ComponentOps) IsShardingComponent() bool {
+	return c.IsSharding
 }
 
 // ToExposeListToMap build expose map

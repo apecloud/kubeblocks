@@ -62,22 +62,23 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if _, ok := cluster.Annotations[constant.SnapShotForStartAnnotationKey]; ok {
 		return nil
 	}
-	setReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, shardingName string) {
-		compKey := getComponentKeyForStartSnapshot(shardingName, compSpec.Name, "")
+	setReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string, isSharding bool) {
+		compKey := getComponentKeyForStartSnapshot(componentName, "", isSharding)
 		componentReplicasMap[compKey] = compSpec.Replicas
 		expectReplicas := int32(0)
 		compSpec.Replicas = expectReplicas
 		for i := range compSpec.Instances {
-			compKey = getComponentKeyForStartSnapshot(shardingName, compSpec.Name, compSpec.Instances[i].Name)
+			compKey = getComponentKeyForStartSnapshot(componentName, compSpec.Instances[i].Name, isSharding)
 			componentReplicasMap[compKey] = intctrlutil.TemplateReplicas(compSpec.Instances[i])
 			compSpec.Instances[i].Replicas = &expectReplicas
 		}
 	}
 	for i := range cluster.Spec.ComponentSpecs {
-		setReplicas(&cluster.Spec.ComponentSpecs[i], "")
+		compSpec := &cluster.Spec.ComponentSpecs[i]
+		setReplicas(compSpec, compSpec.Name, false)
 	}
 	for i, v := range cluster.Spec.ShardingSpecs {
-		setReplicas(&cluster.Spec.ShardingSpecs[i].Template, v.Name)
+		setReplicas(&cluster.Spec.ShardingSpecs[i].Template, v.Name, true)
 	}
 	componentReplicasSnapshot, err := json.Marshal(componentReplicasMap)
 	if err != nil {
@@ -94,8 +95,8 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for stop opsRequest.
 func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, shardingName, componentName string) *int32 {
-		compStatus := opsRequest.Status.Components[componentName]
+	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32 {
+		compStatus := opsRequest.Status.Components[compOps.GetComponentName()]
 		if compStatus.OverrideBy != nil {
 			return compStatus.OverrideBy.Replicas
 		}
@@ -122,8 +123,8 @@ func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func getComponentKeyForStartSnapshot(shardingName, compName, templateName string) string {
-	key := getCompOpsKey(shardingName, compName)
+func getComponentKeyForStartSnapshot(compName, templateName string, isSharding bool) string {
+	key := getCompOpsKey(compName, isSharding)
 	if templateName != "" {
 		key += "." + templateName
 	}

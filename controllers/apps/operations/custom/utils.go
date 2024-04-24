@@ -236,7 +236,7 @@ func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
 	opsDef *appsv1alpha1.OpsDefinition,
 	ops *appsv1alpha1.OpsRequest,
 	comp *appsv1alpha1.ClusterComponentSpec,
-	compCustomItem *appsv1alpha1.CustomOpsItem,
+	compCustomItem *appsv1alpha1.CustomOpsComponent,
 	targetPodTemplate *appsv1alpha1.TargetPodTemplate,
 	targetPod *corev1.Pod) ([]corev1.EnvVar, error) {
 	var env = []corev1.EnvVar{

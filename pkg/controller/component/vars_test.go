@@ -821,7 +821,7 @@ var _ = Describe("vars", func() {
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
 
-			By("adaptive - has load balancer service")
+			By("adaptive - has load balancer pod service")
 			vars = []appsv1alpha1.EnvVar{
 				{
 					Name: "advertised",
@@ -903,7 +903,9 @@ var _ = Describe("vars", func() {
 			Expect(err).Should(Succeed())
 			checkEnvVarWithValue(envVars, "advertised", advertisedSvcName)
 
-			By("adaptive - has load balancer in provisioning")
+			By("adaptive - has load balancer service in provisioning")
+			// change to non pod-service
+			advertisedSvcName = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "advertised")
 			reader = &mockReader{
 				cli: testCtx.Cli,
 				objs: []client.Object{
@@ -961,10 +963,7 @@ var _ = Describe("vars", func() {
 			}
 			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
-			endpoints = []string{
-				fmt.Sprintf("%s:127.0.0.1", advertisedSvcName),
-			}
-			checkEnvVarWithValue(envVars, "advertised", strings.Join(endpoints, ","))
+			checkEnvVarWithValue(envVars, "advertised", "127.0.0.1")
 		})
 
 		It("credential vars", func() {

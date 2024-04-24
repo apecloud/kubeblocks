@@ -169,14 +169,18 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
-	clusterDefNS := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
-	if err := r.Client.Get(reqCtx.Ctx, clusterDefNS, clusterdefinition); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
+	if len(cluster.Spec.ClusterDefRef) > 0 {
+		clusterDefNS := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
+		if err := r.Client.Get(reqCtx.Ctx, clusterDefNS, clusterdefinition); err != nil {
+			return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
+		}
 	}
 
 	clusterVersion := &appsv1alpha1.ClusterVersion{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, clusterVersion); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, clusterVersion); err != nil {
+			return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
+		}
 	}
 
 	componentVersions := clusterVersion.Spec.GetDefNameMappingComponents()

@@ -40,6 +40,8 @@ func FromContext(ctx context.Context) (string, error) {
 	return "", placementNotFoundError{}
 }
 
+// TODO: replace it with a new client option and automatically perform the assignment based on ordinal.
+
 func Assign(ctx context.Context, obj client.Object, ordinal func() int) client.Object {
 	// has been set
 	if obj.GetAnnotations() != nil && obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey] != "" {

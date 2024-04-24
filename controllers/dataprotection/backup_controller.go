@@ -49,6 +49,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
@@ -61,10 +62,11 @@ import (
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
-	Scheme     *k8sruntime.Scheme
-	Recorder   record.EventRecorder
-	RestConfig *rest.Config
-	clock      clock.RealClock
+	Scheme          *k8sruntime.Scheme
+	Recorder        record.EventRecorder
+	RestConfig      *rest.Config
+	clock           clock.RealClock
+	MultiClusterMgr multicluster.Manager
 }
 
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
@@ -149,7 +151,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return b.Complete(r)
 }
 
-func (r *BackupReconciler) filterBackupPods(ctx context.Context, obj client.Object) []reconcile.Request {
+func (r *BackupReconciler) filterBackupPods(_ context.Context, obj client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 	labels := obj.GetLabels()
 	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {

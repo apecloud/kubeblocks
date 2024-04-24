@@ -272,10 +272,11 @@ func main() {
 	}
 
 	if err = (&dpcontrollers.BackupReconciler{
-		Client:     mgr.GetClient(),
-		Scheme:     mgr.GetScheme(),
-		Recorder:   mgr.GetEventRecorderFor("backup-controller"),
-		RestConfig: mgr.GetConfig(),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		Recorder:        mgr.GetEventRecorderFor("backup-controller"),
+		RestConfig:      mgr.GetConfig(),
+		MultiClusterMgr: multiClusterMgr,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		os.Exit(1)

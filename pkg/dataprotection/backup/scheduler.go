@@ -99,7 +99,13 @@ func (s *Scheduler) handleSchedulePolicy(index int) error {
 				if err = s.reconfigure(schedulePolicy); err != nil {
 					return err
 				}
-				return s.reconcileForContinuous(schedulePolicy)
+				var targetSelectorLabels map[string]string
+				if method.Target != nil {
+					targetSelectorLabels = method.Target.PodSelector.MatchLabels
+				} else if s.BackupPolicy.Spec.Target != nil {
+					targetSelectorLabels = s.BackupPolicy.Spec.Target.PodSelector.MatchLabels
+				}
+				return s.reconcileForContinuous(schedulePolicy, targetSelectorLabels)
 			}
 		}
 	}
@@ -274,7 +280,8 @@ func (s *Scheduler) generateBackupName() string {
 	return backupNamePrefix + "-$(date -u +'%Y%m%d%H%M%S')"
 }
 
-func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
+func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy,
+	targetSelectorLabels map[string]string) error {
 	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
 	backup := &dpv1alpha1.Backup{}
 	exists, err := intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
@@ -285,6 +292,9 @@ func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 	patch := client.MergeFrom(backup.DeepCopy())
 	if backup.Labels == nil {
 		backup.Labels = map[string]string{}
+	}
+	for k, v := range targetSelectorLabels {
+		backup.Labels[k] = v
 	}
 	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
 	backup.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name

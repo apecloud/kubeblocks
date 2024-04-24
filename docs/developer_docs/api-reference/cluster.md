@@ -14455,6 +14455,18 @@ string
 <p>Specifies the volume claim restore policy, support values: [Serial, Parallel]</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>doReadyRestoreAfterClusterRunning</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>If set to true, the recovery process in the PostReady phase will be performed after the cluster is running successfully.
+otherwise, it will be performed after component is running.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RetryPolicy">RetryPolicy

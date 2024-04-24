@@ -49,7 +49,8 @@ const (
 	rebuildFromAnnotation  = "apps.kubeblocks.io/rebuild-from"
 	rebuildTmpPVCNameLabel = "apps.kubeblocks.io/rebuild-tmp-pvc"
 
-	waitingForInstanceReadyMessage = "Waiting for the rebuilding instance to be ready"
+	waitingForInstanceReadyMessage   = "Waiting for the rebuilding instance to be ready"
+	waitingForPostReadyRestorePrefix = "Waiting for postReady Restore"
 )
 
 type rebuildInstanceOpsHandler struct{}
@@ -108,10 +109,7 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 				return err
 			}
-			isAvailable, err := r.instanceIsAvailable(reqCtx, cli, opsRes, synthesizedComp, targetPod)
-			if err != nil {
-				return err
-			}
+			isAvailable, _ := r.instanceIsAvailable(reqCtx, cli, opsRes, synthesizedComp, targetPod)
 			if isAvailable {
 				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is availabled, can not rebuild it`, ins.Name))
 			}
@@ -333,7 +331,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 			return false, r.createPrepareDataRestore(reqCtx, cli, opsRes.OpsRequest, insHelper, restoreName)
 		}
 		if restore.Status.Phase != dpv1alpha1.RestorePhaseCompleted {
-			progressDetail.Message = fmt.Sprintf(`Waiting for Restore "%s" to be completed`, restoreName)
+			progressDetail.Message = fmt.Sprintf(`Waiting for %s Restore "%s" to be completed`, stage, restoreName)
 			return false, nil
 		}
 		return true, nil
@@ -353,7 +351,8 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 	if err != nil || !completed {
 		return false, err
 	}
-	if progressDetail.Message != waitingForInstanceReadyMessage {
+	if progressDetail.Message != waitingForInstanceReadyMessage &&
+		!strings.HasPrefix(progressDetail.Message, waitingForPostReadyRestorePrefix) {
 		// 2. rebuild source pvcs and recreate the instance by deleting it.
 		return false, r.rebuildSourcePVCsAndRecreateInstance(reqCtx, cli, opsRes.OpsRequest, progressDetail, insHelper)
 	}

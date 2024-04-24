@@ -33,7 +33,7 @@ type WorkloadAction struct {
 	OpsRequest     *appsv1alpha1.OpsRequest
 	Cluster        *appsv1alpha1.Cluster
 	OpsDef         *appsv1alpha1.OpsDefinition
-	CompCustomItem *appsv1alpha1.CustomOpsItem
+	CustomCompOps  *appsv1alpha1.CustomOpsComponent
 	Comp           *appsv1alpha1.ClusterComponentSpec
 	progressDetail appsv1alpha1.ProgressStatusDetail
 }
@@ -41,14 +41,14 @@ type WorkloadAction struct {
 func NewWorkloadAction(opsRequest *appsv1alpha1.OpsRequest,
 	cluster *appsv1alpha1.Cluster,
 	opsDef *appsv1alpha1.OpsDefinition,
-	compCustomItem *appsv1alpha1.CustomOpsItem,
+	customCompOps *appsv1alpha1.CustomOpsComponent,
 	comp *appsv1alpha1.ClusterComponentSpec,
 	progressDetail appsv1alpha1.ProgressStatusDetail) *WorkloadAction {
 	return &WorkloadAction{
 		OpsRequest:     opsRequest,
 		Cluster:        cluster,
 		OpsDef:         opsDef,
-		CompCustomItem: compCustomItem,
+		CustomCompOps:  customCompOps,
 		Comp:           comp,
 		progressDetail: progressDetail,
 	}
@@ -71,7 +71,7 @@ func (w *WorkloadAction) Execute(actionCtx ActionContext) (*ActionStatus, error)
 		if targetPodTemplate == nil {
 			return nil, intctrlutil.NewFatalError("can not found the targetPodTemplate by " + podTemplateName)
 		}
-		targetPods, err = getTargetPods(actionCtx.ReqCtx.Ctx, actionCtx.Client, w.Cluster, targetPodTemplate.PodSelector, w.CompCustomItem.ComponentName)
+		targetPods, err = getTargetPods(actionCtx.ReqCtx.Ctx, actionCtx.Client, w.Cluster, targetPodTemplate.PodSelector, w.CustomCompOps.ComponentName)
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +144,7 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 	)
 
 	env, err := buildActionPodEnv(actionCtx.ReqCtx, actionCtx.Client, w.Cluster, w.OpsDef, w.OpsRequest,
-		w.Comp, w.CompCustomItem, targetPodTemplate, targetPod)
+		w.Comp, w.CustomCompOps, targetPodTemplate, targetPod)
 	if err != nil {
 		return nil, err
 	}

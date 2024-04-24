@@ -28,6 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -61,7 +62,7 @@ var _ = Describe("instance util test", func() {
 				builder.NewPodBuilder(namespace, "pod-10").AddLabels(RoleLabelKey, "learner").GetObject(),
 				builder.NewPodBuilder(namespace, "foo-20").AddLabels(RoleLabelKey, "learner").GetObject(),
 			}
-			expectedOrder := []string{"pod-4", "pod-2", "foo-20", "pod-10", "pod-6", "pod-3", "pod-1", "pod-0", "pod-5"}
+			expectedOrder := []string{"pod-4", "pod-2", "pod-10", "pod-6", "pod-3", "foo-20", "pod-1", "pod-0", "pod-5"}
 
 			sortObjects(pods, priorityMap, false)
 			for i, pod := range pods {
@@ -413,7 +414,28 @@ var _ = Describe("instance util test", func() {
 				return ParseParentNameAndOrdinal(instanceNameList[i])
 			}
 			baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
-			podNamesExpected := []string{"foo-bar-0", "foo-bar-2", "foo-1", "foo-2"}
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+	})
+
+	Context("GenerateAllInstanceNames", func() {
+		It("should work well", func() {
+			parentName := "foo"
+			templatesFoo := &workloads.InstanceTemplate{
+				Name:     "foo",
+				Replicas: pointer.Int32(1),
+			}
+			templateBar := &workloads.InstanceTemplate{
+				Name:     "bar",
+				Replicas: pointer.Int32(2),
+			}
+			var templates []InstanceTemplate
+			templates = append(templates, templatesFoo, templateBar)
+			offlineInstances := []string{"foo-bar-1", "foo-0"}
+			instanceNameList := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances)
+
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
 	})

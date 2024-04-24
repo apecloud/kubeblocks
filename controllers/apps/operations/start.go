@@ -59,8 +59,8 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if err != nil {
 		return intctrlutil.NewFatalError(err.Error())
 	}
-	applyReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, shardingName string) {
-		componentKey := getComponentKeyForStartSnapshot(shardingName, compSpec.Name, "")
+	applyReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string, isSharding bool) {
+		componentKey := getComponentKeyForStartSnapshot(componentName, "", isSharding)
 		replicasOfSnapshot := componentReplicasMap[componentKey]
 		if replicasOfSnapshot == 0 {
 			return
@@ -69,7 +69,7 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		if compSpec.Replicas == 0 {
 			compSpec.Replicas = replicasOfSnapshot
 			for i := range compSpec.Instances {
-				componentKey = getComponentKeyForStartSnapshot(shardingName, compSpec.Name, compSpec.Instances[i].Name)
+				componentKey = getComponentKeyForStartSnapshot(componentName, compSpec.Instances[i].Name, isSharding)
 				replicasOfSnapshot = componentReplicasMap[componentKey]
 				if replicasOfSnapshot == 0 {
 					continue
@@ -80,11 +80,11 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	}
 	for i := range cluster.Spec.ComponentSpecs {
 		compSpec := &cluster.Spec.ComponentSpecs[i]
-		applyReplicas(compSpec, "")
+		applyReplicas(compSpec, compSpec.Name, false)
 	}
 	for i := range cluster.Spec.ShardingSpecs {
 		shardingSpec := &cluster.Spec.ShardingSpecs[i]
-		applyReplicas(&shardingSpec.Template, shardingSpec.Name)
+		applyReplicas(&shardingSpec.Template, shardingSpec.Name, true)
 	}
 	// delete the replicas snapshot of components from the cluster.
 	delete(cluster.Annotations, constant.SnapShotForStartAnnotationKey)
@@ -94,13 +94,13 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for start opsRequest.
 func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, shardingName, componentName string) *int32 {
-		compStatus := opsRequest.Status.Components[componentName]
+	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32 {
+		compStatus := opsRequest.Status.Components[compOps.GetComponentName()]
 		if compStatus.OverrideBy != nil {
 			return compStatus.OverrideBy.Replicas
 		}
 		componentReplicasMap, _ := getComponentReplicasSnapshot(opsRequest.Annotations)
-		componentKey := getComponentKeyForStartSnapshot(shardingName, componentName, "")
+		componentKey := getComponentKeyForStartSnapshot(compOps.GetComponentName(), "", compOps.IsShardingComponent())
 		replicas, ok := componentReplicasMap[componentKey]
 		if !ok {
 			return nil

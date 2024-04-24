@@ -36,7 +36,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -380,17 +379,14 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterObj.Namespace,
 			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+		compObj := &appsv1alpha1.Component{}
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
 
-		By("Wait InstanceSet created")
-		itsKey := compKey
-		its := &workloads.InstanceSet{}
-		Eventually(testapps.CheckObjExists(&testCtx, itsKey, its, true)).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(cluster.Spec.ComponentSpecs).Should(HaveLen(1))
 			clusterJSON, err := json.Marshal(cluster.Spec.ComponentSpecs[0].Instances)
 			g.Expect(err).Should(BeNil())
-			itsJSON, err := json.Marshal(its.Spec.Instances)
+			itsJSON, err := json.Marshal(compObj.Spec.Instances)
 			g.Expect(err).Should(BeNil())
 			g.Expect(clusterJSON).Should(Equal(itsJSON))
 		})).Should(Succeed())

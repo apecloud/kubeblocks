@@ -124,7 +124,7 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	rule *appsv1alpha1.Rule,
-	compCustomItem appsv1alpha1.CustomOpsItem) error {
+	compCustomItem appsv1alpha1.CustomOpsComponent) error {
 	opsSpec := opsRes.OpsRequest.Spec
 	if opsSpec.Force {
 		return nil
@@ -174,7 +174,7 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	compCustomItem appsv1alpha1.CustomOpsItem) bool {
+	compCustomItem appsv1alpha1.CustomOpsComponent) bool {
 	if opsRes.OpsRequest.Status.Components == nil {
 		opsRes.OpsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}

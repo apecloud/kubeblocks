@@ -114,7 +114,7 @@ spec:
               customSpec:
                 description: Specifies a custom operation as defined by OpsDefinition.
                 properties:
-                  items:
+                  components:
                     description: Defines which components need to perform the actions
                       defined by this OpsDefinition. At least one component/shardComponent
                       is required. The components are identified by their name and
@@ -124,6 +124,10 @@ spec:
                         componentName:
                           description: Specifies the name of the cluster component.
                           type: string
+                        isSharding:
+                          description: Specifies that the componentName refers to
+                            the cluster's sharding component.
+                          type: boolean
                         parameters:
                           description: Represents the parameters for this operation
                             as declared in the opsDefinition.spec.parametersSchema.
@@ -146,18 +150,15 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                        shardingName:
-                          description: Specifies the name of the cluster sharding
-                            component.
-                          type: string
+                      required:
+                      - componentName
                       type: object
-                      x-kubernetes-validations:
-                      - message: either componentName or shardingName
-                        rule: (has(self.componentName) && !has(self.shardingName))
-                          || (has(self.shardingName) && !has(self.componentName))
                     maxItems: 1024
                     minItems: 1
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - componentName
+                    x-kubernetes-list-type: map
                   opsDefinitionRef:
                     description: Is a reference to an OpsDefinition.
                     type: string
@@ -176,7 +177,7 @@ spec:
                   serviceAccountName:
                     type: string
                 required:
-                - items
+                - components
                 - opsDefinitionRef
                 type: object
               expose:
@@ -2642,6 +2643,10 @@ spec:
                         - name
                         type: object
                       type: array
+                    isSharding:
+                      description: Specifies that the componentName refers to the
+                        cluster's sharding component.
+                      type: boolean
                     offlineInstances:
                       description: Specifies instances to be scaled in with dedicated
                         names in the list.
@@ -2653,17 +2658,14 @@ spec:
                       format: int32
                       minimum: 0
                       type: integer
-                    shardingName:
-                      description: Specifies the name of the cluster sharding component.
-                      type: string
                   required:
+                  - componentName
                   - replicas
                   type: object
-                  x-kubernetes-validations:
-                  - message: either componentName or shardingName
-                    rule: (has(self.componentName) && !has(self.shardingName)) ||
-                      (has(self.shardingName) && !has(self.componentName))
                 type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: forbidden to update spec.horizontalScaling
                   rule: self == oldSelf
@@ -2821,17 +2823,18 @@ spec:
                         - name
                         type: object
                       type: array
-                    shardingName:
-                      description: Specifies the name of the cluster sharding component.
-                      type: string
+                    isSharding:
+                      description: Specifies that the componentName refers to the
+                        cluster's sharding component.
+                      type: boolean
                   required:
+                  - componentName
                   - instances
                   type: object
-                  x-kubernetes-validations:
-                  - message: either componentName or shardingName
-                    rule: (has(self.componentName) && !has(self.shardingName)) ||
-                      (has(self.shardingName) && !has(self.componentName))
                 type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: forbidden to update spec.rebuildFrom
                   rule: self == oldSelf
@@ -2914,16 +2917,14 @@ spec:
                     x-kubernetes-list-map-keys:
                     - name
                     x-kubernetes-list-type: map
-                  shardingName:
-                    description: Specifies the name of the cluster sharding component.
-                    type: string
+                  isSharding:
+                    description: Specifies that the componentName refers to the cluster's
+                      sharding component.
+                    type: boolean
                 required:
+                - componentName
                 - configurations
                 type: object
-                x-kubernetes-validations:
-                - message: either componentName or shardingName
-                  rule: (has(self.componentName) && !has(self.shardingName)) || (has(self.shardingName)
-                    && !has(self.componentName))
               reconfigures:
                 description: Defines the variables that need to input when updating
                   configuration.
@@ -3008,17 +3009,18 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    shardingName:
-                      description: Specifies the name of the cluster sharding component.
-                      type: string
+                    isSharding:
+                      description: Specifies that the componentName refers to the
+                        cluster's sharding component.
+                      type: boolean
                   required:
+                  - componentName
                   - configurations
                   type: object
-                  x-kubernetes-validations:
-                  - message: either componentName or shardingName
-                    rule: (has(self.componentName) && !has(self.shardingName)) ||
-                      (has(self.shardingName) && !has(self.componentName))
                 type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: forbidden to update spec.reconfigure
                   rule: self == oldSelf
@@ -3031,16 +3033,18 @@ spec:
                     componentName:
                       description: Specifies the name of the cluster component.
                       type: string
-                    shardingName:
-                      description: Specifies the name of the cluster sharding component.
-                      type: string
+                    isSharding:
+                      description: Specifies that the componentName refers to the
+                        cluster's sharding component.
+                      type: boolean
+                  required:
+                  - componentName
                   type: object
-                  x-kubernetes-validations:
-                  - message: either componentName or shardingName
-                    rule: (has(self.componentName) && !has(self.shardingName)) ||
-                      (has(self.shardingName) && !has(self.componentName))
                 maxItems: 1024
                 type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: forbidden to update spec.restart
                   rule: self == oldSelf
@@ -3125,6 +3129,10 @@ spec:
                     description: Specifies the image to be used for the exec command.
                       By default, the image of kubeblocks-datascript is used.
                     type: string
+                  isSharding:
+                    description: Specifies that the componentName refers to the cluster's
+                      sharding component.
+                    type: boolean
                   script:
                     description: Defines the script to be executed.
                     items:
@@ -3264,14 +3272,9 @@ spec:
                     x-kubernetes-validations:
                     - message: forbidden to update spec.scriptSpec.script.selector
                       rule: self == oldSelf
-                  shardingName:
-                    description: Specifies the name of the cluster sharding component.
-                    type: string
+                required:
+                - componentName
                 type: object
-                x-kubernetes-validations:
-                - message: either componentName or shardingName
-                  rule: (has(self.componentName) && !has(self.shardingName)) || (has(self.shardingName)
-                    && !has(self.componentName))
               switchover:
                 description: Switches over the specified components.
                 items:
@@ -3294,17 +3297,18 @@ spec:
                         will be executed, and it is mandatory that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate
                         is not left blank."
                       type: string
-                    shardingName:
-                      description: Specifies the name of the cluster sharding component.
-                      type: string
+                    isSharding:
+                      description: Specifies that the componentName refers to the
+                        cluster's sharding component.
+                      type: boolean
                   required:
+                  - componentName
                   - instanceName
                   type: object
-                  x-kubernetes-validations:
-                  - message: either componentName or shardingName
-                    rule: (has(self.componentName) && !has(self.shardingName)) ||
-                      (has(self.shardingName) && !has(self.componentName))
                 type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: forbidden to update spec.switchover
                   rule: self == oldSelf
@@ -3471,6 +3475,10 @@ spec:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
                       type: array
+                    isSharding:
+                      description: Specifies that the componentName refers to the
+                        cluster's sharding component.
+                      type: boolean
                     limits:
                       additionalProperties:
                         anyOf:
@@ -3494,17 +3502,15 @@ spec:
                         to an implementation-defined value. Requests cannot exceed
                         Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                       type: object
-                    shardingName:
-                      description: Specifies the name of the cluster sharding component.
-                      type: string
+                  required:
+                  - componentName
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
-                  x-kubernetes-validations:
-                  - message: either componentName or shardingName
-                    rule: (has(self.componentName) && !has(self.shardingName)) ||
-                      (has(self.shardingName) && !has(self.componentName))
                 maxItems: 1024
                 type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
               volumeExpansion:
                 description: 'Note: Quantity struct can not do immutable check by
                   CEL. Defines what component and volumeClaimTemplate need to expand
@@ -3601,9 +3607,10 @@ spec:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
                       type: array
-                    shardingName:
-                      description: Specifies the name of the cluster sharding component.
-                      type: string
+                    isSharding:
+                      description: Specifies that the componentName refers to the
+                        cluster's sharding component.
+                      type: boolean
                     volumeClaimTemplates:
                       description: volumeClaimTemplates specifies the storage size
                         and volumeClaimTemplate name.
@@ -3630,13 +3637,13 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                   required:
+                  - componentName
                   - volumeClaimTemplates
                   type: object
-                  x-kubernetes-validations:
-                  - message: either componentName or shardingName
-                    rule: (has(self.componentName) && !has(self.shardingName)) ||
-                      (has(self.shardingName) && !has(self.componentName))
                 type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
             required:
             - clusterRef
             - type

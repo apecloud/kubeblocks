@@ -532,6 +532,14 @@ func buildEnvConfigData(its workloads.InstanceSet) map[string]string {
 			envData[prefix+"FOLLOWERS"] = followers
 		}
 	}
+	// generate all pod names
+	generatePodNames := func() []string {
+		var instances []InstanceTemplate
+		for i := range its.Spec.Instances {
+			instances = append(instances, &its.Spec.Instances[i])
+		}
+		return GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, instances, its.Spec.OfflineInstances)
+	}
 
 	prefix := constant.KBPrefix + "_ITS_"
 	envData[prefix+"N"] = strReplicas
@@ -546,6 +554,9 @@ func buildEnvConfigData(its workloads.InstanceSet) map[string]string {
 	envData[prefix+"REPLICA_COUNT"] = strReplicas
 	generateReplicaEnv(prefix)
 	generateMemberEnv(prefix)
+	// KB_POD_LIST
+	names := generatePodNames()
+	envData[prefix+"POD_LIST"] = strings.Join(names, ",")
 
 	// have backward compatible handling for CM key with 'compDefName' being part of the key name, prior 0.5.0
 	// and introduce env/cm key naming reference complexity

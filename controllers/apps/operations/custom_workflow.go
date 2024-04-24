@@ -53,7 +53,7 @@ func NewWorkflowContext(
 }
 
 // Run actions execution layer.
-func (w *WorkflowContext) Run(compCustomSpec *appsv1alpha1.CustomOpsItem) (*WorkflowStatus, error) {
+func (w *WorkflowContext) Run(compCustomSpec *appsv1alpha1.CustomOpsComponent) (*WorkflowStatus, error) {
 	var (
 		err            error
 		actionStatus   *custom.ActionStatus
@@ -145,7 +145,7 @@ steps:
 }
 
 func (w *WorkflowContext) getAction(action appsv1alpha1.OpsAction,
-	compCustomItem *appsv1alpha1.CustomOpsItem,
+	compCustomItem *appsv1alpha1.CustomOpsComponent,
 	comp *appsv1alpha1.ClusterComponentSpec,
 	progressDetail appsv1alpha1.ProgressStatusDetail) custom.OpsAction {
 	switch {

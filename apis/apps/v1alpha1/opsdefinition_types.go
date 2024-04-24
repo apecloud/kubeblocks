@@ -22,15 +22,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// OpsDefinitionSpec defines the desired state of OpsDefinition
+// OpsDefinitionSpec defines the desired state of OpsDefinition.
 type OpsDefinitionSpec struct {
-
 	// Specifies the preconditions that must be met to run the actions for the operation.
-	// if set, it will check the condition before the component run this operation.
+	// if set, it will check the condition before the Component runs this operation.
+	// Example:
+	// ```yaml
+	//  preConditions:
+	//  - rule:
+	//      expression: '{{ eq .component.status.phase "Running" }}'
+	//      message: Component is not in Running status.
+	// ```
 	// +optional
 	PreConditions []PreCondition `json:"preConditions,omitempty"`
 
-	// Defines the targetPodTemplate to be referenced by the action.
+	// Specifies a list of TargetPodTemplate, each designed to select a specific Pod and extract selected runtime info
+	// from its PodSpec.
+	// The extracted information, such as environment variables, volumes and tolerations, are then injected into
+	// Jobs or Pods that execute the OpsActions defined in `actions`.
+	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
@@ -38,9 +48,9 @@ type OpsDefinitionSpec struct {
 	// +optional
 	TargetPodTemplates []TargetPodTemplate `json:"targetPodTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Specifies the types of componentDefinitions supported by the operation.
-	// It can reference certain variables of the componentDefinition.
-	// If set, any component not meeting these conditions will be intercepted.
+	// Specifies a list of ComponentDefinition for Components associated with this OpsDefinition.
+	// It also includes connection credentials (address and account) for each Component.
+	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
@@ -48,11 +58,13 @@ type OpsDefinitionSpec struct {
 	// +optional
 	ComponentDefinitionRefs []ComponentDefinitionRef `json:"componentDefinitionRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Describes the schema used for validation, pruning, and defaulting.
+	// Specifies the schema for validating the data types and value ranges of parameters in OpsActions before their usage.
+	//
 	// +optional
 	ParametersSchema *ParametersSchema `json:"parametersSchema,omitempty"`
 
-	// The actions to be executed in the opsRequest are performed sequentially.
+	// Specifies a list of OpsAction where each customized action is executed sequentially.
+	//
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -63,8 +75,7 @@ type OpsDefinitionSpec struct {
 }
 
 type PreCondition struct {
-
-	// Defines the conditions under which the operation can be executed.
+	// Specifies the conditions that must be met for the operation to execute.
 	Rule *Rule `json:"rule,omitempty"`
 
 	// Represents a job that will be run to execute the PreCondition.
@@ -73,63 +84,78 @@ type PreCondition struct {
 	// Exec *PreConditionExec `json:"exec,omitempty"`
 }
 
+// PreConditionExec is deprecated.
 type PreConditionExec struct {
-	// Specifies the name of the Docker image to be used for the execution.
+	// Specifies the name of the image used for execution.
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// Defines the environment variables to be set in the container.
+	// Specifies a list of environment variables to be set in the container.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// Specifies the commands to be executed in the container.
+	// Specifies the command to be executed in the container.
 	// +optional
 	Command []string `json:"command,omitempty"`
 
-	// Represents the arguments to be passed to the command in the container.
+	// Specifies the arguments to be passed to the command in the container.
 	// +optional
 	Args []string `json:"args,omitempty"`
 }
 
 type Rule struct {
-	// Defines how the operation can be executed using a Go template expression.
-	// Should return either `true` or `false`. The built-in objects available for use in the expression include:
-	// - `params`: These are the input parameters.
-	// - `cluster`: This is the referenced cluster object.
-	// - `component`: This is the referenced component object.
+	// Specifies a Go template expression that determines how the operation can be executed.
+	// The return value must be either `true` or `false`.
+	// Available built-in objects that can be referenced in the expression include:
+	//
+	// - `params`: Input parameters.
+	// - `cluster`: The referenced Cluster object.
+	// - `component`: The referenced Component object.
+	//
 	// +kubebuilder:validation:Required
 	Expression string `json:"expression"`
 
-	// Reported if the rule is not matched.
+	// Specifies the error or status message reported if the `expression` does not evaluate to `true`.
+	//
 	// +kubebuilder:validation:Required
 	Message string `json:"message"`
 }
 
 type TargetPodTemplate struct {
-	// Represents the template name.
+	// Specifies the name of the TargetPodTemplate.
+	//
 	// +kubebuilder:validation:MaxLength=32
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Defines the environment variables that need to be referenced from the target component pod, and will be injected into the pod's containers.
+	// Specifies a list of environment variables to be extracted from a selected Pod,
+	// and injected into the containers executing each OpsAction.
+	//
 	// +optional
 	Vars []OpsEnvVar `json:"vars,omitempty"`
 
-	// Used to identify the target pod.
+	// Used to select the target Pod from which environment variables and volumes are extracted from its PodSpec.
+	//
 	// +kubebuilder:validation:Required
 	PodSelector PodSelector `json:"podSelector"`
 
-	// Specifies the mount points for the volumes defined in the `Volumes` section for the action pod.
+	// Specifies a list of volumes, along with their respective mount points, that are to be extracted from a selected Pod,
+	// and mounted onto the containers executing each OpsAction.
+	// This allows the containers to access shared or persistent data necessary for the operation.
+	//
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 type OpsEnvVar struct {
-	// Specifies the name of the variable. This must be a C_IDENTIFIER.
+	// Specifies the name of the environment variable to be injected into Pods executing OpsActions.
+	// It must conform to the C_IDENTIFIER format, which includes only alphanumeric characters and underscores, and cannot begin with a digit.
+	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Defines the source for the variable's value.
+	// Specifies the source of the environment variable's value.
+	//
 	// +kubebuilder:validation:Required
 	ValueFrom *OpsVarSource `json:"valueFrom"`
 }
@@ -139,69 +165,80 @@ type OpsEnvVar struct {
 type OpsVarSource struct {
 	// Specifies a reference to a specific environment variable within a container.
 	// Used to specify the source of the variable, which can be either "env" or "envFrom".
+	//
 	// +optional
 	EnvVarRef *EnvVarRef `json:"envRef,omitempty"`
 
-	// Represents the JSONPath of the target pod. This is used to specify the exact location of the data within the JSON structure of the pod.
+	// Represents the JSONPath expression pointing to the specific data within the JSON structure of the target Pod.
+	// It is used to extract precise data locations for operations on the Pod.
+	//
 	// +optional
 	FieldPath string `json:"fieldPath,omitempty"`
 }
 
 type EnvVarRef struct {
-	// Specifies the name of the container as defined in the componentDefinition or as injected by the kubeBlocks controller.
+	// Specifies the container name in the target Pod.
 	// If not specified, the first container will be used by default.
+	//
 	// +optional
 	ContainerName string `json:"containerName,omitempty"`
 
 	// Defines the name of the environment variable.
+	// This name can originate from an 'env' entry or be a data key from an 'envFrom' source.
+	//
 	// +kubebuilder:validation:Required
 	EnvName string `json:"envName"`
 }
 
+// PodSelector selects the target Pod from which environment variables and volumes are extracted from its PodSpec.
 type PodSelector struct {
-
-	// Specifies the role of the target pod.
+	// Specifies the role of the target Pod.
+	//
 	// +optional
 	Role string `json:"role,omitempty"`
 
 	// Defines the policy for selecting the target pod when multiple pods match the podSelector.
 	// It can be either 'Any' (select any one pod that matches the podSelector)
 	// or 'All' (select all pods that match the podSelector).
+	//
 	// +kubebuilder:default=Any
 	// +kubebuilder:validation:Required
 	SelectionPolicy PodSelectionPolicy `json:"selectionPolicy,omitempty"`
 
-	// Indicates the desired availability status of the pods to be selected.
-	// valid values:
-	// - 'Available': selects only available pods and terminates the action if none are found.
-	// - 'PreferredAvailable': prioritizes the selection of available pods。
-	// - 'None': there are no requirements for the availability of pods.
+	// Specifies the pod selection criteria based on their availability:
+	// - 'Available': Only selects available pods, and terminates the action if none are found.
+	// - 'PreferredAvailable': Prioritizes available pods but considers others if none available.
+	// - 'None': No availability requirements.
+	//
 	// +kubebuilder:default=PreferredAvailable
 	// +kubebuilder:validation:Required
 	Availability PodAvailabilityPolicy `json:"availability,omitempty"`
 }
 
 type ComponentDefinitionRef struct {
-
-	// Refers to the name of the component definition. This is a required field with a maximum length of 32 characters.
+	// Specifies the name of the ComponentDefinition.
 	// +kubebuilder:validation:MaxLength=32
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Represents the account name of the component.
-	// If provided, the account username and password will be injected into the job environment variables `KB_ACCOUNT_USERNAME` and `KB_ACCOUNT_PASSWORD`.
+	// Specifies the account name associated with the Component.
+	// If set, the corresponding account username and password are injected into containers' environment variables
+	// `KB_ACCOUNT_USERNAME` and `KB_ACCOUNT_PASSWORD`.
+	//
 	// +optional
 	AccountName string `json:"accountName,omitempty"`
 
-	// References the name of the service.
-	// If provided, the service name and ports will be mapped to the job environment variables `KB_COMP_SVC_NAME` and `KB_COMP_SVC_PORT_$(portName)`.
-	// Note that the portName will replace the characters '-' with '_' and convert to uppercase.
+	// Specifies the name of the Service.
+	// If set, the service name is injected as the `KB_COMP_SVC_NAME` environment variable in the containers,
+	// and each service port is mapped to a corresponding environment variable named `KB_COMP_SVC_PORT_$(portName)`.
+	// The `portName` is transformed by replacing '-' with '_' and converting to uppercase.
+	//
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 }
 
 type ParametersSchema struct {
-	// Defines the OpenAPI v3 schema used for the parameter schema.
+	// Defines the schema for parameters using the OpenAPI v3.
 	// The supported property types include:
 	// - string
 	// - number
@@ -215,119 +252,148 @@ type ParametersSchema struct {
 	OpenAPIV3Schema *apiextensionsv1.JSONSchemaProps `json:"openAPIV3Schema,omitempty"`
 }
 
+// OpsAction specifies a custom action defined in OpsDefinition for execution in a "Custom" OpsRequest.
+//
+// OpsAction can be of three types:
+//
+//   - workload: Creates a Job or Pod to run custom scripts, ideal for isolated or long-running tasks.
+//   - exec: Executes commands directly within an existing container using the kubectl exec interface,
+//     suitable for immediate, short-lived operations.
+//   - resourceModifier: Modifies a K8s object using JSON patches, useful for updating the spec of some resource.
+//
 // +kubebuilder:validation:XValidation:rule="has(self.workload) || has(self.exec) || has(self.resourceModifier)", message="at least one action exists for workload, exec and resourceModifier."
-
 type OpsAction struct {
-	// action name.
+	// Specifies the name of the OpsAction.
 	// +kubebuilder:validation:MaxLength=20
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// failurePolicy is the failure policy of the action. valid values Fail and Ignore.
-	// - Fail: if the action failed, the opsRequest will be failed.
-	// - Ignore: opsRequest will ignore the failure if the action is failed.
+	// Specifies the failure policy of the OpsAction.
+	// Valid values are:
+	//
+	// - "Fail": Marks the entire OpsRequest as failed if the action fails.
+	// - "Ignore": The OpsRequest continues processing despite the failure of the action.
 	// +kubebuilder:validation:Enum={Ignore,Fail}
 	// +kubebuilder:default=Fail
 	// +optional
 	FailurePolicy FailurePolicyType `json:"failurePolicy"`
 
-	// Refers to the parameter of the ParametersSchema.
-	// The parameter will be used in the action.
-	// If it is a 'workload' and 'exec' Action, they will be injected into the corresponding environment variable.
-	// If it is a 'resourceModifier' Action, parameter can be referenced using $() in completionProbe.matchExpressions and JsonPatches[*].Value.
+	// Specifies the parameters for the OpsAction. Their usage varies based on the action type:
+	//
+	// - For 'workload' or 'exec' actions, parameters are injected as environment variables.
+	// - For 'resourceModifier' actions, parameter can be referenced using $() in fields
+	// `resourceModifier.completionProbe.matchExpressions` and `resourceModifier.jsonPatches[*].value`.
+	//
 	// +optional
 	Parameters []string `json:"parameters,omitempty"`
 
-	// Indicates the workload action and a corresponding workload will be created to execute this action.
+	// Specifies the configuration for a 'workload' action.
+	// This action leads to the creation of a K8s workload, such as a Pod or Job, to execute specified tasks.
+	//
 	// +optional
 	Workload *OpsWorkloadAction `json:"workload,omitempty"`
 
-	// Represents the exec action. This will call the kubectl exec interface.
+	// Specifies the configuration for a 'exec' action.
+	// It creates a Pod and invokes a 'kubectl exec' to run command inside a specified container with the target Pod.
 	// +optional
 	Exec *OpsExecAction `json:"exec,omitempty"`
 
-	// Specifies the resource modifier to update the custom resource.
+	// Specifies the configuration for a 'resourceModifier' action.
+	// This action allows for modifications to existing K8s objects.
+	//
+	// Note: This feature has not been implemented yet.
+	//
 	// +optional
 	ResourceModifier *OpsResourceModifierAction `json:"resourceModifier,omitempty"`
 }
 
 type OpsWorkloadAction struct {
 	// Defines the workload type of the action. Valid values include "Job" and "Pod".
-	// "Job" creates a job to execute the action.
-	// "Pod" creates a pod to execute the action. Note that unlike jobs, if a pod is manually deleted, it will not consume backoffLimit times.
+	//
+	// - "Job": Creates a Job to execute the action.
+	// - "Pod": Creates a Pod to execute the action.
+	//    Note: unlike Jobs, manually deleting a Pod does not affect the `backoffLimit`.
+	//
 	// +kubebuilder:validation:Required
 	Type OpsWorkloadType `json:"type"`
 
-	// Refers to the spec.targetPodTemplates.
-	// This field defines the target pod for the current action.
+	// Specifies a TargetPodTemplate defined in the `opsDefinition.spec.targetPodTemplates`.
 	TargetPodTemplate string `json:"targetPodTemplate,omitempty"`
 
-	// Specifies the number of retries before marking the action as failed.
+	// Specifies the number of retries allowed before marking the action as failed.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=0
 	// +optional
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
 
-	// Represents the pod spec of the workload.
+	// Specifies the PodSpec of the 'workload' action.
 	// +kubebuilder:validation:Required
 	PodSpec corev1.PodSpec `json:"podSpec"`
 }
 
 type OpsExecAction struct {
-	// Refers to the spec.targetPodTemplates. Defines the target pods that need to execute exec actions.
+	// Specifies a TargetPodTemplate defined in the `opsDefinition.spec.targetPodTemplates`.
 	// +kubebuilder:validation:Required
 	TargetPodTemplate string `json:"targetPodTemplate"`
 
-	// Specifies the number of retries before marking the action as failed.
+	// Specifies the number of retries allowed before marking the action as failed.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=0
 	// +optional
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
 
-	// The command to execute.
+	// The command to be executed via 'kubectl exec --'.
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
 
-	// The name of the container in the target pod to execute the command.
+	// The name of the container in the target pod where the command should be executed.
+	// This corresponds to the `-c {containerName}` option in `kubectl exec`.
+	//
 	// If not set, the first container is used.
+	//
 	// +optional
 	ContainerName string `json:"containerName"`
 }
 
 type OpsResourceModifierAction struct {
-	// Refers to the Kubernetes objects that are required to be updated.
+	// Specifies the K8s object that is to be updated.
+	//
 	// +kubebuilder:validation:Required
 	Resource TypedObjectRef `json:"resource"`
 
-	//  Defines the set of patches that are used to perform updates on the resource object.
+	// Specifies a list of patches for modifying the object.
+	//
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:Required
 	JSONPatches []JSONPatchOperation `json:"jsonPatches"`
 
-	// Provides a method to check if the action has been completed.
+	// Specifies a method to determine if the action has been completed.
+	//
+	// Note: This feature has not been implemented yet.
+	//
 	// +kubebuilder:validation:Required
 	CompletionProbe CompletionProbe `json:"completionProbe"`
 }
 
 type JSONPatchOperation struct {
-	// Represents the type of JSON patch operation. It supports the following values: 'add', 'remove', 'replace'.
+	// Specifies the type of JSON patch operation. It supports the following values: 'add', 'remove', 'replace'.
 	// +enum
 	// +kubebuilder:validation:Enum={add,remove,replace}
 	// +kubebuilder:validation:Required
 	Operation string `json:"op"`
 
-	// Represents the json patch path.
+	// Specifies the json patch path.
 	// +kubebuilder:validation:Required
 	Path string `json:"path"`
 
-	// Represents the value to be used in the JSON patch operation.
+	// Specifies the value to be used in the JSON patch operation.
 	// +kubebuilder:validation:Required
 	Value string `json:"value"`
 }
 
 type TypedObjectRef struct {
-	// Defines the group for the resource being referenced.
+	// Specifies the group for the resource being referenced.
 	// If not specified, the referenced Kind must belong to the core API group.
 	// For all third-party types, this is mandatory.
 	// +kubebuilder:validation:Required
@@ -350,14 +416,14 @@ type CompletionProbe struct {
 	// +optional
 	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
 
-	// Defines the number of seconds after which the probe times out.
+	// Specifies the number of seconds after which the probe times out.
 	// The default value is 60 seconds, with a minimum value of 1.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=60
 	// +optional
 	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
 
-	// Indicates the frequency (in seconds) at which the probe should be performed.
+	// Specifies the frequency (in seconds) at which the probe should be performed.
 	// The default value is 5 seconds, with a minimum value of 1.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=5
@@ -370,14 +436,14 @@ type CompletionProbe struct {
 }
 
 type MatchExpressions struct {
-	// Defines a failure condition for an action using a Go template expression.
+	// Specifies a failure condition for an action using a Go template expression.
 	// Should evaluate to either `true` or `false`.
 	// The current resource object is parsed into the Go template.
 	// for example, you can use '{{ eq .spec.replicas 1 }}'.
 	// +optional
 	Failure string `json:"failure,omitempty"`
 
-	// Defines a success condition for an action using a Go template expression.
+	// Specifies a success condition for an action using a Go template expression.
 	// Should evaluate to either `true` or `false`.
 	// The current resource object is parsed into the Go template.
 	// for example, using '{{ eq .spec.replicas 1 }}'
@@ -387,12 +453,13 @@ type MatchExpressions struct {
 
 // OpsDefinitionStatus defines the observed state of OpsDefinition
 type OpsDefinitionStatus struct {
-	// Refers to the most recent generation observed for this OpsDefinition.
+	// Represents the most recent generation observed of this OpsDefinition.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Represents the current state of the OpsDefinition. Valid values are ``, `Available`, `Unavailable`.
-	// When the state is `Available`, the OpsDefinition is ready and can be used for related objects.
+	// Represents the current state of the OpsDefinition.
+	// Valid values are "", "Available", "Unavailable".
+	// When it equals to "Available", the OpsDefinition is ready and can be used in a "Custom" OpsRequest.
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -410,7 +477,7 @@ type OpsDefinitionStatus struct {
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="OpsDefinition status phase."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// OpsDefinition is the Schema for the opsdefinitions API
+// OpsDefinition is the Schema for the OpsDefinitions API.
 type OpsDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -421,7 +488,7 @@ type OpsDefinition struct {
 
 // +kubebuilder:object:root=true
 
-// OpsDefinitionList contains a list of OpsDefinition
+// OpsDefinitionList contains a list of OpsDefinition.
 type OpsDefinitionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

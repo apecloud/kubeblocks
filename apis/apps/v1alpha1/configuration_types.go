@@ -162,7 +162,10 @@ type ConfigurationItemDetailStatus struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Indicates the current status of the configuration item. This field is optional.
+	// Indicates the current status of the configuration item.
+	//
+	// Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+	// "Upgrading", "Deleting", "FailedAndRetry", "Finished".
 	//
 	// +optional
 	Phase ConfigurationPhase `json:"phase,omitempty"`

@@ -304,11 +304,12 @@ const (
 )
 
 const (
-	BackupNameKeyForRestore          = "name"
-	BackupNamespaceKeyForRestore     = "namespace"
-	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
-	RestoreTimeKeyForRestore         = "restoreTime"
-	ConnectionPassword               = "connectionPassword"
+	BackupNameKeyForRestore           = "name"
+	BackupNamespaceKeyForRestore      = "namespace"
+	VolumeRestorePolicyKeyForRestore  = "volumeRestorePolicy"
+	DoReadyRestoreAfterClusterRunning = "doReadyRestoreAfterClusterRunning"
+	RestoreTimeKeyForRestore          = "restoreTime"
+	ConnectionPassword                = "connectionPassword"
 )
 
 const (

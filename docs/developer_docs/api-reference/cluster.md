@@ -17497,17 +17497,6 @@ string
 </tr>
 <tr>
 <td>
-<code>effectiveCommonComponentDef</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<p>Indicates if this backup will be restored for all components which refer to common ComponentDefinition.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>restoreTimeStr</code><br/>
 <em>
 string
@@ -17526,6 +17515,18 @@ string
 </td>
 <td>
 <p>Specifies the volume claim restore policy, support values: [Serial, Parallel]</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>doReadyRestoreAfterClusterRunning</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>If set to true, the recovery process in the PostReady phase will be performed after the cluster is running successfully.
+otherwise, it will be performed after component is running.</p>
 </td>
 </tr>
 </tbody>

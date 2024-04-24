@@ -53,12 +53,13 @@ type RestoreManager struct {
 	Scheme  *k8sruntime.Scheme
 
 	// private
-	namespace           string
-	restoreTime         string
-	volumeRestorePolicy dpv1alpha1.VolumeClaimRestorePolicy
-	startingIndex       int32
-	replicas            int32
-	restoreLabels       map[string]string
+	namespace                         string
+	restoreTime                       string
+	volumeRestorePolicy               dpv1alpha1.VolumeClaimRestorePolicy
+	doReadyRestoreAfterClusterRunning bool
+	startingIndex                     int32
+	replicas                          int32
+	restoreLabels                     map[string]string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -202,6 +203,9 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	if compObj.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 		return nil
 	}
+	if r.doReadyRestoreAfterClusterRunning && r.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+		return nil
+	}
 	jobActionLabels := constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name)
 	if comp.WorkloadType == appsv1alpha1.Consensus || comp.WorkloadType == appsv1alpha1.Replication {
 		jobActionLabels[instanceset.AccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
@@ -312,6 +316,10 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 		r.volumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(volumeRestorePolicy)
 	}
 	r.restoreTime = backupSource[constant.RestoreTimeKeyForRestore]
+	doReadyRestoreAfterClusterRunning := backupSource[constant.DoReadyRestoreAfterClusterRunning]
+	if doReadyRestoreAfterClusterRunning == "true" {
+		r.doReadyRestoreAfterClusterRunning = true
+	}
 	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, synthesizedComponent.Name, r.Cluster.Namespace)
 }
 

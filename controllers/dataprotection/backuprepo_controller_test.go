@@ -27,6 +27,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -62,6 +63,11 @@ var _ = Describe("BackupRepo controller", func() {
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 		testapps.ClearResources(&testCtx, generics.CSIDriverSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+
+		// TODO: to be removed
+		var legacyStorageProviderSignature = func(_ storagev1alpha1.StorageProvider, _ *storagev1alpha1.StorageProvider, _ storagev1alpha1.StorageProviderList, _ *storagev1alpha1.StorageProviderList) {
+		}
+		testapps.ClearResources(&testCtx, legacyStorageProviderSignature, ml)
 
 		// namespaced
 		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
@@ -172,8 +178,8 @@ var _ = Describe("BackupRepo controller", func() {
 			return repo
 		}
 
-		createStorageProviderSpec := func(mutateFunc func(provider *storagev1alpha1.StorageProvider)) {
-			obj := &storagev1alpha1.StorageProvider{}
+		createStorageProviderSpec := func(mutateFunc func(provider *dpv1alpha1.StorageProvider)) {
+			obj := &dpv1alpha1.StorageProvider{}
 			obj.GenerateName = "storageprovider-"
 			obj.Spec.CSIDriverName = defaultCSIDriverName
 			obj.Spec.CSIDriverSecretTemplate = `
@@ -192,9 +198,9 @@ parameters:
     secret-name: {{ .CSIDriverSecretRef.Name }}
     secret-namespace: {{ .CSIDriverSecretRef.Namespace }}
 `
-			obj.Status.Phase = storagev1alpha1.StorageProviderReady
+			obj.Status.Phase = dpv1alpha1.StorageProviderReady
 			meta.SetStatusCondition(&obj.Status.Conditions, metav1.Condition{
-				Type:   storagev1alpha1.ConditionTypeCSIDriverInstalled,
+				Type:   dpv1alpha1.ConditionTypeCSIDriverInstalled,
 				Status: metav1.ConditionTrue,
 				Reason: "CSIDriverInstalled",
 			})
@@ -204,7 +210,7 @@ parameters:
 			provider := testapps.CreateK8sResource(&testCtx, obj.DeepCopy())
 			providerKey = client.ObjectKeyFromObject(provider)
 			// update status
-			newObj := provider.(*storagev1alpha1.StorageProvider)
+			newObj := provider.(*dpv1alpha1.StorageProvider)
 			patch := client.MergeFrom(newObj.DeepCopy())
 			newObj.Status = obj.Status
 			Expect(testCtx.Cli.Status().Patch(testCtx.Ctx, newObj, patch)).NotTo(HaveOccurred())
@@ -371,7 +377,7 @@ parameters:
 			})).Should(Succeed())
 
 			By("creating the required storage provider")
-			createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+			createStorageProviderSpec(func(provider *dpv1alpha1.StorageProvider) {
 				provider.GenerateName = ""
 				provider.Name = "myprovider"
 			})
@@ -386,10 +392,10 @@ parameters:
 			})).Should(Succeed())
 
 			By("updating the status of the storage provider to not ready")
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
-				provider.Status.Phase = storagev1alpha1.StorageProviderNotReady
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, providerKey, func(provider *dpv1alpha1.StorageProvider) {
+				provider.Status.Phase = dpv1alpha1.StorageProviderNotReady
 				meta.SetStatusCondition(&provider.Status.Conditions, metav1.Condition{
-					Type:   storagev1alpha1.ConditionTypeCSIDriverInstalled,
+					Type:   dpv1alpha1.ConditionTypeCSIDriverInstalled,
 					Status: metav1.ConditionFalse,
 					Reason: "CSINotInstalled",
 				})
@@ -404,7 +410,7 @@ parameters:
 			})).Should(Succeed())
 
 			By("deleting the storage provider")
-			testapps.DeleteObject(&testCtx, providerKey, &storagev1alpha1.StorageProvider{})
+			testapps.DeleteObject(&testCtx, providerKey, &dpv1alpha1.StorageProvider{})
 			By("checking the status of the BackupRepo, condition should become NotFound")
 			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageProviderReady)
@@ -476,7 +482,7 @@ parameters:
 			})).Should(Succeed())
 
 			By("updating the template")
-			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *dpv1alpha1.StorageProvider) {
 				provider.Spec.CSIDriverSecretTemplate += "\nnew-item: new-value"
 			})).Should(Succeed())
 			By("checking the Secret again, should have new generation and new content")
@@ -548,7 +554,7 @@ parameters:
 
 		It("should fail if the secret template is invalid", func() {
 			By("setting a invalid template")
-			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *dpv1alpha1.StorageProvider) {
 				provider.Spec.CSIDriverSecretTemplate = "{{ bad template }"
 			})).Should(Succeed())
 			By("checking the repo status")
@@ -564,7 +570,7 @@ parameters:
 
 		It("should fail if the render result of the secret template is not a yaml", func() {
 			By("setting a invalid template")
-			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *dpv1alpha1.StorageProvider) {
 				provider.Spec.CSIDriverSecretTemplate = "bad yaml"
 			})).Should(Succeed())
 			By("checking the repo status")
@@ -580,7 +586,7 @@ parameters:
 
 		It("should fail if the storage class template is invalid", func() {
 			By("setting a invalid template")
-			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *dpv1alpha1.StorageProvider) {
 				provider.Spec.StorageClassTemplate = "{{ bad template }"
 			})).Should(Succeed())
 			By("creating a new repo to reference the provider")
@@ -598,7 +604,7 @@ parameters:
 
 		It("should fail if the render result of the storage class template is not a yaml", func() {
 			By("setting a invalid template")
-			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *dpv1alpha1.StorageProvider) {
 				provider.Spec.StorageClassTemplate = "bad yaml"
 			})).Should(Succeed())
 			By("creating a new repo to reference the provider")
@@ -768,7 +774,7 @@ parameters:
 		Context("storage provider with PersistentVolumeClaimTemplate", func() {
 			It("should create a PVC in Backup's namespace (in default namespace)", func() {
 				By("setting the PersistentVolumeClaimTemplate")
-				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+				createStorageProviderSpec(func(provider *dpv1alpha1.StorageProvider) {
 					provider.Spec.PersistentVolumeClaimTemplate = `
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -803,7 +809,7 @@ spec:
 
 			It("should fail if the PVC template is invalid", func() {
 				By("setting a invalid PersistentVolumeClaimTemplate")
-				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *dpv1alpha1.StorageProvider) {
 					provider.Spec.PersistentVolumeClaimTemplate = `bad spec`
 				})).Should(Succeed())
 
@@ -820,7 +826,7 @@ spec:
 
 		Context("storage provider contains only PersistentVolumeClaimTemplate", func() {
 			BeforeEach(func() {
-				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+				createStorageProviderSpec(func(provider *dpv1alpha1.StorageProvider) {
 					provider.Spec.CSIDriverName = ""
 					provider.Spec.CSIDriverSecretTemplate = ""
 					provider.Spec.StorageClassTemplate = ""
@@ -851,7 +857,7 @@ spec:
 
 		It("should fail if both StorageClassTemplate and PersistentVolumeClaimTemplate are empty", func() {
 			By("creating a storage provider with empty PersistentVolumeClaimTemplate and StorageClassTemplate")
-			createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+			createStorageProviderSpec(func(provider *dpv1alpha1.StorageProvider) {
 				provider.Spec.CSIDriverName = ""
 				provider.Spec.CSIDriverSecretTemplate = ""
 				provider.Spec.StorageClassTemplate = ""
@@ -873,8 +879,8 @@ spec:
 			var backup *dpv1alpha1.Backup
 			var toolConfigSecretKey types.NamespacedName
 
-			createStorageProviderSpecForToolAccessMethod := func(mutateFunc func(provider *storagev1alpha1.StorageProvider)) {
-				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+			createStorageProviderSpecForToolAccessMethod := func(mutateFunc func(provider *dpv1alpha1.StorageProvider)) {
+				createStorageProviderSpec(func(provider *dpv1alpha1.StorageProvider) {
 					provider.Spec.DatasafedConfigTemplate = `
 [storage]
 type=local
@@ -912,7 +918,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 
 			It("should check that the storage provider has a non-empty datasafedConfigTemplate", func() {
 				By("preparing")
-				createStorageProviderSpecForToolAccessMethod(func(provider *storagev1alpha1.StorageProvider) {
+				createStorageProviderSpecForToolAccessMethod(func(provider *dpv1alpha1.StorageProvider) {
 					provider.Spec.DatasafedConfigTemplate = ""
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
@@ -931,7 +937,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 
 			It("should fail if the datasafedConfigTemplate is invalid", func() {
 				By("preparing")
-				createStorageProviderSpecForToolAccessMethod(func(provider *storagev1alpha1.StorageProvider) {
+				createStorageProviderSpecForToolAccessMethod(func(provider *dpv1alpha1.StorageProvider) {
 					provider.Spec.DatasafedConfigTemplate = "bad template {{"
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
@@ -950,10 +956,10 @@ cred-key2={{ index .Parameters "cred-key2" }}
 
 			It("should work even if the CSI driver required by the storage provider is not installed", func() {
 				By("preparing")
-				createStorageProviderSpecForToolAccessMethod(func(provider *storagev1alpha1.StorageProvider) {
-					provider.Status.Phase = storagev1alpha1.StorageProviderNotReady
+				createStorageProviderSpecForToolAccessMethod(func(provider *dpv1alpha1.StorageProvider) {
+					provider.Status.Phase = dpv1alpha1.StorageProviderNotReady
 					meta.SetStatusCondition(&provider.Status.Conditions, metav1.Condition{
-						Type:   storagev1alpha1.ConditionTypeCSIDriverInstalled,
+						Type:   dpv1alpha1.ConditionTypeCSIDriverInstalled,
 						Status: metav1.ConditionFalse,
 						Reason: "NotInstalled",
 					})
@@ -993,7 +999,7 @@ cred-key2=cred-val2
 
 			It("should update the content of the secret when the template or the value changes", func() {
 				By("changing the template")
-				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *dpv1alpha1.StorageProvider) {
 					provider.Spec.DatasafedConfigTemplate += "new-item=new-value\n"
 				})).Should(Succeed())
 				completePreCheckJob(repo)
@@ -1307,6 +1313,58 @@ new-item=new-value
 				Namespace: namespace2,
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+		})
+
+		It("should convert legacy storageProvider to the new one", func() {
+			By("creating a legacy storageProvider")
+			sp := &storagev1alpha1.StorageProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-sp",
+				},
+				Spec: storagev1alpha1.StorageProviderSpec{
+					CSIDriverName:                 "CSIDriverName",
+					CSIDriverSecretTemplate:       "CSIDriverSecretTemplate",
+					StorageClassTemplate:          "StorageClassTemplate",
+					PersistentVolumeClaimTemplate: "PersistentVolumeClaimTemplate",
+					DatasafedConfigTemplate:       "DatasafedConfigTemplate",
+					ParametersSchema: &storagev1alpha1.ParametersSchema{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"field1": {Type: "string"},
+								"field2": {Type: "integer"},
+							},
+						},
+						CredentialFields: []string{"field1"},
+					},
+				},
+			}
+			testapps.CreateK8sResource(&testCtx, sp)
+
+			By("creating a backupRepo")
+			repo := createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
+				repo.Spec.StorageProviderRef = sp.Name
+			})
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(repo), func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+				g.Expect(repo.Status.Phase, dpv1alpha1.BackupRepoFailed)
+				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageProviderReady)
+				g.Expect(cond).NotTo(BeNil())
+				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
+			})).Should(Succeed())
+
+			By("checking the new storageProvider")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sp),
+				func(g Gomega, newSp *dpv1alpha1.StorageProvider) {
+					g.Expect(newSp.Spec.CSIDriverName).To(BeEquivalentTo(sp.Spec.CSIDriverName))
+					g.Expect(newSp.Spec.CSIDriverSecretTemplate).To(BeEquivalentTo(sp.Spec.CSIDriverSecretTemplate))
+					g.Expect(newSp.Spec.StorageClassTemplate).To(BeEquivalentTo(sp.Spec.StorageClassTemplate))
+					g.Expect(newSp.Spec.PersistentVolumeClaimTemplate).To(BeEquivalentTo(sp.Spec.PersistentVolumeClaimTemplate))
+					g.Expect(newSp.Spec.DatasafedConfigTemplate).To(BeEquivalentTo(sp.Spec.DatasafedConfigTemplate))
+					g.Expect(newSp.Spec.ParametersSchema).NotTo(BeNil())
+					g.Expect(newSp.Spec.ParametersSchema.OpenAPIV3Schema).To(BeEquivalentTo(sp.Spec.ParametersSchema.OpenAPIV3Schema))
+					g.Expect(newSp.Spec.ParametersSchema.CredentialFields).To(BeEquivalentTo(sp.Spec.ParametersSchema.CredentialFields))
+				}),
+			).Should(Succeed())
 		})
 	})
 })

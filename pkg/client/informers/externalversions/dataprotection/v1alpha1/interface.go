@@ -36,6 +36,8 @@ type Interface interface {
 	BackupSchedules() BackupScheduleInformer
 	// Restores returns a RestoreInformer.
 	Restores() RestoreInformer
+	// StorageProviders returns a StorageProviderInformer.
+	StorageProviders() StorageProviderInformer
 }
 
 type version struct {
@@ -77,4 +79,9 @@ func (v *version) BackupSchedules() BackupScheduleInformer {
 // Restores returns a RestoreInformer.
 func (v *version) Restores() RestoreInformer {
 	return &restoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// StorageProviders returns a StorageProviderInformer.
+func (v *version) StorageProviders() StorageProviderInformer {
+	return &storageProviderInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

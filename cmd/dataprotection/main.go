@@ -338,6 +338,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&dpcontrollers.StorageProviderReconciler{
+		Client:          client,
+		Scheme:          mgr.GetScheme(),
+		Recorder:        mgr.GetEventRecorderFor("storage-provider-controller"),
+		MultiClusterMgr: multiClusterMgr,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
+		os.Exit(1)
+	}
+
 	if err = (&dpcontrollers.LogCollectionReconciler{
 		Client:     mgr.GetClient(),
 		Scheme:     mgr.GetScheme(),

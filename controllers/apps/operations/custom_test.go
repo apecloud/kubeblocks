@@ -81,7 +81,7 @@ var _ = Describe("CustomOps", func() {
 			cluster.Name, appsv1alpha1.CustomType)
 		ops.Spec.CustomSpec = &appsv1alpha1.CustomOpsSpec{
 			OpsDefinitionRef: opsDef.Name,
-			CustomOpsItems: []appsv1alpha1.CustomOpsItem{
+			CustomOpsItems: []appsv1alpha1.CustomOpsComponent{
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{
 						ComponentName: comp,

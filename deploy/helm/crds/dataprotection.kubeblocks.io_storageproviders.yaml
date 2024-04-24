@@ -5,9 +5,9 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
-  name: storageproviders.storage.kubeblocks.io
+  name: storageproviders.dataprotection.kubeblocks.io
 spec:
-  group: storage.kubeblocks.io
+  group: dataprotection.kubeblocks.io
   names:
     categories:
     - kubeblocks
@@ -30,13 +30,12 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: "StorageProvider comprises specifications that provide guidance
+        description: StorageProvider comprises specifications that provide guidance
           on accessing remote storage. Currently the supported access methods are
           via a dedicated CSI driver or the `datasafed` tool. In case of CSI driver,
           the specification expounds on provisioning PVCs for that driver. As for
           the `datasafed` tool, the specification provides insights on generating
-          the necessary configuration file. \n Deprecated since v0.9, moving to dataprotection.kubeblocks.io
-          API group, will be removed in v0.11."
+          the necessary configuration file.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

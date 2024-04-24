@@ -25,6 +25,7 @@ resources:
 - bases/apps.kubeblocks.io_components.yaml
 - bases/apps.kubeblocks.io_opsdefinitions.yaml
 - bases/apps.kubeblocks.io_componentversions.yaml
+- bases/dataprotection.kubeblocks.io_storageproviders.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

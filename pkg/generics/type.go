@@ -33,7 +33,6 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
@@ -128,7 +127,7 @@ var ComponentResourceConstraintSignature = func(_ appsv1alpha1.ComponentResource
 var ComponentClassDefinitionSignature = func(_ appsv1alpha1.ComponentClassDefinition, _ *appsv1alpha1.ComponentClassDefinition, _ appsv1alpha1.ComponentClassDefinitionList, _ *appsv1alpha1.ComponentClassDefinitionList) {
 }
 
-var StorageProviderSignature = func(_ storagev1alpha1.StorageProvider, _ *storagev1alpha1.StorageProvider, _ storagev1alpha1.StorageProviderList, _ *storagev1alpha1.StorageProviderList) {
+var StorageProviderSignature = func(_ dpv1alpha1.StorageProvider, _ *dpv1alpha1.StorageProvider, _ dpv1alpha1.StorageProviderList, _ *dpv1alpha1.StorageProviderList) {
 }
 
 var ConfigurationSignature = func(_ appsv1alpha1.Configuration, _ *appsv1alpha1.Configuration, _ appsv1alpha1.ConfigurationList, _ *appsv1alpha1.ConfigurationList) {

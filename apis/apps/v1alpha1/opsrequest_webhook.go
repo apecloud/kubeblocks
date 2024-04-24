@@ -494,7 +494,6 @@ func (r *OpsRequest) checkComponentExistence(cluster *Cluster, compOpsList []Com
 			}
 			continue
 		}
-		return fmt.Errorf("shardingName or componentName can not be empty")
 	}
 
 	if len(notFoundCompNames) > 0 {

@@ -660,9 +660,6 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Required
 	BackupName string `json:"backupName"`
 
-	// Indicates if this backup will be restored for all components which refer to common ComponentDefinition.
-	EffectiveCommonComponentDef bool `json:"effectiveCommonComponentDef,omitempty"`
-
 	// Defines the point in time to restore.
 	RestoreTimeStr string `json:"restoreTimeStr,omitempty"`
 
@@ -670,6 +667,10 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Enum=Serial;Parallel
 	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
+
+	// If set to true, the recovery process in the PostReady phase will be performed after the cluster is running successfully.
+	// otherwise, it will be performed after component is running.
+	DoReadyRestoreAfterClusterRunning bool `json:"doReadyRestoreAfterClusterRunning,omitempty"`
 }
 
 // ScriptSecret represents the secret that is used to execute the script.

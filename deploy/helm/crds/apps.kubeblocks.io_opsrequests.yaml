@@ -61,22 +61,23 @@ spec:
             description: OpsRequestSpec defines the desired state of OpsRequest
             properties:
               backupSpec:
-                description: Defines how to backup the cluster.
+                description: Specifies the parameters to backup a Cluster.
                 properties:
                   backupMethod:
-                    description: Defines the backup method that is defined in backupPolicy.
+                    description: Specifies the name of BackupMethod. The specified
+                      BackupMethod must be defined in the BackupPolicy.
                     type: string
                   backupName:
-                    description: Specifies the name of the backup.
+                    description: Specifies the name of the Backup custom resource.
                     type: string
                   backupPolicyName:
-                    description: Indicates the backupPolicy applied to perform this
-                      backup.
+                    description: Indicates the name of the BackupPolicy applied to
+                      perform this Backup.
                     type: string
                   deletionPolicy:
                     default: Delete
                     description: Determines whether the backup contents stored in
-                      backup repository should be deleted when the backup custom resource
+                      backup repository should be deleted when the Backup custom resource
                       is deleted. Supported values are `Retain` and `Delete`. - `Retain`
                       means that the backup content and its physical snapshot on backup
                       repository are kept. - `Delete` means that the backup content
@@ -86,51 +87,58 @@ spec:
                     - Retain
                     type: string
                   parentBackupName:
-                    description: If backupType is incremental, parentBackupName is
-                      required.
+                    description: If the specified BackupMethod is incremental, `parentBackupName`
+                      is required.
                     type: string
                   retentionPeriod:
-                    description: "Determines a duration up to which the backup should
-                      be kept. Controller will remove all backups that are older than
-                      the RetentionPeriod. For example, RetentionPeriod of `30d` will
-                      keep only the backups of last 30 days. Sample duration format:
-                      \n - years: 2y - months: 6mo - days: 30d - hours: 12h - minutes:
-                      30m \n You can also combine the above durations. For example:
-                      30d12h30m. If not set, the backup will be kept forever."
+                    description: "Determines the duration for which the Backup custom
+                      resources should be retained. \n The controller will automatically
+                      remove all Backup objects that are older than the specified
+                      RetentionPeriod. For example, RetentionPeriod of `30d` will
+                      keep only the Backup objects of last 30 days. Sample duration
+                      format: \n - years: 2y - months: 6mo - days: 30d - hours: 12h
+                      - minutes: 30m \n You can also combine the above durations.
+                      For example: 30d12h30m. If not set, the Backup objects will
+                      be kept forever. \n If the `deletionPolicy` is set to 'Delete',
+                      then the associated backup data will also be deleted along with
+                      the Backup object. Otherwise, only the Backup custom resource
+                      will be deleted."
                     type: string
                 type: object
               cancel:
-                description: 'Defines the action to cancel the `Pending/Creating/Running`
-                  opsRequest, supported types: `VerticalScaling/HorizontalScaling`.
-                  Once set to true, this opsRequest will be canceled and modifying
-                  this property again will not take effect.'
+                description: "Indicates whether the current operation should be canceled
+                  and terminated gracefully if it's in the \"Pending\", \"Creating\",
+                  or \"Running\" state. \n This field applies only to \"VerticalScaling\"
+                  and \"HorizontalScaling\" opsRequests. \n Note: Setting `cancel`
+                  to true is irreversible; further modifications to this field are
+                  ineffective."
                 type: boolean
               clusterRef:
-                description: References the cluster object.
+                description: Specifies the name of the Cluster resource that this
+                  operation is targeting.
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
               customSpec:
-                description: Specifies a custom operation as defined by OpsDefinition.
+                description: Specifies a custom operation defined by OpsDefinition.
                 properties:
                   components:
-                    description: Defines which components need to perform the actions
-                      defined by this OpsDefinition. At least one component/shardComponent
-                      is required. The components are identified by their name and
-                      can be merged or retained.
+                    description: Specifies the components and their parameters for
+                      executing custom actions as defined in OpsDefinition. Requires
+                      at least one component.
                     items:
                       properties:
                         componentName:
-                          description: Specifies the name of the cluster component.
+                          description: Specifies the name of the Component.
                           type: string
                         isSharding:
                           description: Specifies that the componentName refers to
                             the cluster's sharding component.
                           type: boolean
                         parameters:
-                          description: Represents the parameters for this operation
-                            as declared in the opsDefinition.spec.parametersSchema.
+                          description: Specifies the parameters that match the schema
+                            specified in the `opsDefinition.spec.parametersSchema`.
                           items:
                             properties:
                               name:
@@ -160,65 +168,84 @@ spec:
                     - componentName
                     x-kubernetes-list-type: map
                   opsDefinitionRef:
-                    description: Is a reference to an OpsDefinition.
+                    description: Specifies the name of the OpsDefinition.
                     type: string
                   parallelism:
                     anyOf:
                     - type: integer
                     - type: string
-                    description: Defines the execution concurrency. By default, all
-                      incoming Components will be executed simultaneously. The value
-                      can be an absolute number (e.g., 5) or a percentage of desired
-                      components (e.g., 10%). The absolute number is calculated from
-                      the percentage by rounding up. For instance, if the percentage
-                      value is 10% and the components length is 1, the calculated
-                      number will be rounded up to 1.
+                    description: "Specifies the maximum number of components to be
+                      operated on concurrently to mitigate performance impact on clusters
+                      with multiple components. \n It accepts an absolute number (e.g.,
+                      5) or a percentage of components to execute in parallel (e.g.,
+                      \"10%\"). Percentages are rounded up to the nearest whole number
+                      of components. For example, if \"10%\" results in less than
+                      one, it rounds up to 1. \n When unspecified, all components
+                      are processed simultaneously by default. \n Note: This feature
+                      is not implemented yet."
                     x-kubernetes-int-or-string: true
                   serviceAccountName:
+                    description: Specifies the name of the ServiceAccount to be used
+                      for executing the custom operation.
                     type: string
                 required:
                 - components
                 - opsDefinitionRef
                 type: object
               expose:
-                description: Defines services the component needs to expose.
+                description: Lists Expose objects, each specifying a Component and
+                  its services to be exposed.
                 items:
                   properties:
                     componentName:
-                      description: Specifies the name of the cluster component.
+                      description: Specifies the name of the Component.
                       type: string
                     services:
-                      description: A list of services that are to be exposed or removed.
-                        If componentName is not specified, each `OpsService` in the
-                        list must specify ports and selectors.
+                      description: "Specifies a list of OpsService. When an OpsService
+                        is exposed, a corresponding ClusterService will be added to
+                        `cluster.spec.services`. On the other hand, when an OpsService
+                        is unexposed, the corresponding ClusterService will be removed
+                        from `cluster.spec.services`. \n Note: If `componentName`
+                        is not specified, the `ports` and `selector` fields must be
+                        provided in each OpsService definition."
                       items:
+                        description: OpsService represents the parameters to dynamically
+                          create or remove a ClusterService in the `cluster.spec.services`
+                          array.
                         properties:
                           annotations:
                             additionalProperties:
                               type: string
-                            description: 'Contains cloud provider related parameters
-                              if ServiceType is LoadBalancer. More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
+                            description: "Contains cloud provider related parameters
+                              if ServiceType is LoadBalancer. \n More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer."
                             type: object
                           ipFamilies:
-                            description: "IPFamilies is a list of IP families (e.g.
-                              IPv4, IPv6) assigned to this service. This field is
-                              usually assigned automatically based on cluster configuration
-                              and the ipFamilyPolicy field. If this field is specified
-                              manually, the requested family is available in the cluster,
-                              and ipFamilyPolicy allows it, it will be used; otherwise
-                              creation of the service will fail. This field is conditionally
-                              mutable: it allows for adding or removing a secondary
-                              IP family, but it does not allow changing the primary
-                              IP family of the Service. Valid values are \"IPv4\"
-                              and \"IPv6\".  This field only applies to Services of
-                              types ClusterIP, NodePort, and LoadBalancer, and does
-                              apply to \"headless\" services. This field will be wiped
-                              when updating a Service to type ExternalName. \n This
+                            description: "A list of IP families (e.g., IPv4, IPv6)
+                              assigned to this Service. \n Usually assigned automatically
+                              based on the cluster configuration and the `ipFamilyPolicy`
+                              field. If specified manually, the requested IP family
+                              must be available in the cluster and allowed by the
+                              `ipFamilyPolicy`. If the requested IP family is not
+                              available or not allowed, the Service creation will
+                              fail. \n Valid values: \n - \"IPv4\" - \"IPv6\" \n This
                               field may hold a maximum of two entries (dual-stack
-                              families, in either order).  These families must correspond
-                              to the values of the clusterIPs field, if specified.
-                              Both clusterIPs and ipFamilies are governed by the ipFamilyPolicy
-                              field."
+                              families, in either order). \n Common combinations of
+                              `ipFamilies` and `ipFamilyPolicy` are: \n - ipFamilies=[]
+                              + ipFamilyPolicy=\"PreferDualStack\" : The Service prefers
+                              dual-stack but can fall back to single-stack if the
+                              cluster does not support dual-stack. The IP family is
+                              automatically assigned based on the cluster configuration.
+                              - ipFamilies=[\"IPV4\",\"IPV6\"] + ipFamilyPolicy=\"RequiredDualStack\"
+                              : The Service requires dual-stack and will only be created
+                              if the cluster supports both IPv4 and IPv6. The primary
+                              IP family is IPV4. - ipFamilies=[\"IPV6\",\"IPV4\"]
+                              + ipFamilyPolicy=\"RequiredDualStack\" : The Service
+                              requires dual-stack and will only be created if the
+                              cluster supports both IPv4 and IPv6. The primary IP
+                              family is IPV6. - ipFamilies=[\"IPV4\"] + ipFamilyPolicy=\"SingleStack\"
+                              : The Service uses a single-stack with IPv4 only. -
+                              ipFamilies=[\"IPV6\"] + ipFamilyPolicy=\"SingleStack\"
+                              : The Service uses a single-stack with IPv6 only."
                             items:
                               description: IPFamily represents the IP Family (IPv4
                                 or IPv6). This type is used to express the family
@@ -227,31 +254,31 @@ spec:
                             type: array
                             x-kubernetes-list-type: atomic
                           ipFamilyPolicy:
-                            description: IPFamilyPolicy represents the dual-stack-ness
-                              requested or required by this Service. If there is no
-                              value provided, then this field will be set to SingleStack.
-                              Services can be "SingleStack" (a single IP family),
-                              "PreferDualStack" (two IP families on dual-stack configured
-                              clusters or a single IP family on single-stack clusters),
-                              or "RequireDualStack" (two IP families on dual-stack
-                              configured clusters, otherwise fail). The ipFamilies
-                              and clusterIPs fields depend on the value of this field.
-                              This field will be wiped when updating a service to
-                              type ExternalName.
+                            description: "Specifies whether the Service should use
+                              a single IP family (SingleStack) or two IP families
+                              (DualStack). \n Possible values: \n - 'SingleStack'
+                              (default) : The Service uses a single IP family. If
+                              no value is provided, IPFamilyPolicy defaults to SingleStack.
+                              - 'PreferDualStack' : The Service prefers to use two
+                              IP families on dual-stack configured clusters or a single
+                              IP family on single-stack clusters. - 'RequiredDualStack'
+                              : The Service requires two IP families on dual-stack
+                              configured clusters. If the cluster is not configured
+                              for dual-stack, the Service creation fails."
                             type: string
                           name:
-                            description: 'Specifies the name of the service. This
-                              name is used by others to refer to this service (e.g.,
-                              connection credential). Note: This field cannot be updated.'
+                            description: "Specifies the name of the Service. This
+                              name is used to set `clusterService.name`. \n Note:
+                              This field cannot be updated."
                             type: string
                           ports:
-                            description: 'Lists the ports that are exposed by this
-                              service. If not provided, the default Services Ports
-                              defined in the ClusterDefinition or ComponentDefinition
-                              that are neither of NodePort nor LoadBalancer service
-                              type will be used. If there is no corresponding Service
-                              defined in the ClusterDefinition or ComponentDefinition,
-                              the expose operation will fail. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies'
+                            description: "Specifies Port definitions that are to be
+                              exposed by a ClusterService. \n If not specified, the
+                              Port definitions from non-NodePort and non-LoadBalancer
+                              type ComponentService defined in the ComponentDefinition
+                              (`componentDefinition.spec.services`) will be used.
+                              If no matching ComponentService is found, the expose
+                              operation will fail. \n More info: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports"
                             items:
                               description: ServicePort contains information on service's
                                 port.
@@ -329,41 +356,48 @@ spec:
                             - protocol
                             x-kubernetes-list-type: map
                           roleSelector:
-                            description: Allows you to specify a defined role as a
-                              selector for the service, extending the ServiceSpec.Selector.
+                            description: "Specifies a role to target with the service.
+                              If specified, the service will only be exposed to pods
+                              with the matching role. \n Note: At least one of 'roleSelector'
+                              or 'selector' must be specified. If both are specified,
+                              a pod must match both conditions to be selected."
                             type: string
                           selector:
                             additionalProperties:
                               type: string
-                            description: 'Routes service traffic to pods with label
-                              keys and values matching this selector. If empty or
-                              not present, the service is assumed to have an external
-                              process managing its endpoints, which Kubernetes will
-                              not modify. This only applies to types ClusterIP, NodePort,
-                              and LoadBalancer and is ignored if type is ExternalName.
-                              More info: https://kubernetes.io/docs/concepts/services-networking/service/'
+                            description: "Routes service traffic to pods with matching
+                              label keys and values. If specified, the service will
+                              only be exposed to pods matching the selector. \n Note:
+                              At least one of 'roleSelector' or 'selector' must be
+                              specified. If both are specified, a pod must match both
+                              conditions to be selected."
                             type: object
                             x-kubernetes-map-type: atomic
                           serviceType:
-                            description: 'Determines how the Service is exposed. Defaults
-                              to ClusterIP. Valid options are ExternalName, ClusterIP,
-                              NodePort, and LoadBalancer. - `ClusterIP` allocates
-                              a cluster-internal IP address for load-balancing to
-                              endpoints. - `NodePort` builds on ClusterIP and allocates
-                              a port on every node which routes to the same endpoints
-                              as the clusterIP. - `LoadBalancer` builds on NodePort
-                              and creates an external load-balancer (if supported
-                              in the current cloud) which routes to the same endpoints
-                              as the clusterIP. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.'
+                            description: "Determines how the Service is exposed. Defaults
+                              to 'ClusterIP'. Valid options are `ClusterIP`, `NodePort`,
+                              and `LoadBalancer`. \n - `ClusterIP`: allocates a cluster-internal
+                              IP address for load-balancing to endpoints. Endpoints
+                              are determined by the selector or if that is not specified,
+                              they are determined by manual construction of an Endpoints
+                              object or EndpointSlice objects. - `NodePort`: builds
+                              on ClusterIP and allocates a port on every node which
+                              routes to the same endpoints as the clusterIP. - `LoadBalancer`:
+                              builds on NodePort and creates an external load-balancer
+                              (if supported in the current cloud) which routes to
+                              the same endpoints as the clusterIP. \n Note: although
+                              K8s Service type allows the 'ExternalName' type, it
+                              is not a valid option for the expose operation. \n For
+                              more info, see: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
                             type: string
                         required:
                         - name
                         type: object
                       type: array
                     switch:
-                      description: Controls the expose operation. If set to Enable,
-                        the corresponding service will be exposed. Conversely, if
-                        set to Disable, the service will be removed.
+                      description: Indicates whether the services will be exposed.
+                        'Enable' exposes the services. while 'Disable' removes the
+                        exposed Service.
                       enum:
                       - Enable
                       - Disable
@@ -374,31 +408,46 @@ spec:
                   type: object
                 type: array
               force:
-                description: Indicates if pre-checks should be bypassed, allowing
-                  the opsRequest to execute immediately. If set to true, pre-checks
-                  are skipped except for 'Start' type. Particularly useful when concurrent
-                  execution of VerticalScaling and HorizontalScaling opsRequests is
-                  required, achievable through the use of the Force flag.
+                description: "Instructs the system to bypass pre-checks (including
+                  cluster state checks and customized pre-conditions hooks) and immediately
+                  execute the opsRequest, except for the opsRequest of 'Start' type,
+                  which will still undergo pre-checks even if `force` is true. \n
+                  This is useful for concurrent execution of 'VerticalScaling' and
+                  'HorizontalScaling' opsRequests. By setting `force` to true, you
+                  can bypass the default checks and demand these opsRequests to run
+                  simultaneously. \n Note: Once set, the `force` field is immutable
+                  and cannot be updated."
                 type: boolean
                 x-kubernetes-validations:
                 - message: forbidden to update spec.force
                   rule: self == oldSelf
               horizontalScaling:
-                description: Defines what component need to horizontal scale the specified
-                  replicas.
+                description: Lists HorizontalScaling objects, each specifying scaling
+                  requirements for a Component, including desired total replica counts,
+                  configurations for new instances, modifications for existing instances,
+                  and instance downscaling options.
                 items:
-                  description: HorizontalScaling defines the variables of horizontal
-                    scaling operation
+                  description: HorizontalScaling defines the parameters of a horizontal
+                    scaling operation.
                   properties:
                     componentName:
-                      description: Specifies the name of the cluster component.
+                      description: Specifies the name of the Component.
                       type: string
                     instances:
-                      description: Specifies instances to be added and/or deleted
-                        for the workloads. Name and Replicas should be provided. Other
-                        fields will simply be ignored. The Replicas will be overridden
-                        if an existing InstanceTemplate is matched by Name. Or the
-                        InstanceTemplate will be added as a new one.
+                      description: "Contains a list of InstanceTemplate objects. Each
+                        InstanceTemplate object allows for modifying replica counts
+                        or specifying configurations for new instances during scaling.
+                        \n The field supports two main use cases: \n - Modifying replica
+                        count: Specify the desired replica count for existing instances
+                        with a particular configuration using Name and Replicas fields.
+                        To modify the replica count, the Name and Replicas fields
+                        of the InstanceTemplate object should be provided. Only these
+                        fields are used for matching and adjusting replicas; other
+                        fields are ignored. The Replicas value overrides any existing
+                        count. - Configuring new instances: Define the configuration
+                        for new instances added during scaling, including resource
+                        requirements, labels, annotations, etc. New instances are
+                        created based on the provided InstanceTemplate."
                       items:
                         description: InstanceTemplate allows customization of individual
                           replica configurations within a Component, without altering
@@ -2648,13 +2697,14 @@ spec:
                         cluster's sharding component.
                       type: boolean
                     offlineInstances:
-                      description: Specifies instances to be scaled in with dedicated
-                        names in the list.
+                      description: Specifies the names of instances to be scaled down.
+                        This provides control over which specific instances are targeted
+                        for termination when reducing the replica count.
                       items:
                         type: string
                       type: array
                     replicas:
-                      description: Specifies the number of replicas for the workloads.
+                      description: Specifies the number of total replicas.
                       format: int32
                       minimum: 0
                       type: integer
@@ -2670,25 +2720,35 @@ spec:
                 - message: forbidden to update spec.horizontalScaling
                   rule: self == oldSelf
               rebuildFrom:
-                description: Specifies the instances that require re-creation.
+                description: Specifies the parameters to rebuild some instances. Rebuilding
+                  an instance involves restoring its data from a backup or another
+                  database replica. The instances being rebuilt usually serve as standby
+                  in the cluster. Hence rebuilding instances is often also referred
+                  to as "standby reconstruction".
                 items:
                   properties:
                     backupName:
-                      description: Indicates the name of the backup from which to
-                        recover. Currently, only a full physical backup is supported
-                        unless your component only has one replica. Such as 'xtrabackup'
-                        is full physical backup for mysql and 'mysqldump' is not.
-                        And if no specified backupName, the instance will be recreated
-                        with empty 'PersistentVolumes'.
+                      description: "Indicates the name of the Backup custom resource
+                        from which to recover the instance. Defaults to an empty PersistentVolume
+                        if unspecified. \n Note: - Only full physical backups are
+                        supported for multi-replica Components (e.g., 'xtrabackup'
+                        for MySQL). - Logical backups (e.g., 'mysqldump' for MySQL)
+                        are unsupported in the current version."
                       type: string
                     componentName:
-                      description: Specifies the name of the cluster component.
+                      description: Specifies the name of the Component.
                       type: string
                     envForRestore:
-                      description: "List of environment variables to set in the container
-                        for restore. These will be merged with the env of Backup and
-                        ActionSet. \n The priority of merging is as follows: `Restore
-                        env > Backup env > ActionSet env`."
+                      description: "Defines container environment variables for the
+                        restore process. merged with the ones specified in the Backup
+                        and ActionSet resources. \n Merge priority: Restore env >
+                        Backup env > ActionSet env. \n Purpose: Some databases require
+                        different configurations when being restored as a standby
+                        compared to being restored as a primary. For example, when
+                        restoring MySQL as a replica, you need to set `skip_slave_start=\"ON\"`
+                        for 5.7 or `skip_replica_start=\"ON\"` for 8.0. Allowing environment
+                        variables to be passed in makes it more convenient to control
+                        these behavioral differences during the restore process."
                       items:
                         description: EnvVar represents an environment variable present
                           in a Container.
@@ -2807,7 +2867,8 @@ spec:
                       type: array
                       x-kubernetes-preserve-unknown-fields: true
                     instances:
-                      description: Defines the instances that need to be rebuilt.
+                      description: Specifies the instances (Pods) that need to be
+                        rebuilt, typically operating as standbys.
                       items:
                         properties:
                           name:
@@ -2839,35 +2900,44 @@ spec:
                 - message: forbidden to update spec.rebuildFrom
                   rule: self == oldSelf
               reconfigure:
-                description: 'Deprecated: replace by reconfigures. Defines the variables
-                  that need to input when updating configuration.'
+                description: "Specifies a component and its configuration updates.
+                  \n This field is deprecated and replaced by `reconfigures`."
                 properties:
                   componentName:
-                    description: Specifies the name of the cluster component.
+                    description: Specifies the name of the Component.
                     type: string
                   configurations:
-                    description: Specifies the components that will perform the operation.
+                    description: Contains a list of ConfigurationItem objects, specifying
+                      the Component's configuration template name, upgrade policy,
+                      and parameter key-value pairs to be updated.
                     items:
                       properties:
                         keys:
-                          description: Sets the parameters to be updated. It should
-                            contain at least one item. The keys are merged and retained
-                            during patch operations.
+                          description: Sets the configuration files and their associated
+                            parameters that need to be updated. It should contain
+                            at least one item.
                           items:
                             properties:
                               fileContent:
-                                description: Represents the content of the configuration
-                                  file. This field is used to update the entire content
-                                  of the file.
+                                description: "Specifies the content of the entire
+                                  configuration file. This field is used to update
+                                  the complete configuration file. \n Either the `parameters`
+                                  field or the `fileContent` field must be set, but
+                                  not both."
                                 type: string
                               key:
-                                description: Represents the unique identifier for
-                                  the ConfigMap.
+                                description: Represents a key in the configuration
+                                  template(as ConfigMap). Each key in the ConfigMap
+                                  corresponds to a specific configuration file.
                                 type: string
                               parameters:
-                                description: Defines a list of key-value pairs for
-                                  a single configuration file. These parameters are
-                                  used to update the specified configuration settings.
+                                description: "Specifies a list of key-value pairs
+                                  representing parameters and their corresponding
+                                  values within a single configuration file. This
+                                  field is used to override or set the values of parameters
+                                  without modifying the entire configuration file.
+                                  \n Either the `parameters` field or the `fileContent`
+                                  field must be set, but not both."
                                 items:
                                   properties:
                                     key:
@@ -2899,7 +2969,6 @@ spec:
                           type: string
                         policy:
                           description: Defines the upgrade policy for the configuration.
-                            This field is optional.
                           enum:
                           - simple
                           - parallel
@@ -2926,40 +2995,47 @@ spec:
                 - configurations
                 type: object
               reconfigures:
-                description: Defines the variables that need to input when updating
-                  configuration.
+                description: Lists Reconfigure objects, each specifying a Component
+                  and its configuration updates.
                 items:
-                  description: Reconfigure represents the variables required for updating
-                    a configuration.
+                  description: Reconfigure defines the parameters for updating a Component's
+                    configuration.
                   properties:
                     componentName:
-                      description: Specifies the name of the cluster component.
+                      description: Specifies the name of the Component.
                       type: string
                     configurations:
-                      description: Specifies the components that will perform the
-                        operation.
+                      description: Contains a list of ConfigurationItem objects, specifying
+                        the Component's configuration template name, upgrade policy,
+                        and parameter key-value pairs to be updated.
                       items:
                         properties:
                           keys:
-                            description: Sets the parameters to be updated. It should
-                              contain at least one item. The keys are merged and retained
-                              during patch operations.
+                            description: Sets the configuration files and their associated
+                              parameters that need to be updated. It should contain
+                              at least one item.
                             items:
                               properties:
                                 fileContent:
-                                  description: Represents the content of the configuration
-                                    file. This field is used to update the entire
-                                    content of the file.
+                                  description: "Specifies the content of the entire
+                                    configuration file. This field is used to update
+                                    the complete configuration file. \n Either the
+                                    `parameters` field or the `fileContent` field
+                                    must be set, but not both."
                                   type: string
                                 key:
-                                  description: Represents the unique identifier for
-                                    the ConfigMap.
+                                  description: Represents a key in the configuration
+                                    template(as ConfigMap). Each key in the ConfigMap
+                                    corresponds to a specific configuration file.
                                   type: string
                                 parameters:
-                                  description: Defines a list of key-value pairs for
-                                    a single configuration file. These parameters
-                                    are used to update the specified configuration
-                                    settings.
+                                  description: "Specifies a list of key-value pairs
+                                    representing parameters and their corresponding
+                                    values within a single configuration file. This
+                                    field is used to override or set the values of
+                                    parameters without modifying the entire configuration
+                                    file. \n Either the `parameters` field or the
+                                    `fileContent` field must be set, but not both."
                                   items:
                                     properties:
                                       key:
@@ -2991,7 +3067,6 @@ spec:
                             type: string
                           policy:
                             description: Defines the upgrade policy for the configuration.
-                              This field is optional.
                             enum:
                             - simple
                             - parallel
@@ -3025,13 +3100,13 @@ spec:
                 - message: forbidden to update spec.reconfigure
                   rule: self == oldSelf
               restart:
-                description: Restarts the specified components.
+                description: Lists Components to be restarted.
                 items:
-                  description: ComponentOps represents the common variables required
-                    for operations within the scope of a normal component/shard component.
+                  description: ComponentOps specifies the Component to be operated
+                    on.
                   properties:
                     componentName:
-                      description: Specifies the name of the cluster component.
+                      description: Specifies the name of the Component.
                       type: string
                     isSharding:
                       description: Specifies that the componentName refers to the
@@ -3053,7 +3128,7 @@ spec:
                 properties:
                   backup:
                     description: Refers to the backup name and component name used
-                      for restoration. Supports recovery of multiple components.
+                      for restoration. Supports recovery of multiple Components.
                     items:
                       properties:
                         ref:
@@ -3095,11 +3170,11 @@ spec:
                 - message: forbidden to update spec.restoreFrom
                   rule: self == oldSelf
               restoreSpec:
-                description: Defines how to restore the cluster. Note that this restore
-                  operation will roll back cluster services.
+                description: Specifies the parameters to restore a Cluster. Note that
+                  this restore operation will roll back cluster services.
                 properties:
                   backupName:
-                    description: Specifies the name of the backup.
+                    description: Specifies the name of the Backup custom resource.
                     type: string
                   doReadyRestoreAfterClusterRunning:
                     description: If set to true, the recovery process in the PostReady
@@ -3107,12 +3182,17 @@ spec:
                       otherwise, it will be performed after component is running.
                     type: boolean
                   restoreTimeStr:
-                    description: Defines the point in time to restore.
+                    description: "Specifies the point in time to which the restore
+                      should be performed. Supported time formats: \n - RFC3339 format,
+                      e.g. \"2023-11-25T18:52:53Z\" - A human-readable date-time format,
+                      e.g. \"Jul 25,2023 18:52:53 UTC+0800\""
                     type: string
                   volumeRestorePolicy:
                     default: Parallel
-                    description: 'Specifies the volume claim restore policy, support
-                      values: [Serial, Parallel]'
+                    description: "Specifies the policy for restoring volume claims
+                      of a Component's Pods. It determines whether the volume claims
+                      should be restored sequentially (one by one) or in parallel
+                      (all at once). Support values: \n - \"Serial\" - \"Parallel\""
                     enum:
                     - Serial
                     - Parallel
@@ -3121,21 +3201,30 @@ spec:
                 - backupName
                 type: object
               scriptSpec:
-                description: Defines the script to be executed.
+                description: "Specifies the image and scripts for executing engine-specific
+                  operations such as creating databases or users. It supports limited
+                  engines including MySQL, PostgreSQL, Redis, MongoDB. \n ScriptSpec
+                  has been replaced by the more versatile OpsDefinition. It is recommended
+                  to use OpsDefinition instead. ScriptSpec is deprecated and will
+                  be removed in a future version."
                 properties:
                   componentName:
-                    description: Specifies the name of the cluster component.
+                    description: Specifies the name of the Component.
                     type: string
                   image:
-                    description: Specifies the image to be used for the exec command.
-                      By default, the image of kubeblocks-datascript is used.
+                    description: "Specifies the image to be used to execute scripts.
+                      \n By default, the image \"apecloud/kubeblocks-datascript:latest\"
+                      is used."
                     type: string
                   isSharding:
                     description: Specifies that the componentName refers to the cluster's
                       sharding component.
                     type: boolean
                   script:
-                    description: Defines the script to be executed.
+                    description: "Defines the content of scripts to be executed. \n
+                      All scripts specified in this field will be executed in the
+                      order they are provided. \n Note: this field cannot be modified
+                      once set."
                     items:
                       type: string
                     type: array
@@ -3143,11 +3232,20 @@ spec:
                     - message: forbidden to update spec.scriptSpec.script
                       rule: self == oldSelf
                   scriptFrom:
-                    description: Defines the script to be executed from a configMap
-                      or secret.
+                    description: "Specifies the sources of the scripts to be executed.
+                      Each script can be imported either from a ConfigMap or a Secret.
+                      \n All scripts obtained from the sources specified in this field
+                      will be executed after any scripts provided in the `script`
+                      field. \n Execution order: 1. Scripts provided in the `script`
+                      field, in the order of the scripts listed. 2. Scripts imported
+                      from ConfigMaps, in the order of the sources listed. 3. Scripts
+                      imported from Secrets, in the order of the sources listed. \n
+                      Note: this field cannot be modified once set."
                     properties:
                       configMapRef:
-                        description: Specifies the configMap that is to be executed.
+                        description: "A list of ConfigMapKeySelector objects, each
+                          specifies a ConfigMap and a key containing the script. \n
+                          Note: This field cannot be modified once set."
                         items:
                           description: Selects a key from a ConfigMap.
                           properties:
@@ -3171,7 +3269,9 @@ spec:
                         - message: forbidden to update spec.scriptSpec.scriptFrom.configMapRef
                           rule: self == oldSelf
                       secretRef:
-                        description: Specifies the secret that is to be executed.
+                        description: "A list of SecretKeySelector objects, each specifies
+                          a Secret and a key containing the script. \n Note: This
+                          field cannot be modified once set."
                         items:
                           description: SecretKeySelector selects a key of a Secret.
                           properties:
@@ -3221,12 +3321,14 @@ spec:
                     - name
                     type: object
                   selector:
-                    description: By default, KubeBlocks will execute the script on
-                      the primary pod with role=leader. Exceptions exist, such as
-                      Redis, which does not synchronize account information between
-                      primary and secondary. In such cases, the script needs to be
-                      executed on all pods matching the selector. Indicates the components
-                      on which the script is executed.
+                    description: "Specifies the labels used to select the Pods on
+                      which the script should be executed. \n By default, the script
+                      is executed on the Pod associated with the service named \"{clusterName}-{componentName}\",
+                      which typically routes to the Pod with the primary/leader role.
+                      \n However, some Components, such as Redis, do not synchronize
+                      account information between primary and secondary Pods. In these
+                      cases, the script must be executed on all replica Pods matching
+                      the selector. \n Note: this field cannot be modified once set."
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector
@@ -3277,26 +3379,27 @@ spec:
                 - componentName
                 type: object
               switchover:
-                description: Switches over the specified components.
+                description: Lists Switchover objects, each specifying a Component
+                  to perform the switchover operation.
                 items:
                   properties:
                     componentName:
-                      description: Specifies the name of the cluster component.
+                      description: Specifies the name of the Component.
                       type: string
                     instanceName:
-                      description: "Utilized to designate the candidate primary or
-                        leader instance for the switchover process. If assigned \"*\",
-                        it signifies that no specific primary or leader is designated
-                        for the switchover, and the switchoverAction defined in `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate`
-                        will be executed. \n It is mandatory that `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate`
-                        is not left blank. \n If assigned a valid instance name other
-                        than \"*\", it signifies that a specific candidate primary
-                        or leader is designated for the switchover. The value can
-                        be retrieved using `kbcli cluster list-instances`, any other
-                        value is considered invalid. \n In this scenario, the `switchoverAction`
-                        defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate
-                        will be executed, and it is mandatory that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate
-                        is not left blank."
+                      description: "Specifies the instance to become the primary or
+                        leader during a switchover operation. \n The value of `instanceName`
+                        can be either: \n 1. \"*\" (wildcard value): - Indicates no
+                        specific instance is designated as the primary or leader.
+                        - Executes the switchover action from `clusterDefinition.componentDefs[*].switchoverSpec.withoutCandidate`.
+                        - `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate`
+                        must be defined when using \"*\". \n 2. A valid instance name
+                        (pod name): - Designates a specific instance (pod) as the
+                        primary or leader. - The name must match one of the pods in
+                        the component. Any non-valid pod name is considered invalid.
+                        - Executes the switchover action from `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate`.
+                        - `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate`
+                        must be defined when specifying a valid instance name."
                       type: string
                     isSharding:
                       description: Specifies that the componentName refers to the
@@ -3314,19 +3417,25 @@ spec:
                 - message: forbidden to update spec.switchover
                   rule: self == oldSelf
               ttlSecondsAfterSucceed:
-                description: OpsRequest will be deleted after TTLSecondsAfterSucceed
-                  second when OpsRequest.status.phase is Succeed.
+                description: Specifies the duration in seconds that an OpsRequest
+                  will remain in the system after successfully completing (when `opsRequest.status.phase`
+                  is "Succeed") before automatic deletion.
                 format: int32
                 type: integer
               ttlSecondsBeforeAbort:
                 default: 0
-                description: OpsRequest will wait at most TTLSecondsBeforeAbort seconds
-                  for start-conditions to be met. If not specified, the default value
-                  is 0, which means that the start-conditions must be met immediately.
+                description: Specifies the maximum number of seconds the OpsRequest
+                  will wait for its start conditions to be met before aborting. If
+                  set to 0 (default), the start conditions must be met immediately
+                  for the OpsRequest to proceed.
                 format: int32
                 type: integer
               type:
-                description: Defines the operation type.
+                description: "Specifies the type of this operation. Supported types
+                  include \"Start\", \"Stop\", \"Restart\", \"Switchover\", \"VerticalScaling\",
+                  \"HorizontalScaling\", \"VolumeExpansion\", \"Reconfiguring\", \"Upgrade\",
+                  \"Backup\", \"Restore\", \"Expose\", \"DataScript\", \"RebuildInstance\",
+                  \"Custom\". \n Note: This field is immutable once set."
                 enum:
                 - Upgrade
                 - VerticalScaling
@@ -3348,10 +3457,13 @@ spec:
                 - message: forbidden to update spec.type
                   rule: self == oldSelf
               upgrade:
-                description: Specifies the cluster version by specifying clusterVersionRef.
+                description: "Specifies the desired new version of the Cluster. \n
+                  Note: This field is immutable once set."
                 properties:
                   clusterVersionRef:
-                    description: A reference to the name of the ClusterVersion.
+                    description: "Specifies the name of the target ClusterVersion
+                      for the upgrade. \n This field is deprecated since v0.9 because
+                      ClusterVersion is deprecated."
                     type: string
                 required:
                 - clusterVersionRef
@@ -3360,12 +3472,12 @@ spec:
                 - message: forbidden to update spec.upgrade
                   rule: self == oldSelf
               verticalScaling:
-                description: 'Note: Quantity struct can not do immutable check by
-                  CEL. Defines what component need to vertical scale the specified
-                  compute resources.'
+                description: Lists VerticalScaling objects, each specifying a component
+                  and its desired compute resources for vertical scaling.
                 items:
-                  description: VerticalScaling defines the parameters required for
-                    scaling compute resources.
+                  description: VerticalScaling refers to the process of adjusting
+                    the compute resources (e.g., CPU, memory) allocated to a Component.
+                    It defines the parameters required for the operation.
                   properties:
                     claims:
                       description: "Claims lists the names of resources, defined in
@@ -3388,23 +3500,8 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    classDefRef:
-                      description: A reference to a class defined in ComponentClassDefinition.
-                      properties:
-                        class:
-                          description: Defines the name of the class that is defined
-                            in the ComponentClassDefinition.
-                          type: string
-                        name:
-                          description: Specifies the name of the ComponentClassDefinition.
-                          maxLength: 63
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
-                      required:
-                      - class
-                      type: object
                     componentName:
-                      description: Specifies the name of the cluster component.
+                      description: Specifies the name of the Component.
                       type: string
                     instances:
                       description: Specifies the instance template that need to vertical
@@ -3466,14 +3563,16 @@ spec:
                             items:
                               properties:
                                 name:
-                                  description: A reference to the volumeClaimTemplate
-                                    name from the cluster components.
+                                  description: Specify the name of the volumeClaimTemplate
+                                    in the Component. The specified name must match
+                                    one of the volumeClaimTemplates defined in the
+                                    `clusterComponentSpec.volumeClaimTemplates` field.
                                   type: string
                                 storage:
                                   anyOf:
                                   - type: integer
                                   - type: string
-                                  description: Specifies the requested storage size
+                                  description: Specifies the desired storage size
                                     for the volume.
                                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                   x-kubernetes-int-or-string: true
@@ -3528,15 +3627,15 @@ spec:
                 - componentName
                 x-kubernetes-list-type: map
               volumeExpansion:
-                description: 'Note: Quantity struct can not do immutable check by
-                  CEL. Defines what component and volumeClaimTemplate need to expand
-                  the specified storage.'
+                description: Lists VolumeExpansion objects, each specifying a component
+                  and its corresponding volumeClaimTemplates that requires storage
+                  expansion.
                 items:
                   description: VolumeExpansion encapsulates the parameters required
                     for a volume expansion operation.
                   properties:
                     componentName:
-                      description: Specifies the name of the cluster component.
+                      description: Specifies the name of the Component.
                       type: string
                     instances:
                       description: Specifies the instance template that need to volume
@@ -3598,14 +3697,16 @@ spec:
                             items:
                               properties:
                                 name:
-                                  description: A reference to the volumeClaimTemplate
-                                    name from the cluster components.
+                                  description: Specify the name of the volumeClaimTemplate
+                                    in the Component. The specified name must match
+                                    one of the volumeClaimTemplates defined in the
+                                    `clusterComponentSpec.volumeClaimTemplates` field.
                                   type: string
                                 storage:
                                   anyOf:
                                   - type: integer
                                   - type: string
-                                  description: Specifies the requested storage size
+                                  description: Specifies the desired storage size
                                     for the volume.
                                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                   x-kubernetes-int-or-string: true
@@ -3628,20 +3729,23 @@ spec:
                         cluster's sharding component.
                       type: boolean
                     volumeClaimTemplates:
-                      description: volumeClaimTemplates specifies the storage size
-                        and volumeClaimTemplate name.
+                      description: Specifies a list of OpsRequestVolumeClaimTemplate
+                        objects, defining the volumeClaimTemplates that are used to
+                        expand the storage and the desired storage size for each one.
                       items:
                         properties:
                           name:
-                            description: A reference to the volumeClaimTemplate name
-                              from the cluster components.
+                            description: Specify the name of the volumeClaimTemplate
+                              in the Component. The specified name must match one
+                              of the volumeClaimTemplates defined in the `clusterComponentSpec.volumeClaimTemplates`
+                              field.
                             type: string
                           storage:
                             anyOf:
                             - type: integer
                             - type: string
-                            description: Specifies the requested storage size for
-                              the volume.
+                            description: Specifies the desired storage size for the
+                              volume.
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                         required:
@@ -3672,24 +3776,24 @@ spec:
             description: OpsRequestStatus represents the observed state of an OpsRequest.
             properties:
               cancelTimestamp:
-                description: Defines the time when the OpsRequest was cancelled.
+                description: Records the time when the OpsRequest was cancelled.
                 format: date-time
                 type: string
               clusterGeneration:
-                description: Specifies the cluster generation after the OpsRequest
-                  action has been handled.
+                description: Records the cluster generation after the OpsRequest action
+                  has been handled.
                 format: int64
                 type: integer
               completionTimestamp:
-                description: Specifies the time when the OpsRequest was completed.
+                description: Records the time when the OpsRequest was completed.
                 format: date-time
                 type: string
               components:
                 additionalProperties:
                   properties:
                     lastFailedTime:
-                      description: Indicates the last time the component phase transitioned
-                        to Failed or Abnormal.
+                      description: Records the timestamp when the Component last transitioned
+                        to a "Failed" or "Abnormal" phase.
                       format: date-time
                       type: string
                     message:
@@ -3726,7 +3830,8 @@ spec:
                           - name
                           x-kubernetes-list-type: map
                         classDefRef:
-                          description: References a class defined in ComponentClassDefinition.
+                          description: Records the class of the Component prior to
+                            any changes. Deprecated since v0.9.
                           properties:
                             class:
                               description: Defines the name of the class that is defined
@@ -3741,7 +3846,8 @@ spec:
                           - class
                           type: object
                         instances:
-                          description: Records the last instances of the component.
+                          description: Records the InstanceTemplate list of the Component
+                            prior to any changes.
                           items:
                             description: InstanceTemplate allows customization of
                               individual replica configurations within a Component,
@@ -6123,15 +6229,17 @@ spec:
                             resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
                         offlineInstances:
-                          description: Records the last offline instances of the component.
+                          description: Records the offline instances of the Component
+                            prior to any changes.
                           items:
                             type: string
                           type: array
                         opsName:
-                          description: Indicates the opsRequest name.
+                          description: Indicates the name of the OpsRequest.
                           type: string
                         replicas:
-                          description: Represents the last replicas of the component.
+                          description: Records the `replicas` of the Component prior
+                            to any changes.
                           format: int32
                           type: integer
                         requests:
@@ -6148,7 +6256,8 @@ spec:
                             cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
                         services:
-                          description: Records the last services of the component.
+                          description: Records the ClusterComponentService list of
+                            the Component prior to any changes.
                           items:
                             properties:
                               annotations:
@@ -6160,7 +6269,7 @@ spec:
                                 type: object
                               name:
                                 description: References the component service name
-                                  defined in the ComponentDefinition.Spec.Services[x].Name.
+                                  defined in the `componentDefinition.spec.services[*].name`.
                                 maxLength: 25
                                 type: string
                               podService:
@@ -6177,15 +6286,15 @@ spec:
                                   are determined by the selector or if that is not
                                   specified, they are determined by manual construction
                                   of an Endpoints object or EndpointSlice objects.
-                                  If clusterIP is \"None\", no virtual IP is allocated
-                                  and the endpoints are published as a set of endpoints
-                                  rather than a virtual IP. - `NodePort` builds on
-                                  ClusterIP and allocates a port on every node which
-                                  routes to the same endpoints as the clusterIP. -
-                                  `LoadBalancer` builds on NodePort and creates an
-                                  external load-balancer (if supported in the current
-                                  cloud) which routes to the same endpoints as the
-                                  clusterIP. \n More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
+                                  - `NodePort` builds on ClusterIP and allocates a
+                                  port on every node which routes to the same endpoints
+                                  as the clusterIP. - `LoadBalancer` builds on NodePort
+                                  and creates an external load-balancer (if supported
+                                  in the current cloud) which routes to the same endpoints
+                                  as the clusterIP. \n Note: although K8s Service
+                                  type allows the 'ExternalName' type, it is not a
+                                  valid option for ClusterComponentService. \n For
+                                  more info, see: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
                                 enum:
                                 - ClusterIP
                                 - NodePort
@@ -6201,25 +6310,29 @@ spec:
                             items:
                               type: string
                             type: array
-                          description: Records the information about the target resources
-                            affected by the component. The resource key is in the
-                            list of [pods].
+                          description: 'Records the information about various types
+                            of resources associated with the Component prior to any
+                            changes. Currently, only one type of resource is supported:
+                            "pods". The "pods" key maps to a list of names of all
+                            Pods of the Component.'
                           type: object
                         volumeClaimTemplates:
-                          description: Records the last volumeClaimTemplates of the
-                            component.
+                          description: Records volumes' storage size of the Component
+                            prior to any changes.
                           items:
                             properties:
                               name:
-                                description: A reference to the volumeClaimTemplate
-                                  name from the cluster components.
+                                description: Specify the name of the volumeClaimTemplate
+                                  in the Component. The specified name must match
+                                  one of the volumeClaimTemplates defined in the `clusterComponentSpec.volumeClaimTemplates`
+                                  field.
                                 type: string
                               storage:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Specifies the requested storage size
-                                  for the volume.
+                                description: Specifies the desired storage size for
+                                  the volume.
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                             required:
@@ -6230,7 +6343,10 @@ spec:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                     phase:
-                      description: Describes the component phase, referencing Cluster.status.component.phase.
+                      description: Records the current phase of the Component, mirroring
+                        `cluster.status.components[componentName].phase`. Possible
+                        values include "Creating", "Running", "Updating", "Stopping",
+                        "Stopped", "Deleting", "Failed", "Abnormal".
                       enum:
                       - Creating
                       - Running
@@ -6242,58 +6358,58 @@ spec:
                       - Abnormal
                       type: string
                     preCheck:
-                      description: Specifies the outcome of the preConditions check
-                        for the opsRequest. This result is crucial for determining
-                        the next steps in the operation.
+                      description: Records the result of the preConditions check of
+                        the opsRequest, which determines subsequent steps.
                       properties:
                         message:
-                          description: Provides additional details about the preCheck
-                            operation in a human-readable format.
+                          description: Provides explanations related to the preCheck
+                            result in a human-readable format.
                           type: string
                         pass:
-                          description: Indicates whether the preCheck operation was
-                            successful or not.
+                          description: Indicates whether the preCheck operation passed
+                            or failed.
                           type: boolean
                       required:
                       - pass
                       type: object
                     progressDetails:
-                      description: Describes the progress details of the component
-                        for this operation.
+                      description: Describes the progress details of objects or actions
+                        associated with the Component.
                       items:
                         properties:
                           actionName:
-                            description: Refer to the action name of the OpsDefinition.spec.actions[*].name.
-                              either objectKey or actionName.
+                            description: Indicates the name of an OpsAction, as defined
+                              in `opsDefinition.spec.actions[*].name`. Either `objectKey`
+                              or `actionName` must be provided.
                             type: string
                           actionTasks:
-                            description: Records the tasks associated with an action.
-                              such as Jobs/Pods that executes action.
+                            description: Lists the tasks, such as Jobs or Pods, that
+                              carry out the action.
                             items:
                               properties:
                                 namespace:
-                                  description: Defines the namespace where the task
-                                    workload is deployed.
+                                  description: Represents the namespace where the
+                                    task is deployed.
                                   type: string
                                 objectKey:
-                                  description: Specifies the name of the task workload.
+                                  description: Represents the name of the task.
                                   type: string
                                 retries:
-                                  description: The number of retry attempts for this
-                                    task.
+                                  description: The count of retry attempts made for
+                                    this task.
                                   format: int32
                                   type: integer
                                 status:
                                   description: Indicates the current status of the
-                                    task.
+                                    task, including "Processing", "Failed", "Succeed".
                                   enum:
                                   - Processing
                                   - Failed
                                   - Succeed
                                   type: string
                                 targetPodName:
-                                  description: The name of the target pod for the
-                                    task.
+                                  description: The name of the Pod that the task is
+                                    associated with or operates on.
                                   type: string
                               required:
                               - namespace
@@ -6302,29 +6418,30 @@ spec:
                               type: object
                             type: array
                           endTime:
-                            description: Represents the completion time of object
-                              processing.
+                            description: Records the completion time of object processing.
                             format: date-time
                             type: string
                           group:
                             description: Specifies the group to which the current
-                              object belongs. If the objects of a component belong
-                              to the same group, they can be ignored.
+                              object belongs to.
                             type: string
                           message:
-                            description: Provides a human-readable message detailing
-                              the condition of the object.
+                            description: Provides a human-readable explanation of
+                              the object's condition.
                             type: string
                           objectKey:
-                            description: Represents the unique key of the object.
-                              either objectKey or actionName.
+                            description: '`objectKey` uniquely identifies the object,
+                              which can be any K8s object, like a Pod, Job, Component,
+                              or PVC. Either `objectKey` or `actionName` must be provided.'
                             type: string
                           startTime:
-                            description: Represents the start time of object processing.
+                            description: Records the start time of object processing.
                             format: date-time
                             type: string
                           status:
-                            description: Indicates the state of processing the object.
+                            description: Represents the current processing state of
+                              the object, including "Processing", "Pending", "Failed",
+                              "Succeed"
                             enum:
                             - Processing
                             - Pending
@@ -6339,11 +6456,13 @@ spec:
                           rule: has(self.objectKey) || has(self.actionName)
                       type: array
                     reason:
-                      description: Describes the reason for the component phase.
+                      description: Provides an explanation for the Component being
+                        in its current state.
                       maxLength: 1024
                       type: string
                     workloadType:
-                      description: References the workload type of component in ClusterDefinition.
+                      description: Records the workload type of Component in ClusterDefinition.
+                        Deprecated and should be removed in the future version.
                       enum:
                       - Stateless
                       - Stateful
@@ -6351,11 +6470,16 @@ spec:
                       - Replication
                       type: string
                   type: object
-                description: Records the status information of components, including
-                  the sharding component, that have changed due to the operation request.
+                description: Records the status information of Components changed
+                  due to the OpsRequest.
                 type: object
               conditions:
-                description: Describes the detailed status of the OpsRequest.
+                description: Describes the detailed status of the OpsRequest. Possible
+                  condition types include "Cancelled", "WaitForProgressing", "Validated",
+                  "Succeed", "Failed", "Restarting", "VerticalScaling", "HorizontalScaling",
+                  "VolumeExpanding", "Reconfigure", "Switchover", "Stopping", "Starting",
+                  "VersionUpgrading", "Exposing", "ExecuteDataScript", "Backup", "InstancesRebuilding",
+                  "CustomOperation".
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -6428,21 +6552,23 @@ spec:
                 x-kubernetes-list-type: map
               extras:
                 description: A collection of additional key-value pairs that provide
-                  supplementary information for the opsRequest.
+                  supplementary information for the OpsRequest.
                 items:
                   additionalProperties:
                     type: string
                   type: object
                 type: array
               lastConfiguration:
-                description: Records the last configuration before this operation
-                  took effect.
+                description: Records the configuration prior to any changes.
                 properties:
                   clusterVersionRef:
-                    description: Specifies the reference to the ClusterVersion name.
+                    description: Specifies the name of the ClusterVersion. Deprecated
+                      and should be removed in the future version.
                     type: string
                   components:
                     additionalProperties:
+                      description: LastComponentConfiguration can be used to track
+                        and compare the desired state of the Component over time.
                       properties:
                         claims:
                           description: "Claims lists the names of resources, defined
@@ -6467,7 +6593,8 @@ spec:
                           - name
                           x-kubernetes-list-type: map
                         classDefRef:
-                          description: References a class defined in ComponentClassDefinition.
+                          description: Records the class of the Component prior to
+                            any changes. Deprecated since v0.9.
                           properties:
                             class:
                               description: Defines the name of the class that is defined
@@ -6482,7 +6609,8 @@ spec:
                           - class
                           type: object
                         instances:
-                          description: Records the last instances of the component.
+                          description: Records the InstanceTemplate list of the Component
+                            prior to any changes.
                           items:
                             description: InstanceTemplate allows customization of
                               individual replica configurations within a Component,
@@ -8864,12 +8992,14 @@ spec:
                             resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
                         offlineInstances:
-                          description: Records the last offline instances of the component.
+                          description: Records the offline instances of the Component
+                            prior to any changes.
                           items:
                             type: string
                           type: array
                         replicas:
-                          description: Represents the last replicas of the component.
+                          description: Records the `replicas` of the Component prior
+                            to any changes.
                           format: int32
                           type: integer
                         requests:
@@ -8886,7 +9016,8 @@ spec:
                             cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
                         services:
-                          description: Records the last services of the component.
+                          description: Records the ClusterComponentService list of
+                            the Component prior to any changes.
                           items:
                             properties:
                               annotations:
@@ -8898,7 +9029,7 @@ spec:
                                 type: object
                               name:
                                 description: References the component service name
-                                  defined in the ComponentDefinition.Spec.Services[x].Name.
+                                  defined in the `componentDefinition.spec.services[*].name`.
                                 maxLength: 25
                                 type: string
                               podService:
@@ -8915,15 +9046,15 @@ spec:
                                   are determined by the selector or if that is not
                                   specified, they are determined by manual construction
                                   of an Endpoints object or EndpointSlice objects.
-                                  If clusterIP is \"None\", no virtual IP is allocated
-                                  and the endpoints are published as a set of endpoints
-                                  rather than a virtual IP. - `NodePort` builds on
-                                  ClusterIP and allocates a port on every node which
-                                  routes to the same endpoints as the clusterIP. -
-                                  `LoadBalancer` builds on NodePort and creates an
-                                  external load-balancer (if supported in the current
-                                  cloud) which routes to the same endpoints as the
-                                  clusterIP. \n More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
+                                  - `NodePort` builds on ClusterIP and allocates a
+                                  port on every node which routes to the same endpoints
+                                  as the clusterIP. - `LoadBalancer` builds on NodePort
+                                  and creates an external load-balancer (if supported
+                                  in the current cloud) which routes to the same endpoints
+                                  as the clusterIP. \n Note: although K8s Service
+                                  type allows the 'ExternalName' type, it is not a
+                                  valid option for ClusterComponentService. \n For
+                                  more info, see: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
                                 enum:
                                 - ClusterIP
                                 - NodePort
@@ -8939,25 +9070,29 @@ spec:
                             items:
                               type: string
                             type: array
-                          description: Records the information about the target resources
-                            affected by the component. The resource key is in the
-                            list of [pods].
+                          description: 'Records the information about various types
+                            of resources associated with the Component prior to any
+                            changes. Currently, only one type of resource is supported:
+                            "pods". The "pods" key maps to a list of names of all
+                            Pods of the Component.'
                           type: object
                         volumeClaimTemplates:
-                          description: Records the last volumeClaimTemplates of the
-                            component.
+                          description: Records volumes' storage size of the Component
+                            prior to any changes.
                           items:
                             properties:
                               name:
-                                description: A reference to the volumeClaimTemplate
-                                  name from the cluster components.
+                                description: Specify the name of the volumeClaimTemplate
+                                  in the Component. The specified name must match
+                                  one of the volumeClaimTemplates defined in the `clusterComponentSpec.volumeClaimTemplates`
+                                  field.
                                 type: string
                               storage:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: Specifies the requested storage size
-                                  for the volume.
+                                description: Specifies the desired storage size for
+                                  the volume.
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                             required:
@@ -8967,11 +9102,14 @@ spec:
                           type: array
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-                    description: Records the last configuration of the component.
+                    description: Records the configuration of each Component prior
+                      to any changes.
                     type: object
                 type: object
               phase:
-                description: Defines the phase of the OpsRequest.
+                description: Represents the phase of the OpsRequest. Possible values
+                  include "Pending", "Creating", "Running", "Cancelling", "Cancelled",
+                  "Failed", "Succeed".
                 enum:
                 - Pending
                 - Creating
@@ -8991,7 +9129,10 @@ spec:
                   Defines the status information of reconfiguring.'
                 properties:
                   conditions:
-                    description: Describes the reconfiguring detail status.
+                    description: Describes the reconfiguring detail status. Possible
+                      condition types include "Creating", "Init", "Running", "Pending",
+                      "Merged", "MergeFailed", "FailedAndPause", "Upgrading", "Deleting",
+                      "FailedAndRetry", "Finished", "ReconfigurePersisting", "ReconfigurePersisted".
                     items:
                       description: "Condition contains details for one aspect of the
                         current state of this API Resource. --- This struct is intended
@@ -9071,7 +9212,8 @@ spec:
                       properties:
                         expectedCount:
                           default: -1
-                          description: Specifies the number of expected reconfigurations.
+                          description: Represents the total count of pods intended
+                            to be updated by a configuration change.
                           format: int32
                           type: integer
                         lastAppliedConfiguration:
@@ -9080,28 +9222,40 @@ spec:
                           description: Stores the last applied configuration.
                           type: object
                         lastStatus:
-                          description: Records the last status of the reconfiguration
-                            controller.
+                          description: "Records the last state of the reconfiguration
+                            finite state machine. Possible values include \"None\",
+                            \"Retry\", \"Failed\", \"NotSupport\", \"FailedAndRetry\".
+                            \n - \"None\" describes fsm has finished and quit. - \"Retry\"
+                            describes fsm is running. - \"Failed\" describes fsm is
+                            failed and exited. - \"NotSupport\" describes fsm does
+                            not support the feature. - \"FailedAndRetry\" describes
+                            fsm is failed in current state, but can be retried."
                           type: string
                         message:
                           description: Provides details about the operation.
                           type: string
                         name:
-                          description: Specifies the name of the configuration template.
+                          description: Indicates the name of the configuration template
+                            (as ConfigMap).
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         status:
-                          description: Indicates the current state of the reconfiguration
-                            state machine.
+                          description: Represents the current state of the reconfiguration
+                            state machine. Possible values include "Creating", "Init",
+                            "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+                            "Upgrading", "Deleting", "FailedAndRetry", "Finished",
+                            "ReconfigurePersisting", "ReconfigurePersisted".
                           type: string
                         succeedCount:
                           default: 0
-                          description: Counts the number of successful reconfigurations.
+                          description: Records the number of pods successfully updated
+                            following a configuration change.
                           format: int32
                           type: integer
                         updatePolicy:
-                          description: Defines the policy for reconfiguration.
+                          description: Records the UpgradePolicy of the configuration
+                            change operation.
                           enum:
                           - simple
                           - parallel
@@ -9116,17 +9270,20 @@ spec:
                             addedKeys:
                               additionalProperties:
                                 type: string
-                              description: Lists the keys that have been added.
+                              description: Maps newly added configuration files to
+                                their content.
                               type: object
                             deletedKeys:
                               additionalProperties:
                                 type: string
-                              description: Lists the keys that have been deleted.
+                              description: Lists the name of configuration files that
+                                have been deleted.
                               type: object
                             updatedKeys:
                               additionalProperties:
                                 type: string
-                              description: Lists the keys that have been updated.
+                              description: Maps the name of configuration files to
+                                their updated content, detailing the changes made.
                               type: object
                           type: object
                       required:
@@ -9143,7 +9300,10 @@ spec:
                 additionalProperties:
                   properties:
                     conditions:
-                      description: Describes the reconfiguring detail status.
+                      description: Describes the reconfiguring detail status. Possible
+                        condition types include "Creating", "Init", "Running", "Pending",
+                        "Merged", "MergeFailed", "FailedAndPause", "Upgrading", "Deleting",
+                        "FailedAndRetry", "Finished", "ReconfigurePersisting", "ReconfigurePersisted".
                       items:
                         description: "Condition contains details for one aspect of
                           the current state of this API Resource. --- This struct
@@ -9225,7 +9385,8 @@ spec:
                         properties:
                           expectedCount:
                             default: -1
-                            description: Specifies the number of expected reconfigurations.
+                            description: Represents the total count of pods intended
+                              to be updated by a configuration change.
                             format: int32
                             type: integer
                           lastAppliedConfiguration:
@@ -9234,28 +9395,41 @@ spec:
                             description: Stores the last applied configuration.
                             type: object
                           lastStatus:
-                            description: Records the last status of the reconfiguration
-                              controller.
+                            description: "Records the last state of the reconfiguration
+                              finite state machine. Possible values include \"None\",
+                              \"Retry\", \"Failed\", \"NotSupport\", \"FailedAndRetry\".
+                              \n - \"None\" describes fsm has finished and quit. -
+                              \"Retry\" describes fsm is running. - \"Failed\" describes
+                              fsm is failed and exited. - \"NotSupport\" describes
+                              fsm does not support the feature. - \"FailedAndRetry\"
+                              describes fsm is failed in current state, but can be
+                              retried."
                             type: string
                           message:
                             description: Provides details about the operation.
                             type: string
                           name:
-                            description: Specifies the name of the configuration template.
+                            description: Indicates the name of the configuration template
+                              (as ConfigMap).
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           status:
-                            description: Indicates the current state of the reconfiguration
-                              state machine.
+                            description: Represents the current state of the reconfiguration
+                              state machine. Possible values include "Creating", "Init",
+                              "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+                              "Upgrading", "Deleting", "FailedAndRetry", "Finished",
+                              "ReconfigurePersisting", "ReconfigurePersisted".
                             type: string
                           succeedCount:
                             default: 0
-                            description: Counts the number of successful reconfigurations.
+                            description: Records the number of pods successfully updated
+                              following a configuration change.
                             format: int32
                             type: integer
                           updatePolicy:
-                            description: Defines the policy for reconfiguration.
+                            description: Records the UpgradePolicy of the configuration
+                              change operation.
                             enum:
                             - simple
                             - parallel
@@ -9270,17 +9444,21 @@ spec:
                               addedKeys:
                                 additionalProperties:
                                   type: string
-                                description: Lists the keys that have been added.
+                                description: Maps newly added configuration files
+                                  to their content.
                                 type: object
                               deletedKeys:
                                 additionalProperties:
                                   type: string
-                                description: Lists the keys that have been deleted.
+                                description: Lists the name of configuration files
+                                  that have been deleted.
                                 type: object
                               updatedKeys:
                                 additionalProperties:
                                   type: string
-                                description: Lists the keys that have been updated.
+                                description: Maps the name of configuration files
+                                  to their updated content, detailing the changes
+                                  made.
                                 type: object
                             type: object
                         required:
@@ -9293,10 +9471,11 @@ spec:
                   required:
                   - configurationStatus
                   type: object
-                description: Represents the status information of reconfiguring.
+                description: Records the status of a reconfiguring operation if `opsRequest.spec.type`
+                  equals to "Reconfiguring".
                 type: object
               startTimestamp:
-                description: Indicates the time when the OpsRequest started processing.
+                description: Records the time when the OpsRequest started processing.
                 format: date-time
                 type: string
             required:

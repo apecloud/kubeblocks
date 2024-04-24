@@ -1102,7 +1102,7 @@ type TLSSecretRef struct {
 }
 
 type ClusterComponentService struct {
-	// References the component service name defined in the ComponentDefinition.Spec.Services[x].Name.
+	// References the component service name defined in the `componentDefinition.spec.services[*].name`.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=25
@@ -1110,15 +1110,17 @@ type ClusterComponentService struct {
 
 	// Determines how the Service is exposed. Valid options are `ClusterIP`, `NodePort`, and `LoadBalancer`.
 	//
-	// - `ClusterIP` allocates a cluster-internal IP address for load-balancing to endpoints. Endpoints are determined
-	//    by the selector or if that is not specified, they are determined by manual construction of an Endpoints object
-	//    or EndpointSlice objects. If clusterIP is "None", no virtual IP is allocated and the endpoints are published
-	//    as a set of endpoints rather than a virtual IP.
+	// - `ClusterIP` allocates a cluster-internal IP address for load-balancing to endpoints.
+	//    Endpoints are determined by the selector or if that is not specified,
+	//    they are determined by manual construction of an Endpoints object or EndpointSlice objects.
 	// - `NodePort` builds on ClusterIP and allocates a port on every node which routes to the same endpoints as the clusterIP.
 	// - `LoadBalancer` builds on NodePort and creates an external load-balancer (if supported in the current cloud)
 	//    which routes to the same endpoints as the clusterIP.
 	//
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.
+	// Note: although K8s Service type allows the 'ExternalName' type, it is not a valid option for ClusterComponentService.
+	//
+	// For more info, see:
+	// https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.
 	//
 	// +kubebuilder:default=ClusterIP
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}

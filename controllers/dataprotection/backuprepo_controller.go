@@ -87,7 +87,7 @@ var (
 type reconcileContext struct {
 	intctrlutil.RequestCtx
 	repo       *dpv1alpha1.BackupRepo
-	provider   *storagev1alpha1.StorageProvider
+	provider   *dpv1alpha1.StorageProvider
 	Parameters map[string]string
 	renderCtx  renderContext
 	digest     string
@@ -141,8 +141,12 @@ type BackupRepoReconciler struct {
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepos/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepos/finalizers,verbs=update
 
+// TODO(x.zhou): deprecated, will be removed in v0.11
 // watch StorageProviders
 // +kubebuilder:rbac:groups=storage.kubeblocks.io,resources=storageproviders,verbs=get;list;watch
+
+// create or watch StorageProviders
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=storageproviders,verbs=create;get;list;watch
 
 // watch or update Backups
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;update;patch
@@ -353,17 +357,66 @@ func (r *BackupRepoReconciler) updateConditionInDefer(ctx context.Context, repo 
 	}
 }
 
+func (r *BackupRepoReconciler) tryConvertLegacyProvider(reqCtx intctrlutil.RequestCtx, name string) (*dpv1alpha1.StorageProvider, error) {
+	providerKey := client.ObjectKey{Name: name}
+	provider := &storagev1alpha1.StorageProvider{}
+	err := r.Client.Get(reqCtx.Ctx, providerKey, provider, multicluster.InControlContext())
+	if err != nil {
+		return nil, err
+	}
+
+	var parametersSchema *dpv1alpha1.ParametersSchema
+	if provider.Spec.ParametersSchema != nil {
+		parametersSchema = &dpv1alpha1.ParametersSchema{
+			OpenAPIV3Schema:  provider.Spec.ParametersSchema.OpenAPIV3Schema,
+			CredentialFields: provider.Spec.ParametersSchema.CredentialFields,
+		}
+	}
+
+	newProvider := &dpv1alpha1.StorageProvider{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        provider.Name,
+			Labels:      provider.Labels,
+			Annotations: provider.Annotations,
+		},
+		Spec: dpv1alpha1.StorageProviderSpec{
+			CSIDriverName:                 provider.Spec.CSIDriverName,
+			CSIDriverSecretTemplate:       provider.Spec.CSIDriverSecretTemplate,
+			StorageClassTemplate:          provider.Spec.StorageClassTemplate,
+			PersistentVolumeClaimTemplate: provider.Spec.PersistentVolumeClaimTemplate,
+			DatasafedConfigTemplate:       provider.Spec.DatasafedConfigTemplate,
+			ParametersSchema:              parametersSchema,
+		},
+	}
+
+	if err := r.Client.Create(reqCtx.Ctx, newProvider, multicluster.InControlContext()); err != nil {
+		return nil, err
+	}
+	return newProvider, nil
+}
+
+func (r *BackupRepoReconciler) getStorageProvider(reqCtx intctrlutil.RequestCtx, name string) (*dpv1alpha1.StorageProvider, error) {
+	providerKey := client.ObjectKey{Name: name}
+	provider := &dpv1alpha1.StorageProvider{}
+	err := r.Client.Get(reqCtx.Ctx, providerKey, provider, multicluster.InControlContext())
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return r.tryConvertLegacyProvider(reqCtx, name)
+		}
+		return nil, err
+	}
+	return provider, nil
+}
+
 func (r *BackupRepoReconciler) checkStorageProvider(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) (provider *storagev1alpha1.StorageProvider, err error) {
+	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) (provider *dpv1alpha1.StorageProvider, err error) {
 	reason := ReasonUnknownError
 	defer func() {
 		r.updateConditionInDefer(reqCtx.Ctx, repo, ConditionTypeStorageProviderReady, reason, nil, nil, &err)
 	}()
 
 	// get storage provider object
-	providerKey := client.ObjectKey{Name: repo.Spec.StorageProviderRef}
-	provider = &storagev1alpha1.StorageProvider{}
-	err = r.Client.Get(reqCtx.Ctx, providerKey, provider, multicluster.InControlContext())
+	provider, err = r.getStorageProvider(reqCtx, repo.Spec.StorageProviderRef)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			reason = ReasonStorageProviderNotFound
@@ -381,7 +434,7 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 			reason = ReasonInvalidStorageProvider
 			return provider, newDependencyError("both StorageClassTemplate and PersistentVolumeClaimTemplate are empty")
 		}
-		csiInstalledCond := meta.FindStatusCondition(provider.Status.Conditions, storagev1alpha1.ConditionTypeCSIDriverInstalled)
+		csiInstalledCond := meta.FindStatusCondition(provider.Status.Conditions, dpv1alpha1.ConditionTypeCSIDriverInstalled)
 		if csiInstalledCond == nil || csiInstalledCond.Status != metav1.ConditionTrue {
 			reason = ReasonStorageProviderNotReady
 			return provider, newDependencyError("CSI driver is not installed")
@@ -1490,6 +1543,7 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&dpv1alpha1.BackupRepo{}).
+		Watches(&dpv1alpha1.StorageProvider{}, handler.EnqueueRequestsFromMapFunc(r.mapProviderToRepos)).
 		Watches(&storagev1alpha1.StorageProvider{}, handler.EnqueueRequestsFromMapFunc(r.mapProviderToRepos)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.mapBackupToRepo)).
 		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.mapRestoreToRepo)).

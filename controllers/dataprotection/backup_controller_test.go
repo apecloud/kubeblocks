@@ -36,7 +36,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
@@ -706,7 +705,7 @@ var _ = Describe("Backup Controller test", func() {
 	When("with backup repo", func() {
 		var (
 			repoPVCName string
-			sp          *storagev1alpha1.StorageProvider
+			sp          *dpv1alpha1.StorageProvider
 			repo        *dpv1alpha1.BackupRepo
 		)
 
@@ -791,7 +790,7 @@ var _ = Describe("Backup Controller test", func() {
 				var repoPVCName2 string
 				BeforeEach(func() {
 					By("creating a second backup repo")
-					sp2 := testdp.NewFakeStorageProvider(&testCtx, func(sp *storagev1alpha1.StorageProvider) {
+					sp2 := testdp.NewFakeStorageProvider(&testCtx, func(sp *dpv1alpha1.StorageProvider) {
 						sp.Name += "2"
 					})
 					_, repoPVCName2 = testdp.NewFakeBackupRepo(&testCtx, func(repo *dpv1alpha1.BackupRepo) {
@@ -818,8 +817,8 @@ var _ = Describe("Backup Controller test", func() {
 				It("should only repos in ready status can be selected as the default backup repo", func() {
 					By("making repo to failed status")
 					Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(sp),
-						func(fetched *storagev1alpha1.StorageProvider) {
-							fetched.Status.Phase = storagev1alpha1.StorageProviderNotReady
+						func(fetched *dpv1alpha1.StorageProvider) {
+							fetched.Status.Phase = dpv1alpha1.StorageProviderNotReady
 							fetched.Status.Conditions = nil
 						})).ShouldNot(HaveOccurred())
 					Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(repo),

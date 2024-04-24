@@ -34,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 var _ = Describe("instance util test", func() {
@@ -46,21 +45,21 @@ var _ = Describe("instance util test", func() {
 			SetVolumeClaimTemplates(volumeClaimTemplates...).
 			SetRoles(roles).
 			GetObject()
-		priorityMap = rsm.ComposeRolePriorityMap(its.Spec.Roles)
+		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
 	})
 
 	Context("sortObjects function", func() {
 		It("should work well", func() {
 			pods := []client.Object{
-				builder.NewPodBuilder(namespace, "pod-0").AddLabels(rsm.RoleLabelKey, "follower").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-1").AddLabels(rsm.RoleLabelKey, "logger").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-0").AddLabels(RoleLabelKey, "follower").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-1").AddLabels(RoleLabelKey, "logger").GetObject(),
 				builder.NewPodBuilder(namespace, "pod-2").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-3").AddLabels(rsm.RoleLabelKey, "learner").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-4").AddLabels(rsm.RoleLabelKey, "candidate").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-5").AddLabels(rsm.RoleLabelKey, "leader").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-6").AddLabels(rsm.RoleLabelKey, "learner").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-10").AddLabels(rsm.RoleLabelKey, "learner").GetObject(),
-				builder.NewPodBuilder(namespace, "foo-20").AddLabels(rsm.RoleLabelKey, "learner").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-3").AddLabels(RoleLabelKey, "learner").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-4").AddLabels(RoleLabelKey, "candidate").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-5").AddLabels(RoleLabelKey, "leader").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-6").AddLabels(RoleLabelKey, "learner").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-10").AddLabels(RoleLabelKey, "learner").GetObject(),
+				builder.NewPodBuilder(namespace, "foo-20").AddLabels(RoleLabelKey, "learner").GetObject(),
 			}
 			expectedOrder := []string{"pod-4", "pod-2", "foo-20", "pod-10", "pod-6", "pod-3", "pod-1", "pod-0", "pod-5"}
 
@@ -127,8 +126,8 @@ var _ = Describe("instance util test", func() {
 			Expect(nameTemplate).Should(HaveKey(its.Name + "-1"))
 			Expect(nameTemplate).Should(HaveKey(its.Name + "-2"))
 			nameTemplate[name0].PodTemplateSpec.Spec.Volumes = nil
-			envConfigName := rsm.GetEnvConfigMapName(its.Name)
-			defaultTemplate := rsm.BuildPodTemplate(its, envConfigName)
+			envConfigName := GetEnvConfigMapName(its.Name)
+			defaultTemplate := BuildPodTemplate(its, envConfigName)
 			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(defaultTemplate.Spec))
 		})
 
@@ -165,8 +164,8 @@ var _ = Describe("instance util test", func() {
 			Expect(nameTemplate).Should(HaveKey(name0))
 			Expect(nameTemplate).Should(HaveKey(name1))
 			Expect(nameTemplate).Should(HaveKey(nameOverride0))
-			envConfigName := rsm.GetEnvConfigMapName(its.Name)
-			expectedTemplate := rsm.BuildPodTemplate(its, envConfigName)
+			envConfigName := GetEnvConfigMapName(its.Name)
+			expectedTemplate := BuildPodTemplate(its, envConfigName)
 			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
 			Expect(nameTemplate[name1].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
 			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec).ShouldNot(Equal(expectedTemplate.Spec))
@@ -197,8 +196,8 @@ var _ = Describe("instance util test", func() {
 			Expect(replica.pod.Namespace).Should(Equal(its.Namespace))
 			Expect(replica.pod.Spec.Volumes).Should(HaveLen(1))
 			Expect(replica.pod.Spec.Volumes[0].Name).Should(Equal(volumeClaimTemplates[0].Name))
-			envConfigName := rsm.GetEnvConfigMapName(its.Name)
-			expectedTemplate := rsm.BuildPodTemplate(its, envConfigName)
+			envConfigName := GetEnvConfigMapName(its.Name)
+			expectedTemplate := BuildPodTemplate(its, envConfigName)
 			Expect(replica.pod.Spec).ShouldNot(Equal(expectedTemplate.Spec))
 			// reset pod.volumes, pod.hostname and pod.subdomain
 			replica.pod.Spec.Volumes = nil

@@ -124,7 +124,7 @@ var _ = Describe("builder", func() {
 				MountPath: "/mnt/config",
 			}},
 		}
-		return testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
+		return testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, "mock-its", clusterName, mysqlCompName).
 			AddAppNameLabel("mock-app").
 			AddAppInstanceLabel(clusterName).
 			AddAppComponentLabel(mysqlCompName).

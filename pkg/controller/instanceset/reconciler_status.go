@@ -20,12 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/kubectl/pkg/util/podutils"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // statusReconciler computes the current status
@@ -103,7 +106,70 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	}
 
 	// 3. set members status
-	rsm.SetMembersStatus(its, &podList)
+	setMembersStatus(its, &podList)
 
 	return tree, nil
+}
+
+func setMembersStatus(its *workloads.InstanceSet, pods *[]corev1.Pod) {
+	// no roles defined
+	if its.Spec.Roles == nil {
+		setMembersStatusWithoutRole(its, pods)
+		return
+	}
+	// compose new status
+	newMembersStatus := make([]workloads.MemberStatus, 0)
+	roleMap := composeRoleMap(*its)
+	for _, pod := range *pods {
+		if !intctrlutil.PodIsReadyWithLabel(pod) {
+			continue
+		}
+		readyWithoutPrimary := false
+		roleName := GetRoleName(pod)
+		role, ok := roleMap[roleName]
+		if !ok {
+			continue
+		}
+		if value, ok := pod.Labels[constant.ReadyWithoutPrimaryKey]; ok && value == "true" {
+			readyWithoutPrimary = true
+		}
+		memberStatus := workloads.MemberStatus{
+			PodName:             pod.Name,
+			ReplicaRole:         &role,
+			Ready:               true,
+			ReadyWithoutPrimary: readyWithoutPrimary,
+		}
+		newMembersStatus = append(newMembersStatus, memberStatus)
+	}
+
+	// sort and set
+	rolePriorityMap := ComposeRolePriorityMap(its.Spec.Roles)
+	sortMembersStatus(newMembersStatus, rolePriorityMap)
+	its.Status.MembersStatus = newMembersStatus
+}
+
+func setMembersStatusWithoutRole(its *workloads.InstanceSet, pods *[]corev1.Pod) {
+	var membersStatus []workloads.MemberStatus
+	for _, pod := range *pods {
+		memberStatus := workloads.MemberStatus{
+			PodName: pod.Name,
+			Ready:   podutils.IsPodReady(&pod),
+		}
+		membersStatus = append(membersStatus, memberStatus)
+	}
+	slices.SortStableFunc(membersStatus, func(a, b workloads.MemberStatus) bool {
+		return a.PodName < b.PodName
+	})
+	its.Status.MembersStatus = membersStatus
+}
+
+func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {
+	getRolePriorityFunc := func(i int) int {
+		role := membersStatus[i].ReplicaRole.Name
+		return rolePriorityMap[role]
+	}
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(membersStatus[i].PodName)
+	}
+	baseSort(membersStatus, getNameNOrdinalFunc, getRolePriorityFunc, true)
 }

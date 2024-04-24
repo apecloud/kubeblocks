@@ -703,15 +703,20 @@ func resolveServiceHostOrLoadBalancerRefAdaptive(ctx context.Context, cli client
 		return &corev1.EnvVar{Name: defineKey, Value: *points}, nil
 	}
 	adaptive := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
-		hasLBPodService := func() bool {
-			for _, svc := range obj.(*resolvedServiceObj).podServices {
+		hasLBService := func() bool {
+			robj := obj.(*resolvedServiceObj)
+			services := []*corev1.Service{robj.service}
+			if robj.podServices != nil {
+				services = robj.podServices
+			}
+			for _, svc := range services {
 				if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
 					return true
 				}
 			}
 			return false
 		}
-		if hasLBPodService() {
+		if hasLBService() {
 			return loadBalancer(obj)
 		}
 		return host(obj)

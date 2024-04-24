@@ -769,7 +769,7 @@ var _ = Describe("vars", func() {
 			}
 			checkEnvVarWithValue(envVars, "lb", strings.Join(endpoints, ","))
 
-			By("load balancer - pod service - provisioning")
+			By("load balancer - pod service in provisioning")
 			reader = &mockReader{
 				cli: testCtx.Cli,
 				objs: []client.Object{
@@ -821,7 +821,7 @@ var _ = Describe("vars", func() {
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
 
-			By("adaptive - has load balancer")
+			By("adaptive - has load balancer service")
 			vars = []appsv1alpha1.EnvVar{
 				{
 					Name: "advertised",
@@ -832,14 +832,14 @@ var _ = Describe("vars", func() {
 								Optional: required(),
 							},
 							ServiceVars: appsv1alpha1.ServiceVars{
-								Host:         &appsv1alpha1.VarRequired,
+								Host:         &appsv1alpha1.VarRequired, // both host and loadBalancer
 								LoadBalancer: &appsv1alpha1.VarRequired,
 							},
 						},
 					},
 				},
 			}
-			advertisedSvcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "advertised")
+			advertisedSvcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "advertised-0")
 			reader = &mockReader{
 				cli: testCtx.Cli,
 				objs: []client.Object{
@@ -872,9 +872,12 @@ var _ = Describe("vars", func() {
 			}
 			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
-			checkEnvVarWithValue(envVars, "advertised", "127.0.0.1")
+			endpoints = []string{
+				fmt.Sprintf("%s:127.0.0.1", advertisedSvcName),
+			}
+			checkEnvVarWithValue(envVars, "advertised", strings.Join(endpoints, ","))
 
-			By("adaptive - has no load balancer")
+			By("adaptive - has no load balancer service")
 			reader = &mockReader{
 				cli: testCtx.Cli,
 				objs: []client.Object{
@@ -958,7 +961,10 @@ var _ = Describe("vars", func() {
 			}
 			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
-			checkEnvVarWithValue(envVars, "advertised", "127.0.0.1")
+			endpoints = []string{
+				fmt.Sprintf("%s:127.0.0.1", advertisedSvcName),
+			}
+			checkEnvVarWithValue(envVars, "advertised", strings.Join(endpoints, ","))
 		})
 
 		It("credential vars", func() {

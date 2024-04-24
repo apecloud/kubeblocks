@@ -45,7 +45,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -119,7 +119,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		return nil, err
 	}
 
-	// update sts.spec.volumeClaimTemplates[].metadata.labels
+	// update its.spec.volumeClaimTemplates[].metadata.labels
 	// TODO(xingran): synthesizedComp.VolumeTypes has been removed, and the following code needs to be refactored.
 	if len(itsObj.Spec.VolumeClaimTemplates) > 0 && len(itsObj.GetLabels()) > 0 {
 		for index, vct := range itsObj.Spec.VolumeClaimTemplates {
@@ -157,7 +157,7 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, comp
 	if monitor == nil {
 		return nil
 	}
-	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor, container))
+	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor, container))
 }
 
 func isSupportedMonitor(componentDef *appsv1alpha1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) bool {
@@ -206,7 +206,7 @@ func setDefaultResourceLimits(its *workloads.InstanceSet) {
 	}
 }
 
-// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
+// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from component to pvc.
 func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
 	pvcTplName string) {
 	// strict args checking.

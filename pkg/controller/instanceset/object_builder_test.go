@@ -17,17 +17,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm
+package instanceset
 
 import (
-	"context"
-
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	apps "k8s.io/api/apps/v1"
+
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -36,7 +33,7 @@ import (
 
 var _ = Describe("object generation transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewInstanceSetBuilder(namespace, name).
+		its = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			AddLabels(constant.AppComponentLabelKey, name).
 			SetReplicas(3).
@@ -48,92 +45,22 @@ var _ = Describe("object generation transformer test.", func() {
 			SetTemplate(template).
 			SetCustomHandler(observeActions).
 			GetObject()
-
-		transCtx = &rsmTransformContext{
-			Context:       ctx,
-			Client:        graphCli,
-			EventRecorder: nil,
-			Logger:        logger,
-			rsmOrig:       rsm.DeepCopy(),
-			rsm:           rsm,
-		}
-
-		transformer = &ObjectGenerationTransformer{}
-	})
-
-	Context("Transform function", func() {
-		It("should work well", func() {
-			sts := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			headlessSvc := builder.NewHeadlessServiceBuilder(name, getHeadlessSvcName(*rsm)).GetObject()
-			svc := builder.NewServiceBuilder(name, name).GetObject()
-			env := builder.NewConfigMapBuilder(name, GetEnvConfigMapName(name)).GetObject()
-			k8sMock.EXPECT().
-				List(gomock.Any(), &apps.StatefulSetList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *apps.StatefulSetList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.ServiceList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.ServiceList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.ConfigMapList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.ConfigMapList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-
-			dagExpected := mockDAG()
-			graphCli.Create(dagExpected, sts)
-			graphCli.Create(dagExpected, headlessSvc)
-			graphCli.Create(dagExpected, svc)
-			graphCli.Create(dagExpected, env)
-			graphCli.DependOn(dagExpected, sts, headlessSvc, svc, env)
-
-			// do Transform
-			dag := mockDAG()
-			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-
-			// compare DAGs
-			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
-
-			By("set svc and alternative svcs to nil")
-			rsm.Spec.Service = nil
-			rsm.Spec.AlternativeServices = nil
-			k8sMock.EXPECT().
-				List(gomock.Any(), &apps.StatefulSetList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *apps.StatefulSetList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.ServiceList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.ServiceList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.ConfigMapList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.ConfigMapList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			dag = mockDAG()
-			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-		})
 	})
 
 	Context("buildEnvConfigData function", func() {
 		It("should work well", func() {
 			By("build env config data")
-			rsm.Status.MembersStatus = []workloads.MemberStatus{
+			its.Status.MembersStatus = []workloads.MemberStatus{
 				{
-					PodName:     getPodName(rsm.Name, 1),
+					PodName:     getPodName(its.Name, 1),
 					ReplicaRole: &workloads.ReplicaRole{Name: "leader", IsLeader: true},
 				},
 				{
-					PodName:     getPodName(rsm.Name, 0),
+					PodName:     getPodName(its.Name, 0),
 					ReplicaRole: &workloads.ReplicaRole{Name: "follower", CanVote: true},
 				},
 				{
-					PodName:     getPodName(rsm.Name, 2),
+					PodName:     getPodName(its.Name, 2),
 					ReplicaRole: &workloads.ReplicaRole{Name: "follower", CanVote: true},
 				},
 			}
@@ -141,7 +68,7 @@ var _ = Describe("object generation transformer test.", func() {
 				"KB_REPLICA_COUNT",
 				"KB_0_HOSTNAME",
 			}
-			cfg := buildEnvConfigData(*rsm)
+			cfg := buildEnvConfigData(*its)
 
 			By("builds Env Config correctly")
 			Expect(cfg).ShouldNot(BeNil())
@@ -164,7 +91,7 @@ var _ = Describe("object generation transformer test.", func() {
 
 	Context("well-known service labels", func() {
 		It("should work well", func() {
-			svc := BuildSvc(*rsm, getLabels(rsm), getSvcSelector(rsm, false))
+			svc := buildSvc(*its, getMatchLabels(its.Name), getSvcSelector(its, false))
 			Expect(svc).ShouldNot(BeNil())
 			for k, ev := range service.Labels {
 				v, ok := svc.Labels[k]
@@ -191,7 +118,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(its, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
@@ -199,7 +126,7 @@ var _ = Describe("object generation transformer test.", func() {
 		})
 
 		It("should not use default grpcPort in case of 'lorry-grpc-port' existence", func() {
-			rsm.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
+			its.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
 			templateCopy := template.DeepCopy()
 			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
 				Name:  constant.RoleProbeContainerName,
@@ -215,7 +142,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(its, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
@@ -223,7 +150,7 @@ var _ = Describe("object generation transformer test.", func() {
 		})
 
 		It("container.ports nil", func() {
-			rsm.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
+			its.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
 			templateCopy := template.DeepCopy()
 			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
 				Name:  constant.RoleProbeContainerName,
@@ -239,7 +166,7 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(its, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
@@ -247,7 +174,7 @@ var _ = Describe("object generation transformer test.", func() {
 		})
 
 		It("container.ports.containerPort negative", func() {
-			rsm.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
+			its.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
 			templateCopy := template.DeepCopy()
 			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
 				Name:  constant.RoleProbeContainerName,
@@ -263,13 +190,72 @@ var _ = Describe("object generation transformer test.", func() {
 					},
 				},
 			})
-			injectRoleProbeBaseContainer(rsm, templateCopy, "", nil)
+			injectRoleProbeBaseContainer(its, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
 			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(defaultRoleProbeGRPCPort)))
 		})
-
 	})
 
+	Context("getHeadlessSvcName function", func() {
+		It("should work well", func() {
+			Expect(getHeadlessSvcName(*its)).Should(Equal("bar-headless"))
+		})
+	})
+
+	Context("findSvcPort function", func() {
+		It("should work well", func() {
+			By("set port name")
+			its.Spec.Service.Spec.Ports = []corev1.ServicePort{
+				{
+					Name:       "svc-port",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromString("my-service"),
+				},
+			}
+			containerPort := int32(54321)
+			container := corev1.Container{
+				Name: name,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "my-service",
+						Protocol:      corev1.ProtocolTCP,
+						ContainerPort: containerPort,
+					},
+				},
+			}
+			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+				SetContainers([]corev1.Container{container}).
+				GetObject()
+			its.Spec.Template = corev1.PodTemplateSpec{
+				ObjectMeta: pod.ObjectMeta,
+				Spec:       pod.Spec,
+			}
+			Expect(findSvcPort(its)).Should(BeEquivalentTo(containerPort))
+
+			By("set port number")
+			its.Spec.Service.Spec.Ports = []corev1.ServicePort{
+				{
+					Name:       "svc-port",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromInt(int(containerPort)),
+				},
+			}
+			Expect(findSvcPort(its)).Should(BeEquivalentTo(containerPort))
+
+			By("set no matched port")
+			its.Spec.Service.Spec.Ports = []corev1.ServicePort{
+				{
+					Name:       "svc-port",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromInt(int(containerPort - 1)),
+				},
+			}
+			Expect(findSvcPort(its)).Should(BeZero())
+		})
+	})
 })

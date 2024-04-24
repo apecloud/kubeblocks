@@ -877,6 +877,106 @@ var _ = Describe("vars", func() {
 			checkEnvVarWithValue(envVars, "serviceref-password", "password")
 		})
 
+		It("component vars", func() {
+			By("non-exist component with optional")
+			vars := []appsv1alpha1.EnvVar{
+				{
+					Name: "non-exist-component-var",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "non-exist",
+								Optional: optional(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								Replicas: &appsv1alpha1.VarOptional,
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).ShouldNot(HaveKey("non-exist-component-var"))
+			checkEnvVarNotExist(envVars, "non-exist-component-var")
+
+			By("non-exist component with required")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "non-exist-component-var",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "non-exist",
+								Optional: required(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								Replicas: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+
+			By("ok")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "component-replicas",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Optional: required(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								Replicas: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
+					Name: "component-podNames",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Optional: required(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								PodNames: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&appsv1alpha1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: appsv1alpha1.ComponentSpec{
+							CompDef:  synthesizedComp.CompDefName,
+							Replicas: 3,
+						},
+					},
+				},
+			}
+			mockPodList := []string{
+				constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 0),
+				constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 1),
+				constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 2),
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			checkEnvVarWithValue(envVars, "component-replicas", fmt.Sprintf("%d", 3))
+			checkEnvVarWithValue(envVars, "component-podNames", strings.Join(mockPodList, ","))
+		})
+
 		It("resolve component", func() {
 			By("component not found w/ optional")
 			vars := []appsv1alpha1.EnvVar{

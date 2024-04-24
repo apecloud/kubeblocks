@@ -40,6 +40,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -413,6 +414,8 @@ func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesi
 		return resolveCredentialVarRef(ctx, cli, synthesizedComp, defineKey, *source.CredentialVarRef)
 	case source.ServiceRefVarRef != nil:
 		return resolveServiceRefVarRef(ctx, cli, synthesizedComp, defineKey, *source.ServiceRefVarRef)
+	case source.ComponentVarRef != nil:
+		return resolveComponentVarRef(ctx, cli, synthesizedComp, defineKey, *source.ComponentVarRef)
 	}
 	return nil, nil, nil
 }
@@ -917,6 +920,60 @@ func resolveServiceRefVarRefLow(ctx context.Context, cli client.Reader, synthesi
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
 	}
 	return resolveClusterObjectVars("ServiceRef", selector.ClusterObjectReference, option, resolveObjs, resolveVar)
+}
+
+func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
+	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
+	switch {
+	case selector.Replicas != nil:
+		resolveFunc = resolveComponentReplicasRef
+	case selector.PodNames != nil:
+		resolveFunc = resolveComponentPodNamesRef
+	default:
+		return nil, nil, nil
+	}
+	return checkNBuildVars(resolveFunc(ctx, cli, synthesizedComp, defineKey, selector))
+}
+
+func resolveComponentReplicasRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveReplicas := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		comp := obj.(*appsv1alpha1.Component)
+		return &corev1.EnvVar{Name: defineKey, Value: strconv.Itoa(int(comp.Spec.Replicas))}, nil
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.Replicas, resolveReplicas)
+}
+
+func resolveComponentPodNamesRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolvePodNames := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		comp := obj.(*appsv1alpha1.Component)
+		var templates []instanceset.InstanceTemplate
+		for i := range comp.Spec.Instances {
+			templates = append(templates, &comp.Spec.Instances[i])
+		}
+		podNameList := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances)
+		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(podNameList, ",")}, nil
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.Replicas, resolvePodNames)
+}
+
+func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	selector appsv1alpha1.ComponentVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar)) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveObjs := func() (map[string]any, error) {
+		getter := func(compName string) (any, error) {
+			key := types.NamespacedName{
+				Namespace: synthesizedComp.Namespace,
+				Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, compName),
+			}
+			obj := &appsv1alpha1.Component{}
+			err := cli.Get(ctx, key, obj, inDataContext())
+			return obj, err
+		}
+		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
+	}
+	return resolveClusterObjectVars("Component", selector.ClusterObjectReference, option, resolveObjs, resolveVar)
 }
 
 func resolveReferentObjects(synthesizedComp *SynthesizedComponent,

@@ -3101,9 +3101,10 @@ spec:
                   backupName:
                     description: Specifies the name of the backup.
                     type: string
-                  effectiveCommonComponentDef:
-                    description: Indicates if this backup will be restored for all
-                      components which refer to common ComponentDefinition.
+                  doReadyRestoreAfterClusterRunning:
+                    description: If set to true, the recovery process in the PostReady
+                      phase will be performed after the cluster is running successfully.
+                      otherwise, it will be performed after component is running.
                     type: boolean
                   restoreTimeStr:
                     description: Defines the point in time to restore.

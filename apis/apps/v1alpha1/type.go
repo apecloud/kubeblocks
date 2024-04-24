@@ -1140,7 +1140,6 @@ type ServiceRefVarSelector struct {
 // ComponentVarSelector selects a var from a Component.
 type ComponentVarSelector struct {
 	// The Component to select from.
-	// The Name field can not be specified, and the CompDef field is required.
 	ClusterObjectReference `json:",inline"`
 
 	ComponentVars `json:",inline"`

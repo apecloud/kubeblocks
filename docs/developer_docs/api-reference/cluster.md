@@ -8857,8 +8857,7 @@ ClusterObjectReference
 <p>
 (Members of <code>ClusterObjectReference</code> are embedded into this type.)
 </p>
-<p>The Component to select from.
-The Name field can not be specified, and the CompDef field is required.</p>
+<p>The Component to select from.</p>
 </td>
 </tr>
 <tr>

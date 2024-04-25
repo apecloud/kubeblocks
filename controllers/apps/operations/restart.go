@@ -64,13 +64,6 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
-	// abort earlier running vertical scaling opsRequest.
-	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.RestartType},
-		func(earlierOps *appsv1alpha1.OpsRequest) bool {
-			return true
-		}); err != nil {
-		return err
-	}
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
 	componentKindList := []client.ObjectList{
 		&appv1.StatefulSetList{},
@@ -142,7 +135,7 @@ func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object
 	cName := object.GetLabels()[constant.KBAppComponentLabelKey]
 	shardingName := object.GetLabels()[constant.KBAppShardingNameLabelKey]
 	if shardingName != "" {
-		if _, ok := r.compOpsHelper.componentOpsSet[getShardingKey(shardingName)]; !ok {
+		if _, ok := r.compOpsHelper.componentOpsSet[shardingName]; !ok {
 			return true
 		}
 	} else {

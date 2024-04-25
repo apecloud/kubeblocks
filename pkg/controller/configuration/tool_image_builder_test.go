@@ -75,7 +75,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 						FormatterConfig: appsv1beta1.FormatterConfig{},
 					},
 					ToolsImageSpec: &appsv1beta1.ReloadToolsImage{
-						MountPoint: "/opt/images",
+						MountPoint: "/opt/tools",
 						ToolConfigs: []appsv1beta1.ToolConfig{
 							{
 								Name:    "test",
@@ -86,6 +86,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 								Name:    "test2",
 								Image:   "",
 								Command: noneCommand,
+								// AsContainerImage: cfgutil.ToPointer(true),
 							},
 							{
 								Name:    "test3",
@@ -105,7 +106,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 					Policy:      appsv1alpha1.NoneMergePolicy,
 				},
 			}
-			Expect(buildConfigToolsContainer(cfgManagerParams, &its.Spec.Template.Spec, clusterComponent)).Should(Succeed())
+			Expect(buildReloadToolsContainer(cfgManagerParams, &its.Spec.Template.Spec)).Should(Succeed())
 			Expect(4).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))
 			Expect("test_images").Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[0].Image))
 			Expect(its.Spec.Template.Spec.Containers[0].Image).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[1].Image))

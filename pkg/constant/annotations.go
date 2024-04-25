@@ -44,3 +44,9 @@ func GetKBReservedAnnotationKeys() []string {
 const (
 	HorizontalScaleBackupPolicyTemplateKey = "apps.kubeblocks.io/horizontal-scale-backup-policy-template"
 )
+
+// annotations for multi-cluster
+const (
+	KBAppMultiClusterPlacementKey   = "apps.kubeblocks.io/multi-cluster-placement"
+	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
+)

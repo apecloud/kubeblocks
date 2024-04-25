@@ -5557,6 +5557,11 @@ func (in *ServiceVars) DeepCopyInto(out *ServiceVars) {
 		*out = new(VarOption)
 		**out = **in
 	}
+	if in.LoadBalancer != nil {
+		in, out := &in.LoadBalancer, &out.LoadBalancer
+		*out = new(VarOption)
+		**out = **in
+	}
 	if in.Port != nil {
 		in, out := &in.Port, &out.Port
 		*out = new(NamedVar)

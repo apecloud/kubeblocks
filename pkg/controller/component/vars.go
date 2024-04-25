@@ -534,10 +534,14 @@ func resolveServiceVarRef(ctx context.Context, cli client.Reader, synthesizedCom
 	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
 	switch {
+	case selector.Host != nil && selector.LoadBalancer != nil:
+		resolveFunc = resolveServiceHostOrLoadBalancerRefAdaptive
 	case selector.Host != nil:
 		resolveFunc = resolveServiceHostRef
 	case selector.Port != nil:
 		resolveFunc = resolveServicePortRef
+	case selector.LoadBalancer != nil:
+		resolveFunc = resolveServiceLoadBalancerRef
 	default:
 		return nil, nil, nil
 	}
@@ -586,12 +590,6 @@ func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedCo
 }
 
 func composePortValueFromServices(obj any, targetPortName string) *string {
-	robj := obj.(*resolvedServiceObj)
-	services := []*corev1.Service{robj.service}
-	if robj.podServices != nil {
-		services = robj.podServices
-	}
-
 	hasNodePort := func(svc *corev1.Service, svcPort corev1.ServicePort) bool {
 		return (svc.Spec.Type == corev1.ServiceTypeNodePort || svc.Spec.Type == corev1.ServiceTypeLoadBalancer) && svcPort.NodePort > 0
 	}
@@ -603,48 +601,130 @@ func composePortValueFromServices(obj any, targetPortName string) *string {
 		return int(svcPort.Port)
 	}
 
-	svcPorts := make(map[string]string)
-	for _, svc := range services {
-		for _, svcPort := range svc.Spec.Ports {
-			if svcPort.Name == targetPortName {
-				svcPorts[svc.Name] = strconv.Itoa(port(svc, svcPort))
+	selector := func(services []*corev1.Service) map[string]string {
+		ports := make(map[string]string)
+		for _, svc := range services {
+			for _, svcPort := range svc.Spec.Ports {
+				if svcPort.Name == targetPortName {
+					ports[svc.Name] = strconv.Itoa(port(svc, svcPort))
+					break
+				}
+			}
+
+			if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(targetPortName) == 0) {
+				ports[svc.Name] = strconv.Itoa(port(svc, svc.Spec.Ports[0]))
+			}
+		}
+		return ports
+	}
+	return composeNamedValueFromServices(obj, selector)
+}
+
+func resolveServiceLoadBalancerRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveLoadBalancer := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		points := composeLoadBalancerValueFromServices(obj)
+		if points == nil {
+			return nil, nil
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: *points}, nil
+	}
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host, resolveLoadBalancer)
+}
+
+func composeLoadBalancerValueFromServices(obj any) *string {
+	selector := func(services []*corev1.Service) map[string]string {
+		points := make(map[string]string)
+		for _, svc := range services {
+			if svc.Spec.Type != corev1.ServiceTypeLoadBalancer || len(svc.Status.LoadBalancer.Ingress) == 0 {
 				break
 			}
+			ingress := svc.Status.LoadBalancer.Ingress[0]
+			if len(ingress.IP) == 0 && len(ingress.Hostname) == 0 {
+				break
+			}
+			if len(ingress.IP) > 0 {
+				points[svc.Name] = ingress.IP
+			} else {
+				points[svc.Name] = ingress.Hostname
+			}
 		}
+		return points
+	}
+	return composeNamedValueFromServices(obj, selector)
+}
 
-		if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(targetPortName) == 0) {
-			svcPorts[svc.Name] = strconv.Itoa(port(svc, svc.Spec.Ports[0]))
-		}
+func composeNamedValueFromServices(obj any, selector func([]*corev1.Service) map[string]string) *string {
+	robj := obj.(*resolvedServiceObj)
+	services := []*corev1.Service{robj.service}
+	if robj.podServices != nil {
+		services = robj.podServices
 	}
 
-	if len(svcPorts) > 0 {
-		svcNames := maps.Keys(svcPorts)
-		slices.Sort(svcNames)
-
-		ports := func() []string {
-			var ports []string
-			for _, svcName := range svcNames {
-				ports = append(ports, svcPorts[svcName])
-			}
-			return ports
-		}
-		namedPorts := func() []string {
-			var namedPorts []string
-			for _, svcName := range svcNames {
-				namedPorts = append(namedPorts, fmt.Sprintf("%s:%s", svcName, svcPorts[svcName]))
-			}
-			return namedPorts
-		}
-
-		value := ""
-		if robj.podServices == nil {
-			value = ports()[0]
-		} else {
-			value = strings.Join(namedPorts(), ",")
-		}
-		return &value
+	values := selector(services)
+	if len(values) == 0 || len(values) != len(services) {
+		return nil
 	}
-	return nil
+
+	svcNames := maps.Keys(values)
+	slices.Sort(svcNames)
+
+	nameless := func() []string {
+		var vals []string
+		for _, svcName := range svcNames {
+			vals = append(vals, values[svcName])
+		}
+		return vals
+	}
+	named := func() []string {
+		var vals []string
+		for _, svcName := range svcNames {
+			vals = append(vals, fmt.Sprintf("%s:%s", svcName, values[svcName]))
+		}
+		return vals
+	}
+
+	value := ""
+	if robj.podServices == nil {
+		value = nameless()[0]
+	} else {
+		value = strings.Join(named(), ",")
+	}
+	return &value
+}
+
+func resolveServiceHostOrLoadBalancerRefAdaptive(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	host := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		return &corev1.EnvVar{Name: defineKey, Value: composeHostValueFromServices(obj)}, nil
+	}
+	loadBalancer := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		points := composeLoadBalancerValueFromServices(obj)
+		if points == nil {
+			return nil, nil
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: *points}, nil
+	}
+	adaptive := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		hasLBService := func() bool {
+			robj := obj.(*resolvedServiceObj)
+			services := []*corev1.Service{robj.service}
+			if robj.podServices != nil {
+				services = robj.podServices
+			}
+			for _, svc := range services {
+				if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+					return true
+				}
+			}
+			return false
+		}
+		if hasLBService() {
+			return loadBalancer(obj)
+		}
+		return host(obj)
+	}
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host, adaptive)
 }
 
 func resolveCredentialVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

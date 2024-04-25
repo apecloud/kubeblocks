@@ -35,44 +35,72 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func Setup(scheme *runtime.Scheme, cli client.Client, kubeConfig, contexts string) (Manager, error) {
+func Setup(scheme *runtime.Scheme, cfg *rest.Config, cli client.Client, kubeConfig, contexts string) (Manager, error) {
 	if len(contexts) == 0 {
 		return nil, nil
 	}
-	clients, caches, err := newClientNCache(scheme, kubeConfig, contexts)
+	mcc, err := newClientNCache(scheme, kubeConfig, contexts)
 	if err != nil {
 		return nil, err
 	}
+	for k, c := range mcc {
+		if isSameContextWithControl(cfg, c) {
+			cc := mcc[k]
+			// reset the cache and use default cli of control cluster
+			cc.cache = nil
+			cc.client = cli
+			mcc[k] = cc
+		}
+	}
+
+	clients := func() map[string]client.Client {
+		m := make(map[string]client.Client)
+		for _, c := range mcc {
+			m[c.context] = c.client
+		}
+		return m
+	}
+	caches := func() map[string]cache.Cache {
+		m := make(map[string]cache.Cache)
+		for _, c := range mcc {
+			m[c.context] = c.cache
+		}
+		return m
+	}
+
 	return &manager{
-		cli:    NewClient(cli, clients),
-		caches: caches,
+		cli:    NewClient(cli, clients()),
+		caches: caches(),
 	}, nil
 }
 
-func newClientNCache(scheme *runtime.Scheme, kubeConfig, contexts string) (map[string]client.Client, map[string]cache.Cache, error) {
-	clients := make(map[string]client.Client)
-	caches := make(map[string]cache.Cache)
-	for _, context := range strings.Split(contexts, ",") {
-		cli, cache, err := newClientNCache4Context(scheme, kubeConfig, context)
-		if err != nil {
-			return nil, nil, err
-		}
-		if cli != nil && cache != nil {
-			clients[context] = cli
-			caches[context] = cache
-		}
-	}
-	return clients, caches, nil
+// isSameContextWithControl checks whether the context is the same as the control cluster.
+func isSameContextWithControl(cfg *rest.Config, mcc multiClusterContext) bool {
+	return cfg.Host == mcc.id
 }
 
-func newClientNCache4Context(scheme *runtime.Scheme, kubeConfig, context string) (client.Client, cache.Cache, error) {
+func newClientNCache(scheme *runtime.Scheme, kubeConfig, contexts string) (map[string]multiClusterContext, error) {
+	mcc := make(map[string]multiClusterContext, 0)
+	for _, context := range strings.Split(contexts, ",") {
+		cc, err := newClientNCache4Context(scheme, kubeConfig, context)
+		if err != nil {
+			return nil, err
+		}
+		if cc != nil {
+			mcc[context] = *cc
+		}
+	}
+	return mcc, nil
+}
+
+func newClientNCache4Context(scheme *runtime.Scheme, kubeConfig, context string) (*multiClusterContext, error) {
 	if len(context) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	config, err := getConfigWithContext(kubeConfig, context)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to get kubeconfig for context %s: %s", context, err.Error())
+		return nil, fmt.Errorf("unable to get kubeconfig for context %s: %s", context, err.Error())
 	}
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
@@ -80,18 +108,23 @@ func newClientNCache4Context(scheme *runtime.Scheme, kubeConfig, context string)
 
 	clientOpts, err := clientOptions(scheme, context, config)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	cli, err := client.New(config, clientOpts)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create Client for context %s: %s", context, err.Error())
+		return nil, fmt.Errorf("unable to create Client for context %s: %s", context, err.Error())
 	}
 	cache, err := cache.New(config, cacheOptions(clientOpts))
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create Cache for context %s: %s", context, err.Error())
+		return nil, fmt.Errorf("unable to create Cache for context %s: %s", context, err.Error())
 	}
-	return cli, cache, nil
+	return &multiClusterContext{
+		context: context,
+		id:      config.Host,
+		cache:   cache,
+		client:  cli,
+	}, nil
 }
 
 func getConfigWithContext(kubeConfig, context string) (*rest.Config, error) {

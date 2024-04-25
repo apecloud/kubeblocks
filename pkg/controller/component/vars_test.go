@@ -620,6 +620,350 @@ var _ = Describe("vars", func() {
 			Expect(err).Should(Succeed())
 			checkEnvVarWithValue(envVars, "pod-service-endpoint", strings.Join([]string{svcName0, svcName1}, ","))
 			checkEnvVarWithValue(envVars, "pod-service-port", strings.Join([]string{fmt.Sprintf("%s:300001", svcName0), fmt.Sprintf("%s:300002", svcName1)}, ","))
+
+			By("load balancer")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "lb",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "lb",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								LoadBalancer: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			lbSvcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										IP: "127.0.0.1",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			checkEnvVarWithValue(envVars, "lb", "127.0.0.1")
+
+			By("load balancer - pod service")
+			lbSvcName0 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb-0")
+			lbSvcName1 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb-1")
+			lbSvcName2 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb-2")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName0,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										IP: "127.0.0.1", // IP
+									},
+								},
+							},
+						},
+					},
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName1,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										Hostname: "127.0.0.2", // hostname
+									},
+								},
+							},
+						},
+					},
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName2,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{ // more than one ingress points
+									{
+										IP: "127.0.0.4", // IP
+									},
+									{
+										Hostname: "127.0.0.3", // hostname
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			endpoints := []string{
+				fmt.Sprintf("%s:127.0.0.1", lbSvcName0),
+				fmt.Sprintf("%s:127.0.0.2", lbSvcName1),
+				fmt.Sprintf("%s:127.0.0.4", lbSvcName2),
+			}
+			checkEnvVarWithValue(envVars, "lb", strings.Join(endpoints, ","))
+
+			By("load balancer - pod service in provisioning")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName0,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										IP: "127.0.0.1", // IP
+									},
+								},
+							},
+						},
+					},
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName1,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{}, // has no load balancer status, may be in provisioning
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
+
+			By("adaptive - has load balancer pod service")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "advertised",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "advertised",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host:         &appsv1alpha1.VarRequired, // both host and loadBalancer
+								LoadBalancer: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			advertisedSvcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "advertised-0")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      advertisedSvcName,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										IP: "127.0.0.1", // IP
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			endpoints = []string{
+				fmt.Sprintf("%s:127.0.0.1", advertisedSvcName),
+			}
+			checkEnvVarWithValue(envVars, "advertised", strings.Join(endpoints, ","))
+
+			By("adaptive - has no load balancer service")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      advertisedSvcName,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeClusterIP,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+					},
+				},
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			checkEnvVarWithValue(envVars, "advertised", advertisedSvcName)
+
+			By("adaptive - has load balancer service in provisioning")
+			// change to non pod-service
+			advertisedSvcName = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "advertised")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      advertisedSvcName,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{}, // has no load balancer status, may be in provisioning
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      advertisedSvcName,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										IP: "127.0.0.1", // IP
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			checkEnvVarWithValue(envVars, "advertised", "127.0.0.1")
 		})
 
 		It("credential vars", func() {

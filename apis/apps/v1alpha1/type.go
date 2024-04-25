@@ -1074,6 +1074,13 @@ type ServiceVars struct {
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
 
+	// LoadBalancer represents the LoadBalancer ingress point of the service.
+	//
+	// If multiple ingress points are available, the first one will be used automatically, choosing between IP and Hostname.
+	//
+	// +optional
+	LoadBalancer *VarOption `json:"loadBalancer,omitempty"`
+
 	// Port references a port or node-port defined in the service.
 	//
 	// If the referenced service is a pod-service, there will be multiple service objects matched,

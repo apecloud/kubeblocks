@@ -499,7 +499,7 @@ func main() {
 		if err = (&workloadscontrollers.InstanceSetReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
+			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
 		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
 			os.Exit(1)

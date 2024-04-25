@@ -21,14 +21,16 @@ package instanceset
 
 import (
 	"encoding/json"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // statusReconciler computes the current status
@@ -104,12 +106,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	}
 
 	// 3. set InstanceFailure condition
-	failureCondition, err := buildFailureCondition(podList)
+	failureCondition, err := buildFailureCondition(its, podList)
 	if err != nil {
 		return nil, err
 	}
 	if failureCondition != nil {
-		meta.SetStatusCondition(&its.Status.Conditions, failureCondition)
+		meta.SetStatusCondition(&its.Status.Conditions, *failureCondition)
 	}
 
 	// 4. set members status

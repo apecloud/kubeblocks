@@ -60,12 +60,12 @@ func (c *unavailableClient) RESTMapper() meta.RESTMapper {
 	return nil
 }
 
-func (c *unavailableClient) GroupVersionKindFor(runtime.Object) (schema.GroupVersionKind, error) {
-	return schema.GroupVersionKind{}, genericUnavailableError(c.context)
+func (c *unavailableClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
+	return schema.GroupVersionKind{}, genericUnavailableError(c.context, obj)
 }
 
-func (c *unavailableClient) IsObjectNamespaced(runtime.Object) (bool, error) {
-	return false, genericUnavailableError(c.context)
+func (c *unavailableClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
+	return false, genericUnavailableError(c.context, obj)
 }
 
 type unavailableClientReader struct {
@@ -74,12 +74,12 @@ type unavailableClientReader struct {
 
 var _ client.Reader = &unavailableClientReader{}
 
-func (c *unavailableClientReader) Get(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error {
-	return getUnavailableError(c.context)
+func (c *unavailableClientReader) Get(_ context.Context, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
+	return getUnavailableError(c.context, obj)
 }
 
-func (c *unavailableClientReader) List(context.Context, client.ObjectList, ...client.ListOption) error {
-	return listUnavailableError(c.context)
+func (c *unavailableClientReader) List(_ context.Context, objList client.ObjectList, _ ...client.ListOption) error {
+	return listUnavailableError(c.context, objList)
 }
 
 type unavailableClientWriter struct{}
@@ -139,8 +139,8 @@ type unavailableSubResourceReader struct {
 
 var _ client.SubResourceReader = &unavailableSubResourceReader{}
 
-func (c *unavailableSubResourceReader) Get(context.Context, client.Object, client.Object, ...client.SubResourceGetOption) error {
-	return getUnavailableError(c.context)
+func (c *unavailableSubResourceReader) Get(_ context.Context, obj client.Object, _ client.Object, _ ...client.SubResourceGetOption) error {
+	return getUnavailableError(c.context, obj)
 }
 
 type unavailableSubResourceWriter struct{}

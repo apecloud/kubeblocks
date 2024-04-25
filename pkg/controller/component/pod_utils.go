@@ -93,7 +93,7 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 		return false, nil
 	}
 	pods, err := ListPodOwnedByComponent(ctx, cli, its.Namespace, its.Spec.Selector.MatchLabels, inDataContext())
-	if err != nil {
+	if err != nil && !isUnavailableError(err) {
 		return false, err
 	}
 	for _, pod := range pods {

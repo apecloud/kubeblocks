@@ -35,6 +35,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+var (
+	scheme *runtime.Scheme
+)
+
 func Setup(scheme *runtime.Scheme, cfg *rest.Config, cli client.Client, kubeConfig, contexts, disabledContexts string) (Manager, error) {
 	if len(contexts) == 0 {
 		return nil, nil
@@ -71,10 +75,15 @@ func Setup(scheme *runtime.Scheme, cfg *rest.Config, cli client.Client, kubeConf
 		}
 		return m
 	}
+	setupScheme(scheme)
 	return &manager{
 		cli:    NewClient(cli, clients()),
 		caches: caches(),
 	}, nil
+}
+
+func setupScheme(s *runtime.Scheme) {
+	scheme = s
 }
 
 // isSameContextWithControl checks whether the context is the same as the control cluster.

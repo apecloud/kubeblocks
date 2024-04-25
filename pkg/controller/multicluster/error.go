@@ -21,29 +21,40 @@ package multicluster
 
 import (
 	"fmt"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
-
-type unavailableError struct {
-	context string
-}
-
-func (e *unavailableError) Error() string {
-	return fmt.Sprintf("cluster %s is unavailable", e.context)
-}
-
-func genericUnavailableError(context string) error {
-	return &unavailableError{context}
-}
-
-func getUnavailableError(context string) error {
-	return &unavailableError{context}
-}
-
-func listUnavailableError(context string) error {
-	return &unavailableError{context}
-}
 
 func IsUnavailableError(err error) bool {
 	_, ok := err.(*unavailableError)
 	return ok
+}
+
+type unavailableError struct {
+	context string
+	call    string
+	obj     string
+}
+
+func (e *unavailableError) Error() string {
+	return fmt.Sprintf("cluster %s is unavailable, call: %s, object: %s", e.context, e.call, e.obj)
+}
+
+func genericUnavailableError(context string, obj runtime.Object) error {
+	return &unavailableError{context, "Generic", objectNameKind(obj, "")}
+}
+
+func getUnavailableError(context string, obj client.Object) error {
+	return &unavailableError{context, "Get", objectNameKind(obj, obj.GetName())}
+}
+
+func listUnavailableError(context string, obj runtime.Object) error {
+	return &unavailableError{context, "List", objectNameKind(obj, "")}
+}
+
+func objectNameKind(obj runtime.Object, name string) string {
+	gvk, _ := apiutil.GVKForObject(obj, scheme)
+	return fmt.Sprintf("%s@%s", name, gvk.Kind)
 }

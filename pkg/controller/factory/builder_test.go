@@ -411,7 +411,7 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds cfg manager tools  correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			_, cluster, _ := newClusterObjs(nil)
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 				ManagerName:               constant.ConfigSidecarName,
 				SecreteName:               constant.GenerateDefaultConnCredential(cluster.Name),
@@ -423,7 +423,7 @@ var _ = Describe("builder", func() {
 				{Name: "test-tool", Image: "test-image", Command: []string{"sh"}},
 			}
 
-			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, synthesizedComponent, toolContainers, map[string]cfgcm.ConfigSpecMeta{})
+			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, toolContainers, map[string]cfgcm.ConfigSpecMeta{})
 			Expect(err).Should(BeNil())
 			Expect(obj).ShouldNot(BeEmpty())
 		})

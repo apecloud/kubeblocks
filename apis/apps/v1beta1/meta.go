@@ -43,3 +43,9 @@ func (in *ConfigConstraintSpec) BatchReload() bool {
 func (cs *ConfigConstraintStatus) ConfigConstraintTerminalPhases() bool {
 	return cs.Phase == CCAvailablePhase
 }
+
+func (tc *ToolConfig) AsSidecarContainerImage() bool {
+	return tc != nil &&
+		tc.AsContainerImage != nil &&
+		*tc.AsContainerImage
+}

@@ -42,7 +42,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// InstanceSetReconciler reconciles a InstanceSet object
+// InstanceSetReconciler reconciles an InstanceSet object
 type InstanceSetReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme

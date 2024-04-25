@@ -302,8 +302,8 @@ type InstanceSetStatus struct {
 	// [replicas-updatedReplicas,replicas)
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
-	// Represents the latest available observations of a instanceset's current state.
-	// Known .status.conditions.type are: "InstanceFailure"
+	// Represents the latest available observations of an instanceset's current state.
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
 	//
 	// +optional
 	// +patchMergeKey=type

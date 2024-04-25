@@ -12168,8 +12168,9 @@ spec:
                 format: int32
                 type: integer
               conditions:
-                description: 'Represents the latest available observations of a instanceset''s
-                  current state. Known .status.conditions.type are: "InstanceFailure"'
+                description: 'Represents the latest available observations of an instanceset''s
+                  current state. Known .status.conditions.type are: "InstanceFailure",
+                  "InstanceReady"'
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct

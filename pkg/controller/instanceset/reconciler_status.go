@@ -121,6 +121,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	}
 	if failureCondition != nil {
 		meta.SetStatusCondition(&its.Status.Conditions, *failureCondition)
+	} else {
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
 	// 4. set members status

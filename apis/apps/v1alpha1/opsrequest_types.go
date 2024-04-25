@@ -1112,11 +1112,6 @@ type OpsRequestComponentStatus struct {
 	// +optional
 	WorkloadType WorkloadType `json:"workloadType,omitempty"`
 
-	// Describes the configuration covered by the latest OpsRequest of the same kind.
-	// when reconciling, this information will be used as a benchmark rather than the 'spec', such as 'Spec.HorizontalScaling'.
-	// +optional
-	OverrideBy *OverrideBy `json:"overrideBy,omitempty"`
-
 	// Provides an explanation for the Component being in its current state.
 	// +kubebuilder:validation:MaxLength=1024
 	// +optional

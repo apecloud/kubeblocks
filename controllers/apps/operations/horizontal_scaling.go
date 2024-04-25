@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"slices"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,6 +56,10 @@ func (hs horizontalScalingOpsHandler) ActionStartedCondition(reqCtx intctrlutil.
 
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	if slices.Contains([]appsv1alpha1.ClusterPhase{appsv1alpha1.StoppedClusterPhase,
+		appsv1alpha1.StoppingClusterPhase}, opsRes.Cluster.Status.Phase) {
+		return intctrlutil.NewFatalError("please start the cluster before scaling the cluster horizontally")
+	}
 	applyHorizontalScaling := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
 		horizontalScaling := obj.(appsv1alpha1.HorizontalScaling)
 		instances := buildInstances(*compSpec, horizontalScaling)
@@ -65,6 +70,23 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		compSpec.Replicas = horizontalScaling.Replicas
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
+	// abort earlier running vertical scaling opsRequest.
+	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.HorizontalScalingType, appsv1alpha1.StartType},
+		func(earlierOps *appsv1alpha1.OpsRequest) bool {
+			if slices.Contains([]appsv1alpha1.OpsType{appsv1alpha1.StartType, appsv1alpha1.StopType}, earlierOps.Spec.Type) {
+				return true
+			}
+			for _, v := range earlierOps.Spec.HorizontalScalingList {
+				// abort the earlierOps if exists the same component.
+				if _, ok := compOpsSet.componentOpsSet[v.ComponentName]; ok {
+					return true
+				}
+			}
+			return false
+		}); err != nil {
+		return err
+	}
+
 	compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyHorizontalScaling)
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
@@ -102,7 +124,7 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, hs.getExpectReplicas)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", syncOverrideByOpsForScaleReplicas, handleComponentProgress)
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
@@ -135,10 +157,6 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 }
 
 func (hs horizontalScalingOpsHandler) getExpectReplicas(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32 {
-	compStatus := opsRequest.Status.Components[compOps.GetComponentName()]
-	if compStatus.OverrideBy != nil {
-		return compStatus.OverrideBy.Replicas
-	}
 	for _, v := range opsRequest.Spec.HorizontalScalingList {
 		if v.ComponentName == compOps.GetComponentName() {
 			return &v.Replicas
@@ -149,11 +167,6 @@ func (hs horizontalScalingOpsHandler) getExpectReplicas(opsRequest *appsv1alpha1
 
 // Cancel this function defines the cancel horizontalScaling action.
 func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	for _, v := range opsRes.OpsRequest.Status.Components {
-		if v.OverrideBy != nil && v.OverrideBy.OpsName != "" {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorIgnoreCancel, `can not cancel the opsRequest due to another opsRequest "%s" is running`, v.OverrideBy.OpsName)
-		}
-	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
 	return compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) {
 		if lastConfig.Replicas == nil {

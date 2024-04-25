@@ -74,6 +74,19 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 		}
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
+	// abort earlier running vertical scaling opsRequest.
+	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.VerticalScalingType},
+		func(earlierOps *appsv1alpha1.OpsRequest) bool {
+			for _, v := range earlierOps.Spec.VerticalScalingList {
+				// abort the earlierOps if exists the same component.
+				if _, ok := compOpsSet.componentOpsSet[v.ComponentName]; ok {
+					return true
+				}
+			}
+			return false
+		}); err != nil {
+		return err
+	}
 	compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVerticalScaling)
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
@@ -123,7 +136,7 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 		}
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, vs.podApplyCompOps)
 	}
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", vs.syncOverrideByOps, handleComponentStatusProgressForVS)
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgressForVS)
 }
 
 func (vs verticalScalingHandler) verticalScalingComp(verticalScaling appsv1alpha1.VerticalScaling) bool {
@@ -167,46 +180,6 @@ func (vs verticalScalingHandler) podApplyCompOps(
 	return false
 }
 
-func (vs verticalScalingHandler) syncOverrideByOps(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	runningOpsRequests, err := getRunningOpsRequestsWithSameKind(reqCtx, cli, opsRes.Cluster, appsv1alpha1.VerticalScalingType)
-	if err != nil || len(runningOpsRequests) == 0 {
-		return err
-	}
-	// get the latest opsName which has the same resource with the component resource.
-	getTheLatestOpsName := func(compName string, compResource corev1.ResourceRequirements) string {
-		for _, ops := range runningOpsRequests {
-			for _, v := range ops.Spec.VerticalScalingList {
-				if v.ComponentName == compName && v.ResourceRequirements.String() == compResource.String() {
-					return ops.Name
-				}
-			}
-		}
-		return ""
-	}
-	compResourceMap := map[string]corev1.ResourceRequirements{}
-	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
-		compResourceMap[comp.Name] = comp.Resources
-	}
-	// checks if the resources applied by the current opsRequest matches the desired resources for the component.
-	// if not matched, set the OverrideB info in the opsRequest.status.components.
-	for _, opsComp := range opsRes.OpsRequest.Spec.VerticalScalingList {
-		compResource, ok := compResourceMap[opsComp.ComponentName]
-		if !ok || compResource.String() == opsComp.ResourceRequirements.String() {
-			continue
-		}
-		// if the component resource of the cluster has changed, indicates the changes has been overwritten by other opsRequest.
-		componentStatus := opsRes.OpsRequest.Status.Components[opsComp.ComponentName]
-		componentStatus.OverrideBy = &appsv1alpha1.OverrideBy{
-			OpsName: getTheLatestOpsName(opsComp.ComponentName, compResource),
-			LastComponentConfiguration: appsv1alpha1.LastComponentConfiguration{
-				ResourceRequirements: compResource,
-			},
-		}
-		opsRes.OpsRequest.Status.Components[opsComp.ComponentName] = componentStatus
-	}
-	return nil
-}
-
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
@@ -235,11 +208,6 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 
 // Cancel this function defines the cancel verticalScaling action.
 func (vs verticalScalingHandler) Cancel(reqCxt intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	for _, v := range opsRes.OpsRequest.Status.Components {
-		if v.OverrideBy != nil && v.OverrideBy.OpsName != "" {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorIgnoreCancel, `can not cancel the opsRequest due to another VerticalScaling opsRequest "%s" is running`, v.OverrideBy.OpsName)
-		}
-	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
 	return compOpsHelper.cancelComponentOps(reqCxt.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) {
 		comp.Resources = lastConfig.ResourceRequirements

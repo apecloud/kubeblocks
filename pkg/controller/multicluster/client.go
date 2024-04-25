@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -261,15 +262,13 @@ func (c *subResourceWriter) Patch(ctx context.Context, obj client.Object, patch 
 }
 
 func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
-	var err error
+	var errs []error
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
 		if e := request(cc, obj); e != nil {
-			if err == nil {
-				err = e
-			}
+			errs = append(errs, e)
 		}
 	}
-	return err
+	return errors.NewAggregate(errs)
 }
 
 func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
@@ -281,32 +280,32 @@ func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(c
 }
 
 func anyOf_(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
-	var err error
+	var errs []error
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
 		if e := request(cc, obj); e == nil {
 			return nil
-		} else if err == nil {
-			err = e
+		} else {
+			errs = append(errs, e)
 		}
 	}
-	return err
+	return errors.NewAggregate(errs)
 }
 
 func anyOfWithMultiCheck(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
-	var err error
+	var errs []error
 	objs := make([]client.Object, 0)
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
 		o := obj.DeepCopyObject().(client.Object)
 		if e := request(cc, o); e == nil {
 			objs = append(objs, o)
-		} else if err == nil {
-			err = e
+		} else {
+			errs = append(errs, e)
 		}
 	}
 	if len(objs) > 0 {
 		reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(objs[0]).Elem())
 	}
-	return err
+	return errors.NewAggregate(errs)
 }
 
 type contextCli struct {

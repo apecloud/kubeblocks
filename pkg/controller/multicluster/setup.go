@@ -80,7 +80,7 @@ func isSameContextWithControl(cfg *rest.Config, mcc multiClusterContext) bool {
 }
 
 func newClientNCache(scheme *runtime.Scheme, kubeConfig, contexts string) (map[string]multiClusterContext, error) {
-	mcc := make(map[string]multiClusterContext, 0)
+	mcc := make(map[string]multiClusterContext)
 	for _, context := range strings.Split(contexts, ",") {
 		cc, err := newClientNCache4Context(scheme, kubeConfig, context)
 		if err != nil {

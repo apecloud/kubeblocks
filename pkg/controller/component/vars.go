@@ -1008,8 +1008,8 @@ func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedC
 	switch {
 	case selector.Replicas != nil:
 		resolveFunc = resolveComponentReplicasRef
-	case selector.PodNames != nil:
-		resolveFunc = resolveComponentPodNamesRef
+	case selector.InstanceNames != nil:
+		resolveFunc = resolveComponentInstanceNamesRef
 	default:
 		return nil, nil, nil
 	}
@@ -1025,18 +1025,18 @@ func resolveComponentReplicasRef(ctx context.Context, cli client.Reader, synthes
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.Replicas, resolveReplicas)
 }
 
-func resolveComponentPodNamesRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveComponentInstanceNamesRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
-	resolvePodNames := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+	resolveInstanceNames := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		comp := obj.(*appsv1alpha1.Component)
 		var templates []instanceset.InstanceTemplate
 		for i := range comp.Spec.Instances {
 			templates = append(templates, &comp.Spec.Instances[i])
 		}
-		podNameList := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances)
-		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(podNameList, ",")}, nil
+		instanceNameList := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances)
+		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(instanceNameList, ",")}, nil
 	}
-	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.Replicas, resolvePodNames)
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.InstanceNames, resolveInstanceNames)
 }
 
 func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

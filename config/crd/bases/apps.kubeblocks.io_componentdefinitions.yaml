@@ -14715,6 +14715,14 @@ spec:
                                 the component that the referent object resident in.
                                 If not specified, the component itself will be used.
                               type: string
+                            instanceNames:
+                              description: 'Reference to the instanceName list of
+                                the component. and the value will be presented in
+                                the following format: instanceName1,instanceName2...'
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
                             multipleClusterObjectOption:
                               description: This option defines the behavior when multiple
                                 component objects match the specified @CompDef. If
@@ -14774,14 +14782,6 @@ spec:
                             optional:
                               description: Specify whether the object must be defined.
                               type: boolean
-                            podNames:
-                              description: 'Reference to the podName list of the component.
-                                and the value will be presented in the following format:
-                                podName1,podName2...'
-                              enum:
-                              - Required
-                              - Optional
-                              type: string
                             replicas:
                               description: Reference to the replicas of the component.
                               enum:

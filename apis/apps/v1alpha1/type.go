@@ -1158,11 +1158,11 @@ type ComponentVars struct {
 	// +optional
 	Replicas *VarOption `json:"replicas,omitempty"`
 
-	// Reference to the podName list of the component.
-	// and the value will be presented in the following format: podName1,podName2...
+	// Reference to the instanceName list of the component.
+	// and the value will be presented in the following format: instanceName1,instanceName2...
 	//
 	// +optional
-	PodNames *VarOption `json:"podNames,omitempty"`
+	InstanceNames *VarOption `json:"instanceNames,omitempty"`
 }
 
 // ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.

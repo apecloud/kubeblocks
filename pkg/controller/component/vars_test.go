@@ -1281,7 +1281,7 @@ var _ = Describe("vars", func() {
 					},
 				},
 				{
-					Name: "component-podNames",
+					Name: "component-instanceNames",
 					ValueFrom: &appsv1alpha1.VarSource{
 						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
@@ -1289,7 +1289,7 @@ var _ = Describe("vars", func() {
 								Optional: required(),
 							},
 							ComponentVars: appsv1alpha1.ComponentVars{
-								PodNames: &appsv1alpha1.VarRequired,
+								InstanceNames: &appsv1alpha1.VarRequired,
 							},
 						},
 					},
@@ -1310,7 +1310,7 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-			mockPodList := []string{
+			mockInstanceList := []string{
 				constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 0),
 				constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 1),
 				constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 2),
@@ -1318,7 +1318,7 @@ var _ = Describe("vars", func() {
 			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			checkEnvVarWithValue(envVars, "component-replicas", fmt.Sprintf("%d", 3))
-			checkEnvVarWithValue(envVars, "component-podNames", strings.Join(mockPodList, ","))
+			checkEnvVarWithValue(envVars, "component-instanceNames", strings.Join(mockInstanceList, ","))
 		})
 
 		It("resolve component", func() {

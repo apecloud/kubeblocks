@@ -8942,7 +8942,7 @@ VarOption
 </tr>
 <tr>
 <td>
-<code>podNames</code><br/>
+<code>instanceNames</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.VarOption">
 VarOption
@@ -8951,8 +8951,8 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
-<p>Reference to the podName list of the component.
-and the value will be presented in the following format: podName1,podName2&hellip;</p>
+<p>Reference to the instanceName list of the component.
+and the value will be presented in the following format: instanceName1,instanceName2&hellip;</p>
 </td>
 </tr>
 </tbody>

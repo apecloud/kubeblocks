@@ -2125,8 +2125,8 @@ func (in *ComponentVars) DeepCopyInto(out *ComponentVars) {
 		*out = new(VarOption)
 		**out = **in
 	}
-	if in.PodNames != nil {
-		in, out := &in.PodNames, &out.PodNames
+	if in.InstanceNames != nil {
+		in, out := &in.InstanceNames, &out.InstanceNames
 		*out = new(VarOption)
 		**out = **in
 	}

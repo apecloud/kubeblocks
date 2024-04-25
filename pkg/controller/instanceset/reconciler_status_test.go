@@ -148,6 +148,7 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
+			Expect(its.Status.Conditions).Should(HaveLen(1))
 
 			By("make all pods failed")
 			for _, object := range pods {

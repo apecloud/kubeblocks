@@ -1110,7 +1110,7 @@ func getKubeBlocksDeploy(ctx context.Context, r *AddonReconciler) (*v1.Deploymen
 		return nil, err
 	}
 	if deploys.Items == nil || len(deploys.Items) == 0 {
-		return nil, nil
+		return nil, fmt.Errorf("there is no KubeBlocks deployment, please check your cluster")
 	}
 	if len(deploys.Items) > 1 {
 		return nil, fmt.Errorf("found multiple KubeBlocks deployments, please check your cluster")
@@ -1120,7 +1120,7 @@ func getKubeBlocksDeploy(ctx context.Context, r *AddonReconciler) (*v1.Deploymen
 
 func getKubeBlocksVersion(ctx context.Context, r *AddonReconciler) (string, error) {
 	deploy, err := getKubeBlocksDeploy(ctx, r)
-	if err != nil || deploy == nil {
+	if err != nil {
 		return "", err
 	}
 	labels := deploy.GetLabels()
@@ -1157,7 +1157,7 @@ func checkAnnotationsConstraint(ctx context.Context, reconciler *AddonReconciler
 		if ok, err := validateVersion(addon.Annotations[KBVersionValidate], kbVersion); err == nil && !ok {
 			// kb version is mismatch, set the event and modify the status of the addon
 			reconciler.Event(addon, corev1.EventTypeWarning, "Kubeblocks Version Mismatch",
-				fmt.Sprintf("The version of kubeblocks needs to %s, current is %s", addon.Annotations[KBVersionValidate], kbVersion))
+				fmt.Sprintf("The version of kubeblocks needs to be %s, current is %s", addon.Annotations[KBVersionValidate], kbVersion))
 			if addon.Status.Phase != extensionsv1alpha1.AddonFailed || meta.FindStatusCondition(addon.Status.Conditions, extensionsv1alpha1.ConditionTypeFailed) == nil {
 				patch := client.MergeFrom(addon.DeepCopy())
 				addon.Status.Phase = extensionsv1alpha1.AddonFailed
@@ -1166,7 +1166,7 @@ func checkAnnotationsConstraint(ctx context.Context, reconciler *AddonReconciler
 					Status:             metav1.ConditionFalse,
 					Reason:             InstallableRequirementUnmatched,
 					LastTransitionTime: metav1.Now(),
-					Message:            fmt.Sprintf("The version of kubeblocks needs %s, current is %s", addon.Annotations[KBVersionValidate], kbVersion),
+					Message:            fmt.Sprintf("The version of kubeblocks needs to be %s, current is %s", addon.Annotations[KBVersionValidate], kbVersion),
 				})
 				if err := reconciler.Status().Patch(ctx, addon, patch); err != nil {
 					return false, err
@@ -1184,13 +1184,13 @@ func validateVersion(annotations, kbVersion string) (bool, error) {
 	if kbVersion == "" {
 		return false, nil
 	}
-	addPreReleaseInfo := func(constrain string) string {
-		constrain = strings.Trim(constrain, " ")
-		split := strings.Split(constrain, "-")
-		if len(split) == 1 && (strings.HasPrefix(constrain, ">") || strings.Contains(constrain, "<")) {
-			constrain += "-0"
+	addPreReleaseInfo := func(constraint string) string {
+		constraint = strings.Trim(constraint, " ")
+		split := strings.Split(constraint, "-")
+		if len(split) == 1 && (strings.HasPrefix(constraint, ">") || strings.Contains(constraint, "<")) {
+			constraint += "-0"
 		}
-		return constrain
+		return constraint
 	}
 	if strings.Contains(kbVersion, "-") {
 		rules := strings.Split(annotations, ",")

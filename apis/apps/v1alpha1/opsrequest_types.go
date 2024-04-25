@@ -639,7 +639,25 @@ type RestoreSpec struct {
 	// Indicates if this backup will be restored for all components which refer to common ComponentDefinition.
 	EffectiveCommonComponentDef bool `json:"effectiveCommonComponentDef,omitempty"`
 
-	// Defines the point in time to restore.
+	// Defines the point in time to restore. The restoreTimeStr parameter represents the time string to be formatted and validated. If the restoreTimeStr is empty, it is returned as is without any formatting or validation.
+	//The function follows a specific time format/layout constraint for the restoreTimeStr API,
+	//which is "Jan 02, 2006 15:04:05 UTC-0700". The restoreTimeStr is formatted using the RFC3339 format, after parsing this string into a time.Time object.
+	//Example usage:
+	// Define a restore time string
+	// restoreTimeStr := "Jan 02,2006 15:04:05 UTC-0700"
+	// Use the function
+	// formattedTime, err := FormatRestoreTimeAndValidate(restoreTimeStr, backup)
+	// if err != nil {
+	//     fmt.Println("Error:", err)
+	// }
+	// fmt.Println("Formatted time:", formattedTime)
+	// Parameters:
+	//   - restoreTimeStr: A string representing a time in the given format.
+	//   - backup: A pointer to the backup object that contains the time range
+	//     for validation.
+	// Returns:
+	//   - string: The formatted restore time string.
+	//   - error: An error if the restore time string cannot be parsed or is outside the time range.
 	RestoreTimeStr string `json:"restoreTimeStr,omitempty"`
 
 	// Specifies the volume claim restore policy, support values: [Serial, Parallel]

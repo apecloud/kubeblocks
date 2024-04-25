@@ -22925,6 +22925,57 @@ string
 </tr>
 <tr>
 <td>
+<code>asContainerImage</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the tool image should be used as the container image for a sidecar.
+This is useful for large tool images, such as those for C++ tools, which may depend on
+numerous libraries (e.g., *.so files).</p>
+<p>If enabled, the tool image is deployed as a sidecar container image.</p>
+<p>Examples:</p>
+<pre><code class="language-yaml"> reloadToolsImage:
+   mountPoint: /kb_tools
+   toolConfigs:
+     - name: kb-tools
+       asContainerImage: true
+       image:  apecloud/oceanbase:4.2.0.0-100010032023083021
+</code></pre>
+<p>generated containers:</p>
+<pre><code class="language-yaml">initContainers:
+ - name: install-config-manager-tool
+   image: apecloud/kubeblocks-tools:$&#123;version&#125;
+   command:
+   - cp
+   - /bin/config_render
+   - /opt/tools
+   volumemounts:
+   - name: kb-tools
+     mountpath: /opt/tools
+containers:
+ - name: config-manager
+   image: apecloud/oceanbase:4.2.0.0-100010032023083021
+   imagePullPolicy: IfNotPresent
+	  command:
+   - /opt/tools/reloader
+   - --log-level
+   - info
+   - --operator-update-enable
+   - --tcp
+   - &quot;9901&quot;
+   - --config
+   - /opt/config-manager/config-manager.yaml
+   volumemounts:
+   - name: kb-tools
+     mountpath: /opt/tools
+</code></pre>
+</td>
+</tr>
+<tr>
+<td>
 <code>image</code><br/>
 <em>
 string
@@ -22943,6 +22994,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the command to be executed by the init container.</p>
 </td>
 </tr>

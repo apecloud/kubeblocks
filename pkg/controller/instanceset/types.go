@@ -65,6 +65,10 @@ const (
 )
 
 const (
+	EventReasonInvalidSpec = "InvalidSpec"
+)
+
+const (
 	// MaxPlainRevisionCount specified max number of plain revision stored in status.updateRevisions.
 	// All revisions will be compressed if exceeding this value.
 	MaxPlainRevisionCount = "MAX_PLAIN_REVISION_COUNT"

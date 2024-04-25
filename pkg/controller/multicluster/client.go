@@ -281,7 +281,7 @@ func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(c
 
 func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
 	o := hasClientOption(opts)
-	if o == nil && !o.multiCheck {
+	if o == nil || !o.multiCheck {
 		return anyOf_(mctx, ctx, obj, request, opts)
 	}
 	return anyOfWithMultiCheck(mctx, ctx, obj, request, opts)

@@ -22,7 +22,6 @@ package apps
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -420,10 +419,6 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		}
 	}
 
-	if err := r.updatePodReplicaLabel4Scaling(r.synthesizeComp.Replicas); err != nil {
-		return err
-	}
-
 	r.reqCtx.Recorder.Eventf(r.cluster,
 		corev1.EventTypeNormal,
 		"HorizontalScale",
@@ -531,24 +526,6 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 		}
 		return nil
 	}
-}
-
-func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) error {
-	graphCli := model.NewGraphClient(r.cli)
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
-	if err != nil {
-		return err
-	}
-	for _, pod := range pods {
-		obj := pod.DeepCopy()
-		if obj.Annotations == nil {
-			obj.Annotations = make(map[string]string)
-		}
-		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
-		graphCli.Update(r.dag, nil, obj, inDataContext4G())
-	}
-	return nil
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {

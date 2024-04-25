@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -140,10 +141,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	}()
 
 	// check if the ITS is running
-	isITSRunning, err := r.isInstanceSetRunning()
-	if err != nil {
-		return err
-	}
+	isITSUpdatedNRunning := r.isInstanceSetRunning()
 
 	// check if all configTemplates are synced
 	isAllConfigSynced, err := r.isAllConfigSynced()
@@ -182,7 +180,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 
 	r.reqCtx.Log.Info(
 		fmt.Sprintf("component status conditions, isInstanceSetRunning: %v, isAllConfigSynced: %v, hasRunningVolumeExpansion: %v, hasFailure: %v,  isInCreatingPhase: %v, isComponentAvailable: %v",
-			isITSRunning, isAllConfigSynced, hasRunningVolumeExpansion, hasFailure, isInCreatingPhase, isComponentAvailable))
+			isITSUpdatedNRunning, isAllConfigSynced, hasRunningVolumeExpansion, hasFailure, isInCreatingPhase, isComponentAvailable))
 
 	r.podsReady = false
 	switch {
@@ -194,7 +192,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	case isZeroReplica:
 		r.setComponentStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "component is Stopped")
 		r.podsReady = true
-	case isITSRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
+	case isITSUpdatedNRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
 		r.setComponentStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "component is Running")
 		r.podsReady = true
 	case !hasFailure && isInCreatingPhase:
@@ -217,11 +215,26 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	return nil
 }
 
+func (r *componentStatusHandler) isWorkloadUpdated() bool  {
+	if r.cluster == nil || r.runningITS == nil {
+		return false
+	}
+	// check whether component spec has been sent to the underlying workload
+	itsComponentGeneration := r.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	if itsComponentGeneration != strconv.FormatInt(r.cluster.Generation, 10) {
+		return false
+	}
+	return true
+}
+
 // isComponentAvailable tells whether the component is basically available, ether working well or in a fragile state:
 // 1. at least one pod is available
 // 2. with latest revision
 // 3. and with leader role label set
 func (r *componentStatusHandler) isComponentAvailable() bool {
+	if !r.isWorkloadUpdated() {
+		return false
+	}
 	if r.runningITS.Status.CurrentRevision != r.runningITS.Status.UpdateRevision {
 		return false
 	}
@@ -240,11 +253,14 @@ func (r *componentStatusHandler) isComponentAvailable() bool {
 }
 
 // isRunning checks if the component underlying workload is running.
-func (r *componentStatusHandler) isInstanceSetRunning() (bool, error) {
+func (r *componentStatusHandler) isInstanceSetRunning() bool {
 	if r.runningITS == nil {
-		return false, nil
+		return false
 	}
-	return instanceset.IsInstanceSetReady(r.runningITS), nil
+	if !r.isWorkloadUpdated() {
+		return false
+	}
+	return instanceset.IsInstanceSetReady(r.runningITS)
 }
 
 // isAllConfigSynced checks if all configTemplates are synced.

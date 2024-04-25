@@ -19580,6 +19580,21 @@ VarOption
 </tr>
 <tr>
 <td>
+<code>loadBalancer</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>LoadBalancer represents the LoadBalancer ingress point of the service.</p>
+<p>If multiple ingress points are available, the first one will be used automatically, choosing between IP and Hostname.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>port</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">

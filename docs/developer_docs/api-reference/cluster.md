@@ -1413,6 +1413,7 @@ The purpose of ServiceVar is to obtain the address of a ComponentService.</li>
 ServiceRefDeclaration.
 The purpose of ServiceRefVar is to obtain the specific address that a ServiceRef is bound to
 (e.g., a ClusterService of another Cluster).</li>
+<li>Component: Retrieves values from a field of a Component.</li>
 </ul>
 <p>This field is immutable.</p>
 </td>
@@ -5728,7 +5729,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.</p>
@@ -7700,6 +7701,7 @@ The purpose of ServiceVar is to obtain the address of a ComponentService.</li>
 ServiceRefDeclaration.
 The purpose of ServiceRefVar is to obtain the specific address that a ServiceRef is bound to
 (e.g., a ClusterService of another Cluster).</li>
+<li>Component: Retrieves values from a field of a Component.</li>
 </ul>
 <p>This field is immutable.</p>
 </td>
@@ -9553,6 +9555,101 @@ string
 <td><p>FromServiceRef refers to a service within the same namespace as the object.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>ComponentVarSelector selects a var from a Component.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The Component to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ComponentVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">
+ComponentVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the replicas of the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceNames</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the instanceName list of the component.
+and the value will be presented in the following format: instanceName1,instanceName2&hellip;</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">ComponentVersionCompatibilityRule
 </h3>
@@ -21076,7 +21173,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.VarOption">VarOption
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 <p>VarOption defines whether a variable is required or optional.</p>
@@ -21179,6 +21276,20 @@ ServiceRefVarSelector
 <td>
 <em>(Optional)</em>
 <p>Selects a defined var of a ServiceRef.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">
+ComponentVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Component.</p>
 </td>
 </tr>
 </tbody>

@@ -320,7 +320,7 @@ const (
 
 // OpsPhase defines opsRequest phase.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Aborted,Failed,Succeed}
 type OpsPhase string
 
 const (
@@ -331,6 +331,7 @@ const (
 	OpsSucceedPhase    OpsPhase = "Succeed"
 	OpsCancelledPhase  OpsPhase = "Cancelled"
 	OpsFailedPhase     OpsPhase = "Failed"
+	OpsAbortedPhase    OpsPhase = "Aborted"
 )
 
 // PodSelectionPolicy pod selection strategy.

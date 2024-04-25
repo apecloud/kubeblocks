@@ -14293,7 +14293,9 @@ This corresponds to the <code>-c &#123;containerName&#125;</code> option in <cod
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Cancelled&#34;</p></td>
+<tbody><tr><td><p>&#34;Aborted&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Cancelled&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Cancelling&#34;</p></td>
 <td></td>
@@ -14492,21 +14494,6 @@ WorkloadType
 <em>(Optional)</em>
 <p>Records the workload type of Component in ClusterDefinition.
 Deprecated and should be removed in the future version.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>overrideBy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.OverrideBy">
-OverrideBy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Describes the configuration covered by the latest OpsRequest of the same kind.
-when reconciling, this information will be used as a benchmark rather than the &lsquo;spec&rsquo;, such as &lsquo;Spec.HorizontalScaling&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -15514,9 +15501,6 @@ Kubernetes core/v1.PodSpec
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.OverrideBy">OverrideBy
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">OpsRequestComponentStatus</a>)
-</p>
 <div>
 </div>
 <table>

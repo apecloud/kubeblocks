@@ -21,17 +21,12 @@ package component
 
 import (
 	"context"
-	"strconv"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -58,46 +53,4 @@ func GetComponentPodListWithRole(ctx context.Context, cli client.Reader, cluster
 		return nil, err
 	}
 	return podList, nil
-}
-
-// IsComponentPodsWithLatestRevision checks whether the underlying pod spec matches the one declared in the Cluster/Component.
-func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, its *workloads.InstanceSet) (bool, error) {
-	if cluster == nil || its == nil {
-		return false, nil
-	}
-	// check whether component spec has been sent to the underlying workload
-	itsComponentGeneration := its.GetAnnotations()[constant.KubeBlocksGenerationKey]
-	if cluster.Status.ObservedGeneration != cluster.Generation ||
-		itsComponentGeneration != strconv.FormatInt(cluster.Generation, 10) {
-		return false, nil
-	}
-	// check whether its spec has been sent to the underlying workload
-	if its.Status.ObservedGeneration != its.Generation {
-		return false, nil
-	}
-
-	// TODO: depends on the workload (InstanceSet)
-	// check whether the underlying workload(sts) has sent the latest template to pods
-	sts := &appsv1.StatefulSet{}
-	if err := cli.Get(ctx, client.ObjectKeyFromObject(its), sts); err != nil {
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	}
-	if sts.Status.ObservedGeneration != sts.Generation {
-		return false, nil
-	}
-	pods, err := ListPodOwnedByComponent(ctx, cli, its.Namespace, its.Spec.Selector.MatchLabels, inDataContext())
-	if err != nil {
-		return false, err
-	}
-	for _, pod := range pods {
-		if intctrlutil.GetPodRevision(pod) != sts.Status.UpdateRevision {
-			return false, nil
-		}
-	}
-
-	return true, nil
 }

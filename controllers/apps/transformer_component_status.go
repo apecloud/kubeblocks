@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"strings"
 	"time"
 
@@ -29,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -135,14 +135,8 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 		return (r.runningITS.Spec.Replicas == nil || *r.runningITS.Spec.Replicas == 0) && r.synthesizeComp.Replicas == 0
 	}()
 
-	// get the component's underlying pods
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
-	if err != nil {
-		return err
-	}
 	hasComponentPod := func() bool {
-		return len(pods) > 0
+		return r.runningITS.Status.Replicas > 0
 	}()
 
 	// check if the ITS is running
@@ -158,10 +152,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	}
 
 	// check if the component has failed pod
-	hasFailedPod, messages, err := r.hasFailedPod(pods)
-	if err != nil {
-		return err
-	}
+	hasFailedPod, messages := r.hasFailedPod()
 
 	// check if the component scale out failed
 	isScaleOutFailed, err := r.isScaleOutFailed()
@@ -181,10 +172,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	}()
 
 	// check if the component is available
-	isComponentAvailable, err := r.isComponentAvailable(pods)
-	if err != nil {
-		return err
-	}
+	isComponentAvailable := r.isComponentAvailable()
 
 	// check if the component is in creating phase
 	isInCreatingPhase := func() bool {
@@ -233,41 +221,22 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 // 1. at least one pod is available
 // 2. with latest revision
 // 3. and with leader role label set
-func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool, error) {
-	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningITS); err != nil {
-		return false, err
-	} else if !isLatestRevision {
-		return false, nil
-	}
-
-	shouldCheckRole := len(r.synthesizeComp.Roles) > 0
-
-	hasLeaderRoleLabel := func(pod *corev1.Pod) bool {
-		roleName, ok := pod.Labels[constant.RoleLabelKey]
-		if !ok {
-			return false
-		}
-		for _, replicaRole := range r.runningITS.Spec.Roles {
-			if roleName == replicaRole.Name && replicaRole.IsLeader {
-				return true
-			}
-		}
+func (r *componentStatusHandler) isComponentAvailable() bool {
+	if r.runningITS.Status.CurrentRevision != r.runningITS.Status.UpdateRevision {
 		return false
 	}
-
-	hasPodAvailable := false
-	for _, pod := range pods {
-		if !podutils.IsPodAvailable(pod, r.runningITS.Spec.MinReadySeconds, metav1.Time{Time: time.Now()}) {
-			continue
-		}
-		if shouldCheckRole && hasLeaderRoleLabel(pod) {
-			return true, nil
-		}
-		if !hasPodAvailable {
-			hasPodAvailable = !shouldCheckRole
+	if r.runningITS.Status.AvailableReplicas <= 0 {
+		return false
+	}
+	if len(r.synthesizeComp.Roles) == 0 {
+		return true
+	}
+	for _, status := range r.runningITS.Status.MembersStatus {
+		if status.ReplicaRole.IsLeader {
+			return true
 		}
 	}
-	return hasPodAvailable, nil
+	return false
 }
 
 // isRunning checks if the component underlying workload is running.
@@ -275,14 +244,6 @@ func (r *componentStatusHandler) isInstanceSetRunning() (bool, error) {
 	if r.runningITS == nil {
 		return false, nil
 	}
-	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningITS); err != nil {
-		return false, err
-	} else if !isLatestRevision {
-		r.reqCtx.Log.Info("underlying workload is not the latest revision")
-		return false, nil
-	}
-
-	// whether the ITS is ready
 	return instanceset.IsInstanceSetReady(r.runningITS), nil
 }
 
@@ -405,46 +366,44 @@ func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx
 	return matchedPVCs, nil
 }
 
-// hasFailedPod checks if the component has failed pod.
-// TODO(xingran): remove the dependency of the component's workload type.
-func (r *componentStatusHandler) hasFailedPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, error) {
-	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningITS); err != nil {
-		return false, nil, err
-	} else if !isLatestRevision {
-		return false, nil, nil
+// hasFailedPod checks if the instance set has failed pod.
+func (r *componentStatusHandler) hasFailedPod() (bool, appsv1alpha1.ComponentMessageMap) {
+	messages := appsv1alpha1.ComponentMessageMap{}
+	// check InstanceFailure condition
+	hasFailedPod := meta.IsStatusConditionTrue(r.runningITS.Status.Conditions, string(workloads.InstanceFailure))
+	if hasFailedPod {
+		failureCondition := meta.FindStatusCondition(r.runningITS.Status.Conditions, string(workloads.InstanceFailure))
+		messages.SetObjectMessage(workloads.Kind, r.runningITS.Name, failureCondition.Message)
+		return true, messages
 	}
 
-	var messages appsv1alpha1.ComponentMessageMap
-	// check pod readiness
-	hasFailedPod, msg, _ := hasFailedAndTimedOutPod(pods)
-	if hasFailedPod {
-		messages = msg
-		return true, messages, nil
+	// check InstanceReady condition
+	condition := meta.FindStatusCondition(r.runningITS.Status.Conditions, string(workloads.InstanceReady))
+	if condition == nil {
+		return false, nil
 	}
-	// check role probe
-	if r.synthesizeComp.WorkloadType != appsv1alpha1.Consensus && r.synthesizeComp.WorkloadType != appsv1alpha1.Replication {
-		return false, messages, nil
-	}
-	hasProbeTimeout := false
-	for _, pod := range pods {
-		if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
-			continue
+	if condition.Status == metav1.ConditionFalse {
+		if time.Now().After(condition.LastTransitionTime.Add(intctrlutil.PodScheduledFailedTimeout)) {
+			messages.SetObjectMessage(workloads.Kind, r.runningITS.Name, condition.Message)
+			return true, messages
 		}
-		for _, condition := range pod.Status.Conditions {
-			if condition.Type != corev1.PodReady || condition.Status != corev1.ConditionTrue {
-				continue
-			}
-			podsReadyTime := &condition.LastTransitionTime
-			if IsProbeTimeout(r.synthesizeComp.Probes, podsReadyTime) {
-				hasProbeTimeout = true
-				if messages == nil {
-					messages = appsv1alpha1.ComponentMessageMap{}
-				}
-				messages.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
-			}
-		}
+		return false, nil
 	}
-	return hasProbeTimeout, messages, nil
+
+	// all instances are in Ready condition, check role probe
+	if len(r.runningITS.Spec.Roles) == 0 {
+		return false, nil
+	}
+	if len(r.runningITS.Status.MembersStatus) == int(r.runningITS.Status.Replicas) {
+		return false, nil
+	}
+	probeTimeoutDuration := time.Duration(appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady) * time.Second
+	if time.Now().After(condition.LastTransitionTime.Add(probeTimeoutDuration)) {
+		messages.SetObjectMessage(workloads.Kind, r.runningITS.Name, "Role probe timeout, check whether the application is available")
+		return true, messages
+	}
+
+	return false, nil
 }
 
 // setComponentStatusPhase sets the component phase and messages conditionally.
@@ -545,32 +504,6 @@ func (r *componentStatusHandler) updatePrimaryIndex() error {
 		}
 	}
 	return nil
-}
-
-// hasFailedAndTimedOutPod returns whether the pods of components are still failed after a PodFailedTimeout period.
-func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, time.Duration) {
-	var (
-		hasTimedOutPod bool
-		messages       = appsv1alpha1.ComponentMessageMap{}
-		hasFailedPod   bool
-		requeueAfter   time.Duration
-	)
-	for _, pod := range pods {
-		isFailed, isTimedOut, messageStr := intctrlutil.IsPodFailedAndTimedOut(pod)
-		if !isFailed {
-			continue
-		}
-		if isTimedOut {
-			hasTimedOutPod = true
-			messages.SetObjectMessage(pod.Kind, pod.Name, messageStr)
-		} else {
-			hasFailedPod = true
-		}
-	}
-	if hasFailedPod && !hasTimedOutPod {
-		requeueAfter = intctrlutil.PodContainerFailedTimeout
-	}
-	return hasTimedOutPod, messages, requeueAfter
 }
 
 // newComponentStatusHandler creates a new componentStatusHandler

@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"encoding/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -66,12 +67,15 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
+	notReadyNames := sets.New[string]()
 	for _, pod := range podList {
 		if isCreated(pod) {
+			notReadyNames.Insert(pod.Name)
 			replicas++
 		}
 		if isRunningAndReady(pod) {
 			readyReplicas++
+			notReadyNames.Delete(pod.Name)
 			if isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
 				availableReplicas++
 			}
@@ -104,6 +108,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		its.Status.CurrentRevision = its.Status.UpdateRevision
 		its.Status.CurrentReplicas = totalReplicas
 	}
+	readyCondition := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
+	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
 	// 3. set InstanceFailure condition
 	failureCondition, err := buildFailureCondition(its, podList)
@@ -122,6 +128,24 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	setReadyWithPrimary(its, podList)
 
 	return tree, nil
+}
+
+func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) *metav1.Condition {
+	condition := &metav1.Condition{
+		Type:               string(workloads.InstanceReady),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonReady,
+	}
+	if !ready {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = workloads.ReasonNotReady
+		names := notReadyNames.UnsortedList()
+		baseSort(names, func(i int) (string, int) {
+			return ParseParentNameAndOrdinal(names[i])
+		}, nil, true)
+	}
+	return condition
 }
 
 func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {

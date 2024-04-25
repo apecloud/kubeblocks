@@ -614,11 +614,22 @@ type MemberStatus struct {
 type ConditionType string
 
 const (
-	// InstanceFailure is added in a instance set when at least one of its instances(pods) is in a `Failed` phase.
+	// InstanceReady is added in an instance set when at least one of its instances(pods) is in a Ready condition.
+	// ConditionStatus will be True if all its instances(pods) are in a Ready condition.
+	// Or, a NotReady reason with not ready instances encoded in the Message filed will be set.
+	InstanceReady ConditionType = "InstanceReady"
+
+	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.
 	InstanceFailure ConditionType = "InstanceFailure"
 )
 
 const (
+	// ReasonNotReady is a reason for condition InstanceReady.
+	ReasonNotReady = "NotReady"
+
+	// ReasonReady is a reason for condition InstanceReady.
+	ReasonReady = "Ready"
+
 	// ReasonInstanceFailure is a reason for condition InstanceFailure.
 	ReasonInstanceFailure = "InstanceFailure"
 )

@@ -938,7 +938,7 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 	svcList := &corev1.ServiceList{}
 	matchingLabels := client.MatchingLabels(constant.GetComponentWellKnownLabels(clusterName, compName))
 	err = cli.List(ctx, svcList, matchingLabels, inDataContext())
-	if err != nil {
+	if err != nil && !isUnavailableError(err) {
 		return nil, err
 	}
 	objs := make([]*corev1.Service, 0)

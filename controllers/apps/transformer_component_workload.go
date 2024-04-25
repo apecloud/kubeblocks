@@ -714,7 +714,9 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		}
 		pvList := corev1.PersistentVolumeList{}
 		if err := r.cli.List(r.reqCtx.Ctx, &pvList, ml, inDataContext4C()); err != nil {
-			return err
+			if !isUnavailableError(err) {
+				return err
+			}
 		}
 		for _, pv := range pvList.Items {
 			// find pv referenced this pvc

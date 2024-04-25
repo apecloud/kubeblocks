@@ -17,16 +17,33 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package multicluster
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	"fmt"
 )
 
-func inDataContext() *multicluster.ClientOption {
-	return multicluster.InDataContext()
+type unavailableError struct {
+	context string
 }
 
-func isUnavailableError(err error) bool {
-	return multicluster.IsUnavailableError(err)
+func (e *unavailableError) Error() string {
+	return fmt.Sprintf("cluster %s is unavailable", e.context)
+}
+
+func genericUnavailableError(context string) error {
+	return &unavailableError{context}
+}
+
+func getUnavailableError(context string) error {
+	return &unavailableError{context}
+}
+
+func listUnavailableError(context string) error {
+	return &unavailableError{context}
+}
+
+func IsUnavailableError(err error) bool {
+	_, ok := err.(*unavailableError)
+	return ok
 }

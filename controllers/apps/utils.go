@@ -136,3 +136,7 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	}
 	return multicluster.InControlContext()
 }
+
+func isUnavailableError(err error) bool {
+	return multicluster.IsUnavailableError(err)
+}

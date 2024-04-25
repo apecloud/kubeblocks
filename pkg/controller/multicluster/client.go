@@ -261,52 +261,72 @@ func (c *subResourceWriter) Patch(ctx context.Context, obj client.Object, patch 
 }
 
 func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
-	var err error
+	var err, uerr error
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
 		if e := request(cc, obj); e != nil {
-			if err == nil {
+			switch {
+			case !IsUnavailableError(e) && err == nil:
 				err = e
+			case IsUnavailableError(e) && uerr == nil:
+				uerr = e
 			}
 		}
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return uerr // TODO: handle the error
 }
 
 func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
 	o := hasClientOption(opts)
-	if o == nil && !o.multiCheck {
+	if o == nil || !o.multiCheck {
 		return anyOf_(mctx, ctx, obj, request, opts)
 	}
 	return anyOfWithMultiCheck(mctx, ctx, obj, request, opts)
 }
 
 func anyOf_(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
-	var err error
+	var err, uerr error
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
-		if e := request(cc, obj); e == nil {
+		e := request(cc, obj)
+		switch {
+		case e == nil:
 			return nil
-		} else if err == nil {
+		case !IsUnavailableError(e) && err == nil:
 			err = e
+		case IsUnavailableError(e) && uerr == nil:
+			uerr = e
 		}
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return uerr // all clusters are unavailable?
 }
 
 func anyOfWithMultiCheck(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
-	var err error
+	var err, uerr error
 	objs := make([]client.Object, 0)
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
 		o := obj.DeepCopyObject().(client.Object)
-		if e := request(cc, o); e == nil {
+		e := request(cc, o)
+		switch {
+		case e == nil:
 			objs = append(objs, o)
-		} else if err == nil {
+		case !IsUnavailableError(e) && err == nil:
 			err = e
+		case IsUnavailableError(e) && uerr == nil:
+			uerr = e
 		}
 	}
 	if len(objs) > 0 {
 		reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(objs[0]).Elem())
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return uerr // TODO: handle the error
 }
 
 type contextCli struct {

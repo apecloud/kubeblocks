@@ -50,9 +50,7 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, pvName stri
 	vsCli := NewCompatClient(cli)
 	vscList := vsv1.VolumeSnapshotClassList{}
 	if err := vsCli.List(ctx, &vscList, multicluster.InDataContext()); err != nil {
-		if !multicluster.IsUnavailableError(err) {
-			return false, err
-		}
+		return false, err
 	}
 	for _, vsc := range vscList.Items {
 		if vsc.Driver == pv.Spec.CSI.Driver {

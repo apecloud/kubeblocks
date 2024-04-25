@@ -27,8 +27,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
-func IsUnavailableError(err error) bool {
-	_, ok := err.(*unavailableError)
+func ignoreUnavailableError(err error) error {
+	if isUnavailableError(err) {
+		return nil
+	}
+	return err
+}
+
+func isUnavailableError(err error) bool {
+	_, ok := err.(*unavailableError) // TODO: unwrap
 	return ok
 }
 
@@ -37,6 +44,8 @@ type unavailableError struct {
 	call    string
 	obj     string
 }
+
+var _ error = &unavailableError{}
 
 func (e *unavailableError) Error() string {
 	return fmt.Sprintf("cluster %s is unavailable, call: %s, object: %s", e.context, e.call, e.obj)

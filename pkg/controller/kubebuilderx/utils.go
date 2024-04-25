@@ -63,9 +63,7 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 	inNS := client.InNamespace(req.Namespace)
 	for _, list := range kinds {
 		if err := reader.List(ctx, list, inNS, ml, inDataContext4C()); err != nil {
-			if !isUnavailableError(err) {
-				return nil, err
-			}
+			return nil, err
 		}
 		// reflect get list.Items
 		items := reflect.ValueOf(list).Elem().FieldByName("Items")
@@ -128,8 +126,4 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
 	}
 	return multicluster.InControlContext()
-}
-
-func isUnavailableError(err error) bool {
-	return multicluster.IsUnavailableError(err)
 }

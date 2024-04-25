@@ -26,7 +26,3 @@ import (
 func inDataContext() *multicluster.ClientOption {
 	return multicluster.InDataContext()
 }
-
-func isUnavailableError(err error) bool {
-	return multicluster.IsUnavailableError(err)
-}

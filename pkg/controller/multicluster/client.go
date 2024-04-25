@@ -113,7 +113,8 @@ func (c *clientReader) List(ctx context.Context, list client.ObjectList, opts ..
 	if objects.Len() != 0 {
 		items.Set(objects)
 	}
-	return err
+	// TODO: ignore the unavailable error slightly, need to handle it correctly in the future
+	return ignoreUnavailableError(err)
 }
 
 type clientWriter struct {
@@ -265,9 +266,9 @@ func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(c
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
 		if e := request(cc, obj); e != nil {
 			switch {
-			case !IsUnavailableError(e) && err == nil:
+			case !isUnavailableError(e) && err == nil:
 				err = e
-			case IsUnavailableError(e) && uerr == nil:
+			case isUnavailableError(e) && uerr == nil:
 				uerr = e
 			}
 		}
@@ -293,9 +294,9 @@ func anyOf_(mctx mcontext, ctx context.Context, obj client.Object, request func(
 		switch {
 		case e == nil:
 			return nil
-		case !IsUnavailableError(e) && err == nil:
+		case !isUnavailableError(e) && err == nil:
 			err = e
-		case IsUnavailableError(e) && uerr == nil:
+		case isUnavailableError(e) && uerr == nil:
 			uerr = e
 		}
 	}
@@ -314,9 +315,9 @@ func anyOfWithMultiCheck(mctx mcontext, ctx context.Context, obj client.Object, 
 		switch {
 		case e == nil:
 			objs = append(objs, o)
-		case !IsUnavailableError(e) && err == nil:
+		case !isUnavailableError(e) && err == nil:
 			err = e
-		case IsUnavailableError(e) && uerr == nil:
+		case isUnavailableError(e) && uerr == nil:
 			uerr = e
 		}
 	}

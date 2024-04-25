@@ -209,9 +209,7 @@ func (t *componentAccountProvisionTransformer) componentPodsWithRole(transCtx *c
 	labels[constant.RoleLabelKey] = role
 	if err := transCtx.Client.List(transCtx.Context, podList,
 		client.InNamespace(cluster.Namespace), client.MatchingLabels(labels), inDataContext4C()); err != nil {
-		if !isUnavailableError(err) {
-			return nil, err
-		}
+		return nil, err
 	}
 	return podList, nil
 }

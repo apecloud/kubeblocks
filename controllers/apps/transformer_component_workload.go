@@ -532,7 +532,7 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	labels := constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name)
 	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, labels, inDataContext4C())
-	if err != nil && !isUnavailableError(err) {
+	if err != nil {
 		return err
 	}
 	tryToSwitchover := func(lorryCli lorry.Client, pod *corev1.Pod) error {
@@ -692,9 +692,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		}
 		pvList := corev1.PersistentVolumeList{}
 		if err := r.cli.List(r.reqCtx.Ctx, &pvList, ml, inDataContext4C()); err != nil {
-			if !isUnavailableError(err) {
-				return err
-			}
+			return err
 		}
 		for _, pv := range pvList.Items {
 			// find pv referenced this pvc
@@ -876,9 +874,7 @@ func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *
 		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}
-		if !isUnavailableError(err) {
-			return nil, err
-		}
+		return nil, err
 	}
 	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
 	prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)

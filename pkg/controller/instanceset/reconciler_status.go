@@ -20,13 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
-	corev1 "k8s.io/api/core/v1"
-
+	"encoding/json"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // statusReconciler computes the current status
@@ -49,10 +51,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
-	var podList []corev1.Pod
+	var podList []*corev1.Pod
 	for _, object := range pods {
 		pod, _ := object.(*corev1.Pod)
-		podList = append(podList, *pod)
+		podList = append(podList, pod)
 	}
 	// 2. calculate status summary
 	updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
@@ -62,8 +64,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
-	for i := range podList {
-		pod := &podList[i]
+	for _, pod := range podList {
 		if isCreated(pod) {
 			replicas++
 		}
@@ -102,19 +103,51 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		its.Status.CurrentReplicas = totalReplicas
 	}
 
-	// 3. set members status
-	setMembersStatus(its, &podList)
+	// 3. set InstanceFailure condition
+	failureCondition, err := buildFailureCondition(podList)
+	if err != nil {
+		return nil, err
+	}
+	if failureCondition != nil {
+		meta.SetStatusCondition(&its.Status.Conditions, failureCondition)
+	}
 
-	// 4. set readyWithoutPrimary
+	// 4. set members status
+	setMembersStatus(its, podList)
+
+	// 5. set readyWithoutPrimary
 	// TODO(free6om): should put this field to the spec
-	setReadyWithPrimary(its, &podList)
+	setReadyWithPrimary(its, podList)
 
 	return tree, nil
 }
 
-func setReadyWithPrimary(its *workloads.InstanceSet, pods *[]corev1.Pod) {
+func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
+	var failureNames []string
+	for _, pod := range pods {
+		if pod.Status.Phase == corev1.PodFailed {
+			failureNames = append(failureNames, pod.Name)
+		}
+	}
+	if len(failureNames) == 0 {
+		return nil, nil
+	}
+	message, err := json.Marshal(failureNames)
+	if err != nil {
+		return nil, err
+	}
+	return &metav1.Condition{
+		Type:               string(workloads.InstanceFailure),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonInstanceFailure,
+		Message:            string(message),
+	}, nil
+}
+
+func setReadyWithPrimary(its *workloads.InstanceSet, pods []*corev1.Pod) {
 	readyWithoutPrimary := false
-	for _, pod := range *pods {
+	for _, pod := range pods {
 		if value, ok := pod.Labels[constant.ReadyWithoutPrimaryKey]; ok && value == "true" {
 			readyWithoutPrimary = true
 			break
@@ -123,7 +156,7 @@ func setReadyWithPrimary(its *workloads.InstanceSet, pods *[]corev1.Pod) {
 	its.Status.ReadyWithoutPrimary = readyWithoutPrimary
 }
 
-func setMembersStatus(its *workloads.InstanceSet, pods *[]corev1.Pod) {
+func setMembersStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 	// no roles defined
 	if its.Spec.Roles == nil {
 		return
@@ -131,18 +164,18 @@ func setMembersStatus(its *workloads.InstanceSet, pods *[]corev1.Pod) {
 	// compose new status
 	newMembersStatus := make([]workloads.MemberStatus, 0)
 	roleMap := composeRoleMap(*its)
-	for _, pod := range *pods {
-		if !intctrlutil.PodIsReadyWithLabel(pod) {
+	for _, pod := range pods {
+		if !intctrlutil.PodIsReadyWithLabel(*pod) {
 			continue
 		}
-		roleName := GetRoleName(pod)
+		roleName := getRoleName(pod)
 		role, ok := roleMap[roleName]
 		if !ok {
 			continue
 		}
 		memberStatus := workloads.MemberStatus{
-			PodName:             pod.Name,
-			ReplicaRole:         &role,
+			PodName:     pod.Name,
+			ReplicaRole: &role,
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)
 	}

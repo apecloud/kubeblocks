@@ -611,6 +611,18 @@ type MemberStatus struct {
 	ReplicaRole *ReplicaRole `json:"role,omitempty"`
 }
 
+type ConditionType string
+
+const (
+	// InstanceFailure is added in a instance set when at least one of its instances(pods) is in a `Failed` phase.
+	InstanceFailure ConditionType = "InstanceFailure"
+)
+
+const (
+	// ReasonInstanceFailure is a reason for condition InstanceFailure.
+	ReasonInstanceFailure = "InstanceFailure"
+)
+
 func (t *InstanceTemplate) GetName() string {
 	return t.Name
 }

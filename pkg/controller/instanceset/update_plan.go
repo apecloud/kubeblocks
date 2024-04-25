@@ -137,7 +137,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	index := 0
 	podList := p.pods
 	for i, pod := range podList {
-		roleName := GetRoleName(pod)
+		roleName := getRoleName(&pod)
 		if rolePriorityMap[roleName] <= learnerPriority {
 			vertex := &model.ObjectVertex{Obj: &podList[i]}
 			p.dag.AddConnect(preVertex, vertex)
@@ -151,7 +151,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	podList = podList[index:]
 	followerCount := 0
 	for _, pod := range podList {
-		roleName := GetRoleName(pod)
+		roleName := getRoleName(&pod)
 		if rolePriorityMap[roleName] < leaderPriority {
 			followerCount++
 		}

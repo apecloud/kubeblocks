@@ -71,7 +71,7 @@ func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 // reverse it if reverse==true
 func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 	getRolePriorityFunc := func(i int) int {
-		role := GetRoleName(pods[i])
+		role := getRoleName(&pods[i])
 		return rolePriorityMap[role]
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
@@ -80,8 +80,8 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 	baseSort(pods, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }
 
-// GetRoleName gets role name of pod 'pod'
-func GetRoleName(pod corev1.Pod) string {
+// getRoleName gets role name of pod 'pod'
+func getRoleName(pod *corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
 
@@ -97,7 +97,7 @@ func IsInstanceSetReady(its *workloads.InstanceSet) bool {
 		return false
 	}
 	// check whether latest spec has been sent to the underlying workload
-	if its.Status.ObservedGeneration != its.Generation || its.Status.CurrentGeneration != its.Generation {
+	if its.Status.ObservedGeneration != its.Generation {
 		return false
 	}
 	// check whether the underlying workload is ready
@@ -122,11 +122,11 @@ func IsInstanceSetReady(its *workloads.InstanceSet) bool {
 	if len(membersStatus) != int(*its.Spec.Replicas) {
 		return false
 	}
+	if its.Status.ReadyWithoutPrimary {
+		return true
+	}
 	hasLeader := false
 	for _, status := range membersStatus {
-		if status.ReadyWithoutPrimary {
-			return true
-		}
 		if status.ReplicaRole != nil && status.ReplicaRole.IsLeader {
 			hasLeader = true
 			break

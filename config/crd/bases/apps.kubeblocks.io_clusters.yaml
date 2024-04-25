@@ -11033,14 +11033,6 @@ spec:
                             default: Unknown
                             description: Represents the name of the pod.
                             type: string
-                          ready:
-                            description: Whether the corresponding Pod is in ready
-                              condition.
-                            type: boolean
-                          readyWithoutPrimary:
-                            description: Indicates whether it is required for the
-                              InstanceSet to have at least one primary instance ready.
-                            type: boolean
                           role:
                             description: Defines the role of the replica in the cluster.
                             properties:

@@ -51,7 +51,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// BuildInstanceSet builds a InstanceSet object from SynthesizedComponent.
+// BuildInstanceSet builds an InstanceSet object from SynthesizedComponent.
 func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
 		clusterDefName     = synthesizedComp.ClusterDefName

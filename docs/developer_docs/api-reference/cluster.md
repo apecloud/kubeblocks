@@ -22802,6 +22802,27 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.ConditionType">ConditionType
+(<code>string</code> alias)</h3>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;InstanceFailure&#34;</p></td>
+<td><p>InstanceFailure is added in an instance set when at least one of its instances(pods) is in a <code>Failed</code> phase.</p>
+</td>
+</tr><tr><td><p>&#34;InstanceReady&#34;</p></td>
+<td><p>InstanceReady is added in an instance set when at least one of its instances(pods) is in a Ready condition.
+ConditionStatus will be True if all its instances(pods) are in a Ready condition.
+Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.Credential">Credential
 </h3>
 <p>
@@ -23223,17 +23244,112 @@ Credential
 <tbody>
 <tr>
 <td>
-<code>StatefulSetStatus</code><br/>
+<code>observedGeneration</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetstatus-v1-apps">
-Kubernetes apps/v1.StatefulSetStatus
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
+InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>replicas is the number of instances created by the InstanceSet controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readyReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+indicated by CurrentRevisions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatedReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>updatedReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+indicated by UpdateRevisions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>currentRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the
+sequence [0,currentReplicas).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>updateRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the sequence
+[replicas-updatedReplicas,replicas)</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
 </a>
 </em>
 </td>
 <td>
-<p>
-(Members of <code>StatefulSetStatus</code> are embedded into this type.)
-</p>
+<em>(Optional)</em>
+<p>Represents the latest available observations of an instanceset&rsquo;s current state.
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availableReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Total number of available instances (ready for at least minReadySeconds) targeted by this InstanceSet.</p>
 </td>
 </tr>
 <tr>
@@ -23244,8 +23360,10 @@ int32
 </em>
 </td>
 <td>
-<p>Defines the initial number of pods (members) when the cluster is first initialized.
-This value is set to spec.Replicas at the time of object creation and remains constant thereafter.</p>
+<em>(Optional)</em>
+<p>Defines the initial number of instances when the cluster is first initialized.
+This value is set to spec.Replicas at the time of object creation and remains constant thereafter.
+Used only when spec.roles set.</p>
 </td>
 </tr>
 <tr>
@@ -23257,20 +23375,9 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the number of pods (members) that have already reached the MembersStatus during the cluster initialization stage.
-This value remains constant once it equals InitReplicas.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>currentGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>When not empty, indicates the version of the InstanceSet used to generate the underlying workload.</p>
+<p>Represents the number of instances that have already reached the MembersStatus during the cluster initialization stage.
+This value remains constant once it equals InitReplicas.
+Used only when spec.roles set.</p>
 </td>
 </tr>
 <tr>
@@ -23285,6 +23392,18 @@ int64
 <td>
 <em>(Optional)</em>
 <p>Provides the status of each member in the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readyWithoutPrimary</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether it is required for the InstanceSet to have at least one primary instance ready.</p>
 </td>
 </tr>
 <tr>
@@ -23561,30 +23680,6 @@ ReplicaRole
 <td>
 <em>(Optional)</em>
 <p>Defines the role of the replica in the cluster.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ready</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Whether the corresponding Pod is in ready condition.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>readyWithoutPrimary</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether it is required for the InstanceSet to have at least one primary instance ready.</p>
 </td>
 </tr>
 </tbody>

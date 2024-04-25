@@ -241,37 +241,39 @@ func (mgr *Manager) HealthyCheckForOracleMode(ctx context.Context, cluster *dcs.
 	if err != nil {
 		return err
 	}
-	if isLeader {
-		cmd := []string{"mysql", "-h", member.PodIP, "-P", member.DBPort, "-u", "SYS@" + mgr.ReplicaTenant, "-e", "SELECT t.table_name tablename FROM user_tables t WHERE table_name = 'KB_HEALTH_CHECK'"}
-		output, err := util.ExecCommand(ctx, cmd, os.Environ())
-		if err != nil {
-			return errors.Wrap(err, "check table failed")
-		}
-		if !strings.Contains(output, "KB_HEALTH_CHECK") {
-			sql := "create table kb_health_check (type int primary key, check_ts NUMBER);"
-			sql += fmt.Sprintf("INSERT INTO kb_health_check (type, check_ts) VALUES (1, %d);", time.Now().Unix())
-			sql += "commit;"
-			cmd = []string{"mysql", "-h", member.PodIP, "-P", member.DBPort, "-u", "SYS@" + mgr.ReplicaTenant, "-e", sql}
-			_, err = util.ExecCommand(ctx, cmd, os.Environ())
-			if err != nil {
-				return errors.Wrap(err, "create table failed")
-			}
-		}
-		sql := fmt.Sprintf("UPDATE kb_health_check SET check_ts = %d WHERE type=1;", time.Now().Unix())
-		sql += "commit;"
-		cmd = []string{"mysql", "-h", member.PodIP, "-P", member.DBPort, "-u", "SYS@" + mgr.ReplicaTenant, "-e", sql}
-		_, err = util.ExecCommand(ctx, cmd, os.Environ())
-		if err != nil {
-			return errors.Wrap(err, "create table failed")
-		}
-	}
+	mgr.Logger.Info("check member", "isLeader", isLeader)
+	// lorry has no mysql client
+	// if isLeader {
+	// 	cmd := []string{"mysql", "-h", member.PodIP, "-P", member.DBPort, "-u", "SYS@" + mgr.ReplicaTenant, "-e", "SELECT t.table_name tablename FROM user_tables t WHERE table_name = 'KB_HEALTH_CHECK'"}
+	// 	output, err := util.ExecCommand(ctx, cmd, os.Environ())
+	// 	if err != nil {
+	// 		return errors.Wrap(err, "check table failed")
+	// 	}
+	// 	if !strings.Contains(output, "KB_HEALTH_CHECK") {
+	// 		sql := "create table kb_health_check (type int primary key, check_ts NUMBER);"
+	// 		sql += fmt.Sprintf("INSERT INTO kb_health_check (type, check_ts) VALUES (1, %d);", time.Now().Unix())
+	// 		sql += "commit;"
+	// 		cmd = []string{"mysql", "-h", member.PodIP, "-P", member.DBPort, "-u", "SYS@" + mgr.ReplicaTenant, "-e", sql}
+	// 		_, err = util.ExecCommand(ctx, cmd, os.Environ())
+	// 		if err != nil {
+	// 			return errors.Wrap(err, "create table failed")
+	// 		}
+	// 	}
+	// 	sql := fmt.Sprintf("UPDATE kb_health_check SET check_ts = %d WHERE type=1;", time.Now().Unix())
+	// 	sql += "commit;"
+	// 	cmd = []string{"mysql", "-h", member.PodIP, "-P", member.DBPort, "-u", "SYS@" + mgr.ReplicaTenant, "-e", sql}
+	// 	_, err = util.ExecCommand(ctx, cmd, os.Environ())
+	// 	if err != nil {
+	// 		return errors.Wrap(err, "create table failed")
+	// 	}
+	// }
 
-	sql := "SELECT check_ts from kb_health_check WHERE type=1;"
-	cmd := []string{"mysql", "-h", member.PodIP, "-P", member.DBPort, "-u", "SYS@" + mgr.ReplicaTenant, "-e", sql}
-	_, err = util.ExecCommand(ctx, cmd, os.Environ())
-	if err != nil {
-		return errors.Wrap(err, "create table failed")
-	}
+	// sql := "SELECT check_ts from kb_health_check WHERE type=1;"
+	// cmd := []string{"mysql", "-h", member.PodIP, "-P", member.DBPort, "-u", "SYS@" + mgr.ReplicaTenant, "-e", sql}
+	// _, err = util.ExecCommand(ctx, cmd, os.Environ())
+	// if err != nil {
+	// 	return errors.Wrap(err, "create table failed")
+	// }
 	return nil
 }
 

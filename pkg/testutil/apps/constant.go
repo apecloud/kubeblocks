@@ -38,10 +38,9 @@ const (
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"
 
-	ReplicationPodRoleVolume         = "pod-role"
-	ReplicationRoleLabelFieldPath    = "metadata.labels['kubeblocks.io/role']"
-	DefaultReplicationCandidateIndex = 0
-	DefaultReplicationReplicas       = 2
+	ReplicationPodRoleVolume      = "pod-role"
+	ReplicationRoleLabelFieldPath = "metadata.labels['kubeblocks.io/role']"
+	DefaultReplicationReplicas    = 2
 
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
 	DefaultMySQLContainerName = "mysql"
@@ -59,7 +58,6 @@ const (
 	Class2c4gName                 = "general-2c4g"
 	DefaultResourceConstraintName = "kb-resource-constraint"
 
-	StorageClassName = "test-sc"
 	EnvKeyImageTag   = "IMAGE_TAG"
 	DefaultImageTag  = "test"
 

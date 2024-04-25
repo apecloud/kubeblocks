@@ -104,7 +104,6 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentRevisions).Should(HaveLen(0))
-			Expect(its.Status.CurrentGeneration).Should(BeEquivalentTo(its.Generation))
 
 			By("make all pods ready with old revision")
 			condition := corev1.PodCondition{
@@ -131,7 +130,6 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentRevisions).Should(HaveLen(0))
-			Expect(its.Status.CurrentGeneration).Should(BeEquivalentTo(its.Generation))
 
 			By("make all pods available with latest revision")
 			updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
@@ -149,7 +147,6 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
-			Expect(its.Status.CurrentGeneration).Should(BeEquivalentTo(its.Generation))
 		})
 	})
 

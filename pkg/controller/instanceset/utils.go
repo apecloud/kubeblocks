@@ -97,7 +97,7 @@ func IsInstanceSetReady(its *workloads.InstanceSet) bool {
 		return false
 	}
 	// check whether latest spec has been sent to the underlying workload
-	if its.Status.ObservedGeneration != its.Generation || its.Status.CurrentGeneration != its.Generation {
+	if its.Status.ObservedGeneration != its.Generation {
 		return false
 	}
 	// check whether the underlying workload is ready
@@ -122,11 +122,11 @@ func IsInstanceSetReady(its *workloads.InstanceSet) bool {
 	if len(membersStatus) != int(*its.Spec.Replicas) {
 		return false
 	}
+	if its.Status.ReadyWithoutPrimary {
+		return true
+	}
 	hasLeader := false
 	for _, status := range membersStatus {
-		if status.ReadyWithoutPrimary {
-			return true
-		}
 		if status.ReplicaRole != nil && status.ReplicaRole.IsLeader {
 			hasLeader = true
 			break

@@ -12163,61 +12163,92 @@ spec:
               This data may be out of date.
             properties:
               availableReplicas:
-                description: Total number of available pods (ready for at least minReadySeconds)
-                  targeted by this statefulset.
-                format: int32
-                type: integer
-              collisionCount:
-                description: collisionCount is the count of hash collisions for the
-                  StatefulSet. The StatefulSet controller uses this field as a collision
-                  avoidance mechanism when it needs to create the name for the newest
-                  ControllerRevision.
+                description: Total number of available instances (ready for at least
+                  minReadySeconds) targeted by this InstanceSet.
                 format: int32
                 type: integer
               conditions:
-                description: Represents the latest available observations of a statefulset's
-                  current state.
+                description: 'Represents the latest available observations of a instanceset''s
+                  current state. Known .status.conditions.type are: "InstanceFailure"'
                 items:
-                  description: StatefulSetCondition describes the state of a statefulset
-                    at a certain point.
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource. --- This struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
                   properties:
                     lastTransitionTime:
-                      description: Last time the condition transitioned from one status
-                        to another.
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
                       format: date-time
                       type: string
                     message:
-                      description: A human readable message indicating details about
-                        the transition.
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
                       type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
                     reason:
-                      description: The reason for the condition's last transition.
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                       type: string
                     status:
-                      description: Status of the condition, one of True, False, Unknown.
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
                       type: string
                     type:
-                      description: Type of statefulset condition.
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
                   required:
+                  - lastTransitionTime
+                  - message
+                  - reason
                   - status
                   - type
                   type: object
                 type: array
-              currentGeneration:
-                description: When not empty, indicates the version of the InstanceSet
-                  used to generate the underlying workload.
-                format: int64
-                type: integer
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               currentReplicas:
-                description: currentReplicas is the number of Pods created by the
-                  StatefulSet controller from the StatefulSet version indicated by
-                  currentRevision.
+                description: currentReplicas is the number of instances created by
+                  the InstanceSet controller from the InstanceSet version indicated
+                  by CurrentRevisions.
                 format: int32
                 type: integer
               currentRevision:
                 description: currentRevision, if not empty, indicates the version
-                  of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).
+                  of the InstanceSet used to generate instances in the sequence [0,currentReplicas).
                 type: string
               currentRevisions:
                 additionalProperties:
@@ -12227,9 +12258,10 @@ spec:
                   is the pod name, value is the revision.
                 type: object
               initReplicas:
-                description: Defines the initial number of pods (members) when the
-                  cluster is first initialized. This value is set to spec.Replicas
-                  at the time of object creation and remains constant thereafter.
+                description: Defines the initial number of instances when the cluster
+                  is first initialized. This value is set to spec.Replicas at the
+                  time of object creation and remains constant thereafter. Used only
+                  when spec.roles set.
                 format: int32
                 type: integer
               membersStatus:
@@ -12240,13 +12272,6 @@ spec:
                       default: Unknown
                       description: Represents the name of the pod.
                       type: string
-                    ready:
-                      description: Whether the corresponding Pod is in ready condition.
-                      type: boolean
-                    readyWithoutPrimary:
-                      description: Indicates whether it is required for the InstanceSet
-                        to have at least one primary instance ready.
-                      type: boolean
                     role:
                       description: Defines the role of the replica in the cluster.
                       properties:
@@ -12281,29 +12306,34 @@ spec:
                 type: array
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
-                  for this StatefulSet. It corresponds to the StatefulSet's generation,
+                  for this InstanceSet. It corresponds to the InstanceSet's generation,
                   which is updated on mutation by the API Server.
                 format: int64
                 type: integer
               readyInitReplicas:
-                description: Represents the number of pods (members) that have already
+                description: Represents the number of instances that have already
                   reached the MembersStatus during the cluster initialization stage.
-                  This value remains constant once it equals InitReplicas.
+                  This value remains constant once it equals InitReplicas. Used only
+                  when spec.roles set.
                 format: int32
                 type: integer
               readyReplicas:
-                description: readyReplicas is the number of pods created for this
-                  StatefulSet with a Ready Condition.
+                description: readyReplicas is the number of instances created for
+                  this InstanceSet with a Ready Condition.
                 format: int32
                 type: integer
+              readyWithoutPrimary:
+                description: Indicates whether it is required for the InstanceSet
+                  to have at least one primary instance ready.
+                type: boolean
               replicas:
-                description: replicas is the number of Pods created by the StatefulSet
+                description: replicas is the number of instances created by the InstanceSet
                   controller.
                 format: int32
                 type: integer
               updateRevision:
                 description: updateRevision, if not empty, indicates the version of
-                  the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)
+                  the InstanceSet used to generate instances in the sequence [replicas-updatedReplicas,replicas)
                 type: string
               updateRevisions:
                 additionalProperties:
@@ -12313,13 +12343,12 @@ spec:
                   is the pod name, value is the revision.
                 type: object
               updatedReplicas:
-                description: updatedReplicas is the number of Pods created by the
-                  StatefulSet controller from the StatefulSet version indicated by
-                  updateRevision.
+                description: updatedReplicas is the number of instances created by
+                  the InstanceSet controller from the InstanceSet version indicated
+                  by UpdateRevisions.
                 format: int32
                 type: integer
             required:
-            - initReplicas
             - replicas
             type: object
         type: object

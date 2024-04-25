@@ -76,9 +76,6 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 	if its.Status.ObservedGeneration != its.Generation {
 		return false, nil
 	}
-	if its.Status.CurrentGeneration != its.Generation {
-		return false, nil
-	}
 
 	// TODO: depends on the workload (InstanceSet)
 	// check whether the underlying workload(sts) has sent the latest template to pods

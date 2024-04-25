@@ -207,7 +207,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	return nil
 }
 
-func (r *componentStatusHandler) isWorkloadUpdated() bool  {
+func (r *componentStatusHandler) isWorkloadUpdated() bool {
 	if r.cluster == nil || r.runningITS == nil {
 		return false
 	}

@@ -37,6 +37,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -170,6 +171,23 @@ func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
 	}
 	r.reqCtx.Log.V(1).Info("get addon", "generation", addon.Generation, "observedGeneration", addon.Status.ObservedGeneration)
 	r.reqCtx.UpdateCtxValue(operandValueKey, addon)
+
+	// CheckIfAddonUsedByCluster, if err, skip the deletion stage
+	if !addon.GetDeletionTimestamp().IsZero() || (addon.Spec.InstallSpec != nil && !addon.Spec.InstallSpec.GetEnabled()) {
+		used, err := CheckIfAddonUsedByCluster(ctx, r.reconciler.Client, addon.Name, r.reqCtx.Req.Namespace)
+		if err != nil {
+			if used {
+				r.reconciler.Event(addon, corev1.EventTypeNormal, "Addon is used by some clusters",
+					fmt.Sprintf("Addon is used by %s", err.Error()))
+				r.setRequeueAfter(time.Second, "Waiting for the cluster to end")
+				return
+			} else {
+				r.setRequeueWithErr(err, "")
+				return
+			}
+		}
+	}
+
 	res, err := intctrlutil.HandleCRDeletion(*r.reqCtx, r.reconciler, addon, addonFinalizerName, func() (*ctrl.Result, error) {
 		r.deletionStage.Handle(ctx)
 		return r.deletionStage.doReturn()
@@ -1081,4 +1099,31 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 		return true
 	}
 	return false
+}
+
+func CheckIfAddonUsedByCluster(ctx context.Context, c client.Client, addonName string, namespace string) (bool, error) {
+	labelSelector := metav1.LabelSelector{
+		MatchLabels: map[string]string{"clusterdefinition.kubeblocks.io/name": addonName},
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	if err != nil {
+		return false, err
+	}
+
+	var clusters appsv1alpha1.ClusterList
+	if err := c.List(ctx, &clusters, client.InNamespace(namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		return false, err
+	}
+
+	if len(clusters.Items) > 0 {
+		clusterNames := make([]string, len(clusters.Items))
+		for i, cluster := range clusters.Items {
+			clusterNames[i] = cluster.Name
+		}
+		errMsg := strings.Join(clusterNames, ", ")
+		return true, fmt.Errorf(errMsg)
+	}
+
+	return false, nil
 }

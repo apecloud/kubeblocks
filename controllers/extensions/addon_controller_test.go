@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -48,6 +49,14 @@ import (
 )
 
 var _ = Describe("Addon controller", func() {
+	const (
+		clusterDefName     = "test-clusterdef"
+		clusterVersionName = "test-clusterversion"
+		compDefName        = "test-compdef"
+		compVersionName    = "test-compversion"
+		clusterName        = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
+	)
+
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -93,6 +102,8 @@ var _ = Describe("Addon controller", func() {
 	Context("Addon controller test", func() {
 		var addon *extensionsv1alpha1.Addon
 		var key types.NamespacedName
+		var clusterKey types.NamespacedName
+
 		BeforeEach(func() {
 			cleanEnv()
 			const distro = "kubeblocks"
@@ -290,12 +301,36 @@ var _ = Describe("Addon controller", func() {
 			g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 		}
 
+		checkAddonNotDeleted := func(g Gomega) {
+			addon = &extensionsv1alpha1.Addon{}
+			err := testCtx.Cli.Get(ctx, key, addon)
+			g.Expect(err).To(Not(HaveOccurred()))
+		}
+
 		disableAddon := func(genID int) {
 			addon = &extensionsv1alpha1.Addon{}
 			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 			addon.Spec.InstallSpec.Enabled = false
 			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
 			disablingPhaseCheck(genID)
+		}
+
+		disableAddonFailedCheck := func(genID, obGenID int, expectPhase extensionsv1alpha1.AddonPhase) {
+			addon = &extensionsv1alpha1.Addon{}
+			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+			addon.Spec.InstallSpec.Enabled = false
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				Expect(err).To(Not(HaveOccurred()))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Generation).Should(BeEquivalentTo(genID))
+				g.Expect(addon.Spec.InstallSpec).ShouldNot(BeNil())
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(obGenID))
+				g.Expect(addon.Status.Phase).Should(Equal(expectPhase))
+			}).Should(Succeed())
 		}
 
 		fakeHelmRelease := func() {
@@ -425,7 +460,6 @@ var _ = Describe("Addon controller", func() {
 			By("By disabling enabled addon")
 			fakeHelmRelease()
 			disableAddon(3)
-
 			By("By failed an uninstallation job")
 			fakeUninstallationFailedJob(3)
 
@@ -630,6 +664,81 @@ var _ = Describe("Addon controller", func() {
 			})
 			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
 		})
+
+		It("should successfully reconcile a custom resource for Addon deleting with used by clusters", func() {
+			createAutoInstallAddon()
+
+			By("By enable addon with fake completed install job status")
+			fakeInstallationCompletedJob(2)
+
+			By("By creating cluster with addon")
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				"test-cd", "test-cv").
+				AddComponent(addon.Name, addon.Name).SetReplicas(1).
+				WithRandomName().
+				AddLabels(constant.ClusterDefLabelKey, addon.Name).
+				Create(&testCtx).
+				GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			cluster := &appsv1alpha1.Cluster{}
+			Eventually(func(g Gomega) {
+				err := testCtx.Cli.Get(ctx, clusterKey, cluster)
+				g.Expect(err).To(Not(HaveOccurred()))
+			}).Should(Succeed())
+
+			By("By delete addon with disabling status")
+			Expect(testCtx.Cli.Delete(ctx, addon)).To(Not(HaveOccurred()))
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				checkAddonNotDeleted(g)
+			}).Should(Succeed())
+
+			By("By deleting cluster")
+			Expect(testCtx.Cli.Delete(ctx, cluster)).To(Not(HaveOccurred()))
+
+			By("By checking addon with no used cluster")
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				checkAddonDeleted(g)
+			}).Should(Succeed())
+		})
+
+		It("should successfully reconcile a custom resource for Addon disabling with used by clusters", func() {
+			createAutoInstallAddon()
+
+			By("By enable addon with fake completed install job status")
+			fakeInstallationCompletedJob(2)
+
+			By("By creating cluster with addon")
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				"test-cd", "test-cv").
+				AddComponent(addon.Name, addon.Name).SetReplicas(1).
+				WithRandomName().
+				AddLabels(constant.ClusterDefLabelKey, addon.Name).
+				Create(&testCtx).
+				GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			cluster := &appsv1alpha1.Cluster{}
+			Eventually(func(g Gomega) {
+				err := testCtx.Cli.Get(ctx, clusterKey, cluster)
+				g.Expect(err).To(Not(HaveOccurred()))
+			}).Should(Succeed())
+
+			By("By disabling enabled addon")
+			fakeHelmRelease()
+			disableAddonFailedCheck(3, 2, extensionsv1alpha1.AddonEnabled)
+
+			By("By deleting cluster")
+			Expect(testCtx.Cli.Delete(ctx, cluster)).To(Not(HaveOccurred()))
+
+			By("By checking addon with no used cluster")
+			disablingPhaseCheck(3)
+		})
+
 	})
 
 	Context("Addon controller SetupWithManager", func() {

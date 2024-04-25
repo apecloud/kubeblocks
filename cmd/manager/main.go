@@ -95,8 +95,6 @@ var (
 )
 
 func init() {
-	os.Setenv("CM_NAMESPACE", "kb-system")
-
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))

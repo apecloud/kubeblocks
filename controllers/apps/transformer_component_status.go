@@ -221,10 +221,7 @@ func (r *componentStatusHandler) isWorkloadUpdated() bool  {
 	}
 	// check whether component spec has been sent to the underlying workload
 	itsComponentGeneration := r.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
-	if itsComponentGeneration != strconv.FormatInt(r.cluster.Generation, 10) {
-		return false
-	}
-	return true
+	return itsComponentGeneration == strconv.FormatInt(r.cluster.Generation, 10)
 }
 
 // isComponentAvailable tells whether the component is basically available, ether working well or in a fragile state:

@@ -108,7 +108,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		its.Status.CurrentRevision = its.Status.UpdateRevision
 		its.Status.CurrentReplicas = totalReplicas
 	}
-	readyCondition := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
+	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
+	if err != nil {
+		return nil, err
+	}
 	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
 	// 3. set InstanceFailure condition
@@ -130,7 +133,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	return tree, nil
 }
 
-func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) *metav1.Condition {
+func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) (*metav1.Condition, error) {
 	condition := &metav1.Condition{
 		Type:               string(workloads.InstanceReady),
 		Status:             metav1.ConditionTrue,
@@ -144,8 +147,13 @@ func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames s
 		baseSort(names, func(i int) (string, int) {
 			return ParseParentNameAndOrdinal(names[i])
 		}, nil, true)
+		message, err := json.Marshal(names)
+		if err != nil {
+			return nil, err
+		}
+		condition.Message = string(message)
 	}
-	return condition
+	return condition, nil
 }
 
 func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {

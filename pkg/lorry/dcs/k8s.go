@@ -263,6 +263,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 			member.UseIP = true
 		}
 		member.resource = pod.DeepCopy()
+		members = append(members, member)
 	}
 
 	return members, nil

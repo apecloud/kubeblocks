@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"encoding/json"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -111,7 +112,7 @@ var _ = Describe("status reconciler test", func() {
 				Status:             corev1.ConditionTrue,
 				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
 			}
-			makePodAvailableWithOldRevision := func(pod *corev1.Pod, revision string) {
+			makePodAvailableWithRevision := func(pod *corev1.Pod, revision string) {
 				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
 				pod.Status.Phase = corev1.PodRunning
 				pod.Status.Conditions = append(pod.Status.Conditions, condition)
@@ -120,7 +121,7 @@ var _ = Describe("status reconciler test", func() {
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
-				makePodAvailableWithOldRevision(pod, "old-revision")
+				makePodAvailableWithRevision(pod, "old-revision")
 			}
 			_, err = reconciler.Reconcile(newTree)
 			Expect(err).Should(BeNil())
@@ -137,7 +138,7 @@ var _ = Describe("status reconciler test", func() {
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
-				makePodAvailableWithOldRevision(pod, updateRevisions[pod.Name])
+				makePodAvailableWithRevision(pod, updateRevisions[pod.Name])
 			}
 			_, err = reconciler.Reconcile(newTree)
 			Expect(err).Should(BeNil())
@@ -147,6 +148,27 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
+
+			By("make all pods failed")
+			for _, object := range pods {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				pod.Status.Phase = corev1.PodFailed
+			}
+			_, err = reconciler.Reconcile(newTree)
+			Expect(err).Should(BeNil())
+			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(0))
+			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
+			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
+			Expect(its.Status.Conditions).Should(HaveLen(1))
+			Expect(its.Status.Conditions[0].Type).Should(BeEquivalentTo(workloads.InstanceFailure))
+			failureNames := []string{"bar-0", "bar-1", "bar-2", "bar-3", "bar-foo-0", "bar-foo-1", "bar-hello-0"}
+			message, err := json.Marshal(failureNames)
+			Expect(err).Should(BeNil())
+			Expect(its.Status.Conditions[0].Message).Should(BeEquivalentTo(message))
 		})
 	})
 

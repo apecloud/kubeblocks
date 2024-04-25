@@ -134,6 +134,9 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	if len(failureNames) == 0 {
 		return nil, nil
 	}
+	baseSort(failureNames, func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(failureNames[i])
+	}, nil, true)
 	message, err := json.Marshal(failureNames)
 	if err != nil {
 		return nil, err

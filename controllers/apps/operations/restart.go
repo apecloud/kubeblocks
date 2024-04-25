@@ -64,6 +64,13 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
+	// abort earlier running vertical scaling opsRequest.
+	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.RestartType},
+		func(earlierOps *appsv1alpha1.OpsRequest) bool {
+			return true
+		}); err != nil {
+		return err
+	}
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
 	componentKindList := []client.ObjectList{
 		&appv1.StatefulSetList{},
@@ -89,7 +96,7 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
 	}
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes,
-		"restart", nil, handleRestartProgress)
+		"restart", handleRestartProgress)
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.

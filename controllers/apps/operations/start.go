@@ -95,10 +95,6 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 // the Reconcile function for start opsRequest.
 func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32 {
-		compStatus := opsRequest.Status.Components[compOps.GetComponentName()]
-		if compStatus.OverrideBy != nil {
-			return compStatus.OverrideBy.Replicas
-		}
 		componentReplicasMap, _ := getComponentReplicasSnapshot(opsRequest.Annotations)
 		componentKey := getComponentKeyForStartSnapshot(compOps.GetComponentName(), "", compOps.IsShardingComponent())
 		replicas, ok := componentReplicasMap[componentKey]
@@ -116,7 +112,7 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, getExpectReplicas)
 	}
 	compOpsHelper := newComponentOpsHelper([]appsv1alpha1.ComponentOps{})
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "start", syncOverrideByOpsForScaleReplicas, handleComponentProgress)
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "start", handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

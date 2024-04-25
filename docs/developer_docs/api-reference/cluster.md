@@ -1334,6 +1334,7 @@ The purpose of ServiceVar is to obtain the address of a ComponentService.</li>
 ServiceRefDeclaration.
 The purpose of ServiceRefVar is to obtain the specific address that a ServiceRef is bound to
 (e.g., a ClusterService of another Cluster).</li>
+<li>Component: Retrieves values from a field of a Component.</li>
 </ul>
 <p>This field is immutable.</p>
 </td>
@@ -5420,7 +5421,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.</p>
@@ -7108,6 +7109,7 @@ The purpose of ServiceVar is to obtain the address of a ComponentService.</li>
 ServiceRefDeclaration.
 The purpose of ServiceRefVar is to obtain the specific address that a ServiceRef is bound to
 (e.g., a ClusterService of another Cluster).</li>
+<li>Component: Retrieves values from a field of a Component.</li>
 </ul>
 <p>This field is immutable.</p>
 </td>
@@ -8859,6 +8861,101 @@ string
 <td><p>FromServiceRef refers to a service within the same namespace as the object.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>ComponentVarSelector selects a var from a Component.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The Component to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ComponentVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">
+ComponentVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the replicas of the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceNames</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the instanceName list of the component.
+and the value will be presented in the following format: instanceName1,instanceName2&hellip;</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">ComponentVersionCompatibilityRule
 </h3>
@@ -13420,7 +13517,9 @@ This corresponds to the <code>-c &#123;containerName&#125;</code> option in <cod
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Cancelled&#34;</p></td>
+<tbody><tr><td><p>&#34;Aborted&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Cancelled&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Cancelling&#34;</p></td>
 <td></td>
@@ -13619,21 +13718,6 @@ WorkloadType
 <em>(Optional)</em>
 <p>Records the workload type of Component in ClusterDefinition.
 Deprecated and should be removed in the future version.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>overrideBy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.OverrideBy">
-OverrideBy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Describes the configuration covered by the latest OpsRequest of the same kind.
-when reconciling, this information will be used as a benchmark rather than the &lsquo;spec&rsquo;, such as &lsquo;Spec.HorizontalScaling&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -14641,9 +14725,6 @@ Kubernetes core/v1.PodSpec
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.OverrideBy">OverrideBy
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">OpsRequestComponentStatus</a>)
-</p>
 <div>
 </div>
 <table>
@@ -20289,7 +20370,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.VarOption">VarOption
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 <p>VarOption defines whether a variable is required or optional.</p>
@@ -20392,6 +20473,20 @@ ServiceRefVarSelector
 <td>
 <em>(Optional)</em>
 <p>Selects a defined var of a ServiceRef.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">
+ComponentVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Component.</p>
 </td>
 </tr>
 </tbody>
@@ -22138,6 +22233,57 @@ string
 </tr>
 <tr>
 <td>
+<code>asContainerImage</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the tool image should be used as the container image for a sidecar.
+This is useful for large tool images, such as those for C++ tools, which may depend on
+numerous libraries (e.g., *.so files).</p>
+<p>If enabled, the tool image is deployed as a sidecar container image.</p>
+<p>Examples:</p>
+<pre><code class="language-yaml"> reloadToolsImage:
+   mountPoint: /kb_tools
+   toolConfigs:
+     - name: kb-tools
+       asContainerImage: true
+       image:  apecloud/oceanbase:4.2.0.0-100010032023083021
+</code></pre>
+<p>generated containers:</p>
+<pre><code class="language-yaml">initContainers:
+ - name: install-config-manager-tool
+   image: apecloud/kubeblocks-tools:$&#123;version&#125;
+   command:
+   - cp
+   - /bin/config_render
+   - /opt/tools
+   volumemounts:
+   - name: kb-tools
+     mountpath: /opt/tools
+containers:
+ - name: config-manager
+   image: apecloud/oceanbase:4.2.0.0-100010032023083021
+   imagePullPolicy: IfNotPresent
+	  command:
+   - /opt/tools/reloader
+   - --log-level
+   - info
+   - --operator-update-enable
+   - --tcp
+   - &quot;9901&quot;
+   - --config
+   - /opt/config-manager/config-manager.yaml
+   volumemounts:
+   - name: kb-tools
+     mountpath: /opt/tools
+</code></pre>
+</td>
+</tr>
+<tr>
+<td>
 <code>image</code><br/>
 <em>
 string
@@ -22156,6 +22302,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the command to be executed by the init container.</p>
 </td>
 </tr>

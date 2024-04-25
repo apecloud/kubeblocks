@@ -205,13 +205,6 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 		r.setComponentStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "component is Abnormal")
 	}
 
-	// set primary-pod annotation
-	// TODO(free6om): primary-pod is only used in redis to bootstrap the redis cluster correctly.
-	// it is too hacky to be replaced by a better design.
-	if err := r.updatePrimaryIndex(); err != nil {
-		return err
-	}
-
 	return nil
 }
 

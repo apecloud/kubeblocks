@@ -21,6 +21,8 @@ package operations
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,8 +61,21 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		componentReplicasMap = map[string]int32{}
 		cluster              = opsRes.Cluster
 	)
-	if _, ok := cluster.Annotations[constant.SnapShotForStartAnnotationKey]; ok {
+	// if the cluster is already stopping or stopped, return
+	if slices.Contains([]appsv1alpha1.ClusterPhase{appsv1alpha1.StoppedClusterPhase,
+		appsv1alpha1.StoppingClusterPhase}, opsRes.Cluster.Status.Phase) {
 		return nil
+	}
+	if _, ok := cluster.Annotations[constant.SnapShotForStartAnnotationKey]; ok {
+		return fmt.Errorf("wait for the cluster to start before continuing to stop the cluster")
+	}
+	// abort earlier running vertical scaling opsRequest.
+	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.HorizontalScalingType,
+		appsv1alpha1.StartType, appsv1alpha1.RestartType, appsv1alpha1.VerticalScalingType},
+		func(earlierOps *appsv1alpha1.OpsRequest) bool {
+			return true
+		}); err != nil {
+		return err
 	}
 	setReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string, isSharding bool) {
 		compKey := getComponentKeyForStartSnapshot(componentName, "", isSharding)
@@ -96,10 +111,6 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // the Reconcile function for stop opsRequest.
 func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32 {
-		compStatus := opsRequest.Status.Components[compOps.GetComponentName()]
-		if compStatus.OverrideBy != nil {
-			return compStatus.OverrideBy.Replicas
-		}
 		return pointer.Int32(0)
 	}
 	handleComponentProgress := func(reqCtx intctrlutil.RequestCtx,
@@ -114,7 +125,7 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return expectProgressCount, completedCount, nil
 	}
 	compOpsHelper := newComponentOpsHelper([]appsv1alpha1.ComponentOps{})
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", syncOverrideByOpsForScaleReplicas, handleComponentProgress)
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

@@ -242,13 +242,18 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 	}
 
 	store.logger.Info(fmt.Sprintf("podlist: %d", len(podList.Items)))
-	members := make([]Member, len(podList.Items))
-	for i, pod := range podList.Items {
-		member := &members[i]
+	members := make([]Member, 0, len(podList.Items))
+	for _, pod := range podList.Items {
+		componentName := pod.Labels[constant.KBAppComponentLabelKey]
+		if componentName == "" {
+			// it is not a member pod
+			continue
+		}
+		member := Member{}
 		member.Name = pod.Name
 		// member.Name = fmt.Sprintf("%s.%s-headless.%s.svc", pod.Name, store.clusterCompName, store.namespace)
 		member.Role = pod.Labels[constant.RoleLabelKey]
-		member.ComponentName = pod.Labels[constant.KBAppComponentLabelKey]
+		member.ComponentName = componentName
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.LorryPort = getLorryPort(&pod)

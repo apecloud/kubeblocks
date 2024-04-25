@@ -6,6 +6,9 @@ sidebar_position: 2
 sidebar_label: Scale
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Scale for an ApeCloud MySQL cluster
 
 You can scale a MySQL cluster in two ways, vertical scaling and horizontal scaling.
@@ -25,31 +28,19 @@ During the vertical scaling process, all pods restart in the order of learner ->
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list mysql-cluster
+kubectl get cluster mycluster -n demo
 >
-NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
+NAME             NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
+mycluster        demo             apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        April 25,2024 17:30 UTC+0800
 ```
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
+1. Change configuration. There are two ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
+   <Tabs>
 
-   Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ```bash
-   kbcli cluster vscale mysql-cluster \
-   --components="mysql" \
-   --memory="4Gi" --cpu="2" \
-   ```
-
-   - `--components` describes the component name ready for vertical scaling.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-
-   **Option 2.** Create an OpsRequest
+   <TabItem value="OpsRequest" label="OpsRequest" default>
   
    Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -60,7 +51,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    metadata:
      name: ops-vertical-scaling
    spec:
-     clusterRef: mysql-cluster
+     clusterRef: mycluster
      type: VerticalScaling 
      verticalScaling:
      - componentName: mysql
@@ -72,8 +63,10 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
          cpu: "2000m"
    EOF
    ```
+
+   </TabItem>
   
-   **Option 3.** Change the YAML file of the cluster
+   <TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
 
    Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
@@ -83,7 +76,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: mysql-cluster
+     name: mycluster
      namespace: default
    spec:
      clusterDefinitionRef: apecloud-mysql
@@ -110,13 +103,17 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
      terminationPolicy: Halt
    ```
 
+   </TabItem>
+
+   </Tabs>
+
 2. Check the cluster status to validate the vertical scaling.
 
     ```bash
-    kbcli cluster list mysql-cluster
+    kubectl get cluster mycluster -n demo
     >
-    NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS                 CREATED-TIME
-    mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    VerticalScaling        Jan 29,2023 14:29 UTC+0800
+    NAME             NAMESPACE     CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS                 CREATED-TIME
+    mycluster        demo          apecloud-mysql            ac-mysql-8.0.30        Delete                    VerticalScaling        April 25,2023 17:40 UTC+0800
     ```
 
    - STATUS=VerticalScaling: it means the vertical scaling is in progress.
@@ -133,7 +130,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kubectl describe cluster mycluster -n demo
     ```
 
 ## Horizontal scaling
@@ -145,29 +142,19 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list mysql-cluster
+kubectl get cluster mycluster -n demo
 >
-NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
+NAME             NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
+mycluster        demo             apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        April 25,2024 17:30 UTC+0800
 ```
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply horizontal scaling.
+1. Change configuration. There are two ways to apply horizontal scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
+   <Tabs>
 
-   Configure the parameters `--components` and `--replicas`, and run the command.
-
-   ```bash
-   kbcli cluster hscale mysql-cluster \
-   --components="mysql" --replicas=3
-   ```
-
-   - `--components` describes the component name ready for horizontal scaling.
-   - `--replicas` describes the replica amount of the specified components.
-
-   **Option 2.** Create an OpsRequest
+   <TabItem value="OpsRequest" label="OpsRequest" default>
 
    Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
@@ -178,15 +165,17 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    metadata:
      name: ops-horizontal-scaling
    spec:
-     clusterRef: mysql-cluster
+     clusterRef: mycluster
      type: HorizontalScaling
      horizontalScaling:
      - componentName: mysql
-       replicas: 3
+       replicas: 1
    EOF
    ```
 
-   **Option 3.** Change the YAML file of the cluster
+   </TabItem>
+  
+   <TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
 
    Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
@@ -199,7 +188,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: mysql-cluster
+     name: mycluster
      namespace: default
    spec:
      clusterDefinitionRef: apecloud-mysql
@@ -224,7 +213,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    Check the cluster STATUS to identify the horizontal scaling status.
 
    ```bash
-   kbcli cluster list mysql-cluster
+   kubectl get cluster mycluster -n demo
    ```
 
    - STATUS=HorizontalScaling: it means horizontal scaling is in progress.
@@ -233,7 +222,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kubectl describe cluster mycluster -n demo
     ```
 
 ### Handle the snapshot exception
@@ -244,8 +233,8 @@ In the example below, a snapshot exception occurs.
 ```bash
 Status:
   conditions: 
-  - lastTransitionTime: "2023-02-08T04:20:26Z"
-    message: VolumeSnapshot/mysql-cluster-mysql-scaling-dbqgp: Failed to set default snapshot
+  - lastTransitionTime: "2024-04-25T17:40:26Z"
+    message: VolumeSnapshot/mycluster-mysql-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"
@@ -276,9 +265,9 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
 2. Delete the wrong backup (volumesnapshot is generated by backup) and volumesnapshot resources.
 
    ```bash
-   kubectl delete backup -l app.kubernetes.io/instance=mysql-cluster
+   kubectl delete backup -l app.kubernetes.io/instance=mycluster
    
-   kubectl delete volumesnapshot -l app.kubernetes.io/instance=mysql-cluster
+   kubectl delete volumesnapshot -l app.kubernetes.io/instance=mycluster
    ```
 
 ***Result***

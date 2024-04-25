@@ -18,25 +18,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
 
 ## Steps
 
-1. Restart a cluster.
-
-   You can use `kbcli` or create an OpsRequest to restart a cluster.
-  
-   **Option 1.** (**Recommended**) Use kbcli
-
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
-
-   ```bash
-   kbcli cluster restart <name> --components="mysql" \
-   --ttlSecondsAfterSucceed=30
-   ```
-
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
-
-   **Option 2.** Create an OpsRequest
-
-   Run the command below to restart a cluster.
+1. Create an OpsRequest to restart a cluster.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -45,7 +27,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    metadata:
      name: ops-restart
    spec:
-     clusterRef: mysql-cluster
+     clusterRef: mycluster
      type: Restart 
      restart:
      - componentName: mysql
@@ -55,10 +37,10 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
 2. Check the cluster status to validate the restarting.
 
    ```bash
-   kbcli cluster list mysql-cluster
+   kubectl get cluster mycluster -n demo
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-   mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
+   NAME             NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
+   mycluster        demo             apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        April 25,2024 17:25 UTC+0800
    ```
 
    - STATUS=Restarting: it means the cluster restart is in progress.

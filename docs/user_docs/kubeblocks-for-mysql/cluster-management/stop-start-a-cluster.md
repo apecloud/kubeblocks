@@ -6,39 +6,38 @@ sidebar_position: 5
 sidebar_label: Stop/Start
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Stop/Start a MySQL cluster
 
 You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
 
 ## Stop a cluster
 
-### Option 1. (Recommended) Use kbcli
+You can stop a cluster by creating an OpsRequest or changing the YAML file of the cluster.
 
-Configure the name of your cluster and run the command below to stop this cluster.
+<Tabs>
 
-```bash
-kbcli cluster stop mysql-cluster
-```
-
-### Option 2. Create an OpsRequest
-
-Run the command below to stop a cluster.
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mysql-cluster
+  name: mycluster
   generateName: stop-
 spec:
   # cluster ref
-  clusterRef: mysql-cluster
+  clusterRef: mycluster
   type: Stop
 EOF
 ```
 
-### Option 3. Change the YAML file of the cluster
+</TabItem>
+  
+<TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
 
 Configure replicas as 0 to delete pods.
 
@@ -46,7 +45,7 @@ Configure replicas as 0 to delete pods.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-    name: mysql-cluster
+    name: mycluster
 spec:
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
@@ -67,35 +66,35 @@ spec:
             storage: 1Gi
 ```
 
+</TabItem>
+
+</Tabs>
+
 ## Start a cluster
-  
-### Option 1. (Recommended) Use kbcli
 
-Configure the name of your cluster and run the command below to start this cluster.
+You can start a cluster by creating an OpsRequest or changing the YAML file of the cluster.
 
-```bash
-kbcli cluster start mysql-cluster
-```
+<Tabs>
 
-### Option 2. Create an OpsRequest
-
-Run the command below to start a cluster.
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mysql-cluster
+  name: mycluster
   generateName: start-
 spec:
   # cluster ref
-  clusterRef: mysql-cluster
+  clusterRef: mycluster
   type: Start
 EOF 
 ```
 
-### Option 3. Change the YAML file of the cluster
+</TabItem>
+  
+<TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
 
 Change replicas back to the original amount to start this cluster again.
 
@@ -103,7 +102,7 @@ Change replicas back to the original amount to start this cluster again.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-    name: mysql-cluster
+    name: mycluster
 spec:
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
@@ -123,3 +122,7 @@ spec:
           requests:
             storage: 1Gi
 ```
+
+</TabItem>
+
+</Tabs>

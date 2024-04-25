@@ -5,6 +5,9 @@ sidebar_position: 3
 sidebar_label: Expand volume
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Expand volume
 
 You can expand the storage volume size of each pod.
@@ -20,30 +23,19 @@ Volume expansion triggers pod restart, all pods restart in the order of learner 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list mysql-cluster
+kubectl get cluster mycluster -n demo
 >
-NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
+NAME             NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
+mycluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        April 25,2024 17:29 UTC+0800
 ```
 
 ## Steps
 
-1. Change configuration. There are 3 ways to apply volume expansion.
+1. Change configuration. There are two ways to apply volume expansion.
 
-    **Option 1.** (**Recommended**) Use kbcli
+    <Tabs>
 
-    Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
-
-    ```bash
-    kbcli cluster volume-expand mysql-cluster --components="mysql" \
-    --volume-claim-templates="data" --storage="2Gi"
-    ```
-
-    - `--components` describes the component name for volume expansion.
-    - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
-    - `--storage` describes the volume storage size.
-
-    **Option 2.** Create an OpsRequest
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
@@ -54,7 +46,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     metadata:
       name: ops-volume-expansion
     spec:
-      clusterRef: mysql-cluster
+      clusterRef: mycluster
       type: VolumeExpansion
       volumeExpansion:
       - componentName: mysql
@@ -64,7 +56,9 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     EOF
     ```
 
-    **Option 3.** Change the YAML file of the cluster
+    </TabItem>
+
+    <TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
 
     Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
@@ -74,7 +68,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: Cluster
     metadata:
-      name: mysql-cluster
+      name: mycluster
       namespace: default
     spec:
       clusterDefinitionRef: apecloud-mysql
@@ -94,13 +88,17 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
       terminationPolicy: Halt
     ```
 
+    </TabItem>
+
+    </Tabs>
+
 2. Validate the volume expansion operation.
 
    ```bash
-   kbcli cluster list mysql-cluster
+   kubectl get cluster mycluster -n demo
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30          Delete                    VolumeExpanding        Jan 29,2023 14:35 UTC+0800
+   NAME             NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
+   mycluster        default          apecloud-mysql            ac-mysql-8.0.30          Delete                    VolumeExpanding        April 25,2024 17:35 UTC+0800
    ```
 
    * STATUS=VolumeExpanding: it means the volume expansion is in progress.
@@ -109,5 +107,5 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kubectl describe cluster mycluster -n demo
     ```

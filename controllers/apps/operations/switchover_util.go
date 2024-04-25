@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -90,9 +91,9 @@ func needDoSwitchover(ctx context.Context,
 		if err != nil {
 			return false, err
 		}
-		podParent, _ := intctrlutil.ParseParentNameAndOrdinal(pod.Name)
-		siParent, o := intctrlutil.ParseParentNameAndOrdinal(switchover.InstanceName)
-		if podParent != siParent || o < 0 || o >= int32(len(podList.Items)) {
+		podParent, _ := instanceset.ParseParentNameAndOrdinal(pod.Name)
+		siParent, o := instanceset.ParseParentNameAndOrdinal(switchover.InstanceName)
+		if podParent != siParent || o < 0 || o >= len(podList.Items) {
 			return false, errors.New("switchover.InstanceName is invalid")
 		}
 		// If the current instance is already the primary, then no switchover will be performed.

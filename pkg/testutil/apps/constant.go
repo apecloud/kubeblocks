@@ -40,7 +40,6 @@ const (
 
 	ReplicationPodRoleVolume         = "pod-role"
 	ReplicationRoleLabelFieldPath    = "metadata.labels['kubeblocks.io/role']"
-	DefaultReplicationCandidateIndex = 0
 	DefaultReplicationReplicas       = 2
 
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
@@ -55,7 +54,6 @@ const (
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"
 
-	StorageClassName = "test-sc"
 	EnvKeyImageTag   = "IMAGE_TAG"
 	DefaultImageTag  = "test"
 

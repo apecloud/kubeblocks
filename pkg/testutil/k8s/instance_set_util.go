@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -67,15 +66,13 @@ func NewFakeInstanceSet(name string, replicas int) *workloads.InstanceSet {
 			ServiceName: "governingsvc",
 		},
 		Status: workloads.InstanceSetStatus{
-			InitReplicas: itsReplicas,
-			StatefulSetStatus: appsv1.StatefulSetStatus{
-				AvailableReplicas:  itsReplicas,
-				ObservedGeneration: 0,
-				ReadyReplicas:      itsReplicas,
-				UpdatedReplicas:    itsReplicas,
-				CurrentRevision:    Revision,
-				UpdateRevision:     Revision,
-			},
+			InitReplicas:       itsReplicas,
+			AvailableReplicas:  itsReplicas,
+			ObservedGeneration: 0,
+			ReadyReplicas:      itsReplicas,
+			UpdatedReplicas:    itsReplicas,
+			CurrentRevision:    Revision,
+			UpdateRevision:     Revision,
 		},
 	}
 }
@@ -93,7 +90,6 @@ func MockInstanceSetReady(its *workloads.InstanceSet, pods ...*corev1.Pod) {
 	its.Status.ReadyInitReplicas = *its.Spec.Replicas
 	its.Status.AvailableReplicas = *its.Spec.Replicas
 	its.Status.ObservedGeneration = its.Generation
-	its.Status.CurrentGeneration = its.Generation
 	its.Status.Replicas = *its.Spec.Replicas
 	its.Status.ReadyReplicas = *its.Spec.Replicas
 	its.Status.CurrentRevision = its.Status.UpdateRevision
@@ -176,6 +172,5 @@ func InitInstanceSetStatus(testCtx testutil.TestContext, its *workloads.Instance
 		its.Status.UpdateRevision = controllerRevision
 		its.Status.CurrentRevision = controllerRevision
 		its.Status.ObservedGeneration = its.Generation
-		its.Status.CurrentGeneration = its.Generation
 	})).Should(gomega.Succeed())
 }

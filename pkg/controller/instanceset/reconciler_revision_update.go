@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -94,12 +97,33 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 		updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision
 	}
 	its.Status.UpdateRevision = updateRevision
+	updatedReplicas, err := calculateUpdatedReplicas(its, tree.List(&corev1.Pod{}))
+	if err != nil {
+		return nil, err
+	}
+	its.Status.UpdatedReplicas = updatedReplicas
 	// The 'ObservedGeneration' field is used to indicate whether the revisions have been updated.
 	// Computing these revisions in each reconciliation loop can be time-consuming, so we optimize it by
 	// performing the computation only when the 'spec' is updated.
 	its.Status.ObservedGeneration = its.Generation
 
 	return tree, nil
+}
+
+func calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) (int32, error) {
+	updatedReplicas := int32(0)
+	for i := range pods {
+		pod, _ := pods[i].(*corev1.Pod)
+		updated, err := IsPodUpdated(its, pod)
+		if err != nil {
+			return 0, nil
+		}
+		if updated {
+			updatedReplicas++
+		}
+
+	}
+	return updatedReplicas, nil
 }
 
 var _ kubebuilderx.Reconciler = &revisionUpdateReconciler{}

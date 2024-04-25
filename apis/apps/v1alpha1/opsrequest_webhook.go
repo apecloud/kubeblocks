@@ -101,10 +101,18 @@ func (r *OpsRequest) ValidateDelete() (admission.Warnings, error) {
 
 // IsComplete checks if opsRequest has been completed.
 func (r *OpsRequest) IsComplete(phases ...OpsPhase) bool {
-	if len(phases) == 0 {
-		return slices.Contains([]OpsPhase{OpsCancelledPhase, OpsSucceedPhase, OpsFailedPhase}, r.Status.Phase)
+	completedPhase := func(phase OpsPhase) bool {
+		return slices.Contains([]OpsPhase{OpsCancelledPhase, OpsSucceedPhase, OpsAbortedPhase, OpsFailedPhase}, phase)
 	}
-	return slices.Contains([]OpsPhase{OpsCancelledPhase, OpsSucceedPhase, OpsFailedPhase}, phases[0])
+	if len(phases) == 0 {
+		return completedPhase(r.Status.Phase)
+	}
+	for i := range phases {
+		if !completedPhase(phases[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // Force checks if the current opsRequest can be forcibly executed

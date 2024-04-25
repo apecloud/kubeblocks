@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -145,7 +146,6 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	cli client.Client,
 	opsRes *OpsResource,
 	opsMessageKey string,
-	syncOverrideBy syncOverrideByOps,
 	handleStatusProgress handleStatusProgressWithComponent,
 ) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	if opsRes == nil {
@@ -171,11 +171,6 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	patch := client.MergeFrom(oldOpsRequest)
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
-	}
-	if syncOverrideBy != nil {
-		if err = syncOverrideBy(reqCtx, cli, opsRes); err != nil {
-			return "", 0, nil
-		}
 	}
 	var progressResources []progressResource
 	setProgressResource := func(compSpec *appsv1alpha1.ClusterComponentSpec, compOps ComponentOpsInteface, fullComponentName string) error {
@@ -234,7 +229,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 			}
 		}
 	}
-	var waitCompleted bool
+	var waitComponentCompleted bool
 	for _, pgResource := range progressResources {
 		opsCompStatus := c.getOpsComponentAndShardStatus(opsRequest, pgResource.compOps)
 		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, pgResource, &opsCompStatus)
@@ -266,8 +261,8 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 				opsCompStatus.LastFailedTime = lastFailedTime
 			}
 			// wait the component to complete
-			if !pgResource.noWaitComponentCompleted && !isComponentCompleted(componentPhase) {
-				waitCompleted = true
+			if !pgResource.noWaitComponentCompleted && !slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), componentPhase) {
+				waitComponentCompleted = true
 			}
 		}
 		c.setOpsComponentAndShardStatus(opsRequest, opsCompStatus, pgResource.compOps)
@@ -279,7 +274,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 			return opsRequestPhase, 0, err
 		}
 	}
-	if waitCompleted || completedProgressCount != expectProgressCount {
+	if waitComponentCompleted || completedProgressCount != expectProgressCount {
 		return opsRequestPhase, 0, nil
 	}
 	if isFailed {

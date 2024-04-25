@@ -768,29 +768,19 @@ var _ = Describe("OpsRequest Controller", func() {
 			ops3 := createRestartOps(clusterObj.Name, 3, true)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
-			By("expect for all opsRequests in the queue")
+			By("expect for ops3 is running and ops1/ops is aborted")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1alpha1.Cluster) {
-				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-				g.Expect(len(opsSlice)).Should(Equal(3))
-				// ops1/ops3 is running
-				g.Expect(opsSlice[0].InQueue).Should(BeFalse())
-				g.Expect(opsSlice[2].InQueue).Should(BeFalse())
-				g.Expect(opsSlice[1].InQueue).Should(BeTrue())
-			})).Should(Succeed())
-
-			By("mock component to running and expect ops1/op3 phase to Succeed")
-			mockCompRunning(replicas, true)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
-
-			By("expect for next ops is Running")
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsRunningPhase))
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1alpha1.Cluster) {
-				// ops1 should be dequeue
 				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 				g.Expect(len(opsSlice)).Should(Equal(1))
 				g.Expect(opsSlice[0].InQueue).Should(BeFalse())
 			})).Should(Succeed())
+
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
+
+			By("mock component to running and expect op3 phase to Succeed")
+			mockCompRunning(replicas, true)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 
 		It("test opsRequest queue for QueueBySelf", func() {

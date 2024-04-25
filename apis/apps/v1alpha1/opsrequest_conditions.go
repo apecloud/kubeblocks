@@ -30,6 +30,7 @@ const (
 	ConditionTypeValidated          = "Validated"
 	ConditionTypeSucceed            = "Succeed"
 	ConditionTypeFailed             = "Failed"
+	ConditionTypeAborted            = "Aborted"
 	ConditionTypeRestarting         = "Restarting"
 	ConditionTypeVerticalScaling    = "VerticalScaling"
 	ConditionTypeHorizontalScaling  = "HorizontalScaling"
@@ -106,6 +107,17 @@ func NewCancelFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
 		Reason:             ReasonOpsCancelFailed,
 		LastTransitionTime: metav1.Now(),
 		Message:            msg,
+	}
+}
+
+// NewAbortedCondition creates a condition for aborted phase.
+func NewAbortedCondition(ops *OpsRequest) metav1.Condition {
+	return metav1.Condition{
+		Type:               ConditionTypeAborted,
+		Status:             metav1.ConditionTrue,
+		Reason:             ConditionTypeAborted,
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf(`Aborted as a result of the latest opsRequest "%s"`, ops.Name),
 	}
 }
 

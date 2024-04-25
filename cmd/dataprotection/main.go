@@ -251,7 +251,7 @@ func main() {
 	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
 
 	// multi-cluster manager for all data-plane k8s
-	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetClient(), multiClusterKubeConfig, multiClusterContexts)
+	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetConfig(), mgr.GetClient(), multiClusterKubeConfig, multiClusterContexts)
 	if err != nil {
 		setupLog.Error(err, "unable to setup multi-cluster manager")
 		os.Exit(1)

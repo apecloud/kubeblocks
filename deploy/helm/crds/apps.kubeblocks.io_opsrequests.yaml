@@ -132,10 +132,6 @@ spec:
                         componentName:
                           description: Specifies the name of the Component.
                           type: string
-                        isSharding:
-                          description: Specifies that the componentName refers to
-                            the cluster's sharding component.
-                          type: boolean
                         parameters:
                           description: Specifies the parameters that match the schema
                             specified in the `opsDefinition.spec.parametersSchema`.
@@ -2692,10 +2688,6 @@ spec:
                         - name
                         type: object
                       type: array
-                    isSharding:
-                      description: Specifies that the componentName refers to the
-                        cluster's sharding component.
-                      type: boolean
                     offlineInstances:
                       description: Specifies the names of instances to be scaled down.
                         This provides control over which specific instances are targeted
@@ -2884,10 +2876,6 @@ spec:
                         - name
                         type: object
                       type: array
-                    isSharding:
-                      description: Specifies that the componentName refers to the
-                        cluster's sharding component.
-                      type: boolean
                   required:
                   - componentName
                   - instances
@@ -2986,10 +2974,6 @@ spec:
                     x-kubernetes-list-map-keys:
                     - name
                     x-kubernetes-list-type: map
-                  isSharding:
-                    description: Specifies that the componentName refers to the cluster's
-                      sharding component.
-                    type: boolean
                 required:
                 - componentName
                 - configurations
@@ -3084,10 +3068,6 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    isSharding:
-                      description: Specifies that the componentName refers to the
-                        cluster's sharding component.
-                      type: boolean
                   required:
                   - componentName
                   - configurations
@@ -3108,10 +3088,6 @@ spec:
                     componentName:
                       description: Specifies the name of the Component.
                       type: string
-                    isSharding:
-                      description: Specifies that the componentName refers to the
-                        cluster's sharding component.
-                      type: boolean
                   required:
                   - componentName
                   type: object
@@ -3216,10 +3192,6 @@ spec:
                       \n By default, the image \"apecloud/kubeblocks-datascript:latest\"
                       is used."
                     type: string
-                  isSharding:
-                    description: Specifies that the componentName refers to the cluster's
-                      sharding component.
-                    type: boolean
                   script:
                     description: "Defines the content of scripts to be executed. \n
                       All scripts specified in this field will be executed in the
@@ -3401,10 +3373,6 @@ spec:
                         - `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate`
                         must be defined when specifying a valid instance name."
                       type: string
-                    isSharding:
-                      description: Specifies that the componentName refers to the
-                        cluster's sharding component.
-                      type: boolean
                   required:
                   - componentName
                   - instanceName
@@ -3557,43 +3525,11 @@ spec:
                               specified, otherwise to an implementation-defined value.
                               Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                             type: object
-                          volumeClaimTemplates:
-                            description: volumeClaimTemplates specifies the storage
-                              size and volumeClaimTemplate name.
-                            items:
-                              properties:
-                                name:
-                                  description: Specify the name of the volumeClaimTemplate
-                                    in the Component. The specified name must match
-                                    one of the volumeClaimTemplates defined in the
-                                    `clusterComponentSpec.volumeClaimTemplates` field.
-                                  type: string
-                                storage:
-                                  anyOf:
-                                  - type: integer
-                                  - type: string
-                                  description: Specifies the desired storage size
-                                    for the volume.
-                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                  x-kubernetes-int-or-string: true
-                              required:
-                              - name
-                              - storage
-                              type: object
-                            type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
                         required:
                         - name
-                        - volumeClaimTemplates
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
                       type: array
-                    isSharding:
-                      description: Specifies that the componentName refers to the
-                        cluster's sharding component.
-                      type: boolean
                     limits:
                       additionalProperties:
                         anyOf:
@@ -3642,55 +3578,10 @@ spec:
                         expand.
                       items:
                         properties:
-                          claims:
-                            description: "Claims lists the names of resources, defined
-                              in spec.resourceClaims, that are used by this container.
-                              \n This is an alpha field and requires enabling the
-                              DynamicResourceAllocation feature gate. \n This field
-                              is immutable. It can only be set for containers."
-                            items:
-                              description: ResourceClaim references one entry in PodSpec.ResourceClaims.
-                              properties:
-                                name:
-                                  description: Name must match the name of one entry
-                                    in pod.spec.resourceClaims of the Pod where this
-                                    field is used. It makes that resource available
-                                    inside a container.
-                                  type: string
-                              required:
-                              - name
-                              type: object
-                            type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
-                          limits:
-                            additionalProperties:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                              x-kubernetes-int-or-string: true
-                            description: 'Limits describes the maximum amount of compute
-                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                            type: object
                           name:
                             description: Refer to the instance template name of the
                               component or sharding.
                             type: string
-                          requests:
-                            additionalProperties:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                              x-kubernetes-int-or-string: true
-                            description: 'Requests describes the minimum amount of
-                              compute resources required. If Requests is omitted for
-                              a container, it defaults to Limits if that is explicitly
-                              specified, otherwise to an implementation-defined value.
-                              Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                            type: object
                           volumeClaimTemplates:
                             description: volumeClaimTemplates specifies the storage
                               size and volumeClaimTemplate name.
@@ -3722,12 +3613,7 @@ spec:
                         - name
                         - volumeClaimTemplates
                         type: object
-                        x-kubernetes-preserve-unknown-fields: true
                       type: array
-                    isSharding:
-                      description: Specifies that the componentName refers to the
-                        cluster's sharding component.
-                      type: boolean
                     volumeClaimTemplates:
                       description: Specifies a list of OpsRequestVolumeClaimTemplate
                         objects, defining the volumeClaimTemplates that are used to

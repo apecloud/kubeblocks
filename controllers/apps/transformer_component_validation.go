@@ -61,7 +61,7 @@ func validateSidecarContainers(comp *appsv1alpha1.Component, compDef *appsv1alph
 
 	var notFoundSidecar []string
 	for _, sidecar := range comp.Spec.Sidecars {
-		if !HasSidecar(compDef, sidecar) {
+		if !hasSidecar(compDef, sidecar) {
 			notFoundSidecar = append(notFoundSidecar, sidecar)
 		}
 	}

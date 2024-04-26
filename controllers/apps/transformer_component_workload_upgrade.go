@@ -101,9 +101,9 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 
 	// update pod & pvc & svc labels
 	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.ServiceList{}, &corev1.PodList{}}
-	ml := constant.GetComponentWellKnownLabels(transCtx.Cluster.Name, synthesizeComp.Name)
+	ml := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	inNS := client.InNamespace(comp.Namespace)
-	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(transCtx.Cluster.Name, synthesizeComp.Name)
+	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	var revision string
 	for _, list := range objectList {
 		if err := graphCli.List(transCtx.Context, list, client.MatchingLabels(ml), inNS); err == nil {

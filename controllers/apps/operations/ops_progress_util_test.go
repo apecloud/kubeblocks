@@ -171,7 +171,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test the progressDetails when scaling up replicas")
-			targetPod = &podList[2]
+			targetPod = podList[2]
 			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
 				targetPod.Name, "follower", "ReadWrite")
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetPod.Name, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())

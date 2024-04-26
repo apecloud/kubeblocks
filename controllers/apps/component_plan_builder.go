@@ -39,7 +39,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// componentTransformContext a graph.TransformContext implementation for Cluster reconciliation
+// componentTransformContext a graph.TransformContext implementation for Component reconciliation
 type componentTransformContext struct {
 	context.Context
 	Client client.Reader

@@ -305,11 +305,11 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	}
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
-	DelayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
+	delayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
 
 	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
 	if isSpecUpdated {
-		UpdateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)
+		updateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)
 	}
 
 	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)

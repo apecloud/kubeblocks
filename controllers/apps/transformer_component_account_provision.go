@@ -187,31 +187,20 @@ func (t *componentAccountProvisionTransformer) buildLorryClient(transCtx *compon
 		return nil, nil
 	}
 
-	podList, err := t.componentPodsWithRole(transCtx, *transCtx.Cluster, synthesizedComp.Name, roleName)
+	pods, err := component.ListOwnedPodsWithRole(transCtx.Context, transCtx.Client,
+		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, roleName)
 	if err != nil {
 		return nil, err
 	}
-	if podList == nil || len(podList.Items) == 0 {
+	if len(pods) == 0 {
 		return nil, fmt.Errorf("unable to find appropriate pods to create accounts")
 	}
 
-	lorryCli, err := lorry.NewClient(podList.Items[0])
+	lorryCli, err := lorry.NewClient(*pods[0])
 	if err != nil {
 		return nil, err
 	}
 	return lorryCli, nil
-}
-
-func (t *componentAccountProvisionTransformer) componentPodsWithRole(transCtx *componentTransformContext,
-	cluster appsv1alpha1.Cluster, compSpecName, role string) (*corev1.PodList, error) {
-	podList := &corev1.PodList{}
-	labels := constant.GetComponentWellKnownLabels(cluster.Name, compSpecName)
-	labels[constant.RoleLabelKey] = role
-	if err := transCtx.Client.List(transCtx.Context, podList,
-		client.InNamespace(cluster.Namespace), client.MatchingLabels(labels), inDataContext4C()); err != nil {
-		return nil, err
-	}
-	return podList, nil
 }
 
 func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *componentTransformContext,

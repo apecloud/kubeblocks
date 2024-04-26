@@ -27,6 +27,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/job"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -86,15 +87,15 @@ func reconcileCompPreTerminate(ctx context.Context,
 		return nil
 	}
 
-	job, err := createActionJobIfNotExist(ctx, cli, graphCli, dag, cluster, comp, synthesizedComp, PreTerminateAction)
+	actionJob, err := createActionJobIfNotExist(ctx, cli, graphCli, dag, cluster, comp, synthesizedComp, PreTerminateAction)
 	if err != nil {
 		return err
 	}
-	if job == nil {
+	if actionJob == nil {
 		return nil
 	}
 
-	err = CheckJobSucceed(ctx, cli, cluster, job.Name)
+	err = job.CheckJobSucceed(ctx, cli, cluster, actionJob.Name)
 	if err != nil {
 		return err
 	}
@@ -105,11 +106,11 @@ func reconcileCompPreTerminate(ctx context.Context,
 		return err
 	}
 
-	if err := cleanActionJob(ctx, cli, dag, cluster, *compOrig, *synthesizedComp, PreTerminateAction, job.Name); err != nil {
+	if err := cleanActionJob(ctx, cli, dag, cluster, *compOrig, *synthesizedComp, PreTerminateAction, actionJob.Name); err != nil {
 		return err
 	}
 
-	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for job %s to be cleaned.", job.Name)
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for job %s to be cleaned.", actionJob.Name)
 }
 
 func needDoPreTerminate(ctx context.Context, cli client.Reader,

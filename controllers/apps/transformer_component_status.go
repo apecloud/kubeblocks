@@ -41,7 +41,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 const (
@@ -351,9 +350,7 @@ func (r *componentStatusHandler) hasVolumeExpansionRunning() (bool, bool, error)
 // getRunningVolumes gets the running volumes of the ITS.
 func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string,
 	itsObj *workloads.InstanceSet) ([]*corev1.PersistentVolumeClaim, error) {
-	labels := constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name)
-	pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
-		generics.PersistentVolumeClaimSignature, r.cluster.Namespace, labels, inDataContext4C())
+	pvcs, err := component.ListOwnedPVCs(reqCtx.Ctx, cli, r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil

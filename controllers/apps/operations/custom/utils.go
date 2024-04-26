@@ -316,38 +316,38 @@ func getTargetPods(
 	podSelector appsv1alpha1.PodSelector,
 	compName string) ([]*corev1.Pod, error) {
 	var (
-		podList *corev1.PodList
-		err     error
+		pods []*corev1.Pod
+		err  error
 	)
 	if podSelector.Role != "" {
-		podList, err = component.GetComponentPodListWithRole(ctx, cli, *cluster, compName, podSelector.Role)
+		pods, err = component.ListOwnedPodsWithRole(ctx, cli, cluster.Namespace, cluster.Name, compName, podSelector.Role)
 	} else {
-		podList, err = component.GetComponentPodList(ctx, cli, *cluster, compName)
+		pods, err = component.ListOwnedPods(ctx, cli, cluster.Namespace, cluster.Name, compName)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	var targetPods []*corev1.Pod
-	for _, v := range podList.Items {
+	for _, v := range pods {
 		switch podSelector.Availability {
 		case appsv1alpha1.AvailablePolicy:
-			if intctrlutil.IsAvailable(&v, 0) {
-				targetPods = append(targetPods, &v)
+			if intctrlutil.IsAvailable(v, 0) {
+				targetPods = append(targetPods, v)
 			}
 		case appsv1alpha1.UnAvailablePolicy:
-			if !intctrlutil.IsAvailable(&v, 0) {
-				targetPods = append(targetPods, &v)
+			if !intctrlutil.IsAvailable(v, 0) {
+				targetPods = append(targetPods, v)
 			}
 
 		default:
-			targetPods = append(targetPods, &v)
+			targetPods = append(targetPods, v)
 		}
 		if podSelector.SelectionPolicy == appsv1alpha1.Any && len(targetPods) > 0 {
 			break
 		}
 	}
-	if len(podList.Items) == 0 {
+	if len(pods) == 0 {
 		return nil, intctrlutil.NewFatalError("can not find any pod which matches the podSelector for the component " + compName)
 	}
 	return targetPods, nil

@@ -78,7 +78,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 	}
 
 	Context("Test OpsRequest", func() {
-		commonHScaleConsensusCompTest := func(reqCtx intctrlutil.RequestCtx, replicas int, offlineInstances []string, instances ...appsv1alpha1.InstanceTemplate) (*OpsResource, []corev1.Pod) {
+		commonHScaleConsensusCompTest := func(reqCtx intctrlutil.RequestCtx, replicas int, offlineInstances []string, instances ...appsv1alpha1.InstanceTemplate) (*OpsResource, []*corev1.Pod) {
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
@@ -132,8 +132,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, 1, nil)
 			By("mock two pods are deleted")
 			for i := 1; i < 3; i++ {
-				pod := &podList[i]
-				pod.Kind = constant.PodKind
+				pod := podList[i]
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 			}
@@ -156,8 +155,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, 1, nil)
 
 			By("mock one pod has been deleted")
-			pod := &podList[2]
-			pod.Kind = constant.PodKind
+			pod := podList[2]
 			testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 
@@ -255,8 +253,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(targetSpec.OfflineInstances).Should(Equal(offlineInstances))
 
 			By("mock specified pod (with ordinal 1) deleted")
-			pod := &podList[specifiedOrdinal]
-			pod.Kind = constant.PodKind
+			pod := podList[specifiedOrdinal]
 			testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)

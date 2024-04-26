@@ -36,6 +36,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/job"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -127,15 +128,14 @@ func renderActionCmdJob(ctx context.Context,
 		return nil, fmt.Errorf("lifecycle action %s custom handler only support exec command by now, please check your customHandler spec", actionType)
 	}
 
-	podList, err := GetComponentPodList(ctx, cli, *cluster, synthesizeComp.Name)
+	pods, err := ListOwnedPods(ctx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name)
 	if err != nil {
 		return nil, err
 	}
-	if podList == nil || len(podList.Items) == 0 {
+	if len(pods) == 0 {
 		return nil, errors.New("component pods not found")
 	}
-	pods := podList.Items
-	tplPod := podList.Items[0]
+	tplPod := pods[0]
 
 	renderJobPodVolumes := func() ([]corev1.Volume, []corev1.VolumeMount) {
 		volumes := make([]corev1.Volume, 0)
@@ -217,7 +217,7 @@ func renderActionCmdJob(ctx context.Context,
 		return job, nil
 	}
 
-	envs, envFroms, err := buildLifecycleActionEnvs(ctx, cli, cluster, synthesizeComp, action, pods, &tplPod)
+	envs, envFroms, err := buildLifecycleActionEnvs(ctx, cli, cluster, synthesizeComp, action, pods, tplPod)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func buildLifecycleActionEnvs(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent,
 	action *appsv1alpha1.Action,
-	pods []corev1.Pod,
+	pods []*corev1.Pod,
 	tplPod *corev1.Pod) ([]corev1.EnvVar, []corev1.EnvFromSource, error) {
 	var workloadEnvs []corev1.EnvVar
 	var workloadEnvFroms []corev1.EnvFromSource
@@ -268,7 +268,7 @@ func genClusterNComponentEnvs(ctx context.Context,
 	cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent,
-	pods []corev1.Pod) ([]corev1.EnvVar, error) {
+	pods []*corev1.Pod) ([]corev1.EnvVar, error) {
 	if cluster == nil || (cluster.Spec.ComponentSpecs == nil && cluster.Spec.ShardingSpecs == nil) {
 		return nil, nil
 	}
@@ -317,7 +317,7 @@ func genComponentEnvs(synthesizeComp *SynthesizedComponent, components []appsv1a
 }
 
 // genComponentPodEnvs generates the component pod relative envs.
-func genComponentPodEnvs(compPods []corev1.Pod) ([]corev1.EnvVar, error) {
+func genComponentPodEnvs(compPods []*corev1.Pod) ([]corev1.EnvVar, error) {
 	compEnvs := make([]corev1.EnvVar, 0)
 	compPodNameList := make([]string, 0, len(compPods))
 	compPodIPList := make([]string, 0, len(compPods))
@@ -353,7 +353,7 @@ func genComponentPodEnvs(compPods []corev1.Pod) ([]corev1.EnvVar, error) {
 
 // genClusterEnvs generates the cluster scope relative envs.
 func genClusterEnvs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, components []appsv1alpha1.Component) ([]corev1.EnvVar, error) {
-	clusterPods := make([]corev1.Pod, 0)
+	clusterPods := make([]*corev1.Pod, 0)
 	compNames := make([]string, len(components))
 	deletingCompNames := make([]string, len(components))
 	undeletedCompNames := make([]string, len(components))
@@ -362,14 +362,14 @@ func genClusterEnvs(ctx context.Context, cli client.Reader, cluster *appsv1alpha
 		if err != nil {
 			return nil, err
 		}
-		compPodList, err := GetComponentPodList(ctx, cli, *cluster, compShortName)
+		compPods, err := ListOwnedPods(ctx, cli, cluster.Namespace, cluster.Name, compShortName)
 		if err != nil {
 			return nil, err
 		}
-		if compPodList == nil || len(compPodList.Items) == 0 {
+		if len(compPods) == 0 {
 			continue
 		}
-		clusterPods = append(clusterPods, compPodList.Items...)
+		clusterPods = append(clusterPods, compPods...)
 		compNames = append(compNames, compShortName)
 		if model.IsObjectDeleting(&comp) {
 			deletingCompNames = append(deletingCompNames, compShortName)
@@ -489,7 +489,7 @@ func cleanActionJob(ctx context.Context,
 	if !checkActionDoneAnnotationExist(*cluster, comp, synthesizeComp, actionType) {
 		return fmt.Errorf("cluster %s %s done annotation has not been set", cluster.Name, actionType)
 	}
-	return CleanJobByNameWithDAG(ctx, cli, dag, cluster, jobName)
+	return job.CleanJobByNameWithDAG(ctx, cli, dag, cluster, jobName)
 }
 
 // checkActionDoneAnnotationExist checks if the action done annotation exists.

@@ -35,7 +35,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -102,19 +101,8 @@ var _ = Describe("Component Utils", func() {
 			newCluster, _ := GetClusterByObject(ctx, k8sClient, its)
 			Expect(newCluster != nil).Should(BeTrue())
 
-			By("test getObjectListByComponentName function")
-			itsList := &workloads.InstanceSetList{}
-			_ = component.GetObjectListByComponentName(ctx, k8sClient, *cluster, itsList, consensusCompName)
-			Expect(len(itsList.Items) > 0).Should(BeTrue())
-
-			By("test getObjectListByCustomLabels function")
-			itsList = &workloads.InstanceSetList{}
-			matchLabel := constant.GetComponentWellKnownLabels(cluster.Name, consensusCompName)
-			_ = getObjectListByCustomLabels(ctx, k8sClient, *cluster, itsList, client.MatchingLabels(matchLabel))
-			Expect(len(itsList.Items) > 0).Should(BeTrue())
-
-			By("test GetComponentStsMinReadySeconds")
-			minReadySeconds, _ := component.GetComponentMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)
+			By("test GetMinReadySeconds function")
+			minReadySeconds, _ := component.GetMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
 		})
 	})

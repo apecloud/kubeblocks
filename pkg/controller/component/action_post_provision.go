@@ -26,6 +26,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/job"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -58,15 +59,15 @@ func ReconcileCompPostProvision(ctx context.Context,
 		return nil
 	}
 
-	job, err := createActionJobIfNotExist(ctx, cli, graphCli, dag, cluster, comp, synthesizeComp, PostProvisionAction)
+	actionJob, err := createActionJobIfNotExist(ctx, cli, graphCli, dag, cluster, comp, synthesizeComp, PostProvisionAction)
 	if err != nil {
 		return err
 	}
-	if job == nil {
+	if actionJob == nil {
 		return nil
 	}
 
-	err = CheckJobSucceed(ctx, cli, cluster, job.Name)
+	err = job.CheckJobSucceed(ctx, cli, cluster, actionJob.Name)
 	if err != nil {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
 			return nil
@@ -80,7 +81,7 @@ func ReconcileCompPostProvision(ctx context.Context,
 		return err
 	}
 
-	if err := cleanActionJob(ctx, cli, dag, cluster, *compOrig, *synthesizeComp, PostProvisionAction, job.Name); err != nil {
+	if err := cleanActionJob(ctx, cli, dag, cluster, *compOrig, *synthesizeComp, PostProvisionAction, actionJob.Name); err != nil {
 		return err
 	}
 

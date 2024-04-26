@@ -43,7 +43,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 )
 
@@ -529,8 +528,7 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
 	if err != nil {
 		return err
 	}
@@ -839,9 +837,7 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 	itsObj *workloads.InstanceSet, dag *graph.DAG) error {
 	graphCli := model.NewGraphClient(cli)
 	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
-		labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
-		pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
-			generics.PersistentVolumeClaimSignature, itsObj.Namespace, labels, inDataContext4C())
+		pvcs, err := component.ListOwnedPVCs(reqCtx.Ctx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil, nil

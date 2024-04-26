@@ -4017,10 +4017,10 @@ spec:
                               using this approach. - If both `cluster` and `serviceDescriptor`
                               are present, `cluster` will take precedence. \n Deprecated
                               since v0.9 since `clusterDefinition.spec.connectionCredential`
-                              is deprecated, use `clusterRef` instead. This field
-                              is maintained for backward compatibility and its use
-                              is discouraged. Existing usage should be updated to
-                              the current preferred approach to avoid compatibility
+                              is deprecated, use `clusterServiceSelector` instead.
+                              This field is maintained for backward compatibility
+                              and its use is discouraged. Existing usage should be
+                              updated to the current preferred approach to avoid compatibility
                               issues in future releases."
                             type: string
                           clusterServiceSelector:
@@ -5836,9 +5836,9 @@ spec:
                         leader\" to the `serviceSpec.selector`. This means that the
                         service will select and route traffic to Pods with the label
                         \"kubeblocks.io/role\" set to \"leader\". \n Note that if
-                        `generatePodOrdinalService` sets to true, RoleSelector will
-                        be ignored. The `generatePodOrdinalService` flag takes precedence
-                        over `roleSelector` and generates a service for each Pod."
+                        `podService` sets to true, RoleSelector will be ignored. The
+                        `podService` flag takes precedence over `roleSelector` and
+                        generates a service for each Pod."
                       type: string
                     serviceName:
                       description: "ServiceName defines the name of the underlying
@@ -10275,11 +10275,11 @@ spec:
                                   using this approach. - If both `cluster` and `serviceDescriptor`
                                   are present, `cluster` will take precedence. \n
                                   Deprecated since v0.9 since `clusterDefinition.spec.connectionCredential`
-                                  is deprecated, use `clusterRef` instead. This field
-                                  is maintained for backward compatibility and its
-                                  use is discouraged. Existing usage should be updated
-                                  to the current preferred approach to avoid compatibility
-                                  issues in future releases."
+                                  is deprecated, use `clusterServiceSelector` instead.
+                                  This field is maintained for backward compatibility
+                                  and its use is discouraged. Existing usage should
+                                  be updated to the current preferred approach to
+                                  avoid compatibility issues in future releases."
                                 type: string
                               clusterServiceSelector:
                                 description: ClusterRef is used to reference a service

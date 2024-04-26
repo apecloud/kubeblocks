@@ -38,6 +38,7 @@ type BackupPolicySpec struct {
 	PathPrefix string `json:"pathPrefix,omitempty"`
 
 	// Specifies the number of retries before marking the backup as failed.
+	// If not set, default value is the value of DefaultBackOffLimit.
 	//
 	// +optional
 	// +kubebuilder:validation:Minimum=0

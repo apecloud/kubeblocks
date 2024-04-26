@@ -14713,6 +14713,13 @@ spec:
                                 the component that the referent object resident in.
                                 If not specified, the component itself will be used.
                               type: string
+                            componentName:
+                              description: Reference to the name of the Component
+                                object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
                             instanceNames:
                               description: 'Reference to the instanceName list of
                                 the component. and the value will be presented in

@@ -1267,6 +1267,20 @@ var _ = Describe("vars", func() {
 			By("ok")
 			vars = []appsv1alpha1.EnvVar{
 				{
+					Name: "component-name",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Optional: required(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								ComponentName: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
 					Name: "component-replicas",
 					ValueFrom: &appsv1alpha1.VarSource{
 						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
@@ -1317,6 +1331,7 @@ var _ = Describe("vars", func() {
 			}
 			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
+			checkEnvVarWithValue(envVars, "component-name", constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name))
 			checkEnvVarWithValue(envVars, "component-replicas", fmt.Sprintf("%d", 3))
 			checkEnvVarWithValue(envVars, "component-instanceNames", strings.Join(mockInstanceList, ","))
 		})

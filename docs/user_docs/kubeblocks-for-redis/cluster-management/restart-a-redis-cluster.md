@@ -20,22 +20,8 @@ Restarting a Redis cluster triggers a concurrent restart and the leader may chan
 
 1. Restart a cluster.
 
-   You can use `kbcli` or create an OpsRequest to restart a cluster.
+   You can create an OpsRequest to restart a cluster.
   
-   **Option 1.** (**Recommended**) Use kbcli
-
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
-
-   ```bash
-   kbcli cluster restart redis-cluster --components="redis" \
-   --ttlSecondsAfterSucceed=30
-   ```
-
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
-
-   **Option 2.** Create an OpsRequest
-
    Run the command below to restart a cluster.
 
    ```bash
@@ -45,7 +31,7 @@ Restarting a Redis cluster triggers a concurrent restart and the leader may chan
    metadata:
      name: ops-restart
    spec:
-     clusterRef: redis-cluster
+     clusterRef: mycluster
      type: Restart 
      restart:
      - componentName: redis
@@ -57,7 +43,7 @@ Restarting a Redis cluster triggers a concurrent restart and the leader may chan
    Check the cluster status to identify the restart status.
 
    ```bash
-   kbcli cluster list <name>
+   kubectl get cluster mycluster
    ```
 
    - STATUS=Restarting: it means the cluster restart is in progress.
@@ -66,8 +52,8 @@ Restarting a Redis cluster triggers a concurrent restart and the leader may chan
    ***Example***
 
    ```bash
-   kbcli cluster list redis-cluster
+   kubectl get cluster mycluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION            TERMINATION-POLICY        STATUS         CREATED-TIME
-   redis-cluster        default          redis                     redis-7.0.x        Delete                    Running        Apr 10,2023 19:20 UTC+0800
+   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+   mycluster   redis                redis-7.0.6    Delete               Running   4d18h
    ```

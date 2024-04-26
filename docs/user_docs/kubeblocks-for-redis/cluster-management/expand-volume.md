@@ -21,36 +21,23 @@ Volume expansion triggers a concurrent restart and the leader pod may change aft
 Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list <name>
+kubectl get cluster mycluster
 ```
 
 ***Example***
 
 ```bash
-kbcli cluster list redis-cluster
+kubectl get cluster mycluster
 >
-NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-redis-cluster        default          redis                     redis-7.0.6            Delete                    Running        Apr 10,2023 19:00 UTC+0800
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+mycluster   redis                redis-7.0.6    Delete               Running   4d18h
 ```
 
 ## Steps
 
-1. Change configuration. There are 3 ways to apply volume expansion.
+1. Change configuration. There are 2 ways to apply volume expansion.
 
-   **Option 1**. (**Recommended**) Use kbcli
-
-   Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
-
-   ```bash
-   kbcli cluster volume-expand redis-cluster --components="redis" \
-   --volume-claim-templates="data" --storage="2Gi"
-   ```
-
-   - `--components` describes the component name for volume expansion.
-   - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
-   - `--storage` describes the volume storage size.
-
-   **Option 2**. Create an OpsRequest
+   **Option 1**. Create an OpsRequest
 
    Run the command below to expand the volume of a cluster.
 
@@ -61,7 +48,7 @@ redis-cluster        default          redis                     redis-7.0.6     
    metadata:
      name: ops-volume-expansion
    spec:
-     clusterRef: redis-cluster
+     clusterRef: mycluster
      type: VolumeExpansion
      volumeExpansion:
      - componentName: redis
@@ -71,7 +58,7 @@ redis-cluster        default          redis                     redis-7.0.6     
    EOF
    ```
 
-   **Option 3**. Change the YAML file of the cluster
+   **Option 2**. Change the YAML file of the cluster
 
    Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
@@ -81,7 +68,7 @@ redis-cluster        default          redis                     redis-7.0.6     
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: redis-cluster
+     name: mycluster
      namespace: default
    spec:
      clusterDefinitionRef: redis
@@ -104,16 +91,17 @@ redis-cluster        default          redis                     redis-7.0.6     
 2. Validate the volume expansion.
 
    ```bash
-   kbcli cluster list <name>
+   kubectl get cluster mycluster
    ```
 
    ***Example***
 
    ```bash
-   kbcli cluster list redis-cluster
+   kubectl get cluster mycluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   redis-cluster        default          redis                     redis-7.0.6              Delete                    VolumeExpanding        Apr 10,2023 16:27 UTC+0800
+   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS            AGE
+   mycluster   redis                redis-7.0.6    Delete               VolumeExpanding   4d18h
+
    ```
 
    - STATUS=VolumeExpanding: it means the volume expansion is in progress.

@@ -865,9 +865,7 @@ type ComponentService struct {
 	// When set to true, a set of Services will be automatically generated for each Pod,
 	// and the `roleSelector` field will be ignored.
 	//
-	// The names of the generated Services will follow the same naming pattern: `$(serviceName)-$(podOrdinal)`.
-	//
-	// The podOrdinal is zero-based, meaning it starts from 0 for the first Pod and increments for each subsequent Pod.
+	// The names of the generated Services will follow the same suffix naming pattern: `$(serviceName)-$(podOrdinal)`.
 	// The total number of generated Services will be equal to the number of replicas specified for the Component.
 	//
 	// Example usage:
@@ -875,7 +873,8 @@ type ComponentService struct {
 	// ```yaml
 	// name: my-service
 	// serviceName: my-service
-	// generatePodOrdinalService: true
+	// podService: true
+	// disableAutoProvision: true
 	// spec:
 	//   type: NodePort
 	//   ports:
@@ -953,8 +952,8 @@ type Service struct {
 	// This means that the service will select and route traffic to Pods with the label
 	// "kubeblocks.io/role" set to "leader".
 	//
-	// Note that if `generatePodOrdinalService` sets to true, RoleSelector will be ignored.
-	// The `generatePodOrdinalService` flag takes precedence over `roleSelector` and generates a service for each Pod.
+	// Note that if `podService` sets to true, RoleSelector will be ignored.
+	// The `podService` flag takes precedence over `roleSelector` and generates a service for each Pod.
 	//
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`

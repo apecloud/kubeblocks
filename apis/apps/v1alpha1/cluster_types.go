@@ -1202,7 +1202,7 @@ type ServiceRef struct {
 	// - If both `cluster` and `serviceDescriptor` are present, `cluster` will take precedence.
 	//
 	// Deprecated since v0.9 since `clusterDefinition.spec.connectionCredential` is deprecated,
-	// use `clusterRef` instead.
+	// use `clusterServiceSelector` instead.
 	// This field is maintained for backward compatibility and its use is discouraged.
 	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
 	//

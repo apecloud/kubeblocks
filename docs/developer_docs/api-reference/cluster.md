@@ -8818,13 +8818,13 @@ bool
 <p>Indicates whether to create a corresponding Service for each Pod of the selected Component.
 When set to true, a set of Services will be automatically generated for each Pod,
 and the <code>roleSelector</code> field will be ignored.</p>
-<p>The names of the generated Services will follow the same naming pattern: <code>$(serviceName)-$(podOrdinal)</code>.</p>
-<p>The podOrdinal is zero-based, meaning it starts from 0 for the first Pod and increments for each subsequent Pod.
+<p>The names of the generated Services will follow the same suffix naming pattern: <code>$(serviceName)-$(podOrdinal)</code>.
 The total number of generated Services will be equal to the number of replicas specified for the Component.</p>
 <p>Example usage:</p>
 <pre><code class="language-yaml">name: my-service
 serviceName: my-service
-generatePodOrdinalService: true
+podService: true
+disableAutoProvision: true
 spec:
   type: NodePort
   ports:
@@ -18834,8 +18834,8 @@ Example usage:</p>
 &ldquo;kubeblocks.io/role: leader&rdquo; to the <code>serviceSpec.selector</code>.
 This means that the service will select and route traffic to Pods with the label
 &ldquo;kubeblocks.io/role&rdquo; set to &ldquo;leader&rdquo;.</p>
-<p>Note that if <code>generatePodOrdinalService</code> sets to true, RoleSelector will be ignored.
-The <code>generatePodOrdinalService</code> flag takes precedence over <code>roleSelector</code> and generates a service for each Pod.</p>
+<p>Note that if <code>podService</code> sets to true, RoleSelector will be ignored.
+The <code>podService</code> flag takes precedence over <code>roleSelector</code> and generates a service for each Pod.</p>
 </td>
 </tr>
 </tbody>
@@ -19143,7 +19143,7 @@ ClusterDefinition are not validated when using this approach.</li>
 <li>If both <code>cluster</code> and <code>serviceDescriptor</code> are present, <code>cluster</code> will take precedence.</li>
 </ul>
 <p>Deprecated since v0.9 since <code>clusterDefinition.spec.connectionCredential</code> is deprecated,
-use <code>clusterRef</code> instead.
+use <code>clusterServiceSelector</code> instead.
 This field is maintained for backward compatibility and its use is discouraged.
 Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
 </td>

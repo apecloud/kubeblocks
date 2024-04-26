@@ -2593,10 +2593,11 @@ spec:
                         not validated when using this approach. - If both `cluster`
                         and `serviceDescriptor` are present, `cluster` will take precedence.
                         \n Deprecated since v0.9 since `clusterDefinition.spec.connectionCredential`
-                        is deprecated, use `clusterRef` instead. This field is maintained
-                        for backward compatibility and its use is discouraged. Existing
-                        usage should be updated to the current preferred approach
-                        to avoid compatibility issues in future releases."
+                        is deprecated, use `clusterServiceSelector` instead. This
+                        field is maintained for backward compatibility and its use
+                        is discouraged. Existing usage should be updated to the current
+                        preferred approach to avoid compatibility issues in future
+                        releases."
                       type: string
                     clusterServiceSelector:
                       description: ClusterRef is used to reference a service provided
@@ -2733,23 +2734,21 @@ spec:
                         for each Pod of the selected Component. When set to true,
                         a set of Services will be automatically generated for each
                         Pod, and the `roleSelector` field will be ignored. \n The
-                        names of the generated Services will follow the same naming
-                        pattern: `$(serviceName)-$(podOrdinal)`. \n The podOrdinal
-                        is zero-based, meaning it starts from 0 for the first Pod
-                        and increments for each subsequent Pod. The total number of
-                        generated Services will be equal to the number of replicas
-                        specified for the Component. \n Example usage: \n ```yaml
-                        name: my-service serviceName: my-service generatePodOrdinalService:
-                        true spec: type: NodePort ports: - name: http port: 80 targetPort:
-                        8080 ``` \n In this example, if the Component has 3 replicas,
-                        three Services will be generated: - my-service-0: Points to
-                        the first Pod (podOrdinal: 0) - my-service-1: Points to the
-                        second Pod (podOrdinal: 1) - my-service-2: Points to the third
-                        Pod (podOrdinal: 2) \n Each generated Service will have the
-                        specified spec configuration and will target its respective
-                        Pod. \n This feature is useful when you need to expose each
-                        Pod of a Component individually, allowing external access
-                        to specific instances of the Component."
+                        names of the generated Services will follow the same suffix
+                        naming pattern: `$(serviceName)-$(podOrdinal)`. The total
+                        number of generated Services will be equal to the number of
+                        replicas specified for the Component. \n Example usage: \n
+                        ```yaml name: my-service serviceName: my-service podService:
+                        true disableAutoProvision: true spec: type: NodePort ports:
+                        - name: http port: 80 targetPort: 8080 ``` \n In this example,
+                        if the Component has 3 replicas, three Services will be generated:
+                        - my-service-0: Points to the first Pod (podOrdinal: 0) -
+                        my-service-1: Points to the second Pod (podOrdinal: 1) - my-service-2:
+                        Points to the third Pod (podOrdinal: 2) \n Each generated
+                        Service will have the specified spec configuration and will
+                        target its respective Pod. \n This feature is useful when
+                        you need to expose each Pod of a Component individually, allowing
+                        external access to specific instances of the Component."
                       type: boolean
                     roleSelector:
                       description: "Extends the above `serviceSpec.selector` by allowing
@@ -2761,9 +2760,9 @@ spec:
                         leader\" to the `serviceSpec.selector`. This means that the
                         service will select and route traffic to Pods with the label
                         \"kubeblocks.io/role\" set to \"leader\". \n Note that if
-                        `generatePodOrdinalService` sets to true, RoleSelector will
-                        be ignored. The `generatePodOrdinalService` flag takes precedence
-                        over `roleSelector` and generates a service for each Pod."
+                        `podService` sets to true, RoleSelector will be ignored. The
+                        `podService` flag takes precedence over `roleSelector` and
+                        generates a service for each Pod."
                       type: string
                     serviceName:
                       description: "ServiceName defines the name of the underlying

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,8 +61,21 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		componentReplicasMap = map[string]int32{}
 		cluster              = opsRes.Cluster
 	)
-	if _, ok := cluster.Annotations[constant.SnapShotForStartAnnotationKey]; ok {
+	// if the cluster is already stopping or stopped, return
+	if slices.Contains([]appsv1alpha1.ClusterPhase{appsv1alpha1.StoppedClusterPhase,
+		appsv1alpha1.StoppingClusterPhase}, opsRes.Cluster.Status.Phase) {
 		return nil
+	}
+	if _, ok := cluster.Annotations[constant.SnapShotForStartAnnotationKey]; ok {
+		return fmt.Errorf("wait for the cluster to start before continuing to stop the cluster")
+	}
+	// abort earlier running vertical scaling opsRequest.
+	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.HorizontalScalingType,
+		appsv1alpha1.StartType, appsv1alpha1.RestartType, appsv1alpha1.VerticalScalingType},
+		func(earlierOps *appsv1alpha1.OpsRequest) bool {
+			return true
+		}); err != nil {
+		return err
 	}
 	setReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string) {
 		compKey := getComponentKeyForStartSnapshot(componentName, "")

@@ -7995,17 +7995,6 @@ string
 <p>Specifies the name of the Component.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>isSharding</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<p>Specifies that the componentName refers to the cluster&rsquo;s sharding component.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentRefEnv">ComponentRefEnv
@@ -12064,6 +12053,50 @@ If not set, it will rebuild on a random node.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceResourceTemplate">InstanceResourceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refer to the instance template name of the component or sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ResourceRequirements</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ResourceRequirements</code> are embedded into this type.)
+</p>
+<p>Defines the computational resource size for vertical scaling.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
@@ -12268,6 +12301,47 @@ Add new or override existing volume mounts of the first container in the pod.</p
 <em>(Optional)</em>
 <p>Defines VolumeClaimTemplates to override.
 Add new or override existing volume claim templates.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refer to the instance template name of the component or sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OpsRequestVolumeClaimTemplate">
+[]OpsRequestVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<p>volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.</p>
 </td>
 </tr>
 </tbody>
@@ -14258,7 +14332,7 @@ Possible condition types include &ldquo;Cancelled&rdquo;, &ldquo;WaitForProgress
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsRequestVolumeClaimTemplate">OpsRequestVolumeClaimTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">PartInstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 </div>
@@ -14937,63 +15011,6 @@ The supported property types include:
 - number
 - integer
 - array: Note that only items of string type are supported.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">PartInstanceTemplate
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Refer to the instance template name of the component or sharding.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ResourceRequirements</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
-Kubernetes core/v1.ResourceRequirements
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ResourceRequirements</code> are embedded into this type.)
-</p>
-<p>Defines the computational resource size for vertical scaling.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeClaimTemplates</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.OpsRequestVolumeClaimTemplate">
-[]OpsRequestVolumeClaimTemplate
-</a>
-</em>
-</td>
-<td>
-<p>volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.</p>
 </td>
 </tr>
 </tbody>
@@ -20593,8 +20610,8 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">
-[]PartInstanceTemplate
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceResourceTemplate">
+[]InstanceResourceTemplate
 </a>
 </em>
 </td>
@@ -20654,8 +20671,8 @@ that are used to expand the storage and the desired storage size for each one.</
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">
-[]PartInstanceTemplate
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">
+[]InstanceVolumeClaimTemplate
 </a>
 </em>
 </td>

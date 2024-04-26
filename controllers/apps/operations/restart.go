@@ -142,7 +142,7 @@ func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object
 	cName := object.GetLabels()[constant.KBAppComponentLabelKey]
 	shardingName := object.GetLabels()[constant.KBAppShardingNameLabelKey]
 	if shardingName != "" {
-		if _, ok := r.compOpsHelper.componentOpsSet[getShardingKey(shardingName)]; !ok {
+		if _, ok := r.compOpsHelper.componentOpsSet[shardingName]; !ok {
 			return true
 		}
 	} else {

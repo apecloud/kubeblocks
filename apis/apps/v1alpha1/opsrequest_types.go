@@ -214,9 +214,6 @@ type ComponentOps struct {
 	// Specifies the name of the Component.
 	// +kubebuilder:validation:Required
 	ComponentName string `json:"componentName"`
-
-	// Specifies that the componentName refers to the cluster's sharding component.
-	IsSharding bool `json:"isSharding,omitempty"`
 }
 
 type RebuildInstance struct {
@@ -312,10 +309,10 @@ type VerticalScaling struct {
 	corev1.ResourceRequirements `json:",inline"`
 
 	// Specifies the instance template that need to vertical scale.
-	Instances []PartInstanceTemplate `json:"instances,omitempty"`
+	Instances []InstanceResourceTemplate `json:"instances,omitempty"`
 }
 
-type PartInstanceTemplate struct {
+type InstanceResourceTemplate struct {
 	// Refer to the instance template name of the component or sharding.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
@@ -323,6 +320,12 @@ type PartInstanceTemplate struct {
 	// Defines the computational resource size for vertical scaling.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
+}
+
+type InstanceVolumeClaimTemplate struct {
+	// Refer to the instance template name of the component or sharding.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
 
 	// volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.
 	// +kubebuilder:validation:Required
@@ -349,7 +352,7 @@ type VolumeExpansion struct {
 	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies the instance template that need to volume expand.
-	Instances []PartInstanceTemplate `json:"instances,omitempty"`
+	Instances []InstanceVolumeClaimTemplate `json:"instances,omitempty"`
 }
 
 type OpsRequestVolumeClaimTemplate struct {
@@ -1271,10 +1274,6 @@ func init() {
 
 func (c ComponentOps) GetComponentName() string {
 	return c.ComponentName
-}
-
-func (c ComponentOps) IsShardingComponent() bool {
-	return c.IsSharding
 }
 
 // ToExposeListToMap build expose map

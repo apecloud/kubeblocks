@@ -415,8 +415,8 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		}
 
 		// set service selector
-		if exposeService.Selector != nil {
-			clusterService.Spec.Selector = exposeService.Selector
+		if exposeService.PodSelector != nil {
+			clusterService.Spec.Selector = exposeService.PodSelector
 		}
 
 		// set service ports

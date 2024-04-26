@@ -166,7 +166,7 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 				continue
 			}
 			// rebuild instance
-			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.EnvForRestore, &progressDetail, instance, v.BackupName, i)
+			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.RestoreEnv, &progressDetail, instance, v.BackupName, i)
 			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				// If a fatal error occurs, this instance rebuilds failed.
 				progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, err.Error())

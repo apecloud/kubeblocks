@@ -86,13 +86,13 @@ spec:
                             to the `-c {containerName}` option in `kubectl exec`.
                             \n If not set, the first container is used."
                           type: string
-                        targetPodTemplate:
-                          description: Specifies a TargetPodTemplate defined in the
-                            `opsDefinition.spec.targetPodTemplates`.
+                        podInfoExtractorName:
+                          description: Specifies a PodInfoExtractor defined in the
+                            `opsDefinition.spec.podInfoExtractors`.
                           type: string
                       required:
                       - command
-                      - targetPodTemplate
+                      - podInfoExtractorName
                       type: object
                     failurePolicy:
                       allOf:
@@ -249,6 +249,10 @@ spec:
                           format: int32
                           minimum: 0
                           type: integer
+                        podInfoExtractorName:
+                          description: Specifies a PodInfoExtractor defined in the
+                            `opsDefinition.spec.podInfoExtractors`.
+                          type: string
                         podSpec:
                           description: Specifies the PodSpec of the 'workload' action.
                           properties:
@@ -8357,10 +8361,6 @@ spec:
                           required:
                           - containers
                           type: object
-                        targetPodTemplate:
-                          description: Specifies a TargetPodTemplate defined in the
-                            `opsDefinition.spec.targetPodTemplates`.
-                          type: string
                         type:
                           description: "Defines the workload type of the action. Valid
                             values include \"Job\" and \"Pod\". \n - \"Job\": Creates
@@ -8386,7 +8386,7 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
-              componentDefinitionRefs:
+              componentInfos:
                 description: Specifies a list of ComponentDefinition for Components
                   associated with this OpsDefinition. It also includes connection
                   credentials (address and account) for each Component.
@@ -8398,7 +8398,7 @@ spec:
                         password are injected into containers' environment variables
                         `KB_ACCOUNT_USERNAME` and `KB_ACCOUNT_PASSWORD`.
                       type: string
-                    name:
+                    componentDefinitionName:
                       description: Specifies the name of the ComponentDefinition.
                       maxLength: 32
                       type: string
@@ -8411,11 +8411,11 @@ spec:
                         converting to uppercase.
                       type: string
                   required:
-                  - name
+                  - componentDefinitionName
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:
-                - name
+                - componentDefinitionName
                 x-kubernetes-list-type: map
               parametersSchema:
                 description: Specifies the schema for validating the data types and
@@ -8428,80 +8428,15 @@ spec:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
-              preConditions:
-                description: 'Specifies the preconditions that must be met to run
-                  the actions for the operation. if set, it will check the condition
-                  before the Component runs this operation. Example: ```yaml preConditions:
-                  - rule: expression: ''{{ eq .component.status.phase "Running" }}''
-                  message: Component is not in Running status. ```'
-                items:
-                  properties:
-                    rule:
-                      description: Specifies the conditions that must be met for the
-                        operation to execute.
-                      properties:
-                        expression:
-                          description: "Specifies a Go template expression that determines
-                            how the operation can be executed. The return value must
-                            be either `true` or `false`. Available built-in objects
-                            that can be referenced in the expression include: \n -
-                            `params`: Input parameters. - `cluster`: The referenced
-                            Cluster object. - `component`: The referenced Component
-                            object."
-                          type: string
-                        message:
-                          description: Specifies the error or status message reported
-                            if the `expression` does not evaluate to `true`.
-                          type: string
-                      required:
-                      - expression
-                      - message
-                      type: object
-                  type: object
-                type: array
-              targetPodTemplates:
-                description: Specifies a list of TargetPodTemplate, each designed
-                  to select a specific Pod and extract selected runtime info from
-                  its PodSpec. The extracted information, such as environment variables,
+              podInfoExtractors:
+                description: Specifies a list of PodInfoExtractor, each designed to
+                  select a specific Pod and extract selected runtime info from its
+                  PodSpec. The extracted information, such as environment variables,
                   volumes and tolerations, are then injected into Jobs or Pods that
                   execute the OpsActions defined in `actions`.
                 items:
                   properties:
-                    name:
-                      description: Specifies the name of the TargetPodTemplate.
-                      maxLength: 32
-                      type: string
-                    podSelector:
-                      description: Used to select the target Pod from which environment
-                        variables and volumes are extracted from its PodSpec.
-                      properties:
-                        availability:
-                          default: PreferredAvailable
-                          description: 'Specifies the pod selection criteria based
-                            on their availability: - ''Available'': Only selects available
-                            pods, and terminates the action if none are found. - ''PreferredAvailable'':
-                            Prioritizes available pods but considers others if none
-                            available. - ''None'': No availability requirements.'
-                          enum:
-                          - Available
-                          - PreferredAvailable
-                          - None
-                          type: string
-                        role:
-                          description: Specifies the role of the target Pod.
-                          type: string
-                        selectionPolicy:
-                          default: Any
-                          description: Defines the policy for selecting the target
-                            pod when multiple pods match the podSelector. It can be
-                            either 'Any' (select any one pod that matches the podSelector)
-                            or 'All' (select all pods that match the podSelector).
-                          enum:
-                          - All
-                          - Any
-                          type: string
-                      type: object
-                    vars:
+                    env:
                       description: Specifies a list of environment variables to be
                         extracted from a selected Pod, and injected into the containers
                         executing each OpsAction.
@@ -8524,15 +8459,15 @@ spec:
                                   source of the variable, which can be either "env"
                                   or "envFrom".
                                 properties:
-                                  containerName:
-                                    description: Specifies the container name in the
-                                      target Pod. If not specified, the first container
-                                      will be used by default.
-                                    type: string
                                   envName:
                                     description: Defines the name of the environment
                                       variable. This name can originate from an 'env'
                                       entry or be a data key from an 'envFrom' source.
+                                    type: string
+                                  targetContainerName:
+                                    description: Specifies the container name in the
+                                      target Pod. If not specified, the first container
+                                      will be used by default.
                                     type: string
                                 required:
                                 - envName
@@ -8542,7 +8477,19 @@ spec:
                                   to the specific data within the JSON structure of
                                   the target Pod. It is used to extract precise data
                                   locations for operations on the Pod.
-                                type: string
+                                properties:
+                                  apiVersion:
+                                    description: Version of the schema the FieldPath
+                                      is written in terms of, defaults to "v1".
+                                    type: string
+                                  fieldPath:
+                                    description: Path of the field to select in the
+                                      specified API version.
+                                    type: string
+                                required:
+                                - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
                             type: object
                             x-kubernetes-validations:
                             - message: either fieldPath and envRef.
@@ -8552,6 +8499,28 @@ spec:
                         - valueFrom
                         type: object
                       type: array
+                    name:
+                      description: Specifies the name of the PodInfoExtractor.
+                      maxLength: 32
+                      type: string
+                    podSelector:
+                      description: Used to select the target Pod from which environment
+                        variables and volumes are extracted from its PodSpec.
+                      properties:
+                        multiPodSelectionPolicy:
+                          default: Any
+                          description: Defines the policy for selecting the target
+                            pod when multiple pods match the podSelector. It can be
+                            either 'Any' (select any one pod that matches the podSelector)
+                            or 'All' (select all pods that match the podSelector).
+                          enum:
+                          - All
+                          - Any
+                          type: string
+                        role:
+                          description: Specifies the role of the target Pod.
+                          type: string
+                      type: object
                     volumeMounts:
                       description: Specifies a list of volumes, along with their respective
                         mount points, that are to be extracted from a selected Pod,
@@ -8604,6 +8573,37 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              preConditions:
+                description: 'Specifies the preconditions that must be met to run
+                  the actions for the operation. if set, it will check the condition
+                  before the Component runs this operation. Example: ```yaml preConditions:
+                  - rule: expression: ''{{ eq .component.status.phase "Running" }}''
+                  message: Component is not in Running status. ```'
+                items:
+                  properties:
+                    rule:
+                      description: Specifies the conditions that must be met for the
+                        operation to execute.
+                      properties:
+                        expression:
+                          description: "Specifies a Go template expression that determines
+                            how the operation can be executed. The return value must
+                            be either `true` or `false`. Available built-in objects
+                            that can be referenced in the expression include: \n -
+                            `params`: Input parameters. - `cluster`: The referenced
+                            Cluster object. - `component`: The referenced Component
+                            object."
+                          type: string
+                        message:
+                          description: Specifies the error or status message reported
+                            if the `expression` does not evaluate to `true`.
+                          type: string
+                      required:
+                      - expression
+                      - message
+                      type: object
+                  type: object
+                type: array
             required:
             - actions
             type: object

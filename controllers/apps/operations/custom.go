@@ -52,13 +52,13 @@ func init() {
 
 // ActionStartedCondition the started condition when handling the stop request.
 func (c CustomOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
-	opsDefName := common.ToCamelCase(opsRes.OpsRequest.Spec.CustomSpec.OpsDefinitionRef)
+	opsDefName := common.ToCamelCase(opsRes.OpsRequest.Spec.CustomOps.OpsDefinitionName)
 	return &metav1.Condition{
 		Type:               appsv1alpha1.ConditionTypeCustomOperation,
 		Status:             metav1.ConditionTrue,
 		Reason:             opsDefName + "Starting",
 		LastTransitionTime: metav1.Now(),
-		Message:            fmt.Sprintf("Start to handle %s on the Cluster: %s", opsDefName, opsRes.OpsRequest.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to handle %s on the Cluster: %s", opsDefName, opsRes.OpsRequest.Spec.ClusterName),
 	}, nil
 }
 
@@ -72,15 +72,15 @@ func (c CustomOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	var (
 		oldOpsRequest        = opsRes.OpsRequest.DeepCopy()
 		opsRequestPhase      = opsRes.OpsRequest.Status.Phase
-		customSpec           = opsRes.OpsRequest.Spec.CustomSpec
+		customSpec           = opsRes.OpsRequest.Spec.CustomOps
 		workflowContext      = NewWorkflowContext(reqCtx, cli, opsRes)
-		compCount            = len(customSpec.CustomOpsItems)
+		compCount            = len(customSpec.CustomOpsComponents)
 		completedActionCount int
 		compFailedCount      int
 		compCompleteCount    int
 	)
 	// TODO: support Parallelism
-	for _, v := range customSpec.CustomOpsItems {
+	for _, v := range customSpec.CustomOpsComponents {
 		// 1. init component action progress and preCheck if the conditions for executing ops are met.
 		passed := c.initCompActionStatusAndPreCheck(reqCtx, cli, opsRes, v)
 		if !passed {
@@ -129,7 +129,7 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	if opsSpec.Force {
 		return nil
 	}
-	componentObjName := constant.GenerateClusterComponentName(opsSpec.ClusterRef, compCustomItem.ComponentName)
+	componentObjName := constant.GenerateClusterComponentName(opsSpec.ClusterName, compCustomItem.ComponentName)
 	comp := &appsv1alpha1.Component{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: componentObjName, Namespace: opsRes.OpsRequest.Namespace}, comp); err != nil {
 		return err
@@ -217,18 +217,18 @@ func covertParametersToMap(parameters []appsv1alpha1.Parameter) map[string]strin
 func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource) error {
-	customSpec := opsRes.OpsRequest.Spec.CustomSpec
+	customSpec := opsRes.OpsRequest.Spec.CustomOps
 	if customSpec == nil {
 		return intctrlutil.NewFatalError("spec.customSpec can not be empty if opsType is Custom.")
 	}
 	opsDef := &appsv1alpha1.OpsDefinition{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: customSpec.OpsDefinitionRef}, opsDef); err != nil {
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: customSpec.OpsDefinitionName}, opsDef); err != nil {
 		return err
 	}
 	opsRes.OpsDef = opsDef
 	// 1. validate OpenApV3Schema
 	parametersSchema := opsDef.Spec.ParametersSchema
-	for _, v := range customSpec.CustomOpsItems {
+	for _, v := range customSpec.CustomOpsComponents {
 		// covert to type map[string]interface{}
 		params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, covertParametersToMap(v.Parameters))
 		if err != nil {
@@ -241,7 +241,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 		}
 
 		// 2. validate component and componentDef
-		if len(opsRes.OpsDef.Spec.ComponentDefinitionRefs) > 0 {
+		if len(opsRes.OpsDef.Spec.ComponentInfos) > 0 {
 			comp := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
 			if comp == nil {
 				return intctrlutil.NewNotFound(`can not found component "%s" in cluster "%s"`, v.ComponentName, opsRes.Cluster.Name)
@@ -250,10 +250,10 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 			if err != nil {
 				return err
 			}
-			if len(opsDef.Spec.ComponentDefinitionRefs) > 0 {
+			if len(opsDef.Spec.ComponentInfos) > 0 {
 				var componentDefMatched bool
-				for _, v := range opsDef.Spec.ComponentDefinitionRefs {
-					if v.Name == compDef.Name {
+				for _, c := range opsDef.Spec.ComponentInfos {
+					if c.ComponentDefinitionName == compDef.Name {
 						componentDefMatched = true
 						break
 					}

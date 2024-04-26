@@ -153,7 +153,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		return nil
 	}
 	// if TTLSecondsBeforeAbort is not set or 0, return error
-	if r.Spec.TTLSecondsBeforeAbort == nil || *r.Spec.TTLSecondsBeforeAbort == 0 {
+	if r.Spec.PreConditionDeadlineSeconds == nil || *r.Spec.PreConditionDeadlineSeconds == 0 {
 		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
 	}
 	return nil
@@ -166,8 +166,8 @@ func (r *OpsRequest) getCluster(ctx context.Context, k8sClient client.Client) (*
 	}
 	cluster := &Cluster{}
 	// get cluster resource
-	if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: r.Spec.ClusterRef}, cluster); err != nil {
-		return nil, fmt.Errorf("get cluster: %s failed, err: %s", r.Spec.ClusterRef, err.Error())
+	if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: r.Spec.ClusterName}, cluster); err != nil {
+		return nil, fmt.Errorf("get cluster: %s failed, err: %s", r.Spec.ClusterName, err.Error())
 	}
 	return cluster, nil
 }
@@ -355,7 +355,7 @@ func (r *OpsRequest) validateReconfigureParams(ctx context.Context,
 		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
 	}
 	for _, configuration := range reconfigure.Configurations {
-		cmObj, err := r.getConfigMap(ctx, k8sClient, fmt.Sprintf("%s-%s-%s", r.Spec.ClusterRef, reconfigure.ComponentName, configuration.Name))
+		cmObj, err := r.getConfigMap(ctx, k8sClient, fmt.Sprintf("%s-%s-%s", r.Spec.ClusterName, reconfigure.ComponentName, configuration.Name))
 		if err != nil {
 			return err
 		}
@@ -475,7 +475,7 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *Cluster, componentOps Compon
 		}
 	}
 	if len(notFoundInstanceNames) > 0 {
-		return fmt.Errorf("instance: %v not found in cluster: %s", notFoundInstanceNames, r.Spec.ClusterRef)
+		return fmt.Errorf("instance: %v not found in cluster: %s", notFoundInstanceNames, r.Spec.ClusterName)
 	}
 	return nil
 }
@@ -652,7 +652,7 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	isShardingComponent bool,
 	requestStorage resource.Quantity) (*string, error) {
 	matchingLabels := client.MatchingLabels{
-		constant.AppInstanceLabelKey:             r.Spec.ClusterRef,
+		constant.AppInstanceLabelKey:             r.Spec.ClusterName,
 		constant.VolumeClaimTemplateNameLabelKey: vctName,
 	}
 	if isShardingComponent {

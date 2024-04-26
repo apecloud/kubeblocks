@@ -126,7 +126,7 @@ func PatchOpsStatus(ctx context.Context,
 
 // PatchClusterNotFound patches ClusterNotFound condition to the OpsRequest.status.conditions.
 func PatchClusterNotFound(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
-	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.ClusterRef)
+	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.ClusterName)
 	condition := appsv1alpha1.NewValidateFailedCondition(appsv1alpha1.ReasonClusterNotFound, message)
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
@@ -226,7 +226,7 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 	}
 	// check if entry-condition is met
 	// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
-	if ops.Spec.TTLSecondsBeforeAbort == nil || (time.Now().After(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.TTLSecondsBeforeAbort) * time.Second))) {
+	if ops.Spec.PreConditionDeadlineSeconds == nil || (time.Now().After(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.PreConditionDeadlineSeconds) * time.Second))) {
 		return nil
 	}
 

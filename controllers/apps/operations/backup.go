@@ -106,9 +106,9 @@ func (b BackupOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, cluster *appsv1alpha1.Cluster) (*dpv1alpha1.Backup, error) {
 	var err error
 
-	backupSpec := opsRequest.Spec.BackupSpec
+	backupSpec := opsRequest.Spec.Backup
 	if backupSpec == nil {
-		backupSpec = &appsv1alpha1.BackupSpec{}
+		backupSpec = &appsv1alpha1.Backup{}
 	}
 
 	if len(backupSpec.BackupName) == 0 {

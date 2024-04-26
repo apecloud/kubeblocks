@@ -96,7 +96,7 @@ func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, c
 		Context:       reqCtx.Ctx,
 		Client:        cli,
 		Namespace:     opsRes.Cluster.Namespace,
-		ClusterName:   ops.ClusterRef,
+		ClusterName:   ops.ClusterName,
 		ComponentName: componentName,
 	})
 

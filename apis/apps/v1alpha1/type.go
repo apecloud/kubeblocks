@@ -1153,6 +1153,11 @@ type ComponentVarSelector struct {
 }
 
 type ComponentVars struct {
+	// Reference to the name of the Component object.
+	//
+	// +optional
+	ComponentName *VarOption `json:"componentName,omitempty"`
+
 	// Reference to the replicas of the component.
 	//
 	// +optional

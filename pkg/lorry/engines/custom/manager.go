@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -169,11 +170,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 		// return errors.New("member leave command is empty!")
 		return nil
 	}
-	envs, err := util.GetGlobalSharedEnvs()
-	if err != nil {
-		return err
-	}
-
+	envs := os.Environ()
 	if cluster.Leader != nil && cluster.Leader.Name != "" {
 		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
 		fqdn := cluster.GetMemberAddr(*leaderMember)

@@ -183,18 +183,22 @@ func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
 
 	if clusterCompDef.VolumeProtectionSpec != nil {
 		defaultHighWatermark := clusterCompDef.VolumeProtectionSpec.HighWatermark
-		for i := range volumes {
-			volumes[i].HighWatermark = defaultHighWatermark
+		highWatermark := func(v appsv1alpha1.ProtectedVolume) int {
+			if v.HighWatermark != nil {
+				return *v.HighWatermark
+			}
+			return defaultHighWatermark
 		}
-		for _, v := range clusterCompDef.VolumeProtectionSpec.Volumes {
-			if v.HighWatermark != nil && *v.HighWatermark != defaultHighWatermark {
-				for i, vv := range volumes {
-					if v.Name != vv.Name {
-						continue
-					}
-					volumes[i].HighWatermark = *v.HighWatermark
+		setHighWatermark := func(protectedVol appsv1alpha1.ProtectedVolume) {
+			for i, v := range volumes {
+				if v.Name == protectedVol.Name {
+					volumes[i].HighWatermark = highWatermark(protectedVol)
+					break
 				}
 			}
+		}
+		for _, v := range clusterCompDef.VolumeProtectionSpec.Volumes {
+			setHighWatermark(v)
 		}
 	}
 	return volumes, nil

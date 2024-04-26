@@ -178,7 +178,6 @@ var _ = Describe("Restore", func() {
 			synthesizedComponent = &component.SynthesizedComponent{
 				WorkloadType:          appsv1alpha1.Consensus,
 				PodSpec:               clusterCompDefObj.PodSpec,
-				Probes:                clusterCompDefObj.Probes,
 				LogConfigs:            clusterCompDefObj.LogConfigs,
 				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
 				VolumeClaimTemplates:  cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),

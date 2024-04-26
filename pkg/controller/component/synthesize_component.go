@@ -481,33 +481,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
-		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
-		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
-		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
-		if synthesizeComp.TLSConfig != nil {
-			synthesizeComp.TLS = true
-		}
-	}
-
-	// Services is a backward compatible field, which will be replaced with ComponentServices in the future.
-	buildServices := func() {
-		if clusterCompDef.Service != nil {
-			service := corev1.Service{Spec: clusterCompDef.Service.ToSVCSpec()}
-			service.Spec.Type = corev1.ServiceTypeClusterIP
-			synthesizeComp.Services = append(synthesizeComp.Services, service)
-			for _, item := range clusterCompSpec.Services {
-				service = corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:        item.Name,
-						Annotations: item.Annotations,
-					},
-					Spec: service.Spec,
-				}
-				service.Spec.Type = item.ServiceType
-				synthesizeComp.Services = append(synthesizeComp.Services, service)
-			}
-		}
 	}
 
 	mergeClusterCompVersion := func() {
@@ -544,9 +518,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 
 	// merge clusterCompVersion
 	mergeClusterCompVersion()
-
-	// build services
-	buildServices()
 
 	// build pod management policy
 	buildPodManagementPolicy()

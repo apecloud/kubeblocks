@@ -21,18 +21,14 @@ package component
 
 import (
 	"encoding/json"
-	"reflect"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("Lorry Utils", func() {
@@ -42,28 +38,21 @@ var _ = Describe("Lorry Utils", func() {
 		var component *SynthesizedComponent
 		var lorryHTTPPort int
 		var lorryGRPCPort int
-		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
 			lorryHTTPPort = 3501
 			lorryGRPCPort = 50001
 
-			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
-			clusterDefProbe.PeriodSeconds = 1
-			clusterDefProbe.TimeoutSeconds = 1
-			clusterDefProbe.FailureThreshold = 1
-
 			component = &SynthesizedComponent{}
 			component.CharacterType = "mysql"
-			component.Services = append(component.Services, corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "mysql",
-				},
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{{
-						Protocol: corev1.ProtocolTCP,
-						Port:     3306,
-					}},
+			component.ComponentServices = append(component.ComponentServices, appsv1alpha1.ComponentService{
+				Service: appsv1alpha1.Service{
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{
+							Protocol: corev1.ProtocolTCP,
+							Port:     3306,
+						}},
+					},
 				},
 			})
 			component.Roles = []appsv1alpha1.ReplicaRole{
@@ -174,17 +163,14 @@ var _ = Describe("Lorry Utils", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			zeroWatermark := 0
-			component.VolumeProtection = &appsv1alpha1.VolumeProtectionSpec{
-				HighWatermark: 90,
-				Volumes: []appsv1alpha1.ProtectedVolume{
-					{
-						Name: "volume-001",
-					},
-					{
-						Name:          "volume-002",
-						HighWatermark: &zeroWatermark,
-					},
+			component.Volumes = []appsv1alpha1.ComponentVolume{
+				{
+					Name:          "volume-001",
+					HighWatermark: 90,
+				},
+				{
+					Name:          "volume-002",
+					HighWatermark: 0,
 				},
 			}
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
@@ -206,17 +192,14 @@ var _ = Describe("Lorry Utils", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			zeroWatermark := 0
-			component.VolumeProtection = &appsv1alpha1.VolumeProtectionSpec{
-				HighWatermark: 90,
-				Volumes: []appsv1alpha1.ProtectedVolume{
-					{
-						Name: "volume-001",
-					},
-					{
-						Name:          "volume-002",
-						HighWatermark: &zeroWatermark,
-					},
+			component.Volumes = []appsv1alpha1.ComponentVolume{
+				{
+					Name:          "volume-001",
+					HighWatermark: 90,
+				},
+				{
+					Name:          "volume-002",
+					HighWatermark: 0,
 				},
 			}
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
@@ -237,7 +220,9 @@ var _ = Describe("Lorry Utils", func() {
 					break
 				}
 			}
-			Expect(reflect.DeepEqual(component.VolumeProtection, spec)).Should(BeTrue())
+			Expect(spec.Volumes).Should(HaveLen(2))
+			Expect(spec.Volumes[0].HighWatermark).Should(Equal(90))
+			Expect(spec.Volumes[1].HighWatermark).Should(Equal(0))
 		})
 	})
 })

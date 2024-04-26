@@ -261,6 +261,14 @@ func (r *deletionStage) Handle(ctx context.Context) {
 
 func (r *installableCheckStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
+		// additional check to the addon YAML to ensure support for Kubernetes versions prior to 1.2.5
+		err := checkAddonSpec(addon)
+		if err != nil {
+			setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, AddonCheckError, err.Error())
+			r.setReconciled()
+			return
+		}
+
 		r.reqCtx.Log.V(1).Info("installableCheckStage", "phase", addon.Status.Phase)
 		if addon.Spec.Installable == nil {
 			return
@@ -1081,4 +1089,13 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 		return true
 	}
 	return false
+}
+
+func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
+	if addon.Spec.Type == "Helm" {
+		if addon.Spec.Helm == nil || addon.Spec.Helm.ChartLocationURL == "" {
+			return fmt.Errorf("invalid Helm configuration: either 'Helm' is not specified or 'ChartLocationURL' is empty")
+		}
+	}
+	return nil
 }

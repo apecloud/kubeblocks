@@ -630,6 +630,25 @@ var _ = Describe("Addon controller", func() {
 			})
 			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
 		})
+
+		It("should failed reconcile a custom resource for Addon with missing spec helm of helm chartLocationURL", func() {
+			By("By create an addon with spec.helm = nil")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+				newOjb.Spec.Type = extensionsv1alpha1.HelmType
+				newOjb.Spec.Helm = nil
+			})
+
+			By("By check addon status")
+			Eventually(func(g Gomega) {
+				doReconcileOnce(g)
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+				g.Expect(addon.Spec.InstallSpec).Should(BeNil())
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+			}).Should(Succeed())
+		})
 	})
 
 	Context("Addon controller SetupWithManager", func() {

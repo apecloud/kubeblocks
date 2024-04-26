@@ -105,7 +105,7 @@ func newClientNCache(scheme *runtime.Scheme, kubeConfig, contexts, disabledConte
 		}
 	}
 
-	mcc := make(map[string]multiClusterContext, 0)
+	mcc := make(map[string]multiClusterContext)
 	for context, disabled := range merged {
 		cc, err := newClientNCache4Context(scheme, kubeConfig, context, disabled)
 		if err != nil {

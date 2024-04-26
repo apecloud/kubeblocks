@@ -530,8 +530,8 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
-	labels := constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name)
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, labels, inDataContext4C())
+	labels := constant.GetComponentWellKnownLabels(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.synthesizeComp.Namespace, labels, inDataContext4C())
 	if err != nil {
 		return err
 	}
@@ -710,23 +710,24 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		delete(newPVC.Annotations, "pv.kubernetes.io/bind-completed")
 	}
 
-	if len(newPVC.Spec.VolumeName) == 0 {
-		return nil // the pv is not exist, maybe is under provisioning
-	}
-
 	pvNotFound := false
 
 	// step 1: update pv to retain
 	pv := &corev1.PersistentVolume{}
-	pvKey := types.NamespacedName{
-		Namespace: pvcKey.Namespace,
-		Name:      newPVC.Spec.VolumeName,
-	}
-	if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
-		if apierrors.IsNotFound(err) {
-			pvNotFound = true
-		} else {
-			return err
+	if len(newPVC.Spec.VolumeName) == 0 {
+		// the PV may be under provisioning
+		pvNotFound = true
+	} else {
+		pvKey := types.NamespacedName{
+			Namespace: pvcKey.Namespace,
+			Name:      newPVC.Spec.VolumeName,
+		}
+		if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
+			if apierrors.IsNotFound(err) {
+				pvNotFound = true
+			} else {
+				return err
+			}
 		}
 	}
 
@@ -869,7 +870,7 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
 	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
 	labels := constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)
-	pvcs, err := component.ListObjWithLabelsInNamespace(ctx, cli, generics.PersistentVolumeClaimSignature, itsObj.Namespace, labels, inDataContext4C())
+	pvcs, err := component.ListObjWithLabelsInNamespace(ctx, cli, generics.PersistentVolumeClaimSignature, synthesizedComp.Namespace, labels, inDataContext4C())
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil

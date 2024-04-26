@@ -176,7 +176,6 @@ var _ = Describe("Restore", func() {
 
 			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
 			synthesizedComponent = &component.SynthesizedComponent{
-				WorkloadType:          appsv1alpha1.Consensus,
 				PodSpec:               clusterCompDefObj.PodSpec,
 				LogConfigs:            clusterCompDefObj.LogConfigs,
 				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
@@ -184,6 +183,20 @@ var _ = Describe("Restore", func() {
 				Name:                  mysqlCompName,
 				VolumeTypes:           []appsv1alpha1.VolumeTypeSpec{{Name: testapps.DataVolumeName, Type: appsv1alpha1.VolumeTypeData}},
 				Replicas:              1,
+				Roles: []appsv1alpha1.ReplicaRole{
+					{
+						Name:        "leader",
+						Serviceable: true,
+						Writable:    true,
+						Votable:     true,
+					},
+					{
+						Name:        "follower",
+						Serviceable: true,
+						Writable:    false,
+						Votable:     true,
+					},
+				},
 			}
 			By("create component object")
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+synthesizedComponent.Name, "").

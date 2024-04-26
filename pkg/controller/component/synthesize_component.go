@@ -478,7 +478,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	buildWorkload := func() {
 		synthesizeComp.ClusterDefName = clusterDef.Name
 		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
-		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes

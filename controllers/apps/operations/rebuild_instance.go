@@ -777,7 +777,7 @@ func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 		return false, nil
 	}
 	// If roleProbe is not defined, return true.
-	if synthesizedComp.Roles == nil && !slices.Contains([]appsv1alpha1.WorkloadType{appsv1alpha1.Consensus, appsv1alpha1.Replication}, synthesizedComp.WorkloadType) {
+	if len(synthesizedComp.Roles) == 0 {
 		return true, nil
 	}
 	// check if the role detection is successfully.

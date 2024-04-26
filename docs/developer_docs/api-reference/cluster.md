@@ -8917,6 +8917,20 @@ ComponentVars
 <tbody>
 <tr>
 <td>
+<code>componentName</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the name of the Component object.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.VarOption">

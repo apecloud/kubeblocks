@@ -610,18 +610,17 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 				}
 			}
 		}
-		keyStrs := strings.Split(key, ".")
 		if len(notFound) > 0 {
-			return fmt.Errorf("volumeClaimTemplates: %v not found in %s: %s, you can view infos by command: "+
-				"kubectl get cluster %s -n %s", notFound, keyStrs[0], keyStrs[1], cluster.Name, r.Namespace)
+			return fmt.Errorf("volumeClaimTemplates: %v not found in component: %s, you can view infos by command: "+
+				"kubectl get cluster %s -n %s", notFound, key, cluster.Name, r.Namespace)
 		}
 		if len(notSupport) > 0 {
 			var notSupportScString string
 			if len(notSupportSc) > 0 {
 				notSupportScString = fmt.Sprintf("storageClass: %v of ", notSupportSc)
 			}
-			return fmt.Errorf(notSupportScString+"volumeClaimTemplate: %v not support volume expansion in %s: %s, you can view infos by command: "+
-				"kubectl get sc", notSupport, keyStrs[0], keyStrs[1])
+			return fmt.Errorf(notSupportScString+"volumeClaimTemplate: %v not support volume expansion in component: %s, you can view infos by command: "+
+				"kubectl get sc", notSupport, key)
 		}
 	}
 	return nil

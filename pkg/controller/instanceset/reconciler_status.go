@@ -73,7 +73,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			notReadyNames.Insert(pod.Name)
 			replicas++
 		}
-		if isRunningAndReady(pod) {
+		if isRunningAndReady(pod) && !isTerminating(pod) {
 			readyReplicas++
 			notReadyNames.Delete(pod.Name)
 			if isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
@@ -161,7 +161,7 @@ func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames s
 func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
 	var failureNames []string
 	for _, pod := range pods {
-		if pod.Status.Phase == corev1.PodFailed {
+		if !isTerminating(pod) && pod.Status.Phase == corev1.PodFailed {
 			failureNames = append(failureNames, pod.Name)
 		}
 	}

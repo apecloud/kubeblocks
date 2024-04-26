@@ -133,7 +133,7 @@ func (p *pipeline) doMergeImpl(parameters appsv1alpha1.ConfigurationItem) error 
 
 	configSpec := p.configSpec
 	if item.ConfigFileParams == nil {
-		item.ConfigFileParams = make(map[string]appsv1alpha1.ConfigParams)
+		item.ConfigFileParams = make(map[string]appsv1alpha1.ParametersInFile)
 	}
 	filter := validate.WithKeySelector(configSpec.Keys)
 	paramFilter := createImmutableParamsFilter(p.configConstraint)

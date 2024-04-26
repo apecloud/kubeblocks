@@ -868,6 +868,15 @@ type ClusterComponentSpec struct {
 	// +optional
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	Monitor *bool `json:"monitor,omitempty"`
+
+	// Specifies the user-defined configuration template or parameters.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ComponentConfigItems []ComponentConfigItem `json:"componentConfigItem,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type ComponentMessageMap map[string]string

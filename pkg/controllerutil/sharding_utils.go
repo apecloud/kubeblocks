@@ -99,11 +99,8 @@ func listNCheckShardingComponents(ctx context.Context, cli client.Reader,
 func ListShardingComponents(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, shardingName string) ([]appsv1alpha1.Component, error) {
 	compList := &appsv1alpha1.ComponentList{}
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:       cluster.Name,
-		constant.KBAppShardingNameLabelKey: shardingName,
-	}
-	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), ml); err != nil {
+	ml := constant.GetClusterShardingNameLabel(cluster.Name, shardingSpec.Name)
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(ml)); err != nil {
 		return nil, err
 	}
 	return compList.Items, nil

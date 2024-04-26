@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -383,15 +382,7 @@ func (r *componentStatusHandler) hasFailedPod() (bool, appsv1alpha1.ComponentMes
 	}
 
 	// check InstanceReady condition
-	condition := meta.FindStatusCondition(r.runningITS.Status.Conditions, string(workloads.InstanceReady))
-	if condition == nil {
-		return false, nil
-	}
-	if condition.Status == metav1.ConditionFalse {
-		if time.Now().After(condition.LastTransitionTime.Add(intctrlutil.PodScheduledFailedTimeout)) {
-			messages.SetObjectMessage(workloads.Kind, r.runningITS.Name, condition.Message)
-			return true, messages
-		}
+	if !meta.IsStatusConditionTrue(r.runningITS.Status.Conditions, string(workloads.InstanceReady)) {
 		return false, nil
 	}
 
@@ -403,6 +394,7 @@ func (r *componentStatusHandler) hasFailedPod() (bool, appsv1alpha1.ComponentMes
 		return false, nil
 	}
 	probeTimeoutDuration := time.Duration(appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady) * time.Second
+	condition := meta.FindStatusCondition(r.runningITS.Status.Conditions, string(workloads.InstanceReady))
 	if time.Now().After(condition.LastTransitionTime.Add(probeTimeoutDuration)) {
 		messages.SetObjectMessage(workloads.Kind, r.runningITS.Name, "Role probe timeout, check whether the application is available")
 		return true, messages

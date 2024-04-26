@@ -308,7 +308,11 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 	compOpsList := make([]ComponentOps, len(verticalScalingList))
 	for i, v := range verticalScalingList {
 		compOpsList[i] = v.ComponentOps
-		if err := r.checkInstanceTemplate(cluster, v.ComponentOps, v.Instances); err != nil {
+		var instanceNames []string
+		for j := range v.Instances {
+			instanceNames = append(instanceNames, v.Instances[j].Name)
+		}
+		if err := r.checkInstanceTemplate(cluster, v.ComponentOps, instanceNames); err != nil {
 			return err
 		}
 		if invalidValue, err := validateVerticalResourceList(v.Requests); err != nil {
@@ -413,9 +417,12 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 
 	compOpsList := make([]ComponentOps, len(volumeExpansionList))
 	for i, v := range volumeExpansionList {
-		// TODO: check instances
 		compOpsList[i] = v.ComponentOps
-		if err := r.checkInstanceTemplate(cluster, v.ComponentOps, v.Instances); err != nil {
+		var instanceNames []string
+		for j := range v.Instances {
+			instanceNames = append(instanceNames, v.Instances[j].Name)
+		}
+		if err := r.checkInstanceTemplate(cluster, v.ComponentOps, instanceNames); err != nil {
 			return err
 		}
 	}
@@ -442,32 +449,29 @@ func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, 
 	return validateSwitchoverResourceList(ctx, cli, cluster, switchoverList)
 }
 
-func (r *OpsRequest) checkInstanceTemplate(cluster *Cluster, componentOps ComponentOps, inputInstances []PartInstanceTemplate) error {
+func (r *OpsRequest) checkInstanceTemplate(cluster *Cluster, componentOps ComponentOps, inputInstances []string) error {
 	instanceNameMap := make(map[string]sets.Empty)
 	setInstanceMap := func(instances []InstanceTemplate) {
 		for i := range instances {
 			instanceNameMap[instances[i].Name] = sets.Empty{}
 		}
 	}
-	if componentOps.IsSharding {
-		for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-			if shardingSpec.Name != componentOps.ComponentName {
-				continue
-			}
-			setInstanceMap(shardingSpec.Template.Instances)
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		if shardingSpec.Name != componentOps.ComponentName {
+			continue
 		}
-	} else {
-		for _, compSpec := range cluster.Spec.ComponentSpecs {
-			if compSpec.Name != componentOps.ComponentName {
-				continue
-			}
-			setInstanceMap(compSpec.Instances)
+		setInstanceMap(shardingSpec.Template.Instances)
+	}
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if compSpec.Name != componentOps.ComponentName {
+			continue
 		}
+		setInstanceMap(compSpec.Instances)
 	}
 	var notFoundInstanceNames []string
-	for _, v := range inputInstances {
-		if _, ok := instanceNameMap[v.Name]; !ok {
-			notFoundInstanceNames = append(notFoundInstanceNames, v.Name)
+	for _, insName := range inputInstances {
+		if _, ok := instanceNameMap[insName]; !ok {
+			notFoundInstanceNames = append(notFoundInstanceNames, insName)
 		}
 	}
 	if len(notFoundInstanceNames) > 0 {
@@ -478,107 +482,94 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *Cluster, componentOps Compon
 
 // checkComponentExistence checks whether components to be operated exist in cluster spec.
 func (r *OpsRequest) checkComponentExistence(cluster *Cluster, compOpsList []ComponentOps) error {
-	compSpecNameMap := make(map[string]sets.Empty)
-	shardingMap := make(map[string]sets.Empty)
+	compNameMap := make(map[string]sets.Empty)
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		compSpecNameMap[compSpec.Name] = sets.Empty{}
+		compNameMap[compSpec.Name] = sets.Empty{}
 	}
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		shardingMap[shardingSpec.Name] = sets.Empty{}
+		compNameMap[shardingSpec.Name] = sets.Empty{}
 	}
 	var (
-		notFoundCompNames     []string
-		notFoundShardingNames []string
+		notFoundCompNames []string
 	)
 	for _, compOps := range compOpsList {
-		if compOps.IsSharding {
-			if _, ok := shardingMap[compOps.ComponentName]; !ok {
-				notFoundShardingNames = append(notFoundShardingNames, compOps.ComponentName)
-			}
-			continue
-		} else {
-			if _, ok := compSpecNameMap[compOps.ComponentName]; !ok {
-				notFoundCompNames = append(notFoundCompNames, compOps.ComponentName)
-			}
-			continue
+		if _, ok := compNameMap[compOps.ComponentName]; !ok {
+			notFoundCompNames = append(notFoundCompNames, compOps.ComponentName)
 		}
+		continue
 	}
 
 	if len(notFoundCompNames) > 0 {
-		return fmt.Errorf("components: %v not found, in cluster.spec.componentSpecs", notFoundCompNames)
-	}
-	if len(notFoundShardingNames) > 0 {
-		return fmt.Errorf("shardings: %v not found in cluster.spec.shardingSpecs", notFoundShardingNames)
+		return fmt.Errorf("components: %v not found, in cluster.spec.componentSpecs or cluster.spec.shardingSpecs", notFoundCompNames)
 	}
 	return nil
 }
 
 func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.Client, cluster *Cluster) error {
 	type Entity struct {
-		existInSpec      bool
-		storageClassName *string
-		allowExpansion   bool
-		requestStorage   resource.Quantity
+		existInSpec         bool
+		storageClassName    *string
+		allowExpansion      bool
+		requestStorage      resource.Quantity
+		isShardingComponent bool
 	}
 
 	vols := make(map[string]map[string]Entity)
 	// component name/ sharding name -> vct name -> entity
-	getKey := func(compOps ComponentOps, templateName string) string {
+	getKey := func(componentName string, templateName string) string {
 		templateKey := ""
 		if templateName != "" {
 			templateKey = "." + templateName
 		}
-		if compOps.IsSharding {
-			return fmt.Sprintf("sharding.%s%s", compOps.ComponentName, templateKey)
-		}
-		return fmt.Sprintf("component.%s%s", compOps.ComponentName, templateKey)
+		return fmt.Sprintf("%s%s", componentName, templateKey)
 	}
-	setVols := func(vcts []OpsRequestVolumeClaimTemplate, compOps ComponentOps, templateName string) {
+	setVols := func(vcts []OpsRequestVolumeClaimTemplate, componentName, templateName string) {
 		for _, vct := range vcts {
-			key := getKey(compOps, templateName)
+			key := getKey(componentName, templateName)
 			if _, ok := vols[key]; !ok {
 				vols[key] = make(map[string]Entity)
 			}
-			vols[key][vct.Name] = Entity{false, nil, false, vct.Storage}
+			vols[key][vct.Name] = Entity{false, nil, false, vct.Storage, false}
 		}
 	}
 
 	for _, comp := range r.Spec.VolumeExpansionList {
-		setVols(comp.VolumeClaimTemplates, comp.ComponentOps, "")
+		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName, "")
 		for _, ins := range comp.Instances {
-			setVols(ins.VolumeClaimTemplates, comp.ComponentOps, ins.Name)
+			setVols(ins.VolumeClaimTemplates, comp.ComponentOps.ComponentName, ins.Name)
 		}
 	}
-	fillVol := func(vct ClusterComponentVolumeClaimTemplate, key string) {
+	fillVol := func(vct ClusterComponentVolumeClaimTemplate, key string, isShardingComp bool) {
 		e, ok := vols[key][vct.Name]
 		if !ok {
 			return
 		}
 		e.existInSpec = true
 		e.storageClassName = vct.Spec.StorageClassName
+		e.isShardingComponent = isShardingComp
 		vols[key][vct.Name] = e
 	}
-	fillCompVols := func(compSpec ClusterComponentSpec, compOps ComponentOps) {
-		key := getKey(compOps, "")
+	fillCompVols := func(compSpec ClusterComponentSpec, componentName string, isShardingComp bool) {
+		key := getKey(componentName, "")
 		if _, ok := vols[key]; !ok {
 			return // ignore not-exist component
 		}
 		for _, vct := range compSpec.VolumeClaimTemplates {
-			fillVol(vct, key)
+			fillVol(vct, key, isShardingComp)
 		}
 		for _, ins := range compSpec.Instances {
-			key = getKey(compOps, ins.Name)
+			key = getKey(componentName, ins.Name)
 			for _, vct := range ins.VolumeClaimTemplates {
-				fillVol(vct, key)
+				fillVol(vct, key, isShardingComp)
 			}
 		}
 	}
 	// traverse the spec to update volumes
 	for _, comp := range cluster.Spec.ComponentSpecs {
-		fillCompVols(comp, ComponentOps{ComponentName: comp.Name})
+		fillCompVols(comp, comp.Name, false)
 	}
 	for _, sharding := range cluster.Spec.ShardingSpecs {
-		fillCompVols(sharding.Template, ComponentOps{ComponentName: sharding.Name, IsSharding: true})
+		fillCompVols(sharding.Template, sharding.Name, true)
 	}
 
 	// check all used storage classes
@@ -589,7 +580,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			if !e.existInSpec {
 				continue
 			}
-			e.storageClassName, err = r.getSCNameByPvcAndCheckStorageSize(ctx, cli, key, vname, e.requestStorage)
+			e.storageClassName, err = r.getSCNameByPvcAndCheckStorageSize(ctx, cli, key, vname, e.isShardingComponent, e.requestStorage)
 			if err != nil {
 				return err
 			}
@@ -619,18 +610,17 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 				}
 			}
 		}
-		keyStrs := strings.Split(key, ".")
 		if len(notFound) > 0 {
-			return fmt.Errorf("volumeClaimTemplates: %v not found in %s: %s, you can view infos by command: "+
-				"kubectl get cluster %s -n %s", notFound, keyStrs[0], keyStrs[1], cluster.Name, r.Namespace)
+			return fmt.Errorf("volumeClaimTemplates: %v not found in component: %s, you can view infos by command: "+
+				"kubectl get cluster %s -n %s", notFound, key, cluster.Name, r.Namespace)
 		}
 		if len(notSupport) > 0 {
 			var notSupportScString string
 			if len(notSupportSc) > 0 {
 				notSupportScString = fmt.Sprintf("storageClass: %v of ", notSupportSc)
 			}
-			return fmt.Errorf(notSupportScString+"volumeClaimTemplate: %v not support volume expansion in %s: %s, you can view infos by command: "+
-				"kubectl get sc", notSupport, keyStrs[0], keyStrs[1])
+			return fmt.Errorf(notSupportScString+"volumeClaimTemplate: %v not support volume expansion in component: %s, you can view infos by command: "+
+				"kubectl get sc", notSupport, key)
 		}
 	}
 	return nil
@@ -657,18 +647,18 @@ func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
 // getSCNameByPvcAndCheckStorageSize gets the storageClassName by pvc and checks if the storage size is valid.
 func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	cli client.Client,
-	key,
+	componentName,
 	vctName string,
+	isShardingComponent bool,
 	requestStorage resource.Quantity) (*string, error) {
-	keyStrs := strings.Split(key, ".")
 	matchingLabels := client.MatchingLabels{
 		constant.AppInstanceLabelKey:             r.Spec.ClusterRef,
 		constant.VolumeClaimTemplateNameLabelKey: vctName,
 	}
-	if keyStrs[0] == "component" {
-		matchingLabels[constant.KBAppComponentLabelKey] = keyStrs[1]
+	if isShardingComponent {
+		matchingLabels[constant.KBAppShardingNameLabelKey] = componentName
 	} else {
-		matchingLabels[constant.KBAppShardingNameLabelKey] = keyStrs[1]
+		matchingLabels[constant.KBAppComponentLabelKey] = componentName
 	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), matchingLabels); err != nil {

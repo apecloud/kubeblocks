@@ -409,8 +409,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	if expectReplicas == nil {
 		return 0, 0, nil
 	}
-	compOpsKey := getCompOpsKey(pgRes.compOps.GetComponentName(), pgRes.compOps.IsShardingComponent())
-	lastComponentReplicas := opsRequest.Status.LastConfiguration.Components[compOpsKey].Replicas
+	lastComponentReplicas := opsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()].Replicas
 	if lastComponentReplicas == nil {
 		return 0, 0, nil
 	}
@@ -427,7 +426,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	}
 	if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
 		lastComponentReplicas = expectReplicas
-		expectReplicas = opsRequest.Status.LastConfiguration.Components[compOpsKey].Replicas
+		expectReplicas = opsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()].Replicas
 	}
 	var (
 		expectProgressCount int32

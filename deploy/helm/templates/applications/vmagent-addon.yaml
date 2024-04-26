@@ -23,6 +23,11 @@ spec:
       version: 0.8.41
       {{- end }}
 
+    installValues:
+      configMapRefs:
+        - name: victoria-metrics-agent-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
     valuesMapping:
       valueMap:
         replicaCount: replicaCount

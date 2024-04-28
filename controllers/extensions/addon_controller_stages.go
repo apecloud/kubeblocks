@@ -495,6 +495,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 		r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)
 		mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 
+		// if there are some dependencies of current addon, we need to enabled them in topological order
 		if _, sequenceDependencies, err := checkAddonDependency(ctx, &r.stageCtx, addon); err != nil {
 			r.setRequeueWithErr(err, "")
 			return
@@ -504,13 +505,13 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 				if dependencyName == addon.Name {
 					continue
 				}
-				tmpKey := types.NamespacedName{Namespace: r.reqCtx.Req.Namespace, Name: dependencyName}
 				dependencyAddon := &extensionsv1alpha1.Addon{}
-				if err := r.reconciler.Get(ctx, tmpKey, dependencyAddon); err != nil {
+				if err := r.reconciler.Get(ctx, types.NamespacedName{Namespace: r.reqCtx.Req.Namespace, Name: dependencyName}, dependencyAddon); err != nil {
 					r.setRequeueWithErr(err, "")
 					return
 				}
 				if dependencyAddon.Status.Phase != extensionsv1alpha1.AddonEnabled {
+					// the release of the dependency is not installed(not enabled)
 					allDependenciesEnabled = false
 					// enable the dependency addon
 					if dependencyAddon.Spec.InstallSpec == nil {
@@ -527,7 +528,8 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			}
 
 			if !allDependenciesEnabled {
-				r.setReconciled()
+				// some dependencies are not enabled, wait for them to be enabled
+				r.setRequeueAfter(time.Second, "")
 				return
 			}
 		}

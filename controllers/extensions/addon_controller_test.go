@@ -431,7 +431,9 @@ var _ = Describe("Addon controller", func() {
 			for i := range names {
 				createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 					newOjb.Name = names[i]
-					newOjb.Spec.Installable.AutoInstall = true
+					if i == 0 {
+						newOjb.Spec.Installable.AutoInstall = true
+					}
 					newOjb.Spec.Version = "1.0.0"
 					if i < len(dependencies) {
 						newOjb.Spec.Dependencies = dependencies[i]

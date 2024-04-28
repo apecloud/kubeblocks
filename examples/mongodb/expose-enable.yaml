@@ -1,0 +1,21 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: mongo-expose-enable
+  namespace: default
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterRef: mongo-cluster
+  # Lists Expose objects, each specifying a Component and its services to be exposed.
+  expose:
+    # Specifies the name of the Component.
+  - componentName: mongo
+    # Specifies a list of OpsService. When an OpsService is exposed, a corresponding ClusterService will be added to `cluster.spec.services`. On the other hand, when an OpsService is unexposed, the corresponding ClusterService will be removed from `cluster.spec.services`. Note: If `componentName` is not specified, the `ports` and `selector` fields must be provided in each OpsService definition. OpsService represents the parameters to dynamically create or remove a ClusterService in the `cluster.spec.services` array.
+    services:
+    - name: internet
+      serviceType: LoadBalancer
+    # Indicates whether the services will be exposed. 'Enable' exposes the services. while 'Disable' removes the exposed Service.
+    switch: Enable
+  # Specifies the maximum number of seconds the OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed.
+  ttlSecondsBeforeAbort: 0
+  type: Expose

@@ -1,0 +1,22 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: greptimedb-volumeexpansion
+  namespace: default
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterRef: greptimedb-cluster
+  type: VolumeExpansion
+  # Note: Quantity struct can not do immutable check by CEL. Defines what component and volumeClaimTemplate need to expand the specified storage. VolumeExpansion encapsulates the parameters required for a volume expansion operation.
+  volumeExpansion:
+    # Specifies the name of the Component.
+    # - datanode
+    # - etcd
+  - componentName: datanode
+    # volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.
+    volumeClaimTemplates:
+      # A reference to the volumeClaimTemplate name from the cluster components.
+      # - datanode, datanode
+      # - etcd, etcd-storage
+    - name: datanode
+      storage: 30Gi

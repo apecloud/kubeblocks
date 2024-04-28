@@ -1,0 +1,58 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mongo-cluster-restore
+  namespace: default
+  annotations:
+    kubeblocks.io/restore-from-backup: '{"mongodb":{"connectionPassword":"<backup-connection-password>","name":"mongo-cluster-backup","namespace":"default","volumeRestorePolicy":"Parallel"}}'
+spec:
+  # Specifies the behavior when a Cluster is deleted. It defines how resources, data, and backups associated with a Cluster are managed during termination. Choose a policy based on the desired level of resource cleanup and data preservation: - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact. - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data. - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss. Warning: Choosing an inappropriate termination policy can result in significant data loss. The `WipeOut` policy is particularly risky in production environments due to its irreversible nature.
+  terminationPolicy: Delete
+  # Specifies the name of the ClusterDefinition to use when creating a Cluster. This field enables users to create a Cluster using a specific ClusterDefinition and topology. The specified ClusterDefinition determines the components to be used based on its defined topology, allowing for the utilization of predefined configurations and behaviors. Advanced users may opt for more precise control by directly referencing specific ComponentDefinitions for each component within `componentSpecs[*].componentDef`. This method offers granular control over the composition of the Cluster. If this field is not provided, each component must be explicitly defined in `componentSpecs[*].componentDef`. Note: Once set, this field cannot be modified; it is immutable.
+  clusterDefinitionRef: mongodb
+  # Refers to the ClusterVersion name. Deprecated since v0.9, use ComponentVersion instead. This field is maintained for backward compatibility and its use is discouraged. Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+  clusterVersionRef: mongodb-6.0
+  # Specifies a list of ClusterComponentSpec objects used to define the individual components that make up a Cluster. This field allows for detailed configuration of each component within the Cluster. Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster. ClusterComponentSpec defines the specifications for a Component in a Cluster. 
+  componentSpecs:
+    # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. When ClusterComponentSpec is referenced as a template, the name is optional. Otherwise, it is required.
+  - name: mongodb
+    # References the name of a ComponentDefinition. The ComponentDefinition specifies the behavior and characteristics of the Component. If both `componentDefRef` and `componentDef` are provided, the `componentDef` will take precedence over `componentDefRef`.
+    componentDef: mongodb
+    # Specifies a group of affinity scheduling rules for the Component. It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
+    affinity:
+      podAntiAffinity: Preferred
+      topologyKeys:
+      - kubernetes.io/hostname
+      tenancy: SharedNode
+    # Allows the Component to be scheduled onto nodes with matching taints. It is an array of tolerations that are attached to the Component's Pods. Each toleration consists of a `key`, `value`, `effect`, and `operator`. The `key`, `value`, and `effect` define the taint that the toleration matches. The `operator` specifies how the toleration matches the taint. If a node has a taint that matches a toleration, the Component's pods can be scheduled onto that node. This allows the Component's Pods to run on nodes that have been tainted to prevent regular Pods from being scheduled.
+    tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+    # Specifies which types of logs should be collected for the Cluster. The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries. The elements in the `enabledLogs` array correspond to the names of the LogConfig entries. For example, if the `componentDefinition.spec.logConfigs` defines LogConfig entries with names "slow_query_log" and "error_log", you can enable the collection of these logs by including their names in the `enabledLogs` array: enabledLogs: ["slow_query_log", "error_log"]
+    enabledLogs:
+    - running
+    # Determines whether the metrics exporter needs to be published to the service endpoint. If set to true, the metrics exporter will be published to the service endpoint, the service will be injected with the following annotations: - "monitor.kubeblocks.io/path" - "monitor.kubeblocks.io/port" - "monitor.kubeblocks.io/scheme"
+    monitorEnabled: false
+    # Specifies the name of the ServiceAccount required by the running Component. This ServiceAccount is used to grant necessary permissions for the Component's Pods to interact with other Kubernetes resources, such as modifying pod labels or sending events. Defaults: If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}", bound to a default role defined during KubeBlocks installation. Future Changes: Future versions might change the default ServiceAccount creation strategy to one per Component, potentially revising the naming to "kb-{cluster.name}-{component.name}". Users can override the automatic ServiceAccount assignment by explicitly setting the name of an existed ServiceAccount in this field.
+    serviceAccountName: kb-mongo-cluster
+    # Each component supports running multiple replicas to provide high availability and persistence. This field can be used to specify the desired number of replicas.
+    replicas: 3
+    # Specifies the resources required by the Component. It allows defining the CPU, memory requirements and limits for the Component's containers.
+    resources:
+      limits:
+        cpu: '1'
+        memory: 1Gi
+      requests:
+        cpu: '1'
+        memory: 1Gi
+    # Specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component. Each template specifies the desired characteristics of a persistent volume, such as storage class, size, and access modes. These templates are used to dynamically provision persistent volumes for the Component when it is deployed.
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 30Gi

@@ -1,0 +1,108 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: elasticsearch-cluster
+  namespace: default
+spec:
+  # Specifies the behavior when a Cluster is deleted. It defines how resources, data, and backups associated with a Cluster are managed during termination. Choose a policy based on the desired level of resource cleanup and data preservation: - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact. - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data. - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss. Warning: Choosing an inappropriate termination policy can result in significant data loss. The `WipeOut` policy is particularly risky in production environments due to its irreversible nature.
+  terminationPolicy: Delete
+  # Defines a set of node affinity scheduling rules for the Cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.
+  affinity:
+    # Specifies the anti-affinity level of Pods within a Component. It determines how pods should be spread across nodes to improve availability and performance. It can have the following values: `Preferred` and `Required`. The default value is `Preferred`.
+    podAntiAffinity: Preferred
+    # Represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints. In K8s, a topology domain is a set of nodes that have the same value for a specific label key. Nodes with labels containing any of the specified TopologyKeys and identical values are considered to be in the same topology domain. Note: The concept of topology in the context of K8s TopologyKeys is different from the concept of topology in the ClusterDefinition. When a Pod has anti-affinity or spread constraints specified, Kubernetes will attempt to schedule the Pod on nodes with different values for the specified TopologyKeys. This ensures that Pods are spread across different topology domains, promoting high availability and reducing the impact of node failures. Some well-known label keys, such as `kubernetes.io/hostname` and `topology.kubernetes.io/zone`, are often used as TopologyKey. These keys represent the hostname and zone of a node, respectively. By including these keys in the TopologyKeys list, Pods will be spread across nodes with different hostnames or zones. In addition to the well-known keys, users can also specify custom label keys as TopologyKeys. This allows for more flexible and custom topology definitions based on the specific needs of the application or environment. The TopologyKeys field is a slice of strings, where each string represents a label key. The order of the keys in the slice does not matter.
+    topologyKeys:
+    - kubernetes.io/hostname
+    # Determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. - SharedNode: Allow that multiple Pods may share the same node, which is the default behavior of K8s. - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node. In other words, if a Pod is already running on a node, no other Pods will be scheduled on that node. Which provides a higher level of isolation and resource guarantee for Pods. The default value is `SharedNode`.
+    tenancy: SharedNode
+  # An array that specifies tolerations attached to the Cluster's Pods, allowing them to be scheduled onto nodes with matching taints.
+  tolerations:
+  - key: kb-data
+    operator: Equal
+    value: 'true'
+    effect: NoSchedule
+  # Specifies a list of ClusterComponentSpec objects used to define the individual components that make up a Cluster. This field allows for detailed configuration of each component within the Cluster.
+  # Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster.
+  # ClusterComponentSpec defines the specifications for a Component in a Cluster.
+  componentSpecs:
+  - name: master
+    componentDef: es-master
+    monitorEnabled: false
+    serviceAccountName: kb-elasticsearch-cluster
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: data
+    componentDef: es-data
+    serviceAccountName: null
+    monitorEnabled: false
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: ingest
+    componentDef: es-ingest
+    serviceAccountName: null
+    monitorEnabled: false
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+    services: null
+  - name: transform
+    componentDef: es-transform
+    serviceAccountName: null
+    monitorEnabled: false
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi

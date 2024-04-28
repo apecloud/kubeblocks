@@ -80,6 +80,10 @@ type AddonSpec struct {
 	//
 	// +optional
 	CliPlugins []CliPlugin `json:"cliPlugins,omitempty"`
+
+	// Specifies the dependencies of this addon
+	// +optional
+	Dependencies []DependencySpec `json:"dependencies,omitempty"`
 }
 
 // AddonStatus defines the observed state of an add-on.
@@ -470,6 +474,11 @@ type ResourceRequirements struct {
 	//
 	// +optional
 	Requests corev1.ResourceList `json:"requests,omitempty"`
+}
+
+type DependencySpec struct {
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
 }
 
 // +genclient

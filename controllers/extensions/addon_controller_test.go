@@ -118,6 +118,17 @@ var _ = Describe("Addon controller", func() {
 			return addonReconciler.Reconcile(ctx, req)
 		}
 
+		//doReconcileWithKey := func(specifiedKey types.NamespacedName) (ctrl.Result, error) {
+		//	addonReconciler := &AddonReconciler{
+		//		Client: testCtx.Cli,
+		//		Scheme: testCtx.Cli.Scheme(),
+		//	}
+		//	req := reconcile.Request{
+		//		NamespacedName: specifiedKey,
+		//	}
+		//	return addonReconciler.Reconcile(ctx, req)
+		//}
+
 		doReconcileOnce := func(g Gomega) {
 			By("Reconciling once")
 			result, err := doReconcile()
@@ -400,6 +411,157 @@ var _ = Describe("Addon controller", func() {
 			By("By addon autoInstall auto added")
 			enablingPhaseCheck(2)
 		}
+
+		It("should should successfully enable an addon with right dependencies", func() {
+			By("create an addon with dependencies")
+			dependencies := [][]extensionsv1alpha1.DependencySpec{
+				{
+					{Name: "b", Version: "1.0.0"},
+					{Name: "c", Version: "1.0.0"},
+				},
+				{
+					{Name: "d", Version: "1.0.0"},
+					{Name: "e", Version: "1.0.0"},
+					{Name: "f", Version: "1.0.0"},
+				},
+				{
+					{Name: "h", Version: "1.0.0"},
+				},
+				{},
+				{
+					{Name: "g", Version: "1.0.0"},
+					{Name: "d", Version: "1.0.0"},
+				},
+				{
+					{Name: "c", Version: "1.0.0"},
+				},
+				{},
+				{},
+			}
+			names := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
+			for i := range names {
+				createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+					newOjb.Name = names[i]
+					newOjb.Spec.Installable.AutoInstall = true
+					newOjb.Spec.Version = "1.0.0"
+					if i < len(dependencies) {
+						newOjb.Spec.Dependencies = dependencies[i]
+					}
+				})
+				Expect(key.Name).Should(BeEquivalentTo(names[i]))
+			}
+			key.Name = "a"
+			//enablingPhaseCheck(2)
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				addon := &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
+			}).Should(Succeed())
+
+			sequence := []string{"d", "g", "h", "e", "c", "f", "b"}
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				for _, seq := range sequence {
+					addon := &extensionsv1alpha1.Addon{}
+					tmpKey := key
+					tmpKey.Name = seq
+					g.Expect(testCtx.Cli.Get(ctx, tmpKey, addon)).To(Not(HaveOccurred()))
+					g.Expect(addon.Spec.InstallSpec).ShouldNot(BeNil())
+					g.Expect(addon.Spec.InstallSpec.Enabled).Should(Equal(true))
+				}
+			}).Should(Succeed())
+
+			for _, seq := range sequence {
+				key.Name = seq
+				Eventually(func(g Gomega) {
+					_, err := doReconcile()
+					g.Expect(err).To(Not(HaveOccurred()))
+					addon := &extensionsv1alpha1.Addon{}
+					g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+					g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
+				}).Should(Succeed())
+				jobKey := client.ObjectKey{
+					Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+					Name:      fmt.Sprintf("install-%s-addon", seq),
+				}
+				Eventually(func(g Gomega) {
+					fakeCompletedJob(g, jobKey)
+				}).Should(Succeed())
+				Eventually(func(g Gomega) {
+					_, err := doReconcile()
+					g.Expect(err).To(Not(HaveOccurred()))
+					addon = &extensionsv1alpha1.Addon{}
+					g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+					g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabled))
+					checkedJobDeletion(g, jobKey)
+				}).Should(Succeed())
+			}
+			key.Name = "a"
+			jobKey := client.ObjectKey{
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+				Name:      fmt.Sprintf("install-%s-addon", "a"),
+			}
+			Eventually(func(g Gomega) {
+				fakeCompletedJob(g, jobKey)
+			}).Should(Succeed())
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				addon := &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabled))
+				checkedJobDeletion(g, jobKey)
+			}).Should(Succeed())
+		})
+
+		It("should fail to enable or install an addon with version of dependencies not matched", func() {
+			By("create an addon with dependencies")
+			dependencies := [][]extensionsv1alpha1.DependencySpec{
+				{
+					{Name: "b", Version: "1.0.0"},
+					{Name: "c", Version: "1.0.0"},
+				},
+				{
+					{Name: "d", Version: "1.0.0"},
+					{Name: "e", Version: "1.0.0"},
+					{Name: "f", Version: "1.0.0"},
+				},
+				{
+					{Name: "h", Version: "1.0.0"},
+				},
+				{},
+				{
+					{Name: "g", Version: "1.0.0"},
+					{Name: "d", Version: "1.0.0"},
+				},
+				{
+					{Name: "c", Version: "1.0.0"},
+				},
+				{},
+				{},
+			}
+			names := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
+			for i := range names {
+				createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+					newOjb.Name = names[i]
+					newOjb.Spec.Installable.AutoInstall = true
+					if i < len(dependencies) {
+						newOjb.Spec.Dependencies = dependencies[i]
+					}
+				})
+				Expect(key.Name).Should(BeEquivalentTo(names[i]))
+			}
+			key.Name = "a"
+			Eventually(func(g Gomega) {
+				doReconcile()
+				addon := &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+			}).Should(Succeed())
+		})
 
 		It("should successfully reconcile a custom resource for Addon with autoInstall=true", func() {
 			createAutoInstallAddon()

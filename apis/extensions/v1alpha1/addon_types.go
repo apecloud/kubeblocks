@@ -82,6 +82,7 @@ type AddonSpec struct {
 	CliPlugins []CliPlugin `json:"cliPlugins,omitempty"`
 
 	// Specifies the dependencies of this addon
+	//
 	// +optional
 	Dependencies []DependencySpec `json:"dependencies,omitempty"`
 }

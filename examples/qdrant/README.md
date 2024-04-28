@@ -39,7 +39,7 @@ helm upgrade -i kb-addon-qdrant kubeblocks-addons/qdrant -n kb-system
 
 ## Examples
 
-### [Create](./../../examples/qdrant/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a qdrant cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/qdrant/cluster.yaml
@@ -48,43 +48,43 @@ Starting from kubeblocks 0.9.0, we introduced a more flexible cluster creation m
 ```bash
 kubectl apply -f examples/qdrant/cluster-cmpd.yaml
 ```
-### [Horizontal scaling](./../../examples/qdrant/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/qdrant/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/qdrant/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/qdrant/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/qdrant/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/qdrant/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/qdrant/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/qdrant/restart.yaml
 ```
 
-### [Stop](./../../examples/qdrant/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/qdrant/stop.yaml
 ```
 
-### [Start](./../../examples/qdrant/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/qdrant/start.yaml
 ```
 
-### [BackupRepo](./../../examples/qdrant/backuprepo.yaml)
+### [BackupRepo](backuprepo.yaml)
 BackupRepo is the storage repository for backup data, using the full backup and restore function of KubeBlocks relies on BackupRepo
 ```bash
 # Create a secret to save the access key
@@ -96,13 +96,13 @@ kubectl create secret generic <storage-provider>-credential-for-backuprepo\
 kubectl apply -f examples/qdrant/backuprepo.yaml
 ```
 
-### [Backup](./../../examples/qdrant/backup.yaml)
+### [Backup](backup.yaml)
 Create a backup for the cluster
 ```bash
 kubectl apply -f examples/qdrant/backup.yaml
 ```
 
-### [Restore](./../../examples/qdrant/restore.yaml)
+### [Restore](restore.yaml)
 Restore a new cluster from backup
 ```bash
 # Get backup connection password

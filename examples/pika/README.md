@@ -40,43 +40,43 @@ helm upgrade -i kb-addon-pika kubeblocks-addons/pika --version 0.8.0 -n kb-syste
 
 ## Examples
 
-### [Create](./../../examples/pika/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a pika cluster with specified cluster definition.
 ```bash
 kubectl apply -f examples/pika/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/pika/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/pika/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/pika/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/pika/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/pika/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/pika/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/pika/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/pika/restart.yaml
 ```
 
-### [Stop](./../../examples/pika/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/pika/stop.yaml
 ```
 
-### [Start](./../../examples/pika/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/pika/start.yaml

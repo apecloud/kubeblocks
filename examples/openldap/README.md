@@ -39,43 +39,43 @@ helm upgrade -i kb-addon-openldap kubeblocks-addons/openldap --version 0.9.0 -n 
 
 ## Examples
 
-### [Create](./../../examples/openldap/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a openldap cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/openldap/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/openldap/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/openldap/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/openldap/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/openldap/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/openldap/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/openldap/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/openldap/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/openldap/restart.yaml
 ```
 
-### [Stop](./../../examples/openldap/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/openldap/stop.yaml
 ```
 
-### [Start](./../../examples/openldap/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/openldap/start.yaml

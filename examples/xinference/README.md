@@ -39,31 +39,31 @@ helm upgrade -i kb-addon-xinference kubeblocks-addons/xinference --version 0.1.0
 
 ## Examples
 
-### [Create](./../../examples/xinference/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a xinference cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/xinference/cluster.yaml
 ```
 
-### [Vertical scaling](./../../examples/xinference/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/xinference/verticalscale.yaml
 ```
 
-### [Restart](./../../examples/xinference/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/xinference/restart.yaml
 ```
 
-### [Stop](./../../examples/xinference/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/xinference/stop.yaml
 ```
 
-### [Start](./../../examples/xinference/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/xinference/start.yaml

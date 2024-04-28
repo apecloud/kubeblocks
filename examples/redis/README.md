@@ -28,7 +28,7 @@ helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-nam
 
 ## Examples
 
-### [Create](./../../examples/redis/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a redis cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/redis/cluster.yaml
@@ -44,49 +44,49 @@ Create a redis cluster with ShardingSpecs
 kubectl apply -f examples/redis/cluster-shard.yaml
 ```
 
-### [Horizontal scaling](./../../examples/redis/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/redis/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/redis/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/redis/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/redis/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/redis/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/redis/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/redis/restart.yaml
 ```
 
-### [Stop](./../../examples/redis/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/redis/stop.yaml
 ```
 
-### [Start](./../../examples/redis/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/redis/start.yaml
 ```
 
-### [Configure](./../../examples/redis/configure.yaml)
+### [Configure](configure.yaml)
 Configure parameters with the specified components in the cluster
 ```bash
 kubectl apply -f examples/redis/configure.yaml
 ```
 
-### [BackupRepo](./../../examples/redis/backuprepo.yaml)
+### [BackupRepo](backuprepo.yaml)
 BackupRepo is the storage repository for backup data, using the full backup and restore function of KubeBlocks relies on BackupRepo
 ```bash
 # Create a secret to save the access key
@@ -98,13 +98,13 @@ kubectl create secret generic <storage-provider>-credential-for-backuprepo\
 kubectl apply -f examples/redis/backuprepo.yaml
 ```
 
-### [Backup](./../../examples/redis/backup.yaml)
+### [Backup](backup.yaml)
 Create a backup for the cluster
 ```bash
 kubectl apply -f examples/redis/backup.yaml
 ```
 
-### [Restore](./../../examples/redis/restore.yaml)
+### [Restore](restore.yaml)
 Restore a new cluster from backup
 ```bash
 # Get backup connection password
@@ -115,12 +115,12 @@ kubectl apply -f examples/redis/restore.yaml
 
 ### Expose
 Expose a cluster with a new endpoint
-#### [Enable](./../../examples/redis/expose-enable.yaml)
+#### [Enable](expose-enable.yaml)
 ```bash
 kubectl apply -f examples/redis/expose-enable.yaml
 ```
 
-#### [Disable](./../../examples/redis/expose-disable.yaml)
+#### [Disable](expose-disable.yaml)
 ```bash
 kubectl apply -f examples/redis/expose-disable.yaml
 ```

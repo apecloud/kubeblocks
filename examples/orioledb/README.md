@@ -41,43 +41,43 @@ helm upgrade -i kb-addon-etcd kubeblocks-addons/etcd --version 0.9.0 -n kb-syste
 
 ## Examples
 
-### [Create](./../../examples/orioledb/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a orioledb cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/orioledb/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/orioledb/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/orioledb/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/orioledb/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/orioledb/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/orioledb/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/orioledb/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/orioledb/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/orioledb/restart.yaml
 ```
 
-### [Stop](./../../examples/orioledb/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/orioledb/stop.yaml
 ```
 
-### [Start](./../../examples/orioledb/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/orioledb/start.yaml
@@ -85,11 +85,11 @@ kubectl apply -f examples/orioledb/start.yaml
 
 ### Expose
 Expose a cluster with a new endpoint
-#### [Enable](./../../examples/orioledb/expose-enable.yaml)
+#### [Enable](expose-enable.yaml)
 ```bash
 kubectl apply -f examples/orioledb/expose-enable.yaml
 ```
-#### [Disable](./../../examples/orioledb/expose-disable.yaml)
+#### [Disable](expose-disable.yaml)
 ```bash
 kubectl apply -f examples/orioledb/expose-disable.yaml
 ```

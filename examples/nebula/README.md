@@ -39,43 +39,43 @@ helm upgrade -i kb-addon-nebula kubeblocks-addons/nebula --version 0.9.0 -n kb-s
 
 ## Examples
 
-### [Create](./../../examples/nebula/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a nebula cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/nebula/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/nebula/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/nebula/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/nebula/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/nebula/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/nebula/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/nebula/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/nebula/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/nebula/restart.yaml
 ```
 
-### [Stop](./../../examples/nebula/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/nebula/stop.yaml
 ```
 
-### [Start](./../../examples/nebula/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/nebula/start.yaml

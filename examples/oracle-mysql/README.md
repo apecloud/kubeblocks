@@ -39,43 +39,43 @@ helm upgrade -i kb-addon-oracle-mysql kubeblocks-addons/oracle-mysql -n kb-syste
 
 ## Examples
 
-### [Create](./../../examples/oracle-mysql/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a oracle-mysql cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/oracle-mysql/cluster.yaml
 ```
 
-### [Vertical scaling](./../../examples/oracle-mysql/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/oracle-mysql/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/oracle-mysql/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/oracle-mysql/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/oracle-mysql/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/oracle-mysql/restart.yaml
 ```
 
-### [Stop](./../../examples/oracle-mysql/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/oracle-mysql/stop.yaml
 ```
 
-### [Start](./../../examples/oracle-mysql/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/oracle-mysql/start.yaml
 ```
 
-### [Configure](./../../examples/oracle-mysql/configure.yaml)
+### [Configure](configure.yaml)
 Configure parameters with the specified components in the cluster
 ```bash
 kubectl apply -f examples/oracle-mysql/configure.yaml

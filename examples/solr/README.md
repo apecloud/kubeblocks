@@ -41,7 +41,7 @@ helm upgrade -i kb-addon-zookeeper kubeblocks-addons/zookeeper -n kb-system --ve
 
 ## Examples
 
-### [Create](./../../examples/solr/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a zookeeper cluster with specified cluster definition to be referenced by solr
 ```bash
 kubectl apply -f examples/zookeeper/cluster.yaml
@@ -51,31 +51,31 @@ Create a solr cluster with specified cluster definition
 kubectl apply -f examples/solr/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/solr/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/solr/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/solr/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/solr/verticalscale.yaml
 ```
 
-### [Restart](./../../examples/solr/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/solr/restart.yaml
 ```
 
-### [Stop](./../../examples/solr/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/solr/stop.yaml
 ```
 
-### [Start](./../../examples/solr/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/solr/start.yaml

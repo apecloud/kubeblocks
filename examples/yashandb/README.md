@@ -39,32 +39,32 @@ helm upgrade -i yashandb kubeblocks-addons/yashandb --version 0.0.2 -n kb-system
 
 ## Examples
 
-### [Create](./../../examples/yashandb/cluster.yaml)
+### [Create](cluster.yaml)
 
 Create a yashandb cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/yashandb/cluster.yaml
 ```
 
-### [Vertical scaling](./../../examples/yashandb/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/yashandb/verticalscale.yaml
 ```
 
-### [Restart](./../../examples/yashandb/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/yashandb/restart.yaml
 ```
 
-### [Stop](./../../examples/yashandb/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/yashandb/stop.yaml
 ```
 
-### [Start](./../../examples/yashandb/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/yashandb/start.yaml

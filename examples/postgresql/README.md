@@ -28,7 +28,7 @@ helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-nam
 
 ## Examples
 
-### [Create](./../../examples/postgresql/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a postgresql cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/postgresql/cluster.yaml
@@ -37,61 +37,61 @@ Starting from kubeblocks 0.9.0, we introduced a more flexible cluster creation m
 ```bash
 kubectl apply -f examples/postgresql/cluster-cmpd.yaml
 ```
-### [Horizontal scaling](./../../examples/postgresql/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/postgresql/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/postgresql/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/postgresql/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/postgresql/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/postgresql/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/postgresql/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/postgresql/restart.yaml
 ```
 
-### [Stop](./../../examples/postgresql/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/postgresql/stop.yaml
 ```
 
-### [Start](./../../examples/postgresql/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/postgresql/start.yaml
 ```
 
-### [Switchover](./../../examples/postgresql/switchover.yaml)
+### [Switchover](switchover.yaml)
 Switchover a non-primary or non-leader instance as the new primary or leader of the cluster
 ```bash
 kubectl apply -f examples/postgresql/switchover.yaml
 ```
 
-### [Switchover-specified-instance](./../../examples/postgresql/switchover-specified-instance.yaml)
+### [Switchover-specified-instance](switchover-specified-instance.yaml)
 Switchover a specified instance as the new primary or leader of the cluster
 ```bash
 kubectl apply -f examples/postgresql/switchover-specified-instance.yaml
 ```
 
-### [Configure](./../../examples/postgresql/configure.yaml)
+### [Configure](configure.yaml)
 Configure parameters with the specified components in the cluster
 ```bash
 kubectl apply -f examples/postgresql/configure.yaml
 ```
 
-### [BackupRepo](./../../examples/postgresql/backuprepo.yaml)
+### [BackupRepo](backuprepo.yaml)
 BackupRepo is the storage repository for backup data, using the full backup and restore function of KubeBlocks relies on BackupRepo
 ```bash
 # Create a secret to save the access key
@@ -103,7 +103,7 @@ kubectl create secret generic <storage-provider>-credential-for-backuprepo\
 kubectl apply -f examples/postgresql/backuprepo.yaml
 ```
 
-### [Backup](./../../examples/postgresql/backup.yaml)
+### [Backup](backup.yaml)
 Create pg-basebackup or volume-snapshot backup for the cluster
 ```bash
 kubectl apply -f examples/postgresql/backup.yaml
@@ -120,7 +120,7 @@ kubectl apply -f examples/postgresql/backup-wal-g.yaml
 select pg_switch_wal();
 ```
 
-### [Restore](./../../examples/postgresql/restore.yaml)
+### [Restore](restore.yaml)
 Restore a new cluster from backup
 ```bash
 # Get backup connection password
@@ -131,16 +131,16 @@ kubectl apply -f examples/postgresql/restore.yaml
 
 ### Expose
 Expose a cluster with a new endpoint
-#### [Enable](./../../examples/postgresql/expose-enable.yaml)
+#### [Enable](expose-enable.yaml)
 ```bash
 kubectl apply -f examples/postgresql/expose-enable.yaml
 ```
-#### [Disable](./../../examples/postgresql/expose-disable.yaml)
+#### [Disable](expose-disable.yaml)
 ```bash
 kubectl apply -f examples/postgresql/expose-disable.yaml
 ```
 
-### [Upgrade](./../../examples/postgresql/upgrade.yaml)
+### [Upgrade](upgrade.yaml)
 Upgrade pg cluster to a newer version
 ```bash
 kubectl apply -f examples/postgresql/upgrade.yaml

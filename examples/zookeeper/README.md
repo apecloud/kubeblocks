@@ -39,43 +39,43 @@ helm upgrade -i kb-addon-zookeeper kubeblocks-addons/zookeeper -n kb-system --ve
 
 ## Examples
 
-### [Create](./../../examples/zookeeper/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a zookeeper cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/zookeeper/cluster.yaml
 ```
 
-### [Vertical scaling](./../../examples/zookeeper/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/zookeeper/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/zookeeper/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/zookeeper/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/zookeeper/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/zookeeper/restart.yaml
 ```
 
-### [Stop](./../../examples/zookeeper/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/zookeeper/stop.yaml
 ```
 
-### [Start](./../../examples/zookeeper/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/zookeeper/start.yaml
 ```
 
-### [Configure](./../../examples/zookeeper/configure.yaml)
+### [Configure](configure.yaml)
 Configure parameters with the specified components in the cluster
 ```bash
 kubectl apply -f examples/zookeeper/configure.yaml

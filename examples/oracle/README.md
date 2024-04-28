@@ -39,31 +39,31 @@ helm upgrade -i kb-addon-oracle kubeblocks-addons/oracle -n kb-system --version 
 
 ## Examples
 
-### [Create](./../../examples/oracle/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a oracle cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/oracle/cluster.yaml
 ```
 
-### [Vertical scaling](./../../examples/oracle/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/oracle/verticalscale.yaml
 ```
 
-### [Restart](./../../examples/oracle/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/oracle/restart.yaml
 ```
 
-### [Stop](./../../examples/oracle/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/oracle/stop.yaml
 ```
 
-### [Start](./../../examples/oracle/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/oracle/start.yaml

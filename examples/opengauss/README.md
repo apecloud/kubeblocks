@@ -39,25 +39,25 @@ helm upgrade -i kb-addon-opengauss kubeblocks-addons/opengauss -n kb-system --ve
 
 ## Examples
 
-### [Create](./../../examples/opengauss/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a opengauss cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/opengauss/cluster.yaml
 ```
 
-### [Restart](./../../examples/opengauss/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/opengauss/restart.yaml
 ```
 
-### [Stop](./../../examples/opengauss/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/opengauss/stop.yaml
 ```
 
-### [Start](./../../examples/opengauss/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/opengauss/start.yaml

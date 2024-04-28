@@ -39,7 +39,7 @@ helm upgrade -i kb-addon-weaviate kubeblocks-addons/weaviate -n kb-system
 
 ## Examples
 
-### [Create](./../../examples/weaviate/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a weaviate cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/weaviate/cluster.yaml
@@ -48,43 +48,43 @@ Starting from kubeblocks 0.9.0, we introduced a more flexible cluster creation m
 ```bash
 kubectl apply -f examples/weaviate/cluster-cmpd.yaml
 ```
-### [Horizontal scaling](./../../examples/weaviate/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/weaviate/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/weaviate/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/weaviate/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/weaviate/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/weaviate/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/weaviate/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/weaviate/restart.yaml
 ```
 
-### [Stop](./../../examples/weaviate/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/weaviate/stop.yaml
 ```
 
-### [Start](./../../examples/weaviate/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/weaviate/start.yaml
 ```
 
-### [Configure](./../../examples/weaviate/configure.yaml)
+### [Configure](configure.yaml)
 Configure parameters with the specified components in the cluster
 ```bash
 kubectl apply -f examples/weaviate/configure.yaml

@@ -50,14 +50,14 @@ helm upgrade -i cert-manager kubeblocks-addons/cert-manager --version 0.7.5 -n c
 
 ## Examples
 
-### [Create](./../../examples/neon/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a neon cluster with specified cluster definition.
 ```bash
 kubectl apply -f examples/neon/cluster.yaml
 ```
 
 
-### [Vertical scaling NeonVM]
+### Vertical scaling NeonVM
 Vertical scaling up or down NeonVM specified cpu or memory.
 
 View NeonVM CPU/MEMORY information.

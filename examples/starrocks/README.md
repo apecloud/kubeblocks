@@ -39,43 +39,43 @@ helm upgrade -i starrocks-ce kubeblocks-addons/starrocks-ce --version 0.9.0 -n k
 
 ## Examples
 
-### [Create](./../../examples/starrocks/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a starrocks cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/starrocks/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/starrocks/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/starrocks/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/starrocks/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/starrocks/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/starrocks/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/starrocks/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/starrocks/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/starrocks/restart.yaml
 ```
 
-### [Stop](./../../examples/starrocks/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/starrocks/stop.yaml
 ```
 
-### [Start](./../../examples/starrocks/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/starrocks/start.yaml

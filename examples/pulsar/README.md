@@ -28,7 +28,7 @@ helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-nam
 
 ## Examples
 
-### [Create](./../../examples/pulsar/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a pulsar cluster with specified cluster definition.
 ```bash
 kubectl apply -f examples/pulsar/cluster.yaml
@@ -48,43 +48,43 @@ Starting from kubeblocks 0.9.0, we introduced a more flexible cluster creation m
 kubectl apply -f examples/pulsar/cluster-cmpd.yaml
 ```
 
-### [Horizontal scaling](./../../examples/pulsar/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/pulsar/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/pulsar/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/pulsar/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/pulsar/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/pulsar/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/pulsar/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/pulsar/restart.yaml
 ```
 
-### [Stop](./../../examples/pulsar/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/pulsar/stop.yaml
 ```
 
-### [Start](./../../examples/pulsar/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/pulsar/start.yaml
 ```
 
-### [Configure](./../../examples/pulsar/configure.yaml)
+### [Configure](configure.yaml)
 Configure parameters with the specified components in the cluster
 ```bash
 kubectl apply -f examples/pulsar/configure.yaml

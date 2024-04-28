@@ -39,43 +39,43 @@ helm upgrade -i kb-addon-polardbx kubeblocks-addons/polardbx --version 0.9.0 -n 
 
 ## Examples
 
-### [Create](./../../examples/polardbx/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a polardbx cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/polardbx/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/polardbx/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/polardbx/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/polardbx/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/polardbx/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/polardbx/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/polardbx/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/polardbx/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/polardbx/restart.yaml
 ```
 
-### [Stop](./../../examples/polardbx/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/polardbx/stop.yaml
 ```
 
-### [Start](./../../examples/polardbx/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/polardbx/start.yaml

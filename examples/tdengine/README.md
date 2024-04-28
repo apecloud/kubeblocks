@@ -39,43 +39,43 @@ helm upgrade -i kb-addon-tdengine kubeblocks-addons/tdengine -n kb-system
 
 ## Examples
 
-### [Create](./../../examples/tdengine/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a tdengine cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/tdengine/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/tdengine/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/tdengine/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/tdengine/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/tdengine/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/tdengine/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/tdengine/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/tdengine/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/tdengine/restart.yaml
 ```
 
-### [Stop](./../../examples/tdengine/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/tdengine/stop.yaml
 ```
 
-### [Start](./../../examples/tdengine/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/tdengine/start.yaml

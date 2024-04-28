@@ -41,37 +41,37 @@ helm upgrade -i kb-addon-etcd kubeblocks-addons/etcd --version 0.9.0 -n kb-syste
 
 ## Examples
 
-### [Create](./../../examples/risingwave/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a risingwave cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/risingwave/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/risingwave/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/risingwave/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/risingwave/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/risingwave/verticalscale.yaml
 ```
 
-### [Restart](./../../examples/risingwave/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/risingwave/restart.yaml
 ```
 
-### [Stop](./../../examples/risingwave/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/risingwave/stop.yaml
 ```
 
-### [Start](./../../examples/risingwave/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/risingwave/start.yaml

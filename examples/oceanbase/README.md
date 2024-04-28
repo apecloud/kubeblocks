@@ -39,7 +39,7 @@ helm upgrade -i oceanbase-ce kubeblocks-addons/oceanbase-ce --version 0.9.0 -n k
 
 ## Examples
 
-### [Create](./../../examples/oceanbase/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a distributed oceanbase cluster
 ```bash
 kubectl apply -f examples/oceanbase/cluster.yaml
@@ -59,43 +59,43 @@ Please note that not all operations are currently supported for all topologies. 
 | Primary/Standby<br/>host network   | Not support   | Not support | Not support  |Supported | Supported |Supported|Supported | Supported |
 
 
-### [Horizontal scaling](./../../examples/oceanbase/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/oceanbase/horizontalscale.yaml
 ```
 
-### [Restart](./../../examples/oceanbase/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/oceanbase/restart.yaml
 ```
 
-### [Stop](./../../examples/oceanbase/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/oceanbase/stop.yaml
 ```
 
-### [Start](./../../examples/oceanbase/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/oceanbase/start.yaml
 ```
 
-### [Switchover](./../../examples/oceanbase/switchover.yaml)
+### [Switchover](switchover.yaml)
 Switchover a non-primary or non-leader instance as the new primary or leader of the primary and standby cluster
 ```bash
 kubectl apply -f examples/oceanbase/switchover.yaml
 ```
 
-### [Configure](./../../examples/oceanbase/configure.yaml)
+### [Configure](configure.yaml)
 Configure parameters with the specified components in the cluster
 ```bash
 kubectl apply -f examples/oceanbase/configure.yaml
 ```
 
-### [BackupRepo](./../../examples/oceanbase/backuprepo.yaml)
+### [BackupRepo](backuprepo.yaml)
 BackupRepo is the storage repository for backup data, using the full backup and restore function of KubeBlocks relies on BackupRepo
 ```bash
 # Create a secret to save the access key
@@ -107,13 +107,13 @@ kubectl create secret generic <storage-provider>-credential-for-backuprepo\
 kubectl apply -f examples/oceanbase/backuprepo.yaml
 ```
 
-### [Backup](./../../examples/oceanbase/backup.yaml)
+### [Backup](backup.yaml)
 Create a backup for the cluster
 ```bash
 kubectl apply -f examples/oceanbase/backup.yaml
 ```
 
-### [Restore](./../../examples/oceanbase/restore.yaml)
+### [Restore](restore.yaml)
 Restore a new cluster from backup
 ```bash
 # Get backup connection password
@@ -124,11 +124,11 @@ kubectl apply -f examples/oceanbase/restore.yaml
 
 ### Expose
 Expose a cluster with a new endpoint
-#### [Enable](./../../examples/oceanbase/expose-enable.yaml)
+#### [Enable](expose-enable.yaml)
 ```bash
 kubectl apply -f examples/oceanbase/expose-enable.yaml
 ```
-#### [Disable](./../../examples/oceanbase/expose-disable.yaml)
+#### [Disable](expose-disable.yaml)
 ```bash
 kubectl apply -f examples/oceanbase/expose-disable.yaml
 ```

@@ -39,43 +39,43 @@ helm upgrade -i kb-addon-official-postgresql kubeblocks-addons/official-postgres
 
 ## Examples
 
-### [Create](./../../examples/official-postgresql/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a official-postgresql cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/official-postgresql/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/official-postgresql/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/official-postgresql/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/official-postgresql/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/official-postgresql/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/official-postgresql/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/official-postgresql/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/official-postgresql/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/official-postgresql/restart.yaml
 ```
 
-### [Stop](./../../examples/official-postgresql/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/official-postgresql/stop.yaml
 ```
 
-### [Start](./../../examples/official-postgresql/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/official-postgresql/start.yaml

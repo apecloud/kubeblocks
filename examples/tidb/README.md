@@ -39,43 +39,43 @@ helm upgrade -i kb-addon-tidb kubeblocks-addons/tidb --version 0.1.0-alpha.1 -n 
 
 ## Examples
 
-### [Create](./../../examples/tidb/cluster.yaml) 
+### [Create](cluster.yaml) 
 Create a tidb cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/tidb/cluster.yaml
 ```
 
-### [Horizontal scaling](./../../examples/tidb/horizontalscale.yaml)
+### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash
 kubectl apply -f examples/tidb/horizontalscale.yaml
 ```
 
-### [Vertical scaling](./../../examples/tidb/verticalscale.yaml)
+### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
 kubectl apply -f examples/tidb/verticalscale.yaml
 ```
 
-### [Expand volume](./../../examples/tidb/volumeexpand.yaml)
+### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
 kubectl apply -f examples/tidb/volumeexpand.yaml
 ```
 
-### [Restart](./../../examples/tidb/restart.yaml)
+### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
 kubectl apply -f examples/tidb/restart.yaml
 ```
 
-### [Stop](./../../examples/tidb/stop.yaml)
+### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
 kubectl apply -f examples/tidb/stop.yaml
 ```
 
-### [Start](./../../examples/tidb/start.yaml)
+### [Start](start.yaml)
 Start the stopped cluster
 ```bash
 kubectl apply -f examples/tidb/start.yaml

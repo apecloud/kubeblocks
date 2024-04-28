@@ -77,11 +77,6 @@ var _ = Describe("Lorry Utils", func() {
 					Votable:     false,
 				},
 			}
-			// component.Probes = &appsv1alpha1.ClusterDefinitionProbes{
-			// 	RunningProbe: &appsv1alpha1.ClusterDefinitionProbe{},
-			// 	StatusProbe:  &appsv1alpha1.ClusterDefinitionProbe{},
-			// 	RoleProbe:    &appsv1alpha1.ClusterDefinitionProbe{},
-			// }
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
 				RoleProbe: &appsv1alpha1.RoleProbe{},
 			}
@@ -222,9 +217,8 @@ var _ = Describe("Lorry Utils", func() {
 					break
 				}
 			}
-			Expect(spec.Volumes).Should(HaveLen(2))
-			Expect(spec.Volumes[0].HighWatermark).Should(Equal(90))
-			Expect(spec.Volumes[1].HighWatermark).Should(Equal(0))
+			Expect(spec.Volumes).Should(HaveLen(1))
+			Expect(*spec.Volumes[0].HighWatermark).Should(Equal(90))
 		})
 	})
 })

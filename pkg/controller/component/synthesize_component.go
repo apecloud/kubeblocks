@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
@@ -160,6 +159,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		ClusterGeneration:  clusterGeneration(cluster, comp),
 		PodSpec:            &compDef.Spec.Runtime,
 		HostNetwork:        compDefObj.Spec.HostNetwork,
+		ComponentServices:  compDefObj.Spec.Services,
 		LogConfigs:         compDefObj.Spec.LogConfigs,
 		ConfigTemplates:    compDefObj.Spec.Configs,
 		ScriptTemplates:    compDefObj.Spec.Scripts,
@@ -210,7 +210,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	limitSharedMemoryVolumeSize(synthesizeComp, comp)
 
 	// build componentService
-	buildComponentServices(synthesizeComp, compDefObj, comp)
+	buildComponentServices(synthesizeComp, comp)
 
 	// build monitor
 	// buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
@@ -414,15 +414,14 @@ func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1a
 	}
 }
 
-func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) {
+func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+	if len(synthesizeComp.ComponentServices) == 0 || len(comp.Spec.Services) == 0 {
+		return
+	}
+
 	services := map[string]appsv1alpha1.ComponentService{}
 	for i, svc := range comp.Spec.Services {
 		services[svc.Name] = comp.Spec.Services[i]
-	}
-
-	synthesizeComp.ComponentServices = compDef.Spec.Services
-	if len(synthesizeComp.ComponentServices) == 0 || len(services) == 0 {
-		return
 	}
 
 	override := func(svc *appsv1alpha1.ComponentService) {
@@ -483,20 +482,24 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 	}
 
-	mergeClusterCompVersion := func() {
-		var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-		if clusterVer != nil {
-			clusterCompVer = clusterVer.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
-		}
-		if clusterCompVer != nil {
-			// only accept 1st ClusterVersion override context
-			synthesizeComp.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, synthesizeComp.ConfigTemplates)
-			// override component.PodSpec.InitContainers and component.PodSpec.Containers
-			for _, c := range clusterCompVer.VersionsCtx.InitContainers {
-				synthesizeComp.PodSpec.InitContainers = appendOrOverrideContainerAttr(synthesizeComp.PodSpec.InitContainers, c)
+	buildClusterCompServices := func() {
+		if len(synthesizeComp.ComponentServices) > 0 {
+			service := corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: synthesizeComp.ComponentServices[0].Spec.Ports,
+				},
 			}
-			for _, c := range clusterCompVer.VersionsCtx.Containers {
-				synthesizeComp.PodSpec.Containers = appendOrOverrideContainerAttr(synthesizeComp.PodSpec.Containers, c)
+			for _, item := range clusterCompSpec.Services {
+				svc := appsv1alpha1.ComponentService{
+					Service: appsv1alpha1.Service{
+						Name:        item.Name,
+						ServiceName: item.Name,
+						Annotations: item.Annotations,
+						Spec:        *service.Spec.DeepCopy(),
+					},
+				}
+				svc.Spec.Type = item.ServiceType
+				synthesizeComp.ComponentServices = append(synthesizeComp.ComponentServices, svc)
 			}
 		}
 	}
@@ -515,8 +518,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	// build workload
 	buildWorkload()
 
-	// merge clusterCompVersion
-	mergeClusterCompVersion()
+	buildClusterCompServices()
 
 	// build pod management policy
 	buildPodManagementPolicy()

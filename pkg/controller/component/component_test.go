@@ -99,7 +99,7 @@ var _ = Describe("Component", func() {
 			By("new container in clusterVersion not in clusterDefinition")
 			component, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
-			Expect(len(component.PodSpec.Containers) >= 3).Should(BeTrue())
+			Expect(len(component.PodSpec.Containers) >= 2).Should(BeTrue())
 
 			By("new init container in clusterVersion not in clusterDefinition")
 			component, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[1])
@@ -167,6 +167,7 @@ var _ = Describe("Component", func() {
 			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
+			Expect(synthesizeComp.ComponentServices).Should(HaveLen(2))
 			Expect(synthesizeComp.ComponentServices[1].Name).Should(Equal("vpc"))
 			Expect(synthesizeComp.ComponentServices[1].Annotations["networking.gke.io/load-balancer-type"]).Should(Equal("Internal"))
 			Expect(synthesizeComp.ComponentServices[1].Spec.Type).Should(BeEquivalentTo("LoadBalancer"))

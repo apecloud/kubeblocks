@@ -250,17 +250,6 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 		SetType(corev1.ServiceTypeClusterIP).
 		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...).
 		GetObject()
-
-	headlessSvcBuilder := builder.NewHeadlessServiceBuilder("", "").
-		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...).
-		SetPublishNotReadyAddresses(true)
-	if clusterCompDef.PodSpec != nil {
-		for _, container := range clusterCompDef.PodSpec.Containers {
-			headlessSvcBuilder = headlessSvcBuilder.AddContainerPorts(container.Ports...)
-		}
-	}
-	headlessSvc := c.removeDuplicatePorts(headlessSvcBuilder.GetObject())
-
 	services := []appsv1alpha1.ComponentService{
 		{
 			Service: appsv1alpha1.Service{
@@ -270,29 +259,8 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 				RoleSelector: c.roleSelector(clusterCompDef),
 			},
 		},
-		{
-			Service: appsv1alpha1.Service{
-				Name:         "headless",
-				ServiceName:  "headless",
-				Spec:         headlessSvc.Spec,
-				RoleSelector: c.roleSelector(clusterCompDef),
-			},
-		},
 	}
 	return services, nil
-}
-
-func (c *compDefServicesConvertor) removeDuplicatePorts(svc *corev1.Service) *corev1.Service {
-	ports := make(map[int32]bool)
-	servicePorts := make([]corev1.ServicePort, 0)
-	for _, port := range svc.Spec.Ports {
-		if !ports[port.Port] {
-			ports[port.Port] = true
-			servicePorts = append(servicePorts, port)
-		}
-	}
-	svc.Spec.Ports = servicePorts
-	return svc
 }
 
 func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) string {

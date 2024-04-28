@@ -7,7 +7,7 @@ spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
   clusterRef: tdengine-cluster
   type: VolumeExpansion
-  # Note: Quantity struct can not do immutable check by CEL. Defines what component and volumeClaimTemplate need to expand the specified storage. VolumeExpansion encapsulates the parameters required for a volume expansion operation.
+  # Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates that requires storage expansion. 
   volumeExpansion:
     # Specifies the name of the Component.
   - componentName: tdengine

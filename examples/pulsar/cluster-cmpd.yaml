@@ -7,7 +7,11 @@ metadata:
     # KB_PULSAR_BROKER_NODEPORT: enable NodePort services
     "kubeblocks.io/extra-env": '{"KB_PULSAR_BROKER_NODEPORT": "false"}'
 spec:
-  # Specifies the behavior when a Cluster is deleted. It defines how resources, data, and backups associated with a Cluster are managed during termination. Choose a policy based on the desired level of resource cleanup and data preservation: - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact. - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data. - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss. Warning: Choosing an inappropriate termination policy can result in significant data loss. The `WipeOut` policy is particularly risky in production environments due to its irreversible nature.
+  # Specifies the behavior when a Cluster is deleted.
+  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
+  # - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations.
+  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
+  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
   terminationPolicy: Delete
   # Defines the list of services that are exposed by a Cluster. This field allows selected components, either from `componentSpecs` or `shardingSpecs`, to be exposed as cluster-level services. Services defined here can be referenced by other clusters using the ServiceRefClusterSelector.
   services:

@@ -10,7 +10,7 @@ spec:
   expose:
     # Specifies the name of the Component.
   - componentName: ob-ce-0
-    # Specifies a list of OpsService. When an OpsService is exposed, a corresponding ClusterService will be added to `cluster.spec.services`. On the other hand, when an OpsService is unexposed, the corresponding ClusterService will be removed from `cluster.spec.services`. Note: If `componentName` is not specified, the `ports` and `selector` fields must be provided in each OpsService definition. OpsService represents the parameters to dynamically create or remove a ClusterService in the `cluster.spec.services` array.
+    # Specifies a list of OpsService. When an OpsService is exposed, a corresponding ClusterService will be added to `cluster.spec.services`. 
     services:
     - name: internet
       serviceType: LoadBalancer

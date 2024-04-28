@@ -28,14 +28,12 @@ helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-nam
 
 ## Examples
 
-### [Create Combined](cluster.yaml) 
-Create a kafka cluster with Combined
+### [Create](cluster.yaml) 
+Create a kafka cluster with combined controller and broker components 
 ```bash
 kubectl apply -f examples/kafka/cluster.yaml
 ```
-
-### [Create Separated](cluster-separated.yaml) 
-Create a kafka cluster with Separated
+Create a kafka cluster with separated controller and broker components
 ```bash
 kubectl apply -f examples/kafka/cluster-separated.yaml
 ```

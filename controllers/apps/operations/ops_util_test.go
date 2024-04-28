@@ -140,8 +140,7 @@ var _ = Describe("OpsUtil functions", func() {
 			}
 
 			By("mock instance set")
-			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
-
+			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusComp)
 			By("expect to disable ha")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -152,7 +151,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("mock restart ops to succeed and expect to enable ha")
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
-			_ = initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
+			_ = testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusComp)
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsSucceedPhase))

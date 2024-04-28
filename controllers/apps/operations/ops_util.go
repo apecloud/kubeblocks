@@ -485,3 +485,20 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 		expectedPhase: opsBehaviour.FromClusterPhases,
 	}
 }
+
+func updateHAConfigIfNecessary(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, switchBoolStr string) error {
+	haConfigName, ok := opsRequest.Annotations[constant.DisableHAAnnotationKey]
+	if !ok {
+		return nil
+	}
+	haConfig := &corev1.ConfigMap{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: haConfigName, Namespace: opsRequest.Namespace}, haConfig); err != nil {
+		return err
+	}
+	val, ok := haConfig.Annotations["enable"]
+	if !ok || val == switchBoolStr {
+		return nil
+	}
+	haConfig.Annotations["enable"] = switchBoolStr
+	return cli.Update(reqCtx.Ctx, haConfig)
+}

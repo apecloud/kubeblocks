@@ -161,7 +161,7 @@ const (
 	HostPortAnnotationKey                       = "kubeblocks.io/host-port"
 	HostPortIncludeAnnotationKey                = "network.kubeblocks.io/host-ports-include"
 	HostPortExcludeAnnotationKey                = "network.kubeblocks.io/host-ports-exclude"
-
+	DisableHAAnnotationKey                      = "kubeblocks.io/disable-ha"
 	// EnabledNodePortSvcAnnotationKey defines the feature gate of NodePort Service defined in ComponentDefinition.Spec.Services.
 	// Components defined in the annotation value, their all services of type NodePort defined in ComponentDefinition will be created; otherwise, they will be ignored.
 	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-node-port-svc: comp1,comp2"

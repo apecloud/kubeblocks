@@ -33,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -290,4 +291,21 @@ func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	return opsutil.UpdateClusterOpsAnnotations(reqCtx.Ctx, cli, opsRes.Cluster, opsRequestSlice)
+}
+
+func updateHAConfigIfNecessary(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, switchBoolStr string) error {
+	haConfigName, ok := opsRequest.Annotations[constant.DisableHAAnnotationKey]
+	if !ok {
+		return nil
+	}
+	haConfig := &corev1.ConfigMap{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: haConfigName, Namespace: opsRequest.Namespace}, haConfig); err != nil {
+		return err
+	}
+	val, ok := haConfig.Annotations["enable"]
+	if !ok || val == switchBoolStr {
+		return nil
+	}
+	haConfig.Annotations["enable"] = switchBoolStr
+	return cli.Update(reqCtx.Ctx, haConfig)
 }

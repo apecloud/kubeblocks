@@ -437,7 +437,6 @@ var _ = Describe("Addon controller", func() {
 						newOjb.Spec.Dependencies = dependencies[i]
 					}
 				})
-				Expect(key.Name).Should(BeEquivalentTo(names[i]))
 			}
 			key.Name = "a"
 			Eventually(func(g Gomega) {

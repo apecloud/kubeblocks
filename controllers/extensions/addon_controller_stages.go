@@ -27,10 +27,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
@@ -42,6 +38,11 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type stageCtx struct {
@@ -278,7 +279,6 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 				return
 			}
 		}
-		//fmt.Printf("addon %s, check = true\n", addon.Name)
 
 		if addon.Spec.Installable == nil {
 			return
@@ -515,7 +515,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 					// enable the dependency addon
 					if dependencyAddon.Spec.InstallSpec == nil {
 						enabledAddonWithDefaultValues(ctx, &r.stageCtx, dependencyAddon, AddonAutoInstall, "")
-					} else if dependencyAddon.Spec.InstallSpec.Enabled != true {
+					} else if !dependencyAddon.Spec.InstallSpec.Enabled {
 						dependencyAddon.Spec.InstallSpec.Enabled = true
 						if err := r.reconciler.Client.Update(ctx, dependencyAddon); err != nil {
 							r.setRequeueWithErr(err, "")
@@ -875,145 +875,6 @@ func (r *terminalStateStage) Handle(ctx context.Context) {
 	r.next.Handle(ctx)
 }
 
-func checkVersionMatched(requiredVersion, currentVersion string) (bool, error) {
-	if len(currentVersion) == 0 {
-		fmt.Println("not specify the version")
-		return false, nil
-	}
-	if len(requiredVersion) == 0 {
-		return true, nil
-	}
-	if strings.Contains(currentVersion, "-") {
-		addPreReleaseInfo := func(constraint string) string {
-			constraint = strings.Trim(constraint, " ")
-			split := strings.Split(constraint, "-")
-			if len(split) == 1 && (strings.HasPrefix(constraint, ">") || strings.Contains(constraint, "<")) {
-				constraint += "-0"
-			}
-			return constraint
-		}
-		rules := strings.Split(requiredVersion, ",")
-		for i := range rules {
-			rules[i] = addPreReleaseInfo(rules[i])
-		}
-		requiredVersion = strings.Join(rules, ",")
-	}
-	constraint, err := semver.NewConstraint(requiredVersion)
-	if err != nil {
-		return false, err
-	}
-	v, err := semver.NewVersion(currentVersion)
-	if err != nil {
-		return false, err
-	}
-	validate, _ := constraint.Validate(v)
-	return validate, nil
-}
-
-// check if all the dependency are installed and not fail
-// check if  circular dependency is existing
-// give the top sort of all the dependencies, return it
-func checkAddonDependency(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) (bool, []string, error) {
-	AddonIdToName := map[int]string{}
-	AddonNameToId := map[string]int{}
-	visited := map[string]bool{}
-	addonList := &extensionsv1alpha1.AddonList{}
-	if err := stageCtx.reconciler.List(ctx, addonList, client.InNamespace(addon.Namespace)); err != nil {
-		return false, nil, err
-	}
-
-	// construct an empty graph
-	addonCount := len(addonList.Items)
-	graph := make([][]int, addonCount)
-	for i := range graph {
-		graph[i] = make([]int, addonCount)
-	}
-	indegree := make([]int, addonCount)
-
-	// construct the map between name and id
-	for i, item := range addonList.Items {
-		AddonNameToId[item.Name] = i
-		AddonIdToName[i] = item.Name
-	}
-
-	// construct the graph which represents the dependency relationship among addons
-	var constructGraph func(addon *extensionsv1alpha1.Addon) error
-	constructGraph = func(addon *extensionsv1alpha1.Addon) error {
-		visited[addon.Name] = true
-		currentID := AddonNameToId[addon.Name]
-		for _, dependency := range addon.Spec.Dependencies {
-			var dependencyID int
-			var exist bool
-			if dependencyID, exist = AddonNameToId[dependency.Name]; !exist {
-				return fmt.Errorf("dependency %s not exist", dependency.Name)
-			}
-
-			graph[dependencyID][currentID]++
-			indegree[currentID]++
-			if !visited[dependency.Name] {
-				dependencyAddon := &extensionsv1alpha1.Addon{}
-				if err := stageCtx.reconciler.Get(ctx, types.NamespacedName{Namespace: stageCtx.reqCtx.Req.Namespace, Name: dependency.Name}, dependencyAddon); err != nil {
-					return err
-				}
-				if dependencyAddon.Status.Phase == extensionsv1alpha1.AddonFailed {
-					return fmt.Errorf("dependency %s failed", dependency.Name)
-				}
-				if versionMatched, err := checkVersionMatched(dependency.Version, dependencyAddon.Spec.Version); err != nil {
-					return err
-				} else if !versionMatched {
-					return fmt.Errorf("version %s not matched", dependencyAddon.Spec.Version)
-				}
-				if err := constructGraph(dependencyAddon); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-
-	if err := constructGraph(addon); err != nil {
-		return false, nil, err
-	}
-
-	// TopSort
-	queue := make([]int, 0)
-	result := make([]int, 0)
-
-	for i, degree := range indegree {
-		if degree == 0 {
-			queue = append(queue, i)
-		}
-	}
-
-	for len(queue) > 0 {
-		top := queue[0]
-		result = append(result, top)
-		queue = queue[1:]
-		for i := 0; i < addonCount; i++ {
-			if graph[top][i] != 0 {
-				indegree[i]--
-				if indegree[i] == 0 {
-					queue = append(queue, i)
-				}
-			}
-		}
-	}
-
-	// if circular dependency is existing
-	if len(result) != addonCount {
-		return false, nil, fmt.Errorf("there is a circular dependency cycle")
-	}
-
-	sequenceDependencyName := make([]string, 0)
-	for _, id := range result {
-		if visited[AddonIdToName[id]] {
-			sequenceDependencyName = append(sequenceDependencyName, AddonIdToName[id])
-		}
-	}
-
-	return true, sequenceDependencyName, nil
-}
-
 // attachVolumeMount attaches a volumes to pod and added container.VolumeMounts to a ConfigMap
 // or Secret referenced key as file, and add --values={volumeMountPath}/{selector.Key} to
 // helm install/upgrade args
@@ -1275,4 +1136,143 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 		return true
 	}
 	return false
+}
+
+func checkVersionMatched(requiredVersion, currentVersion string) (bool, error) {
+	if len(currentVersion) == 0 {
+		fmt.Println("not specify the version")
+		return false, nil
+	}
+	if len(requiredVersion) == 0 {
+		return true, nil
+	}
+	if strings.Contains(currentVersion, "-") {
+		addPreReleaseInfo := func(constraint string) string {
+			constraint = strings.Trim(constraint, " ")
+			split := strings.Split(constraint, "-")
+			if len(split) == 1 && (strings.HasPrefix(constraint, ">") || strings.Contains(constraint, "<")) {
+				constraint += "-0"
+			}
+			return constraint
+		}
+		rules := strings.Split(requiredVersion, ",")
+		for i := range rules {
+			rules[i] = addPreReleaseInfo(rules[i])
+		}
+		requiredVersion = strings.Join(rules, ",")
+	}
+	constraint, err := semver.NewConstraint(requiredVersion)
+	if err != nil {
+		return false, err
+	}
+	v, err := semver.NewVersion(currentVersion)
+	if err != nil {
+		return false, err
+	}
+	validate, _ := constraint.Validate(v)
+	return validate, nil
+}
+
+// check if all the dependency are installed and not fail
+// check if  circular dependency is existing
+// give the top sort of all the dependencies, return it
+func checkAddonDependency(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) (bool, []string, error) {
+	AddonIDToName := map[int]string{}
+	AddonNameToID := map[string]int{}
+	visited := map[string]bool{}
+	addonList := &extensionsv1alpha1.AddonList{}
+	if err := stageCtx.reconciler.List(ctx, addonList, client.InNamespace(addon.Namespace)); err != nil {
+		return false, nil, err
+	}
+
+	// construct an empty graph
+	addonCount := len(addonList.Items)
+	graph := make([][]int, addonCount)
+	for i := range graph {
+		graph[i] = make([]int, addonCount)
+	}
+	indegree := make([]int, addonCount)
+
+	// construct the map between name and id
+	for i, item := range addonList.Items {
+		AddonNameToID[item.Name] = i
+		AddonIDToName[i] = item.Name
+	}
+
+	// construct the graph which represents the dependency relationship among addons
+	var constructGraph func(addon *extensionsv1alpha1.Addon) error
+	constructGraph = func(addon *extensionsv1alpha1.Addon) error {
+		visited[addon.Name] = true
+		currentID := AddonNameToID[addon.Name]
+		for _, dependency := range addon.Spec.Dependencies {
+			var dependencyID int
+			var exist bool
+			if dependencyID, exist = AddonNameToID[dependency.Name]; !exist {
+				return fmt.Errorf("dependency %s not exist", dependency.Name)
+			}
+
+			graph[dependencyID][currentID]++
+			indegree[currentID]++
+			if !visited[dependency.Name] {
+				dependencyAddon := &extensionsv1alpha1.Addon{}
+				if err := stageCtx.reconciler.Get(ctx, types.NamespacedName{Namespace: stageCtx.reqCtx.Req.Namespace, Name: dependency.Name}, dependencyAddon); err != nil {
+					return err
+				}
+				if dependencyAddon.Status.Phase == extensionsv1alpha1.AddonFailed {
+					return fmt.Errorf("dependency %s failed", dependency.Name)
+				}
+				if versionMatched, err := checkVersionMatched(dependency.Version, dependencyAddon.Spec.Version); err != nil {
+					return err
+				} else if !versionMatched {
+					return fmt.Errorf("version %s not matched", dependencyAddon.Spec.Version)
+				}
+				if err := constructGraph(dependencyAddon); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	if err := constructGraph(addon); err != nil {
+		return false, nil, err
+	}
+
+	// TopSort
+	queue := make([]int, 0)
+	result := make([]int, 0)
+
+	for i, degree := range indegree {
+		if degree == 0 {
+			queue = append(queue, i)
+		}
+	}
+
+	for len(queue) > 0 {
+		top := queue[0]
+		result = append(result, top)
+		queue = queue[1:]
+		for i := 0; i < addonCount; i++ {
+			if graph[top][i] != 0 {
+				indegree[i]--
+				if indegree[i] == 0 {
+					queue = append(queue, i)
+				}
+			}
+		}
+	}
+
+	// if circular dependency is existing
+	if len(result) != addonCount {
+		return false, nil, fmt.Errorf("there is a circular dependency cycle")
+	}
+
+	sequenceDependencyName := make([]string, 0)
+	for _, id := range result {
+		if visited[AddonIDToName[id]] {
+			sequenceDependencyName = append(sequenceDependencyName, AddonIDToName[id])
+		}
+	}
+
+	return true, sequenceDependencyName, nil
 }

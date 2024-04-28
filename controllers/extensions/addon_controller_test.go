@@ -118,17 +118,6 @@ var _ = Describe("Addon controller", func() {
 			return addonReconciler.Reconcile(ctx, req)
 		}
 
-		//doReconcileWithKey := func(specifiedKey types.NamespacedName) (ctrl.Result, error) {
-		//	addonReconciler := &AddonReconciler{
-		//		Client: testCtx.Cli,
-		//		Scheme: testCtx.Cli.Scheme(),
-		//	}
-		//	req := reconcile.Request{
-		//		NamespacedName: specifiedKey,
-		//	}
-		//	return addonReconciler.Reconcile(ctx, req)
-		//}
-
 		doReconcileOnce := func(g Gomega) {
 			By("Reconciling once")
 			result, err := doReconcile()
@@ -451,7 +440,6 @@ var _ = Describe("Addon controller", func() {
 				Expect(key.Name).Should(BeEquivalentTo(names[i]))
 			}
 			key.Name = "a"
-			//enablingPhaseCheck(2)
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				g.Expect(err).To(Not(HaveOccurred()))
@@ -556,7 +544,8 @@ var _ = Describe("Addon controller", func() {
 			}
 			key.Name = "a"
 			Eventually(func(g Gomega) {
-				doReconcile()
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
 				addon := &extensionsv1alpha1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))

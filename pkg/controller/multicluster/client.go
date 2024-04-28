@@ -113,7 +113,8 @@ func (c *clientReader) List(ctx context.Context, list client.ObjectList, opts ..
 	if objects.Len() != 0 {
 		items.Set(objects)
 	}
-	return err
+	// TODO: ignore the unavailable error slightly, need to handle it correctly in the future
+	return ignoreUnavailableError(err)
 }
 
 type clientWriter struct {
@@ -261,15 +262,21 @@ func (c *subResourceWriter) Patch(ctx context.Context, obj client.Object, patch 
 }
 
 func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
-	var err error
+	var err, uerr error
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
 		if e := request(cc, obj); e != nil {
-			if err == nil {
+			switch {
+			case !isUnavailableError(e) && err == nil:
 				err = e
+			case isUnavailableError(e) && uerr == nil:
+				uerr = e
 			}
 		}
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return uerr // TODO: handle the error
 }
 
 func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
@@ -281,32 +288,46 @@ func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(c
 }
 
 func anyOf_(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
-	var err error
+	var err, uerr error
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
-		if e := request(cc, obj); e == nil {
+		e := request(cc, obj)
+		switch {
+		case e == nil:
 			return nil
-		} else if err == nil {
+		case !isUnavailableError(e) && err == nil:
 			err = e
+		case isUnavailableError(e) && uerr == nil:
+			uerr = e
 		}
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return uerr // all clusters are unavailable?
 }
 
 func anyOfWithMultiCheck(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
-	var err error
+	var err, uerr error
 	objs := make([]client.Object, 0)
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
 		o := obj.DeepCopyObject().(client.Object)
-		if e := request(cc, o); e == nil {
+		e := request(cc, o)
+		switch {
+		case e == nil:
 			objs = append(objs, o)
-		} else if err == nil {
+		case !isUnavailableError(e) && err == nil:
 			err = e
+		case isUnavailableError(e) && uerr == nil:
+			uerr = e
 		}
 	}
 	if len(objs) > 0 {
 		reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(objs[0]).Elem())
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return uerr // TODO: handle the error
 }
 
 type contextCli struct {

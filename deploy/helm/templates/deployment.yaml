@@ -74,6 +74,9 @@ spec:
             {{- if .Values.multiCluster.contexts }}
             - "--multi-cluster-contexts={{ .Values.multiCluster.contexts }}"
             {{- end }}
+            {{- if .Values.multiCluster.contextsDisabled }}
+            - "--multi-cluster-contexts-disabled={{ .Values.multiCluster.contextsDisabled }}"
+            {{- end }}
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}

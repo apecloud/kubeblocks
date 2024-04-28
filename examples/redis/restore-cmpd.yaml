@@ -16,8 +16,8 @@ spec:
   componentSpecs:
     # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. 
     - name: redis
-    # References a ClusterComponentDefinition defined in the `clusterDefinition.spec.componentDef` field. Must comply with the IANA service naming rule. Deprecated since v0.9, because defining components in `clusterDefinition.spec.componentDef` field has been deprecated. This field is replaced by the `componentDef` field, use `componentDef` instead. This field is maintained for backward compatibility and its use is discouraged. Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-    componentDefRef: redis
+    # References the name of a ComponentDefinition. The ComponentDefinition specifies the behavior and characteristics of the Component. If both `componentDefRef` and `componentDef` are provided, the `componentDef` will take precedence over `componentDefRef`.
+    componentDef: redis
     # Specifies a group of affinity scheduling rules for the Component. It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
     affinity:
       podAntiAffinity: Preferred

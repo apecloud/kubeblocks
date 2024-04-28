@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -529,8 +530,8 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
+	labels := constant.GetComponentWellKnownLabels(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.synthesizeComp.Namespace, labels, inDataContext4C())
 	if err != nil {
 		return err
 	}
@@ -713,15 +714,20 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 
 	// step 1: update pv to retain
 	pv := &corev1.PersistentVolume{}
-	pvKey := types.NamespacedName{
-		Namespace: pvcKey.Namespace,
-		Name:      newPVC.Spec.VolumeName,
-	}
-	if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
-		if apierrors.IsNotFound(err) {
-			pvNotFound = true
-		} else {
-			return err
+	if len(newPVC.Spec.VolumeName) == 0 {
+		// the PV may be under provisioning
+		pvNotFound = true
+	} else {
+		pvKey := types.NamespacedName{
+			Namespace: pvcKey.Namespace,
+			Name:      newPVC.Spec.VolumeName,
+		}
+		if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
+			if apierrors.IsNotFound(err) {
+				pvNotFound = true
+			} else {
+				return err
+			}
 		}
 	}
 
@@ -838,25 +844,6 @@ func (r *componentWorkloadOps) buildProtoITSWorkloadVertex() *model.ObjectVertex
 func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeComp *component.SynthesizedComponent,
 	itsObj *workloads.InstanceSet, dag *graph.DAG) error {
 	graphCli := model.NewGraphClient(cli)
-	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
-		labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
-		pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
-			generics.PersistentVolumeClaimSignature, itsObj.Namespace, labels, inDataContext4C())
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
-		matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
-		prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
-		for _, pvc := range pvcs {
-			if strings.HasPrefix(pvc.Name, prefix) {
-				matchedPVCs = append(matchedPVCs, pvc)
-			}
-		}
-		return matchedPVCs, nil
-	}
 
 	// PVCs which have been added to the dag because of volume expansion.
 	pvcNameSet := sets.New[string]()
@@ -865,7 +852,7 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 	}
 
 	for _, vct := range synthesizeComp.VolumeClaimTemplates {
-		pvcs, err := getRunningVolumes(vct.Name)
+		pvcs, err := getRunningVolumes(reqCtx.Ctx, cli, synthesizeComp, itsObj, vct.Name)
 		if err != nil {
 			return err
 		}
@@ -877,6 +864,27 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 		}
 	}
 	return nil
+}
+
+// getRunningVolumes gets the running volumes of the ITS.
+func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
+	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
+	labels := constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)
+	pvcs, err := component.ListObjWithLabelsInNamespace(ctx, cli, generics.PersistentVolumeClaimSignature, synthesizedComp.Namespace, labels, inDataContext4C())
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
+	prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
+	for _, pvc := range pvcs {
+		if strings.HasPrefix(pvc.Name, prefix) {
+			matchedPVCs = append(matchedPVCs, pvc)
+		}
+	}
+	return matchedPVCs, nil
 }
 
 func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *workloads.InstanceSet) {

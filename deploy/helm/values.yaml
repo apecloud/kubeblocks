@@ -125,10 +125,12 @@ managedNamespaces:
 multiCluster:
   # Configure the kubeconfig secret. The config content should be in the item with the key kubeconfig.
   kubeConfig:
-  # Configure the contexts to use, multiple contexts are separated by commas.
-  contexts:
   # The path to which kubeconfig is mounted.
   mountPath: /var/run/secrets/kubeblocks.io/multicluster
+  # Configure the contexts to use, multiple contexts are separated by commas.
+  contexts:
+  # Configure the contexts to be disabled.
+  contextsDisabled:
 
 ## Logger settings
 ##

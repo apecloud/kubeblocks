@@ -50,8 +50,8 @@ spec:
   # Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster.
   # ClusterComponentSpec defines the specifications for a Component in a Cluster.
   componentSpecs:
-    # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. When ClusterComponentSpec is referenced as a template, the name is optional. Otherwise, it is required.
-  - name: pulsar-broker
+    # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. 
+    - name: pulsar-broker
     componentDef: pulsar-broker
     monitorEnabled: false
     serviceAccountName: kb-pulsar-cluster

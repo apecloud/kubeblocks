@@ -8,6 +8,7 @@ spec:
   clusterRef: mogdb-cluster
   type: VerticalScaling
   # Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling. 
+  verticalScaling:
   - componentName: mogdb
     # VerticalScaling refers to the process of adjusting the compute resources (e.g., CPU, memory) allocated to a Component. It defines the parameters required for the operation.
     requests:

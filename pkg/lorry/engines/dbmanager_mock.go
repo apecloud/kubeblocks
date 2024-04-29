@@ -728,6 +728,18 @@ func (mr *MockDBManagerMockRecorder) Stop() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockDBManager)(nil).Stop))
 }
 
+// SubscribeRoleChange mocks base method.
+func (m *MockDBManager) SubscribeRoleChange(arg0 context.Context, arg1 *string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SubscribeRoleChange", arg0, arg1)
+}
+
+// SubscribeRoleChange indicates an expected call of SubscribeRoleChange.
+func (mr *MockDBManagerMockRecorder) SubscribeRoleChange(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeRoleChange", reflect.TypeOf((*MockDBManager)(nil).SubscribeRoleChange), arg0, arg1)
+}
+
 // Unlock mocks base method.
 func (m *MockDBManager) Unlock(arg0 context.Context) error {
 	m.ctrl.T.Helper()

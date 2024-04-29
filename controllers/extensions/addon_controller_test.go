@@ -32,6 +32,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -312,6 +314,21 @@ var _ = Describe("Addon controller", func() {
 				Type: "helm.sh/release.v1",
 			}
 			Expect(testCtx.CreateObj(ctx, helmRelease)).Should(Succeed())
+		}
+
+		CheckKubernetesVersion := func() bool {
+			var serverVersion *version.Info
+			var isBeforeVersion bool
+			Eventually(func(g Gomega) {
+				clientset, err := kubernetes.NewForConfig(cfg)
+				g.Expect(err).NotTo(HaveOccurred())
+				discoveryClient := clientset.Discovery()
+				serverVersion, err = discoveryClient.ServerVersion()
+				g.Expect(err).NotTo(HaveOccurred())
+				isBeforeVersion = (version.CompareKubeAwareVersionStrings(serverVersion.String(), "v1.23.0") > 0)
+			}).Should(Succeed())
+			fmt.Printf("Kubernetes server version: %s\n", serverVersion.String())
+			return isBeforeVersion
 		}
 
 		It("should successfully reconcile a custom resource for Addon with spec.type=Helm", func() {
@@ -632,22 +649,26 @@ var _ = Describe("Addon controller", func() {
 		})
 
 		It("should failed reconcile a custom resource for Addon with missing spec helm of helm chartLocationURL", func() {
-			By("By create an addon with spec.helm = nil")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
-				newOjb.Spec.Installable.AutoInstall = true
-				newOjb.Spec.Type = extensionsv1alpha1.HelmType
-				newOjb.Spec.Helm = nil
-			})
+			By("By check Kubernetes Version to decide if check")
+			// if k8s version > 1.23, it has kubebuilder X-Validation, no need to check again
+			if CheckKubernetesVersion() {
+				By("By create an addon with spec.helm = nil")
+				createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+					newOjb.Spec.Installable.AutoInstall = true
+					newOjb.Spec.Type = extensionsv1alpha1.HelmType
+					newOjb.Spec.Helm = nil
+				})
 
-			By("By check addon status")
-			Eventually(func(g Gomega) {
-				doReconcileOnce(g)
-				addon = &extensionsv1alpha1.Addon{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
-				g.Expect(addon.Spec.InstallSpec).Should(BeNil())
-				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
-			}).Should(Succeed())
+				By("By check addon status")
+				Eventually(func(g Gomega) {
+					doReconcileOnce(g)
+					addon = &extensionsv1alpha1.Addon{}
+					g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+					g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+					g.Expect(addon.Spec.InstallSpec).Should(BeNil())
+					g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+				}).Should(Succeed())
+			}
 		})
 	})
 

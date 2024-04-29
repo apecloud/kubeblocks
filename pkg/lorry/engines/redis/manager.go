@@ -115,7 +115,7 @@ func tokenizeCmd2Args(cmd string) []interface{} {
 }
 
 func (mgr *Manager) SubscribeRoleChange(ctx context.Context, oriRole *string) {
-	pubSub := mgr.sentinelClient.Subscribe(ctx, "+switch_master")
+	pubSub := mgr.sentinelClient.Subscribe(ctx, "+switch-master")
 
 	// go-redis periodically sends ping messages to test connection health
 	// and re-subscribes if ping can not receive for 30 seconds.
@@ -124,7 +124,7 @@ func (mgr *Manager) SubscribeRoleChange(ctx context.Context, oriRole *string) {
 	var role string
 	for msg := range ch {
 		masterAddr := strings.Split(msg.Payload, " ")
-		masterName := strings.Split(masterAddr[1], ".")[0]
+		masterName := strings.Split(masterAddr[3], ".")[0]
 
 		if masterName == mgr.CurrentMemberName {
 			role = models.PRIMARY

@@ -110,6 +110,7 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		return err
 	}
 	// In addition to active probing, if the database engine supports it, we also support passive subscription to role changes.
+	s.OriRole = new(string)
 	go manager.SubscribeRoleChange(ctx, s.OriRole)
 
 	return nil

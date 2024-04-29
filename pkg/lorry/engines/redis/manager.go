@@ -21,8 +21,6 @@ package redis
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	"strings"
 	"time"
 
@@ -31,6 +29,8 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 

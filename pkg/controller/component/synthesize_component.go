@@ -212,7 +212,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build componentService
 	buildComponentServices(synthesizeComp, compDefObj, comp)
 
-	if err = buildConfigTemplates(synthesizeComp, comp); err != nil {
+	if err = overrideConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
 
@@ -445,7 +445,7 @@ func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv
 	}
 }
 
-func buildConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
 	if comp == nil || len(comp.Spec.Configs) == 0 {
 		return nil
 	}
@@ -463,12 +463,19 @@ func buildConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1alp
 		if template == nil {
 			return fmt.Errorf("the config template %s is not defined in definition", *config.Name)
 		}
-		if config.ConfigMap == nil && len(template.TemplateRef) == 0 {
-			return fmt.Errorf("the config template %s has not provied any content in both definition and cluster", *config.Name)
+
+		specified := func() bool {
+			return config.ConfigMap != nil && len(config.ConfigMap.Name) > 0
 		}
-		if config.ConfigMap != nil {
-			// TODO: merge by th key (different file)?
+		switch {
+		case len(template.TemplateRef) == 0 && !specified():
+			return fmt.Errorf("there is no content provided for config template %s", *config.Name)
+		case len(template.TemplateRef) > 0 && specified():
+			return fmt.Errorf("partial overriding is not supported, config template: %s", *config.Name)
+		case specified():
 			template.TemplateRef = config.ConfigMap.Name
+		default:
+			// do nothing
 		}
 	}
 	return nil

@@ -4096,10 +4096,10 @@ spec:
                               using this approach. - If both `cluster` and `serviceDescriptor`
                               are present, `cluster` will take precedence. \n Deprecated
                               since v0.9 since `clusterDefinition.spec.connectionCredential`
-                              is deprecated, use `clusterRef` instead. This field
-                              is maintained for backward compatibility and its use
-                              is discouraged. Existing usage should be updated to
-                              the current preferred approach to avoid compatibility
+                              is deprecated, use `clusterServiceSelector` instead.
+                              This field is maintained for backward compatibility
+                              and its use is discouraged. Existing usage should be
+                              updated to the current preferred approach to avoid compatibility
                               issues in future releases."
                             type: string
                           clusterServiceSelector:
@@ -4216,7 +4216,7 @@ spec:
                             type: object
                           name:
                             description: References the component service name defined
-                              in the ComponentDefinition.Spec.Services[x].Name.
+                              in the `componentDefinition.spec.services[*].name`.
                             maxLength: 25
                             type: string
                           podService:
@@ -4232,15 +4232,15 @@ spec:
                               for load-balancing to endpoints. Endpoints are determined
                               by the selector or if that is not specified, they are
                               determined by manual construction of an Endpoints object
-                              or EndpointSlice objects. If clusterIP is \"None\",
-                              no virtual IP is allocated and the endpoints are published
-                              as a set of endpoints rather than a virtual IP. - `NodePort`
-                              builds on ClusterIP and allocates a port on every node
-                              which routes to the same endpoints as the clusterIP.
-                              - `LoadBalancer` builds on NodePort and creates an external
-                              load-balancer (if supported in the current cloud) which
-                              routes to the same endpoints as the clusterIP. \n More
-                              info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
+                              or EndpointSlice objects. - `NodePort` builds on ClusterIP
+                              and allocates a port on every node which routes to the
+                              same endpoints as the clusterIP. - `LoadBalancer` builds
+                              on NodePort and creates an external load-balancer (if
+                              supported in the current cloud) which routes to the
+                              same endpoints as the clusterIP. \n Note: although K8s
+                              Service type allows the 'ExternalName' type, it is not
+                              a valid option for ClusterComponentService. \n For more
+                              info, see: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
                             enum:
                             - ClusterIP
                             - NodePort
@@ -5915,9 +5915,9 @@ spec:
                         leader\" to the `serviceSpec.selector`. This means that the
                         service will select and route traffic to Pods with the label
                         \"kubeblocks.io/role\" set to \"leader\". \n Note that if
-                        `generatePodOrdinalService` sets to true, RoleSelector will
-                        be ignored. The `generatePodOrdinalService` flag takes precedence
-                        over `roleSelector` and generates a service for each Pod."
+                        `podService` sets to true, RoleSelector will be ignored. The
+                        `podService` flag takes precedence over `roleSelector` and
+                        generates a service for each Pod."
                       type: string
                     serviceName:
                       description: "ServiceName defines the name of the underlying
@@ -10438,11 +10438,11 @@ spec:
                                   using this approach. - If both `cluster` and `serviceDescriptor`
                                   are present, `cluster` will take precedence. \n
                                   Deprecated since v0.9 since `clusterDefinition.spec.connectionCredential`
-                                  is deprecated, use `clusterRef` instead. This field
-                                  is maintained for backward compatibility and its
-                                  use is discouraged. Existing usage should be updated
-                                  to the current preferred approach to avoid compatibility
-                                  issues in future releases."
+                                  is deprecated, use `clusterServiceSelector` instead.
+                                  This field is maintained for backward compatibility
+                                  and its use is discouraged. Existing usage should
+                                  be updated to the current preferred approach to
+                                  avoid compatibility issues in future releases."
                                 type: string
                               clusterServiceSelector:
                                 description: ClusterRef is used to reference a service
@@ -10564,7 +10564,7 @@ spec:
                                 type: object
                               name:
                                 description: References the component service name
-                                  defined in the ComponentDefinition.Spec.Services[x].Name.
+                                  defined in the `componentDefinition.spec.services[*].name`.
                                 maxLength: 25
                                 type: string
                               podService:
@@ -10581,15 +10581,15 @@ spec:
                                   are determined by the selector or if that is not
                                   specified, they are determined by manual construction
                                   of an Endpoints object or EndpointSlice objects.
-                                  If clusterIP is \"None\", no virtual IP is allocated
-                                  and the endpoints are published as a set of endpoints
-                                  rather than a virtual IP. - `NodePort` builds on
-                                  ClusterIP and allocates a port on every node which
-                                  routes to the same endpoints as the clusterIP. -
-                                  `LoadBalancer` builds on NodePort and creates an
-                                  external load-balancer (if supported in the current
-                                  cloud) which routes to the same endpoints as the
-                                  clusterIP. \n More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
+                                  - `NodePort` builds on ClusterIP and allocates a
+                                  port on every node which routes to the same endpoints
+                                  as the clusterIP. - `LoadBalancer` builds on NodePort
+                                  and creates an external load-balancer (if supported
+                                  in the current cloud) which routes to the same endpoints
+                                  as the clusterIP. \n Note: although K8s Service
+                                  type allows the 'ExternalName' type, it is not a
+                                  valid option for ClusterComponentService. \n For
+                                  more info, see: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types."
                                 enum:
                                 - ClusterIP
                                 - NodePort
@@ -11196,14 +11196,6 @@ spec:
                             default: Unknown
                             description: Represents the name of the pod.
                             type: string
-                          ready:
-                            description: Whether the corresponding Pod is in ready
-                              condition.
-                            type: boolean
-                          readyWithoutPrimary:
-                            description: Indicates whether it is required for the
-                              InstanceSet to have at least one primary instance ready.
-                            type: boolean
                           role:
                             description: Defines the role of the replica in the cluster.
                             properties:

@@ -12817,23 +12817,21 @@ spec:
                         for each Pod of the selected Component. When set to true,
                         a set of Services will be automatically generated for each
                         Pod, and the `roleSelector` field will be ignored. \n The
-                        names of the generated Services will follow the same naming
-                        pattern: `$(serviceName)-$(podOrdinal)`. \n The podOrdinal
-                        is zero-based, meaning it starts from 0 for the first Pod
-                        and increments for each subsequent Pod. The total number of
-                        generated Services will be equal to the number of replicas
-                        specified for the Component. \n Example usage: \n ```yaml
-                        name: my-service serviceName: my-service generatePodOrdinalService:
-                        true spec: type: NodePort ports: - name: http port: 80 targetPort:
-                        8080 ``` \n In this example, if the Component has 3 replicas,
-                        three Services will be generated: - my-service-0: Points to
-                        the first Pod (podOrdinal: 0) - my-service-1: Points to the
-                        second Pod (podOrdinal: 1) - my-service-2: Points to the third
-                        Pod (podOrdinal: 2) \n Each generated Service will have the
-                        specified spec configuration and will target its respective
-                        Pod. \n This feature is useful when you need to expose each
-                        Pod of a Component individually, allowing external access
-                        to specific instances of the Component."
+                        names of the generated Services will follow the same suffix
+                        naming pattern: `$(serviceName)-$(podOrdinal)`. The total
+                        number of generated Services will be equal to the number of
+                        replicas specified for the Component. \n Example usage: \n
+                        ```yaml name: my-service serviceName: my-service podService:
+                        true disableAutoProvision: true spec: type: NodePort ports:
+                        - name: http port: 80 targetPort: 8080 ``` \n In this example,
+                        if the Component has 3 replicas, three Services will be generated:
+                        - my-service-0: Points to the first Pod (podOrdinal: 0) -
+                        my-service-1: Points to the second Pod (podOrdinal: 1) - my-service-2:
+                        Points to the third Pod (podOrdinal: 2) \n Each generated
+                        Service will have the specified spec configuration and will
+                        target its respective Pod. \n This feature is useful when
+                        you need to expose each Pod of a Component individually, allowing
+                        external access to specific instances of the Component."
                       type: boolean
                     roleSelector:
                       description: "Extends the above `serviceSpec.selector` by allowing
@@ -12845,9 +12843,9 @@ spec:
                         leader\" to the `serviceSpec.selector`. This means that the
                         service will select and route traffic to Pods with the label
                         \"kubeblocks.io/role\" set to \"leader\". \n Note that if
-                        `generatePodOrdinalService` sets to true, RoleSelector will
-                        be ignored. The `generatePodOrdinalService` flag takes precedence
-                        over `roleSelector` and generates a service for each Pod."
+                        `podService` sets to true, RoleSelector will be ignored. The
+                        `podService` flag takes precedence over `roleSelector` and
+                        generates a service for each Pod."
                       type: string
                     serviceName:
                       description: "ServiceName defines the name of the underlying
@@ -14680,7 +14678,8 @@ spec:
                   address, port, account name, account password) from a selected ServiceRefDeclaration.
                   The purpose of ServiceRefVar is to obtain the specific address that
                   a ServiceRef is bound to (e.g., a ClusterService of another Cluster).
-                  \n This field is immutable."
+                  - Component: Retrieves values from a field of a Component. \n This
+                  field is immutable."
                 items:
                   description: EnvVar represents a variable present in the env of
                     Pod/Action or the template of config/script.
@@ -14703,6 +14702,95 @@ spec:
                       description: Source for the variable's value. Cannot be used
                         if value is not empty.
                       properties:
+                        componentVarRef:
+                          description: Selects a defined var of a Component.
+                          properties:
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
+                                If not specified, the component itself will be used.
+                              type: string
+                            componentName:
+                              description: Reference to the name of the Component
+                                object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            instanceNames:
+                              description: 'Reference to the instanceName list of
+                                the component. and the value will be presented in
+                                the following format: instanceName1,instanceName2...'
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            multipleClusterObjectOption:
+                              description: This option defines the behavior when multiple
+                                component objects match the specified @CompDef. If
+                                not provided, an error will be raised when handling
+                                multiple matches.
+                              properties:
+                                combinedOption:
+                                  description: Define the options for handling combined
+                                    variables. Valid only when the strategy is set
+                                    to "combined".
+                                  properties:
+                                    flattenFormat:
+                                      description: 'The flatten format, default is:
+                                        $(comp-name-1):value,$(comp-name-2):value.'
+                                      properties:
+                                        delimiter:
+                                          default: ','
+                                          description: Pair delimiter.
+                                          type: string
+                                        keyValueDelimiter:
+                                          default: ':'
+                                          description: Key-value delimiter.
+                                          type: string
+                                      required:
+                                      - delimiter
+                                      - keyValueDelimiter
+                                      type: object
+                                    newVarSuffix:
+                                      description: 'If set, the existing variable
+                                        will be kept, and a new variable will be defined
+                                        with the specified suffix in pattern: $(var.name)_$(suffix).
+                                        The new variable will be auto-created and
+                                        placed behind the existing one. If not set,
+                                        the existing variable will be reused with
+                                        the value format defined below.'
+                                      type: string
+                                    valueFormat:
+                                      default: Flatten
+                                      description: The format of the value that the
+                                        operator will use to compose values from multiple
+                                        components.
+                                      type: string
+                                  type: object
+                                strategy:
+                                  description: Define the strategy for handling multiple
+                                    cluster objects.
+                                  enum:
+                                  - individual
+                                  - combined
+                                  type: string
+                              required:
+                              - strategy
+                              type: object
+                            name:
+                              description: Name of the referent object.
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                            replicas:
+                              description: Reference to the replicas of the component.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                          type: object
                         configMapKeyRef:
                           description: Selects a key of a ConfigMap.
                           properties:
@@ -15020,6 +15108,15 @@ spec:
                             host:
                               description: VarOption defines whether a variable is
                                 required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            loadBalancer:
+                              description: "LoadBalancer represents the LoadBalancer
+                                ingress point of the service. \n If multiple ingress
+                                points are available, the first one will be used automatically,
+                                choosing between IP and Hostname."
                               enum:
                               - Required
                               - Optional

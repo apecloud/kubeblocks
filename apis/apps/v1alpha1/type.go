@@ -322,7 +322,7 @@ const (
 
 // OpsPhase defines opsRequest phase.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Aborted,Failed,Succeed}
 type OpsPhase string
 
 const (
@@ -333,6 +333,7 @@ const (
 	OpsSucceedPhase    OpsPhase = "Succeed"
 	OpsCancelledPhase  OpsPhase = "Cancelled"
 	OpsFailedPhase     OpsPhase = "Failed"
+	OpsAbortedPhase    OpsPhase = "Aborted"
 )
 
 // PodSelectionPolicy pod selection strategy.
@@ -866,9 +867,7 @@ type ComponentService struct {
 	// When set to true, a set of Services will be automatically generated for each Pod,
 	// and the `roleSelector` field will be ignored.
 	//
-	// The names of the generated Services will follow the same naming pattern: `$(serviceName)-$(podOrdinal)`.
-	//
-	// The podOrdinal is zero-based, meaning it starts from 0 for the first Pod and increments for each subsequent Pod.
+	// The names of the generated Services will follow the same suffix naming pattern: `$(serviceName)-$(podOrdinal)`.
 	// The total number of generated Services will be equal to the number of replicas specified for the Component.
 	//
 	// Example usage:
@@ -876,7 +875,8 @@ type ComponentService struct {
 	// ```yaml
 	// name: my-service
 	// serviceName: my-service
-	// generatePodOrdinalService: true
+	// podService: true
+	// disableAutoProvision: true
 	// spec:
 	//   type: NodePort
 	//   ports:
@@ -954,8 +954,8 @@ type Service struct {
 	// This means that the service will select and route traffic to Pods with the label
 	// "kubeblocks.io/role" set to "leader".
 	//
-	// Note that if `generatePodOrdinalService` sets to true, RoleSelector will be ignored.
-	// The `generatePodOrdinalService` flag takes precedence over `roleSelector` and generates a service for each Pod.
+	// Note that if `podService` sets to true, RoleSelector will be ignored.
+	// The `podService` flag takes precedence over `roleSelector` and generates a service for each Pod.
 	//
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
@@ -1030,6 +1030,10 @@ type VarSource struct {
 	// Selects a defined var of a ServiceRef.
 	// +optional
 	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
+
+	// Selects a defined var of a Component.
+	// +optional
+	ComponentVarRef *ComponentVarSelector `json:"componentVarRef,omitempty"`
 }
 
 // VarOption defines whether a variable is required or optional.
@@ -1071,6 +1075,13 @@ type ContainerVars struct {
 type ServiceVars struct {
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
+
+	// LoadBalancer represents the LoadBalancer ingress point of the service.
+	//
+	// If multiple ingress points are available, the first one will be used automatically, choosing between IP and Hostname.
+	//
+	// +optional
+	LoadBalancer *VarOption `json:"loadBalancer,omitempty"`
 
 	// Port references a port or node-port defined in the service.
 	//
@@ -1133,6 +1144,32 @@ type ServiceRefVarSelector struct {
 	ClusterObjectReference `json:",inline"`
 
 	ServiceRefVars `json:",inline"`
+}
+
+// ComponentVarSelector selects a var from a Component.
+type ComponentVarSelector struct {
+	// The Component to select from.
+	ClusterObjectReference `json:",inline"`
+
+	ComponentVars `json:",inline"`
+}
+
+type ComponentVars struct {
+	// Reference to the name of the Component object.
+	//
+	// +optional
+	ComponentName *VarOption `json:"componentName,omitempty"`
+
+	// Reference to the replicas of the component.
+	//
+	// +optional
+	Replicas *VarOption `json:"replicas,omitempty"`
+
+	// Reference to the instanceName list of the component.
+	// and the value will be presented in the following format: instanceName1,instanceName2...
+	//
+	// +optional
+	InstanceNames *VarOption `json:"instanceNames,omitempty"`
 }
 
 // ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.

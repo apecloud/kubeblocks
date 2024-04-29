@@ -1333,6 +1333,7 @@ The purpose of ServiceVar is to obtain the address of a ComponentService.</li>
 ServiceRefDeclaration.
 The purpose of ServiceRefVar is to obtain the specific address that a ServiceRef is bound to
 (e.g., a ClusterService of another Cluster).</li>
+<li>Component: Retrieves values from a field of a Component.</li>
 </ul>
 <p>This field is immutable.</p>
 </td>
@@ -1851,7 +1852,7 @@ ComponentVersionStatus
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsDefinition">OpsDefinition
 </h3>
 <div>
-<p>OpsDefinition is the Schema for the opsdefinitions API</p>
+<p>OpsDefinition is the Schema for the OpsDefinitions API.</p>
 </div>
 <table>
 <thead>
@@ -1915,7 +1916,13 @@ OpsDefinitionSpec
 <td>
 <em>(Optional)</em>
 <p>Specifies the preconditions that must be met to run the actions for the operation.
-if set, it will check the condition before the component run this operation.</p>
+if set, it will check the condition before the Component runs this operation.
+Example:</p>
+<pre><code class="language-yaml"> preConditions:
+ - rule:
+     expression: '&#123;&#123; eq .component.status.phase &quot;Running&quot; &#125;&#125;'
+     message: Component is not in Running status.
+</code></pre>
 </td>
 </tr>
 <tr>
@@ -1929,7 +1936,10 @@ if set, it will check the condition before the component run this operation.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the targetPodTemplate to be referenced by the action.</p>
+<p>Specifies a list of TargetPodTemplate, each designed to select a specific Pod and extract selected runtime info
+from its PodSpec.
+The extracted information, such as environment variables, volumes and tolerations, are then injected into
+Jobs or Pods that execute the OpsActions defined in <code>actions</code>.</p>
 </td>
 </tr>
 <tr>
@@ -1943,9 +1953,8 @@ if set, it will check the condition before the component run this operation.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the types of componentDefinitions supported by the operation.
-It can reference certain variables of the componentDefinition.
-If set, any component not meeting these conditions will be intercepted.</p>
+<p>Specifies a list of ComponentDefinition for Components associated with this OpsDefinition.
+It also includes connection credentials (address and account) for each Component.</p>
 </td>
 </tr>
 <tr>
@@ -1959,7 +1968,7 @@ ParametersSchema
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the schema used for validation, pruning, and defaulting.</p>
+<p>Specifies the schema for validating the data types and value ranges of parameters in OpsActions before their usage.</p>
 </td>
 </tr>
 <tr>
@@ -1972,7 +1981,7 @@ ParametersSchema
 </em>
 </td>
 <td>
-<p>The actions to be executed in the opsRequest are performed sequentially.</p>
+<p>Specifies a list of OpsAction where each customized action is executed sequentially.</p>
 </td>
 </tr>
 </table>
@@ -2055,7 +2064,7 @@ string
 </em>
 </td>
 <td>
-<p>References the cluster object.</p>
+<p>Specifies the name of the Cluster resource that this operation is targeting.</p>
 </td>
 </tr>
 <tr>
@@ -2067,8 +2076,10 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the action to cancel the <code>Pending/Creating/Running</code> opsRequest, supported types: <code>VerticalScaling/HorizontalScaling</code>.
-Once set to true, this opsRequest will be canceled and modifying this property again will not take effect.</p>
+<p>Indicates whether the current operation should be canceled and terminated gracefully if it&rsquo;s in the
+&ldquo;Pending&rdquo;, &ldquo;Creating&rdquo;, or &ldquo;Running&rdquo; state.</p>
+<p>This field applies only to &ldquo;VerticalScaling&rdquo; and &ldquo;HorizontalScaling&rdquo; opsRequests.</p>
+<p>Note: Setting <code>cancel</code> to true is irreversible; further modifications to this field are ineffective.</p>
 </td>
 </tr>
 <tr>
@@ -2080,9 +2091,13 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates if pre-checks should be bypassed, allowing the opsRequest to execute immediately. If set to true, pre-checks are skipped except for &lsquo;Start&rsquo; type.
-Particularly useful when concurrent execution of VerticalScaling and HorizontalScaling opsRequests is required,
-achievable through the use of the Force flag.</p>
+<p>Instructs the system to bypass pre-checks (including cluster state checks and customized pre-conditions hooks)
+and immediately execute the opsRequest, except for the opsRequest of &lsquo;Start&rsquo; type, which will still undergo
+pre-checks even if <code>force</code> is true.</p>
+<p>This is useful for concurrent execution of &lsquo;VerticalScaling&rsquo; and &lsquo;HorizontalScaling&rsquo; opsRequests.
+By setting <code>force</code> to true, you can bypass the default checks and demand these opsRequests to run
+simultaneously.</p>
+<p>Note: Once set, the <code>force</code> field is immutable and cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -2095,7 +2110,10 @@ OpsType
 </em>
 </td>
 <td>
-<p>Defines the operation type.</p>
+<p>Specifies the type of this operation. Supported types include &ldquo;Start&rdquo;, &ldquo;Stop&rdquo;, &ldquo;Restart&rdquo;, &ldquo;Switchover&rdquo;,
+&ldquo;VerticalScaling&rdquo;, &ldquo;HorizontalScaling&rdquo;, &ldquo;VolumeExpansion&rdquo;, &ldquo;Reconfiguring&rdquo;, &ldquo;Upgrade&rdquo;, &ldquo;Backup&rdquo;, &ldquo;Restore&rdquo;,
+&ldquo;Expose&rdquo;, &ldquo;DataScript&rdquo;, &ldquo;RebuildInstance&rdquo;, &ldquo;Custom&rdquo;.</p>
+<p>Note: This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -2107,7 +2125,8 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.</p>
+<p>Specifies the duration in seconds that an OpsRequest will remain in the system after successfully completing
+(when <code>opsRequest.status.phase</code> is &ldquo;Succeed&rdquo;) before automatic deletion.</p>
 </td>
 </tr>
 <tr>
@@ -2121,7 +2140,8 @@ Upgrade
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the cluster version by specifying clusterVersionRef.</p>
+<p>Specifies the desired new version of the Cluster.</p>
+<p>Note: This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -2135,7 +2155,9 @@ Upgrade
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines what component need to horizontal scale the specified replicas.</p>
+<p>Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
+including desired total replica counts, configurations for new instances, modifications for existing instances,
+and instance downscaling options.</p>
 </td>
 </tr>
 <tr>
@@ -2149,8 +2171,8 @@ Upgrade
 </td>
 <td>
 <em>(Optional)</em>
-<p>Note: Quantity struct can not do immutable check by CEL.
-Defines what component and volumeClaimTemplate need to expand the specified storage.</p>
+<p>Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates
+that requires storage expansion.</p>
 </td>
 </tr>
 <tr>
@@ -2164,7 +2186,7 @@ Defines what component and volumeClaimTemplate need to expand the specified stor
 </td>
 <td>
 <em>(Optional)</em>
-<p>Restarts the specified components.</p>
+<p>Lists Components to be restarted.</p>
 </td>
 </tr>
 <tr>
@@ -2178,7 +2200,7 @@ Defines what component and volumeClaimTemplate need to expand the specified stor
 </td>
 <td>
 <em>(Optional)</em>
-<p>Switches over the specified components.</p>
+<p>Lists Switchover objects, each specifying a Component to perform the switchover operation.</p>
 </td>
 </tr>
 <tr>
@@ -2192,8 +2214,7 @@ Defines what component and volumeClaimTemplate need to expand the specified stor
 </td>
 <td>
 <em>(Optional)</em>
-<p>Note: Quantity struct can not do immutable check by CEL.
-Defines what component need to vertical scale the specified compute resources.</p>
+<p>Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.</p>
 </td>
 </tr>
 <tr>
@@ -2207,8 +2228,8 @@ Reconfigure
 </td>
 <td>
 <em>(Optional)</em>
-<p>Deprecated: replace by reconfigures.
-Defines the variables that need to input when updating configuration.</p>
+<p>Specifies a component and its configuration updates.</p>
+<p>This field is deprecated and replaced by <code>reconfigures</code>.</p>
 </td>
 </tr>
 <tr>
@@ -2222,7 +2243,7 @@ Defines the variables that need to input when updating configuration.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the variables that need to input when updating configuration.</p>
+<p>Lists Reconfigure objects, each specifying a Component and its configuration updates.</p>
 </td>
 </tr>
 <tr>
@@ -2236,7 +2257,7 @@ Defines the variables that need to input when updating configuration.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines services the component needs to expose.</p>
+<p>Lists Expose objects, each specifying a Component and its services to be exposed.</p>
 </td>
 </tr>
 <tr>
@@ -2262,8 +2283,8 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>OpsRequest will wait at most TTLSecondsBeforeAbort seconds for start-conditions to be met.
-If not specified, the default value is 0, which means that the start-conditions must be met immediately.</p>
+<p>Specifies the maximum number of seconds the OpsRequest will wait for its start conditions to be met before aborting.
+If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed.</p>
 </td>
 </tr>
 <tr>
@@ -2277,7 +2298,11 @@ ScriptSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the script to be executed.</p>
+<p>Specifies the image and scripts for executing engine-specific operations such as creating databases or users.
+It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.</p>
+<p>ScriptSpec has been replaced by the more versatile OpsDefinition.
+It is recommended to use OpsDefinition instead.
+ScriptSpec is deprecated and will be removed in a future version.</p>
 </td>
 </tr>
 <tr>
@@ -2291,7 +2316,7 @@ BackupSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines how to backup the cluster.</p>
+<p>Specifies the parameters to backup a Cluster.</p>
 </td>
 </tr>
 <tr>
@@ -2305,7 +2330,7 @@ RestoreSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines how to restore the cluster.
+<p>Specifies the parameters to restore a Cluster.
 Note that this restore operation will roll back cluster services.</p>
 </td>
 </tr>
@@ -2320,7 +2345,10 @@ Note that this restore operation will roll back cluster services.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the instances that require re-creation.</p>
+<p>Specifies the parameters to rebuild some instances.
+Rebuilding an instance involves restoring its data from a backup or another database replica.
+The instances being rebuilt usually serve as standby in the cluster.
+Hence rebuilding instances is often also referred to as &ldquo;standby reconstruction&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -2334,7 +2362,7 @@ CustomOpsSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a custom operation as defined by OpsDefinition.</p>
+<p>Specifies a custom operation defined by OpsDefinition.</p>
 </td>
 </tr>
 </table>
@@ -2810,7 +2838,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the task workload.</p>
+<p>Represents the name of the task.</p>
 </td>
 </tr>
 <tr>
@@ -2821,7 +2849,7 @@ string
 </em>
 </td>
 <td>
-<p>Defines the namespace where the task workload is deployed.</p>
+<p>Represents the namespace where the task is deployed.</p>
 </td>
 </tr>
 <tr>
@@ -2834,7 +2862,7 @@ ActionTaskStatus
 </em>
 </td>
 <td>
-<p>Indicates the current status of the task.</p>
+<p>Indicates the current status of the task, including &ldquo;Processing&rdquo;, &ldquo;Failed&rdquo;, &ldquo;Succeed&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -2846,7 +2874,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The name of the target pod for the task.</p>
+<p>The name of the Pod that the task is associated with or operates on.</p>
 </td>
 </tr>
 <tr>
@@ -2858,7 +2886,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>The number of retry attempts for this task.</p>
+<p>The count of retry attempts made for this task.</p>
 </td>
 </tr>
 </tbody>
@@ -3428,7 +3456,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the name of the backup.</p>
+<p>Specifies the name of the Backup custom resource.</p>
 </td>
 </tr>
 <tr>
@@ -3440,7 +3468,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates the backupPolicy applied to perform this backup.</p>
+<p>Indicates the name of the BackupPolicy applied to perform this Backup.</p>
 </td>
 </tr>
 <tr>
@@ -3452,7 +3480,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the backup method that is defined in backupPolicy.</p>
+<p>Specifies the name of BackupMethod.
+The specified BackupMethod must be defined in the BackupPolicy.</p>
 </td>
 </tr>
 <tr>
@@ -3465,7 +3494,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Determines whether the backup contents stored in backup repository
-should be deleted when the backup custom resource is deleted.
+should be deleted when the Backup custom resource is deleted.
 Supported values are <code>Retain</code> and <code>Delete</code>.
 - <code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.
 - <code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</p>
@@ -3480,9 +3509,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Determines a duration up to which the backup should be kept.
-Controller will remove all backups that are older than the RetentionPeriod.
-For example, RetentionPeriod of <code>30d</code> will keep only the backups of last 30 days.
+<p>Determines the duration for which the Backup custom resources should be retained.</p>
+<p>The controller will automatically remove all Backup objects that are older than the specified RetentionPeriod.
+For example, RetentionPeriod of <code>30d</code> will keep only the Backup objects of last 30 days.
 Sample duration format:</p>
 <ul>
 <li>years: 2y</li>
@@ -3492,7 +3521,10 @@ Sample duration format:</p>
 <li>minutes: 30m</li>
 </ul>
 <p>You can also combine the above durations. For example: 30d12h30m.
-If not set, the backup will be kept forever.</p>
+If not set, the Backup objects will be kept forever.</p>
+<p>If the <code>deletionPolicy</code> is set to &lsquo;Delete&rsquo;, then the associated backup data will also be deleted
+along with the Backup object.
+Otherwise, only the Backup custom resource will be deleted.</p>
 </td>
 </tr>
 <tr>
@@ -3504,7 +3536,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>If backupType is incremental, parentBackupName is required.</p>
+<p>If the specified BackupMethod is incremental, <code>parentBackupName</code> is required.</p>
 </td>
 </tr>
 </tbody>
@@ -4275,7 +4307,7 @@ string
 </em>
 </td>
 <td>
-<p>References the component service name defined in the ComponentDefinition.Spec.Services[x].Name.</p>
+<p>References the component service name defined in the <code>componentDefinition.spec.services[*].name</code>.</p>
 </td>
 </tr>
 <tr>
@@ -4291,15 +4323,16 @@ Kubernetes core/v1.ServiceType
 <em>(Optional)</em>
 <p>Determines how the Service is exposed. Valid options are <code>ClusterIP</code>, <code>NodePort</code>, and <code>LoadBalancer</code>.</p>
 <ul>
-<li><code>ClusterIP</code> allocates a cluster-internal IP address for load-balancing to endpoints. Endpoints are determined
-by the selector or if that is not specified, they are determined by manual construction of an Endpoints object
-or EndpointSlice objects. If clusterIP is &ldquo;None&rdquo;, no virtual IP is allocated and the endpoints are published
-as a set of endpoints rather than a virtual IP.</li>
+<li><code>ClusterIP</code> allocates a cluster-internal IP address for load-balancing to endpoints.
+Endpoints are determined by the selector or if that is not specified,
+they are determined by manual construction of an Endpoints object or EndpointSlice objects.</li>
 <li><code>NodePort</code> builds on ClusterIP and allocates a port on every node which routes to the same endpoints as the clusterIP.</li>
 <li><code>LoadBalancer</code> builds on NodePort and creates an external load-balancer (if supported in the current cloud)
 which routes to the same endpoints as the clusterIP.</li>
 </ul>
-<p>More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a>.</p>
+<p>Note: although K8s Service type allows the &lsquo;ExternalName&rsquo; type, it is not a valid option for ClusterComponentService.</p>
+<p>For more info, see:
+<a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a>.</p>
 </td>
 </tr>
 <tr>
@@ -5478,7 +5511,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.</p>
@@ -6669,7 +6702,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the number of seconds after which the probe times out.
+<p>Specifies the number of seconds after which the probe times out.
 The default value is 60 seconds, with a minimum value of 1.</p>
 </td>
 </tr>
@@ -6682,7 +6715,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates the frequency (in seconds) at which the probe should be performed.
+<p>Specifies the frequency (in seconds) at which the probe should be performed.
 The default value is 5 seconds, with a minimum value of 1.</p>
 </td>
 </tr>
@@ -6922,7 +6955,7 @@ string
 </em>
 </td>
 <td>
-<p>Refers to the name of the component definition. This is a required field with a maximum length of 32 characters.</p>
+<p>Specifies the name of the ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -6934,8 +6967,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the account name of the component.
-If provided, the account username and password will be injected into the job environment variables <code>KB_ACCOUNT_USERNAME</code> and <code>KB_ACCOUNT_PASSWORD</code>.</p>
+<p>Specifies the account name associated with the Component.
+If set, the corresponding account username and password are injected into containers&rsquo; environment variables
+<code>KB_ACCOUNT_USERNAME</code> and <code>KB_ACCOUNT_PASSWORD</code>.</p>
 </td>
 </tr>
 <tr>
@@ -6947,9 +6981,10 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>References the name of the service.
-If provided, the service name and ports will be mapped to the job environment variables <code>KB_COMP_SVC_NAME</code> and <code>KB_COMP_SVC_PORT_$(portName)</code>.
-Note that the portName will replace the characters &lsquo;-&rsquo; with &lsquo;_&rsquo; and convert to uppercase.</p>
+<p>Specifies the name of the Service.
+If set, the service name is injected as the <code>KB_COMP_SVC_NAME</code> environment variable in the containers,
+and each service port is mapped to a corresponding environment variable named <code>KB_COMP_SVC_PORT_$(portName)</code>.
+The <code>portName</code> is transformed by replacing &lsquo;-&rsquo; with &lsquo;_&rsquo; and converting to uppercase.</p>
 </td>
 </tr>
 </tbody>
@@ -7164,6 +7199,7 @@ The purpose of ServiceVar is to obtain the address of a ComponentService.</li>
 ServiceRefDeclaration.
 The purpose of ServiceRefVar is to obtain the specific address that a ServiceRef is bound to
 (e.g., a ClusterService of another Cluster).</li>
+<li>Component: Retrieves values from a field of a Component.</li>
 </ul>
 <p>This field is immutable.</p>
 </td>
@@ -8028,7 +8064,7 @@ and other administrative tasks.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
-<p>ComponentOps represents the common variables required for operations within the scope of a normal component/shard component.</p>
+<p>ComponentOps specifies the Component to be operated on.</p>
 </div>
 <table>
 <thead>
@@ -8046,18 +8082,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the cluster component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>isSharding</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<p>Specifies that the componentName refers to the cluster&rsquo;s sharding component.</p>
+<p>Specifies the name of the Component.</p>
 </td>
 </tr>
 </tbody>
@@ -8181,13 +8206,13 @@ bool
 <p>Indicates whether to create a corresponding Service for each Pod of the selected Component.
 When set to true, a set of Services will be automatically generated for each Pod,
 and the <code>roleSelector</code> field will be ignored.</p>
-<p>The names of the generated Services will follow the same naming pattern: <code>$(serviceName)-$(podOrdinal)</code>.</p>
-<p>The podOrdinal is zero-based, meaning it starts from 0 for the first Pod and increments for each subsequent Pod.
+<p>The names of the generated Services will follow the same suffix naming pattern: <code>$(serviceName)-$(podOrdinal)</code>.
 The total number of generated Services will be equal to the number of replicas specified for the Component.</p>
 <p>Example usage:</p>
 <pre><code class="language-yaml">name: my-service
 serviceName: my-service
-generatePodOrdinalService: true
+podService: true
+disableAutoProvision: true
 spec:
   type: NodePort
   ports:
@@ -8915,6 +8940,115 @@ string
 <td><p>FromServiceRef refers to a service within the same namespace as the object.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>ComponentVarSelector selects a var from a Component.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The Component to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ComponentVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">
+ComponentVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>componentName</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the name of the Component object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the replicas of the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceNames</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the instanceName list of the component.
+and the value will be presented in the following format: instanceName1,instanceName2&hellip;</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">ComponentVersionCompatibilityRule
 </h3>
@@ -10104,7 +10238,7 @@ UpgradePolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the upgrade policy for the configuration. This field is optional.</p>
+<p>Defines the upgrade policy for the configuration.</p>
 </td>
 </tr>
 <tr>
@@ -10117,7 +10251,8 @@ UpgradePolicy
 </em>
 </td>
 <td>
-<p>Sets the parameters to be updated. It should contain at least one item. The keys are merged and retained during patch operations.</p>
+<p>Sets the configuration files and their associated parameters that need to be updated.
+It should contain at least one item.</p>
 </td>
 </tr>
 </tbody>
@@ -10271,7 +10406,9 @@ ConfigurationPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates the current status of the configuration item. This field is optional.</p>
+<p>Indicates the current status of the configuration item.</p>
+<p>Possible values include &ldquo;Creating&rdquo;, &ldquo;Init&rdquo;, &ldquo;Running&rdquo;, &ldquo;Pending&rdquo;, &ldquo;Merged&rdquo;, &ldquo;MergeFailed&rdquo;, &ldquo;FailedAndPause&rdquo;,
+&ldquo;Upgrading&rdquo;, &ldquo;Deleting&rdquo;, &ldquo;FailedAndRetry&rdquo;, &ldquo;Finished&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -10349,7 +10486,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the configuration template.</p>
+<p>Indicates the name of the configuration template (as ConfigMap).</p>
 </td>
 </tr>
 <tr>
@@ -10363,7 +10500,7 @@ UpgradePolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the policy for reconfiguration.</p>
+<p>Records the UpgradePolicy of the configuration change operation.</p>
 </td>
 </tr>
 <tr>
@@ -10375,7 +10512,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates the current state of the reconfiguration state machine.</p>
+<p>Represents the current state of the reconfiguration state machine.
+Possible values include &ldquo;Creating&rdquo;, &ldquo;Init&rdquo;, &ldquo;Running&rdquo;, &ldquo;Pending&rdquo;, &ldquo;Merged&rdquo;, &ldquo;MergeFailed&rdquo;, &ldquo;FailedAndPause&rdquo;,
+&ldquo;Upgrading&rdquo;, &ldquo;Deleting&rdquo;, &ldquo;FailedAndRetry&rdquo;, &ldquo;Finished&rdquo;, &ldquo;ReconfigurePersisting&rdquo;, &ldquo;ReconfigurePersisted&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -10399,7 +10538,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Counts the number of successful reconfigurations.</p>
+<p>Records the number of pods successfully updated following a configuration change.</p>
 </td>
 </tr>
 <tr>
@@ -10411,7 +10550,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the number of expected reconfigurations.</p>
+<p>Represents the total count of pods intended to be updated by a configuration change.</p>
 </td>
 </tr>
 <tr>
@@ -10423,7 +10562,15 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the last status of the reconfiguration controller.</p>
+<p>Records the last state of the reconfiguration finite state machine.
+Possible values include &ldquo;None&rdquo;, &ldquo;Retry&rdquo;, &ldquo;Failed&rdquo;, &ldquo;NotSupport&rdquo;, &ldquo;FailedAndRetry&rdquo;.</p>
+<ul>
+<li>&ldquo;None&rdquo; describes fsm has finished and quit.</li>
+<li>&ldquo;Retry&rdquo; describes fsm is running.</li>
+<li>&ldquo;Failed&rdquo; describes fsm is failed and exited.</li>
+<li>&ldquo;NotSupport&rdquo; describes fsm does not support the feature.</li>
+<li>&ldquo;FailedAndRetry&rdquo; describes fsm is failed in current state, but can be retried.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -11136,6 +11283,7 @@ ComponentOps
 <p>
 (Members of <code>ComponentOps</code> are embedded into this type.)
 </p>
+<p>Specifies the name of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -11149,7 +11297,7 @@ ComponentOps
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the parameters for this operation as declared in the opsDefinition.spec.parametersSchema.</p>
+<p>Specifies the parameters that match the schema specified in the <code>opsDefinition.spec.parametersSchema</code>.</p>
 </td>
 </tr>
 </tbody>
@@ -11177,7 +11325,7 @@ string
 </em>
 </td>
 <td>
-<p>Is a reference to an OpsDefinition.</p>
+<p>Specifies the name of the OpsDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -11188,6 +11336,7 @@ string
 </em>
 </td>
 <td>
+<p>Specifies the name of the ServiceAccount to be used for executing the custom operation.</p>
 </td>
 </tr>
 <tr>
@@ -11201,11 +11350,13 @@ Kubernetes api utils intstr.IntOrString
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the execution concurrency. By default, all incoming Components will be executed simultaneously.
-The value can be an absolute number (e.g., 5) or a percentage of desired components (e.g., 10%).
-The absolute number is calculated from the percentage by rounding up.
-For instance, if the percentage value is 10% and the components length is 1,
-the calculated number will be rounded up to 1.</p>
+<p>Specifies the maximum number of components to be operated on concurrently to mitigate performance impact
+on clusters with multiple components.</p>
+<p>It accepts an absolute number (e.g., 5) or a percentage of components to execute in parallel (e.g., &ldquo;10%&rdquo;).
+Percentages are rounded up to the nearest whole number of components.
+For example, if &ldquo;10%&rdquo; results in less than one, it rounds up to 1.</p>
+<p>When unspecified, all components are processed simultaneously by default.</p>
+<p>Note: This feature is not implemented yet.</p>
 </td>
 </tr>
 <tr>
@@ -11218,8 +11369,8 @@ the calculated number will be rounded up to 1.</p>
 </em>
 </td>
 <td>
-<p>Defines which components need to perform the actions defined by this OpsDefinition.
-At least one component/shardComponent is required. The components are identified by their name and can be merged or retained.</p>
+<p>Specifies the components and their parameters for executing custom actions as defined in OpsDefinition.
+Requires at least one component.</p>
 </td>
 </tr>
 </tbody>
@@ -11403,7 +11554,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the name of the container as defined in the componentDefinition or as injected by the kubeBlocks controller.
+<p>Specifies the container name in the target Pod.
 If not specified, the first container will be used by default.</p>
 </td>
 </tr>
@@ -11415,7 +11566,8 @@ string
 </em>
 </td>
 <td>
-<p>Defines the name of the environment variable.</p>
+<p>Defines the name of the environment variable.
+This name can originate from an &lsquo;env&rsquo; entry or be a data key from an &lsquo;envFrom&rsquo; source.</p>
 </td>
 </tr>
 </tbody>
@@ -11491,7 +11643,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the cluster component.</p>
+<p>Specifies the name of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -11504,8 +11656,8 @@ ExposeSwitch
 </em>
 </td>
 <td>
-<p>Controls the expose operation.
-If set to Enable, the corresponding service will be exposed. Conversely, if set to Disable, the service will be removed.</p>
+<p>Indicates whether the services will be exposed.
+&lsquo;Enable&rsquo; exposes the services. while &lsquo;Disable&rsquo; removes the exposed Service.</p>
 </td>
 </tr>
 <tr>
@@ -11518,8 +11670,12 @@ If set to Enable, the corresponding service will be exposed. Conversely, if set 
 </em>
 </td>
 <td>
-<p>A list of services that are to be exposed or removed.
-If componentName is not specified, each <code>OpsService</code> in the list must specify ports and selectors.</p>
+<p>Specifies a list of OpsService.
+When an OpsService is exposed, a corresponding ClusterService will be added to <code>cluster.spec.services</code>.
+On the other hand, when an OpsService is unexposed, the corresponding ClusterService will be removed
+from <code>cluster.spec.services</code>.</p>
+<p>Note: If <code>componentName</code> is not specified, the <code>ports</code> and <code>selector</code> fields must be provided
+in each OpsService definition.</p>
 </td>
 </tr>
 </tbody>
@@ -11811,7 +11967,7 @@ This only works if Type is not None. If not specified, the first volumeMount wil
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
 </p>
 <div>
-<p>HorizontalScaling defines the variables of horizontal scaling operation</p>
+<p>HorizontalScaling defines the parameters of a horizontal scaling operation.</p>
 </div>
 <table>
 <thead>
@@ -11834,6 +11990,7 @@ ComponentOps
 <p>
 (Members of <code>ComponentOps</code> are embedded into this type.)
 </p>
+<p>Specifies the name of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -11844,7 +12001,7 @@ int32
 </em>
 </td>
 <td>
-<p>Specifies the number of replicas for the workloads.</p>
+<p>Specifies the number of total replicas.</p>
 </td>
 </tr>
 <tr>
@@ -11858,10 +12015,19 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies instances to be added and/or deleted for the workloads.
-Name and Replicas should be provided. Other fields will simply be ignored.
-The Replicas will be overridden if an existing InstanceTemplate is matched by Name.
-Or the InstanceTemplate will be added as a new one.</p>
+<p>Contains a list of InstanceTemplate objects.
+Each InstanceTemplate object allows for modifying replica counts or specifying configurations for new instances during scaling.</p>
+<p>The field supports two main use cases:</p>
+<ul>
+<li>Modifying replica count:
+Specify the desired replica count for existing instances with a particular configuration using Name and Replicas fields.
+To modify the replica count, the Name and Replicas fields of the InstanceTemplate object should be provided.
+Only these fields are used for matching and adjusting replicas; other fields are ignored.
+The Replicas value overrides any existing count.</li>
+<li>Configuring new instances:
+Define the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
+New instances are created based on the provided InstanceTemplate.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -11873,7 +12039,8 @@ Or the InstanceTemplate will be added as a new one.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies instances to be scaled in with dedicated names in the list.</p>
+<p>Specifies the names of instances to be scaled down.
+This provides control over which specific instances are targeted for termination when reducing the replica count.</p>
 </td>
 </tr>
 </tbody>
@@ -11986,6 +12153,50 @@ string
 <em>(Optional)</em>
 <p>The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
 If not set, it will rebuild on a random node.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceResourceTemplate">InstanceResourceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refer to the instance template name of the component or sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ResourceRequirements</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ResourceRequirements</code> are embedded into this type.)
+</p>
+<p>Defines the computational resource size for vertical scaling.</p>
 </td>
 </tr>
 </tbody>
@@ -12198,6 +12409,47 @@ Add new or override existing volume claim templates.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refer to the instance template name of the component or sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OpsRequestVolumeClaimTemplate">
+[]OpsRequestVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<p>volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Issuer">Issuer
 </h3>
 <p>
@@ -12297,7 +12549,7 @@ string
 </em>
 </td>
 <td>
-<p>Represents the type of JSON patch operation. It supports the following values: &lsquo;add&rsquo;, &lsquo;remove&rsquo;, &lsquo;replace&rsquo;.</p>
+<p>Specifies the type of JSON patch operation. It supports the following values: &lsquo;add&rsquo;, &lsquo;remove&rsquo;, &lsquo;replace&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -12308,7 +12560,7 @@ string
 </em>
 </td>
 <td>
-<p>Represents the json patch path.</p>
+<p>Specifies the json patch path.</p>
 </td>
 </tr>
 <tr>
@@ -12319,7 +12571,7 @@ string
 </em>
 </td>
 <td>
-<p>Represents the value to be used in the JSON patch operation.</p>
+<p>Specifies the value to be used in the JSON patch operation.</p>
 </td>
 </tr>
 </tbody>
@@ -12346,6 +12598,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LastConfiguration">LastConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.OverrideBy">OverrideBy</a>)
 </p>
 <div>
+<p>LastComponentConfiguration can be used to track and compare the desired state of the Component over time.</p>
 </div>
 <table>
 <thead>
@@ -12364,7 +12617,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the last replicas of the component.</p>
+<p>Records the <code>replicas</code> of the Component prior to any changes.</p>
 </td>
 </tr>
 <tr>
@@ -12381,7 +12634,7 @@ Kubernetes core/v1.ResourceRequirements
 (Members of <code>ResourceRequirements</code> are embedded into this type.)
 </p>
 <em>(Optional)</em>
-<p>Represents the last resources of the component.</p>
+<p>Records the resources of the Component prior to any changes.</p>
 </td>
 </tr>
 <tr>
@@ -12395,7 +12648,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the last volumeClaimTemplates of the component.</p>
+<p>Records volumes&rsquo; storage size of the Component prior to any changes.</p>
 </td>
 </tr>
 <tr>
@@ -12409,7 +12662,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the last services of the component.</p>
+<p>Records the ClusterComponentService list of the Component prior to any changes.</p>
 </td>
 </tr>
 <tr>
@@ -12421,8 +12674,9 @@ map[github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ComponentResourceKey][]str
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the information about the target resources affected by the component.
-The resource key is in the list of [pods].</p>
+<p>Records the information about various types of resources associated with the Component prior to any changes.
+Currently, only one type of resource is supported: &ldquo;pods&rdquo;.
+The &ldquo;pods&rdquo; key maps to a list of names of all Pods of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -12436,7 +12690,7 @@ The resource key is in the list of [pods].</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the last instances of the component.</p>
+<p>Records the InstanceTemplate list of the Component prior to any changes.</p>
 </td>
 </tr>
 <tr>
@@ -12448,7 +12702,7 @@ The resource key is in the list of [pods].</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the last offline instances of the component.</p>
+<p>Records the offline instances of the Component prior to any changes.</p>
 </td>
 </tr>
 </tbody>
@@ -12477,7 +12731,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the reference to the ClusterVersion name.</p>
+<p>Specifies the name of the ClusterVersion.
+Deprecated and should be removed in the future version.</p>
 </td>
 </tr>
 <tr>
@@ -12491,7 +12746,7 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the last configuration of the component.</p>
+<p>Records the configuration of each Component prior to any changes.</p>
 </td>
 </tr>
 </tbody>
@@ -12712,7 +12967,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines a failure condition for an action using a Go template expression.
+<p>Specifies a failure condition for an action using a Go template expression.
 Should evaluate to either <code>true</code> or <code>false</code>.
 The current resource object is parsed into the Go template.
 for example, you can use &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;.</p>
@@ -12726,7 +12981,7 @@ string
 </em>
 </td>
 <td>
-<p>Defines a success condition for an action using a Go template expression.
+<p>Specifies a success condition for an action using a Go template expression.
 Should evaluate to either <code>true</code> or <code>false</code>.
 The current resource object is parsed into the Go template.
 for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</p>
@@ -13050,6 +13305,14 @@ VarOption
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionSpec">OpsDefinitionSpec</a>)
 </p>
 <div>
+<p>OpsAction specifies a custom action defined in OpsDefinition for execution in a &ldquo;Custom&rdquo; OpsRequest.</p>
+<p>OpsAction can be of three types:</p>
+<ul>
+<li>workload: Creates a Job or Pod to run custom scripts, ideal for isolated or long-running tasks.</li>
+<li>exec: Executes commands directly within an existing container using the kubectl exec interface,
+suitable for immediate, short-lived operations.</li>
+<li>resourceModifier: Modifies a K8s object using JSON patches, useful for updating the spec of some resource.</li>
+</ul>
 </div>
 <table>
 <thead>
@@ -13067,7 +13330,7 @@ string
 </em>
 </td>
 <td>
-<p>action name.</p>
+<p>Specifies the name of the OpsAction.</p>
 </td>
 </tr>
 <tr>
@@ -13081,9 +13344,12 @@ FailurePolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>failurePolicy is the failure policy of the action. valid values Fail and Ignore.
-- Fail: if the action failed, the opsRequest will be failed.
-- Ignore: opsRequest will ignore the failure if the action is failed.</p>
+<p>Specifies the failure policy of the OpsAction.
+Valid values are:</p>
+<ul>
+<li>&ldquo;Fail&rdquo;: Marks the entire OpsRequest as failed if the action fails.</li>
+<li>&ldquo;Ignore&rdquo;: The OpsRequest continues processing despite the failure of the action.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -13095,10 +13361,12 @@ FailurePolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>Refers to the parameter of the ParametersSchema.
-The parameter will be used in the action.
-If it is a &lsquo;workload&rsquo; and &lsquo;exec&rsquo; Action, they will be injected into the corresponding environment variable.
-If it is a &lsquo;resourceModifier&rsquo; Action, parameter can be referenced using $() in completionProbe.matchExpressions and JsonPatches[*].Value.</p>
+<p>Specifies the parameters for the OpsAction. Their usage varies based on the action type:</p>
+<ul>
+<li>For &lsquo;workload&rsquo; or &lsquo;exec&rsquo; actions, parameters are injected as environment variables.</li>
+<li>For &lsquo;resourceModifier&rsquo; actions, parameter can be referenced using $() in fields
+<code>resourceModifier.completionProbe.matchExpressions</code> and <code>resourceModifier.jsonPatches[*].value</code>.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -13112,7 +13380,8 @@ OpsWorkloadAction
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates the workload action and a corresponding workload will be created to execute this action.</p>
+<p>Specifies the configuration for a &lsquo;workload&rsquo; action.
+This action leads to the creation of a K8s workload, such as a Pod or Job, to execute specified tasks.</p>
 </td>
 </tr>
 <tr>
@@ -13126,7 +13395,8 @@ OpsExecAction
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the exec action. This will call the kubectl exec interface.</p>
+<p>Specifies the configuration for a &lsquo;exec&rsquo; action.
+It creates a Pod and invokes a &lsquo;kubectl exec&rsquo; to run command inside a specified container with the target Pod.</p>
 </td>
 </tr>
 <tr>
@@ -13140,7 +13410,9 @@ OpsResourceModifierAction
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the resource modifier to update the custom resource.</p>
+<p>Specifies the configuration for a &lsquo;resourceModifier&rsquo; action.
+This action allows for modifications to existing K8s objects.</p>
+<p>Note: This feature has not been implemented yet.</p>
 </td>
 </tr>
 </tbody>
@@ -13151,7 +13423,7 @@ OpsResourceModifierAction
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsDefinition">OpsDefinition</a>)
 </p>
 <div>
-<p>OpsDefinitionSpec defines the desired state of OpsDefinition</p>
+<p>OpsDefinitionSpec defines the desired state of OpsDefinition.</p>
 </div>
 <table>
 <thead>
@@ -13173,7 +13445,13 @@ OpsResourceModifierAction
 <td>
 <em>(Optional)</em>
 <p>Specifies the preconditions that must be met to run the actions for the operation.
-if set, it will check the condition before the component run this operation.</p>
+if set, it will check the condition before the Component runs this operation.
+Example:</p>
+<pre><code class="language-yaml"> preConditions:
+ - rule:
+     expression: '&#123;&#123; eq .component.status.phase &quot;Running&quot; &#125;&#125;'
+     message: Component is not in Running status.
+</code></pre>
 </td>
 </tr>
 <tr>
@@ -13187,7 +13465,10 @@ if set, it will check the condition before the component run this operation.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the targetPodTemplate to be referenced by the action.</p>
+<p>Specifies a list of TargetPodTemplate, each designed to select a specific Pod and extract selected runtime info
+from its PodSpec.
+The extracted information, such as environment variables, volumes and tolerations, are then injected into
+Jobs or Pods that execute the OpsActions defined in <code>actions</code>.</p>
 </td>
 </tr>
 <tr>
@@ -13201,9 +13482,8 @@ if set, it will check the condition before the component run this operation.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the types of componentDefinitions supported by the operation.
-It can reference certain variables of the componentDefinition.
-If set, any component not meeting these conditions will be intercepted.</p>
+<p>Specifies a list of ComponentDefinition for Components associated with this OpsDefinition.
+It also includes connection credentials (address and account) for each Component.</p>
 </td>
 </tr>
 <tr>
@@ -13217,7 +13497,7 @@ ParametersSchema
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the schema used for validation, pruning, and defaulting.</p>
+<p>Specifies the schema for validating the data types and value ranges of parameters in OpsActions before their usage.</p>
 </td>
 </tr>
 <tr>
@@ -13230,7 +13510,7 @@ ParametersSchema
 </em>
 </td>
 <td>
-<p>The actions to be executed in the opsRequest are performed sequentially.</p>
+<p>Specifies a list of OpsAction where each customized action is executed sequentially.</p>
 </td>
 </tr>
 </tbody>
@@ -13260,7 +13540,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>Refers to the most recent generation observed for this OpsDefinition.</p>
+<p>Represents the most recent generation observed of this OpsDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -13274,8 +13554,9 @@ Phase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the current state of the OpsDefinition. Valid values are `<code>,</code>Available<code>,</code>Unavailable<code>.
-When the state is</code>Available`, the OpsDefinition is ready and can be used for related objects.</p>
+<p>Represents the current state of the OpsDefinition.
+Valid values are &ldquo;&rdquo;, &ldquo;Available&rdquo;, &ldquo;Unavailable&rdquo;.
+When it equals to &ldquo;Available&rdquo;, the OpsDefinition is ready and can be used in a &ldquo;Custom&rdquo; OpsRequest.</p>
 </td>
 </tr>
 <tr>
@@ -13315,7 +13596,8 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the variable. This must be a C_IDENTIFIER.</p>
+<p>Specifies the name of the environment variable to be injected into Pods executing OpsActions.
+It must conform to the C_IDENTIFIER format, which includes only alphanumeric characters and underscores, and cannot begin with a digit.</p>
 </td>
 </tr>
 <tr>
@@ -13328,7 +13610,7 @@ OpsVarSource
 </em>
 </td>
 <td>
-<p>Defines the source for the variable&rsquo;s value.</p>
+<p>Specifies the source of the environment variable&rsquo;s value.</p>
 </td>
 </tr>
 </tbody>
@@ -13356,7 +13638,7 @@ string
 </em>
 </td>
 <td>
-<p>Refers to the spec.targetPodTemplates. Defines the target pods that need to execute exec actions.</p>
+<p>Specifies a TargetPodTemplate defined in the <code>opsDefinition.spec.targetPodTemplates</code>.</p>
 </td>
 </tr>
 <tr>
@@ -13368,7 +13650,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the number of retries before marking the action as failed.</p>
+<p>Specifies the number of retries allowed before marking the action as failed.</p>
 </td>
 </tr>
 <tr>
@@ -13379,7 +13661,7 @@ int32
 </em>
 </td>
 <td>
-<p>The command to execute.</p>
+<p>The command to be executed via &lsquo;kubectl exec &ndash;&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -13391,8 +13673,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The name of the container in the target pod to execute the command.
-If not set, the first container is used.</p>
+<p>The name of the container in the target pod where the command should be executed.
+This corresponds to the <code>-c &#123;containerName&#125;</code> option in <code>kubectl exec</code>.</p>
+<p>If not set, the first container is used.</p>
 </td>
 </tr>
 </tbody>
@@ -13412,7 +13695,9 @@ If not set, the first container is used.</p>
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Cancelled&#34;</p></td>
+<tbody><tr><td><p>&#34;Aborted&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Cancelled&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Cancelling&#34;</p></td>
 <td></td>
@@ -13552,7 +13837,8 @@ ClusterComponentPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the component phase, referencing Cluster.status.component.phase.</p>
+<p>Records the current phase of the Component, mirroring <code>cluster.status.components[componentName].phase</code>.
+Possible values include &ldquo;Creating&rdquo;, &ldquo;Running&rdquo;, &ldquo;Updating&rdquo;, &ldquo;Stopping&rdquo;, &ldquo;Stopped&rdquo;, &ldquo;Deleting&rdquo;, &ldquo;Failed&rdquo;, &ldquo;Abnormal&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -13566,7 +13852,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates the last time the component phase transitioned to Failed or Abnormal.</p>
+<p>Records the timestamp when the Component last transitioned to a &ldquo;Failed&rdquo; or &ldquo;Abnormal&rdquo; phase.</p>
 </td>
 </tr>
 <tr>
@@ -13580,7 +13866,7 @@ PreCheckResult
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the outcome of the preConditions check for the opsRequest. This result is crucial for determining the next steps in the operation.</p>
+<p>Records the result of the preConditions check of the opsRequest, which determines subsequent steps.</p>
 </td>
 </tr>
 <tr>
@@ -13594,7 +13880,7 @@ PreCheckResult
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the progress details of the component for this operation.</p>
+<p>Describes the progress details of objects or actions associated with the Component.</p>
 </td>
 </tr>
 <tr>
@@ -13608,22 +13894,8 @@ WorkloadType
 </td>
 <td>
 <em>(Optional)</em>
-<p>References the workload type of component in ClusterDefinition.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>overrideBy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.OverrideBy">
-OverrideBy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Describes the configuration covered by the latest OpsRequest of the same kind.
-when reconciling, this information will be used as a benchmark rather than the &lsquo;spec&rsquo;, such as &lsquo;Spec.HorizontalScaling&rsquo;.</p>
+<p>Records the workload type of Component in ClusterDefinition.
+Deprecated and should be removed in the future version.</p>
 </td>
 </tr>
 <tr>
@@ -13635,7 +13907,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the reason for the component phase.</p>
+<p>Provides an explanation for the Component being in its current state.</p>
 </td>
 </tr>
 <tr>
@@ -13676,7 +13948,7 @@ string
 </em>
 </td>
 <td>
-<p>References the cluster object.</p>
+<p>Specifies the name of the Cluster resource that this operation is targeting.</p>
 </td>
 </tr>
 <tr>
@@ -13688,8 +13960,10 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the action to cancel the <code>Pending/Creating/Running</code> opsRequest, supported types: <code>VerticalScaling/HorizontalScaling</code>.
-Once set to true, this opsRequest will be canceled and modifying this property again will not take effect.</p>
+<p>Indicates whether the current operation should be canceled and terminated gracefully if it&rsquo;s in the
+&ldquo;Pending&rdquo;, &ldquo;Creating&rdquo;, or &ldquo;Running&rdquo; state.</p>
+<p>This field applies only to &ldquo;VerticalScaling&rdquo; and &ldquo;HorizontalScaling&rdquo; opsRequests.</p>
+<p>Note: Setting <code>cancel</code> to true is irreversible; further modifications to this field are ineffective.</p>
 </td>
 </tr>
 <tr>
@@ -13701,9 +13975,13 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates if pre-checks should be bypassed, allowing the opsRequest to execute immediately. If set to true, pre-checks are skipped except for &lsquo;Start&rsquo; type.
-Particularly useful when concurrent execution of VerticalScaling and HorizontalScaling opsRequests is required,
-achievable through the use of the Force flag.</p>
+<p>Instructs the system to bypass pre-checks (including cluster state checks and customized pre-conditions hooks)
+and immediately execute the opsRequest, except for the opsRequest of &lsquo;Start&rsquo; type, which will still undergo
+pre-checks even if <code>force</code> is true.</p>
+<p>This is useful for concurrent execution of &lsquo;VerticalScaling&rsquo; and &lsquo;HorizontalScaling&rsquo; opsRequests.
+By setting <code>force</code> to true, you can bypass the default checks and demand these opsRequests to run
+simultaneously.</p>
+<p>Note: Once set, the <code>force</code> field is immutable and cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -13716,7 +13994,10 @@ OpsType
 </em>
 </td>
 <td>
-<p>Defines the operation type.</p>
+<p>Specifies the type of this operation. Supported types include &ldquo;Start&rdquo;, &ldquo;Stop&rdquo;, &ldquo;Restart&rdquo;, &ldquo;Switchover&rdquo;,
+&ldquo;VerticalScaling&rdquo;, &ldquo;HorizontalScaling&rdquo;, &ldquo;VolumeExpansion&rdquo;, &ldquo;Reconfiguring&rdquo;, &ldquo;Upgrade&rdquo;, &ldquo;Backup&rdquo;, &ldquo;Restore&rdquo;,
+&ldquo;Expose&rdquo;, &ldquo;DataScript&rdquo;, &ldquo;RebuildInstance&rdquo;, &ldquo;Custom&rdquo;.</p>
+<p>Note: This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -13728,7 +14009,8 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.</p>
+<p>Specifies the duration in seconds that an OpsRequest will remain in the system after successfully completing
+(when <code>opsRequest.status.phase</code> is &ldquo;Succeed&rdquo;) before automatic deletion.</p>
 </td>
 </tr>
 <tr>
@@ -13742,7 +14024,8 @@ Upgrade
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the cluster version by specifying clusterVersionRef.</p>
+<p>Specifies the desired new version of the Cluster.</p>
+<p>Note: This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -13756,7 +14039,9 @@ Upgrade
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines what component need to horizontal scale the specified replicas.</p>
+<p>Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
+including desired total replica counts, configurations for new instances, modifications for existing instances,
+and instance downscaling options.</p>
 </td>
 </tr>
 <tr>
@@ -13770,8 +14055,8 @@ Upgrade
 </td>
 <td>
 <em>(Optional)</em>
-<p>Note: Quantity struct can not do immutable check by CEL.
-Defines what component and volumeClaimTemplate need to expand the specified storage.</p>
+<p>Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates
+that requires storage expansion.</p>
 </td>
 </tr>
 <tr>
@@ -13785,7 +14070,7 @@ Defines what component and volumeClaimTemplate need to expand the specified stor
 </td>
 <td>
 <em>(Optional)</em>
-<p>Restarts the specified components.</p>
+<p>Lists Components to be restarted.</p>
 </td>
 </tr>
 <tr>
@@ -13799,7 +14084,7 @@ Defines what component and volumeClaimTemplate need to expand the specified stor
 </td>
 <td>
 <em>(Optional)</em>
-<p>Switches over the specified components.</p>
+<p>Lists Switchover objects, each specifying a Component to perform the switchover operation.</p>
 </td>
 </tr>
 <tr>
@@ -13813,8 +14098,7 @@ Defines what component and volumeClaimTemplate need to expand the specified stor
 </td>
 <td>
 <em>(Optional)</em>
-<p>Note: Quantity struct can not do immutable check by CEL.
-Defines what component need to vertical scale the specified compute resources.</p>
+<p>Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.</p>
 </td>
 </tr>
 <tr>
@@ -13828,8 +14112,8 @@ Reconfigure
 </td>
 <td>
 <em>(Optional)</em>
-<p>Deprecated: replace by reconfigures.
-Defines the variables that need to input when updating configuration.</p>
+<p>Specifies a component and its configuration updates.</p>
+<p>This field is deprecated and replaced by <code>reconfigures</code>.</p>
 </td>
 </tr>
 <tr>
@@ -13843,7 +14127,7 @@ Defines the variables that need to input when updating configuration.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the variables that need to input when updating configuration.</p>
+<p>Lists Reconfigure objects, each specifying a Component and its configuration updates.</p>
 </td>
 </tr>
 <tr>
@@ -13857,7 +14141,7 @@ Defines the variables that need to input when updating configuration.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines services the component needs to expose.</p>
+<p>Lists Expose objects, each specifying a Component and its services to be exposed.</p>
 </td>
 </tr>
 <tr>
@@ -13883,8 +14167,8 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>OpsRequest will wait at most TTLSecondsBeforeAbort seconds for start-conditions to be met.
-If not specified, the default value is 0, which means that the start-conditions must be met immediately.</p>
+<p>Specifies the maximum number of seconds the OpsRequest will wait for its start conditions to be met before aborting.
+If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed.</p>
 </td>
 </tr>
 <tr>
@@ -13898,7 +14182,11 @@ ScriptSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the script to be executed.</p>
+<p>Specifies the image and scripts for executing engine-specific operations such as creating databases or users.
+It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.</p>
+<p>ScriptSpec has been replaced by the more versatile OpsDefinition.
+It is recommended to use OpsDefinition instead.
+ScriptSpec is deprecated and will be removed in a future version.</p>
 </td>
 </tr>
 <tr>
@@ -13912,7 +14200,7 @@ BackupSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines how to backup the cluster.</p>
+<p>Specifies the parameters to backup a Cluster.</p>
 </td>
 </tr>
 <tr>
@@ -13926,7 +14214,7 @@ RestoreSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines how to restore the cluster.
+<p>Specifies the parameters to restore a Cluster.
 Note that this restore operation will roll back cluster services.</p>
 </td>
 </tr>
@@ -13941,7 +14229,10 @@ Note that this restore operation will roll back cluster services.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the instances that require re-creation.</p>
+<p>Specifies the parameters to rebuild some instances.
+Rebuilding an instance involves restoring its data from a backup or another database replica.
+The instances being rebuilt usually serve as standby in the cluster.
+Hence rebuilding instances is often also referred to as &ldquo;standby reconstruction&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -13955,7 +14246,7 @@ CustomOpsSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a custom operation as defined by OpsDefinition.</p>
+<p>Specifies a custom operation defined by OpsDefinition.</p>
 </td>
 </tr>
 </tbody>
@@ -13985,7 +14276,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the cluster generation after the OpsRequest action has been handled.</p>
+<p>Records the cluster generation after the OpsRequest action has been handled.</p>
 </td>
 </tr>
 <tr>
@@ -13998,7 +14289,8 @@ OpsPhase
 </em>
 </td>
 <td>
-<p>Defines the phase of the OpsRequest.</p>
+<p>Represents the phase of the OpsRequest.
+Possible values include &ldquo;Pending&rdquo;, &ldquo;Creating&rdquo;, &ldquo;Running&rdquo;, &ldquo;Cancelling&rdquo;, &ldquo;Cancelled&rdquo;, &ldquo;Failed&rdquo;, &ldquo;Succeed&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -14023,7 +14315,7 @@ LastConfiguration
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the last configuration before this operation took effect.</p>
+<p>Records the configuration prior to any changes.</p>
 </td>
 </tr>
 <tr>
@@ -14037,7 +14329,7 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponent
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the status information of components, including the sharding component, that have changed due to the operation request.</p>
+<p>Records the status information of Components changed due to the OpsRequest.</p>
 </td>
 </tr>
 <tr>
@@ -14048,7 +14340,7 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponent
 </em>
 </td>
 <td>
-<p>A collection of additional key-value pairs that provide supplementary information for the opsRequest.</p>
+<p>A collection of additional key-value pairs that provide supplementary information for the OpsRequest.</p>
 </td>
 </tr>
 <tr>
@@ -14062,7 +14354,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates the time when the OpsRequest started processing.</p>
+<p>Records the time when the OpsRequest started processing.</p>
 </td>
 </tr>
 <tr>
@@ -14076,7 +14368,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the time when the OpsRequest was completed.</p>
+<p>Records the time when the OpsRequest was completed.</p>
 </td>
 </tr>
 <tr>
@@ -14090,7 +14382,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the time when the OpsRequest was cancelled.</p>
+<p>Records the time when the OpsRequest was cancelled.</p>
 </td>
 </tr>
 <tr>
@@ -14119,7 +14411,7 @@ map[string]*github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ReconfiguringStatu
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the status information of reconfiguring.</p>
+<p>Records the status of a reconfiguring operation if <code>opsRequest.spec.type</code> equals to &ldquo;Reconfiguring&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -14133,7 +14425,10 @@ map[string]*github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ReconfiguringStatu
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the detailed status of the OpsRequest.</p>
+<p>Describes the detailed status of the OpsRequest.
+Possible condition types include &ldquo;Cancelled&rdquo;, &ldquo;WaitForProgressing&rdquo;, &ldquo;Validated&rdquo;, &ldquo;Succeed&rdquo;, &ldquo;Failed&rdquo;, &ldquo;Restarting&rdquo;,
+&ldquo;VerticalScaling&rdquo;, &ldquo;HorizontalScaling&rdquo;, &ldquo;VolumeExpanding&rdquo;, &ldquo;Reconfigure&rdquo;, &ldquo;Switchover&rdquo;, &ldquo;Stopping&rdquo;, &ldquo;Starting&rdquo;,
+&ldquo;VersionUpgrading&rdquo;, &ldquo;Exposing&rdquo;, &ldquo;ExecuteDataScript&rdquo;, &ldquo;Backup&rdquo;, &ldquo;InstancesRebuilding&rdquo;, &ldquo;CustomOperation&rdquo;.</p>
 </td>
 </tr>
 </tbody>
@@ -14141,7 +14436,7 @@ map[string]*github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ReconfiguringStatu
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsRequestVolumeClaimTemplate">OpsRequestVolumeClaimTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">PartInstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 </div>
@@ -14163,7 +14458,7 @@ Kubernetes resource.Quantity
 </em>
 </td>
 <td>
-<p>Specifies the requested storage size for the volume.</p>
+<p>Specifies the desired storage size for the volume.</p>
 </td>
 </tr>
 <tr>
@@ -14174,7 +14469,9 @@ string
 </em>
 </td>
 <td>
-<p>A reference to the volumeClaimTemplate name from the cluster components.</p>
+<p>Specify the name of the volumeClaimTemplate in the Component.
+The specified name must match one of the volumeClaimTemplates defined
+in the <code>clusterComponentSpec.volumeClaimTemplates</code> field.</p>
 </td>
 </tr>
 </tbody>
@@ -14204,7 +14501,7 @@ TypedObjectRef
 </em>
 </td>
 <td>
-<p>Refers to the Kubernetes objects that are required to be updated.</p>
+<p>Specifies the K8s object that is to be updated.</p>
 </td>
 </tr>
 <tr>
@@ -14217,7 +14514,7 @@ TypedObjectRef
 </em>
 </td>
 <td>
-<p>Defines the set of patches that are used to perform updates on the resource object.</p>
+<p>Specifies a list of patches for modifying the object.</p>
 </td>
 </tr>
 <tr>
@@ -14230,7 +14527,8 @@ CompletionProbe
 </em>
 </td>
 <td>
-<p>Provides a method to check if the action has been completed.</p>
+<p>Specifies a method to determine if the action has been completed.</p>
+<p>Note: This feature has not been implemented yet.</p>
 </td>
 </tr>
 </tbody>
@@ -14241,6 +14539,7 @@ CompletionProbe
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Expose">Expose</a>)
 </p>
 <div>
+<p>OpsService represents the parameters to dynamically create or remove a ClusterService in the <code>cluster.spec.services</code> array.</p>
 </div>
 <table>
 <thead>
@@ -14258,8 +14557,8 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the service. This name is used by others to refer to this service (e.g., connection credential).
-Note: This field cannot be updated.</p>
+<p>Specifies the name of the Service. This name is used to set <code>clusterService.name</code>.</p>
+<p>Note: This field cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -14271,8 +14570,8 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Contains cloud provider related parameters if ServiceType is LoadBalancer.
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer">https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer</a>.</p>
+<p>Contains cloud provider related parameters if ServiceType is LoadBalancer.</p>
+<p>More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer">https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer</a>.</p>
 </td>
 </tr>
 <tr>
@@ -14286,10 +14585,11 @@ More info: <a href="https://kubernetes.io/docs/concepts/services-networking/serv
 </td>
 <td>
 <em>(Optional)</em>
-<p>Lists the ports that are exposed by this service.
-If not provided, the default Services Ports defined in the ClusterDefinition or ComponentDefinition that are neither of NodePort nor LoadBalancer service type will be used.
-If there is no corresponding Service defined in the ClusterDefinition or ComponentDefinition, the expose operation will fail.
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies">https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies</a></p>
+<p>Specifies Port definitions that are to be exposed by a ClusterService.</p>
+<p>If not specified, the Port definitions from non-NodePort and non-LoadBalancer type ComponentService
+defined in the ComponentDefinition (<code>componentDefinition.spec.services</code>) will be used.
+If no matching ComponentService is found, the expose operation will fail.</p>
+<p>More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports">https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports</a></p>
 </td>
 </tr>
 <tr>
@@ -14301,7 +14601,10 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Allows you to specify a defined role as a selector for the service, extending the ServiceSpec.Selector.</p>
+<p>Specifies a role to target with the service.
+If specified, the service will only be exposed to pods with the matching role.</p>
+<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;selector&rsquo; must be specified.
+If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>
 <tr>
@@ -14313,10 +14616,10 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Routes service traffic to pods with label keys and values matching this selector.
-If empty or not present, the service is assumed to have an external process managing its endpoints, which Kubernetes will not modify.
-This only applies to types ClusterIP, NodePort, and LoadBalancer and is ignored if type is ExternalName.
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/">https://kubernetes.io/docs/concepts/services-networking/service/</a></p>
+<p>Routes service traffic to pods with matching label keys and values.
+If specified, the service will only be exposed to pods matching the selector.</p>
+<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;selector&rsquo; must be specified.
+If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>
 <tr>
@@ -14330,11 +14633,19 @@ Kubernetes core/v1.ServiceType
 </td>
 <td>
 <em>(Optional)</em>
-<p>Determines how the Service is exposed. Defaults to ClusterIP. Valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
-- <code>ClusterIP</code> allocates a cluster-internal IP address for load-balancing to endpoints.
-- <code>NodePort</code> builds on ClusterIP and allocates a port on every node which routes to the same endpoints as the clusterIP.
-- <code>LoadBalancer</code> builds on NodePort and creates an external load-balancer (if supported in the current cloud) which routes to the same endpoints as the clusterIP.
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a>.</p>
+<p>Determines how the Service is exposed. Defaults to &lsquo;ClusterIP&rsquo;.
+Valid options are <code>ClusterIP</code>, <code>NodePort</code>, and <code>LoadBalancer</code>.</p>
+<ul>
+<li><code>ClusterIP</code>: allocates a cluster-internal IP address for load-balancing to endpoints.
+Endpoints are determined by the selector or if that is not specified,
+they are determined by manual construction of an Endpoints object or EndpointSlice objects.</li>
+<li><code>NodePort</code>: builds on ClusterIP and allocates a port on every node which routes to the same endpoints as the clusterIP.</li>
+<li><code>LoadBalancer</code>: builds on NodePort and creates an external load-balancer (if supported in the current cloud)
+which routes to the same endpoints as the clusterIP.</li>
+</ul>
+<p>Note: although K8s Service type allows the &lsquo;ExternalName&rsquo; type, it is not a valid option for the expose operation.</p>
+<p>For more info, see:
+<a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a>.</p>
 </td>
 </tr>
 <tr>
@@ -14348,21 +14659,32 @@ More info: <a href="https://kubernetes.io/docs/concepts/services-networking/serv
 </td>
 <td>
 <em>(Optional)</em>
-<p>IPFamilies is a list of IP families (e.g. IPv4, IPv6) assigned to this
-service. This field is usually assigned automatically based on cluster
-configuration and the ipFamilyPolicy field. If this field is specified
-manually, the requested family is available in the cluster,
-and ipFamilyPolicy allows it, it will be used; otherwise creation of
-the service will fail. This field is conditionally mutable: it allows
-for adding or removing a secondary IP family, but it does not allow
-changing the primary IP family of the Service. Valid values are &ldquo;IPv4&rdquo;
-and &ldquo;IPv6&rdquo;.  This field only applies to Services of types ClusterIP,
-NodePort, and LoadBalancer, and does apply to &ldquo;headless&rdquo; services.
-This field will be wiped when updating a Service to type ExternalName.</p>
-<p>This field may hold a maximum of two entries (dual-stack families, in
-either order).  These families must correspond to the values of the
-clusterIPs field, if specified. Both clusterIPs and ipFamilies are
-governed by the ipFamilyPolicy field.</p>
+<p>A list of IP families (e.g., IPv4, IPv6) assigned to this Service.</p>
+<p>Usually assigned automatically based on the cluster configuration and the <code>ipFamilyPolicy</code> field.
+If specified manually, the requested IP family must be available in the cluster and allowed by the <code>ipFamilyPolicy</code>.
+If the requested IP family is not available or not allowed, the Service creation will fail.</p>
+<p>Valid values:</p>
+<ul>
+<li>&ldquo;IPv4&rdquo;</li>
+<li>&ldquo;IPv6&rdquo;</li>
+</ul>
+<p>This field may hold a maximum of two entries (dual-stack families, in either order).</p>
+<p>Common combinations of <code>ipFamilies</code> and <code>ipFamilyPolicy</code> are:</p>
+<ul>
+<li>ipFamilies=[] + ipFamilyPolicy=&ldquo;PreferDualStack&rdquo; :
+The Service prefers dual-stack but can fall back to single-stack if the cluster does not support dual-stack.
+The IP family is automatically assigned based on the cluster configuration.</li>
+<li>ipFamilies=[&ldquo;IPV4&rdquo;,&ldquo;IPV6&rdquo;] + ipFamilyPolicy=&ldquo;RequiredDualStack&rdquo; :
+The Service requires dual-stack and will only be created if the cluster supports both IPv4 and IPv6.
+The primary IP family is IPV4.</li>
+<li>ipFamilies=[&ldquo;IPV6&rdquo;,&ldquo;IPV4&rdquo;] + ipFamilyPolicy=&ldquo;RequiredDualStack&rdquo; :
+The Service requires dual-stack and will only be created if the cluster supports both IPv4 and IPv6.
+The primary IP family is IPV6.</li>
+<li>ipFamilies=[&ldquo;IPV4&rdquo;] + ipFamilyPolicy=&ldquo;SingleStack&rdquo; :
+The Service uses a single-stack with IPv4 only.</li>
+<li>ipFamilies=[&ldquo;IPV6&rdquo;] + ipFamilyPolicy=&ldquo;SingleStack&rdquo; :
+The Service uses a single-stack with IPv6 only.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -14376,14 +14698,16 @@ Kubernetes core/v1.IPFamilyPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>IPFamilyPolicy represents the dual-stack-ness requested or required by
-this Service. If there is no value provided, then this field will be set
-to SingleStack. Services can be &ldquo;SingleStack&rdquo; (a single IP family),
-&ldquo;PreferDualStack&rdquo; (two IP families on dual-stack configured clusters or
-a single IP family on single-stack clusters), or &ldquo;RequireDualStack&rdquo;
-(two IP families on dual-stack configured clusters, otherwise fail). The
-ipFamilies and clusterIPs fields depend on the value of this field. This
-field will be wiped when updating a service to type ExternalName.</p>
+<p>Specifies whether the Service should use a single IP family (SingleStack) or two IP families (DualStack).</p>
+<p>Possible values:</p>
+<ul>
+<li>&lsquo;SingleStack&rsquo; (default) : The Service uses a single IP family.
+If no value is provided, IPFamilyPolicy defaults to SingleStack.</li>
+<li>&lsquo;PreferDualStack&rsquo; : The Service prefers to use two IP families on dual-stack configured clusters
+or a single IP family on single-stack clusters.</li>
+<li>&lsquo;RequiredDualStack&rsquo; : The Service requires two IP families on dual-stack configured clusters.
+If the cluster is not configured for dual-stack, the Service creation fails.</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -14479,7 +14803,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the JSONPath of the target pod. This is used to specify the exact location of the data within the JSON structure of the pod.</p>
+<p>Represents the JSONPath expression pointing to the specific data within the JSON structure of the target Pod.
+It is used to extract precise data locations for operations on the Pod.</p>
 </td>
 </tr>
 </tbody>
@@ -14509,9 +14834,12 @@ OpsWorkloadType
 </em>
 </td>
 <td>
-<p>Defines the workload type of the action. Valid values include &ldquo;Job&rdquo; and &ldquo;Pod&rdquo;.
-&ldquo;Job&rdquo; creates a job to execute the action.
-&ldquo;Pod&rdquo; creates a pod to execute the action. Note that unlike jobs, if a pod is manually deleted, it will not consume backoffLimit times.</p>
+<p>Defines the workload type of the action. Valid values include &ldquo;Job&rdquo; and &ldquo;Pod&rdquo;.</p>
+<ul>
+<li>&ldquo;Job&rdquo;: Creates a Job to execute the action.</li>
+<li>&ldquo;Pod&rdquo;: Creates a Pod to execute the action.
+Note: unlike Jobs, manually deleting a Pod does not affect the <code>backoffLimit</code>.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -14522,8 +14850,7 @@ string
 </em>
 </td>
 <td>
-<p>Refers to the spec.targetPodTemplates.
-This field defines the target pod for the current action.</p>
+<p>Specifies a TargetPodTemplate defined in the <code>opsDefinition.spec.targetPodTemplates</code>.</p>
 </td>
 </tr>
 <tr>
@@ -14535,7 +14862,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the number of retries before marking the action as failed.</p>
+<p>Specifies the number of retries allowed before marking the action as failed.</p>
 </td>
 </tr>
 <tr>
@@ -14548,7 +14875,7 @@ Kubernetes core/v1.PodSpec
 </em>
 </td>
 <td>
-<p>Represents the pod spec of the workload.</p>
+<p>Specifies the PodSpec of the &lsquo;workload&rsquo; action.</p>
 </td>
 </tr>
 </tbody>
@@ -14576,9 +14903,6 @@ Kubernetes core/v1.PodSpec
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.OverrideBy">OverrideBy
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">OpsRequestComponentStatus</a>)
-</p>
 <div>
 </div>
 <table>
@@ -14598,7 +14922,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates the opsRequest name.</p>
+<p>Indicates the name of the OpsRequest.</p>
 </td>
 </tr>
 <tr>
@@ -14681,7 +15005,8 @@ string
 </em>
 </td>
 <td>
-<p>Represents the unique identifier for the ConfigMap.</p>
+<p>Represents a key in the configuration template(as ConfigMap).
+Each key in the ConfigMap corresponds to a specific configuration file.</p>
 </td>
 </tr>
 <tr>
@@ -14695,8 +15020,10 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines a list of key-value pairs for a single configuration file.
-These parameters are used to update the specified configuration settings.</p>
+<p>Specifies a list of key-value pairs representing parameters and their corresponding values
+within a single configuration file.
+This field is used to override or set the values of parameters without modifying the entire configuration file.</p>
+<p>Either the <code>parameters</code> field or the <code>fileContent</code> field must be set, but not both.</p>
 </td>
 </tr>
 <tr>
@@ -14708,8 +15035,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the content of the configuration file.
-This field is used to update the entire content of the file.</p>
+<p>Specifies the content of the entire configuration file.
+This field is used to update the complete configuration file.</p>
+<p>Either the <code>parameters</code> field or the <code>fileContent</code> field must be set, but not both.</p>
 </td>
 </tr>
 </tbody>
@@ -14781,69 +15109,12 @@ Kubernetes api extensions v1.JSONSchemaProps
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the OpenAPI v3 schema used for the parameter schema.
+<p>Defines the schema for parameters using the OpenAPI v3.
 The supported property types include:
 - string
 - number
 - integer
 - array: Note that only items of string type are supported.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">PartInstanceTemplate
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Refer to the instance template name of the component or sharding.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ResourceRequirements</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
-Kubernetes core/v1.ResourceRequirements
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ResourceRequirements</code> are embedded into this type.)
-</p>
-<p>Defines the computational resource size for vertical scaling.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeClaimTemplates</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.OpsRequestVolumeClaimTemplate">
-[]OpsRequestVolumeClaimTemplate
-</a>
-</em>
-</td>
-<td>
-<p>volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.</p>
 </td>
 </tr>
 </tbody>
@@ -15134,6 +15405,7 @@ the rules are met.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.TargetPodTemplate">TargetPodTemplate</a>)
 </p>
 <div>
+<p>PodSelector selects the target Pod from which environment variables and volumes are extracted from its PodSpec.</p>
 </div>
 <table>
 <thead>
@@ -15152,7 +15424,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the role of the target pod.</p>
+<p>Specifies the role of the target Pod.</p>
 </td>
 </tr>
 <tr>
@@ -15180,11 +15452,10 @@ PodAvailabilityPolicy
 </em>
 </td>
 <td>
-<p>Indicates the desired availability status of the pods to be selected.
-valid values:
-- &lsquo;Available&rsquo;: selects only available pods and terminates the action if none are found.
-- &lsquo;PreferredAvailable&rsquo;: prioritizes the selection of available pods。
-- &lsquo;None&rsquo;: there are no requirements for the availability of pods.</p>
+<p>Specifies the pod selection criteria based on their availability:
+- &lsquo;Available&rsquo;: Only selects available pods, and terminates the action if none are found.
+- &lsquo;PreferredAvailable&rsquo;: Prioritizes available pods but considers others if none available.
+- &lsquo;None&rsquo;: No availability requirements.</p>
 </td>
 </tr>
 </tbody>
@@ -15383,7 +15654,7 @@ bool
 </em>
 </td>
 <td>
-<p>Indicates whether the preCheck operation was successful or not.</p>
+<p>Indicates whether the preCheck operation passed or failed.</p>
 </td>
 </tr>
 <tr>
@@ -15395,7 +15666,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides additional details about the preCheck operation in a human-readable format.</p>
+<p>Provides explanations related to the preCheck result in a human-readable format.</p>
 </td>
 </tr>
 </tbody>
@@ -15425,7 +15696,7 @@ Rule
 </em>
 </td>
 <td>
-<p>Defines the conditions under which the operation can be executed.</p>
+<p>Specifies the conditions that must be met for the operation to execute.</p>
 </td>
 </tr>
 </tbody>
@@ -15433,6 +15704,7 @@ Rule
 <h3 id="apps.kubeblocks.io/v1alpha1.PreConditionExec">PreConditionExec
 </h3>
 <div>
+<p>PreConditionExec is deprecated.</p>
 </div>
 <table>
 <thead>
@@ -15450,7 +15722,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the Docker image to be used for the execution.</p>
+<p>Specifies the name of the image used for execution.</p>
 </td>
 </tr>
 <tr>
@@ -15464,7 +15736,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the environment variables to be set in the container.</p>
+<p>Specifies a list of environment variables to be set in the container.</p>
 </td>
 </tr>
 <tr>
@@ -15476,7 +15748,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the commands to be executed in the container.</p>
+<p>Specifies the command to be executed in the container.</p>
 </td>
 </tr>
 <tr>
@@ -15488,7 +15760,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the arguments to be passed to the command in the container.</p>
+<p>Specifies the arguments to be passed to the command in the container.</p>
 </td>
 </tr>
 </tbody>
@@ -15567,8 +15839,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the group to which the current object belongs.
-If the objects of a component belong to the same group, they can be ignored.</p>
+<p>Specifies the group to which the current object belongs to.</p>
 </td>
 </tr>
 <tr>
@@ -15580,8 +15851,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the unique key of the object.
-either objectKey or actionName.</p>
+<p><code>objectKey</code> uniquely identifies the object, which can be any K8s object, like a Pod, Job, Component, or PVC.
+Either <code>objectKey</code> or <code>actionName</code> must be provided.</p>
 </td>
 </tr>
 <tr>
@@ -15593,8 +15864,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Refer to the action name of the OpsDefinition.spec.actions[*].name.
-either objectKey or actionName.</p>
+<p>Indicates the name of an OpsAction, as defined in <code>opsDefinition.spec.actions[*].name</code>.
+Either <code>objectKey</code> or <code>actionName</code> must be provided.</p>
 </td>
 </tr>
 <tr>
@@ -15608,7 +15879,7 @@ either objectKey or actionName.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the tasks associated with an action. such as Jobs/Pods that executes action.</p>
+<p>Lists the tasks, such as Jobs or Pods, that carry out the action.</p>
 </td>
 </tr>
 <tr>
@@ -15621,7 +15892,7 @@ ProgressStatus
 </em>
 </td>
 <td>
-<p>Indicates the state of processing the object.</p>
+<p>Represents the current processing state of the object, including &ldquo;Processing&rdquo;, &ldquo;Pending&rdquo;, &ldquo;Failed&rdquo;, &ldquo;Succeed&rdquo;</p>
 </td>
 </tr>
 <tr>
@@ -15633,7 +15904,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides a human-readable message detailing the condition of the object.</p>
+<p>Provides a human-readable explanation of the object&rsquo;s condition.</p>
 </td>
 </tr>
 <tr>
@@ -15647,7 +15918,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the start time of object processing.</p>
+<p>Records the start time of object processing.</p>
 </td>
 </tr>
 <tr>
@@ -15661,7 +15932,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the completion time of object processing.</p>
+<p>Records the completion time of object processing.</p>
 </td>
 </tr>
 </tbody>
@@ -16098,6 +16369,7 @@ ComponentOps
 <p>
 (Members of <code>ComponentOps</code> are embedded into this type.)
 </p>
+<p>Specifies the name of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -16110,7 +16382,7 @@ ComponentOps
 </em>
 </td>
 <td>
-<p>Defines the instances that need to be rebuilt.</p>
+<p>Specifies the instances (Pods) that need to be rebuilt, typically operating as standbys.</p>
 </td>
 </tr>
 <tr>
@@ -16122,9 +16394,11 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates the name of the backup from which to recover. Currently, only a full physical backup is supported
-unless your component only has one replica. Such as &lsquo;xtrabackup&rsquo; is full physical backup for mysql and &lsquo;mysqldump&rsquo; is not.
-And if no specified backupName, the instance will be recreated with empty &lsquo;PersistentVolumes&rsquo;.</p>
+<p>Indicates the name of the Backup custom resource from which to recover the instance.
+Defaults to an empty PersistentVolume if unspecified.</p>
+<p>Note:
+- Only full physical backups are supported for multi-replica Components (e.g., &lsquo;xtrabackup&rsquo; for MySQL).
+- Logical backups (e.g., &lsquo;mysqldump&rsquo; for MySQL) are unsupported in the current version.</p>
 </td>
 </tr>
 <tr>
@@ -16138,9 +16412,15 @@ And if no specified backupName, the instance will be recreated with empty &lsquo
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of environment variables to set in the container for restore. These will be
-merged with the env of Backup and ActionSet.</p>
-<p>The priority of merging is as follows: <code>Restore env &gt; Backup env &gt; ActionSet env</code>.</p>
+<p>Defines container environment variables for the restore process.
+merged with the ones specified in the Backup and ActionSet resources.</p>
+<p>Merge priority: Restore env &gt; Backup env &gt; ActionSet env.</p>
+<p>Purpose: Some databases require different configurations when being restored as a standby
+compared to being restored as a primary.
+For example, when restoring MySQL as a replica, you need to set <code>skip_slave_start=&quot;ON&quot;</code> for 5.7
+or <code>skip_replica_start=&quot;ON&quot;</code> for 8.0.
+Allowing environment variables to be passed in makes it more convenient to control these behavioral differences
+during the restore process.</p>
 </td>
 </tr>
 </tbody>
@@ -16240,7 +16520,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
 </p>
 <div>
-<p>Reconfigure represents the variables required for updating a configuration.</p>
+<p>Reconfigure defines the parameters for updating a Component&rsquo;s configuration.</p>
 </div>
 <table>
 <thead>
@@ -16263,6 +16543,7 @@ ComponentOps
 <p>
 (Members of <code>ComponentOps</code> are embedded into this type.)
 </p>
+<p>Specifies the name of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -16275,7 +16556,8 @@ ComponentOps
 </em>
 </td>
 <td>
-<p>Specifies the components that will perform the operation.</p>
+<p>Contains a list of ConfigurationItem objects, specifying the Component&rsquo;s configuration template name,
+upgrade policy, and parameter key-value pairs to be updated.</p>
 </td>
 </tr>
 </tbody>
@@ -16306,7 +16588,9 @@ ComponentOps
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the reconfiguring detail status.</p>
+<p>Describes the reconfiguring detail status.
+Possible condition types include &ldquo;Creating&rdquo;, &ldquo;Init&rdquo;, &ldquo;Running&rdquo;, &ldquo;Pending&rdquo;, &ldquo;Merged&rdquo;, &ldquo;MergeFailed&rdquo;, &ldquo;FailedAndPause&rdquo;,
+&ldquo;Upgrading&rdquo;, &ldquo;Deleting&rdquo;, &ldquo;FailedAndRetry&rdquo;, &ldquo;Finished&rdquo;, &ldquo;ReconfigurePersisting&rdquo;, &ldquo;ReconfigurePersisted&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -16697,7 +16981,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Refers to the backup name and component name used for restoration. Supports recovery of multiple components.</p>
+<p>Refers to the backup name and component name used for restoration. Supports recovery of multiple Components.</p>
 </td>
 </tr>
 <tr>
@@ -16739,7 +17023,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the backup.</p>
+<p>Specifies the name of the Backup custom resource.</p>
 </td>
 </tr>
 <tr>
@@ -16750,7 +17034,12 @@ string
 </em>
 </td>
 <td>
-<p>Defines the point in time to restore.</p>
+<p>Specifies the point in time to which the restore should be performed.
+Supported time formats:</p>
+<ul>
+<li>RFC3339 format, e.g. &ldquo;2023-11-25T18:52:53Z&rdquo;</li>
+<li>A human-readable date-time format, e.g. &ldquo;Jul 25,2023 18:52:53 UTC+0800&rdquo;</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -16761,7 +17050,13 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the volume claim restore policy, support values: [Serial, Parallel]</p>
+<p>Specifies the policy for restoring volume claims of a Component&rsquo;s Pods.
+It determines whether the volume claims should be restored sequentially (one by one) or in parallel (all at once).
+Support values:</p>
+<ul>
+<li>&ldquo;Serial&rdquo;</li>
+<li>&ldquo;Parallel&rdquo;</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -16937,11 +17232,14 @@ string
 </em>
 </td>
 <td>
-<p>Defines how the operation can be executed using a Go template expression.
-Should return either <code>true</code> or <code>false</code>. The built-in objects available for use in the expression include:
-- <code>params</code>: These are the input parameters.
-- <code>cluster</code>: This is the referenced cluster object.
-- <code>component</code>: This is the referenced component object.</p>
+<p>Specifies a Go template expression that determines how the operation can be executed.
+The return value must be either <code>true</code> or <code>false</code>.
+Available built-in objects that can be referenced in the expression include:</p>
+<ul>
+<li><code>params</code>: Input parameters.</li>
+<li><code>cluster</code>: The referenced Cluster object.</li>
+<li><code>component</code>: The referenced Component object.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -16952,7 +17250,7 @@ string
 </em>
 </td>
 <td>
-<p>Reported if the rule is not matched.</p>
+<p>Specifies the error or status message reported if the <code>expression</code> does not evaluate to <code>true</code>.</p>
 </td>
 </tr>
 </tbody>
@@ -17140,7 +17438,7 @@ All topologySpreadConstraints are ANDed.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>)
 </p>
 <div>
-<p>ScriptFrom represents the script that is to be executed from a configMap or a secret.</p>
+<p>ScriptFrom specifies the source of the script to be executed, which can be either a ConfigMap or a Secret.</p>
 </div>
 <table>
 <thead>
@@ -17161,7 +17459,8 @@ All topologySpreadConstraints are ANDed.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the configMap that is to be executed.</p>
+<p>A list of ConfigMapKeySelector objects, each specifies a ConfigMap and a key containing the script.</p>
+<p>Note: This field cannot be modified once set.</p>
 </td>
 </tr>
 <tr>
@@ -17175,7 +17474,8 @@ All topologySpreadConstraints are ANDed.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the secret that is to be executed.</p>
+<p>A list of SecretKeySelector objects, each specifies a Secret and a key containing the script.</p>
+<p>Note: This field cannot be modified once set.</p>
 </td>
 </tr>
 </tbody>
@@ -17239,8 +17539,10 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
 </p>
 <div>
-<p>ScriptSpec is designed to execute specific operations such as creating a database or user.
-It is not a general-purpose script executor and is applicable for engines like MySQL, PostgreSQL, Redis, MongoDB, etc.</p>
+<p>ScriptSpec is a legacy feature for executing engine-specific operations such as creating databases or users.
+It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.</p>
+<p>ScriptSpec has been replaced by the more versatile OpsDefinition.
+It is recommended to use OpsDefinition instead. ScriptSpec is deprecated and will be removed in a future version.</p>
 </div>
 <table>
 <thead>
@@ -17263,6 +17565,7 @@ ComponentOps
 <p>
 (Members of <code>ComponentOps</code> are embedded into this type.)
 </p>
+<p>Specifies the name of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -17274,7 +17577,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the image to be used for the exec command. By default, the image of kubeblocks-datascript is used.</p>
+<p>Specifies the image to be used to execute scripts.</p>
+<p>By default, the image &ldquo;apecloud/kubeblocks-datascript:latest&rdquo; is used.</p>
 </td>
 </tr>
 <tr>
@@ -17300,7 +17604,9 @@ ScriptSecret
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the script to be executed.</p>
+<p>Defines the content of scripts to be executed.</p>
+<p>All scripts specified in this field will be executed in the order they are provided.</p>
+<p>Note: this field cannot be modified once set.</p>
 </td>
 </tr>
 <tr>
@@ -17314,7 +17620,15 @@ ScriptFrom
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the script to be executed from a configMap or secret.</p>
+<p>Specifies the sources of the scripts to be executed.
+Each script can be imported either from a ConfigMap or a Secret.</p>
+<p>All scripts obtained from the sources specified in this field will be executed after
+any scripts provided in the <code>script</code> field.</p>
+<p>Execution order:
+1. Scripts provided in the <code>script</code> field, in the order of the scripts listed.
+2. Scripts imported from ConfigMaps, in the order of the sources listed.
+3. Scripts imported from Secrets, in the order of the sources listed.</p>
+<p>Note: this field cannot be modified once set.</p>
 </td>
 </tr>
 <tr>
@@ -17328,10 +17642,12 @@ Kubernetes meta/v1.LabelSelector
 </td>
 <td>
 <em>(Optional)</em>
-<p>By default, KubeBlocks will execute the script on the primary pod with role=leader.
-Exceptions exist, such as Redis, which does not synchronize account information between primary and secondary.
-In such cases, the script needs to be executed on all pods matching the selector.
-Indicates the components on which the script is executed.</p>
+<p>Specifies the labels used to select the Pods on which the script should be executed.</p>
+<p>By default, the script is executed on the Pod associated with the service named &ldquo;&#123;clusterName&#125;-&#123;componentName&#125;&rdquo;,
+which typically routes to the Pod with the primary/leader role.</p>
+<p>However, some Components, such as Redis, do not synchronize account information between primary and secondary Pods.
+In these cases, the script must be executed on all replica Pods matching the selector.</p>
+<p>Note: this field cannot be modified once set.</p>
 </td>
 </tr>
 </tbody>
@@ -17897,8 +18213,8 @@ Example usage:</p>
 &ldquo;kubeblocks.io/role: leader&rdquo; to the <code>serviceSpec.selector</code>.
 This means that the service will select and route traffic to Pods with the label
 &ldquo;kubeblocks.io/role&rdquo; set to &ldquo;leader&rdquo;.</p>
-<p>Note that if <code>generatePodOrdinalService</code> sets to true, RoleSelector will be ignored.
-The <code>generatePodOrdinalService</code> flag takes precedence over <code>roleSelector</code> and generates a service for each Pod.</p>
+<p>Note that if <code>podService</code> sets to true, RoleSelector will be ignored.
+The <code>podService</code> flag takes precedence over <code>roleSelector</code> and generates a service for each Pod.</p>
 </td>
 </tr>
 </tbody>
@@ -18206,7 +18522,7 @@ ClusterDefinition are not validated when using this approach.</li>
 <li>If both <code>cluster</code> and <code>serviceDescriptor</code> are present, <code>cluster</code> will take precedence.</li>
 </ul>
 <p>Deprecated since v0.9 since <code>clusterDefinition.spec.connectionCredential</code> is deprecated,
-use <code>clusterRef</code> instead.
+use <code>clusterServiceSelector</code> instead.
 This field is maintained for backward compatibility and its use is discouraged.
 Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
 </td>
@@ -18724,6 +19040,21 @@ VarOption
 </tr>
 <tr>
 <td>
+<code>loadBalancer</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>LoadBalancer represents the LoadBalancer ingress point of the service.</p>
+<p>If multiple ingress points are available, the first one will be used automatically, choosing between IP and Hostname.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>port</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">
@@ -19079,6 +19410,7 @@ ComponentOps
 <p>
 (Members of <code>ComponentOps</code> are embedded into this type.)
 </p>
+<p>Specifies the name of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -19089,14 +19421,25 @@ string
 </em>
 </td>
 <td>
-<p>Utilized to designate the candidate primary or leader instance for the switchover process.
-If assigned &ldquo;*&rdquo;, it signifies that no specific primary or leader is designated for the switchover,
-and the switchoverAction defined in <code>clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate</code> will be executed.</p>
-<p>It is mandatory that <code>clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate</code> is not left blank.</p>
-<p>If assigned a valid instance name other than &ldquo;*&rdquo;, it signifies that a specific candidate primary or leader is designated for the switchover.
-The value can be retrieved using <code>kbcli cluster list-instances</code>, any other value is considered invalid.</p>
-<p>In this scenario, the <code>switchoverAction</code> defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate will be executed,
-and it is mandatory that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate is not left blank.</p>
+<p>Specifies the instance to become the primary or leader during a switchover operation.</p>
+<p>The value of <code>instanceName</code> can be either:</p>
+<ol>
+<li>&rdquo;*&rdquo; (wildcard value):</li>
+</ol>
+<ul>
+<li>Indicates no specific instance is designated as the primary or leader.</li>
+<li>Executes the switchover action from <code>clusterDefinition.componentDefs[*].switchoverSpec.withoutCandidate</code>.</li>
+<li><code>clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate</code> must be defined when using &ldquo;*&rdquo;.</li>
+</ul>
+<ol>
+<li>A valid instance name (pod name):</li>
+</ol>
+<ul>
+<li>Designates a specific instance (pod) as the primary or leader.</li>
+<li>The name must match one of the pods in the component. Any non-valid pod name is considered invalid.</li>
+<li>Executes the switchover action from <code>clusterDefinition.componentDefs[*].switchoverSpec.withCandidate</code>.</li>
+<li><code>clusterDefinition.componentDefs[*].switchoverSpec.withCandidate</code> must be defined when specifying a valid instance name.</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -19698,7 +20041,7 @@ string
 </em>
 </td>
 <td>
-<p>Represents the template name.</p>
+<p>Specifies the name of the TargetPodTemplate.</p>
 </td>
 </tr>
 <tr>
@@ -19712,7 +20055,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the environment variables that need to be referenced from the target component pod, and will be injected into the pod&rsquo;s containers.</p>
+<p>Specifies a list of environment variables to be extracted from a selected Pod,
+and injected into the containers executing each OpsAction.</p>
 </td>
 </tr>
 <tr>
@@ -19725,7 +20069,7 @@ PodSelector
 </em>
 </td>
 <td>
-<p>Used to identify the target pod.</p>
+<p>Used to select the target Pod from which environment variables and volumes are extracted from its PodSpec.</p>
 </td>
 </tr>
 <tr>
@@ -19739,7 +20083,9 @@ PodSelector
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the mount points for the volumes defined in the <code>Volumes</code> section for the action pod.</p>
+<p>Specifies a list of volumes, along with their respective mount points, that are to be extracted from a selected Pod,
+and mounted onto the containers executing each OpsAction.
+This allows the containers to access shared or persistent data necessary for the operation.</p>
 </td>
 </tr>
 </tbody>
@@ -19819,7 +20165,7 @@ string
 </em>
 </td>
 <td>
-<p>Defines the group for the resource being referenced.
+<p>Specifies the group for the resource being referenced.
 If not specified, the referenced Kind must belong to the core API group.
 For all third-party types, this is mandatory.</p>
 </td>
@@ -19895,6 +20241,12 @@ This ensures that only one replica is unavailable at a time during the update pr
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemStatus">ConfigurationItemStatus</a>)
 </p>
 <div>
+<p>UpdatedParameters holds details about the modifications made to configuration parameters.
+Example:</p>
+<pre><code class="language-yaml">updatedParameters:
+	updatedKeys:
+	  my.cnf: '&#123;&quot;mysqld&quot;:&#123;&quot;max_connections&quot;:&quot;100&quot;&#125;&#125;'
+</code></pre>
 </div>
 <table>
 <thead>
@@ -19913,7 +20265,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Lists the keys that have been added.</p>
+<p>Maps newly added configuration files to their content.</p>
 </td>
 </tr>
 <tr>
@@ -19925,7 +20277,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Lists the keys that have been deleted.</p>
+<p>Lists the name of configuration files that have been deleted.</p>
 </td>
 </tr>
 <tr>
@@ -19937,7 +20289,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Lists the keys that have been updated.</p>
+<p>Maps the name of configuration files to their updated content, detailing the changes made.</p>
 </td>
 </tr>
 </tbody>
@@ -19948,7 +20300,7 @@ map[string]string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
 </p>
 <div>
-<p>Upgrade represents the parameters required for an upgrade operation.</p>
+<p>Upgrade defines the parameters for an upgrade operation.</p>
 </div>
 <table>
 <thead>
@@ -19966,7 +20318,8 @@ string
 </em>
 </td>
 <td>
-<p>A reference to the name of the ClusterVersion.</p>
+<p>Specifies the name of the target ClusterVersion for the upgrade.</p>
+<p>This field is deprecated since v0.9 because ClusterVersion is deprecated.</p>
 </td>
 </tr>
 </tbody>
@@ -20138,7 +20491,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.VarOption">VarOption
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 <p>VarOption defines whether a variable is required or optional.</p>
@@ -20243,6 +20596,20 @@ ServiceRefVarSelector
 <p>Selects a defined var of a ServiceRef.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>componentVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">
+ComponentVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Component.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.VersionsContext">VersionsContext
@@ -20300,7 +20667,8 @@ Typically used in scenarios such as updating application container images.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
 </p>
 <div>
-<p>VerticalScaling defines the parameters required for scaling compute resources.</p>
+<p>VerticalScaling refers to the process of adjusting the compute resources (e.g., CPU, memory) allocated to a Component.
+It defines the parameters required for the operation.</p>
 </div>
 <table>
 <thead>
@@ -20323,6 +20691,7 @@ ComponentOps
 <p>
 (Members of <code>ComponentOps</code> are embedded into this type.)
 </p>
+<p>Specifies the name of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -20338,15 +20707,15 @@ Kubernetes core/v1.ResourceRequirements
 <p>
 (Members of <code>ResourceRequirements</code> are embedded into this type.)
 </p>
-<p>Defines the computational resource size for vertical scaling.</p>
+<p>Defines the desired compute resources of the Component&rsquo;s instances.</p>
 </td>
 </tr>
 <tr>
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">
-[]PartInstanceTemplate
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceResourceTemplate">
+[]InstanceResourceTemplate
 </a>
 </em>
 </td>
@@ -20385,6 +20754,7 @@ ComponentOps
 <p>
 (Members of <code>ComponentOps</code> are embedded into this type.)
 </p>
+<p>Specifies the name of the Component.</p>
 </td>
 </tr>
 <tr>
@@ -20397,15 +20767,16 @@ ComponentOps
 </em>
 </td>
 <td>
-<p>volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.</p>
+<p>Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
+that are used to expand the storage and the desired storage size for each one.</p>
 </td>
 </tr>
 <tr>
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.PartInstanceTemplate">
-[]PartInstanceTemplate
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">
+[]InstanceVolumeClaimTemplate
 </a>
 </em>
 </td>
@@ -21983,6 +22354,57 @@ string
 </tr>
 <tr>
 <td>
+<code>asContainerImage</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the tool image should be used as the container image for a sidecar.
+This is useful for large tool images, such as those for C++ tools, which may depend on
+numerous libraries (e.g., *.so files).</p>
+<p>If enabled, the tool image is deployed as a sidecar container image.</p>
+<p>Examples:</p>
+<pre><code class="language-yaml"> reloadToolsImage:
+   mountPoint: /kb_tools
+   toolConfigs:
+     - name: kb-tools
+       asContainerImage: true
+       image:  apecloud/oceanbase:4.2.0.0-100010032023083021
+</code></pre>
+<p>generated containers:</p>
+<pre><code class="language-yaml">initContainers:
+ - name: install-config-manager-tool
+   image: apecloud/kubeblocks-tools:$&#123;version&#125;
+   command:
+   - cp
+   - /bin/config_render
+   - /opt/tools
+   volumemounts:
+   - name: kb-tools
+     mountpath: /opt/tools
+containers:
+ - name: config-manager
+   image: apecloud/oceanbase:4.2.0.0-100010032023083021
+   imagePullPolicy: IfNotPresent
+	  command:
+   - /opt/tools/reloader
+   - --log-level
+   - info
+   - --operator-update-enable
+   - --tcp
+   - &quot;9901&quot;
+   - --config
+   - /opt/config-manager/config-manager.yaml
+   volumemounts:
+   - name: kb-tools
+     mountpath: /opt/tools
+</code></pre>
+</td>
+</tr>
+<tr>
+<td>
 <code>image</code><br/>
 <em>
 string
@@ -22001,6 +22423,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the command to be executed by the init container.</p>
 </td>
 </tr>
@@ -22500,6 +22923,27 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.ConditionType">ConditionType
+(<code>string</code> alias)</h3>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;InstanceFailure&#34;</p></td>
+<td><p>InstanceFailure is added in an instance set when at least one of its instances(pods) is in a <code>Failed</code> phase.</p>
+</td>
+</tr><tr><td><p>&#34;InstanceReady&#34;</p></td>
+<td><p>InstanceReady is added in an instance set when at least one of its instances(pods) is in a Ready condition.
+ConditionStatus will be True if all its instances(pods) are in a Ready condition.
+Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.Credential">Credential
 </h3>
 <p>
@@ -22921,17 +23365,112 @@ Credential
 <tbody>
 <tr>
 <td>
-<code>StatefulSetStatus</code><br/>
+<code>observedGeneration</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetstatus-v1-apps">
-Kubernetes apps/v1.StatefulSetStatus
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
+InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>replicas is the number of instances created by the InstanceSet controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readyReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+indicated by CurrentRevisions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatedReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>updatedReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+indicated by UpdateRevisions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>currentRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the
+sequence [0,currentReplicas).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>updateRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the sequence
+[replicas-updatedReplicas,replicas)</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
 </a>
 </em>
 </td>
 <td>
-<p>
-(Members of <code>StatefulSetStatus</code> are embedded into this type.)
-</p>
+<em>(Optional)</em>
+<p>Represents the latest available observations of an instanceset&rsquo;s current state.
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availableReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Total number of available instances (ready for at least minReadySeconds) targeted by this InstanceSet.</p>
 </td>
 </tr>
 <tr>
@@ -22942,8 +23481,10 @@ int32
 </em>
 </td>
 <td>
-<p>Defines the initial number of pods (members) when the cluster is first initialized.
-This value is set to spec.Replicas at the time of object creation and remains constant thereafter.</p>
+<em>(Optional)</em>
+<p>Defines the initial number of instances when the cluster is first initialized.
+This value is set to spec.Replicas at the time of object creation and remains constant thereafter.
+Used only when spec.roles set.</p>
 </td>
 </tr>
 <tr>
@@ -22955,20 +23496,9 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the number of pods (members) that have already reached the MembersStatus during the cluster initialization stage.
-This value remains constant once it equals InitReplicas.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>currentGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>When not empty, indicates the version of the InstanceSet used to generate the underlying workload.</p>
+<p>Represents the number of instances that have already reached the MembersStatus during the cluster initialization stage.
+This value remains constant once it equals InitReplicas.
+Used only when spec.roles set.</p>
 </td>
 </tr>
 <tr>
@@ -22983,6 +23513,18 @@ int64
 <td>
 <em>(Optional)</em>
 <p>Provides the status of each member in the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readyWithoutPrimary</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether it is required for the InstanceSet to have at least one primary instance ready.</p>
 </td>
 </tr>
 <tr>
@@ -23259,30 +23801,6 @@ ReplicaRole
 <td>
 <em>(Optional)</em>
 <p>Defines the role of the replica in the cluster.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ready</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Whether the corresponding Pod is in ready condition.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>readyWithoutPrimary</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether it is required for the InstanceSet to have at least one primary instance ready.</p>
 </td>
 </tr>
 </tbody>

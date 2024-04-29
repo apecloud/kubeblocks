@@ -208,6 +208,7 @@ type ComponentDefinitionSpec struct {
 	//   ServiceRefDeclaration.
 	//   The purpose of ServiceRefVar is to obtain the specific address that a ServiceRef is bound to
 	//   (e.g., a ClusterService of another Cluster).
+	// - Component: Retrieves values from a field of a Component.
 	//
 	// This field is immutable.
 	//

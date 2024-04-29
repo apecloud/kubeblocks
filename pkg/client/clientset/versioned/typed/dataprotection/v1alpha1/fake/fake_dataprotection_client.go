@@ -52,6 +52,10 @@ func (c *FakeDataprotectionV1alpha1) Restores(namespace string) v1alpha1.Restore
 	return &FakeRestores{c, namespace}
 }
 
+func (c *FakeDataprotectionV1alpha1) StorageProviders() v1alpha1.StorageProviderInterface {
+	return &FakeStorageProviders{c}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeDataprotectionV1alpha1) RESTClient() rest.Interface {

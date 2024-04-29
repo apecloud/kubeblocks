@@ -1,0 +1,36 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupRepo
+metadata:
+  name: s3-repo
+  annotations:
+    dataprotection.kubeblocks.io/is-default-repo: 'true'
+spec:
+  # Specifies the name of the `StorageProvider` used by this backup repository.
+  # Currently, KubeBlocks supports configuring various object storage services as backup repositories
+  # - s3 (Amazon Simple Storage Service)
+  # - oss (Alibaba Cloud Object Storage Service)
+  # - cos (Tencent Cloud Object Storage)
+  # - gcs (Google Cloud Storage)
+  # - obs (Huawei Cloud Object Storage)
+  # - minio, and other S3-compatible services.
+  storageProviderRef: s3
+  # Specifies the access method of the backup repository.
+  # - Tool
+  # - Mount
+  accessMethod: Tool
+  # Specifies reclaim policy of the PV created by this backup repository.
+  pvReclaimPolicy: Retain
+  # Specifies the capacity of the PVC created by this backup repository.
+  volumeCapacity: 100Gi
+  # Stores the non-secret configuration parameters for the `StorageProvider`.
+  config:
+    bucket: <storage-provider-bucket-name>
+    endpoint: ''
+    mountOptions: --memory-limit 1000 --dir-mode 0777 --file-mode 0666
+    region: <storage-provider-region-name>
+  # References to the secret that holds the credentials for the `StorageProvider`.
+  credential:
+    # name is unique within a namespace to reference a secret resource.
+    name: s3-credential-for-backuprepo
+    # namespace defines the space within which the secret name must be unique.
+    namespace: kb-system

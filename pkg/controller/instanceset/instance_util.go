@@ -433,13 +433,21 @@ func validateSpec(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) err
 		}
 		replicasInTemplates += replicas
 		if templateNames.Has(template.Name) {
-			return fmt.Errorf("duplicate instance template name: %s", template.Name)
+			err = fmt.Errorf("duplicate instance template name: %s", template.Name)
+			if tree != nil {
+				tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
+			}
+			return err
 		}
 		templateNames.Insert(template.Name)
 	}
 	// sum of spec.templates[*].replicas should not greater than spec.replicas
 	if replicasInTemplates > *its.Spec.Replicas {
-		return fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *its.Spec.Replicas)
+		err = fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *its.Spec.Replicas)
+		if tree != nil {
+			tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
+		}
+		return err
 	}
 
 	return nil

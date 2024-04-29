@@ -114,6 +114,9 @@ type StorageProviderStatus struct {
 // In case of CSI driver, the specification expounds on provisioning PVCs for that driver.
 // As for the `datasafed` tool, the specification provides insights on generating the necessary
 // configuration file.
+//
+// Deprecated since v0.9, moving to dataprotection.kubeblocks.io API group,
+// will be removed in v0.11.
 type StorageProvider struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

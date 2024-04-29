@@ -21,6 +21,8 @@ package redis
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	"strings"
 	"time"
 
@@ -41,6 +43,7 @@ type Manager struct {
 	engines.DBManagerBase
 	client         redis.UniversalClient
 	clientSettings *Settings
+	sentinelClient *redis.SentinelClient
 
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -74,10 +77,12 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		Password: redisPasswd,
 		Username: redisUser,
 	}
-	mgr.client, mgr.clientSettings, err = ParseClientFromProperties(map[string]string(properties), defaultSettings)
+	mgr.client, mgr.clientSettings, err = ParseClientFromProperties(properties, defaultSettings)
 	if err != nil {
 		return nil, err
 	}
+
+	mgr.sentinelClient = newSentinelClient(mgr.clientSettings, mgr.ClusterCompName)
 
 	mgr.ctx, mgr.cancel = context.WithCancel(context.Background())
 	return mgr, nil
@@ -107,4 +112,33 @@ func tokenizeCmd2Args(cmd string) []interface{} {
 		redisArgs = append(redisArgs, arg)
 	}
 	return redisArgs
+}
+
+func (mgr *Manager) SubscribeRoleChange(ctx context.Context, oriRole *string) {
+	pubSub := mgr.sentinelClient.Subscribe(ctx, "+switch_master")
+
+	// go-redis periodically sends ping messages to test connection health
+	// and re-subscribes if ping can not receive for 30 seconds.
+	// so we don't need to retry
+	ch := pubSub.Channel()
+	var role string
+	for msg := range ch {
+		masterAddr := strings.Split(msg.Payload, " ")
+		masterName := strings.Split(masterAddr[1], ".")[0]
+
+		if masterName == mgr.CurrentMemberName {
+			role = models.PRIMARY
+		} else {
+			role = models.SECONDARY
+		}
+		if role != *oriRole {
+			_ = util.SentEventForProbe(ctx, map[string]any{
+				"operation":    util.CheckRoleOperation,
+				"originalRole": *oriRole,
+				"role":         role,
+				"event":        util.OperationSuccess,
+			})
+			*oriRole = role
+		}
+	}
 }

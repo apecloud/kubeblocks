@@ -27,30 +27,17 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
-func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
-	section := "Replication"
-
-	var role string
-	result, err := mgr.client.Info(ctx, section).Result()
+func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string, error) {
+	// We use the role obtained from Sentinel as the sole source of truth.
+	masterAddr, err := mgr.sentinelClient.GetMasterAddrByName(ctx, mgr.ClusterCompName).Result()
 	if err != nil {
-		mgr.Logger.Error(err, "Role query error")
-		return role, err
-	} else {
-		// split the result into lines
-		lines := strings.Split(result, "\r\n")
-		// find the line with role
-		for _, line := range lines {
-			if strings.HasPrefix(line, "role:") {
-				role = strings.Split(line, ":")[1]
-				break
-			}
-		}
+		return "", err
 	}
-	if role == models.MASTER {
-		return models.PRIMARY, nil
-	}
-	if role == models.SLAVE {
+
+	masterName := strings.Split(masterAddr[0], ".")[0]
+	// if current member is not master from sentinel, just return secondary to avoid double master
+	if masterName != mgr.CurrentMemberName {
 		return models.SECONDARY, nil
 	}
-	return role, nil
+	return models.PRIMARY, nil
 }

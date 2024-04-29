@@ -187,6 +187,10 @@ func (mgr *DBManagerBase) GetReplicaRole(context.Context, *dcs.Cluster) (string,
 	return "", errors.New("not implemented")
 }
 
+func (mgr *DBManagerBase) SubscribeRoleChange(context.Context, *string) {
+	return
+}
+
 func (mgr *DBManagerBase) Exec(context.Context, string) (int64, error) {
 	return 0, errors.New("not implemented")
 }

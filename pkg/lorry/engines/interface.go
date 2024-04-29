@@ -71,6 +71,7 @@ type DBManager interface {
 	IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error)
 	IsFirstMember() bool
 	GetReplicaRole(context.Context, *dcs.Cluster) (string, error)
+	SubscribeRoleChange(ctx context.Context, oriRole *string)
 
 	JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error
 	LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error

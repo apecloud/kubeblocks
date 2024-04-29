@@ -348,7 +348,6 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp *appsv1alpha1.Clu
 	if r.Cluster.Spec.Backup != nil && r.Cluster.Spec.Backup.RepoName != "" {
 		backupPolicy.Spec.BackupRepoName = &r.Cluster.Spec.Backup.RepoName
 	}
-	backupPolicy.Spec.BackoffLimit = r.backupPolicy.BackoffLimit
 	if r.backupPolicy.BackoffLimit == nil {
 		backupPolicy.Spec.BackoffLimit = &dptypes.DefaultBackOffLimit
 	} else {

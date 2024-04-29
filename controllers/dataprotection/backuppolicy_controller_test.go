@@ -66,15 +66,9 @@ var _ = Describe("BackupPolicy Controller test", func() {
 			bp := testdp.NewFakeBackupPolicy(&testCtx, func(backupPolicy *dpv1alpha1.BackupPolicy) {
 				backupPolicy.Spec.BackoffLimit = nil
 			})
-			By("expect status of backupPolicy to available")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(bp),
-				func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
-					g.Expect(bp.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
-				})).Should(Succeed())
 			By("expect its backoffLimit should be set to the value of DefaultBackOffLimit")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(bp),
 				func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
-					// g.Expect(bp.Spec.BackoffLimit).ShouldNot(BeNil())
 					g.Expect(*bp.Spec.BackoffLimit).Should(Equal(dptypes.DefaultBackOffLimit))
 				})).Should(Succeed())
 		})

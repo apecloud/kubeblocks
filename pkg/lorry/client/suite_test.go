@@ -89,6 +89,8 @@ func newTCPServer(port int) (net.Listener, int) {
 }
 
 func StartHTTPServer() {
+	mockDBManager.EXPECT().SubscribeRoleChange(gomock.Any(), gomock.Any())
+
 	ops := opsregister.Operations()
 	s := httpserver.NewServer(ops)
 	handler := s.Router()

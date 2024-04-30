@@ -125,7 +125,7 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.CheckRoleOperation
-	resp.Data["originalRole"] = s.OriRole
+	resp.Data["originalRole"] = *s.OriRole
 	var role string
 	var err error
 

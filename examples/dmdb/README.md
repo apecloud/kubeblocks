@@ -1,6 +1,4 @@
-# Minio
-
-Minio is a high performance open source relational database management system that is widely used for web and application servers
+# Dmdb
 
 ## Prerequisites
 
@@ -24,7 +22,7 @@ helm repo update
 # Install KubeBlocks
 helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version="0.9.0"
 ```
-Enable minio
+Enable dmdb
 ```bash
 # Add Helm repo 
 helm repo add kubeblocks-addons https://apecloud.github.io/helm-charts
@@ -33,52 +31,52 @@ helm repo add kubeblocks-addons https://jihulab.com/api/v4/projects/150246/packa
 # Update helm repo
 helm repo update
 
-# Enable minio 
-helm upgrade -i kb-addon-minio kubeblocks-addons/minio --version 8.0.17 -n kb-system  
+# Enable dmdb 
+helm upgrade -i kb-addon-dmdb kubeblocks-addons/dmdb --version 0.9.0 -n kb-system  
 ``` 
 
 ## Examples
 
 ### [Create](cluster.yaml) 
-Create a minio cluster with specified cluster definition 
+Create a dmdb cluster with specified cluster definition 
 ```bash
-kubectl apply -f examples/minio/cluster.yaml
+kubectl apply -f examples/dmdb/cluster.yaml
 ```
 
 ### [Vertical scaling](verticalscale.yaml)
 Vertical scaling up or down specified components requests and limits cpu or memory resource in the cluster
 ```bash
-kubectl apply -f examples/minio/verticalscale.yaml
+kubectl apply -f examples/dmdb/verticalscale.yaml
 ```
 
 ### [Expand volume](volumeexpand.yaml)
 Increase size of volume storage with the specified components in the cluster
 ```bash
-kubectl apply -f examples/minio/volumeexpand.yaml
+kubectl apply -f examples/dmdb/volumeexpand.yaml
 ```
 
 ### [Restart](restart.yaml)
 Restart the specified components in the cluster
 ```bash
-kubectl apply -f examples/minio/restart.yaml
+kubectl apply -f examples/dmdb/restart.yaml
 ```
 
 ### [Stop](stop.yaml)
 Stop the cluster and release all the pods of the cluster, but the storage will be reserved
 ```bash
-kubectl apply -f examples/minio/stop.yaml
+kubectl apply -f examples/dmdb/stop.yaml
 ```
 
 ### [Start](start.yaml)
 Start the stopped cluster
 ```bash
-kubectl apply -f examples/minio/start.yaml
+kubectl apply -f examples/dmdb/start.yaml
 ```
 
 ### Delete
 If you want to delete the cluster and all its resource, you can modify the termination policy and then delete the cluster
 ```bash
-kubectl patch cluster minio-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
+kubectl patch cluster dmdb-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
 
-kubectl delete cluster minio-cluster
+kubectl delete cluster dmdb-cluster
 ```

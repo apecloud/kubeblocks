@@ -41,11 +41,7 @@ helm upgrade -i kb-addon-zookeeper kubeblocks-addons/zookeeper -n kb-system --ve
 
 ## Examples
 
-### [Create](cluster.yaml) 
-Create a zookeeper cluster with specified cluster definition to be referenced by solr
-```bash
-kubectl apply -f examples/zookeeper/cluster.yaml
-```
+### [Create](cluster.yaml)
 Create a solr cluster with specified cluster definition 
 ```bash
 kubectl apply -f examples/solr/cluster.yaml
@@ -88,5 +84,5 @@ kubectl patch cluster solr-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}'
 
 kubectl delete cluster solr-cluster
 
-kubectl delete cluster zookeeper-cluster
+kubectl delete cluster zookeepers-cluster
 ```

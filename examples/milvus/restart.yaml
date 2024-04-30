@@ -10,7 +10,12 @@ spec:
   # Lists Components to be restarted. ComponentOps specifies the Component to be operated on.
   restart:
     # Specifies the name of the Component.
-    # - milvus
-    # - etcd
-    # - minio
+    # - standalone: milvus
+    # - standalone: etcd
+    # - standalone: minio
+    # - distributed: proxy
+    # - distributed: mixcoord
+    # - distributed: datanode
+    # - distributed: indexnode
+    # - distributed: querynode
   - componentName: milvus

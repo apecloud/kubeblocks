@@ -41,7 +41,7 @@ spec:
   services:
   - name: proxy
     serviceName: proxy
-    componentSelector: proxy
+    componentSelector: pulsar-proxy
     spec:
       # - ClusterIP
       # - NodePort
@@ -173,23 +173,16 @@ spec:
       replicas: 3
       resources:
         limits:
-          cpu: '0.5'
-          memory: 0.5Gi
+          cpu: "0.5"
+          memory: "0.5Gi"
         requests:
-          cpu: '0.5'
-          memory: 0.5Gi
-      volumeClaimTemplates:
-        - name: data
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-        - name: data-log
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+          cpu: "0.5"
+          memory: "0.5Gi"
+        volumeClaimTemplates:
+          - name: data
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 20Gi

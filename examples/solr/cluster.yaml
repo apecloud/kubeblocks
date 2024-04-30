@@ -38,7 +38,7 @@ spec:
   - name: solr
     componentDefRef: solr
     serviceRefs:
-    - cluster: zookeeper-cluster
+    - cluster: zookeepers-cluster
       name: solrZookeeper
       namespace: default
     serviceAccountName: kb-solr-cluster
@@ -58,3 +58,43 @@ spec:
         resources:
           requests:
             storage: 20Gi
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: zookeepers-cluster
+  namespace: default
+spec:
+  clusterDefinitionRef: zookeeper
+  clusterVersionRef: zookeeper-3.7.2
+  terminationPolicy: WipeOut
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+      - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  componentSpecs:
+    - name: zookeeper
+      componentDefRef: zookeeper
+      monitor: false
+      replicas: 3
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

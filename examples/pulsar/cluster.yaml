@@ -37,7 +37,7 @@ spec:
   services:
   - name: proxy
     serviceName: proxy
-    componentSelector: proxy
+    componentSelector: pulsar-proxy
     spec:
       # - ClusterIP
       # - NodePort

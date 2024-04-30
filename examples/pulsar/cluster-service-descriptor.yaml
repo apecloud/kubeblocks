@@ -37,7 +37,7 @@ spec:
   services:
   - name: proxy
     serviceName: proxy
-    componentSelector: proxy
+    componentSelector: pulsar-proxy
     spec:
       # - ClusterIP
       # - NodePort
@@ -171,3 +171,21 @@ spec:
         resources:
           requests:
             storage: 20Gi
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ServiceDescriptor
+metadata:
+  name: pulsar-cluster-zookeeper-service
+  namespace: default
+spec:
+  # Specifies the type or nature of the service.
+  # Should represent a well-known application cluster type, such as {mysql, redis, zookeeper}.
+  serviceKind: zookeeper
+  # Represents the version of the service reference.
+  serviceVersion: 3.8.5
+  # Represents the endpoint of the service connection credential.
+  endpoint:
+    value: "pulsar-cluster-zookeeper"
+  # Represents the port of the service connection credential.
+  port:
+    value: "2181"

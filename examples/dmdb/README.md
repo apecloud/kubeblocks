@@ -1,5 +1,7 @@
 # Dmdb
 
+The DM8 is a next-generation large general relational database which boasts ultimate compatibility, high availability, high reliability and high security.
+
 ## Prerequisites
 
 This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the kubectl command line tool and helm somewhere in your path. Please see the [getting started](https://kubernetes.io/docs/setup/)  and [Installing Helm](https://helm.sh/docs/intro/install/) for installation instructions for your platform.

@@ -1320,7 +1320,15 @@ type GVKResource struct {
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ClusterDefinition is the Schema for the ClusterDefinition API
+// ClusterDefinition defines the topology for databases or storage systems,
+// offering a variety of topological configurations to meet diverse deployment needs and scenarios.
+//
+// It includes a list of Components, each linked to a ComponentDefinition, which enhances reusability and reduce redundancy.
+// For example, widely used components such as etcd and Zookeeper can be defined once and reused across multiple ClusterDefinitions,
+// simplifying the setup of new systems.
+//
+// Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown for Components,
+// ensuring a controlled and predictable management of component lifecycles.
 type ClusterDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

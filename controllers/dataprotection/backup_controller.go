@@ -387,6 +387,21 @@ func (r *BackupReconciler) prepareBackupRequest(
 			return nil, err
 		}
 		request.ActionSet = actionSet
+
+		//check continuous backups should have backupschedule label
+		if request.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeContinuous {
+			if _, ok := request.Labels[dptypes.BackupScheduleLabelKey]; !ok{
+				return nil, fmt.Errorf("create continuous backup without backupschedule")
+			}
+			backupSchedule := &dpv1alpha1.BackupSchedule{}
+			if err := request.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: backup.Labels[dptypes.BackupScheduleLabelKey],
+				Namespace: backup.Namespace}, backupSchedule); err != nil {
+				return nil, err
+			}
+			if backupSchedule.Status.Phase != dpv1alpha1.BackupSchedulePhaseAvailable {
+				return nil, fmt.Errorf("create continuous backup through failed backupschedule")
+			}
+		}
 	}
 
 	// check encryption config

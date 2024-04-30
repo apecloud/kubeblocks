@@ -700,6 +700,28 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 		})
+		
+		Context("create continuous backup", func(){
+			It("should fail when continuous backup don't have backupschedule label", func() {
+				By("create actionset with continuous backuptype")
+				actionSet := testdp.NewFakeActionSet(&testCtx)
+				actionSetKey := client.ObjectKeyFromObject(actionSet)
+				Eventually(testapps.GetAndChangeObj(&testCtx, actionSetKey, func(fetched *dpv1alpha1.ActionSet) {
+					fetched.Spec.BackupType = dpv1alpha1.BackupTypeContinuous
+				}))
+				By("create continuous backup without backupschedule label")
+				backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, nil)
+				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup){
+					bp.ObjectMeta.Name = "continuousbackup"
+					bp.Labels = map[string]string{}
+				})
+				backupKey := client.ObjectKeyFromObject(backup)
+				By("check backup phase")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+		})
 	})
 
 	When("with backup repo", func() {

@@ -31,7 +31,28 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 	// We use the role obtained from Sentinel as the sole source of truth.
 	masterAddr, err := mgr.sentinelClient.GetMasterAddrByName(ctx, mgr.ClusterCompName).Result()
 	if err != nil {
-		return "", err
+		// when we can't get role from sentinel, we query redis instead
+		var role string
+		result, err := mgr.client.Info(ctx, "Replication").Result()
+		if err != nil {
+			mgr.Logger.Error(err, "Role query error")
+			return role, err
+		} else {
+			// split the result into lines
+			lines := strings.Split(result, "\r\n")
+			// find the line with role
+			for _, line := range lines {
+				if strings.HasPrefix(line, "role:") {
+					role = strings.Split(line, ":")[1]
+					break
+				}
+			}
+		}
+		if role == models.MASTER {
+			return models.PRIMARY, nil
+		} else {
+			return models.SECONDARY, nil
+		}
 	}
 
 	masterName := strings.Split(masterAddr[0], ".")[0]

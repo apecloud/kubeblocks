@@ -15,7 +15,7 @@ on:
         description: 'test type (e.g.  apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|mysqlscale|weaviate|qdrant|smartengine|
         greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|foxlake|orioledb|oracle-mysql|official-pg|asmysql|openldap|
         polardbx|opensearch|elasticsearch|vllm|tdengine|milvus|clickhouse|pika|ggml|zookeeper|mariadb|tidb|xinference|
-        oracle|opengauss|influxdb|flink|solr|doris|halo|mogdb|oceanbase-ent|starrocks-ent|yashandb|redis-cluster|camellia-redis-proxy|pulsar-nodeport)'
+        oracle|opengauss|influxdb|flink|solr|doris|halo|mogdb|oceanbase-ent|starrocks-ent|yashandb|redis-cluster|camellia-redis-proxy|dmdb|minio)'
         required: false
         default: ''
       CLOUD_PROVIDER:

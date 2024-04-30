@@ -1069,6 +1069,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(SchedulingPolicy)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.RuntimeClassName != nil {
+		in, out := &in.RuntimeClassName, &out.RuntimeClassName
+		*out = new(string)
+		**out = **in
+	}
 	if in.Backup != nil {
 		in, out := &in.Backup, &out.Backup
 		*out = new(ClusterBackup)
@@ -1084,11 +1089,6 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 	if in.Network != nil {
 		in, out := &in.Network, &out.Network
 		*out = new(ClusterNetwork)
-		**out = **in
-	}
-	if in.RuntimeClassName != nil {
-		in, out := &in.RuntimeClassName, &out.RuntimeClassName
-		*out = new(string)
 		**out = **in
 	}
 }

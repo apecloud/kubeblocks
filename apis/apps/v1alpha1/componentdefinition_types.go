@@ -36,7 +36,30 @@ import (
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ComponentDefinition is the Schema for the ComponentDefinition API
+// ComponentDefinition serves as a reusable blueprint for creating Components,
+// encapsulating essential static settings such as Component description,
+// Pod templates, configuration file templates, scripts, parameter lists,
+// injected environment variables and their sources, and event handlers.
+// ComponentDefinition works in conjunction with dynamic settings from the ClusterComponentSpec,
+// to instantiate Components during Cluster creation.
+//
+// Key aspects that can be defined in a ComponentDefinition include:
+//
+// - PodSpec template: Specifies the PodSpec template used by the Component.
+// - Configuration templates: Specify the configuration file templates required by the Component.
+// - Scripts: Provide the necessary scripts for Component management and operations.
+// - Storage volumes: Specify the storage volumes and their configurations for the Component.
+// - Pod roles: Outlines various roles of Pods within the Component along with their capabilities.
+// - Exposed Kubernetes Services: Specify the Services that need to be exposed by the Component.
+// - System accounts: Define the system accounts required for the Component.
+// - Monitoring and logging: Configure the exporter and logging settings for the Component.
+//
+// ComponentDefinitions also enable defining reactive behaviors of the Component in response to events,
+// such as member join/leave, Component addition/deletion, role changes, switch over, and more.
+// This allows for automatic event handling, thus encapsulating complex behaviors within the Component.
+//
+// Referencing a ComponentDefinition when creating individual Components ensures inheritance of predefined configurations,
+// promoting reusability and consistency across different deployments and cluster topologies.
 type ComponentDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -58,54 +81,53 @@ func init() {
 	SchemeBuilder.Register(&ComponentDefinition{}, &ComponentDefinitionList{})
 }
 
-// ComponentDefinitionSpec defines the desired state of ComponentDefinition.
 type ComponentDefinitionSpec struct {
-	// Specifies the name of the component provider, typically the vendor or developer name.
-	// It identifies the entity responsible for creating and maintaining the component.
+	// Specifies the name of the Component provider, typically the vendor or developer name.
+	// It identifies the entity responsible for creating and maintaining the Component.
 	//
 	// When specifying the provider name, consider the following guidelines:
 	//
-	// - Keep the name concise and relevant to the component.
-	// - Use a consistent naming convention across components from the same provider.
+	// - Keep the name concise and relevant to the Component.
+	// - Use a consistent naming convention across Components from the same provider.
 	// - Avoid using trademarked or copyrighted names without proper permission.
 	//
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	Provider string `json:"provider,omitempty"`
 
-	// Provides a brief and concise explanation of the component's purpose, functionality, and any relevant details.
-	// It serves as a quick reference for users to understand the component's role and characteristics.
+	// Provides a brief and concise explanation of the Component's purpose, functionality, and any relevant details.
+	// It serves as a quick reference for users to understand the Component's role and characteristics.
 	//
 	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	Description string `json:"description,omitempty"`
 
-	// Defines the type of well-known service protocol that the component provides.
-	// It specifies the standard or widely recognized protocol used by the component to offer its services.
+	// Defines the type of well-known service protocol that the Component provides.
+	// It specifies the standard or widely recognized protocol used by the Component to offer its Services.
 	//
-	// The `serviceKind` field allows users to quickly identify the type of service provided by the component
+	// The `serviceKind` field allows users to quickly identify the type of Service provided by the Component
 	// based on common protocols or service types. This information helps in understanding the compatibility,
-	// interoperability, and usage of the component within a system.
+	// interoperability, and usage of the Component within a system.
 	//
 	// Some examples of well-known service protocols include:
 	//
-	// - "MySQL": Indicates that the component provides a MySQL database service.
-	// - "PostgreSQL": Indicates that the component offers a PostgreSQL database service.
-	// - "Redis": Signifies that the component functions as a Redis key-value store.
-	// - "ETCD": Denotes that the component serves as an ETCD distributed key-value store.
+	// - "MySQL": Indicates that the Component provides a MySQL database service.
+	// - "PostgreSQL": Indicates that the Component offers a PostgreSQL database service.
+	// - "Redis": Signifies that the Component functions as a Redis key-value store.
+	// - "ETCD": Denotes that the Component serves as an ETCD distributed key-value store.
 	//
 	// The `serviceKind` value is case-insensitive, allowing for flexibility in specifying the protocol name.
 	//
 	// When specifying the `serviceKind`, consider the following guidelines:
 	//
 	// - Use well-established and widely recognized protocol names or service types.
-	// - Ensure that the `serviceKind` accurately represents the primary service offered by the component.
-	// - If the component provides multiple services, choose the most prominent or commonly used protocol.
+	// - Ensure that the `serviceKind` accurately represents the primary service type offered by the Component.
+	// - If the Component provides multiple services, choose the most prominent or commonly used protocol.
 	// - Limit the `serviceKind` to a maximum of 32 characters for conciseness and readability.
 	//
-	// Note: The `serviceKind` field is optional and can be left empty if the component does not fit into a well-known
+	// Note: The `serviceKind` field is optional and can be left empty if the Component does not fit into a well-known
 	// service category or if the protocol is not widely recognized. It is primarily used to convey information about
-	// the component's service type to users and facilitate discovery and integration.
+	// the Component's service type to users and facilitate discovery and integration.
 	//
 	// The `serviceKind` field is immutable and cannot be updated.
 	//
@@ -113,7 +135,7 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	ServiceKind string `json:"serviceKind,omitempty"`
 
-	// Specifies the version of the service provided by the component.
+	// Specifies the version of the Service provided by the Component.
 	// It follows the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	//
 	// The Semantic Versioning specification defines a version number format of X.Y.Z (MAJOR.MINOR.PATCH), where:
@@ -140,7 +162,7 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
-	// Defines the component's container configuration that serves as a template for instantiated Components.
+	// Specifies the PodSpec template used in the Component.
 	// It includes the following elements:
 	//
 	// - Init containers
@@ -156,18 +178,16 @@ type ComponentDefinitionSpec struct {
 	//     - Lifecycle
 	// - Volumes
 	//
-	// The runtime field is intended to define information that remains consistent across all instantiated components
-	// and serves as a template for their configuration.
+	// This field is intended to define static settings that remain consistent across all instantiated Components.
 	// Dynamic settings such as CPU and memory resource limits, as well as scheduling settings (affinity,
-	// toleration, priority), may vary for each instantiated component and are specified separately in the
-	// `cluster.spec.componentSpecs` field.
+	// toleration, priority), may vary among different instantiated Components.
+	// They should be specified in the `cluster.spec.componentSpecs` (ClusterComponentSpec).
 	//
-	// However, there can be exceptions. In some cases, individual component instances may need to override
-	// certain aspects of the runtime configuration to customize their behavior.
-	// For example, they may specify a different container image or add/modify environment variables.
-	// Such instance-specific overrides can be specified in the `cluster.spec.componentSpecs[*].instances` field.
+	// Specific instances of a Component may override settings defined here, such as using a different container image
+	// or modifying environment variable values.
+	// These instance-specific overrides can be specified in `cluster.spec.componentSpecs[*].instances`.
 	//
-	// This field is immutable and cannot be updated.
+	// This field is immutable and cannot be updated once set.
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Required
@@ -191,24 +211,26 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	BuiltinMonitorContainer *BuiltinMonitorContainerRef `json:"builtinMonitorContainer,omitempty"`
 
-	// Represents user-defined variables that can be used as environment variables for Pods and Actions,
-	// or to render templates of config and script.
+	// Defines variables which are determined after Cluster instantiation and reflect
+	// dynamic or runtime attributes of instantiated Clusters.
+	// These variables serve as placeholders for setting environment variables in Pods and Actions,
+	// or for rendering configuration and script templates before actual values are finalized.
+	//
 	// These variables are placed in front of the environment variables declared in the Pod if used as
 	// environment variables.
 	//
-	// The value of a var can be populated from the following sources:
+	// Variable values can be sourced from:
 	//
-	// - ConfigMap: Allows you to select a ConfigMap and a specific key within that ConfigMap to extract the value from.
-	// - Secret: Allows you to select a Secret and a specific key within that Secret to extract the value from.
+	// - ConfigMap: Select and extract a value from a specific key within a ConfigMap.
+	// - Secret: Select and extract a value from a specific key within a Secret.
 	// - Pod: Retrieves values (including ports) from a selected Pod.
 	// - Service: Retrieves values (including address, port, NodePort) from a selected Service.
-	//   The purpose of ServiceVar is to obtain the address of a ComponentService.
-	// - Credential: Retrieves values (including account name, account password) from a SystemAccount variable.
-	// - ServiceRef: Retrieves values (including address, port, account name, account password) from a selected
-	//   ServiceRefDeclaration.
-	//   The purpose of ServiceRefVar is to obtain the specific address that a ServiceRef is bound to
-	//   (e.g., a ClusterService of another Cluster).
-	// - Component: Retrieves values from a field of a Component.
+	//   Intended to obtain the address of a ComponentService within the same Cluster.
+	// - Credential: Retrieves account name and password from a SystemAccount variable.
+	// - ServiceRef: Retrieves address, port, account name and password from a selected ServiceRefDeclaration.
+	//   Designed to obtain the address bound to a ServiceRef, such as a ClusterService or
+	//   ComponentService of another cluster or an external service.
+	// - Component: Retrieves values from a selected Component, including replicas and instance name list.
 	//
 	// This field is immutable.
 	//
@@ -223,20 +245,20 @@ type ComponentDefinitionSpec struct {
 	// This field allows you to specify the following:
 	//
 	// - Snapshot behavior: Determines whether a snapshot of the volume should be taken when performing
-	//   a snapshot backup of the component.
+	//   a snapshot backup of the Component.
 	// - Disk high watermark: Sets the high watermark for the volume's disk usage.
 	//   When the disk usage reaches the specified threshold, it triggers an alert or action.
 	//
-	// By configuring these volume behaviors, you can control how the volumes are managed and monitored within the component.
+	// By configuring these volume behaviors, you can control how the volumes are managed and monitored within the Component.
 	//
 	// This field is immutable.
 	//
 	// +optional
 	Volumes []ComponentVolume `json:"volumes"`
 
-	// Specifies the host network configuration for the component.
+	// Specifies the host network configuration for the Component.
 	//
-	// When `hostNetwork` option is enabled, the Pod shares the host's network namespace and can directly access
+	// When `hostNetwork` option is enabled, the Pods share the host's network namespace and can directly access
 	// the host's network interfaces.
 	// This means that if multiple Pods need to use the same port, they cannot run on the same host simultaneously
 	// due to port conflicts.
@@ -251,30 +273,35 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	HostNetwork *HostNetwork `json:"hostNetwork,omitempty"`
 
-	// Defines the Services used to access the Component.
+	// Defines additional Services to expose the Component's endpoints.
 	//
-	// By default, a headless service will be automatically created with the name pattern
-	// `{cluster.name}-{component.name}-headless`.
-	// This headless service is used for internal communication within the cluster.
+	// A default headless Service, named `{cluster.name}-{component.name}-headless`, is automatically created
+	// for internal Cluster communication.
 	//
-	// In addition to the default headless service, this field allows you to customize a list of services
-	// that expose the Component's endpoints to other Components within the same cluster.
-	// Each service in the ComponentService can have its own set of ports, type, and other service-related configurations.
+	// This field enables customization of additional Services to expose the Component's endpoints to
+	// other Components within the same or different Clusters, and to external applications.
+	// Each Service entry in this list can include properties such as ports, type, and selectors.
 	//
-	// When a Component needs to access a ComponentService provided by another Component within the same cluster,
-	// it can declare a variable in the `componentDefinition.spec.vars` section and bind it to the exposed address
-	// using the `serviceVarRef` field.
+	// - For intra-Cluster access, Components can reference Services using variables declared in
+	//   `componentDefinition.spec.vars[*].valueFrom.serviceVarRef`.
+	// - For inter-Cluster access, reference Services use variables declared in
+	//   `componentDefinition.spec.vars[*].valueFrom.serviceRefVarRef`,
+	//   and bind Services at Cluster creation time with `clusterComponentSpec.ServiceRef[*].clusterServiceSelector`.
 	//
 	// This field is immutable.
 	//
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
 
-	// Defines the configuration file templates and volume mount parameters used by the Component.
-	// This field contains a list of templateRef that will be rendered into Component instances' configuration files
-	// based on the provided templates.
-	// The rendered configuration files will be mounted into the component's containers
-	// using the specified volume mount parameters.
+	// Specifies the configuration file templates and volume mount parameters used by the Component.
+	// It also includes descriptions of the parameters in the ConfigMaps, such as value range limitations.
+	//
+	// This field specifies a list of templates that will be rendered into Component containers' configuration files.
+	// Each template is represented as a ConfigMap and may contain multiple configuration files,
+	// with each file being a key in the ConfigMap.
+	//
+	// The rendered configuration files will be mounted into the Component's containers
+	//  according to the specified volume mount parameters.
 	//
 	// This field is immutable.
 	//
@@ -289,9 +316,9 @@ type ComponentDefinitionSpec struct {
 	// Defines the types of logs generated by instances of the Component and their corresponding file paths.
 	// These logs can be collected for further analysis and monitoring.
 	//
-	// The `logConfigs` field is an optional list of `LogConfig` objects, where each object represents
+	// The `logConfigs` field is an optional list of LogConfig objects, where each object represents
 	// a specific log type and its configuration.
-	// It allows you to specify multiple log types and their respective file paths for the Component instances.
+	// It allows you to specify multiple log types and their respective file paths for the Component.
 	//
 	// Examples:
 	//
@@ -314,21 +341,13 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Define how the exporter integrates with the external Time Series Database.
+	// Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+	// These scripts can be executed during container startup or via specific actions.
 	//
-	// This field is immutable.
+	// Each script group is encapsulated in a ComponentTemplateSpec that includes:
 	//
-	// +optional
-	// Monitor *MonitorConfig `json:"monitor,omitempty"`
-
-	// Specifies groups of scripts (each group of scripts provided as a single ConfigMap) to be mounted as volumes and
-	// can be invoked in the container's startup command or action's command.
-	//
-	// The `scripts` field is an optional array that allows you to define a set of scripts to be used by the component.
-	// Each element in the `scripts` array is defined as a `ComponentTemplateSpec` object, which contains the following:
-	//
-	// - A ConfigMap object that holds a set of scripts.
-	// - A mount point where the scripts will be mounted inside the container.
+	// - The ConfigMap containing the scripts.
+	// - The mount point where the scripts will be mounted inside the container.
 	//
 	// This field is immutable.
 	//
@@ -341,14 +360,14 @@ type ComponentDefinitionSpec struct {
 
 	// Defines the namespaced policy rules required by the Component.
 	//
-	// The `policyRules` field is an optional array of `rbacv1.PolicyRule` objects that define the policy rules
+	// The `policyRules` field is an array of `rbacv1.PolicyRule` objects that define the policy rules
 	// needed by the Component to operate within a namespace.
-	// These policy rules determine the permissions and actions the Component is allowed to perform on
+	// These policy rules determine the permissions and verbs the Component is allowed to perform on
 	// Kubernetes resources within the namespace.
 	//
 	// The purpose of this field is to automatically generate the necessary RBAC roles
 	// for the Component based on the specified policy rules.
-	// This ensures that the Pods in the Component has the required permissions to function properly within the namespace.
+	// This ensures that the Pods in the Component has appropriate permissions to function.
 	//
 	// Note: This field is currently non-functional and is reserved for future implementation.
 	//
@@ -357,20 +376,20 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	PolicyRules []rbacv1.PolicyRule `json:"policyRules,omitempty"`
 
-	// Specifies static labels that will be patched to all Kubernetes resources created for the component.
+	// Specifies static labels that will be patched to all Kubernetes resources created for the Component.
 	//
 	// Note: If a label key in the `labels` field conflicts with any system labels or user-specified labels,
-	// it will be silently ignored to avoid overriding critical labels.
+	// it will be silently ignored to avoid overriding higher-priority labels.
 	//
 	// This field is immutable.
 	//
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Specifies static annotations that will be patched to all Kubernetes resources created for the component.
+	// Specifies static annotations that will be patched to all Kubernetes resources created for the Component.
 	//
 	// Note: If an annotation key in the `annotations` field conflicts with any system annotations
-	// or user-specified annotations, it will be silently ignored to avoid overriding critical annotations.
+	// or user-specified annotations, it will be silently ignored to avoid overriding higher-priority annotations.
 	//
 	// This field is immutable.
 	//
@@ -379,8 +398,8 @@ type ComponentDefinitionSpec struct {
 
 	// Defines the upper limit of the number of replicas supported by the Component.
 	//
-	// It defines the maximum number of replicas that can be created for the component.
-	// This field allows you to set a limit on the scalability of the component, preventing it from exceeding a certain number of replicas.
+	// It defines the maximum number of replicas that can be created for the Component.
+	// This field allows you to set a limit on the scalability of the Component, preventing it from exceeding a certain number of replicas.
 	//
 	// This field is immutable.
 	//
@@ -390,69 +409,56 @@ type ComponentDefinitionSpec struct {
 	// An array of `SystemAccount` objects that define the system accounts needed
 	// for the management operations of the Component.
 	//
-	// Each `SystemAccount` object in the array contains the following fields:
+	// Each `SystemAccount` includes:
 	//
 	// - Account name.
-	// - The SQL statement template used to create the system account.
-	// - The source of the password for the system account. It can be generated based on certain rules or copied from a secret.
+	// - The SQL statement template: Used to create the system account.
+	// - Password Source: Either generated based on certain rules or retrieved from a Secret.
 	//
-	// Common scenarios of system accounts include:
-	//
-	// - Accounts required to initialize the system
-	// - Performing backup tasks
-	// - Monitoring
-	// - Health checks
-	// - Replica replication
-	// - Other system-level operations
+	//  Use cases for system accounts typically involve tasks like system initialization, backups, monitoring,
+	//  health checks, replication, and other system-level operations.
 	//
 	// System accounts are distinct from user accounts, although both are database accounts.
 	//
-	// - System accounts are typically created by the operator during cluster creation and initialization.
-	//   They usually have higher privileges and are used exclusively by the operator and for system management tasks.
-	//   System accounts are managed by the KubeBlocks operator using a declarative API, and their lifecycle is fully controlled by the operator.
-	// - User accounts, on the other hand, are managed through ops operations and their lifecycle is controlled by users or administrators.
-	// 	 User account permissions should follow the principle of least privilege, granting only the necessary access rights to complete their required tasks.
+	// - **System Accounts**: Created during Cluster setup by the KubeBlocks operator,
+	//   these accounts have higher privileges for system management and are fully managed
+	//   through a declarative API by the operator.
+	// - **User Accounts**: Managed by users or administrator.
+	//   User account permissions should follow the principle of least privilege,
+	//   granting only the necessary access rights to complete their required tasks.
 	//
 	// This field is immutable.
 	//
 	// +optional
 	SystemAccounts []SystemAccount `json:"systemAccounts,omitempty"`
 
-	// Specifies the strategy for updating the component instance when it has multiple replicas.
-	// It determines whether multiple replicas can be updated concurrently.
+	// Specifies the concurrency strategy for updating multiple instances of the Component.
+	// Available strategies:
 	//
-	// The available strategies are:
+	// - `Serial`: Updates replicas one at a time, ensuring minimal downtime by waiting for each replica to become ready
+	//   before updating the next.
+	// - `Parallel`: Updates all replicas simultaneously, optimizing for speed but potentially reducing availability
+	//   during the update.
+	// - `BestEffortParallel`: Updates replicas concurrently with a limit on simultaneous updates to ensure a minimum
+	//   number of operational replicas for maintaining quorum.
+	//	 For example, in a 5-replica component, updating a maximum of 2 replicas simultaneously keeps
+	//	 at least 3 operational for quorum.
 	//
-	// - `Serial`: The replicas are updated one at a time in a serial manner.
-	//   The operator waits for each replica to be updated and ready before proceeding to the next one.
-	//   This ensures that only one replica is unavailable at a time during the update process.
-	// - `Parallel`: The replicas are updated in parallel, with the operator updating all replicas concurrently.
-	//   This strategy provides the fastest update time but may lead to a period of reduced availability or
-	//   capacity during the update process.
-	// - `BestEffortParallel`: The replicas are updated in parallel, with the operator making a best-effort attempt
-	//   to update as many replicas as possible concurrently while maintaining the component's availability.
-	//	 Unlike the `Parallel` strategy, the `BestEffortParallel` strategy aims to ensure that a minimum number
-	//	 of replicas remain available during the update process to maintain the component's quorum and functionality.
-	//   For example, consider a component with 5 replicas. To maintain the component's availability and quorum,
-	//   the operator may allow a maximum of 2 replicas to be simultaneously updated. This ensures that at least
-	//   3 replicas (a quorum) remain available and functional during the update process.
-	//
-	// This field is immutable.
+	// This field is immutable and defaults to 'Serial'.
 	//
 	// +kubebuilder:default=Serial
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
-	// Enumerate all the possible roles a replica of the Component can have.
-	// Each replica can have zero or more roles assigned to it.
+	// Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.
 	//
+	// A replica can have zero to multiple roles.
 	// KubeBlocks operator determines the roles of each replica by invoking the `lifecycleActions.roleProbe` method.
-	// This method returns a list of roles for each replica, and the returned roles must be defined in the `roles` field.
+	// This action returns a list of roles for each replica, and the returned roles must be predefined in the `roles` field.
 	//
 	// The roles assigned to a replica can influence various aspects of the Component's behavior, such as:
 	//
-	// - Service selection: The Component's provided services can be selected based on the roles of the replicas.
-	//   For example, a service may only target replicas with a specific role.
+	// - Service selection: The Component's exposed Services may target replicas based on their roles using `roleSelector`.
 	// - Update order: The roles can determine the order in which replicas are updated during a Component update.
 	//   For instance, replicas with a "follower" role can be updated first, while the replica with the "leader"
 	//   role is updated last. This helps minimize the number of leader changes during the update process.
@@ -462,8 +468,6 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// Defines the strategy for electing the component's active role.
-	//
 	// This field has been deprecated since v0.9.
 	// This field is maintained for backward compatibility and its use is discouraged.
 	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
@@ -474,12 +478,8 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	RoleArbitrator *RoleArbitrator `json:"roleArbitrator,omitempty"`
 
-	// Defines a set of Actions for customizing the behavior of a Component.
-	//
-	// Each Action defines a customizable hook or procedure, designed to be invoked at predetermined points
-	// within the lifecycle of a Component instance.
-	//
-	// Available Action triggers include:
+	// Defines a set of hooks and procedures that customize the behavior of a Component throughout its lifecycle.
+	// Actions are triggered at specific lifecycle stages:
 	//
 	//   - `postProvision`: Defines the hook to be executed after the creation of a Component,
 	//     with `preCondition` specifying when the action should be fired relative to the Component's lifecycle stages:
@@ -488,14 +488,14 @@ type ComponentDefinitionSpec struct {
 	//   - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
 	//   - `switchover`: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
 	//     This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
-	//     such as during planned maintenance or upgrades on the current leader node.
+	//     such as before planned maintenance or upgrades on the current leader node.
 	//   - `memberJoin`: Defines the procedure to add a new replica to the replication group.
 	//   - `memberLeave`: Defines the method to remove a replica from the replication group.
 	//   - `readOnly`: Defines the procedure to switch a replica into the read-only state.
 	//   - `readWrite`: transition a replica from the read-only state back to the read-write state.
 	//   - `dataDump`: Defines the procedure to export the data from a replica.
 	//   - `dataLoad`: Defines the procedure to import data into a replica.
-	//   - `reconfigure`: Defines the procedure that update a replica with new configuration.
+	//   - `reconfigure`: Defines the procedure that update a replica with new configuration file.
 	//   - `accountProvision`: Defines the procedure to generate a new database account.
 	//
 	// This field is immutable.
@@ -503,22 +503,18 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	LifecycleActions *ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 
-	// Enumerates external service dependencies for the current Component.
-	//
-	// This can include services hosted on other Clusters as well as services deployed outside of the K8s environment.
-	// It is essential for defining cross-service interactions and ensuring that the Component can properly access and
-	// integrate with these specified services.
+	// Lists external service dependencies of the Component, including services from other Clusters or outside the K8s environment.
 	//
 	// This field is immutable.
 	//
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
 
-	// Specifies the minimum duration in seconds that a new pod should remain in the ready
-	// state without any of its containers crashing, before the pod is deemed available for use.
-	// This helps ensure that the pod is stable and capable of serving requests without immediate failures.
+	// `minReadySeconds` is the minimum duration in seconds that a new Pod should remain in the ready
+	// state without any of its containers crashing to be considered available.
+	// This ensures the Pod's stability and readiness to serve requests.
 	//
-	// A default value of 0 means the pod is considered available as soon as it enters the ready state.
+	// A default value of 0 seconds means the Pod is considered available as soon as it enters the ready state.
 	//
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=0

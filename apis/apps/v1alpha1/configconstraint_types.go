@@ -243,15 +243,6 @@ type ReloadOptions struct {
 	AutoTrigger *appsv1beta1.AutoTrigger `json:"autoTrigger,omitempty"`
 }
 
-// ConfigConstraint manages the parameters across multiple configuration files contained in a single configure template.
-// These configuration files should have the same format (e.g. ini, xml, properties, json).
-//
-// It provides the following functionalities:
-//
-// 1. **Parameter Value Validation**: Validates and ensures compliance of parameter values with defined constraints.
-// 2. **Dynamic Reload on Modification**: Monitors parameter changes and triggers dynamic reloads to apply updates.
-// 3. **Parameter Rendering in Templates**: Injects parameters into templates to generate up-to-date configuration files.
-//
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:openapi-gen=true
@@ -260,6 +251,15 @@ type ReloadOptions struct {
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cc
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+
+// ConfigConstraint manages the parameters across multiple configuration files contained in a single configure template.
+// These configuration files should have the same format (e.g. ini, xml, properties, json).
+//
+// It provides the following functionalities:
+//
+// 1. **Parameter Value Validation**: Validates and ensures compliance of parameter values with defined constraints.
+// 2. **Dynamic Reload on Modification**: Monitors parameter changes and triggers dynamic reloads to apply updates.
+// 3. **Parameter Rendering in Templates**: Injects parameters into templates to generate up-to-date configuration files.
 type ConfigConstraint struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

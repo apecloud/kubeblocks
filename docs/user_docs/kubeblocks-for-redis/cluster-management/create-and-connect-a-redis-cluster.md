@@ -241,7 +241,7 @@ status:
       podsReadyTime: "2023-07-19T08:34:34Z"
       replicationSetStatus:
         primary:
-          pod: redis-redis-0
+          pod: mycluster-redis-0
   conditions:
   - lastTransitionTime: "2023-07-19T08:33:48Z"
     message: 'The operator has started the provisioning of Cluster: redis'
@@ -350,12 +350,12 @@ KubeBlocks operator has created a new Secret called `redis-conn-credential` to s
    p7twmbrd
    ```
 
-2. Exec into the pod `redis-redis-0` and connect to the database using username and password.
+2. Exec into the pod `mycluster-redis-0` and connect to the database using username and password.
 
    ```bash
-   kubectl exec -ti -n demo redis-redis-0 -- bash
+   kubectl exec -ti -n demo mycluster-redis-0 -- bash
 
-   root@redis-redis-0:/# redis-cli -a p7twmbrd  --user default
+   root@mycluster-redis-0:/# redis-cli -a p7twmbrd  --user default
    ```
 
 </TabItem>
@@ -373,7 +373,7 @@ You can also port forward the service to connect to the database from your local
 2. Open a new terminal and run the following command to connect to the database.
 
    ```bash
-   root@redis-redis-0:/# redis-cli -a p7twmbrd  --user default
+   root@mycluster-redis-0:/# redis-cli -a p7twmbrd  --user default
    ```
 
 </TabItem>

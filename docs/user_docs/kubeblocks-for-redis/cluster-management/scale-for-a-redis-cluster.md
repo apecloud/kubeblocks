@@ -232,7 +232,7 @@ In the example below, a snapshot exception occurs.
 Status:
   conditions: 
   - lastTransitionTime: "2023-04-10T18:20:26Z"
-    message: VolumeSnapshot/redis-cluster-redis-scaling-dbqgp: Failed to set default snapshot
+    message: VolumeSnapshot/mycluster-redis-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"

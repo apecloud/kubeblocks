@@ -163,8 +163,9 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restoreFrom"
 	RestoreFrom *RestoreFromSpec `json:"restoreFrom,omitempty"`
 
-	// Specifies the maximum number of seconds the OpsRequest will wait for its start conditions to be met before aborting.
-	// If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed.
+	// Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+	// before it aborts the operation.
+	// If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.
 	//
 	// +kubebuilder:default=0
 	// +optional
@@ -887,8 +888,13 @@ type RestoreSpec struct {
 	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
 
-	// If set to true, the recovery process in the PostReady phase will be performed after the cluster is running successfully.
-	// otherwise, it will be performed after component is running.
+	// Controls the timing of PostReady actions during the recovery process.
+	//
+	// If false (default), PostReady actions execute when the Component reaches the "Running" state.
+	// If true, PostReady actions are delayed until the entire Cluster is "Running,"
+	// ensuring the cluster's overall stability before proceeding.
+	//
+	// This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.
 	DoReadyRestoreAfterClusterRunning bool `json:"doReadyRestoreAfterClusterRunning,omitempty"`
 }
 

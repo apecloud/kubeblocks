@@ -227,12 +227,12 @@ type ConfigurationStatus struct {
 	ConfigurationItemStatus []ConfigurationItemDetailStatus `json:"configurationStatus"`
 }
 
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+
 // Configuration represents the complete set of configurations for a specific Component of a Cluster.
 // This includes templates for each configuration file, their corresponding ConfigConstraints, volume mounts,
 // and other relevant details.
-//
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
 type Configuration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

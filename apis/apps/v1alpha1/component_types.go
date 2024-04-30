@@ -29,7 +29,7 @@ type ComponentSpec struct {
 	// +kubebuilder:validation:MaxLength=64
 	CompDef string `json:"compDef"`
 
-	// ServiceVersion specifies the version of the service expected to be provisioned by this component.
+	// ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
 	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	//
 	// +kubebuilder:validation:MaxLength=32
@@ -46,23 +46,17 @@ type ComponentSpec struct {
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
-	// Defines a list of ServiceRef for a Component, allowing it to connect and interact with other services.
-	// These services can be external or managed by the same KubeBlocks operator, categorized as follows:
+	// Defines a list of ServiceRef for a Component, enabling access to both external services and
+	// Services provided by other Clusters.
 	//
-	// 1. External Services:
+	// Types of services:
 	//
-	//    - Not managed by KubeBlocks. These could be services outside KubeBlocks or non-Kubernetes services.
-	//    - Connection requires a ServiceDescriptor providing details for service binding.
+	// - External services: Not managed by KubeBlocks or managed by a different KubeBlocks operator;
+	//   Require a ServiceDescriptor for connection details.
+	// - Services provided by a Cluster: Managed by the same KubeBlocks operator;
+	//   identified using Cluster, Component and Service names.
 	//
-	// 2. KubeBlocks Services:
-	//
-	//    - Managed within the same KubeBlocks environment.
-	//    - Service binding is achieved by specifying cluster names in the service references,
-	//      with configurations handled by the KubeBlocks operator.
-	//
-	// ServiceRef maintains cluster-level semantic consistency; references with the same `serviceRef.name`
-	// within the same cluster are treated as identical.
-	// Only bindings to the same cluster or ServiceDescriptor are allowed within a cluster.
+	// ServiceRefs with identical `serviceRef.name` in the same Cluster are considered the same.
 	//
 	// Example:
 	// ```yaml
@@ -71,10 +65,12 @@ type ComponentSpec struct {
 	//     serviceDescriptor:
 	//       name: "external-redis-sentinel"
 	//   - name: "postgres-cluster"
-	//     cluster:
-	//       name: "my-postgres-cluster"
+	//     clusterServiceSelector:
+	//       cluster: "my-postgres-cluster"
+	//       service:
+	//         component: "postgresql"
 	// ```
-	// The example above includes references to an external Redis Sentinel service and a PostgreSQL cluster managed by KubeBlocks.
+	// The example above includes ServiceRefs to an external Redis Sentinel service and a PostgreSQL Cluster.
 	//
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
@@ -89,21 +85,20 @@ type ComponentSpec struct {
 	// Specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component.
 	// Each template specifies the desired characteristics of a persistent volume, such as storage class,
 	// size, and access modes.
-	// These templates are used to dynamically provision persistent volumes for the Component when it is deployed.
+	// These templates are used to dynamically provision persistent volumes for the Component.
 	//
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Overrides services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
+	// Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
 	// by clients.
 	//
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
 
-	// Each component supports running multiple replicas to provide high availability and persistence.
-	// This field can be used to specify the desired number of replicas.
+	// Specifies the desired number of replicas in the Component for enhancing availability and durability, or load balancing.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
@@ -122,7 +117,11 @@ type ComponentSpec struct {
 	// For example, if the `componentDefinition.spec.logConfigs` defines LogConfig entries with
 	// names "slow_query_log" and "error_log",
 	// you can enable the collection of these logs by including their names in the `enabledLogs` array:
-	// enabledLogs: ["slow_query_log", "error_log"]
+	// ```yaml
+	// enabledLogs:
+	// - slow_query_log
+	// - error_log
+	// ```
 	//
 	// +listType=set
 	// +optional
@@ -130,7 +129,7 @@ type ComponentSpec struct {
 
 	// Specifies the name of the ServiceAccount required by the running Component.
 	// This ServiceAccount is used to grant necessary permissions for the Component's Pods to interact
-	// with other Kubernetes resources, such as modifying pod labels or sending events.
+	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
 	// Defaults:
 	// If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
@@ -147,27 +146,26 @@ type ComponentSpec struct {
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// Specifies a group of affinity scheduling rules for the Component.
-	// It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
+	// It allows users to control how the Component's Pods are scheduled onto nodes in the Cluster.
 	//
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
-	// Allows the Component to be scheduled onto nodes with matching taints.
-	// It is an array of tolerations that are attached to the Component's Pods.
+	// Allows Pods to be scheduled onto nodes with matching taints.
+	// Each toleration in the array allows the Pod to tolerate node taints based on
+	// specified `key`, `value`, `effect`, and `operator`.
 	//
-	// Each toleration consists of a `key`, `value`, `effect`, and `operator`.
-	// The `key`, `value`, and `effect` define the taint that the toleration matches.
-	// The `operator` specifies how the toleration matches the taint.
+	// - The `key`, `value`, and `effect` identify the taint that the toleration matches.
+	// - The `operator` determines how the toleration matches the taint.
 	//
-	// If a node has a taint that matches a toleration, the Component's pods can be scheduled onto that node.
-	// This allows the Component's Pods to run on nodes that have been tainted to prevent regular Pods from being scheduled.
+	// Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
 	//
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// Specifies the TLS configuration for the component, including:
+	// Specifies the TLS configuration for the Component, including:
 	//
-	// - A boolean flag that indicates whether the component should use Transport Layer Security (TLS) for secure communication.
+	// - A boolean flag that indicates whether the Component should use Transport Layer Security (TLS) for secure communication.
 	// - An optional field that specifies the configuration for the TLS certificates issuer when TLS is enabled.
 	//   It allows defining the issuer name and the reference to the secret containing the TLS certificates and key.
 	//	 The secret should contain the CA certificate, TLS certificate, and private key in the specified keys.
@@ -175,15 +173,15 @@ type ComponentSpec struct {
 	// +optional
 	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
 
-	// Allows for the customization of configuration values for each instance within a component.
+	// Allows for the customization of configuration values for each instance within a Component.
 	// An Instance represent a single replica (Pod and associated K8s resources like PVCs, Services, and ConfigMaps).
 	// While instances typically share a common configuration as defined in the ClusterComponentSpec,
 	// they can require unique settings in various scenarios:
 	//
 	// For example:
-	// - A database component might require different resource allocations for primary and secondary instances,
+	// - A database Component might require different resource allocations for primary and secondary instances,
 	//   with primaries needing more resources.
-	// - During a rolling upgrade, a component may first update the image for one or a few instances,
+	// - During a rolling upgrade, a Component may first update the image for one or a few instances,
 	//   and then update the remaining instances after verifying that the updated instances are functioning correctly.
 	//
 	// InstanceTemplate allows for specifying these unique configurations per instance.
@@ -201,25 +199,25 @@ type ComponentSpec struct {
 	//
 	// Marking an instance as offline results in the following:
 	//
-	// 1. The associated pod is stopped, and its PersistentVolumeClaim (PVC) is retained for potential
+	// 1. The associated Pod is stopped, and its PersistentVolumeClaim (PVC) is retained for potential
 	//    future reuse or data recovery, but it is no longer actively used.
 	// 2. The ordinal number assigned to this instance is preserved, ensuring it remains unique
 	//    and avoiding conflicts with new instances.
 	//
 	// Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
-	// ordinal consistency within the cluster.
+	// ordinal consistency within the Cluster.
 	// Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-	// The cluster administrator must manually manage the cleanup and removal of these resources when they are no longer needed.
+	// The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.
 	//
 	//
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
-	// Defines RuntimeClassName for all Pods managed by this component.
+	// Defines runtimeClassName for all Pods managed by this Component.
 	// +optional
 	RuntimeClassName *string `json:"runtimeClassName,omitempty"`
 
-	// Defines the sidecar containers that will be attached to the component's main container.
+	// Defines the sidecar containers that will be attached to the Component's main container.
 	//
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=32
@@ -227,44 +225,56 @@ type ComponentSpec struct {
 	// +optional
 	Sidecars []string `json:"sidecars,omitempty"`
 
-	// Determines whether the metrics exporter needs to be published to the service endpoint.
-	// If set to true, the metrics exporter will be published to the service endpoint,
-	// the service will be injected with the following annotations:
+	// Determines whether metrics exporter information is annotated on the Component's headless Service.
+	//
+	// If set to true, the following annotations will be patched into the Service:
+	//
 	// - "monitor.kubeblocks.io/path"
 	// - "monitor.kubeblocks.io/port"
 	// - "monitor.kubeblocks.io/scheme"
+	//
+	// These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.
 	//
 	// +optional
 	MonitorEnabled *bool `json:"monitorEnabled,omitempty"`
 }
 
-// ComponentStatus represents the observed state of a Component within the cluster.
+// ComponentStatus represents the observed state of a Component within the Cluster.
 type ComponentStatus struct {
-	// Specifies the most recent generation observed for this Component.
-	// This corresponds to the Cluster's generation, which is updated by the API Server upon mutation.
+	// Specifies the most recent generation observed for this Component object.
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Defines the current state of the component API Resource, such as warnings.
+	// Represents a list of detailed status of the Component object.
+	// Each condition in the list provides real-time information about certain aspect of the Component object.
+	//
+	// This field is crucial for administrators and developers to monitor and respond to changes within the Component.
+	// It provides a history of state transitions and a snapshot of the current state that can be used for
+	// automated logic or direct inspection.
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// Indicates the phase of the component. Detailed information for each phase is as follows:
+	// Indicates the current phase of the Component, with each phase indicating specific conditions:
 	//
-	// - Creating: A special `Updating` phase with previous phase `empty`(means "") or `Creating`.
-	// - Running: Component replicas > 0 and all pod specs are latest with a Running state.
-	// - Updating: Component replicas > 0 and no failed pods. The component is being updated.
-	// - Abnormal: Component replicas > 0 but some pods have failed. The component is functional but in a fragile state.
-	// - Failed: Component replicas > 0 but some pods have failed. The component is no longer functional.
-	// - Stopping: Component replicas = 0 and pods are terminating.
-	// - Stopped: Component replicas = 0 and all pods have been deleted.
-	// - Deleting: The component is being deleted.
+	// - Creating: The initial phase for new Components, transitioning from 'empty'("").
+	// - Running: All Pods in a Running state.
+	// - Updating: The Component is currently being updated, with no failed Pods present.
+	// - Abnormal: Some Pods have failed, indicating a potentially unstable state.
+	//   However, the cluster remains available as long as a quorum of members is functioning.
+	// - Failed: A significant number of Pods or critical Pods have failed
+	//   The cluster may be non-functional or may offer only limited services (e.g, read-only).
+	// - Stopping: All Pods are being terminated, with current replica count at zero.
+	// - Stopped: All associated Pods have been successfully deleted.
+	// - Deleting: The Component is being deleted.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
-	// Records the detailed message of the component in its current phase.
-	// Keys can be podName, deployName, or statefulSetName. The format is `ObjectKind/Name`.
+	// A map that stores detailed message about the Component.
+	// Each entry in the map provides insights into specific elements of the Component, such as Pods or workloads.
+	//
+	// Keys in this map are formatted as `ObjectKind/Name`, where `ObjectKind` could be a type like Pod,
+	// and `Name` is the specific name of the object.
 	//
 	// +optional
 	Message ComponentMessageMap `json:"message,omitempty"`
@@ -279,9 +289,18 @@ type ComponentStatus struct {
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// Component is a derived sub-object of a user-submitted Cluster object.
-// It is an internal object, and users should not modify Component objects;
-// they are intended only for observing the status of Components within the system.
+// Component is a fundamental building block of a Cluster object.
+// For example, a Redis Cluster can include Components like 'redis', 'sentinel', and potentially a proxy like 'twemproxy'.
+//
+// The Component object is responsible for managing the lifecycle of all replicas within a Cluster component,
+// It supports a wide range of operations including provisioning, stopping, restarting, termination, upgrading,
+// configuration changes, vertical and horizontal scaling, failover, switchover, cross-node migration,
+// scheduling configuration, exposing Services, managing system accounts, enabling/disabling exporter,
+// and configuring log collection.
+//
+// Component is an internal sub-object derived from the user-submitted Cluster object.
+// It is designed primarily to be used by the KubeBlocks controllers,
+// users are discouraged from modifying Component objects directly and should use them only for monitoring Component statuses.
 type Component struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

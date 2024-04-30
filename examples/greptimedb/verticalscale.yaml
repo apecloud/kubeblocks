@@ -8,6 +8,7 @@ spec:
   clusterRef: greptimedb-cluster
   type: VerticalScaling
   # Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling. 
+  verticalScaling:
     # - frontend
     # - datanode
     # - meta

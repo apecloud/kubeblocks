@@ -8,6 +8,7 @@ spec:
   clusterRef: pika-cluster
   type: VerticalScaling
   # Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling. 
+  verticalScaling:
     # - pika-group
     # - pika-group-1
     # - etcd

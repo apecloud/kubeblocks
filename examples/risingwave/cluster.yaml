@@ -102,7 +102,7 @@ metadata:
 spec:
   clusterDefinitionRef: etcd
   clusterVersionRef: etcd-v3.5.6
-  terminationPolicy: Delete
+  terminationPolicy: WipeOut
   affinity:
     podAntiAffinity: Preferred
     topologyKeys:

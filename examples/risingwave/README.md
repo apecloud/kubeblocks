@@ -83,4 +83,6 @@ If you want to delete the cluster and all its resource, you can modify the termi
 kubectl patch cluster risingwave-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
 
 kubectl delete cluster risingwave-cluster
+
+kubectl delete cluster etcdr-cluster
 ```

@@ -21,12 +21,14 @@ package redis
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
@@ -121,24 +123,44 @@ func (mgr *Manager) SubscribeRoleChange(ctx context.Context, oriRole *string) {
 	// and re-subscribes if ping can not receive for 30 seconds.
 	// so we don't need to retry
 	ch := pubSub.Channel()
-	var role string
+	var role, msgRole string
 	for msg := range ch {
+		// +switch-master <master name> <old ip> <old port> <new ip> <new port>
 		masterAddr := strings.Split(msg.Payload, " ")
 		masterName := strings.Split(masterAddr[3], ".")[0]
 
 		if masterName == mgr.CurrentMemberName {
 			role = models.PRIMARY
+			roleSnapshot := &common.GlobalRoleSnapshot{}
+			oldMasterName := strings.Split(masterAddr[1], ".")[0]
+			roleSnapshot.PodRoleNamePairs = []common.PodRoleNamePair{
+				{
+					PodName:  oldMasterName,
+					RoleName: models.SECONDARY,
+				},
+				{
+					PodName:  masterName,
+					RoleName: models.PRIMARY,
+				},
+			}
+			roleSnapshot.Version = time.Now().Format(time.RFC3339Nano)
+
+			b, _ := json.Marshal(roleSnapshot)
+			msgRole = string(b)
 		} else {
 			role = models.SECONDARY
+			msgRole = models.SECONDARY
 		}
 		if role != *oriRole {
-			_ = util.SentEventForProbe(ctx, map[string]any{
+			err := util.SentEventForProbe(ctx, map[string]any{
 				"operation":    util.CheckRoleOperation,
 				"originalRole": *oriRole,
-				"role":         role,
+				"role":         msgRole,
 				"event":        util.OperationSuccess,
 			})
-			*oriRole = role
+			if err == nil {
+				*oriRole = role
+			}
 		}
 	}
 }

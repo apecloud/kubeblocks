@@ -21,14 +21,14 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
 
 ### Before you start
 
-* Install KubeBlocks: You can install KubeBlocks by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
 * Make sure the Redis add-on is enabled.
 
   ```bash
   kubectl get addons.extensions.kubeblocks.io redis
   >            
-  NAME    TYPE   STATUS    AGE
-  redis   Helm   Enabled   96m
+  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
+  redis   Helm                        Enabled   16d
   ```
 
 * View all the database types and versions available for creating a cluster.
@@ -38,8 +38,8 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
   ```bash
   kubectl get clusterdefinition Redis
   >
-  NAME    MAIN-COMPONENT-NAME   STATUS      AGE
-  redis   redis                 Available   96m
+  NAME    TOPOLOGIES   SERVICEREFS   STATUS      AGE
+  redis                              Available   16d
   ```
 
   View all available versions for creating a cluster.
@@ -182,13 +182,13 @@ kind: Cluster
 metadata:
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"redis","app.kubernetes.io/version":"7.0.6","helm.sh/chart":"redis-cluster-0.6.0-alpha.36"},"name":"redis","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"redis","clusterVersionRef":"redis-7.0.6","componentSpecs":[{"componentDefRef":"redis","enabledLogs":["running"],"monitor":false,"name":"redis","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-redis","services":null,"switchPolicy":{"type":"Noop"},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mycluster","app.kubernetes.io/version":"7.0.6","helm.sh/chart":"redis-cluster-0.6.0-alpha.36"},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"redis","clusterVersionRef":"redis-7.0.6","componentSpecs":[{"componentDefRef":"redis","enabledLogs":["running"],"monitor":false,"name":"redis","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-redis","services":null,"switchPolicy":{"type":"Noop"},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
   creationTimestamp: "2023-07-19T08:33:48Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
   generation: 1
   labels:
-    app.kubernetes.io/instance: redis
+    app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: 7.0.6
     clusterdefinition.kubeblocks.io/name: redis
     clusterversion.kubeblocks.io/name: redis-7.0.6
@@ -220,7 +220,7 @@ spec:
       requests:
         cpu: "0.5"
         memory: 0.5Gi
-    serviceAccountName: kb-mycluster
+    serviceAccountName: kb-redis
     switchPolicy:
       type: Noop
     volumeClaimTemplates:
@@ -244,7 +244,7 @@ status:
           pod: mycluster-redis-0
   conditions:
   - lastTransitionTime: "2023-07-19T08:33:48Z"
-    message: 'The operator has started the provisioning of Cluster: redis'
+    message: 'The operator has started the provisioning of Cluster: mycluster'
     observedGeneration: 1
     reason: PreCheckSucceed
     status: "True"
@@ -261,7 +261,7 @@ status:
     status: "True"
     type: ReplicasReady
   - lastTransitionTime: "2023-07-19T08:34:34Z"
-    message: 'Cluster: redis is ready, current phase is Running'
+    message: 'Cluster: mycluster is ready, current phase is Running'
     reason: ClusterReady
     status: "True"
     type: Ready

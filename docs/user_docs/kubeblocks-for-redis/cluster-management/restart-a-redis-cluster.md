@@ -43,7 +43,7 @@ Restarting a Redis cluster triggers a concurrent restart and the leader may chan
    Check the cluster status to identify the restart status.
 
    ```bash
-   kubectl get cluster mycluster
+   kubectl get cluster mycluster -n demo
    ```
 
    - STATUS=Restarting: it means the cluster restart is in progress.
@@ -52,7 +52,7 @@ Restarting a Redis cluster triggers a concurrent restart and the leader may chan
    ***Example***
 
    ```bash
-   kubectl get cluster mycluster
+   kubectl get cluster mycluster -n demo
    >
    NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
    mycluster   redis                redis-7.0.6    Delete               Running   4d18h

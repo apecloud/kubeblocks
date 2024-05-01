@@ -12,23 +12,10 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 ## Stop a cluster
 
-### Option 1. (Recommended) Use kbcli
-
-Configure the name of your cluster and run the command below to stop this cluster.
-
-```bash
-kbcli cluster stop <name>
-```
-
-***Example***
-
-```bash
-kbcli cluster stop redis-cluster
-```
-
-### Option 2. Create an OpsRequest
+### Option 1. Create an OpsRequest
 
 Run the command below to stop a cluster.
+
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -37,12 +24,12 @@ metadata:
   generateName: stop-
 spec:
   # cluster ref
-  clusterRef: redis-cluster
+  clusterRef: mycluster
   type: Stop
 EOF
 ```
 
-### Option 3. Change the YAML file of the cluster
+### Option 2. Change the YAML file of the cluster
 
 Configure replicas as 0 to delete pods.
 
@@ -50,7 +37,7 @@ Configure replicas as 0 to delete pods.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: redis-cluster
+  name: mycluster
 spec:
   clusterDefinitionRef: redis
   clusterVersionRef: redis-7.0.6
@@ -86,21 +73,7 @@ spec:
 
 ## Start a cluster
   
-### Option 1. (Recommended) Use kbcli
-
-Configure the name of your cluster and run the command below to start this cluster.
-
-```bash
-kbcli cluster start <name>
-```
-
-***Example***
-
-```bash
-kbcli cluster start redis-cluster
-```
-
-### Option 2. Create an OpsRequest
+### Option 1. Create an OpsRequest
 
 Run the command below to start a cluster.
 
@@ -112,12 +85,12 @@ metadata:
   generateName: start-
 spec:
   # cluster ref
-  clusterRef: redis-cluster
+  clusterRef: mycluster
   type: Start
 EOF 
 ```
 
-### Option 3. Change the YAML file of the cluster
+### Option 2. Change the YAML file of the cluster
 
 Change replicas back to the original amount to start this cluster again.
 
@@ -125,7 +98,7 @@ Change replicas back to the original amount to start this cluster again.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-    name: redis-cluster
+    name: mycluster
 spec:
   clusterDefinitionRef: redis
   clusterVersionRef: redis-7.0.6

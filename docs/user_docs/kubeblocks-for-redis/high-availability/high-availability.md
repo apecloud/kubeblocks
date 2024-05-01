@@ -15,13 +15,13 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
 
 ## Before you start
 
-* Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
 * [Create a Redis Replication Cluster](./../cluster-management/create-and-connect-a-redis-cluster.md#create-a-redis-cluster).
 * Check the Switch Policy and the role probe.
   * Check whether the switch policy is `Noop`.
 
     ```bash
-    kubectl get cluster redis-cluster -o yaml
+    kubectl get cluster mycluster -o yaml
     >
     spec:
       componentSpecs:
@@ -48,58 +48,45 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
 1. View the initial status of the Redis cluster.
 
    ```bash
-   kbcli cluster describe redis-cluster
+   kubectl get pods
    ```
 
-   ![Redis cluster original status](../../../img/redis-ha-before.png)
-
-   Currently, `redis-cluster-redis-0` is the primary pod and `redis-cluster-redis-1` is the secondary pod.
+   Currently, `mycluster-redis-0` is the primary pod and `mycluster-redis-1` is the secondary pod.
 
 2. Simulate a primary pod exception.
 
    ```bash
    # Enter the primary pod
-   kubectl exec -it redis-cluster-redis-0  -- bash
+   kubectl exec -it mycluster-redis-0  -- bash
 
    # Execute the debug sleep command to simulate a primary pod exception
-   root@redis-redis-0:/# redis-cli debug sleep 30
+   root@mycluster-redis-0:/# redis-cli debug sleep 30
    ```
 
 3. Open the Redis Sentinel log to view the failover.
 
    ```bash
-   kubectl logs redis-cluster-redis-sentinel-0
+   kubectl logs mycluster-redis-sentinel-0
    ```
 
    In the logs, we can view when a high-availability switch occurs.
 
    ```bash
-   1:X 18 Apr 2023 06:13:17.072 # +switch-master redis-cluster-redis-sentinel redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
-   1:X 18 Apr 2023 06:13:17.074 * +slave slave redis-cluster-redis-0.redis-cluster-redis-headless.default.svc:6379 redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 @ redis-cluster-redis-sentinel redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
+   1:X 18 Apr 2023 06:13:17.072 # +switch-master mycluster-redis-sentinel mycluster-redis-0.mycluster-redis-headless.default.svc 6379 mycluster-redis-1.mycluster-redis-headless.default.svc 6379
+   1:X 18 Apr 2023 06:13:17.074 * +slave slave mycluster-redis-0.mycluster-redis-headless.default.svc:6379 mycluster-redis-0.mycluster-redis-headless.default.svc 6379 @ mycluster-redis-sentinel mycluster-redis-1.mycluster-redis-headless.default.svc 6379
    1:X 18 Apr 2023 06:13:17.077 * Sentinel new configuration saved on disk
    ```
 
 4. Connect to the Redis cluster to view the primary pod information after the exception simulation.
 
-   ```bash
-   kbcli cluster connect redis-cluster
-   ```
+   You can jump to [Connect to a Redis Cluster](./../cluster-management/create-and-connect-a-redis-cluster.md#connect-to-a-redis-cluster) for reference.
 
-   ```bash
-   # View the current primary pod
-   127.0.0.1:6379> info replication
-   ```
-
-   ![Redis info replication](../../../img/redis-ha-info-replication.png)
-
-   From the output, `redis-cluster-redis-1` has been assigned as the primary's pod.
+   From the output, `mycluster-redis-1` has been assigned as the primary's pod.
 
 5. Describe the cluster and check the instance role.
 
    ```bash
-   kbcli cluster describe redis-cluster
+   kubectl get pods
    ```
 
-   ![Redis cluster status after HA](./../../../img/redis-ha-after.png)
-
-   After the failover, `redis-cluster-redis-0` becomes the secondary pod and `redis-cluster-redis-1` becomes the primary pod.
+   After the failover, `mycluster-redis-0` becomes the secondary pod and `mycluster-redis-1` becomes the primary pod.

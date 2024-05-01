@@ -21,13 +21,13 @@ Volume expansion triggers a concurrent restart and the leader pod may change aft
 Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kubectl get cluster mycluster
+kubectl get cluster mycluster -n demo
 ```
 
 ***Example***
 
 ```bash
-kubectl get cluster mycluster
+kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
 mycluster   redis                redis-7.0.6    Delete               Running   4d18h
@@ -91,17 +91,16 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
 2. Validate the volume expansion.
 
    ```bash
-   kubectl get cluster mycluster
+   kubectl get cluster mycluster -n demo
    ```
 
    ***Example***
 
    ```bash
-   kubectl get cluster mycluster
+   kubectl get cluster mycluster -n demo
    >
    NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS            AGE
    mycluster   redis                redis-7.0.6    Delete               VolumeExpanding   4d18h
-
    ```
 
    - STATUS=VolumeExpanding: it means the volume expansion is in progress.

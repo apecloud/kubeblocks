@@ -80,6 +80,7 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 	}
 
 	if _, err = handleRoleChangedEvent(cli, reqCtx, recorder, event); err != nil {
+		reqCtx.Log.Error(err, "handleRoleChangedEvent Error")
 		return err
 	}
 

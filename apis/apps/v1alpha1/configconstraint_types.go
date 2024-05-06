@@ -71,7 +71,7 @@ type ConfigConstraintSpec struct {
 	//   via SQL statements before they can take effect on restart.
 	//
 	// +optional
-	DynamicParameterSelectedPolicy *bool `json:"dynamicParameterSelectedPolicy,omitempty"`
+	ReloadStaticParamsBeforeRestart *bool `json:"reloadStaticParamsBeforeRestart,omitempty"`
 
 	// Specifies the tools container image used by ShellTrigger for dynamic reload.
 	// If the dynamic reload action is triggered by a ShellTrigger, this field is required.

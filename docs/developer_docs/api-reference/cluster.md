@@ -2011,7 +2011,7 @@ an unnecessary reload step.</p>
 </tr>
 <tr>
 <td>
-<code>dynamicParameterSelectedPolicy</code><br/>
+<code>reloadStaticParamsBeforeRestart</code><br/>
 <em>
 bool
 </em>
@@ -9811,7 +9811,7 @@ an unnecessary reload step.</p>
 </tr>
 <tr>
 <td>
-<code>dynamicParameterSelectedPolicy</code><br/>
+<code>reloadStaticParamsBeforeRestart</code><br/>
 <em>
 bool
 </em>

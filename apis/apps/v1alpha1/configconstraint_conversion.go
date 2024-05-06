@@ -59,7 +59,7 @@ func convertToImpl(cc *ConfigConstraint, ccv1 *appsv1beta1.ConfigConstraint) err
 
 func convertToConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1beta1.ConfigConstraintSpec) {
 	ccv1.MergeReloadAndRestart = cc.DynamicActionCanBeMerged
-	ccv1.ReloadStaticParamsBeforeRestart = cc.DynamicParameterSelectedPolicy
+	ccv1.ReloadStaticParamsBeforeRestart = cc.ReloadStaticParamsBeforeRestart
 	ccv1.DownwardAPITriggeredActions = cc.DownwardAPIOptions
 	ccv1.StaticParameters = cc.StaticParameters
 	ccv1.DynamicParameters = cc.DynamicParameters
@@ -118,7 +118,7 @@ func convertFromImpl(ccv1 *appsv1beta1.ConfigConstraint, cc *ConfigConstraint) e
 
 func convertFromConstraintSpec(ccv1 *appsv1beta1.ConfigConstraintSpec, cc *ConfigConstraintSpec) {
 	cc.DynamicActionCanBeMerged = ccv1.MergeReloadAndRestart
-	cc.DynamicParameterSelectedPolicy = ccv1.ReloadStaticParamsBeforeRestart
+	cc.ReloadStaticParamsBeforeRestart = ccv1.ReloadStaticParamsBeforeRestart
 	cc.ToolsImageSpec = ccv1.GetToolsSetup()
 	cc.DownwardAPIOptions = ccv1.DownwardAPITriggeredActions
 	cc.ScriptConfigs = ccv1.GetScriptConfigs()

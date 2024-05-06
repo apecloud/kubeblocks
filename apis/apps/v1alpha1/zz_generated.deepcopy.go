@@ -2384,8 +2384,8 @@ func (in *ConfigConstraintSpec) DeepCopyInto(out *ConfigConstraintSpec) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.DynamicParameterSelectedPolicy != nil {
-		in, out := &in.DynamicParameterSelectedPolicy, &out.DynamicParameterSelectedPolicy
+	if in.ReloadStaticParamsBeforeRestart != nil {
+		in, out := &in.ReloadStaticParamsBeforeRestart, &out.ReloadStaticParamsBeforeRestart
 		*out = new(bool)
 		**out = **in
 	}

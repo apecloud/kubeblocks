@@ -222,17 +222,6 @@ spec:
                   efficient handling of configuration changes by potentially eliminating
                   an unnecessary reload step."
                 type: boolean
-              dynamicParameterSelectedPolicy:
-                description: "Configures whether the dynamic reload specified in `reloadOptions`
-                  applies only to dynamic parameters or to all parameters (including
-                  static parameters). \n - false (default): Only modifications to
-                  the dynamic parameters listed in `dynamicParameters` will trigger
-                  a dynamic reload. - true: Modifications to both dynamic parameters
-                  listed in `dynamicParameters` and static parameters listed in `staticParameters`
-                  will trigger a dynamic reload. The \"all\" option is for certain
-                  engines that require static parameters to be set via SQL statements
-                  before they can take effect on restart."
-                type: boolean
               dynamicParameters:
                 description: List dynamic parameters. Modifications to these parameters
                   trigger a configuration reload without requiring a process restart.
@@ -519,6 +508,17 @@ spec:
                     - signal
                     type: object
                 type: object
+              reloadStaticParamsBeforeRestart:
+                description: "Configures whether the dynamic reload specified in `reloadOptions`
+                  applies only to dynamic parameters or to all parameters (including
+                  static parameters). \n - false (default): Only modifications to
+                  the dynamic parameters listed in `dynamicParameters` will trigger
+                  a dynamic reload. - true: Modifications to both dynamic parameters
+                  listed in `dynamicParameters` and static parameters listed in `staticParameters`
+                  will trigger a dynamic reload. The \"all\" option is for certain
+                  engines that require static parameters to be set via SQL statements
+                  before they can take effect on restart."
+                type: boolean
               scriptConfigs:
                 description: "A list of ScriptConfig Object. \n Each ScriptConfig
                   object specifies a ConfigMap that contains script files that should

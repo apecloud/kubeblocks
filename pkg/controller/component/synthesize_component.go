@@ -176,8 +176,8 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		ServiceAccountName: comp.Spec.ServiceAccountName,
 		Instances:          comp.Spec.Instances,
 		OfflineInstances:   comp.Spec.OfflineInstances,
-		Sidecars:           comp.Spec.Sidecars,
-		MonitorEnabled:     buildMonitorEnabled(comp),
+		MonitorIntegration: comp.Spec.MonitorIntegration,
+		MonitorEnabled:     !buildMonitorEnabled(comp),
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -251,8 +251,8 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alp
 }
 
 func buildMonitorEnabled(comp *appsv1alpha1.Component) bool {
-	if comp.Spec.MonitorEnabled != nil {
-		return *comp.Spec.MonitorEnabled
+	if comp.Spec.DisableExporter != nil {
+		return *comp.Spec.DisableExporter
 	}
 	return false
 }

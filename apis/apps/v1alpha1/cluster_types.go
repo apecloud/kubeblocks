@@ -208,7 +208,7 @@ type ClusterSpec struct {
 	// This field is maintained for backward compatibility and its use is discouraged.
 	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
 	//
-	//+kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
@@ -841,17 +841,14 @@ type ClusterComponentSpec struct {
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
-	// Defines the sidecar containers that will be attached to the Component's main container.
+	// It supports prometheus/victoriametrics operator.
 	//
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=32
-	// +listType=set
 	// +optional
-	Sidecars []string `json:"sidecars,omitempty"`
+	MonitorIntegration *MonitorIntegration `json:"monitorIntegration,omitempty"`
 
 	// Determines whether metrics exporter information is annotated on the Component's headless Service.
 	//
-	// If set to true, the following annotations will be patched into the Service:
+	// If set to true, the following annotations will not be patched into the Service:
 	//
 	// - "monitor.kubeblocks.io/path"
 	// - "monitor.kubeblocks.io/port"
@@ -860,7 +857,7 @@ type ClusterComponentSpec struct {
 	// These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.
 	//
 	// +optional
-	MonitorEnabled *bool `json:"monitorEnabled,omitempty"`
+	DisableExporter *bool `json:"disableExporter,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

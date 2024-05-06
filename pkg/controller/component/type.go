@@ -71,6 +71,7 @@ type SynthesizedComponent struct {
 	MinReadySeconds     int32                               `json:"minReadySeconds,omitempty"`
 	Sidecars            []string                            `json:"sidecars,omitempty"`
 	MonitorEnabled      bool                                `json:"monitorEnabled,omitempty"`
+	MonitorIntegration  *v1alpha1.MonitorIntegration        `json:"monitorIntegration,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0
 	ClusterDefName        string                          `json:"clusterDefName,omitempty"`     // the name of the clusterDefinition

@@ -173,3 +173,7 @@ To check whether the expanding is done, use the following command.
 ```bash
 kbcli cluster describe qdrant
 ```
+
+## Backup and restore
+
+The backup and restore operations for qdrant are the same with those of other clusters. Remember to use `--method datafle` parameter.

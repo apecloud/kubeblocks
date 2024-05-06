@@ -166,22 +166,14 @@ spec:
   terminationPolicy: Delete
 ```
 
-Once the cluster is created, wait until the cluster status change to `running`. Then, run `kbcli cluster describe` to view the roles of nodes in the cluster.
+Once the cluster is created, wait until the cluster status change to `running`. Then, run `kubectl get component -n demo | grep redisc-shard` to view the roles of nodes in the cluster.
 
 ```bash
-kbcli cluster describe redisc
-Name: redisc         Created Time: Apr 23,2024 21:47 UTC+0800
-NAMESPACE   CLUSTER-DEFINITION   VERSION       STATUS    TERMINATION-POLICY
-default                          redis-7.0.6   Running   Delete
-
-Topology:
-COMPONENT   INSTANCE             ROLE        STATUS    AZ       NODE                                  CREATED-TIME
-shard-qst   redisc-shard-qst-0   primary     Running   <none>   k3d-k3s-default-server-0/172.18.0.3   Apr 23,2024 21:47 UTC+0800
-shard-kr2   redisc-shard-kr2-0   primary     Running   <none>   k3d-k3s-default-server-0/172.18.0.3   Apr 23,2024 21:47 UTC+0800
-shard-kr2   redisc-shard-kr2-1   secondary   Running   <none>   k3d-k3s-default-server-0/172.18.0.3   Apr 23,2024 21:47 UTC+0800
-shard-qst   redisc-shard-qst-1   secondary   Running   <none>   k3d-k3s-default-server-0/172.18.0.3   Apr 23,2024 21:47 UTC+0800
-shard-mv6   redisc-shard-mv6-1   secondary   Running   <none>   k3d-k3s-default-server-0/172.18.0.3   Apr 23,2024 21:47 UTC+0800
-shard-mv6   redisc-shard-mv6-0   primary     Running   <none>   k3d-k3s-default-server-0/172.18.0.3   Apr 23,2024 21:47 UTC+0800
+kubectl get component -n demo | grep redisc-shard
+>
+redisc-shard-5hn            redis-cluster          Running   79m
+redisc-shard-7zk            redis-cluster          Running   79m
+redisc-shard-5tw            redis-cluster          Running   79m
 ```
 
 ### Connect to clusters

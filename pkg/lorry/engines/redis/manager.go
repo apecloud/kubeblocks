@@ -130,6 +130,7 @@ func (mgr *Manager) SubscribeRoleChange(ctx context.Context, oriRole *string, cl
 		masterAddr := strings.Split(msg.Payload, " ")
 		masterName := strings.Split(masterAddr[3], ".")[0]
 
+		// When network partition occurs, the new primary needs to send global role change information to the controller.
 		if masterName == mgr.CurrentMemberName {
 			role = models.PRIMARY
 			roleSnapshot := &common.GlobalRoleSnapshot{}

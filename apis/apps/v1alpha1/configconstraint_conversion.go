@@ -58,17 +58,17 @@ func convertToImpl(cc *ConfigConstraint, ccv1 *appsv1beta1.ConfigConstraint) err
 }
 
 func convertToConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1beta1.ConfigConstraintSpec) {
-	ccv1.DynamicActionCanBeMerged = cc.DynamicActionCanBeMerged
-	ccv1.DynamicParameterSelectedPolicy = cc.DynamicParameterSelectedPolicy
-	ccv1.ReloadToolsImage = cc.ToolsImageSpec
-	ccv1.DownwardActions = cc.DownwardAPIOptions
+	ccv1.MergeReloadAndRestart = cc.DynamicActionCanBeMerged
+	ccv1.ReloadStaticParamsBeforeRestart = cc.DynamicParameterSelectedPolicy
+	ccv1.ToolsSetup = cc.ToolsImageSpec
+	ccv1.DownwardAPITriggeredActions = cc.DownwardAPIOptions
 	ccv1.ScriptConfigs = cc.ScriptConfigs
 	ccv1.ConfigSchemaTopLevelKey = cc.CfgSchemaTopLevelName
 	ccv1.StaticParameters = cc.StaticParameters
 	ccv1.DynamicParameters = cc.DynamicParameters
 	ccv1.ImmutableParameters = cc.ImmutableParameters
-	ccv1.DynamicReloadSelector = cc.Selector
-	ccv1.FormatterConfig = cc.FormatterConfig
+	ccv1.ReloadedPodSelector = cc.Selector
+	ccv1.FileFormatConfig = cc.FormatterConfig
 	convertDynamicReloadAction(cc.ReloadOptions, ccv1)
 	convertSchema(cc.ConfigurationSchema, ccv1)
 }
@@ -87,7 +87,7 @@ func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1beta1.Config
 	if options == nil {
 		return
 	}
-	ccv1.DynamicReloadAction = &appsv1beta1.DynamicReloadAction{
+	ccv1.ReloadAction = &appsv1beta1.ReloadAction{
 		UnixSignalTrigger: options.UnixSignalTrigger,
 		ShellTrigger:      options.ShellTrigger,
 		TPLScriptTrigger:  options.TPLScriptTrigger,
@@ -113,24 +113,24 @@ func convertFromImpl(ccv1 *appsv1beta1.ConfigConstraint, cc *ConfigConstraint) e
 }
 
 func convertFromConstraintSpec(ccv1 *appsv1beta1.ConfigConstraintSpec, cc *ConfigConstraintSpec) {
-	cc.DynamicActionCanBeMerged = ccv1.DynamicActionCanBeMerged
-	cc.DynamicParameterSelectedPolicy = ccv1.DynamicParameterSelectedPolicy
-	cc.ToolsImageSpec = ccv1.ReloadToolsImage
-	cc.DownwardAPIOptions = ccv1.DownwardActions
+	cc.DynamicActionCanBeMerged = ccv1.MergeReloadAndRestart
+	cc.DynamicParameterSelectedPolicy = ccv1.ReloadStaticParamsBeforeRestart
+	cc.ToolsImageSpec = ccv1.ToolsSetup
+	cc.DownwardAPIOptions = ccv1.DownwardAPITriggeredActions
 	cc.ScriptConfigs = ccv1.ScriptConfigs
 	cc.CfgSchemaTopLevelName = ccv1.ConfigSchemaTopLevelKey
 	cc.StaticParameters = ccv1.StaticParameters
 	cc.DynamicParameters = ccv1.DynamicParameters
 	cc.ImmutableParameters = ccv1.ImmutableParameters
-	cc.Selector = ccv1.DynamicReloadSelector
-	cc.FormatterConfig = ccv1.FormatterConfig
+	cc.Selector = ccv1.ReloadedPodSelector
+	cc.FormatterConfig = ccv1.FileFormatConfig
 
-	if ccv1.DynamicReloadAction != nil {
+	if ccv1.ReloadAction != nil {
 		cc.ReloadOptions = &ReloadOptions{
-			UnixSignalTrigger: ccv1.DynamicReloadAction.UnixSignalTrigger,
-			ShellTrigger:      ccv1.DynamicReloadAction.ShellTrigger,
-			TPLScriptTrigger:  ccv1.DynamicReloadAction.TPLScriptTrigger,
-			AutoTrigger:       ccv1.DynamicReloadAction.AutoTrigger,
+			UnixSignalTrigger: ccv1.ReloadAction.UnixSignalTrigger,
+			ShellTrigger:      ccv1.ReloadAction.ShellTrigger,
+			TPLScriptTrigger:  ccv1.ReloadAction.TPLScriptTrigger,
+			AutoTrigger:       ccv1.ReloadAction.AutoTrigger,
 		}
 	}
 	if ccv1.ConfigSchema != nil {

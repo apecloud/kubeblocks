@@ -85,7 +85,7 @@ type configOnlyAddMerger struct {
 }
 
 func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string]string) (map[string]string, error) {
-	formatter := c.ccSpec.FormatterConfig
+	formatter := c.ccSpec.FileFormatConfig
 	configPatch, err := core.TransformConfigPatchFromData(updatedData, formatter.Format, c.configSpec.Keys)
 	if err != nil {
 		return nil, err
@@ -161,8 +161,8 @@ func mergerConfigTemplate(template *appsv1alpha1.LegacyRenderedTemplateSpec,
 	if err := cli.Get(ctx, ccKey, ccObj); err != nil {
 		return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
 	}
-	if ccObj.Spec.FormatterConfig == nil {
-		return nil, core.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FormatterConfig, configSpec[%v]", configSpec)
+	if ccObj.Spec.FileFormatConfig == nil {
+		return nil, core.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FileFormatConfig, configSpec[%v]", configSpec)
 	}
 
 	templateMerger, err := NewTemplateMerger(template.ConfigTemplateExtension, ctx, cli, builder, configSpec, &ccObj.Spec)

@@ -316,7 +316,7 @@ var _ = Describe("config_util", func() {
 							CUE: string(ccContext),
 						}
 					}
-					cc.Spec.FormatterConfig = &appsv1beta1.FormatterConfig{
+					cc.Spec.FileFormatConfig = &appsv1beta1.FileFormatConfig{
 						Format: appsv1beta1.Properties,
 					}
 				})
@@ -382,7 +382,7 @@ var _ = Describe("config_util", func() {
 
 				option := core.CfgOption{
 					Type:    core.CfgTplType,
-					CfgType: tt.args.configConstraint.FormatterConfig.Format,
+					CfgType: tt.args.configConstraint.FileFormatConfig.Format,
 				}
 
 				patch, err := core.CreateMergePatch(&core.ConfigResource{

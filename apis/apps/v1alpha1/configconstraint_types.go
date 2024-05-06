@@ -82,7 +82,7 @@ type ConfigConstraintSpec struct {
 	// This ensures that the tools are available to the 'config-manager' sidecar.
 	//
 	// +optional
-	ToolsImageSpec *appsv1beta1.ReloadToolsImage `json:"toolsImageSpec,omitempty"`
+	ToolsImageSpec *appsv1beta1.ToolsSetup `json:"toolsImageSpec,omitempty"`
 
 	// Specifies a list of actions to execute specified commands based on Pod labels.
 	//
@@ -97,7 +97,7 @@ type ConfigConstraintSpec struct {
 	//   to reflect the new role.
 	//
 	// +optional
-	DownwardAPIOptions []appsv1beta1.DownwardAction `json:"downwardAPIOptions,omitempty"`
+	DownwardAPIOptions []appsv1beta1.DownwardAPITriggeredAction `json:"downwardAPIOptions,omitempty"`
 
 	// A list of ScriptConfig Object.
 	//
@@ -170,7 +170,7 @@ type ConfigConstraintSpec struct {
 	//    sectionName: mysqld
 	// ```
 	// +kubebuilder:validation:Required
-	FormatterConfig *appsv1beta1.FormatterConfig `json:"formatterConfig"`
+	FormatterConfig *appsv1beta1.FileFormatConfig `json:"formatterConfig"`
 }
 
 // ConfigConstraintStatus represents the observed state of a ConfigConstraint.

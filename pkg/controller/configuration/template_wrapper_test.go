@@ -130,7 +130,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 						Name: configSpecName,
 					},
 					Spec: appsv1beta1.ConfigConstraintSpec{
-						FormatterConfig: &appsv1beta1.FormatterConfig{
+						FileFormatConfig: &appsv1beta1.FileFormatConfig{
 							Format: appsv1beta1.Ini,
 						},
 					},

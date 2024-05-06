@@ -357,10 +357,10 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 			logger.Error(err, "failed to validate config template!")
 			return false, err
 		}
-		if configConstraint == nil || configConstraint.Spec.DynamicReloadAction == nil {
+		if configConstraint == nil || configConstraint.Spec.ReloadAction == nil {
 			continue
 		}
-		if err := cfgcm.ValidateReloadOptions(configConstraint.Spec.DynamicReloadAction, cli, ctx.Ctx); err != nil {
+		if err := cfgcm.ValidateReloadOptions(configConstraint.Spec.ReloadAction, cli, ctx.Ctx); err != nil {
 			return false, err
 		}
 		if !validateConfigConstraintStatus(configConstraint.Status) {
@@ -383,7 +383,7 @@ func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx,
 	return cli.Status().Patch(ctx.Ctx, configConstraint, patch)
 }
 
-func createConfigPatch(cfg *corev1.ConfigMap, formatter *appsv1beta1.FormatterConfig, cmKeys []string) (*core.ConfigPatchInfo, bool, error) {
+func createConfigPatch(cfg *corev1.ConfigMap, formatter *appsv1beta1.FileFormatConfig, cmKeys []string) (*core.ConfigPatchInfo, bool, error) {
 	// support full update
 	if formatter == nil {
 		return nil, true, nil

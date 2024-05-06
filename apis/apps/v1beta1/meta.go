@@ -17,27 +17,27 @@ limitations under the License.
 package v1beta1
 
 func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
-	if in.DynamicActionCanBeMerged != nil {
-		return !*in.DynamicActionCanBeMerged
+	if in.MergeReloadAndRestart != nil {
+		return !*in.MergeReloadAndRestart
 	}
 	return false
 }
 
-func (in *ConfigConstraintSpec) DynamicParametersPolicy() DynamicParameterSelectedPolicy {
-	if in.DynamicParameterSelectedPolicy != nil {
-		return *in.DynamicParameterSelectedPolicy
+func (in *ConfigConstraintSpec) ReloadStaticParameters() bool {
+	if in.ReloadStaticParamsBeforeRestart != nil {
+		return *in.ReloadStaticParamsBeforeRestart
 	}
-	return SelectedDynamicParameters
+	return false
 }
 
 func (in *ConfigConstraintSpec) ShellTrigger() bool {
-	return in.DynamicReloadAction != nil && in.DynamicReloadAction.ShellTrigger != nil
+	return in.ReloadAction != nil && in.ReloadAction.ShellTrigger != nil
 }
 
 func (in *ConfigConstraintSpec) BatchReload() bool {
 	return in.ShellTrigger() &&
-		in.DynamicReloadAction.ShellTrigger.BatchReload != nil &&
-		*in.DynamicReloadAction.ShellTrigger.BatchReload
+		in.ReloadAction.ShellTrigger.BatchReload != nil &&
+		*in.ReloadAction.ShellTrigger.BatchReload
 }
 
 func (cs *ConfigConstraintStatus) ConfigConstraintTerminalPhases() bool {

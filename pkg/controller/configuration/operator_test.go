@@ -87,13 +87,13 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 				Name: mysqlConfigConstraintName,
 			},
 			Spec: appsv1beta1.ConfigConstraintSpec{
-				DynamicReloadAction: &appsv1beta1.DynamicReloadAction{
+				ReloadAction: &appsv1beta1.ReloadAction{
 					ShellTrigger: &appsv1beta1.ShellTrigger{
 						Command: []string{"echo", "hello"},
 						Sync:    cfgutil.ToPointer(true),
 					},
 				},
-				FormatterConfig: &appsv1beta1.FormatterConfig{
+				FileFormatConfig: &appsv1beta1.FileFormatConfig{
 					Format: appsv1beta1.Ini,
 					FormatterAction: appsv1beta1.FormatterAction{
 						IniConfig: &appsv1beta1.IniConfig{

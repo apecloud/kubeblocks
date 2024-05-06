@@ -67,7 +67,7 @@ func checkExcludeConfigDifference(oldVersion map[string]string, newVersion map[s
 	return false
 }
 
-func LoadRawConfigObject(data map[string]string, formatConfig *appsv1beta1.FormatterConfig, keys []string) (map[string]unstructured.ConfigObject, error) {
+func LoadRawConfigObject(data map[string]string, formatConfig *appsv1beta1.FileFormatConfig, keys []string) (map[string]unstructured.ConfigObject, error) {
 	r := make(map[string]unstructured.ConfigObject)
 	cmKeySet := FromCMKeysSelector(keys)
 	for key, val := range data {
@@ -83,7 +83,7 @@ func LoadRawConfigObject(data map[string]string, formatConfig *appsv1beta1.Forma
 	return r, nil
 }
 
-func FromConfigObject(name, config string, formatConfig *appsv1beta1.FormatterConfig) (unstructured.ConfigObject, error) {
+func FromConfigObject(name, config string, formatConfig *appsv1beta1.FileFormatConfig) (unstructured.ConfigObject, error) {
 	configObject, err := unstructured.LoadConfig(name, config, formatConfig.Format)
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func FromConfigObject(name, config string, formatConfig *appsv1beta1.FormatterCo
 // TransformConfigFileToKeyValueMap transforms a config file in appsv1alpha1.CfgFileFormat format to a map in which the key is config name and the value is config value
 // sectionName means the desired section of config file, such as [mysqld] section.
 // If config file has no section structure, sectionName should be default to get all values in this config file.
-func TransformConfigFileToKeyValueMap(fileName string, formatterConfig *appsv1beta1.FormatterConfig, configData []byte) (map[string]string, error) {
+func TransformConfigFileToKeyValueMap(fileName string, formatterConfig *appsv1beta1.FileFormatConfig, configData []byte) (map[string]string, error) {
 	oldData := map[string]string{
 		fileName: "",
 	}

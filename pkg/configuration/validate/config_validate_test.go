@@ -42,7 +42,7 @@ var newFakeConfConstraint = func(cueFile string, cfgFormatter appsv1beta1.CfgFil
 		ConfigSchema: &appsv1beta1.ConfigSchema{
 			CUE: fromTestData(cueFile),
 		},
-		FormatterConfig: &appsv1beta1.FormatterConfig{
+		FileFormatConfig: &appsv1beta1.FileFormatConfig{
 			Format: cfgFormatter,
 		},
 	}
@@ -187,7 +187,7 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 			tplConstraint := newFakeConfConstraint(tt.args.cueFile, tt.args.format)
 			validator := &schemaValidator{
 				typeName: tt.args.SchemaTypeName,
-				cfgType:  tplConstraint.FormatterConfig.Format,
+				cfgType:  tplConstraint.FileFormatConfig.Format,
 				schema:   tplConstraint.ConfigSchema.SchemaInJSON,
 			}
 			require.Equal(t, tt.err, validator.Validate(

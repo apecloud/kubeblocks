@@ -2391,12 +2391,12 @@ func (in *ConfigConstraintSpec) DeepCopyInto(out *ConfigConstraintSpec) {
 	}
 	if in.ToolsImageSpec != nil {
 		in, out := &in.ToolsImageSpec, &out.ToolsImageSpec
-		*out = new(v1beta1.ReloadToolsImage)
+		*out = new(v1beta1.ToolsSetup)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.DownwardAPIOptions != nil {
 		in, out := &in.DownwardAPIOptions, &out.DownwardAPIOptions
-		*out = make([]v1beta1.DownwardAction, len(*in))
+		*out = make([]v1beta1.DownwardAPITriggeredAction, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -2433,7 +2433,7 @@ func (in *ConfigConstraintSpec) DeepCopyInto(out *ConfigConstraintSpec) {
 	}
 	if in.FormatterConfig != nil {
 		in, out := &in.FormatterConfig, &out.FormatterConfig
-		*out = new(v1beta1.FormatterConfig)
+		*out = new(v1beta1.FileFormatConfig)
 		(*in).DeepCopyInto(*out)
 	}
 }

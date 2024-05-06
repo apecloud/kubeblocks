@@ -120,7 +120,7 @@ max_connections = '1000'
 				Name: mysqlConfigConstraintName,
 			},
 			Spec: appsv1beta1.ConfigConstraintSpec{
-				FormatterConfig: &appsv1beta1.FormatterConfig{
+				FileFormatConfig: &appsv1beta1.FileFormatConfig{
 					Format: appsv1beta1.Properties,
 				},
 			}}
@@ -166,7 +166,7 @@ max_connections = '1000'
 
 			err := createPipeline.Prepare().
 				UpdateConfiguration(). // reconcile Configuration
-				Configuration().       // sync Configuration
+				Configuration(). // sync Configuration
 				CreateConfigTemplate().
 				UpdatePodVolumes().
 				BuildConfigManagerSidecar().

@@ -30,6 +30,32 @@ func (in *ConfigConstraintSpec) ReloadStaticParameters() bool {
 	return false
 }
 
+func (in *ConfigConstraintSpec) GetToolsSetup() *ToolsSetup {
+	if in.ReloadAction != nil && in.ReloadAction.ShellTrigger != nil {
+		return in.ReloadAction.ShellTrigger.ToolsSetup
+	}
+	return nil
+}
+
+func (in *ConfigConstraintSpec) GetScriptConfigs() []ScriptConfig {
+	scriptConfigs := make([]ScriptConfig, 0)
+	for _, action := range in.DownwardAPITriggeredActions {
+		if action.ScriptConfig != nil {
+			scriptConfigs = append(scriptConfigs, *action.ScriptConfig)
+		}
+	}
+	if in.ReloadAction == nil {
+		return scriptConfigs
+	}
+	if in.ReloadAction.ShellTrigger != nil && in.ReloadAction.ShellTrigger.ScriptConfig != nil {
+		scriptConfigs = append(scriptConfigs, *in.ReloadAction.ShellTrigger.ScriptConfig)
+	}
+	if in.ReloadAction.TPLScriptTrigger != nil {
+		scriptConfigs = append(scriptConfigs, in.ReloadAction.TPLScriptTrigger.ScriptConfig)
+	}
+	return scriptConfigs
+}
+
 func (in *ConfigConstraintSpec) ShellTrigger() bool {
 	return in.ReloadAction != nil && in.ReloadAction.ShellTrigger != nil
 }

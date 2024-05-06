@@ -73,17 +73,7 @@ type ConfigConstraintSpec struct {
 	// +optional
 	ReloadStaticParamsBeforeRestart *bool `json:"reloadStaticParamsBeforeRestart,omitempty"`
 
-	// Specifies the tools container image used by ShellTrigger for dynamic reload.
-	// If the dynamic reload action is triggered by a ShellTrigger, this field is required.
-	// This image must contain all necessary tools for executing the ShellTrigger scripts.
-	//
-	// Usually the specified image is referenced by the init container,
-	// which is then responsible for copy the tools from the image to a bin volume.
-	// This ensures that the tools are available to the 'config-manager' sidecar.
-	//
-	// +optional
-	ToolsSetup *ToolsSetup `json:"toolsSetup,omitempty"`
-
+	// TODO: migrate DownwardAPITriggeredActions to ComponentDefinition.spec.lifecycleActions
 	// Specifies a list of actions to execute specified commands based on Pod labels.
 	//
 	// It utilizes the K8s Downward API to mount label information as a volume into the pod.
@@ -98,25 +88,6 @@ type ConfigConstraintSpec struct {
 	//
 	// +optional
 	DownwardAPITriggeredActions []DownwardAPITriggeredAction `json:"downwardAPITriggeredActions,omitempty"`
-
-	// A list of ScriptConfig Object.
-	//
-	// Each ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
-	// The scripts are mounted as volumes and can be referenced and executed by the dynamic reload
-	// and DownwardAction to perform specific tasks or configurations.
-	//
-	// +optional
-	// +patchMergeKey=scriptConfigMapRef
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=scriptConfigMapRef
-	ScriptConfigs []ScriptConfig `json:"scriptConfigs,omitempty"`
-
-	// Specifies the top-level key in the 'configSchema.cue' that organizes the validation rules for parameters.
-	// This key must exist within the CUE script defined in 'configSchema.cue'.
-	//
-	// +optional
-	ConfigSchemaTopLevelKey string `json:"configSchemaTopLevelKey,omitempty"`
 
 	// Defines a list of parameters including their names, default values, descriptions,
 	// types, and constraints (permissible values or the range of valid values).
@@ -197,6 +168,12 @@ type ConfigConstraintStatus struct {
 // ConfigSchema Defines a list of configuration items with their names, default values, descriptions,
 // types, and constraints.
 type ConfigSchema struct {
+	// Specifies the top-level key in the 'configSchema.cue' that organizes the validation rules for parameters.
+	// This key must exist within the CUE script defined in 'configSchema.cue'.
+	//
+	// +optional
+	TopLevelKey string `json:"topLevelKey,omitempty"`
+
 	// Hold a string that contains a script written in CUE language that defines a list of configuration items.
 	// Each item is detailed with its name, default value, description, type (e.g. string, integer, float),
 	// and constraints (permissible values or the valid range of values).
@@ -393,6 +370,12 @@ type DownwardAPITriggeredAction struct {
 	//
 	// +optional
 	Command []string `json:"command,omitempty"`
+
+	// ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
+	// The scripts are mounted as volumes and can be referenced and executed by the DownwardAction to perform specific tasks or configurations.
+	//
+	// +optional
+	ScriptConfig *ScriptConfig `json:"scriptConfig,omitempty"`
 }
 
 type ScriptConfig struct {
@@ -466,6 +449,23 @@ type ShellTrigger struct {
 	//
 	// +optional
 	BatchParamsFormatterTemplate string `json:"batchParamsFormatterTemplate,omitempty"`
+
+	// Specifies the tools container image used by ShellTrigger for dynamic reload.
+	// If the dynamic reload action is triggered by a ShellTrigger, this field is required.
+	// This image must contain all necessary tools for executing the ShellTrigger scripts.
+	//
+	// Usually the specified image is referenced by the init container,
+	// which is then responsible for copy the tools from the image to a bin volume.
+	// This ensures that the tools are available to the 'config-manager' sidecar.
+	//
+	// +optional
+	ToolsSetup *ToolsSetup `json:"toolsSetup,omitempty"`
+
+	// ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
+	// The scripts are mounted as volumes and can be referenced and executed by the dynamic reload.
+	//
+	// +optional
+	ScriptConfig *ScriptConfig `json:"scriptConfig,omitempty"`
 }
 
 // TPLScriptTrigger Enables reloading process using a Go template script.

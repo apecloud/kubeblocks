@@ -175,8 +175,8 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 			continue
 		}
 		reloadConfigSpecMeta = append(reloadConfigSpecMeta, ConfigSpecMeta{
-			ToolsImageSpec: cc.Spec.ToolsSetup,
-			ScriptConfig:   cc.Spec.ScriptConfigs,
+			ToolsImageSpec: cc.Spec.GetToolsSetup(),
+			ScriptConfig:   cc.Spec.GetScriptConfigs(),
 			ConfigSpecInfo: ConfigSpecInfo{
 				ReloadAction:       cc.Spec.ReloadAction,
 				ConfigSpec:         configSpec,

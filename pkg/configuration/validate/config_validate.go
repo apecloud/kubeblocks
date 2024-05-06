@@ -147,7 +147,7 @@ func NewConfigValidator(configConstraint *appsv1beta1.ConfigConstraintSpec, opti
 			cmKeySelector: cmKeySelector{
 				keySelector: options,
 			},
-			typeName: configConstraint.ConfigSchemaTopLevelKey,
+			typeName: configSchema.TopLevelKey,
 			cfgType:  configConstraint.FileFormatConfig.Format,
 			schema:   configSchema.SchemaInJSON,
 		}

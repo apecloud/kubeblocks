@@ -63,15 +63,15 @@ type ConfigConstraintSpec struct {
 	// Configures whether the dynamic reload specified in `reloadOptions` applies only to dynamic parameters or
 	// to all parameters (including static parameters).
 	//
-	// - "dynamic" (default): Only modifications to the dynamic parameters listed in `dynamicParameters`
+	// - false (default): Only modifications to the dynamic parameters listed in `dynamicParameters`
 	//   will trigger a dynamic reload.
-	// - "all": Modifications to both dynamic parameters listed in `dynamicParameters` and static parameters
+	// - true: Modifications to both dynamic parameters listed in `dynamicParameters` and static parameters
 	//   listed in `staticParameters` will trigger a dynamic reload.
 	//   The "all" option is for certain engines that require static parameters to be set
 	//   via SQL statements before they can take effect on restart.
 	//
 	// +optional
-	DynamicParameterSelectedPolicy *appsv1beta1.DynamicParameterSelectedPolicy `json:"dynamicParameterSelectedPolicy,omitempty"`
+	DynamicParameterSelectedPolicy *bool `json:"dynamicParameterSelectedPolicy,omitempty"`
 
 	// Specifies the tools container image used by ShellTrigger for dynamic reload.
 	// If the dynamic reload action is triggered by a ShellTrigger, this field is required.

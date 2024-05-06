@@ -2386,7 +2386,7 @@ func (in *ConfigConstraintSpec) DeepCopyInto(out *ConfigConstraintSpec) {
 	}
 	if in.DynamicParameterSelectedPolicy != nil {
 		in, out := &in.DynamicParameterSelectedPolicy, &out.DynamicParameterSelectedPolicy
-		*out = new(v1beta1.DynamicParameterSelectedPolicy)
+		*out = new(bool)
 		**out = **in
 	}
 	if in.ToolsImageSpec != nil {

@@ -403,7 +403,7 @@ func updateConfigSchema(cc *appsv1beta1.ConfigConstraint, cli client.Client, ctx
 	}
 
 	// Because the conversion of cue to openAPISchema is restricted, and the definition of some cue may not be converted into openAPISchema, and won't return error.
-	openAPISchema, err := openapi.GenerateOpenAPISchema(schema.CUE, cc.Spec.ConfigSchemaTopLevelKey)
+	openAPISchema, err := openapi.GenerateOpenAPISchema(schema.CUE, schema.TopLevelKey)
 	if err != nil {
 		return err
 	}

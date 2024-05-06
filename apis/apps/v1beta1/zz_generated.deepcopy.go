@@ -122,22 +122,12 @@ func (in *ConfigConstraintSpec) DeepCopyInto(out *ConfigConstraintSpec) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.ToolsSetup != nil {
-		in, out := &in.ToolsSetup, &out.ToolsSetup
-		*out = new(ToolsSetup)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.DownwardAPITriggeredActions != nil {
 		in, out := &in.DownwardAPITriggeredActions, &out.DownwardAPITriggeredActions
 		*out = make([]DownwardAPITriggeredAction, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-	}
-	if in.ScriptConfigs != nil {
-		in, out := &in.ScriptConfigs, &out.ScriptConfigs
-		*out = make([]ScriptConfig, len(*in))
-		copy(*out, *in)
 	}
 	if in.ConfigSchema != nil {
 		in, out := &in.ConfigSchema, &out.ConfigSchema
@@ -229,6 +219,11 @@ func (in *DownwardAPITriggeredAction) DeepCopyInto(out *DownwardAPITriggeredActi
 		in, out := &in.Command, &out.Command
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.ScriptConfig != nil {
+		in, out := &in.ScriptConfig, &out.ScriptConfig
+		*out = new(ScriptConfig)
+		**out = **in
 	}
 }
 
@@ -359,6 +354,16 @@ func (in *ShellTrigger) DeepCopyInto(out *ShellTrigger) {
 	if in.BatchReload != nil {
 		in, out := &in.BatchReload, &out.BatchReload
 		*out = new(bool)
+		**out = **in
+	}
+	if in.ToolsSetup != nil {
+		in, out := &in.ToolsSetup, &out.ToolsSetup
+		*out = new(ToolsSetup)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.ScriptConfig != nil {
+		in, out := &in.ScriptConfig, &out.ScriptConfig
+		*out = new(ScriptConfig)
 		**out = **in
 	}
 }

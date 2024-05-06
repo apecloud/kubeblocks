@@ -140,14 +140,14 @@ func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRe
 	}
 	if opsBehaviour.IsClusterCreation {
 		// check if the cluster already exists
-		cluster.Name = opsRes.OpsRequest.Spec.ClusterRef
+		cluster.Name = opsRes.OpsRequest.Spec.GetClusterName()
 		cluster.Namespace = opsRes.OpsRequest.GetNamespace()
 		opsRes.Cluster = cluster
 		return nil, nil
 	}
 	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
 		Namespace: opsRes.OpsRequest.GetNamespace(),
-		Name:      opsRes.OpsRequest.Spec.ClusterRef,
+		Name:      opsRes.OpsRequest.Spec.GetClusterName(),
 	}, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
 			_ = operations.PatchClusterNotFound(reqCtx.Ctx, r.Client, opsRes)
@@ -263,14 +263,14 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 	opsRequest := opsRes.OpsRequest
 	clusterName := opsRequest.Labels[constant.AppInstanceLabelKey]
 	opsType := opsRequest.Labels[constant.OpsRequestTypeLabelKey]
-	if clusterName == opsRequest.Spec.ClusterRef && opsType == string(opsRequest.Spec.Type) {
+	if clusterName == opsRequest.Spec.GetClusterName() && opsType == string(opsRequest.Spec.Type) {
 		return nil, nil
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	if opsRequest.Labels == nil {
 		opsRequest.Labels = map[string]string{}
 	}
-	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
+	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.GetClusterName()
 	opsRequest.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	if err := controllerutil.SetOwnerReference(opsRes.Cluster, opsRequest, scheme); err != nil {

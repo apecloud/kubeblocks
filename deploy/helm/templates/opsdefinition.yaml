@@ -6,12 +6,11 @@ metadata:
 spec:
   preConditions:
     {{- .Files.Get "opsdefinitions/switchover-preconditions" | nindent 4 }}
-  targetPodTemplates:
+  podInfoExtractors:
     - name: availablePod
       podSelector:
-        availability: Available
-        selectionPolicy: Any
-      vars:
+        multiPodSelectionPolicy: Any
+      env:
         - name: TARGET_POD_IP
           valueFrom:
             envRef:
@@ -39,13 +38,13 @@ spec:
         - primary
         - candidate
       workload:
-        targetPodTemplate: availablePod
+        podInfoExtractorName: availablePod
         type: Job
         backoffLimit: 0
         podSpec:
           containers:
             - name: switchover
-              image: docker.io/apecloud/kubeblocks-tools:latest
+              image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
               imagePullPolicy: IfNotPresent
               command:
                 - sh

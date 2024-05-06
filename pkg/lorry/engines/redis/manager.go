@@ -22,7 +22,6 @@ package redis
 import (
 	"context"
 	"encoding/json"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"strings"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"

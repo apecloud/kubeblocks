@@ -46,7 +46,7 @@ kubectl apply -f examples/milvus/cluster-standalone.yaml
 Create a distributed milvus cluster with specified cluster definition
 ```bash
 #Install minio addon
-helm upgrade -i kb-addon-minio kubeblocks-addons/minio --set accessKey=minioadmin,secretKey=minioadmin -n kb-system 
+helm upgrade -i kb-addon-minio kubeblocks-addons/minio --set accessKey=minioadmin,secretKey=minioadmin,serviceAccount.create=false -n kb-system 
 #Install milvus
 helm upgrade -i kb-addon-milvus kubeblocks-addons/milvus --set minio.accessKey=minioadmin,minio.secretKey=minioadmin -n kb-system 
 #Install etcd addon 

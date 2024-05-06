@@ -97,3 +97,14 @@ kubectl patch cluster pulsar-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}
 
 kubectl delete cluster pulsar-cluster
 ```
+
+Delete `serviceRefs.serviceDescriptor`.
+
+```bash
+kubectl delete ServiceDescriptor pulsar-cluster-zookeeper-service
+```
+
+Delete `serviceRefs.cluster`.
+```bash
+kubectl delete cluster zookeeperp-cluster
+```

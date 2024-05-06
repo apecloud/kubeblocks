@@ -157,7 +157,6 @@ type ComponentConfigSpec struct {
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 
-	// Deprecated: AsEnvFrom has been deprecated since 0.9.0 and will be removed in 0.10.0
 	// Specifies the containers to inject the ConfigMap parameters as environment variables.
 	//
 	// This is useful when application images accept parameters through environment variables and
@@ -167,7 +166,8 @@ type ComponentConfigSpec struct {
 	// variables converted from the ConfigMap into these designated containers. This provides a flexible way to
 	// pass the configuration items from the ConfigMap to the container without modifying the image.
 	//
-	// Note: The field name `asEnvFrom` may be changed to `injectEnvTo` in future versions for better clarity.
+	// Deprecated: `asEnvFrom` has been deprecated since 0.9.0 and will be removed in 0.10.0.
+	// Use `injectEnvTo` instead.
 	//
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +listType=set
@@ -816,7 +816,7 @@ type HostNetwork struct {
 }
 
 type HostNetworkContainerPort struct {
-	// Container specifies the target container within the pod.
+	// Container specifies the target container within the Pod.
 	//
 	// +required
 	Container string `json:"container"`
@@ -1172,7 +1172,7 @@ type ComponentVars struct {
 	InstanceNames *VarOption `json:"instanceNames,omitempty"`
 }
 
-// ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.
+// ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.
 type ClusterObjectReference struct {
 	// CompDef specifies the definition used by the component that the referent object resident in.
 	// If not specified, the component itself will be used.

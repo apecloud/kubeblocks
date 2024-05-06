@@ -1,6 +1,6 @@
-# minio
+# Minio
 
-minio is a high performance open source relational database management system that is widely used for web and application servers
+Minio is a high performance open source relational database management system that is widely used for web and application servers
 
 ## Prerequisites
 
@@ -34,7 +34,7 @@ helm repo add kubeblocks-addons https://jihulab.com/api/v4/projects/150246/packa
 helm repo update
 
 # Enable minio 
-helm upgrade -i minio kubeblocks-addons/minio --version 8.0.17 -n kb-system  
+helm upgrade -i kb-addon-minio kubeblocks-addons/minio --version 8.0.17 -n kb-system  
 ``` 
 
 ## Examples

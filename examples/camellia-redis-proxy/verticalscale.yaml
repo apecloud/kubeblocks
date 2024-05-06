@@ -8,6 +8,7 @@ spec:
   clusterRef: camellia-cluster
   type: VerticalScaling
   # Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling. 
+  verticalScaling:
   - componentName: proxy
     requests:
       cpu: '1'

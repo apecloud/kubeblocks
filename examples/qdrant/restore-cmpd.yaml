@@ -4,7 +4,7 @@ metadata:
   name: qdrant-cluster-restore
   namespace: default
   annotations:
-    kubeblocks.io/restore-from-backup: '{"qdrant":{"connectionPassword":"RJwmPho3Mh+teEOqkyDEeyhkosnV6I6HMAXgQIgbLXUUrdSc","name":"qdrant-cluster-backup","namespace":"default","volumeRestorePolicy":"Parallel"}}'
+    kubeblocks.io/restore-from-backup: '{"qdrant":{"connectionPassword":"<backup-connection-password>","name":"qdrant-cluster-backup","namespace":"default","volumeRestorePolicy":"Parallel"}}'
 spec:
   # Specifies the behavior when a Cluster is deleted.
   # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
@@ -15,7 +15,7 @@ spec:
   # Specifies a list of ClusterComponentSpec objects used to define the individual components that make up a Cluster. 
   componentSpecs:
     # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. 
-    - name: qdrant
+  - name: qdrant
     # References the name of a ComponentDefinition. The ComponentDefinition specifies the behavior and characteristics of the Component. If both `componentDefRef` and `componentDef` are provided, the `componentDef` will take precedence over `componentDefRef`.
     componentDef: qdrant
     # Specifies a group of affinity scheduling rules for the Component. It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.

@@ -17,7 +17,7 @@ spec:
   services:
   - name: proxy
     serviceName: proxy
-    componentSelector: proxy
+    componentSelector: pulsar-proxy
     spec:
       # - ClusterIP
       # - NodePort
@@ -51,7 +51,7 @@ spec:
   # ClusterComponentSpec defines the specifications for a Component in a Cluster.
   componentSpecs:
     # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. 
-    - name: pulsar-broker
+  - name: pulsar-broker
     componentDef: pulsar-broker
     monitorEnabled: false
     serviceAccountName: kb-pulsar-cluster

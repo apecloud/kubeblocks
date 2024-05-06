@@ -41,7 +41,7 @@ spec:
   services:
   - name: proxy
     serviceName: proxy
-    componentSelector: proxy
+    componentSelector: pulsar-proxy
     spec:
       # - ClusterIP
       # - NodePort
@@ -156,3 +156,33 @@ spec:
       requests:
         cpu: '0.5'
         memory: 0.5Gi
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: zookeeperp-cluster
+  namespace: default
+spec:
+  clusterDefinitionRef: pulsar-zookeeper
+  clusterVersionRef: pulsar-3.0.2
+  terminationPolicy: WipeOut
+  componentSpecs:
+    - name: zookeeper
+      componentDefRef: zookeeper
+      serviceAccountName: kb-zookeeperp-cluster
+      replicas: 3
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        volumeClaimTemplates:
+          - name: data
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 20Gi

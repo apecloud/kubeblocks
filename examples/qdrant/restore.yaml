@@ -4,7 +4,7 @@ metadata:
   name: qdrant-cluster-restore
   namespace: default
   annotations:
-    kubeblocks.io/restore-from-backup: '{"qdrant":{"connectionPassword":"RJwmPho3Mh+teEOqkyDEeyhkosnV6I6HMAXgQIgbLXUUrdSc","name":"qdrant-cluster-backup","namespace":"default","volumeRestorePolicy":"Parallel"}}'
+    kubeblocks.io/restore-from-backup: '{"qdrant":{"connectionPassword":"<backup-connection-password>","name":"qdrant-cluster-backup","namespace":"default","volumeRestorePolicy":"Parallel"}}'
 spec:
   # Specifies the name of the ClusterDefinition to use when creating a Cluster.
   clusterDefinitionRef: qdrant

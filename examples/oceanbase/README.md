@@ -51,12 +51,12 @@ kubectl apply -f examples/oceanbase/cluster-repl.yaml
 
 Please note that not all operations are currently supported for all topologies. We plan to extend this capability soon.
 
-|                                   | Horizontal<br/>scaling |  Vertical <br/>scaling | Expand<br/>volume | Restart | Stop/Start | Configure | Expose | Switchover | 
-|-----------------------------------|------------------------|-----|--------------|---------|----------|---------|--------|----------|
-| Distributed<br/>container network | Supported  | Not support | Not support  | Not support |Not support |Supported |Not support| N/A      |
-| Distributed<br/>host network       | Supported | Not support | Not support  | Supported | Supported |Supported|Not support | N/A      |
-| Primary/Standby<br/>container network | Not support | Not support | Not support  |Not support |Not support |Supported|Supported | Supported |
-| Primary/Standby<br/>host network   | Not support   | Not support | Not support  |Supported | Supported |Supported|Supported | Supported |
+|                                   | cmpd | Horizontal<br/>scaling | Vertical <br/>scaling | Expand<br/>volume | Restart | Stop/Start | Configure | Expose | Switchover | 
+|-----------------------------------|------|------------------------|-----------------------|--------------|---------|----------|---------|--------|----------|
+| Distributed<br/>container network |  ob-ce    | Supported  | Not support           | Not support  | Not support |Not support |Supported |Not support| N/A      |
+| Distributed<br/>host network       |  ob-ce-hostnetwork    | Supported | Supported             | Not support  | Supported | Supported |Supported|Not support | N/A      |
+| Primary/Standby<br/>container network |  ob-ce-repl    | Not support | Not support           | Not support  |Not support |Not support |Supported|Supported | Supported |
+| Primary/Standby<br/>host network   |   ob-ce-repl-host   | Not support   | Supported          | Not support  |Supported | Supported |Supported|Supported | Supported |
 
 
 ### [Horizontal scaling](horizontalscale.yaml)

@@ -38,7 +38,15 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ClusterDefinition is the Schema for the ClusterDefinition API
+        description: "ClusterDefinition defines the topology for databases or storage
+          systems, offering a variety of topological configurations to meet diverse
+          deployment needs and scenarios. \n It includes a list of Components, each
+          linked to a ComponentDefinition, which enhances reusability and reduce redundancy.
+          For example, widely used components such as etcd and Zookeeper can be defined
+          once and reused across multiple ClusterDefinitions, simplifying the setup
+          of new systems. \n Additionally, ClusterDefinition also specifies the sequence
+          of startup, upgrade, and shutdown for Components, ensuring a controlled
+          and predictable management of component lifecycles."
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -201,21 +209,19 @@ spec:
                       items:
                         properties:
                           asEnvFrom:
-                            description: "Deprecated: AsEnvFrom has been deprecated
-                              since 0.9.0 and will be removed in 0.10.0 Specifies
-                              the containers to inject the ConfigMap parameters as
-                              environment variables. \n This is useful when application
-                              images accept parameters through environment variables
-                              and generate the final configuration file in the startup
-                              script based on these variables. \n This field allows
-                              users to specify a list of container names, and KubeBlocks
-                              will inject the environment variables converted from
-                              the ConfigMap into these designated containers. This
-                              provides a flexible way to pass the configuration items
-                              from the ConfigMap to the container without modifying
-                              the image. \n Note: The field name `asEnvFrom` may be
-                              changed to `injectEnvTo` in future versions for better
-                              clarity."
+                            description: "Specifies the containers to inject the ConfigMap
+                              parameters as environment variables. \n This is useful
+                              when application images accept parameters through environment
+                              variables and generate the final configuration file
+                              in the startup script based on these variables. \n This
+                              field allows users to specify a list of container names,
+                              and KubeBlocks will inject the environment variables
+                              converted from the ConfigMap into these designated containers.
+                              This provides a flexible way to pass the configuration
+                              items from the ConfigMap to the container without modifying
+                              the image. \n Deprecated: `asEnvFrom` has been deprecated
+                              since 0.9.0 and will be removed in 0.10.0. Use `injectEnvTo`
+                              instead."
                             items:
                               type: string
                             type: array

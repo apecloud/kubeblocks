@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
@@ -160,6 +159,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		ClusterGeneration:  clusterGeneration(cluster, comp),
 		PodSpec:            &compDef.Spec.Runtime,
 		HostNetwork:        compDefObj.Spec.HostNetwork,
+		ComponentServices:  compDefObj.Spec.Services,
 		LogConfigs:         compDefObj.Spec.LogConfigs,
 		ConfigTemplates:    compDefObj.Spec.Configs,
 		ScriptTemplates:    compDefObj.Spec.Scripts,
@@ -210,7 +210,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	limitSharedMemoryVolumeSize(synthesizeComp, comp)
 
 	// build componentService
-	buildComponentServices(synthesizeComp, compDefObj, comp)
+	buildComponentServices(synthesizeComp, comp)
 
 	if err = overrideConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
@@ -418,15 +418,14 @@ func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1a
 	}
 }
 
-func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) {
+func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+	if len(synthesizeComp.ComponentServices) == 0 || len(comp.Spec.Services) == 0 {
+		return
+	}
+
 	services := map[string]appsv1alpha1.ComponentService{}
 	for i, svc := range comp.Spec.Services {
 		services[svc.Name] = comp.Spec.Services[i]
-	}
-
-	synthesizeComp.ComponentServices = compDef.Spec.Services
-	if len(synthesizeComp.ComponentServices) == 0 || len(services) == 0 {
-		return
 	}
 
 	override := func(svc *appsv1alpha1.ComponentService) {
@@ -518,52 +517,29 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	buildWorkload := func() {
 		synthesizeComp.ClusterDefName = clusterDef.Name
 		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
-		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
-		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
-		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
-		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
-		if synthesizeComp.TLSConfig != nil {
-			synthesizeComp.TLS = true
-		}
 	}
 
-	// Services is a backward compatible field, which will be replaced with ComponentServices in the future.
-	buildServices := func() {
-		if clusterCompDef.Service != nil {
-			service := corev1.Service{Spec: clusterCompDef.Service.ToSVCSpec()}
-			service.Spec.Type = corev1.ServiceTypeClusterIP
-			synthesizeComp.Services = append(synthesizeComp.Services, service)
+	buildClusterCompServices := func() {
+		if len(synthesizeComp.ComponentServices) > 0 {
+			service := corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: synthesizeComp.ComponentServices[0].Spec.Ports,
+				},
+			}
 			for _, item := range clusterCompSpec.Services {
-				service = corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
+				svc := appsv1alpha1.ComponentService{
+					Service: appsv1alpha1.Service{
 						Name:        item.Name,
+						ServiceName: item.Name,
 						Annotations: item.Annotations,
+						Spec:        *service.Spec.DeepCopy(),
 					},
-					Spec: service.Spec,
 				}
-				service.Spec.Type = item.ServiceType
-				synthesizeComp.Services = append(synthesizeComp.Services, service)
-			}
-		}
-	}
-
-	mergeClusterCompVersion := func() {
-		var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-		if clusterVer != nil {
-			clusterCompVer = clusterVer.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
-		}
-		if clusterCompVer != nil {
-			// only accept 1st ClusterVersion override context
-			synthesizeComp.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, synthesizeComp.ConfigTemplates)
-			// override component.PodSpec.InitContainers and component.PodSpec.Containers
-			for _, c := range clusterCompVer.VersionsCtx.InitContainers {
-				synthesizeComp.PodSpec.InitContainers = appendOrOverrideContainerAttr(synthesizeComp.PodSpec.InitContainers, c)
-			}
-			for _, c := range clusterCompVer.VersionsCtx.Containers {
-				synthesizeComp.PodSpec.Containers = appendOrOverrideContainerAttr(synthesizeComp.PodSpec.Containers, c)
+				svc.Spec.Type = item.ServiceType
+				synthesizeComp.ComponentServices = append(synthesizeComp.ComponentServices, svc)
 			}
 		}
 	}
@@ -582,11 +558,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	// build workload
 	buildWorkload()
 
-	// merge clusterCompVersion
-	mergeClusterCompVersion()
-
-	// build services
-	buildServices()
+	buildClusterCompServices()
 
 	// build pod management policy
 	buildPodManagementPolicy()

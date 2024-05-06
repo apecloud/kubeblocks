@@ -222,7 +222,7 @@ var _ = Describe("builder", func() {
 			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
-			for _, s := range synthesizedComponent.Services[0].Spec.Ports {
+			for _, s := range synthesizedComponent.ComponentServices[0].Spec.Ports {
 				switch s.Name {
 				case "mysql":
 					mysqlPort = s

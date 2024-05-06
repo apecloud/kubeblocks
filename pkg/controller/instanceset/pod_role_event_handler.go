@@ -121,7 +121,6 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		}
 		// event belongs to old pod with the same name, ignore it
 		if pod.Name == pair.PodName && string(pod.UID) != pair.PodUID {
-			reqCtx.Log.Info("pod uid not match", "pod uid", pod.UID, "pair uid", pair.PodUID)
 			return pair.RoleName, nil
 		}
 

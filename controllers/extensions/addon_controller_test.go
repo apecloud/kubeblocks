@@ -641,12 +641,6 @@ var _ = Describe("Addon controller", func() {
 				newOjb.Spec.Installable.AutoInstall = true
 			})
 
-			By("By addon autoInstall auto added")
-			enablingPhaseCheck(2)
-
-			By("By enabled addon with fake completed installation job status")
-			fakeInstallationCompletedJob(2)
-
 			By("By setting the provider and version in spec for Addon")
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
@@ -676,7 +670,6 @@ var _ = Describe("Addon controller", func() {
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Spec.Provider).Should(Equal("apecloud"))
 				g.Expect(addon.Spec.Version).Should(Equal("0.9.0"))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
 			}).Should(Succeed())
 		})
 

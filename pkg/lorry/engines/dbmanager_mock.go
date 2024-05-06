@@ -29,11 +29,10 @@ import (
 	context "context"
 	reflect "reflect"
 
-	logr "github.com/go-logr/logr"
-	gomock "github.com/golang/mock/gomock"
-
 	dcs "github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	models "github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
+	logr "github.com/go-logr/logr"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockDBManager is a mock of DBManager interface.
@@ -729,15 +728,15 @@ func (mr *MockDBManagerMockRecorder) Stop() *gomock.Call {
 }
 
 // SubscribeRoleChange mocks base method.
-func (m *MockDBManager) SubscribeRoleChange(arg0 context.Context, arg1 *string) {
+func (m *MockDBManager) SubscribeRoleChange(arg0 context.Context, arg1 *string, arg2 *dcs.Cluster) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SubscribeRoleChange", arg0, arg1)
+	m.ctrl.Call(m, "SubscribeRoleChange", arg0, arg1, arg2)
 }
 
 // SubscribeRoleChange indicates an expected call of SubscribeRoleChange.
-func (mr *MockDBManagerMockRecorder) SubscribeRoleChange(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockDBManagerMockRecorder) SubscribeRoleChange(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeRoleChange", reflect.TypeOf((*MockDBManager)(nil).SubscribeRoleChange), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeRoleChange", reflect.TypeOf((*MockDBManager)(nil).SubscribeRoleChange), arg0, arg1, arg2)
 }
 
 // Unlock mocks base method.

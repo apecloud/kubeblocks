@@ -22,6 +22,7 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"strings"
 	"time"
 
@@ -116,7 +117,7 @@ func tokenizeCmd2Args(cmd string) []interface{} {
 	return redisArgs
 }
 
-func (mgr *Manager) SubscribeRoleChange(ctx context.Context, oriRole *string) {
+func (mgr *Manager) SubscribeRoleChange(ctx context.Context, oriRole *string, cluster *dcs.Cluster) {
 	pubSub := mgr.sentinelClient.Subscribe(ctx, "+switch-master")
 
 	// go-redis periodically sends ping messages to test connection health
@@ -137,10 +138,12 @@ func (mgr *Manager) SubscribeRoleChange(ctx context.Context, oriRole *string) {
 				{
 					PodName:  oldMasterName,
 					RoleName: models.SECONDARY,
+					PodUID:   cluster.GetMemberWithName(oldMasterName).UID,
 				},
 				{
 					PodName:  masterName,
 					RoleName: models.PRIMARY,
+					PodUID:   cluster.GetMemberWithName(masterName).UID,
 				},
 			}
 			roleSnapshot.Version = time.Now().Format(time.RFC3339Nano)

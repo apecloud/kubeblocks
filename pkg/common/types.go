@@ -23,6 +23,7 @@ package common
 type PodRoleNamePair struct {
 	PodName  string `json:"podName,omitempty"`
 	RoleName string `json:"roleName,omitempty"`
+	PodUID   string `json:"podUid,omitempty"`
 }
 
 // GlobalRoleSnapshot defines a global(leader) perspective of all pods role.

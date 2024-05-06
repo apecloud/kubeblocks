@@ -41,7 +41,7 @@ var _ = Describe("GRPC Server", func() {
 	Context("new GRPC server", func() {
 		It("fail -- no check role operation", func() {
 			delete(operations.Operations(), strings.ToLower(string(util.CheckRoleOperation)))
-			mockDBManager.EXPECT().SubscribeRoleChange(gomock.Any(), gomock.Any()).AnyTimes()
+			mockDBManager.EXPECT().SubscribeRoleChange(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 			_, err := NewGRPCServer()
 			Expect(err).Should(HaveOccurred())
 		})

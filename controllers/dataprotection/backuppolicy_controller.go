@@ -83,13 +83,6 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.Status().Patch(ctx, backupPolicy, patch)
 	}
 
-	if backupPolicy.Spec.BackoffLimit == nil {
-		if err = r.setDefaultBackoffLimit(reqCtx, backupPolicy); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-		return ctrl.Result{}, nil
-	}
-
 	if err = r.validateBackupPolicy(backupPolicy); err != nil {
 		if err = patchStatus(dpv1alpha1.UnavailablePhase, err.Error()); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -140,10 +133,4 @@ func (r *BackupPolicyReconciler) deleteExternalResources(
 	_ intctrlutil.RequestCtx,
 	_ *dpv1alpha1.BackupPolicy) error {
 	return nil
-}
-
-func (r *BackupPolicyReconciler) setDefaultBackoffLimit(reqCtx intctrlutil.RequestCtx, backupPolicy *dpv1alpha1.BackupPolicy) error {
-	patch := client.MergeFrom(backupPolicy.DeepCopy())
-	backupPolicy.Spec.BackoffLimit = &dptypes.DefaultBackOffLimit
-	return r.Patch(reqCtx.Ctx, backupPolicy, patch)
 }

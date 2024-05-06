@@ -348,11 +348,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp *appsv1alpha1.Clu
 	if r.Cluster.Spec.Backup != nil && r.Cluster.Spec.Backup.RepoName != "" {
 		backupPolicy.Spec.BackupRepoName = &r.Cluster.Spec.Backup.RepoName
 	}
-	if r.backupPolicy.BackoffLimit == nil {
-		backupPolicy.Spec.BackoffLimit = &dptypes.DefaultBackOffLimit
-	} else {
-		backupPolicy.Spec.BackoffLimit = r.backupPolicy.BackoffLimit
-	}
+	backupPolicy.Spec.BackoffLimit = r.backupPolicy.BackoffLimit
 	r.syncBackupMethods(backupPolicy, comp)
 	r.syncBackupPolicyTargetSpec(backupPolicy, comp)
 }
@@ -400,11 +396,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupPolicy(comp *appsv1alpha1.Cl
 		bpSpec.BackupRepoName = &cluster.Spec.Backup.RepoName
 	}
 	bpSpec.PathPrefix = buildBackupPathPrefix(cluster, comp.Name)
-	if r.backupPolicy.BackoffLimit == nil {
-		bpSpec.BackoffLimit = &dptypes.DefaultBackOffLimit
-	} else {
-		bpSpec.BackoffLimit = r.backupPolicy.BackoffLimit
-	}
+	bpSpec.BackoffLimit = r.backupPolicy.BackoffLimit
 	backupPolicy.Spec = bpSpec
 	r.setDefaultEncryptionConfig(backupPolicy)
 	r.syncBackupPolicyTargetSpec(backupPolicy, comp)

@@ -36,7 +36,7 @@ type OpsDefinitionSpec struct {
 	// +optional
 	PreConditions []PreCondition `json:"preConditions,omitempty"`
 
-	// Specifies a list of TargetPodTemplate, each designed to select a specific Pod and extract selected runtime info
+	// Specifies a list of PodInfoExtractor, each designed to select a specific Pod and extract selected runtime info
 	// from its PodSpec.
 	// The extracted information, such as environment variables, volumes and tolerations, are then injected into
 	// Jobs or Pods that execute the OpsActions defined in `actions`.
@@ -46,17 +46,17 @@ type OpsDefinitionSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	TargetPodTemplates []TargetPodTemplate `json:"targetPodTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	PodInfoExtractors []PodInfoExtractor `json:"podInfoExtractors,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies a list of ComponentDefinition for Components associated with this OpsDefinition.
 	// It also includes connection credentials (address and account) for each Component.
 	//
-	// +patchMergeKey=name
+	// +patchMergeKey=componentDefinitionName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
-	// +listMapKey=name
+	// +listMapKey=componentDefinitionName
 	// +optional
-	ComponentDefinitionRefs []ComponentDefinitionRef `json:"componentDefinitionRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ComponentInfos []ComponentInfo `json:"componentInfos,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentDefinitionName"`
 
 	// Specifies the schema for validating the data types and value ranges of parameters in OpsActions before their usage.
 	//
@@ -121,8 +121,8 @@ type Rule struct {
 	Message string `json:"message"`
 }
 
-type TargetPodTemplate struct {
-	// Specifies the name of the TargetPodTemplate.
+type PodInfoExtractor struct {
+	// Specifies the name of the PodInfoExtractor.
 	//
 	// +kubebuilder:validation:MaxLength=32
 	// +kubebuilder:validation:Required
@@ -132,7 +132,7 @@ type TargetPodTemplate struct {
 	// and injected into the containers executing each OpsAction.
 	//
 	// +optional
-	Vars []OpsEnvVar `json:"vars,omitempty"`
+	Env []OpsEnvVar `json:"env,omitempty"`
 
 	// Used to select the target Pod from which environment variables and volumes are extracted from its PodSpec.
 	//
@@ -173,7 +173,7 @@ type OpsVarSource struct {
 	// It is used to extract precise data locations for operations on the Pod.
 	//
 	// +optional
-	FieldPath string `json:"fieldPath,omitempty"`
+	FieldRef *corev1.ObjectFieldSelector `json:"fieldPath,omitempty"`
 }
 
 type EnvVarRef struct {
@@ -181,7 +181,7 @@ type EnvVarRef struct {
 	// If not specified, the first container will be used by default.
 	//
 	// +optional
-	ContainerName string `json:"containerName,omitempty"`
+	TargetContainerName string `json:"targetContainerName,omitempty"`
 
 	// Defines the name of the environment variable.
 	// This name can originate from an 'env' entry or be a data key from an 'envFrom' source.
@@ -203,23 +203,14 @@ type PodSelector struct {
 	//
 	// +kubebuilder:default=Any
 	// +kubebuilder:validation:Required
-	SelectionPolicy PodSelectionPolicy `json:"selectionPolicy,omitempty"`
-
-	// Specifies the pod selection criteria based on their availability:
-	// - 'Available': Only selects available pods, and terminates the action if none are found.
-	// - 'PreferredAvailable': Prioritizes available pods but considers others if none available.
-	// - 'None': No availability requirements.
-	//
-	// +kubebuilder:default=PreferredAvailable
-	// +kubebuilder:validation:Required
-	Availability PodAvailabilityPolicy `json:"availability,omitempty"`
+	MultiPodSelectionPolicy PodSelectionPolicy `json:"multiPodSelectionPolicy,omitempty"`
 }
 
-type ComponentDefinitionRef struct {
+type ComponentInfo struct {
 	// Specifies the name of the ComponentDefinition.
 	// +kubebuilder:validation:MaxLength=32
 	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+	ComponentDefinitionName string `json:"componentDefinitionName"`
 
 	// Specifies the account name associated with the Component.
 	// If set, the corresponding account username and password are injected into containers' environment variables
@@ -317,8 +308,8 @@ type OpsWorkloadAction struct {
 	// +kubebuilder:validation:Required
 	Type OpsWorkloadType `json:"type"`
 
-	// Specifies a TargetPodTemplate defined in the `opsDefinition.spec.targetPodTemplates`.
-	TargetPodTemplate string `json:"targetPodTemplate,omitempty"`
+	// Specifies a PodInfoExtractor defined in the `opsDefinition.spec.podInfoExtractors`.
+	PodInfoExtractorName string `json:"podInfoExtractorName,omitempty"`
 
 	// Specifies the number of retries allowed before marking the action as failed.
 	// +kubebuilder:validation:Minimum=0
@@ -332,9 +323,9 @@ type OpsWorkloadAction struct {
 }
 
 type OpsExecAction struct {
-	// Specifies a TargetPodTemplate defined in the `opsDefinition.spec.targetPodTemplates`.
+	// Specifies a PodInfoExtractor defined in the `opsDefinition.spec.podInfoExtractors`.
 	// +kubebuilder:validation:Required
-	TargetPodTemplate string `json:"targetPodTemplate"`
+	PodInfoExtractorName string `json:"podInfoExtractorName"`
 
 	// Specifies the number of retries allowed before marking the action as failed.
 	// +kubebuilder:validation:Minimum=0
@@ -499,12 +490,12 @@ func init() {
 	SchemeBuilder.Register(&OpsDefinition{}, &OpsDefinitionList{})
 }
 
-func (o *OpsDefinition) GetComponentDefRef(compDefName string) *ComponentDefinitionRef {
+func (o *OpsDefinition) GetComponentInfo(compDefName string) *ComponentInfo {
 	if o == nil {
 		return nil
 	}
-	for _, v := range o.Spec.ComponentDefinitionRefs {
-		if compDefName == v.Name {
+	for _, v := range o.Spec.ComponentInfos {
+		if compDefName == v.ComponentDefinitionName {
 			return &v
 		}
 	}

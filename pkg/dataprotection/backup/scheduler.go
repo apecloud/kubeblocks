@@ -392,19 +392,21 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 			},
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
-			Type:       appsv1alpha1.ReconfiguringType,
-			ClusterRef: targetPodSelector.MatchLabels[constant.AppInstanceLabelKey],
-			Reconfigure: &appsv1alpha1.Reconfigure{
-				ComponentOps: appsv1alpha1.ComponentOps{
-					ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
-				},
-				Configurations: []appsv1alpha1.ConfigurationItem{
-					{
-						Name: configRef.Name,
-						Keys: []appsv1alpha1.ParameterConfig{
-							{
-								Key:        configRef.Key,
-								Parameters: parameters,
+			Type:        appsv1alpha1.ReconfiguringType,
+			ClusterName: targetPodSelector.MatchLabels[constant.AppInstanceLabelKey],
+			SpecificOpsRequest: appsv1alpha1.SpecificOpsRequest{
+				Reconfigure: &appsv1alpha1.Reconfigure{
+					ComponentOps: appsv1alpha1.ComponentOps{
+						ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
+					},
+					Configurations: []appsv1alpha1.ConfigurationItem{
+						{
+							Name: configRef.Name,
+							Keys: []appsv1alpha1.ParameterConfig{
+								{
+									Key:        configRef.Key,
+									Parameters: parameters,
+								},
 							},
 						},
 					},

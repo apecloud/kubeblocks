@@ -31,9 +31,14 @@ import (
 type OpsRequestSpec struct {
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	//
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterName"
+	ClusterName string `json:"clusterName,omitempty"`
+
+	// Deprecated: since v0.9, use clusterName instead.
+	// Specifies the name of the Cluster resource that this operation is targeting.
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
-	ClusterRef string `json:"clusterRef"`
+	ClusterRef string `json:"clusterRef,omitempty"`
 
 	// Indicates whether the current operation should be canceled and terminated gracefully if it's in the
 	// "Pending", "Creating", or "Running" state.
@@ -75,6 +80,11 @@ type OpsRequestSpec struct {
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
+	// Exactly one of its members must be set.
+	SpecificOpsRequest `json:",inline"`
+}
+
+type SpecificOpsRequest struct {
 	// Specifies the desired new version of the Cluster.
 	//
 	// Note: This field is immutable once set.
@@ -158,18 +168,13 @@ type OpsRequestSpec struct {
 	// +optional
 	ExposeList []Expose `json:"expose,omitempty"`
 
-	// Cluster RestoreFrom backup or point in time.
-	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restoreFrom"
-	RestoreFrom *RestoreFromSpec `json:"restoreFrom,omitempty"`
-
 	// Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
 	// before it aborts the operation.
 	// If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.
 	//
 	// +kubebuilder:default=0
 	// +optional
-	TTLSecondsBeforeAbort *int32 `json:"ttlSecondsBeforeAbort,omitempty"`
+	PreConditionDeadlineSeconds *int32 `json:"preConditionDeadlineSeconds,omitempty"`
 
 	// Specifies the image and scripts for executing engine-specific operations such as creating databases or users.
 	// It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.
@@ -183,13 +188,26 @@ type OpsRequestSpec struct {
 
 	// Specifies the parameters to backup a Cluster.
 	// +optional
-	BackupSpec *BackupSpec `json:"backupSpec,omitempty"`
+	Backup *Backup `json:"backup,omitempty"`
+
+	// Deprecated: since v0.9, use backup instead.
+	// Specifies the parameters to backup a Cluster.
+	// +optional
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	BackupSpec *Backup `json:"backupSpec,omitempty"`
 
 	// Specifies the parameters to restore a Cluster.
 	// Note that this restore operation will roll back cluster services.
 	//
 	// +optional
-	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
+	Restore *Restore `json:"restore,omitempty"`
+
+	// Deprecated: since v0.9, use restore instead.
+	// Specifies the parameters to restore a Cluster.
+	// Note that this restore operation will roll back cluster services.
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +optional
+	RestoreSpec *Restore `json:"restoreSpec,omitempty"`
 
 	// Specifies the parameters to rebuild some instances.
 	// Rebuilding an instance involves restoring its data from a backup or another database replica.
@@ -207,7 +225,7 @@ type OpsRequestSpec struct {
 	// Specifies a custom operation defined by OpsDefinition.
 	//
 	// +optional
-	CustomSpec *CustomOpsSpec `json:"customSpec,omitempty"`
+	CustomOps *CustomOps `json:"custom,omitempty"`
 }
 
 // ComponentOps specifies the Component to be operated on.
@@ -250,7 +268,7 @@ type RebuildInstance struct {
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	EnvForRestore []corev1.EnvVar `json:"envForRestore,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	RestoreEnv []corev1.EnvVar `json:"restoreEnv,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 type Instance struct {
@@ -309,7 +327,7 @@ type VerticalScaling struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
 
-	// Specifies the instance template that need to vertical scale.
+	// Specifies the desired compute resources of the instance template that need to vertical scale.
 	Instances []InstanceResourceTemplate `json:"instances,omitempty"`
 }
 
@@ -352,7 +370,7 @@ type VolumeExpansion struct {
 	// +listMapKey=name
 	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Specifies the instance template that need to volume expand.
+	// Specifies the desired storage size of the instance template that need to volume expand.
 	Instances []InstanceVolumeClaimTemplate `json:"instances,omitempty"`
 }
 
@@ -462,11 +480,11 @@ type ConfigurationItem struct {
 	Keys []ParameterConfig `json:"keys" patchStrategy:"merge,retainKeys" patchMergeKey:"key"`
 }
 
-type CustomOpsSpec struct {
+type CustomOps struct {
 	// Specifies the name of the OpsDefinition.
 	//
 	// +kubebuilder:validation:Required
-	OpsDefinitionRef string `json:"opsDefinitionRef"`
+	OpsDefinitionName string `json:"opsDefinitionName"`
 
 	// Specifies the name of the ServiceAccount to be used for executing the custom operation.
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
@@ -483,7 +501,7 @@ type CustomOpsSpec struct {
 	// Note: This feature is not implemented yet.
 	//
 	// +optional
-	Parallelism intstr.IntOrString `json:"parallelism,omitempty"`
+	MaxConcurrentComponents intstr.IntOrString `json:"maxConcurrentComponents,omitempty"`
 
 	// Specifies the components and their parameters for executing custom actions as defined in OpsDefinition.
 	// Requires at least one component.
@@ -495,7 +513,7 @@ type CustomOpsSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	CustomOpsItems []CustomOpsComponent `json:"components"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+	CustomOpsComponents []CustomOpsComponent `json:"components"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 }
 
 type CustomOpsComponent struct {
@@ -641,7 +659,7 @@ type OpsService struct {
 	//
 	// +optional
 	// +mapType=atomic
-	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
+	PodSelector map[string]string `json:"podSelector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
 	// Determines how the Service is exposed. Defaults to 'ClusterIP'.
 	// Valid options are `ClusterIP`, `NodePort`, and `LoadBalancer`.
@@ -707,16 +725,6 @@ type OpsService struct {
 	//
 	// +optional
 	IPFamilyPolicy *corev1.IPFamilyPolicy `json:"ipFamilyPolicy,omitempty" protobuf:"bytes,17,opt,name=ipFamilyPolicy,casttype=IPFamilyPolicy"`
-}
-
-type RestoreFromSpec struct {
-	// Refers to the backup name and component name used for restoration. Supports recovery of multiple Components.
-	// +optional
-	Backup []BackupRefSpec `json:"backup,omitempty"`
-
-	// Refers to the specific point in time for recovery.
-	// +optional
-	PointInTime *PointInTimeRefSpec `json:"pointInTime,omitempty"`
 }
 
 type RefNamespaceName struct {
@@ -807,7 +815,7 @@ type ScriptSpec struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
-type BackupSpec struct {
+type Backup struct {
 	// Specifies the name of the Backup custom resource.
 	//
 	// +optional
@@ -863,7 +871,7 @@ type BackupSpec struct {
 	ParentBackupName string `json:"parentBackupName,omitempty"`
 }
 
-type RestoreSpec struct {
+type Restore struct {
 	// Specifies the name of the Backup custom resource.
 	//
 	// +kubebuilder:validation:Required
@@ -875,7 +883,7 @@ type RestoreSpec struct {
 	// - RFC3339 format, e.g. "2023-11-25T18:52:53Z"
 	// - A human-readable date-time format, e.g. "Jul 25,2023 18:52:53 UTC+0800"
 	//
-	RestoreTimeStr string `json:"restoreTimeStr,omitempty"`
+	RestorePointInTime string `json:"restorePointInTime,omitempty"`
 
 	// Specifies the policy for restoring volume claims of a Component's Pods.
 	// It determines whether the volume claims should be restored sequentially (one by one) or in parallel (all at once).
@@ -895,7 +903,7 @@ type RestoreSpec struct {
 	// ensuring the cluster's overall stability before proceeding.
 	//
 	// This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.
-	DoReadyRestoreAfterClusterRunning bool `json:"doReadyRestoreAfterClusterRunning,omitempty"`
+	DeferPostReadyUntilClusterRunning bool `json:"deferPostReadyUntilClusterRunning,omitempty"`
 }
 
 // ScriptSecret represents the secret that is used to execute the script.
@@ -1251,7 +1259,7 @@ type UpdatedParameters struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=ops
 // +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="Operation request type."
-// +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterRef",description="Operand cluster."
+// +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterName",description="Operand cluster."
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Operation status phase."
 // +kubebuilder:printcolumn:name="PROGRESS",type="string",JSONPath=".status.progress",description="Operation processing progress."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
@@ -1289,6 +1297,27 @@ func (r OpsRequestSpec) ToExposeListToMap() map[string]Expose {
 		exposeMap[v.ComponentName] = v
 	}
 	return exposeMap
+}
+
+func (r OpsRequestSpec) GetClusterName() string {
+	if r.ClusterName != "" {
+		return r.ClusterName
+	}
+	return r.ClusterRef
+}
+
+func (r OpsRequestSpec) GetBackup() *Backup {
+	if r.Backup != nil {
+		return r.Backup
+	}
+	return r.BackupSpec
+}
+
+func (r OpsRequestSpec) GetRestore() *Restore {
+	if r.Restore != nil {
+		return r.Restore
+	}
+	return r.RestoreSpec
 }
 
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {

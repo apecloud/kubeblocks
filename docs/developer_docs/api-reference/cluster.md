@@ -2411,16 +2411,16 @@ Example:</p>
 </tr>
 <tr>
 <td>
-<code>targetPodTemplates</code><br/>
+<code>podInfoExtractors</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.TargetPodTemplate">
-[]TargetPodTemplate
+<a href="#apps.kubeblocks.io/v1alpha1.PodInfoExtractor">
+[]PodInfoExtractor
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a list of TargetPodTemplate, each designed to select a specific Pod and extract selected runtime info
+<p>Specifies a list of PodInfoExtractor, each designed to select a specific Pod and extract selected runtime info
 from its PodSpec.
 The extracted information, such as environment variables, volumes and tolerations, are then injected into
 Jobs or Pods that execute the OpsActions defined in <code>actions</code>.</p>
@@ -2428,10 +2428,10 @@ Jobs or Pods that execute the OpsActions defined in <code>actions</code>.</p>
 </tr>
 <tr>
 <td>
-<code>componentDefinitionRefs</code><br/>
+<code>componentInfos</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionRef">
-[]ComponentDefinitionRef
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentInfo">
+[]ComponentInfo
 </a>
 </em>
 </td>
@@ -2542,13 +2542,25 @@ OpsRequestSpec
 <table>
 <tr>
 <td>
-<code>clusterRef</code><br/>
+<code>clusterName</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
 <p>Specifies the name of the Cluster resource that this operation is targeting.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Deprecated: since v0.9, use clusterName instead.
+Specifies the name of the Cluster resource that this operation is targeting.</p>
 </td>
 </tr>
 <tr>
@@ -2615,239 +2627,18 @@ int32
 </tr>
 <tr>
 <td>
-<code>upgrade</code><br/>
+<code>SpecificOpsRequest</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.Upgrade">
-Upgrade
+<a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">
+SpecificOpsRequest
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Specifies the desired new version of the Cluster.</p>
-<p>Note: This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>horizontalScaling</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">
-[]HorizontalScaling
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
-including desired total replica counts, configurations for new instances, modifications for existing instances,
-and instance downscaling options.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeExpansion</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">
-[]VolumeExpansion
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates
-that requires storage expansion.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>restart</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
-[]ComponentOps
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists Components to be restarted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>switchover</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Switchover">
-[]Switchover
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists Switchover objects, each specifying a Component to perform the switchover operation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>verticalScaling</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">
-[]VerticalScaling
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reconfigure</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">
-Reconfigure
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a component and its configuration updates.</p>
-<p>This field is deprecated and replaced by <code>reconfigures</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reconfigures</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">
-[]Reconfigure
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists Reconfigure objects, each specifying a Component and its configuration updates.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>expose</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Expose">
-[]Expose
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists Expose objects, each specifying a Component and its services to be exposed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>restoreFrom</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RestoreFromSpec">
-RestoreFromSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Cluster RestoreFrom backup or point in time.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ttlSecondsBeforeAbort</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
-before it aborts the operation.
-If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">
-ScriptSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the image and scripts for executing engine-specific operations such as creating databases or users.
-It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.</p>
-<p>ScriptSpec has been replaced by the more versatile OpsDefinition.
-It is recommended to use OpsDefinition instead.
-ScriptSpec is deprecated and will be removed in a future version.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>backupSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupSpec">
-BackupSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the parameters to backup a Cluster.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>restoreSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RestoreSpec">
-RestoreSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the parameters to restore a Cluster.
-Note that this restore operation will roll back cluster services.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>rebuildFrom</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">
-[]RebuildInstance
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the parameters to rebuild some instances.
-Rebuilding an instance involves restoring its data from a backup or another database replica.
-The instances being rebuilt usually serve as standby in the cluster.
-Hence rebuilding instances is often also referred to as &ldquo;standby reconstruction&rdquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>customSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CustomOpsSpec">
-CustomOpsSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a custom operation defined by OpsDefinition.</p>
+<p>
+(Members of <code>SpecificOpsRequest</code> are embedded into this type.)
+</p>
+<p>Exactly one of its members must be set.</p>
 </td>
 </tr>
 </table>
@@ -3554,6 +3345,115 @@ the risk of simultaneous downtime.</p>
 </td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.Backup">Backup
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>backupName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the Backup custom resource.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backupPolicyName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the name of the BackupPolicy applied to perform this Backup.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backupMethod</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of BackupMethod.
+The specified BackupMethod must be defined in the BackupPolicy.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>deletionPolicy</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determines whether the backup contents stored in backup repository
+should be deleted when the Backup custom resource is deleted.
+Supported values are <code>Retain</code> and <code>Delete</code>.
+- <code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.
+- <code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retentionPeriod</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determines the duration for which the Backup custom resources should be retained.</p>
+<p>The controller will automatically remove all Backup objects that are older than the specified RetentionPeriod.
+For example, RetentionPeriod of <code>30d</code> will keep only the Backup objects of last 30 days.
+Sample duration format:</p>
+<ul>
+<li>years: 2y</li>
+<li>months: 6mo</li>
+<li>days: 30d</li>
+<li>hours: 12h</li>
+<li>minutes: 30m</li>
+</ul>
+<p>You can also combine the above durations. For example: 30d12h30m.
+If not set, the Backup objects will be kept forever.</p>
+<p>If the <code>deletionPolicy</code> is set to &lsquo;Delete&rsquo;, then the associated backup data will also be deleted
+along with the Backup object.
+Otherwise, only the Backup custom resource will be deleted.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parentBackupName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If the specified BackupMethod is incremental, <code>parentBackupName</code> is required.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod
 </h3>
 <p>
@@ -3901,9 +3801,6 @@ can differentiate the policies.</p>
 </div>
 <h3 id="apps.kubeblocks.io/v1alpha1.BackupRefSpec">BackupRefSpec
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RestoreFromSpec">RestoreFromSpec</a>)
-</p>
 <div>
 </div>
 <table>
@@ -3926,115 +3823,6 @@ RefNamespaceName
 <td>
 <em>(Optional)</em>
 <p>Refers to a reference backup that needs to be restored.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.BackupSpec">BackupSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>backupName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the Backup custom resource.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>backupPolicyName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates the name of the BackupPolicy applied to perform this Backup.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>backupMethod</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of BackupMethod.
-The specified BackupMethod must be defined in the BackupPolicy.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>deletionPolicy</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determines whether the backup contents stored in backup repository
-should be deleted when the Backup custom resource is deleted.
-Supported values are <code>Retain</code> and <code>Delete</code>.
-- <code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.
-- <code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>retentionPeriod</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determines the duration for which the Backup custom resources should be retained.</p>
-<p>The controller will automatically remove all Backup objects that are older than the specified RetentionPeriod.
-For example, RetentionPeriod of <code>30d</code> will keep only the Backup objects of last 30 days.
-Sample duration format:</p>
-<ul>
-<li>years: 2y</li>
-<li>months: 6mo</li>
-<li>days: 30d</li>
-<li>hours: 12h</li>
-<li>minutes: 30m</li>
-</ul>
-<p>You can also combine the above durations. For example: 30d12h30m.
-If not set, the Backup objects will be kept forever.</p>
-<p>If the <code>deletionPolicy</code> is set to &lsquo;Delete&rsquo;, then the associated backup data will also be deleted
-along with the Backup object.
-Otherwise, only the Backup custom resource will be deleted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parentBackupName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>If the specified BackupMethod is incremental, <code>parentBackupName</code> is required.</p>
 </td>
 </tr>
 </tbody>
@@ -7348,63 +7136,6 @@ FailurePolicyType
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentDefinitionRef">ComponentDefinitionRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionSpec">OpsDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the ComponentDefinition.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>accountName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the account name associated with the Component.
-If set, the corresponding account username and password are injected into containers&rsquo; environment variables
-<code>KB_ACCOUNT_USERNAME</code> and <code>KB_ACCOUNT_PASSWORD</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the Service.
-If set, the service name is injected as the <code>KB_COMP_SVC_NAME</code> environment variable in the containers,
-and each service port is mapped to a corresponding environment variable named <code>KB_COMP_SVC_PORT_$(portName)</code>.
-The <code>portName</code> is transformed by replacing &lsquo;-&rsquo; with &lsquo;_&rsquo; and converting to uppercase.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec
 </h3>
 <p>
@@ -8058,6 +7789,63 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentInfo">ComponentInfo
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionSpec">OpsDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>componentDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>accountName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the account name associated with the Component.
+If set, the corresponding account username and password are injected into containers&rsquo; environment variables
+<code>KB_ACCOUNT_USERNAME</code> and <code>KB_ACCOUNT_PASSWORD</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the Service.
+If set, the service name is injected as the <code>KB_COMP_SVC_NAME</code> environment variable in the containers,
+and each service port is mapped to a corresponding environment variable named <code>KB_COMP_SVC_PORT_$(portName)</code>.
+The <code>portName</code> is transformed by replacing &lsquo;-&rsquo; with &lsquo;_&rsquo; and converting to uppercase.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions
 </h3>
 <p>
@@ -8460,7 +8248,7 @@ and other administrative tasks.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentOps">ComponentOps
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 <p>ComponentOps specifies the Component to be operated on.</p>
@@ -11261,10 +11049,83 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.CustomOps">CustomOps
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>opsDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the OpsDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceAccountName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the ServiceAccount to be used for executing the custom operation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxConcurrentComponents</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum number of components to be operated on concurrently to mitigate performance impact
+on clusters with multiple components.</p>
+<p>It accepts an absolute number (e.g., 5) or a percentage of components to execute in parallel (e.g., &ldquo;10%&rdquo;).
+Percentages are rounded up to the nearest whole number of components.
+For example, if &ldquo;10%&rdquo; results in less than one, it rounds up to 1.</p>
+<p>When unspecified, all components are processed simultaneously by default.</p>
+<p>Note: This feature is not implemented yet.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">
+[]CustomOpsComponent
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the components and their parameters for executing custom actions as defined in OpsDefinition.
+Requires at least one component.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsSpec">CustomOpsSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOps">CustomOps</a>)
 </p>
 <div>
 </div>
@@ -11304,79 +11165,6 @@ ComponentOps
 <td>
 <em>(Optional)</em>
 <p>Specifies the parameters that match the schema specified in the <code>opsDefinition.spec.parametersSchema</code>.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.CustomOpsSpec">CustomOpsSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>opsDefinitionRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the OpsDefinition.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceAccountName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the ServiceAccount to be used for executing the custom operation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parallelism</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
-Kubernetes api utils intstr.IntOrString
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the maximum number of components to be operated on concurrently to mitigate performance impact
-on clusters with multiple components.</p>
-<p>It accepts an absolute number (e.g., 5) or a percentage of components to execute in parallel (e.g., &ldquo;10%&rdquo;).
-Percentages are rounded up to the nearest whole number of components.
-For example, if &ldquo;10%&rdquo; results in less than one, it rounds up to 1.</p>
-<p>When unspecified, all components are processed simultaneously by default.</p>
-<p>Note: This feature is not implemented yet.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>components</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">
-[]CustomOpsComponent
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the components and their parameters for executing custom actions as defined in OpsDefinition.
-Requires at least one component.</p>
 </td>
 </tr>
 </tbody>
@@ -11553,7 +11341,7 @@ VarSource
 <tbody>
 <tr>
 <td>
-<code>containerName</code><br/>
+<code>targetContainerName</code><br/>
 <em>
 string
 </em>
@@ -11629,7 +11417,7 @@ If the shell is required, it must be explicitly invoked in the command.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.Expose">Expose
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
 </div>
@@ -11970,7 +11758,7 @@ This only works if Type is not None. If not specified, the first volumeMount wil
 <h3 id="apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
 <p>HorizontalScaling defines the parameters of a horizontal scaling operation.</p>
@@ -13459,16 +13247,16 @@ Example:</p>
 </tr>
 <tr>
 <td>
-<code>targetPodTemplates</code><br/>
+<code>podInfoExtractors</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.TargetPodTemplate">
-[]TargetPodTemplate
+<a href="#apps.kubeblocks.io/v1alpha1.PodInfoExtractor">
+[]PodInfoExtractor
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a list of TargetPodTemplate, each designed to select a specific Pod and extract selected runtime info
+<p>Specifies a list of PodInfoExtractor, each designed to select a specific Pod and extract selected runtime info
 from its PodSpec.
 The extracted information, such as environment variables, volumes and tolerations, are then injected into
 Jobs or Pods that execute the OpsActions defined in <code>actions</code>.</p>
@@ -13476,10 +13264,10 @@ Jobs or Pods that execute the OpsActions defined in <code>actions</code>.</p>
 </tr>
 <tr>
 <td>
-<code>componentDefinitionRefs</code><br/>
+<code>componentInfos</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionRef">
-[]ComponentDefinitionRef
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentInfo">
+[]ComponentInfo
 </a>
 </em>
 </td>
@@ -13579,7 +13367,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsEnvVar">OpsEnvVar
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.TargetPodTemplate">TargetPodTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodInfoExtractor">PodInfoExtractor</a>)
 </p>
 <div>
 </div>
@@ -13635,13 +13423,13 @@ OpsVarSource
 <tbody>
 <tr>
 <td>
-<code>targetPodTemplate</code><br/>
+<code>podInfoExtractorName</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Specifies a TargetPodTemplate defined in the <code>opsDefinition.spec.targetPodTemplates</code>.</p>
+<p>Specifies a PodInfoExtractor defined in the <code>opsDefinition.spec.podInfoExtractors</code>.</p>
 </td>
 </tr>
 <tr>
@@ -13945,13 +13733,25 @@ string
 <tbody>
 <tr>
 <td>
-<code>clusterRef</code><br/>
+<code>clusterName</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
 <p>Specifies the name of the Cluster resource that this operation is targeting.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Deprecated: since v0.9, use clusterName instead.
+Specifies the name of the Cluster resource that this operation is targeting.</p>
 </td>
 </tr>
 <tr>
@@ -14018,239 +13818,18 @@ int32
 </tr>
 <tr>
 <td>
-<code>upgrade</code><br/>
+<code>SpecificOpsRequest</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.Upgrade">
-Upgrade
+<a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">
+SpecificOpsRequest
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Specifies the desired new version of the Cluster.</p>
-<p>Note: This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>horizontalScaling</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">
-[]HorizontalScaling
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
-including desired total replica counts, configurations for new instances, modifications for existing instances,
-and instance downscaling options.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeExpansion</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">
-[]VolumeExpansion
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates
-that requires storage expansion.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>restart</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
-[]ComponentOps
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists Components to be restarted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>switchover</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Switchover">
-[]Switchover
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists Switchover objects, each specifying a Component to perform the switchover operation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>verticalScaling</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">
-[]VerticalScaling
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reconfigure</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">
-Reconfigure
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a component and its configuration updates.</p>
-<p>This field is deprecated and replaced by <code>reconfigures</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reconfigures</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">
-[]Reconfigure
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists Reconfigure objects, each specifying a Component and its configuration updates.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>expose</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Expose">
-[]Expose
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Lists Expose objects, each specifying a Component and its services to be exposed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>restoreFrom</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RestoreFromSpec">
-RestoreFromSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Cluster RestoreFrom backup or point in time.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ttlSecondsBeforeAbort</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
-before it aborts the operation.
-If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">
-ScriptSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the image and scripts for executing engine-specific operations such as creating databases or users.
-It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.</p>
-<p>ScriptSpec has been replaced by the more versatile OpsDefinition.
-It is recommended to use OpsDefinition instead.
-ScriptSpec is deprecated and will be removed in a future version.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>backupSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupSpec">
-BackupSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the parameters to backup a Cluster.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>restoreSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RestoreSpec">
-RestoreSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the parameters to restore a Cluster.
-Note that this restore operation will roll back cluster services.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>rebuildFrom</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">
-[]RebuildInstance
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the parameters to rebuild some instances.
-Rebuilding an instance involves restoring its data from a backup or another database replica.
-The instances being rebuilt usually serve as standby in the cluster.
-Hence rebuilding instances is often also referred to as &ldquo;standby reconstruction&rdquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>customSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CustomOpsSpec">
-CustomOpsSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a custom operation defined by OpsDefinition.</p>
+<p>
+(Members of <code>SpecificOpsRequest</code> are embedded into this type.)
+</p>
+<p>Exactly one of its members must be set.</p>
 </td>
 </tr>
 </tbody>
@@ -14613,7 +14192,7 @@ If both are specified, a pod must match both conditions to be selected.</p>
 </tr>
 <tr>
 <td>
-<code>selector</code><br/>
+<code>podSelector</code><br/>
 <em>
 map[string]string
 </em>
@@ -14802,7 +14381,9 @@ Used to specify the source of the variable, which can be either &ldquo;env&rdquo
 <td>
 <code>fieldPath</code><br/>
 <em>
-string
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectfieldselector-v1-core">
+Kubernetes core/v1.ObjectFieldSelector
+</a>
 </em>
 </td>
 <td>
@@ -14848,13 +14429,13 @@ Note: unlike Jobs, manually deleting a Pod does not affect the <code>backoffLimi
 </tr>
 <tr>
 <td>
-<code>targetPodTemplate</code><br/>
+<code>podInfoExtractorName</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Specifies a TargetPodTemplate defined in the <code>opsDefinition.spec.targetPodTemplates</code>.</p>
+<p>Specifies a PodInfoExtractor defined in the <code>opsDefinition.spec.podInfoExtractors</code>.</p>
 </td>
 </tr>
 <tr>
@@ -15361,9 +14942,6 @@ the rules are met.</p>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.PodAvailabilityPolicy">PodAvailabilityPolicy
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodSelector">PodSelector</a>)
-</p>
 <div>
 <p>PodAvailabilityPolicy pod availability strategy.</p>
 </div>
@@ -15381,6 +14959,78 @@ the rules are met.</p>
 </tr><tr><td><p>&#34;UnAvailable&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.PodInfoExtractor">PodInfoExtractor
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionSpec">OpsDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the PodInfoExtractor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.OpsEnvVar">
+[]OpsEnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of environment variables to be extracted from a selected Pod,
+and injected into the containers executing each OpsAction.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podSelector</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PodSelector">
+PodSelector
+</a>
+</em>
+</td>
+<td>
+<p>Used to select the target Pod from which environment variables and volumes are extracted from its PodSpec.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMounts</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
+[]Kubernetes core/v1.VolumeMount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of volumes, along with their respective mount points, that are to be extracted from a selected Pod,
+and mounted onto the containers executing each OpsAction.
+This allows the containers to access shared or persistent data necessary for the operation.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.PodSelectionPolicy">PodSelectionPolicy
 (<code>string</code> alias)</h3>
@@ -15406,7 +15056,7 @@ the rules are met.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.PodSelector">PodSelector
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.TargetPodTemplate">TargetPodTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodInfoExtractor">PodInfoExtractor</a>)
 </p>
 <div>
 <p>PodSelector selects the target Pod from which environment variables and volumes are extracted from its PodSpec.</p>
@@ -15433,7 +15083,7 @@ string
 </tr>
 <tr>
 <td>
-<code>selectionPolicy</code><br/>
+<code>multiPodSelectionPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.PodSelectionPolicy">
 PodSelectionPolicy
@@ -15444,22 +15094,6 @@ PodSelectionPolicy
 <p>Defines the policy for selecting the target pod when multiple pods match the podSelector.
 It can be either &lsquo;Any&rsquo; (select any one pod that matches the podSelector)
 or &lsquo;All&rsquo; (select all pods that match the podSelector).</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>availability</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PodAvailabilityPolicy">
-PodAvailabilityPolicy
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the pod selection criteria based on their availability:
-- &lsquo;Available&rsquo;: Only selects available pods, and terminates the action if none are found.
-- &lsquo;PreferredAvailable&rsquo;: Prioritizes available pods but considers others if none available.
-- &lsquo;None&rsquo;: No availability requirements.</p>
 </td>
 </tr>
 </tbody>
@@ -15546,9 +15180,6 @@ ContainerVars
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.PointInTimeRefSpec">PointInTimeRefSpec
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RestoreFromSpec">RestoreFromSpec</a>)
-</p>
 <div>
 </div>
 <table>
@@ -16348,7 +15979,7 @@ MemberUpdateStrategy
 <h3 id="apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
 </div>
@@ -16407,7 +16038,7 @@ Defaults to an empty PersistentVolume if unspecified.</p>
 </tr>
 <tr>
 <td>
-<code>envForRestore</code><br/>
+<code>restoreEnv</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
 []Kubernetes core/v1.EnvVar
@@ -16521,7 +16152,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
 <p>Reconfigure defines the parameters for updating a Component&rsquo;s configuration.</p>
@@ -16959,55 +16590,10 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RestoreFromSpec">RestoreFromSpec
+<h3 id="apps.kubeblocks.io/v1alpha1.Restore">Restore
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>backup</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupRefSpec">
-[]BackupRefSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the backup name and component name used for restoration. Supports recovery of multiple Components.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>pointInTime</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PointInTimeRefSpec">
-PointInTimeRefSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the specific point in time for recovery.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RestoreSpec">RestoreSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
 </div>
@@ -17032,7 +16618,7 @@ string
 </tr>
 <tr>
 <td>
-<code>restoreTimeStr</code><br/>
+<code>restorePointInTime</code><br/>
 <em>
 string
 </em>
@@ -17065,7 +16651,7 @@ Support values:</p>
 </tr>
 <tr>
 <td>
-<code>doReadyRestoreAfterClusterRunning</code><br/>
+<code>deferPostReadyUntilClusterRunning</code><br/>
 <em>
 bool
 </em>
@@ -17550,7 +17136,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
 <p>ScriptSpec is a legacy feature for executing engine-specific operations such as creating databases or users.
@@ -19258,6 +18844,277 @@ In order to allow prometheus to scrape metrics from the sidecar container, the s
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>upgrade</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Upgrade">
+Upgrade
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired new version of the Cluster.</p>
+<p>Note: This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>horizontalScaling</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">
+[]HorizontalScaling
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
+including desired total replica counts, configurations for new instances, modifications for existing instances,
+and instance downscaling options.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeExpansion</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">
+[]VolumeExpansion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates
+that requires storage expansion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restart</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
+[]ComponentOps
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists Components to be restarted.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>switchover</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Switchover">
+[]Switchover
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists Switchover objects, each specifying a Component to perform the switchover operation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>verticalScaling</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">
+[]VerticalScaling
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigure</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">
+Reconfigure
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a component and its configuration updates.</p>
+<p>This field is deprecated and replaced by <code>reconfigures</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigures</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">
+[]Reconfigure
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists Reconfigure objects, each specifying a Component and its configuration updates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>expose</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Expose">
+[]Expose
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists Expose objects, each specifying a Component and its services to be exposed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preConditionDeadlineSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+before it aborts the operation.
+If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scriptSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">
+ScriptSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the image and scripts for executing engine-specific operations such as creating databases or users.
+It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.</p>
+<p>ScriptSpec has been replaced by the more versatile OpsDefinition.
+It is recommended to use OpsDefinition instead.
+ScriptSpec is deprecated and will be removed in a future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backup</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Backup">
+Backup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the parameters to backup a Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backupSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Backup">
+Backup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Deprecated: since v0.9, use backup instead.
+Specifies the parameters to backup a Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Restore">
+Restore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the parameters to restore a Cluster.
+Note that this restore operation will roll back cluster services.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restoreSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Restore">
+Restore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Deprecated: since v0.9, use restore instead.
+Specifies the parameters to restore a Cluster.
+Note that this restore operation will roll back cluster services.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rebuildFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">
+[]RebuildInstance
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the parameters to rebuild some instances.
+Rebuilding an instance involves restoring its data from a backup or another database replica.
+The instances being rebuilt usually serve as standby in the cluster.
+Hence rebuilding instances is often also referred to as &ldquo;standby reconstruction&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>custom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.CustomOps">
+CustomOps
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a custom operation defined by OpsDefinition.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.StatefulSetSpec">StatefulSetSpec
 </h3>
 <p>
@@ -19409,7 +19266,7 @@ required to implement their own HA solution or integrate an existing open-source
 <h3 id="apps.kubeblocks.io/v1alpha1.Switchover">Switchover
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
 </div>
@@ -20042,78 +19899,6 @@ It will be ignored when the <code>account</code> is set.</p>
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.TargetPodTemplate">TargetPodTemplate
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionSpec">OpsDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the TargetPodTemplate.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>vars</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.OpsEnvVar">
-[]OpsEnvVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a list of environment variables to be extracted from a selected Pod,
-and injected into the containers executing each OpsAction.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>podSelector</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PodSelector">
-PodSelector
-</a>
-</em>
-</td>
-<td>
-<p>Used to select the target Pod from which environment variables and volumes are extracted from its PodSpec.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeMounts</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
-[]Kubernetes core/v1.VolumeMount
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a list of volumes, along with their respective mount points, that are to be extracted from a selected Pod,
-and mounted onto the containers executing each OpsAction.
-This allows the containers to access shared or persistent data necessary for the operation.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.TenancyType">TenancyType
 (<code>string</code> alias)</h3>
 <p>
@@ -20321,7 +20106,7 @@ map[string]string
 <h3 id="apps.kubeblocks.io/v1alpha1.Upgrade">Upgrade
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
 <p>Upgrade defines the parameters for an upgrade operation.</p>
@@ -20688,7 +20473,7 @@ Typically used in scenarios such as updating application container images.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
 <p>VerticalScaling refers to the process of adjusting the compute resources (e.g., CPU, memory) allocated to a Component.
@@ -20744,7 +20529,7 @@ Kubernetes core/v1.ResourceRequirements
 </em>
 </td>
 <td>
-<p>Specifies the instance template that need to vertical scale.</p>
+<p>Specifies the desired compute resources of the instance template that need to vertical scale.</p>
 </td>
 </tr>
 </tbody>
@@ -20752,7 +20537,7 @@ Kubernetes core/v1.ResourceRequirements
 <h3 id="apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
 <p>VolumeExpansion encapsulates the parameters required for a volume expansion operation.</p>
@@ -20805,7 +20590,7 @@ that are used to expand the storage and the desired storage size for each one.</
 </em>
 </td>
 <td>
-<p>Specifies the instance template that need to volume expand.</p>
+<p>Specifies the desired storage size of the instance template that need to volume expand.</p>
 </td>
 </tr>
 </tbody>

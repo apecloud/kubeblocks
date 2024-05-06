@@ -26,7 +26,7 @@ spec:
       name: TYPE
       type: string
     - description: Operand cluster.
-      jsonPath: .spec.clusterRef
+      jsonPath: .spec.clusterName
       name: CLUSTER
       type: string
     - description: Operation status phase.
@@ -60,8 +60,54 @@ spec:
           spec:
             description: OpsRequestSpec defines the desired state of OpsRequest
             properties:
-              backupSpec:
+              backup:
                 description: Specifies the parameters to backup a Cluster.
+                properties:
+                  backupMethod:
+                    description: Specifies the name of BackupMethod. The specified
+                      BackupMethod must be defined in the BackupPolicy.
+                    type: string
+                  backupName:
+                    description: Specifies the name of the Backup custom resource.
+                    type: string
+                  backupPolicyName:
+                    description: Indicates the name of the BackupPolicy applied to
+                      perform this Backup.
+                    type: string
+                  deletionPolicy:
+                    default: Delete
+                    description: Determines whether the backup contents stored in
+                      backup repository should be deleted when the Backup custom resource
+                      is deleted. Supported values are `Retain` and `Delete`. - `Retain`
+                      means that the backup content and its physical snapshot on backup
+                      repository are kept. - `Delete` means that the backup content
+                      and its physical snapshot on backup repository are deleted.
+                    enum:
+                    - Delete
+                    - Retain
+                    type: string
+                  parentBackupName:
+                    description: If the specified BackupMethod is incremental, `parentBackupName`
+                      is required.
+                    type: string
+                  retentionPeriod:
+                    description: "Determines the duration for which the Backup custom
+                      resources should be retained. \n The controller will automatically
+                      remove all Backup objects that are older than the specified
+                      RetentionPeriod. For example, RetentionPeriod of `30d` will
+                      keep only the Backup objects of last 30 days. Sample duration
+                      format: \n - years: 2y - months: 6mo - days: 30d - hours: 12h
+                      - minutes: 30m \n You can also combine the above durations.
+                      For example: 30d12h30m. If not set, the Backup objects will
+                      be kept forever. \n If the `deletionPolicy` is set to 'Delete',
+                      then the associated backup data will also be deleted along with
+                      the Backup object. Otherwise, only the Backup custom resource
+                      will be deleted."
+                    type: string
+                type: object
+              backupSpec:
+                description: 'Deprecated: since v0.9, use backup instead. Specifies
+                  the parameters to backup a Cluster.'
                 properties:
                   backupMethod:
                     description: Specifies the name of BackupMethod. The specified
@@ -113,14 +159,21 @@ spec:
                   to true is irreversible; further modifications to this field are
                   ineffective."
                 type: boolean
-              clusterRef:
+              clusterName:
                 description: Specifies the name of the Cluster resource that this
                   operation is targeting.
                 type: string
                 x-kubernetes-validations:
+                - message: forbidden to update spec.clusterName
+                  rule: self == oldSelf
+              clusterRef:
+                description: 'Deprecated: since v0.9, use clusterName instead. Specifies
+                  the name of the Cluster resource that this operation is targeting.'
+                type: string
+                x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
-              customSpec:
+              custom:
                 description: Specifies a custom operation defined by OpsDefinition.
                 properties:
                   components:
@@ -163,10 +216,7 @@ spec:
                     x-kubernetes-list-map-keys:
                     - componentName
                     x-kubernetes-list-type: map
-                  opsDefinitionRef:
-                    description: Specifies the name of the OpsDefinition.
-                    type: string
-                  parallelism:
+                  maxConcurrentComponents:
                     anyOf:
                     - type: integer
                     - type: string
@@ -180,13 +230,16 @@ spec:
                       are processed simultaneously by default. \n Note: This feature
                       is not implemented yet."
                     x-kubernetes-int-or-string: true
+                  opsDefinitionName:
+                    description: Specifies the name of the OpsDefinition.
+                    type: string
                   serviceAccountName:
                     description: Specifies the name of the ServiceAccount to be used
                       for executing the custom operation.
                     type: string
                 required:
                 - components
-                - opsDefinitionRef
+                - opsDefinitionName
                 type: object
               expose:
                 description: Lists Expose objects, each specifying a Component and
@@ -267,6 +320,17 @@ spec:
                               name is used to set `clusterService.name`. \n Note:
                               This field cannot be updated."
                             type: string
+                          podSelector:
+                            additionalProperties:
+                              type: string
+                            description: "Routes service traffic to pods with matching
+                              label keys and values. If specified, the service will
+                              only be exposed to pods matching the selector. \n Note:
+                              At least one of 'roleSelector' or 'selector' must be
+                              specified. If both are specified, a pod must match both
+                              conditions to be selected."
+                            type: object
+                            x-kubernetes-map-type: atomic
                           ports:
                             description: "Specifies Port definitions that are to be
                               exposed by a ClusterService. \n If not specified, the
@@ -358,17 +422,6 @@ spec:
                               or 'selector' must be specified. If both are specified,
                               a pod must match both conditions to be selected."
                             type: string
-                          selector:
-                            additionalProperties:
-                              type: string
-                            description: "Routes service traffic to pods with matching
-                              label keys and values. If specified, the service will
-                              only be exposed to pods matching the selector. \n Note:
-                              At least one of 'roleSelector' or 'selector' must be
-                              specified. If both are specified, a pod must match both
-                              conditions to be selected."
-                            type: object
-                            x-kubernetes-map-type: atomic
                           serviceType:
                             description: "Determines how the Service is exposed. Defaults
                               to 'ClusterIP'. Valid options are `ClusterIP`, `NodePort`,
@@ -2707,6 +2760,14 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.horizontalScaling
                   rule: self == oldSelf
+              preConditionDeadlineSeconds:
+                default: 0
+                description: Specifies the maximum time in seconds that the OpsRequest
+                  will wait for its pre-conditions to be met before it aborts the
+                  operation. If set to 0 (default), pre-conditions must be satisfied
+                  immediately for the OpsRequest to proceed.
+                format: int32
+                type: integer
               rebuildFrom:
                 description: Specifies the parameters to rebuild some instances. Rebuilding
                   an instance involves restoring its data from a backup or another
@@ -2726,7 +2787,25 @@ spec:
                     componentName:
                       description: Specifies the name of the Component.
                       type: string
-                    envForRestore:
+                    instances:
+                      description: Specifies the instances (Pods) that need to be
+                        rebuilt, typically operating as standbys.
+                      items:
+                        properties:
+                          name:
+                            description: Pod name of the instance.
+                            type: string
+                          targetNodeName:
+                            description: The instance will rebuild on the specified
+                              node when the instance uses local PersistentVolume as
+                              the storage disk. If not set, it will rebuild on a random
+                              node.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                    restoreEnv:
                       description: "Defines container environment variables for the
                         restore process. merged with the ones specified in the Backup
                         and ActionSet resources. \n Merge priority: Restore env >
@@ -2854,24 +2933,6 @@ spec:
                         type: object
                       type: array
                       x-kubernetes-preserve-unknown-fields: true
-                    instances:
-                      description: Specifies the instances (Pods) that need to be
-                        rebuilt, typically operating as standbys.
-                      items:
-                        properties:
-                          name:
-                            description: Pod name of the instance.
-                            type: string
-                          targetNodeName:
-                            description: The instance will rebuild on the specified
-                              node when the instance uses local PersistentVolume as
-                              the storage disk. If not set, it will rebuild on a random
-                              node.
-                            type: string
-                        required:
-                        - name
-                        type: object
-                      type: array
                   required:
                   - componentName
                   - instances
@@ -3095,60 +3156,14 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.restart
                   rule: self == oldSelf
-              restoreFrom:
-                description: Cluster RestoreFrom backup or point in time.
-                properties:
-                  backup:
-                    description: Refers to the backup name and component name used
-                      for restoration. Supports recovery of multiple Components.
-                    items:
-                      properties:
-                        ref:
-                          description: Refers to a reference backup that needs to
-                            be restored.
-                          properties:
-                            name:
-                              description: Refers to the specific name of the resource.
-                              type: string
-                            namespace:
-                              description: Refers to the specific namespace of the
-                                resource.
-                              type: string
-                          type: object
-                      type: object
-                    type: array
-                  pointInTime:
-                    description: Refers to the specific point in time for recovery.
-                    properties:
-                      ref:
-                        description: Refers to a reference source cluster that needs
-                          to be restored.
-                        properties:
-                          name:
-                            description: Refers to the specific name of the resource.
-                            type: string
-                          namespace:
-                            description: Refers to the specific namespace of the resource.
-                            type: string
-                        type: object
-                      time:
-                        description: Refers to the specific time point for restoration,
-                          with UTC as the time zone.
-                        format: date-time
-                        type: string
-                    type: object
-                type: object
-                x-kubernetes-validations:
-                - message: forbidden to update spec.restoreFrom
-                  rule: self == oldSelf
-              restoreSpec:
+              restore:
                 description: Specifies the parameters to restore a Cluster. Note that
                   this restore operation will roll back cluster services.
                 properties:
                   backupName:
                     description: Specifies the name of the Backup custom resource.
                     type: string
-                  doReadyRestoreAfterClusterRunning:
+                  deferPostReadyUntilClusterRunning:
                     description: "Controls the timing of PostReady actions during
                       the recovery process. \n If false (default), PostReady actions
                       execute when the Component reaches the \"Running\" state. If
@@ -3157,7 +3172,43 @@ spec:
                       proceeding. \n This setting is useful for coordinating PostReady
                       operations across the Cluster for optimal cluster conditions."
                     type: boolean
-                  restoreTimeStr:
+                  restorePointInTime:
+                    description: "Specifies the point in time to which the restore
+                      should be performed. Supported time formats: \n - RFC3339 format,
+                      e.g. \"2023-11-25T18:52:53Z\" - A human-readable date-time format,
+                      e.g. \"Jul 25,2023 18:52:53 UTC+0800\""
+                    type: string
+                  volumeRestorePolicy:
+                    default: Parallel
+                    description: "Specifies the policy for restoring volume claims
+                      of a Component's Pods. It determines whether the volume claims
+                      should be restored sequentially (one by one) or in parallel
+                      (all at once). Support values: \n - \"Serial\" - \"Parallel\""
+                    enum:
+                    - Serial
+                    - Parallel
+                    type: string
+                required:
+                - backupName
+                type: object
+              restoreSpec:
+                description: 'Deprecated: since v0.9, use restore instead. Specifies
+                  the parameters to restore a Cluster. Note that this restore operation
+                  will roll back cluster services.'
+                properties:
+                  backupName:
+                    description: Specifies the name of the Backup custom resource.
+                    type: string
+                  deferPostReadyUntilClusterRunning:
+                    description: "Controls the timing of PostReady actions during
+                      the recovery process. \n If false (default), PostReady actions
+                      execute when the Component reaches the \"Running\" state. If
+                      true, PostReady actions are delayed until the entire Cluster
+                      is \"Running,\" ensuring the cluster's overall stability before
+                      proceeding. \n This setting is useful for coordinating PostReady
+                      operations across the Cluster for optimal cluster conditions."
+                    type: boolean
+                  restorePointInTime:
                     description: "Specifies the point in time to which the restore
                       should be performed. Supported time formats: \n - RFC3339 format,
                       e.g. \"2023-11-25T18:52:53Z\" - A human-readable date-time format,
@@ -3390,14 +3441,6 @@ spec:
                   is "Succeed") before automatic deletion.
                 format: int32
                 type: integer
-              ttlSecondsBeforeAbort:
-                default: 0
-                description: Specifies the maximum time in seconds that the OpsRequest
-                  will wait for its pre-conditions to be met before it aborts the
-                  operation. If set to 0 (default), pre-conditions must be satisfied
-                  immediately for the OpsRequest to proceed.
-                format: int32
-                type: integer
               type:
                 description: "Specifies the type of this operation. Supported types
                   include \"Start\", \"Stop\", \"Restart\", \"Switchover\", \"VerticalScaling\",
@@ -3472,8 +3515,8 @@ spec:
                       description: Specifies the name of the Component.
                       type: string
                     instances:
-                      description: Specifies the instance template that need to vertical
-                        scale.
+                      description: Specifies the desired compute resources of the
+                        instance template that need to vertical scale.
                       items:
                         properties:
                           claims:
@@ -3574,8 +3617,8 @@ spec:
                       description: Specifies the name of the Component.
                       type: string
                     instances:
-                      description: Specifies the instance template that need to volume
-                        expand.
+                      description: Specifies the desired storage size of the instance
+                        template that need to volume expand.
                       items:
                         properties:
                           name:
@@ -3651,7 +3694,6 @@ spec:
                 - componentName
                 x-kubernetes-list-type: map
             required:
-            - clusterRef
             - type
             type: object
             x-kubernetes-validations:

@@ -256,8 +256,8 @@ var _ = Describe("OpsRequest webhook", func() {
 			Expect(k8sClient.Patch(ctx, opsRequest, patch)).ShouldNot(HaveOccurred())
 
 			By(fmt.Sprintf("expect an error for updating spec.ClusterServiceSelector when ops phase is %s", phase))
-			opsRequest.Spec.ClusterRef = newClusterName
-			Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("forbidden to update spec.clusterRef"))
+			opsRequest.Spec.ClusterName = newClusterName
+			Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("forbidden to update spec.clusterName"))
 		}
 
 		phaseList = []OpsPhase{OpsCreatingPhase, OpsRunningPhase, OpsCancellingPhase}
@@ -627,7 +627,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
 
 		By("By creating a configmap")
-		Expect(testCtx.CheckedCreateObj(ctx, createTestConfigmap(fmt.Sprintf("%s-%s-%s", opsRequest.Spec.ClusterRef, componentName, "for-test")))).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, createTestConfigmap(fmt.Sprintf("%s-%s-%s", opsRequest.Spec.ClusterName, componentName, "for-test")))).Should(Succeed())
 		opsRequest.Spec.Reconfigure = createReconfigureObj(componentName)
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in configmap"))
 
@@ -764,7 +764,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			opsRequest.Spec.ScriptSpec.Script = []string{"create database test;"}
 			opsRequest.Spec.ScriptSpec.ScriptFrom = nil
-			opsRequest.Spec.TTLSecondsBeforeAbort = int32Ptr(0)
+			opsRequest.Spec.PreConditionDeadlineSeconds = int32Ptr(0)
 			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 		})
 	})
@@ -782,8 +782,8 @@ func createTestOpsRequest(clusterName, opsRequestName string, opsType OpsType) *
 			},
 		},
 		Spec: OpsRequestSpec{
-			ClusterRef: clusterName,
-			Type:       opsType,
+			ClusterName: clusterName,
+			Type:        opsType,
 		},
 	}
 }

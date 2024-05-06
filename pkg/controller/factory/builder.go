@@ -218,12 +218,10 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 	}
 	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvcTplName
 
-	if component.VolumeTypes != nil {
-		for _, t := range component.VolumeTypes {
-			if t.Name == pvcTplName {
-				pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
-				break
-			}
+	for _, t := range component.VolumeTypes {
+		if t.Name == pvcTplName {
+			pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
+			break
 		}
 	}
 }
@@ -313,8 +311,8 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(cluster.Name, synthesizedComp.Name),
 		"$(HEADLESS_SVC_FQDN)":                                 constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, synthesizedComp.Name),
 	}
-	if len(synthesizedComp.Services) > 0 {
-		for _, p := range synthesizedComp.Services[0].Spec.Ports {
+	if len(synthesizedComp.ComponentServices) > 0 {
+		for _, p := range synthesizedComp.ComponentServices[0].Spec.Ports {
 			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
 		}
 	}

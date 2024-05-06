@@ -84,7 +84,7 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if opsRequest.Labels == nil {
 		opsRequest.Labels = make(map[string]string)
 	}
-	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
+	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.GetClusterName()
 	opsRequest.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	if err = controllerutil.SetOwnerReference(cluster, opsRequest, scheme); err != nil {
@@ -103,7 +103,7 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // If the cluster is not running, it will update the OpsRequest status to Running.
 func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	opsRequest := opsRes.OpsRequest
-	clusterDef := opsRequest.Spec.ClusterRef
+	clusterDef := opsRequest.Spec.GetClusterName()
 
 	// get cluster
 	cluster := &appsv1alpha1.Cluster{}
@@ -132,7 +132,7 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 }
 
 func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
-	backupName := opsRequest.Spec.RestoreSpec.BackupName
+	backupName := opsRequest.Spec.GetRestore().BackupName
 
 	// check if the backup exists
 	backup := &dpv1alpha1.Backup{}
@@ -151,11 +151,11 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 
 	// format and validate the restore time
 	if backupType == string(dpv1alpha1.BackupTypeContinuous) {
-		restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(opsRequest.Spec.RestoreSpec.RestoreTimeStr, backup)
+		restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(opsRequest.Spec.GetRestore().RestorePointInTime, backup)
 		if err != nil {
 			return nil, err
 		}
-		opsRequest.Spec.RestoreSpec.RestoreTimeStr = restoreTimeStr
+		opsRequest.Spec.GetRestore().RestorePointInTime = restoreTimeStr
 	}
 	// get the cluster object from backup
 	clusterObj, err := r.getClusterObjFromBackup(backup, opsRequest)
@@ -182,9 +182,9 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	if err := json.Unmarshal([]byte(clusterString), &cluster); err != nil {
 		return nil, err
 	}
-	restoreSpec := opsRequest.Spec.RestoreSpec
+	restoreSpec := opsRequest.Spec.GetRestore()
 	// set the restore annotation to cluster
-	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, restoreSpec.VolumeRestorePolicy, restoreSpec.RestoreTimeStr, restoreSpec.DoReadyRestoreAfterClusterRunning)
+	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, restoreSpec.VolumeRestorePolicy, restoreSpec.RestorePointInTime, restoreSpec.DeferPostReadyUntilClusterRunning)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 		cluster.Annotations = map[string]string{}
 	}
 	cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
-	cluster.Name = opsRequest.Spec.ClusterRef
+	cluster.Name = opsRequest.Spec.GetClusterName()
 	// Reset cluster services
 	var services []appsv1alpha1.ClusterService
 	for i := range cluster.Spec.Services {

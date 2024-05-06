@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -711,15 +712,20 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 
 	// step 1: update pv to retain
 	pv := &corev1.PersistentVolume{}
-	pvKey := types.NamespacedName{
-		Namespace: pvcKey.Namespace,
-		Name:      newPVC.Spec.VolumeName,
-	}
-	if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
-		if apierrors.IsNotFound(err) {
-			pvNotFound = true
-		} else {
-			return err
+	if len(newPVC.Spec.VolumeName) == 0 {
+		// the PV may be under provisioning
+		pvNotFound = true
+	} else {
+		pvKey := types.NamespacedName{
+			Namespace: pvcKey.Namespace,
+			Name:      newPVC.Spec.VolumeName,
+		}
+		if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
+			if apierrors.IsNotFound(err) {
+				pvNotFound = true
+			} else {
+				return err
+			}
 		}
 	}
 
@@ -836,23 +842,6 @@ func (r *componentWorkloadOps) buildProtoITSWorkloadVertex() *model.ObjectVertex
 func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeComp *component.SynthesizedComponent,
 	itsObj *workloads.InstanceSet, dag *graph.DAG) error {
 	graphCli := model.NewGraphClient(cli)
-	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
-		pvcs, err := component.ListOwnedPVCs(reqCtx.Ctx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
-		matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
-		prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
-		for _, pvc := range pvcs {
-			if strings.HasPrefix(pvc.Name, prefix) {
-				matchedPVCs = append(matchedPVCs, pvc)
-			}
-		}
-		return matchedPVCs, nil
-	}
 
 	// PVCs which have been added to the dag because of volume expansion.
 	pvcNameSet := sets.New[string]()
@@ -861,7 +850,7 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 	}
 
 	for _, vct := range synthesizeComp.VolumeClaimTemplates {
-		pvcs, err := getRunningVolumes(vct.Name)
+		pvcs, err := getRunningVolumes(reqCtx.Ctx, cli, synthesizeComp, itsObj, vct.Name)
 		if err != nil {
 			return err
 		}
@@ -873,6 +862,25 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 		}
 	}
 	return nil
+}
+
+func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
+	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
+	pvcs, err := component.ListOwnedPVCs(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
+	prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
+	for _, pvc := range pvcs {
+		if strings.HasPrefix(pvc.Name, prefix) {
+			matchedPVCs = append(matchedPVCs, pvc)
+		}
+	}
+	return matchedPVCs, nil
 }
 
 func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *workloads.InstanceSet) {

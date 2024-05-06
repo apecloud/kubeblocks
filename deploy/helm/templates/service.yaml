@@ -26,3 +26,4 @@ spec:
     {{- end }}
   selector:
     {{- include "kubeblocks.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: "apps"

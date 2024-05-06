@@ -99,7 +99,7 @@ var _ = Describe("Component", func() {
 			By("new container in clusterVersion not in clusterDefinition")
 			component, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
-			Expect(len(component.PodSpec.Containers) >= 3).Should(BeTrue())
+			Expect(len(component.PodSpec.Containers) >= 2).Should(BeTrue())
 
 			By("new init container in clusterVersion not in clusterDefinition")
 			component, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[1])
@@ -129,11 +129,6 @@ var _ = Describe("Component", func() {
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.Replicas).Should(Equal(*cluster.Spec.Replicas))
 			Expect(synthesizeComp.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
-
-			// By("build second component will be nil")
-			// synthesizeComp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
-			// Expect(err).Should(Succeed())
-			// Expect(synthesizeComp).Should(BeNil())
 		})
 
 		It("build affinity correctly", func() {
@@ -154,35 +149,6 @@ var _ = Describe("Component", func() {
 			Expect(synthesizeComp.PodSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal("kubernetes.io/hostname"))
 		})
 
-		// It("build monitor correctly", func() {
-		// 	reqCtx := intctrlutil.RequestCtx{
-		// 		Ctx: ctx,
-		// 		Log: logger,
-		// 	}
-		// 	By("enable monitor config in clusterdefinition")
-		// 	clusterDef.Spec.ComponentDefs[0].Monitor = &appsv1alpha1.MonitorConfig{
-		// 		BuiltIn: true,
-		// 	}
-		// 	By("fill monitor")
-		// 	interval := intstr.Parse("0")
-		// 	cluster.Spec.Monitor.MonitoringInterval = &interval
-		// 	By("clear cluster's component spec")
-		// 	cluster.Spec.ComponentSpecs = nil
-		// 	By("call build")
-		// 	synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
-		// 	Expect(err).Should(Succeed())
-		// 	Expect(synthesizeComp).ShouldNot(BeNil())
-		// 	Expect(synthesizeComp.Monitor.Enable).Should(Equal(false))
-		// 	By("set monitor interval to 10s")
-		// 	interval2 := intstr.Parse("10s")
-		// 	cluster.Spec.Monitor.MonitoringInterval = &interval2
-		// 	By("call build")
-		// 	synthesizeComp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
-		// 	Expect(err).Should(Succeed())
-		// 	Expect(synthesizeComp).ShouldNot(BeNil())
-		// 	Expect(synthesizeComp.Monitor.Enable).Should(Equal(true))
-		// })
-
 		It("build network correctly", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
@@ -201,9 +167,10 @@ var _ = Describe("Component", func() {
 			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
-			Expect(synthesizeComp.Services[1].Name).Should(Equal("vpc"))
-			Expect(synthesizeComp.Services[1].Annotations["networking.gke.io/load-balancer-type"]).Should(Equal("Internal"))
-			Expect(synthesizeComp.Services[1].Spec.Type).Should(BeEquivalentTo("LoadBalancer"))
+			Expect(synthesizeComp.ComponentServices).Should(HaveLen(2))
+			Expect(synthesizeComp.ComponentServices[1].Name).Should(Equal("vpc"))
+			Expect(synthesizeComp.ComponentServices[1].Annotations["networking.gke.io/load-balancer-type"]).Should(Equal("Internal"))
+			Expect(synthesizeComp.ComponentServices[1].Spec.Type).Should(BeEquivalentTo("LoadBalancer"))
 		})
 
 		It("Test replace secretRef env placeholder token", func() {

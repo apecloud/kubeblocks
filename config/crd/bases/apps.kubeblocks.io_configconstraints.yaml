@@ -304,27 +304,25 @@ spec:
                       the process.
                     properties:
                       batchParametersTemplate:
-                        description: "BatchParametersTemplate provides an optional
-                          Go template string to format the batch input data passed
-                          into the STDIN of the script when `batchReload` is set to
-                          'True'. The template uses the updated parameters' key-value
-                          pairs, accessible via the '$' variable. This allows for
-                          custom formatting of the input data. Example template: \n
-                          ```yaml batchParametersTemplate: |- {{- range $pKey, $pValue
-                          := $ }} {{ printf \"%s:%s\" $pKey $pValue }} {{- end }}
-                          ``` \n This example generates batch input data in a key:value
-                          format, sorted by keys. ``` key1:value1 key2:value2 key3:value3
-                          ``` \n If not specified, the default format is key=value,
-                          sorted by keys, for each updated parameter. ``` key1=value1
-                          key2=value2 key3=value3 ```"
+                        description: "Specifies a Go template string for formatting
+                          batch input data. It's used when `batchReload` is 'True'
+                          to format data passed into STDIN of the script. The template
+                          accesses key-value pairs of updated parameters via the '$'
+                          variable. This allows for custom formatting of the input
+                          data. \n Example template: \n ```yaml batchParametersTemplate:
+                          |- {{- range $pKey, $pValue := $ }} {{ printf \"%s:%s\"
+                          $pKey $pValue }} {{- end }} ``` \n This example generates
+                          batch input data in a key:value format, sorted by keys.
+                          ``` key1:value1 key2:value2 key3:value3 ``` \n If not specified,
+                          the default format is key=value, sorted by keys, for each
+                          updated parameter. ``` key1=value1 key2=value2 key3=value3
+                          ```"
                         type: string
                       batchReload:
-                        description: "Specifies whether to process dynamic parameter
-                          updates individually or collectively in a batch: \n - Set
-                          to 'True' to execute all parameter changes in one batch
-                          reload action. - Set to 'False' to execute a reload action
-                          for each individual parameter change. The default behavior,
-                          if not specified, is 'False'."
+                        description: "Controls whether parameter updates are processed
+                          individually or collectively in a batch: \n - 'True': Processes
+                          all changes in one batch reload. - 'False': Processes each
+                          change individually. \n Defaults to 'False' if unspecified."
                         type: boolean
                       command:
                         description: Specifies the command to execute in order to
@@ -333,14 +331,11 @@ spec:
                           type: string
                         type: array
                       sync:
-                        description: "Determines whether parameter updates should
-                          be synchronized with the config manager. Specifies the controller's
-                          reload strategy: \n - If set to 'True', the controller executes
-                          the reload action in synchronous mode, pausing execution
-                          until the reload completes. - If set to 'False', the controller
-                          executes the reload action in asynchronous mode, updating
-                          the ConfigMap without waiting for the reload process to
-                          finish."
+                        description: "Determines the synchronization mode of parameter
+                          updates with \"config-manager\". \n - 'True': Executes reload
+                          actions synchronously, pausing until completion. - 'False':
+                          Executes reload actions asynchronously, without waiting
+                          for completion."
                         type: boolean
                     required:
                     - command
@@ -350,25 +345,24 @@ spec:
                     properties:
                       namespace:
                         default: default
-                        description: Specifies the namespace where the referenced
-                          tpl script ConfigMap in. If left empty, by default in the
-                          "default" namespace.
+                        description: Specifies the namespace for the ConfigMap. If
+                          not specified, it defaults to the "default" namespace.
                         maxLength: 63
                         pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                         type: string
                       scriptConfigMapRef:
-                        description: Specifies the reference to the ConfigMap that
-                          contains the script to be executed for reload.
+                        description: Specifies the reference to the ConfigMap containing
+                          the scripts.
                         type: string
                       sync:
                         description: "Determines whether parameter updates should
-                          be synchronized with the config manager. Specifies the controller's
-                          reload strategy: \n - If set to 'True', the controller executes
-                          the reload action in synchronous mode, pausing execution
-                          until the reload completes. - If set to 'False', the controller
-                          executes the reload action in asynchronous mode, updating
-                          the ConfigMap without waiting for the reload process to
-                          finish."
+                          be synchronized with the \"config-manager\". Specifies the
+                          controller's reload strategy: \n - If set to 'True', the
+                          controller executes the reload action in synchronous mode,
+                          pausing execution until the reload completes. - If set to
+                          'False', the controller executes the reload action in asynchronous
+                          mode, updating the ConfigMap without waiting for the reload
+                          process to finish."
                         type: boolean
                     required:
                     - scriptConfigMapRef
@@ -429,20 +423,17 @@ spec:
                   can be referenced and executed by the dynamic reload and DownwardAction
                   to perform specific tasks or configurations."
                 items:
-                  description: ScriptConfig specifies the ConfigMap that contains
-                    the script to be executed for reload.
                   properties:
                     namespace:
                       default: default
-                      description: Specifies the namespace where the referenced tpl
-                        script ConfigMap in. If left empty, by default in the "default"
-                        namespace.
+                      description: Specifies the namespace for the ConfigMap. If not
+                        specified, it defaults to the "default" namespace.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     scriptConfigMapRef:
-                      description: Specifies the reference to the ConfigMap that contains
-                        the script to be executed for reload.
+                      description: Specifies the reference to the ConfigMap containing
+                        the scripts.
                       type: string
                   required:
                   - scriptConfigMapRef
@@ -814,7 +805,7 @@ spec:
                   is set to \"all\", modifications to `staticParameters` can also
                   trigger a reload. 2. `dynamicReloadAction` is set. \n If `dynamicReloadAction`
                   is not set or the modified parameters are not listed in `dynamicParameters`,
-                  dynamic reloading will not be triggered. \n Example: ```yaml reloadOptions:
+                  dynamic reloading will not be triggered. \n Example: ```yaml dynamicReloadAction:
                   tplScriptTrigger: namespace: kb-system scriptConfigMapRef: mysql-reload-script
                   sync: true ```"
                 properties:
@@ -831,27 +822,25 @@ spec:
                       the process.
                     properties:
                       batchParametersTemplate:
-                        description: "BatchParametersTemplate provides an optional
-                          Go template string to format the batch input data passed
-                          into the STDIN of the script when `batchReload` is set to
-                          'True'. The template uses the updated parameters' key-value
-                          pairs, accessible via the '$' variable. This allows for
-                          custom formatting of the input data. Example template: \n
-                          ```yaml batchParametersTemplate: |- {{- range $pKey, $pValue
-                          := $ }} {{ printf \"%s:%s\" $pKey $pValue }} {{- end }}
-                          ``` \n This example generates batch input data in a key:value
-                          format, sorted by keys. ``` key1:value1 key2:value2 key3:value3
-                          ``` \n If not specified, the default format is key=value,
-                          sorted by keys, for each updated parameter. ``` key1=value1
-                          key2=value2 key3=value3 ```"
+                        description: "Specifies a Go template string for formatting
+                          batch input data. It's used when `batchReload` is 'True'
+                          to format data passed into STDIN of the script. The template
+                          accesses key-value pairs of updated parameters via the '$'
+                          variable. This allows for custom formatting of the input
+                          data. \n Example template: \n ```yaml batchParametersTemplate:
+                          |- {{- range $pKey, $pValue := $ }} {{ printf \"%s:%s\"
+                          $pKey $pValue }} {{- end }} ``` \n This example generates
+                          batch input data in a key:value format, sorted by keys.
+                          ``` key1:value1 key2:value2 key3:value3 ``` \n If not specified,
+                          the default format is key=value, sorted by keys, for each
+                          updated parameter. ``` key1=value1 key2=value2 key3=value3
+                          ```"
                         type: string
                       batchReload:
-                        description: "Specifies whether to process dynamic parameter
-                          updates individually or collectively in a batch: \n - Set
-                          to 'True' to execute all parameter changes in one batch
-                          reload action. - Set to 'False' to execute a reload action
-                          for each individual parameter change. The default behavior,
-                          if not specified, is 'False'."
+                        description: "Controls whether parameter updates are processed
+                          individually or collectively in a batch: \n - 'True': Processes
+                          all changes in one batch reload. - 'False': Processes each
+                          change individually. \n Defaults to 'False' if unspecified."
                         type: boolean
                       command:
                         description: Specifies the command to execute in order to
@@ -860,14 +849,11 @@ spec:
                           type: string
                         type: array
                       sync:
-                        description: "Determines whether parameter updates should
-                          be synchronized with the config manager. Specifies the controller's
-                          reload strategy: \n - If set to 'True', the controller executes
-                          the reload action in synchronous mode, pausing execution
-                          until the reload completes. - If set to 'False', the controller
-                          executes the reload action in asynchronous mode, updating
-                          the ConfigMap without waiting for the reload process to
-                          finish."
+                        description: "Determines the synchronization mode of parameter
+                          updates with \"config-manager\". \n - 'True': Executes reload
+                          actions synchronously, pausing until completion. - 'False':
+                          Executes reload actions asynchronously, without waiting
+                          for completion."
                         type: boolean
                     required:
                     - command
@@ -877,25 +863,24 @@ spec:
                     properties:
                       namespace:
                         default: default
-                        description: Specifies the namespace where the referenced
-                          tpl script ConfigMap in. If left empty, by default in the
-                          "default" namespace.
+                        description: Specifies the namespace for the ConfigMap. If
+                          not specified, it defaults to the "default" namespace.
                         maxLength: 63
                         pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                         type: string
                       scriptConfigMapRef:
-                        description: Specifies the reference to the ConfigMap that
-                          contains the script to be executed for reload.
+                        description: Specifies the reference to the ConfigMap containing
+                          the scripts.
                         type: string
                       sync:
                         description: "Determines whether parameter updates should
-                          be synchronized with the config manager. Specifies the controller's
-                          reload strategy: \n - If set to 'True', the controller executes
-                          the reload action in synchronous mode, pausing execution
-                          until the reload completes. - If set to 'False', the controller
-                          executes the reload action in asynchronous mode, updating
-                          the ConfigMap without waiting for the reload process to
-                          finish."
+                          be synchronized with the \"config-manager\". Specifies the
+                          controller's reload strategy: \n - If set to 'True', the
+                          controller executes the reload action in synchronous mode,
+                          pausing execution until the reload completes. - If set to
+                          'False', the controller executes the reload action in asynchronous
+                          mode, updating the ConfigMap without waiting for the reload
+                          process to finish."
                         type: boolean
                     required:
                     - scriptConfigMapRef
@@ -1125,20 +1110,17 @@ spec:
                   can be referenced and executed by the dynamic reload and DownwardAction
                   to perform specific tasks or configurations."
                 items:
-                  description: ScriptConfig specifies the ConfigMap that contains
-                    the script to be executed for reload.
                   properties:
                     namespace:
                       default: default
-                      description: Specifies the namespace where the referenced tpl
-                        script ConfigMap in. If left empty, by default in the "default"
-                        namespace.
+                      description: Specifies the namespace for the ConfigMap. If not
+                        specified, it defaults to the "default" namespace.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     scriptConfigMapRef:
-                      description: Specifies the reference to the ConfigMap that contains
-                        the script to be executed for reload.
+                      description: Specifies the reference to the ConfigMap containing
+                        the scripts.
                       type: string
                   required:
                   - scriptConfigMapRef

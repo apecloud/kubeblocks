@@ -109,7 +109,7 @@ func (r restartOpsHandler) podApplyCompOps(
 	pod *corev1.Pod,
 	compOps ComponentOpsInteface,
 	opsStartTime metav1.Time,
-	templateName string) bool {
+	insTemplateName string) bool {
 	return !pod.CreationTimestamp.Before(&opsStartTime)
 }
 

@@ -1,4 +1,3 @@
-
 ---
 title: Cluster API Reference
 description: Cluster API Reference

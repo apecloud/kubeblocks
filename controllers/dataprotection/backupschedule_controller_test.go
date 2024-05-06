@@ -50,13 +50,13 @@ var _ = Describe("Backup Schedule Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
-		// namespaced
 		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupScheduleSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 
 		// wait all backup to be deleted, otherwise the controller maybe create
 		// job to delete the backup between the ClearResources function delete
@@ -72,7 +72,6 @@ var _ = Describe("Backup Schedule Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 	}
 

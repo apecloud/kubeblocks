@@ -3692,7 +3692,6 @@ spec:
                 - componentName
                 x-kubernetes-list-type: map
             required:
-            - clusterName
             - type
             type: object
             x-kubernetes-validations:

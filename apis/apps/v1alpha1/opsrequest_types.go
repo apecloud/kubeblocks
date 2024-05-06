@@ -32,7 +32,7 @@ type OpsRequestSpec struct {
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	//
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterName"
-	ClusterName string `json:"clusterName"`
+	ClusterName string `json:"clusterName,omitempty"`
 
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"

@@ -46,10 +46,7 @@ Create a mongodb cluster with specified cluster definition
 ```bash
 kubectl apply -f examples/mongodb/cluster.yaml
 ```
-Starting from kubeblocks 0.9.0, we introduced a more flexible cluster creation method based on components, allowing customization of cluster topology, functionalities and scale according to specific requirements.
-```bash
-kubectl apply -f examples/mongodb/cluster-cmpd.yaml
-```
+
 ### [Horizontal scaling](horizontalscale.yaml)
 Horizontal scaling out or in specified components replicas in the cluster
 ```bash

@@ -7,13 +7,13 @@ spec:
   clusterRef: ac-postgresql-cluster
   type: Custom
   customSpec:
-    items:
-      - componentName: postgresql
-        parameters:
-          - name: primary
-            value: ac-postgresql-cluster-postgresql-1
-          - name: candidate
-            value: ""
+    components:
+    - componentName: postgresql
+      parameters:
+      - name: primary
+        value: ac-postgresql-cluster-postgresql-0
+      - name: candidate
+        value: ""
     opsDefinitionRef: switchover
     parallelism: 0
   ttlSecondsBeforeAbort: 0

@@ -478,7 +478,14 @@ type ResourceRequirements struct {
 }
 
 type DependencySpec struct {
-	Name    string `json:"name"`
+	// Specifies the name of the dependency.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the version of the dependency.
+	//
+	// +kubebuilder:validation:Required
 	Version string `json:"version,omitempty"`
 }
 

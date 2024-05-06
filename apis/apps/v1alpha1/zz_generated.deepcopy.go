@@ -5643,8 +5643,18 @@ func (in *SpecificOpsRequest) DeepCopyInto(out *SpecificOpsRequest) {
 		*out = new(Backup)
 		**out = **in
 	}
+	if in.BackupSpec != nil {
+		in, out := &in.BackupSpec, &out.BackupSpec
+		*out = new(Backup)
+		**out = **in
+	}
 	if in.Restore != nil {
 		in, out := &in.Restore, &out.Restore
+		*out = new(Restore)
+		**out = **in
+	}
+	if in.RestoreSpec != nil {
+		in, out := &in.RestoreSpec, &out.RestoreSpec
 		*out = new(Restore)
 		**out = **in
 	}

@@ -670,6 +670,7 @@ var _ = Describe("Addon controller", func() {
 					g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				}).Should(Succeed())
 			}
+		})
 
 		It("should have provider and version in spec for Addon with provider and version in label initially", func() {
 			By("By create an addon with auto-install and labels contains provider and version information")

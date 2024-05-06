@@ -80,6 +80,11 @@ type AddonSpec struct {
 	//
 	// +optional
 	CliPlugins []CliPlugin `json:"cliPlugins,omitempty"`
+
+	// Specifies the dependencies of this addon
+	//
+	// +optional
+	Dependencies []DependencySpec `json:"dependencies,omitempty"`
 }
 
 // AddonStatus defines the observed state of an add-on.
@@ -470,6 +475,18 @@ type ResourceRequirements struct {
 	//
 	// +optional
 	Requests corev1.ResourceList `json:"requests,omitempty"`
+}
+
+type DependencySpec struct {
+	// Specifies the name of the dependency.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the version of the dependency.
+	//
+	// +kubebuilder:validation:Required
+	Version string `json:"version,omitempty"`
 }
 
 // +genclient

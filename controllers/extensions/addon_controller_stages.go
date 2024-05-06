@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
@@ -33,9 +34,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -262,6 +266,30 @@ func (r *deletionStage) Handle(ctx context.Context) {
 func (r *installableCheckStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
 		r.reqCtx.Log.V(1).Info("installableCheckStage", "phase", addon.Status.Phase)
+
+		// check if the installation/enable of current addon has a circular dependency
+		if addon.Status.Phase != extensionsv1alpha1.AddonEnabling && len(addon.Spec.Dependencies) != 0 {
+			if _, _, err := checkAddonDependency(ctx, &r.stageCtx, addon); err != nil {
+				r.reconciler.Event(addon, corev1.EventTypeWarning, InstallableRequirementUnmatched, err.Error())
+				r.reqCtx.Log.V(1).Info(err.Error())
+				patch := client.MergeFrom(addon.DeepCopy())
+				addon.Status.Phase = extensionsv1alpha1.AddonFailed
+				addon.Status.ObservedGeneration = addon.Generation
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:               extensionsv1alpha1.ConditionTypeChecked,
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: addon.Generation,
+					Reason:             InstallableRequirementUnmatched,
+					Message:            err.Error(),
+				})
+				if err := r.reconciler.Status().Patch(ctx, addon, patch); err != nil {
+					r.setRequeueWithErr(err, "")
+				}
+				r.setReconciled()
+				return
+			}
+		}
+
 		if addon.Spec.Installable == nil {
 			return
 		}
@@ -365,6 +393,14 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 				return
 			}
 			if addon.Status.Phase != extensionsv1alpha1.AddonDisabling {
+				if depended, err := DependByOtherAddon(ctx, &r.stageCtx, addon); err != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				} else if depended {
+					r.reqCtx.Log.V(1).Info("other addons are depended on it, can not be disabled")
+					r.setReconciled()
+					return
+				}
 				patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
 				return
 			}
@@ -759,6 +795,47 @@ func (r *enablingStage) Handle(ctx context.Context) {
 	r.helmTypeInstallStage.stageCtx = r.stageCtx
 	r.process(func(addon *extensionsv1alpha1.Addon) {
 		r.reqCtx.Log.V(1).Info("enablingStage", "phase", addon.Status.Phase)
+		// if there are some dependencies of current addon, we need to enabled them in topological order
+		if _, sequenceDependencies, err := checkAddonDependency(ctx, &r.stageCtx, addon); err != nil {
+			r.setRequeueWithErr(err, "")
+			return
+		} else {
+			allDependenciesEnabled := true
+			for _, dependency := range sequenceDependencies {
+				dependencyName := dependency.(string)
+				if dependencyName == addon.Name {
+					continue
+				}
+				dependencyAddon := &extensionsv1alpha1.Addon{}
+				if err := r.reconciler.Get(ctx, types.NamespacedName{Namespace: r.reqCtx.Req.Namespace, Name: dependencyName}, dependencyAddon); err != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				}
+				if dependencyAddon.Status.Phase != extensionsv1alpha1.AddonEnabled {
+					// the release of the dependency is not installed(not enabled)
+					allDependenciesEnabled = false
+					// enable the dependency addon
+					if dependencyAddon.Spec.InstallSpec == nil {
+						enabledAddonWithDefaultValues(ctx, &r.stageCtx, dependencyAddon, AddonAutoInstall, "")
+					} else if !dependencyAddon.Spec.InstallSpec.Enabled {
+						patch := client.MergeFrom(addon.DeepCopy())
+						dependencyAddon.Spec.InstallSpec.Enabled = true
+						if err := r.reconciler.Patch(ctx, dependencyAddon, patch); err != nil {
+							r.setRequeueWithErr(err, "")
+							return
+						}
+					}
+				}
+				msg := fmt.Sprintf("dependency %s is enabled", dependencyName)
+				r.reqCtx.Log.V(1).Info(msg)
+			}
+
+			if !allDependenciesEnabled {
+				// some dependencies are not enabled, wait for them to be enabled
+				r.setRequeueAfter(time.Second, "")
+				return
+			}
+		}
 		switch addon.Spec.Type {
 		case extensionsv1alpha1.HelmType:
 			r.helmTypeInstallStage.Handle(ctx)
@@ -1081,4 +1158,130 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 		return true
 	}
 	return false
+}
+
+func checkVersionMatched(requiredVersion, currentVersion string) (bool, error) {
+	if len(currentVersion) == 0 {
+		return false, nil
+	}
+	if len(requiredVersion) == 0 {
+		return true, nil
+	}
+	requiredVersion = ">=" + requiredVersion
+	if strings.Contains(currentVersion, "-") {
+		addPreReleaseInfo := func(constraint string) string {
+			constraint = strings.Trim(constraint, " ")
+			split := strings.Split(constraint, "-")
+			if len(split) == 1 && (strings.HasPrefix(constraint, ">") || strings.Contains(constraint, "<")) {
+				constraint += "-0"
+			}
+			return constraint
+		}
+		rules := strings.Split(requiredVersion, ",")
+		for i := range rules {
+			rules[i] = addPreReleaseInfo(rules[i])
+		}
+		requiredVersion = strings.Join(rules, ",")
+	}
+	constraint, err := semver.NewConstraint(requiredVersion)
+	if err != nil {
+		return false, err
+	}
+	v, err := semver.NewVersion(currentVersion)
+	if err != nil {
+		return false, err
+	}
+	validate, _ := constraint.Validate(v)
+	return validate, nil
+}
+
+// check if all the dependency are installed and not fail
+// check if  circular dependency is existing
+// give the top sort of all the dependencies, return it
+func checkAddonDependency(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) (bool, []graph2.Vertex, error) {
+	addonNameToID := map[string]int{}
+	visited := map[string]bool{}
+	addonList := &extensionsv1alpha1.AddonList{}
+	if err := stageCtx.reconciler.List(ctx, addonList, client.InNamespace(addon.Namespace)); err != nil {
+		return false, nil, err
+	}
+
+	dag := graph2.NewDAG()
+	// construct the map between name and id
+	for i, item := range addonList.Items {
+		addonNameToID[item.Name] = i
+	}
+
+	// construct the graph which represents the dependency relationship among addons
+	var constructGraph func(addon *extensionsv1alpha1.Addon) error
+	constructGraph = func(addon *extensionsv1alpha1.Addon) error {
+		visited[addon.Name] = true
+		for _, dependency := range addon.Spec.Dependencies {
+			if _, exist := addonNameToID[dependency.Name]; !exist {
+				return fmt.Errorf("dependency %s not exist", dependency.Name)
+			}
+			dag.AddConnect(addon.Name, dependency.Name)
+			if !visited[dependency.Name] {
+				dependencyAddon := &extensionsv1alpha1.Addon{}
+				if err := stageCtx.reconciler.Get(ctx, types.NamespacedName{Namespace: stageCtx.reqCtx.Req.Namespace, Name: dependency.Name}, dependencyAddon); err != nil {
+					return err
+				}
+				if dependencyAddon.Status.Phase == extensionsv1alpha1.AddonFailed {
+					return fmt.Errorf("dependency %s failed", dependency.Name)
+				}
+				if versionMatched, err := checkVersionMatched(dependency.Version, dependencyAddon.Spec.Version); err != nil {
+					return err
+				} else if !versionMatched {
+					return fmt.Errorf("version %s not matched", dependencyAddon.Spec.Version)
+				}
+				if err := constructGraph(dependencyAddon); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	dag.AddVertex(addon.Name)
+	if err := constructGraph(addon); err != nil {
+		return false, nil, err
+	}
+
+	// TopSort
+	result, err := TopSortForDependency(dag)
+	if err != nil {
+		return false, nil, err
+	}
+	return true, result, nil
+}
+
+func TopSortForDependency(dag *graph2.DAG) ([]graph2.Vertex, error) {
+	result := make([]graph2.Vertex, 0)
+	walkFunc := func(v graph2.Vertex) error {
+		result = append(result, v)
+		return nil
+	}
+
+	if err := dag.WalkReverseTopoOrder(walkFunc, nil); err != nil {
+		// this will validate cases of self-cycle and cycle
+		return nil, err
+	}
+	return result, nil
+}
+
+func DependByOtherAddon(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) (bool, error) {
+	addonList := &extensionsv1alpha1.AddonList{}
+	if err := stageCtx.reconciler.List(ctx, addonList, client.InNamespace(addon.Namespace)); err != nil {
+		return false, err
+	}
+	for _, item := range addonList.Items {
+		if item.Spec.Dependencies != nil {
+			for _, dependency := range item.Spec.Dependencies {
+				if dependency.Name == addon.Name {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
 }

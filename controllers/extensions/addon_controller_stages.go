@@ -1108,7 +1108,6 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 	return false
 }
 
-
 func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
 	if addon.Spec.Type == "Helm" {
 		if addon.Spec.Helm == nil || addon.Spec.Helm.ChartLocationURL == "" {

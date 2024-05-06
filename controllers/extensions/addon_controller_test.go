@@ -648,7 +648,6 @@ var _ = Describe("Addon controller", func() {
 			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
 		})
 
-
 		It("should failed reconcile a custom resource for Addon with missing spec helm of helm chartLocationURL", func() {
 			By("By check Kubernetes Version to decide if check")
 			// if k8s version > 1.23, it has kubebuilder X-Validation, no need to check again

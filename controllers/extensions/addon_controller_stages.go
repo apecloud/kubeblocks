@@ -121,6 +121,10 @@ type genIDProceedCheckStage struct {
 	stageCtx
 }
 
+type metadataCheckStage struct {
+	stageCtx
+}
+
 type installableCheckStage struct {
 	stageCtx
 }
@@ -201,6 +205,18 @@ func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 				r.setReconciled()
 				return
 			}
+		}
+	})
+	r.next.Handle(ctx)
+}
+
+func (r *metadataCheckStage) Handle(ctx context.Context) {
+	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("metadataCheckStage", "phase", addon.Status.Phase)
+		setAddonProviderAndVersion(ctx, &r.stageCtx, addon)
+		if err := r.reconciler.Client.Update(ctx, addon); err != nil {
+			r.setRequeueWithErr(err, "")
+			return
 		}
 	})
 	r.next.Handle(ctx)
@@ -971,7 +987,6 @@ func enabledAddonWithDefaultValues(ctx context.Context, stageCtx *stageCtx,
 		if di.AddonInstallSpec.IsEmpty() {
 			addon.Annotations[AddonDefaultIsEmpty] = trueVal
 		}
-		setAddonProviderAndVersion(ctx, stageCtx, addon)
 		if err := stageCtx.reconciler.Client.Update(ctx, addon); err != nil {
 			stageCtx.setRequeueWithErr(err, "")
 			return
@@ -1086,22 +1101,20 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 
 func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {
 	// if not set provider and version in spec, set it from labels
-	if addon.Spec.Provider == "" && addon.Labels != nil && len(addon.Labels[AddonProvider]) != 0 {
+	if addon.Labels == nil {
+		addon.Labels = map[string]string{}
+	}
+	if addon.Spec.Provider == "" {
 		addon.Spec.Provider = addon.Labels[AddonProvider]
 	}
-	if addon.Spec.Version == "" && addon.Labels != nil && len(addon.Labels[AddonVersion]) != 0 {
+	if addon.Spec.Version == "" {
 		addon.Spec.Version = addon.Labels[AddonVersion]
 	}
 	// handle the reverse logic
-	if addon.Labels == nil || len(addon.Labels[AddonProvider]) == 0 || len(addon.Labels[AddonVersion]) == 0 {
-		if addon.Labels == nil {
-			addon.Labels = make(map[string]string)
-		}
-		if len(addon.Spec.Provider) != 0 {
-			addon.Labels[AddonProvider] = addon.Spec.Provider
-		}
-		if len(addon.Spec.Version) != 0 {
-			addon.Labels[AddonVersion] = addon.Spec.Version
-		}
+	if len(addon.Labels[AddonProvider]) == 0 && len(addon.Spec.Provider) != 0 {
+		addon.Labels[AddonProvider] = addon.Spec.Provider
+	}
+	if len(addon.Labels[AddonVersion]) == 0 && len(addon.Spec.Version) != 0 {
+		addon.Labels[AddonVersion] = addon.Spec.Version
 	}
 }

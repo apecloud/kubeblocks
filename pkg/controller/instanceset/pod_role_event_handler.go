@@ -109,6 +109,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	role := strings.ToLower(message.Role)
 
 	snapshot := parseGlobalRoleSnapshot(role, event)
+	reqCtx.Log.Info("get snap shot", "snapshot", snapshot)
 	for _, pair := range snapshot.PodRoleNamePairs {
 		podName := types.NamespacedName{
 			Namespace: event.InvolvedObject.Namespace,

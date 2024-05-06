@@ -47,6 +47,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
+	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
+
 	// +kubebuilder:scaffold:imports
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -81,9 +84,10 @@ const (
 	leaderElectIDFlagKey flagName = "leader-elect-id"
 
 	// switch flags key for API groups
-	appsFlagKey       flagName = "apps"
-	extensionsFlagKey flagName = "extensions"
-	workloadsFlagKey  flagName = "workloads"
+	appsFlagKey         flagName = "apps"
+	extensionsFlagKey   flagName = "extensions"
+	workloadsFlagKey    flagName = "workloads"
+	experimentalFlagKey flagName = "experimental"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
@@ -108,6 +112,7 @@ func init() {
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(legacy.AddToScheme(scheme))
 	utilruntime.Must(apiextv1.AddToScheme(scheme))
+	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -168,6 +173,8 @@ func setupFlags() {
 		"Enable the extensions controller manager.")
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager.")
+	flag.Bool(experimentalFlagKey.String(), false,
+		"Enable the experimental controller manager.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
@@ -507,6 +514,16 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
 		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(experimentalFlagKey.viperName()) {
+		if err = (&experimentalcontrollers.NodeAwareScalerReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "NodeAwareScaler")
 			os.Exit(1)
 		}
 	}

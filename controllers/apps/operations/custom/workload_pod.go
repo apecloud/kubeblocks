@@ -50,7 +50,7 @@ func (w *WorkloadAction) checkPodStatus(actionCtx ActionContext,
 	taskIndex int) (bool, bool, error) {
 	return actionCtx.checkPodTaskStatus(task, actionCtx.Action.Workload.BackoffLimit, func() error {
 		targetPodTemplate, targetPod, err := getTargetTemplateAndPod(actionCtx.ReqCtx.Ctx, actionCtx.Client,
-			w.OpsDef, actionCtx.Action.Workload.TargetPodTemplate, task.TargetPodName, w.OpsRequest.Namespace)
+			w.OpsDef, actionCtx.Action.Workload.PodInfoExtractorName, task.TargetPodName, w.OpsRequest.Namespace)
 		if err != nil {
 			return err
 		}

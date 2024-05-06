@@ -59,8 +59,8 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if err != nil {
 		return intctrlutil.NewFatalError(err.Error())
 	}
-	applyReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string, isSharding bool) {
-		componentKey := getComponentKeyForStartSnapshot(componentName, "", isSharding)
+	applyReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string) {
+		componentKey := getComponentKeyForStartSnapshot(componentName, "")
 		replicasOfSnapshot := componentReplicasMap[componentKey]
 		if replicasOfSnapshot == 0 {
 			return
@@ -69,7 +69,7 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		if compSpec.Replicas == 0 {
 			compSpec.Replicas = replicasOfSnapshot
 			for i := range compSpec.Instances {
-				componentKey = getComponentKeyForStartSnapshot(componentName, compSpec.Instances[i].Name, isSharding)
+				componentKey = getComponentKeyForStartSnapshot(componentName, compSpec.Instances[i].Name)
 				replicasOfSnapshot = componentReplicasMap[componentKey]
 				if replicasOfSnapshot == 0 {
 					continue
@@ -80,11 +80,11 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	}
 	for i := range cluster.Spec.ComponentSpecs {
 		compSpec := &cluster.Spec.ComponentSpecs[i]
-		applyReplicas(compSpec, compSpec.Name, false)
+		applyReplicas(compSpec, compSpec.Name)
 	}
 	for i := range cluster.Spec.ShardingSpecs {
 		shardingSpec := &cluster.Spec.ShardingSpecs[i]
-		applyReplicas(&shardingSpec.Template, shardingSpec.Name, true)
+		applyReplicas(&shardingSpec.Template, shardingSpec.Name)
 	}
 	// delete the replicas snapshot of components from the cluster.
 	delete(cluster.Annotations, constant.SnapShotForStartAnnotationKey)
@@ -96,7 +96,7 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32 {
 		componentReplicasMap, _ := getComponentReplicasSnapshot(opsRequest.Annotations)
-		componentKey := getComponentKeyForStartSnapshot(compOps.GetComponentName(), "", compOps.IsShardingComponent())
+		componentKey := getComponentKeyForStartSnapshot(compOps.GetComponentName(), "")
 		replicas, ok := componentReplicasMap[componentKey]
 		if !ok {
 			return nil

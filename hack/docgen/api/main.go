@@ -182,6 +182,8 @@ func main() {
 
 		// remove every line's trailing whitespace & empty line
 		s := regexp.MustCompile(`(?m)\s+$`).ReplaceAllString(b.String(), "")
+		// remove rest empty lines
+		s = regexp.MustCompile(`(?m)^$[\r\n]*`).ReplaceAllString(s, "")
 		// remove leading whitespace if a line begins with an HTML tag "<...>"
 		s = regexp.MustCompile(`(?m)^\s+<`).ReplaceAllString(s, "<")
 		// remove leading whitespace if the last line ends with an HTML tag "<...>"

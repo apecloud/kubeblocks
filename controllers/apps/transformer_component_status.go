@@ -22,13 +22,10 @@ package apps
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -42,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 const (
@@ -334,7 +330,7 @@ func (r *componentStatusHandler) hasVolumeExpansionRunning() (bool, bool, error)
 		failed  bool
 	)
 	for _, vct := range r.runningITS.Spec.VolumeClaimTemplates {
-		volumes, err := r.getRunningVolumes(r.reqCtx, r.cli, vct.Name, r.runningITS)
+		volumes, err := getRunningVolumes(r.reqCtx.Ctx, r.cli, r.synthesizeComp, r.runningITS, vct.Name)
 		if err != nil {
 			return false, false, err
 		}
@@ -349,28 +345,6 @@ func (r *componentStatusHandler) hasVolumeExpansionRunning() (bool, bool, error)
 	return running, failed, nil
 }
 
-// getRunningVolumes gets the running volumes of the ITS.
-func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string,
-	itsObj *workloads.InstanceSet) ([]*corev1.PersistentVolumeClaim, error) {
-	labels := constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name)
-	pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
-		generics.PersistentVolumeClaimSignature, r.cluster.Namespace, labels, inDataContext4C())
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
-	prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
-	for _, pvc := range pvcs {
-		if strings.HasPrefix(pvc.Name, prefix) {
-			matchedPVCs = append(matchedPVCs, pvc)
-		}
-	}
-	return matchedPVCs, nil
-}
-
 // hasFailedPod checks if the instance set has failed pod.
 func (r *componentStatusHandler) hasFailedPod() (bool, appsv1alpha1.ComponentMessageMap) {
 	messages := appsv1alpha1.ComponentMessageMap{}
@@ -383,15 +357,7 @@ func (r *componentStatusHandler) hasFailedPod() (bool, appsv1alpha1.ComponentMes
 	}
 
 	// check InstanceReady condition
-	condition := meta.FindStatusCondition(r.runningITS.Status.Conditions, string(workloads.InstanceReady))
-	if condition == nil {
-		return false, nil
-	}
-	if condition.Status == metav1.ConditionFalse {
-		if time.Now().After(condition.LastTransitionTime.Add(intctrlutil.PodScheduledFailedTimeout)) {
-			messages.SetObjectMessage(workloads.Kind, r.runningITS.Name, condition.Message)
-			return true, messages
-		}
+	if !meta.IsStatusConditionTrue(r.runningITS.Status.Conditions, string(workloads.InstanceReady)) {
 		return false, nil
 	}
 
@@ -403,6 +369,7 @@ func (r *componentStatusHandler) hasFailedPod() (bool, appsv1alpha1.ComponentMes
 		return false, nil
 	}
 	probeTimeoutDuration := time.Duration(appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady) * time.Second
+	condition := meta.FindStatusCondition(r.runningITS.Status.Conditions, string(workloads.InstanceReady))
 	if time.Now().After(condition.LastTransitionTime.Add(probeTimeoutDuration)) {
 		messages.SetObjectMessage(workloads.Kind, r.runningITS.Name, "Role probe timeout, check whether the application is available")
 		return true, messages

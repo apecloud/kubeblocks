@@ -29,6 +29,10 @@ const (
 	NoDeleteJobs         = "extensions.kubeblocks.io/no-delete-jobs"
 	AddonDefaultIsEmpty  = "addons.extensions.kubeblocks.io/default-is-empty"
 
+	// label keys
+	AddonProvider = "addon.kubeblocks.io/provider"
+	AddonVersion  = "addon.kubeblocks.io/version"
+
 	// condition reasons
 	AddonDisabled = "AddonDisabled"
 	AddonEnabled  = "AddonEnabled"

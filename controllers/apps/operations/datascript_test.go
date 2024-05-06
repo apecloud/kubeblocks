@@ -88,7 +88,7 @@ var _ = Describe("DataScriptOps", func() {
 			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: comp},
 			Script:       []string{"CREATE TABLE test (id INT);"},
 		}
-		ops.Spec.TTLSecondsBeforeAbort = int32Ptr(ttlBeforeAbort)
+		ops.Spec.PreConditionDeadlineSeconds = int32Ptr(ttlBeforeAbort)
 		Expect(testCtx.CreateObj(testCtx.Ctx, ops)).Should(Succeed())
 		ops.Status.Phase = appsv1alpha1.OpsPendingPhase
 		return ops

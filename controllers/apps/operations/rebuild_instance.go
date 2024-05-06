@@ -166,7 +166,7 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 				continue
 			}
 			// rebuild instance
-			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.EnvForRestore, &progressDetail, instance, v.BackupName, i)
+			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.RestoreEnv, &progressDetail, instance, v.BackupName, i)
 			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				// If a fatal error occurs, this instance rebuilds failed.
 				progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, err.Error())
@@ -777,7 +777,7 @@ func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 		return false, nil
 	}
 	// If roleProbe is not defined, return true.
-	if synthesizedComp.Roles == nil && !slices.Contains([]appsv1alpha1.WorkloadType{appsv1alpha1.Consensus, appsv1alpha1.Replication}, synthesizedComp.WorkloadType) {
+	if len(synthesizedComp.Roles) == 0 {
 		return true, nil
 	}
 	// check if the role detection is successfully.

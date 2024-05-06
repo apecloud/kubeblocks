@@ -22,9 +22,9 @@ package operations
 import (
 	"encoding/json"
 	"fmt"
-	"slices"
 	"time"
 
+	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,23 +77,23 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}); err != nil {
 		return err
 	}
-	setReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string, isSharding bool) {
-		compKey := getComponentKeyForStartSnapshot(componentName, "", isSharding)
+	setReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string) {
+		compKey := getComponentKeyForStartSnapshot(componentName, "")
 		componentReplicasMap[compKey] = compSpec.Replicas
 		expectReplicas := int32(0)
 		compSpec.Replicas = expectReplicas
 		for i := range compSpec.Instances {
-			compKey = getComponentKeyForStartSnapshot(componentName, compSpec.Instances[i].Name, isSharding)
+			compKey = getComponentKeyForStartSnapshot(componentName, compSpec.Instances[i].Name)
 			componentReplicasMap[compKey] = intctrlutil.TemplateReplicas(compSpec.Instances[i])
 			compSpec.Instances[i].Replicas = &expectReplicas
 		}
 	}
 	for i := range cluster.Spec.ComponentSpecs {
 		compSpec := &cluster.Spec.ComponentSpecs[i]
-		setReplicas(compSpec, compSpec.Name, false)
+		setReplicas(compSpec, compSpec.Name)
 	}
 	for i, v := range cluster.Spec.ShardingSpecs {
-		setReplicas(&cluster.Spec.ShardingSpecs[i].Template, v.Name, true)
+		setReplicas(&cluster.Spec.ShardingSpecs[i].Template, v.Name)
 	}
 	componentReplicasSnapshot, err := json.Marshal(componentReplicasMap)
 	if err != nil {
@@ -134,12 +134,11 @@ func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func getComponentKeyForStartSnapshot(compName, templateName string, isSharding bool) string {
-	key := getCompOpsKey(compName, isSharding)
+func getComponentKeyForStartSnapshot(compName, templateName string) string {
 	if templateName != "" {
-		key += "." + templateName
+		return fmt.Sprintf("%s.%s", compName, templateName)
 	}
-	return key
+	return compName
 }
 
 func saveLastConfigurationForStopAndStart(opsRes *OpsResource) {
@@ -162,6 +161,6 @@ func saveLastConfigurationForStopAndStart(opsRes *OpsResource) {
 		lastConfiguration.Components[v.Name] = getLastComponentConfiguration(v)
 	}
 	for _, v := range opsRes.Cluster.Spec.ShardingSpecs {
-		lastConfiguration.Components[getShardingKey(v.Name)] = getLastComponentConfiguration(v.Template)
+		lastConfiguration.Components[v.Name] = getLastComponentConfiguration(v.Template)
 	}
 }

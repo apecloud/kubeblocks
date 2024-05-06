@@ -207,7 +207,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 		return nil
 	}
 	jobActionLabels := constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name)
-	if comp.WorkloadType == appsv1alpha1.Consensus || comp.WorkloadType == appsv1alpha1.Replication {
+	if len(comp.Roles) > 0 {
 		jobActionLabels[instanceset.AccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
 	}
 	sourceTargetName := compObj.Annotations[constant.BackupSourceTargetAnnotationKey]

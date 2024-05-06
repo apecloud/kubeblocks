@@ -33,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -125,7 +126,7 @@ func PatchOpsStatus(ctx context.Context,
 
 // PatchClusterNotFound patches ClusterNotFound condition to the OpsRequest.status.conditions.
 func PatchClusterNotFound(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
-	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.ClusterRef)
+	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.GetClusterName())
 	condition := appsv1alpha1.NewValidateFailedCondition(appsv1alpha1.ReasonClusterNotFound, message)
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
@@ -225,7 +226,7 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 	}
 	// check if entry-condition is met
 	// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
-	if ops.Spec.TTLSecondsBeforeAbort == nil || (time.Now().After(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.TTLSecondsBeforeAbort) * time.Second))) {
+	if ops.Spec.PreConditionDeadlineSeconds == nil || (time.Now().After(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.PreConditionDeadlineSeconds) * time.Second))) {
 		return nil
 	}
 
@@ -290,4 +291,21 @@ func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	return opsutil.UpdateClusterOpsAnnotations(reqCtx.Ctx, cli, opsRes.Cluster, opsRequestSlice)
+}
+
+func updateHAConfigIfNecessary(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, switchBoolStr string) error {
+	haConfigName, ok := opsRequest.Annotations[constant.DisableHAAnnotationKey]
+	if !ok {
+		return nil
+	}
+	haConfig := &corev1.ConfigMap{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: haConfigName, Namespace: opsRequest.Namespace}, haConfig); err != nil {
+		return err
+	}
+	val, ok := haConfig.Annotations["enable"]
+	if !ok || val == switchBoolStr {
+		return nil
+	}
+	haConfig.Annotations["enable"] = switchBoolStr
+	return cli.Update(reqCtx.Ctx, haConfig)
 }

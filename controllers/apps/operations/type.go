@@ -102,9 +102,11 @@ type progressResource struct {
 	// cluster component name. By default, it is the componentSpec.name.
 	// but if it is a sharding component, the componentName is generated randomly.
 	fullComponentName string
-	clusterComponent  *appsv1alpha1.ClusterComponentSpec
-	clusterDef        *appsv1alpha1.ClusterDefinition
-	componentDef      *appsv1alpha1.ComponentDefinition
+	// checks if the component is a sharding component
+	isShardingComponent bool
+	clusterComponent    *appsv1alpha1.ClusterComponentSpec
+	clusterDef          *appsv1alpha1.ClusterDefinition
+	componentDef        *appsv1alpha1.ComponentDefinition
 	// record which pods need to updated during this operation.
 	updatedPodSet map[string]string
 	compOps       ComponentOpsInteface

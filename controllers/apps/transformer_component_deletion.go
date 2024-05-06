@@ -176,6 +176,7 @@ func compOwnedKinds() []client.ObjectList {
 		&rbacv1.RoleBindingList{},
 		&batchv1.JobList{},
 		&dpv1alpha1.RestoreList{},
+		&dpv1alpha1.BackupList{},
 		&appsv1alpha1.ConfigurationList{},
 	}
 }

@@ -61,7 +61,7 @@ func (w *WorkloadAction) checkJobStatus(actionCtx ActionContext, task *appsv1alp
 	)
 	createIfNotExist := func() error {
 		targetPodTemplate, targetPod, err := getTargetTemplateAndPod(actionCtx.ReqCtx.Ctx, actionCtx.Client,
-			w.OpsDef, actionCtx.Action.Workload.TargetPodTemplate, task.TargetPodName, w.OpsRequest.Namespace)
+			w.OpsDef, actionCtx.Action.Workload.PodInfoExtractorName, task.TargetPodName, w.OpsRequest.Namespace)
 		if err != nil {
 			return err
 		}

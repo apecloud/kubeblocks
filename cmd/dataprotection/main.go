@@ -77,8 +77,9 @@ const (
 	leaderElectFlagKey   flagName = "leader-elect"
 	leaderElectIDFlagKey flagName = "leader-elect-id"
 
-	multiClusterKubeConfigFlagKey flagName = "multi-cluster-kubeconfig"
-	multiClusterContextsFlagKey   flagName = "multi-cluster-contexts"
+	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
+	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
+	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
 )
 
 var (
@@ -119,12 +120,13 @@ func init() {
 
 func main() {
 	var (
-		metricsAddr            string
-		enableLeaderElection   bool
-		enableLeaderElectionID string
-		probeAddr              string
-		multiClusterKubeConfig string
-		multiClusterContexts   string
+		metricsAddr                  string
+		enableLeaderElection         bool
+		enableLeaderElectionID       string
+		probeAddr                    string
+		multiClusterKubeConfig       string
+		multiClusterContexts         string
+		multiClusterContextsDisabled string
 	)
 
 	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
@@ -139,6 +141,7 @@ func main() {
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
+	flag.String(multiClusterContextsDisabledFlagKey.String(), "", "Kube contexts that mark as disabled.")
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
@@ -184,6 +187,7 @@ func main() {
 	enableLeaderElectionID = viper.GetString(leaderElectIDFlagKey.viperName())
 	multiClusterKubeConfig = viper.GetString(multiClusterKubeConfigFlagKey.viperName())
 	multiClusterContexts = viper.GetString(multiClusterContextsFlagKey.viperName())
+	multiClusterContextsDisabled = viper.GetString(multiClusterContextsDisabledFlagKey.viperName())
 
 	setupLog.Info(fmt.Sprintf("config settings: %v", viper.AllSettings()))
 	if err := validateRequiredToParseConfigs(); err != nil {
@@ -251,7 +255,8 @@ func main() {
 	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
 
 	// multi-cluster manager for all data-plane k8s
-	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetConfig(), mgr.GetClient(), multiClusterKubeConfig, multiClusterContexts)
+	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetConfig(), mgr.GetClient(),
+		multiClusterKubeConfig, multiClusterContexts, multiClusterContextsDisabled)
 	if err != nil {
 		setupLog.Error(err, "unable to setup multi-cluster manager")
 		os.Exit(1)

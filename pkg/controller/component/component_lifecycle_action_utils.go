@@ -214,6 +214,9 @@ func renderActionCmdJob(ctx context.Context,
 		for i := range job.Spec.Template.Spec.Containers {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
 		}
+		if customAction.RetryPolicy != nil && customAction.RetryPolicy.MaxRetries > 0 {
+			job.Spec.BackoffLimit = func(i int32) *int32 { return &i }(int32(customAction.RetryPolicy.MaxRetries))
+		}
 		return job, nil
 	}
 

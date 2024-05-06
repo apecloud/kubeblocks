@@ -109,13 +109,13 @@ KubeBlocks 支持创建两种 Redis 集群：单机版（Standalone）和主备�
 创建 Redis 单机版。
 
 ```bash
-kbcli cluster create redis <clustername>
+kbcli cluster create redis --mode standalone <clustername>
 ```
 
 创建 Redis 主备版。
 
 ```bash
-kbcli cluster create redis --mode replication <clustername>
+kbcli cluster create redis <clustername>
 ```
 
 如果只有一个节点用于部署主备版集群，请在创建集群时将 `availability-policy` 设置为 `none`。

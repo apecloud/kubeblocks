@@ -1116,7 +1116,7 @@ func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
 		}
 	}
 	return nil
-
+}
 func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {
 	// if not set provider and version in spec, set it from labels
 	if addon.Labels == nil {

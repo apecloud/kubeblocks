@@ -63,6 +63,7 @@ spec:
                     are different versions of definitions of the same component.
                   properties:
                     backoffLimit:
+                      default: 2
                       description: Specifies the maximum number of retry attempts
                         for a backup before it is considered a failure.
                       format: int32

@@ -349,7 +349,6 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp *appsv1alpha1.Clu
 		backupPolicy.Spec.BackupRepoName = &r.Cluster.Spec.Backup.RepoName
 	}
 	backupPolicy.Spec.BackoffLimit = r.backupPolicy.BackoffLimit
-
 	r.syncBackupMethods(backupPolicy, comp)
 	r.syncBackupPolicyTargetSpec(backupPolicy, comp)
 }

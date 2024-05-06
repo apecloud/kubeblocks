@@ -89,6 +89,7 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		return intctrlutil.Reconciled()
 	}
+
 	if err = patchStatus(dpv1alpha1.AvailablePhase, ""); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

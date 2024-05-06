@@ -5,6 +5,13 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - list
+  - watch
+- apiGroups:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
@@ -776,6 +783,32 @@ rules:
   - dataprotection.kubeblocks.io
   resources:
   - storageproviders/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - experimental.kubeblocks.io
+  resources:
+  - nodeawarescalers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - experimental.kubeblocks.io
+  resources:
+  - nodeawarescalers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - experimental.kubeblocks.io
+  resources:
+  - nodeawarescalers/status
   verbs:
   - get
   - patch

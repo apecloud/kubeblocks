@@ -1,22 +1,22 @@
-# permissions for end users to view instancesets.
+# permissions for end users to view nodeawarescalers.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-  name: {{ include "kubeblocks.fullname" . }}-instanceset-viewer-role
+  name: {{ include "kubeblocks.fullname" . }}-nodeawarescaler-viewer-role
 rules:
 - apiGroups:
-  - workloads.kubeblocks.io
+  - experimental.kubeblocks.io
   resources:
-  - instancesets
+  - nodeawarescalers
   verbs:
   - get
   - list
   - watch
 - apiGroups:
-  - workloads.kubeblocks.io
+  - experimental.kubeblocks.io
   resources:
-  - instancesets/status
+  - nodeawarescalers/status
   verbs:
   - get

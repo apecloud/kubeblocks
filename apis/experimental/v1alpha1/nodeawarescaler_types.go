@@ -28,17 +28,56 @@ import (
 
 // NodeAwareScalerSpec defines the desired state of NodeAwareScaler
 type NodeAwareScalerSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Specified the target Cluster name this scaler applies to.
+	TargetClusterName string `json:"targetName"`
 
-	// Foo is an example field of NodeAwareScaler. Edit nodeawarescaler_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Specified the target Component names this scaler applies to.
+	// All Components will be applied if not set.
+	//
+	// +optional
+	TargetComponentNames []string `json:"TargetComponentNames,omitempty"`
 }
 
 // NodeAwareScalerStatus defines the observed state of NodeAwareScaler
 type NodeAwareScalerStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Records the current status information of all Components specified in the NodeAwareScalerSpec.
+	//
+	// +optional
+	ComponentStatuses []ComponentStatus `json:"componentStatuses,omitempty"`
+
+	// Represents the latest available observations of a nodeawarescaler's current state.
+	// Known .status.conditions.type are: "ScaleReady".
+	// ScaleReady - All target components are ready.
+	//
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+	// LastScaleTime is the last time the NodeAwareScaler scaled the number of instances.
+	//
+	// +optional
+	LastScaleTime metav1.Time `json:"lastScaleTime,omitempty"`
+}
+
+type ComponentStatus struct {
+	// Specified the Component name.
+	Name string `json:"name"`
+
+	// The current number of instances of this component.
+	CurrentReplicas int32 `json:"currentReplicas"`
+
+	// The number of instances of this component with a Ready condition.
+	ReadyReplicas int32 `json:"readyReplicas"`
+
+	// The number of instances of this component with a Ready condition for at least MinReadySeconds defined in the instance template.
+	AvailableReplicas int32 `json:"availableReplicas"`
+
+	// The desired number of instances of this component.
+	// Usually, it should be the number of nodes.
+	DesiredReplicas int32 `json:"desiredReplicas"`
 }
 
 //+kubebuilder:object:root=true

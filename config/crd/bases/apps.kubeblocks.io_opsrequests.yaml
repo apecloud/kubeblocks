@@ -105,6 +105,51 @@ spec:
                       will be deleted."
                     type: string
                 type: object
+              backupSpec:
+                description: Specifies the parameters to backup a Cluster.
+                properties:
+                  backupMethod:
+                    description: Specifies the name of BackupMethod. The specified
+                      BackupMethod must be defined in the BackupPolicy.
+                    type: string
+                  backupName:
+                    description: Specifies the name of the Backup custom resource.
+                    type: string
+                  backupPolicyName:
+                    description: Indicates the name of the BackupPolicy applied to
+                      perform this Backup.
+                    type: string
+                  deletionPolicy:
+                    default: Delete
+                    description: Determines whether the backup contents stored in
+                      backup repository should be deleted when the Backup custom resource
+                      is deleted. Supported values are `Retain` and `Delete`. - `Retain`
+                      means that the backup content and its physical snapshot on backup
+                      repository are kept. - `Delete` means that the backup content
+                      and its physical snapshot on backup repository are deleted.
+                    enum:
+                    - Delete
+                    - Retain
+                    type: string
+                  parentBackupName:
+                    description: If the specified BackupMethod is incremental, `parentBackupName`
+                      is required.
+                    type: string
+                  retentionPeriod:
+                    description: "Determines the duration for which the Backup custom
+                      resources should be retained. \n The controller will automatically
+                      remove all Backup objects that are older than the specified
+                      RetentionPeriod. For example, RetentionPeriod of `30d` will
+                      keep only the Backup objects of last 30 days. Sample duration
+                      format: \n - years: 2y - months: 6mo - days: 30d - hours: 12h
+                      - minutes: 30m \n You can also combine the above durations.
+                      For example: 30d12h30m. If not set, the Backup objects will
+                      be kept forever. \n If the `deletionPolicy` is set to 'Delete',
+                      then the associated backup data will also be deleted along with
+                      the Backup object. Otherwise, only the Backup custom resource
+                      will be deleted."
+                    type: string
+                type: object
               cancel:
                 description: "Indicates whether the current operation should be canceled
                   and terminated gracefully if it's in the \"Pending\", \"Creating\",
@@ -119,6 +164,13 @@ spec:
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterName
+                  rule: self == oldSelf
+              clusterRef:
+                description: Specifies the name of the Cluster resource that this
+                  operation is targeting.
+                type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
               custom:
                 description: Specifies a custom operation defined by OpsDefinition.
@@ -3110,7 +3162,42 @@ spec:
                   backupName:
                     description: Specifies the name of the Backup custom resource.
                     type: string
-                  doReadyRestoreAfterClusterRunning:
+                  deferPostReadyUntilClusterRunning:
+                    description: "Controls the timing of PostReady actions during
+                      the recovery process. \n If false (default), PostReady actions
+                      execute when the Component reaches the \"Running\" state. If
+                      true, PostReady actions are delayed until the entire Cluster
+                      is \"Running,\" ensuring the cluster's overall stability before
+                      proceeding. \n This setting is useful for coordinating PostReady
+                      operations across the Cluster for optimal cluster conditions."
+                    type: boolean
+                  restorePointInTime:
+                    description: "Specifies the point in time to which the restore
+                      should be performed. Supported time formats: \n - RFC3339 format,
+                      e.g. \"2023-11-25T18:52:53Z\" - A human-readable date-time format,
+                      e.g. \"Jul 25,2023 18:52:53 UTC+0800\""
+                    type: string
+                  volumeRestorePolicy:
+                    default: Parallel
+                    description: "Specifies the policy for restoring volume claims
+                      of a Component's Pods. It determines whether the volume claims
+                      should be restored sequentially (one by one) or in parallel
+                      (all at once). Support values: \n - \"Serial\" - \"Parallel\""
+                    enum:
+                    - Serial
+                    - Parallel
+                    type: string
+                required:
+                - backupName
+                type: object
+              restoreSpec:
+                description: Specifies the parameters to restore a Cluster. Note that
+                  this restore operation will roll back cluster services.
+                properties:
+                  backupName:
+                    description: Specifies the name of the Backup custom resource.
+                    type: string
+                  deferPostReadyUntilClusterRunning:
                     description: "Controls the timing of PostReady actions during
                       the recovery process. \n If false (default), PostReady actions
                       execute when the Component reaches the \"Running\" state. If

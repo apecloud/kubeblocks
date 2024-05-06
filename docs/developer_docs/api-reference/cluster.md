@@ -2554,6 +2554,17 @@ string
 </tr>
 <tr>
 <td>
+<code>clusterRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the Cluster resource that this operation is targeting.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>cancel</code><br/>
 <em>
 bool
@@ -13733,6 +13744,17 @@ string
 </tr>
 <tr>
 <td>
+<code>clusterRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the Cluster resource that this operation is targeting.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>cancel</code><br/>
 <em>
 bool
@@ -16628,7 +16650,7 @@ Support values:</p>
 </tr>
 <tr>
 <td>
-<code>doReadyRestoreAfterClusterRunning</code><br/>
+<code>deferPostReadyUntilClusterRunning</code><br/>
 <em>
 bool
 </em>
@@ -19015,7 +19037,36 @@ Backup
 </tr>
 <tr>
 <td>
+<code>backupSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Backup">
+Backup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the parameters to backup a Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>restore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Restore">
+Restore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the parameters to restore a Cluster.
+Note that this restore operation will roll back cluster services.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restoreSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.Restore">
 Restore

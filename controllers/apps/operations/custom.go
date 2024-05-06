@@ -58,7 +58,7 @@ func (c CustomOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, 
 		Status:             metav1.ConditionTrue,
 		Reason:             opsDefName + "Starting",
 		LastTransitionTime: metav1.Now(),
-		Message:            fmt.Sprintf("Start to handle %s on the Cluster: %s", opsDefName, opsRes.OpsRequest.Spec.ClusterName),
+		Message:            fmt.Sprintf("Start to handle %s on the Cluster: %s", opsDefName, opsRes.OpsRequest.Spec.GetClusterName()),
 	}, nil
 }
 
@@ -129,7 +129,7 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	if opsSpec.Force {
 		return nil
 	}
-	componentObjName := constant.GenerateClusterComponentName(opsSpec.ClusterName, compCustomItem.ComponentName)
+	componentObjName := constant.GenerateClusterComponentName(opsSpec.GetClusterName(), compCustomItem.ComponentName)
 	comp := &appsv1alpha1.Component{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: componentObjName, Namespace: opsRes.OpsRequest.Namespace}, comp); err != nil {
 		return err

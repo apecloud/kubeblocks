@@ -126,7 +126,7 @@ func PatchOpsStatus(ctx context.Context,
 
 // PatchClusterNotFound patches ClusterNotFound condition to the OpsRequest.status.conditions.
 func PatchClusterNotFound(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
-	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.ClusterName)
+	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.GetClusterName())
 	condition := appsv1alpha1.NewValidateFailedCondition(appsv1alpha1.ReasonClusterNotFound, message)
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }

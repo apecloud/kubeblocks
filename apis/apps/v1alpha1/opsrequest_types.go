@@ -31,9 +31,13 @@ import (
 type OpsRequestSpec struct {
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterName"
 	ClusterName string `json:"clusterName"`
+
+	// Specifies the name of the Cluster resource that this operation is targeting.
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	ClusterRef string `json:"clusterRef,omitempty"`
 
 	// Indicates whether the current operation should be canceled and terminated gracefully if it's in the
 	// "Pending", "Creating", or "Running" state.
@@ -185,11 +189,22 @@ type SpecificOpsRequest struct {
 	// +optional
 	Backup *Backup `json:"backup,omitempty"`
 
+	// Specifies the parameters to backup a Cluster.
+	// +optional
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	BackupSpec *Backup `json:"backupSpec,omitempty"`
+
 	// Specifies the parameters to restore a Cluster.
 	// Note that this restore operation will roll back cluster services.
 	//
 	// +optional
 	Restore *Restore `json:"restore,omitempty"`
+
+	// Specifies the parameters to restore a Cluster.
+	// Note that this restore operation will roll back cluster services.
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +optional
+	RestoreSpec *Restore `json:"restoreSpec,omitempty"`
 
 	// Specifies the parameters to rebuild some instances.
 	// Rebuilding an instance involves restoring its data from a backup or another database replica.
@@ -885,7 +900,7 @@ type Restore struct {
 	// ensuring the cluster's overall stability before proceeding.
 	//
 	// This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.
-	DeferPostReadyUntilClusterRunning bool `json:"doReadyRestoreAfterClusterRunning,omitempty"`
+	DeferPostReadyUntilClusterRunning bool `json:"deferPostReadyUntilClusterRunning,omitempty"`
 }
 
 // ScriptSecret represents the secret that is used to execute the script.
@@ -1279,6 +1294,27 @@ func (r OpsRequestSpec) ToExposeListToMap() map[string]Expose {
 		exposeMap[v.ComponentName] = v
 	}
 	return exposeMap
+}
+
+func (r OpsRequestSpec) GetClusterName() string {
+	if r.ClusterName != "" {
+		return r.ClusterName
+	}
+	return r.ClusterRef
+}
+
+func (r OpsRequestSpec) GetBackup() *Backup {
+	if r.Backup != nil {
+		return r.Backup
+	}
+	return r.BackupSpec
+}
+
+func (r OpsRequestSpec) GetRestore() *Restore {
+	if r.Restore != nil {
+		return r.Restore
+	}
+	return r.RestoreSpec
 }
 
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {

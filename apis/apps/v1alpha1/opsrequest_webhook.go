@@ -166,8 +166,8 @@ func (r *OpsRequest) getCluster(ctx context.Context, k8sClient client.Client) (*
 	}
 	cluster := &Cluster{}
 	// get cluster resource
-	if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: r.Spec.ClusterName}, cluster); err != nil {
-		return nil, fmt.Errorf("get cluster: %s failed, err: %s", r.Spec.ClusterName, err.Error())
+	if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: r.Spec.GetClusterName()}, cluster); err != nil {
+		return nil, fmt.Errorf("get cluster: %s failed, err: %s", r.Spec.GetClusterName(), err.Error())
 	}
 	return cluster, nil
 }
@@ -355,7 +355,7 @@ func (r *OpsRequest) validateReconfigureParams(ctx context.Context,
 		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
 	}
 	for _, configuration := range reconfigure.Configurations {
-		cmObj, err := r.getConfigMap(ctx, k8sClient, fmt.Sprintf("%s-%s-%s", r.Spec.ClusterName, reconfigure.ComponentName, configuration.Name))
+		cmObj, err := r.getConfigMap(ctx, k8sClient, fmt.Sprintf("%s-%s-%s", r.Spec.GetClusterName(), reconfigure.ComponentName, configuration.Name))
 		if err != nil {
 			return err
 		}
@@ -475,7 +475,7 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *Cluster, componentOps Compon
 		}
 	}
 	if len(notFoundInstanceNames) > 0 {
-		return fmt.Errorf("instance: %v not found in cluster: %s", notFoundInstanceNames, r.Spec.ClusterName)
+		return fmt.Errorf("instance: %v not found in cluster: %s", notFoundInstanceNames, r.Spec.GetClusterName())
 	}
 	return nil
 }
@@ -652,7 +652,7 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	isShardingComponent bool,
 	requestStorage resource.Quantity) (*string, error) {
 	matchingLabels := client.MatchingLabels{
-		constant.AppInstanceLabelKey:             r.Spec.ClusterName,
+		constant.AppInstanceLabelKey:             r.Spec.GetClusterName(),
 		constant.VolumeClaimTemplateNameLabelKey: vctName,
 	}
 	if isShardingComponent {

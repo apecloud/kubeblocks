@@ -2013,9 +2013,7 @@ an unnecessary reload step.</p>
 <td>
 <code>dynamicParameterSelectedPolicy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DynamicParameterSelectedPolicy">
-DynamicParameterSelectedPolicy
-</a>
+bool
 </em>
 </td>
 <td>
@@ -2023,9 +2021,9 @@ DynamicParameterSelectedPolicy
 <p>Configures whether the dynamic reload specified in <code>reloadOptions</code> applies only to dynamic parameters or
 to all parameters (including static parameters).</p>
 <ul>
-<li>&ldquo;dynamic&rdquo; (default): Only modifications to the dynamic parameters listed in <code>dynamicParameters</code>
+<li>false (default): Only modifications to the dynamic parameters listed in <code>dynamicParameters</code>
 will trigger a dynamic reload.</li>
-<li>&ldquo;all&rdquo;: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
+<li>true: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
 listed in <code>staticParameters</code> will trigger a dynamic reload.
 The &ldquo;all&rdquo; option is for certain engines that require static parameters to be set
 via SQL statements before they can take effect on restart.</li>
@@ -2036,8 +2034,8 @@ via SQL statements before they can take effect on restart.</li>
 <td>
 <code>toolsImageSpec</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.ReloadToolsImage">
-ReloadToolsImage
+<a href="#apps.kubeblocks.io/v1beta1.ToolsSetup">
+ToolsSetup
 </a>
 </em>
 </td>
@@ -2055,8 +2053,8 @@ This ensures that the tools are available to the &lsquo;config-manager&rsquo; si
 <td>
 <code>downwardAPIOptions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAction">
-[]DownwardAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
+[]DownwardAPITriggeredAction
 </a>
 </em>
 </td>
@@ -2180,8 +2178,8 @@ reload.</p>
 <td>
 <code>formatterConfig</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">
-FormatterConfig
+<a href="#apps.kubeblocks.io/v1beta1.FileFormatConfig">
+FileFormatConfig
 </a>
 </em>
 </td>
@@ -9815,9 +9813,7 @@ an unnecessary reload step.</p>
 <td>
 <code>dynamicParameterSelectedPolicy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DynamicParameterSelectedPolicy">
-DynamicParameterSelectedPolicy
-</a>
+bool
 </em>
 </td>
 <td>
@@ -9825,9 +9821,9 @@ DynamicParameterSelectedPolicy
 <p>Configures whether the dynamic reload specified in <code>reloadOptions</code> applies only to dynamic parameters or
 to all parameters (including static parameters).</p>
 <ul>
-<li>&ldquo;dynamic&rdquo; (default): Only modifications to the dynamic parameters listed in <code>dynamicParameters</code>
+<li>false (default): Only modifications to the dynamic parameters listed in <code>dynamicParameters</code>
 will trigger a dynamic reload.</li>
-<li>&ldquo;all&rdquo;: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
+<li>true: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
 listed in <code>staticParameters</code> will trigger a dynamic reload.
 The &ldquo;all&rdquo; option is for certain engines that require static parameters to be set
 via SQL statements before they can take effect on restart.</li>
@@ -9838,8 +9834,8 @@ via SQL statements before they can take effect on restart.</li>
 <td>
 <code>toolsImageSpec</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.ReloadToolsImage">
-ReloadToolsImage
+<a href="#apps.kubeblocks.io/v1beta1.ToolsSetup">
+ToolsSetup
 </a>
 </em>
 </td>
@@ -9857,8 +9853,8 @@ This ensures that the tools are available to the &lsquo;config-manager&rsquo; si
 <td>
 <code>downwardAPIOptions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAction">
-[]DownwardAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
+[]DownwardAPITriggeredAction
 </a>
 </em>
 </td>
@@ -9982,8 +9978,8 @@ reload.</p>
 <td>
 <code>formatterConfig</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">
-FormatterConfig
+<a href="#apps.kubeblocks.io/v1beta1.FileFormatConfig">
+FileFormatConfig
 </a>
 </em>
 </td>
@@ -21031,10 +21027,10 @@ ConfigConstraintSpec
 <table>
 <tr>
 <td>
-<code>dynamicReloadAction</code><br/>
+<code>reloadAction</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">
-DynamicReloadAction
+<a href="#apps.kubeblocks.io/v1beta1.ReloadAction">
+ReloadAction
 </a>
 </em>
 </td>
@@ -21047,9 +21043,9 @@ When set, the controller executes the scripts defined in these actions to handle
 <li>The modified parameters are listed in the <code>dynamicParameters</code> field.
 If <code>dynamicParameterSelectedPolicy</code> is set to &ldquo;all&rdquo;, modifications to <code>staticParameters</code>
 can also trigger a reload.</li>
-<li><code>dynamicReloadAction</code> is set.</li>
+<li><code>reloadAction</code> is set.</li>
 </ol>
-<p>If <code>dynamicReloadAction</code> is not set or the modified parameters are not listed in <code>dynamicParameters</code>,
+<p>If <code>reloadAction</code> is not set or the modified parameters are not listed in <code>dynamicParameters</code>,
 dynamic reloading will not be triggered.</p>
 <p>Example:</p>
 <pre><code class="language-yaml">dynamicReloadAction:
@@ -21062,7 +21058,7 @@ dynamic reloading will not be triggered.</p>
 </tr>
 <tr>
 <td>
-<code>dynamicActionCanBeMerged</code><br/>
+<code>mergeReloadAndRestart</code><br/>
 <em>
 bool
 </em>
@@ -21080,21 +21076,19 @@ an unnecessary reload step.</p>
 </tr>
 <tr>
 <td>
-<code>dynamicParameterSelectedPolicy</code><br/>
+<code>reloadStaticParamsBeforeRestart</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DynamicParameterSelectedPolicy">
-DynamicParameterSelectedPolicy
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Configures whether the dynamic reload specified in <code>dynamicReloadAction</code> applies only to dynamic parameters or
+<p>Configures whether the dynamic reload specified in <code>reloadAction</code> applies only to dynamic parameters or
 to all parameters (including static parameters).</p>
 <ul>
-<li>&ldquo;dynamic&rdquo; (default): Only modifications to the dynamic parameters listed in <code>dynamicParameters</code>
+<li>false (default): Only modifications to the dynamic parameters listed in <code>dynamicParameters</code>
 will trigger a dynamic reload.</li>
-<li>&ldquo;all&rdquo;: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
+<li>true: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
 listed in <code>staticParameters</code> will trigger a dynamic reload.
 The &ldquo;all&rdquo; option is for certain engines that require static parameters to be set
 via SQL statements before they can take effect on restart.</li>
@@ -21103,29 +21097,10 @@ via SQL statements before they can take effect on restart.</li>
 </tr>
 <tr>
 <td>
-<code>reloadToolsImage</code><br/>
+<code>downwardAPITriggeredActions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.ReloadToolsImage">
-ReloadToolsImage
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the tools container image used by ShellTrigger for dynamic reload.
-If the dynamic reload action is triggered by a ShellTrigger, this field is required.
-This image must contain all necessary tools for executing the ShellTrigger scripts.</p>
-<p>Usually the specified image is referenced by the init container,
-which is then responsible for copy the tools from the image to a bin volume.
-This ensures that the tools are available to the &lsquo;config-manager&rsquo; sidecar.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>downwardActions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAction">
-[]DownwardAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
+[]DownwardAPITriggeredAction
 </a>
 </em>
 </td>
@@ -21141,36 +21116,6 @@ registered commands (usually execute some SQL statements) when a change is detec
 <li>After a role switch (e.g., from secondary to primary), some changes in configuration are needed
 to reflect the new role.</li>
 </ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptConfigs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1beta1.ScriptConfig">
-[]ScriptConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of ScriptConfig Object.</p>
-<p>Each ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
-The scripts are mounted as volumes and can be referenced and executed by the dynamic reload
-and DownwardAction to perform specific tasks or configurations.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configSchemaTopLevelKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the top-level key in the &lsquo;configSchema.cue&rsquo; that organizes the validation rules for parameters.
-This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -21229,7 +21174,7 @@ Attempting to change any of these parameters will be ignored.</p>
 </tr>
 <tr>
 <td>
-<code>dynamicReloadSelector</code><br/>
+<code>reloadedPodSelector</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
@@ -21240,17 +21185,17 @@ Kubernetes meta/v1.LabelSelector
 <em>(Optional)</em>
 <p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
 <p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
-The <code>dynamicReloadSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
-<p>If the <code>dynamicReloadSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
+The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
+<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
 reload.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>formatterConfig</code><br/>
+<code>fileFormatConfig</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">
-FormatterConfig
+<a href="#apps.kubeblocks.io/v1beta1.FileFormatConfig">
+FileFormatConfig
 </a>
 </em>
 </td>
@@ -21260,7 +21205,7 @@ Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>,
 <p>Each format may have its own set of parameters that can be configured.
 For instance, when using the <code>ini</code> format, you can specify the section name.</p>
 <p>Example:</p>
-<pre><code>formatterConfig:
+<pre><code>fileFormatConfig:
  format: ini
  iniConfig:
    sectionName: mysqld
@@ -21287,7 +21232,7 @@ ConfigConstraintStatus
 <h3 id="apps.kubeblocks.io/v1beta1.AutoTrigger">AutoTrigger
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">DynamicReloadAction</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.ReloadAction">ReloadAction</a>)
 </p>
 <div>
 <p>AutoTrigger automatically perform the reload when specified conditions are met.</p>
@@ -21317,7 +21262,7 @@ string
 <h3 id="apps.kubeblocks.io/v1beta1.CfgFileFormat">CfgFileFormat
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">FormatterConfig</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.FileFormatConfig">FileFormatConfig</a>)
 </p>
 <div>
 <p>CfgFileFormat defines formatter of configuration files.</p>
@@ -21392,10 +21337,10 @@ string
 <tbody>
 <tr>
 <td>
-<code>dynamicReloadAction</code><br/>
+<code>reloadAction</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">
-DynamicReloadAction
+<a href="#apps.kubeblocks.io/v1beta1.ReloadAction">
+ReloadAction
 </a>
 </em>
 </td>
@@ -21408,9 +21353,9 @@ When set, the controller executes the scripts defined in these actions to handle
 <li>The modified parameters are listed in the <code>dynamicParameters</code> field.
 If <code>dynamicParameterSelectedPolicy</code> is set to &ldquo;all&rdquo;, modifications to <code>staticParameters</code>
 can also trigger a reload.</li>
-<li><code>dynamicReloadAction</code> is set.</li>
+<li><code>reloadAction</code> is set.</li>
 </ol>
-<p>If <code>dynamicReloadAction</code> is not set or the modified parameters are not listed in <code>dynamicParameters</code>,
+<p>If <code>reloadAction</code> is not set or the modified parameters are not listed in <code>dynamicParameters</code>,
 dynamic reloading will not be triggered.</p>
 <p>Example:</p>
 <pre><code class="language-yaml">dynamicReloadAction:
@@ -21423,7 +21368,7 @@ dynamic reloading will not be triggered.</p>
 </tr>
 <tr>
 <td>
-<code>dynamicActionCanBeMerged</code><br/>
+<code>mergeReloadAndRestart</code><br/>
 <em>
 bool
 </em>
@@ -21441,21 +21386,19 @@ an unnecessary reload step.</p>
 </tr>
 <tr>
 <td>
-<code>dynamicParameterSelectedPolicy</code><br/>
+<code>reloadStaticParamsBeforeRestart</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DynamicParameterSelectedPolicy">
-DynamicParameterSelectedPolicy
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Configures whether the dynamic reload specified in <code>dynamicReloadAction</code> applies only to dynamic parameters or
+<p>Configures whether the dynamic reload specified in <code>reloadAction</code> applies only to dynamic parameters or
 to all parameters (including static parameters).</p>
 <ul>
-<li>&ldquo;dynamic&rdquo; (default): Only modifications to the dynamic parameters listed in <code>dynamicParameters</code>
+<li>false (default): Only modifications to the dynamic parameters listed in <code>dynamicParameters</code>
 will trigger a dynamic reload.</li>
-<li>&ldquo;all&rdquo;: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
+<li>true: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
 listed in <code>staticParameters</code> will trigger a dynamic reload.
 The &ldquo;all&rdquo; option is for certain engines that require static parameters to be set
 via SQL statements before they can take effect on restart.</li>
@@ -21464,29 +21407,10 @@ via SQL statements before they can take effect on restart.</li>
 </tr>
 <tr>
 <td>
-<code>reloadToolsImage</code><br/>
+<code>downwardAPITriggeredActions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.ReloadToolsImage">
-ReloadToolsImage
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the tools container image used by ShellTrigger for dynamic reload.
-If the dynamic reload action is triggered by a ShellTrigger, this field is required.
-This image must contain all necessary tools for executing the ShellTrigger scripts.</p>
-<p>Usually the specified image is referenced by the init container,
-which is then responsible for copy the tools from the image to a bin volume.
-This ensures that the tools are available to the &lsquo;config-manager&rsquo; sidecar.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>downwardActions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAction">
-[]DownwardAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
+[]DownwardAPITriggeredAction
 </a>
 </em>
 </td>
@@ -21502,36 +21426,6 @@ registered commands (usually execute some SQL statements) when a change is detec
 <li>After a role switch (e.g., from secondary to primary), some changes in configuration are needed
 to reflect the new role.</li>
 </ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptConfigs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1beta1.ScriptConfig">
-[]ScriptConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of ScriptConfig Object.</p>
-<p>Each ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
-The scripts are mounted as volumes and can be referenced and executed by the dynamic reload
-and DownwardAction to perform specific tasks or configurations.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configSchemaTopLevelKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the top-level key in the &lsquo;configSchema.cue&rsquo; that organizes the validation rules for parameters.
-This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -21590,7 +21484,7 @@ Attempting to change any of these parameters will be ignored.</p>
 </tr>
 <tr>
 <td>
-<code>dynamicReloadSelector</code><br/>
+<code>reloadedPodSelector</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
@@ -21601,17 +21495,17 @@ Kubernetes meta/v1.LabelSelector
 <em>(Optional)</em>
 <p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
 <p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
-The <code>dynamicReloadSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
-<p>If the <code>dynamicReloadSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
+The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
+<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
 reload.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>formatterConfig</code><br/>
+<code>fileFormatConfig</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">
-FormatterConfig
+<a href="#apps.kubeblocks.io/v1beta1.FileFormatConfig">
+FileFormatConfig
 </a>
 </em>
 </td>
@@ -21621,7 +21515,7 @@ Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>,
 <p>Each format may have its own set of parameters that can be configured.
 For instance, when using the <code>ini</code> format, you can specify the section name.</p>
 <p>Example:</p>
-<pre><code>formatterConfig:
+<pre><code>fileFormatConfig:
  format: ini
  iniConfig:
    sectionName: mysqld
@@ -21706,6 +21600,19 @@ types, and constraints.</p>
 <tbody>
 <tr>
 <td>
+<code>topLevelKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the top-level key in the &lsquo;configSchema.cue&rsquo; that organizes the validation rules for parameters.
+This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>cue</code><br/>
 <em>
 string
@@ -21738,13 +21645,13 @@ Kubernetes api extensions v1.JSONSchemaProps
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1beta1.DownwardAction">DownwardAction
+<h3 id="apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">DownwardAPITriggeredAction
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
 </p>
 <div>
-<p>DownwardAction defines an action that triggers specific commands in response to changes in Pod labels.
+<p>DownwardAPITriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
 For example, a command might be executed when the &lsquo;role&rsquo; label of the Pod is updated.</p>
 </div>
 <table>
@@ -21804,13 +21711,25 @@ string
 It relies on the inotify mechanism in the config-manager sidecar to monitor file changes.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>scriptConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ScriptConfig">
+ScriptConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
+The scripts are mounted as volumes and can be referenced and executed by the DownwardAction to perform specific tasks or configurations.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1beta1.DynamicParameterSelectedPolicy">DynamicParameterSelectedPolicy
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
 <div>
 <p>DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions</p>
 </div>
@@ -21827,13 +21746,164 @@ It relies on the inotify mechanism in the config-manager sidecar to monitor file
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1beta1.DynamicReloadAction">DynamicReloadAction
+<h3 id="apps.kubeblocks.io/v1beta1.DynamicReloadType">DynamicReloadType
+(<code>string</code> alias)</h3>
+<div>
+<p>DynamicReloadType defines reload method.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;auto&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;http&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;sql&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;exec&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;tpl&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;signal&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.FileFormatConfig">FileFormatConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+<p>FileFormatConfig specifies the format of the configuration file and any associated parameters
+that are specific to the chosen format.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>FormatterAction</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.FormatterAction">
+FormatterAction
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>FormatterAction</code> are embedded into this type.)
+</p>
+<em>(Optional)</em>
+<p>Each format may have its own set of parameters that can be configured.
+For instance, when using the <code>ini</code> format, you can specify the section name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>format</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.CfgFileFormat">
+CfgFileFormat
+</a>
+</em>
+</td>
+<td>
+<p>The config file format. Valid values are <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>,
+<code>hcl</code>, <code>dotenv</code>, <code>properties</code> and <code>toml</code>. Each format has its own characteristics and use cases.</p>
+<ul>
+<li>ini: is a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a></li>
+<li>xml: refers to wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a></li>
+<li>yaml: supports for complex data types and structures.</li>
+<li>json: refers to wiki: <a href="https://en.wikipedia.org/wiki/JSON">https://en.wikipedia.org/wiki/JSON</a></li>
+<li>hcl: The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: <a href="https://www.linode.com/docs/guides/introduction-to-hcl/">https://www.linode.com/docs/guides/introduction-to-hcl/</a></li>
+<li>dotenv: is a plain text file with simple key–value pairs, reference wiki: <a href="https://en.wikipedia.org/wiki/Configuration_file#MS-DOS">https://en.wikipedia.org/wiki/Configuration_file#MS-DOS</a></li>
+<li>properties: a file extension mainly used in Java, reference wiki: <a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a></li>
+<li>toml: refers to wiki: <a href="https://en.wikipedia.org/wiki/TOML">https://en.wikipedia.org/wiki/TOML</a></li>
+<li>props-plus: a file extension mainly used in Java, supports CamelCase(e.g: brokerMaxConnectionsPerIp)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.FormatterAction">FormatterAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.FileFormatConfig">FileFormatConfig</a>)
+</p>
+<div>
+<p>FormatterAction configures format-specific options for different configuration file format.
+Note: Only one of its members should be specified at any given time.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>iniConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.IniConfig">
+IniConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Holds options specific to the &lsquo;ini&rsquo; file format.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.IniConfig">IniConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.FormatterAction">FormatterAction</a>)
+</p>
+<div>
+<p>IniConfig holds options specific to the &lsquo;ini&rsquo; file format.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>sectionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A string that describes the name of the ini section.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1beta1.ReloadAction">ReloadAction
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
 </p>
 <div>
-<p>DynamicReloadAction defines the mechanisms available for dynamically reloading a process within K8s without requiring a restart.</p>
+<p>ReloadAction defines the mechanisms available for dynamically reloading a process within K8s without requiring a restart.</p>
 <p>Only one of the mechanisms can be specified at a time.</p>
 </div>
 <table>
@@ -21902,218 +21972,10 @@ AutoTrigger
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1beta1.DynamicReloadType">DynamicReloadType
-(<code>string</code> alias)</h3>
-<div>
-<p>DynamicReloadType defines reload method.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;auto&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;http&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;sql&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;exec&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;tpl&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;signal&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1beta1.FormatterAction">FormatterAction
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.FormatterConfig">FormatterConfig</a>)
-</p>
-<div>
-<p>FormatterAction configures format-specific options for different configuration file format.
-Note: Only one of its members should be specified at any given time.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>iniConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1beta1.IniConfig">
-IniConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Holds options specific to the &lsquo;ini&rsquo; file format.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1beta1.FormatterConfig">FormatterConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-<p>FormatterConfig specifies the format of the configuration file and any associated parameters
-that are specific to the chosen format.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>FormatterAction</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1beta1.FormatterAction">
-FormatterAction
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>FormatterAction</code> are embedded into this type.)
-</p>
-<em>(Optional)</em>
-<p>Each format may have its own set of parameters that can be configured.
-For instance, when using the <code>ini</code> format, you can specify the section name.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>format</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1beta1.CfgFileFormat">
-CfgFileFormat
-</a>
-</em>
-</td>
-<td>
-<p>The config file format. Valid values are <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>,
-<code>hcl</code>, <code>dotenv</code>, <code>properties</code> and <code>toml</code>. Each format has its own characteristics and use cases.</p>
-<ul>
-<li>ini: is a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a></li>
-<li>xml: refers to wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a></li>
-<li>yaml: supports for complex data types and structures.</li>
-<li>json: refers to wiki: <a href="https://en.wikipedia.org/wiki/JSON">https://en.wikipedia.org/wiki/JSON</a></li>
-<li>hcl: The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: <a href="https://www.linode.com/docs/guides/introduction-to-hcl/">https://www.linode.com/docs/guides/introduction-to-hcl/</a></li>
-<li>dotenv: is a plain text file with simple key–value pairs, reference wiki: <a href="https://en.wikipedia.org/wiki/Configuration_file#MS-DOS">https://en.wikipedia.org/wiki/Configuration_file#MS-DOS</a></li>
-<li>properties: a file extension mainly used in Java, reference wiki: <a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a></li>
-<li>toml: refers to wiki: <a href="https://en.wikipedia.org/wiki/TOML">https://en.wikipedia.org/wiki/TOML</a></li>
-<li>props-plus: a file extension mainly used in Java, supports CamelCase(e.g: brokerMaxConnectionsPerIp)</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1beta1.IniConfig">IniConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.FormatterAction">FormatterAction</a>)
-</p>
-<div>
-<p>IniConfig holds options specific to the &lsquo;ini&rsquo; file format.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>sectionName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A string that describes the name of the ini section.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1beta1.ReloadToolsImage">ReloadToolsImage
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-<p>ReloadToolsImage prepares the tools for dynamic reloads used in ShellTrigger from a specified container image.</p>
-<p>Example:</p>
-<pre><code class="language-yaml">
-reloadToolsImage:
-	 mountPoint: /kb_tools
-	 toolConfigs:
-	   - name: kb-tools
-	     command:
-	       - cp
-	       - /bin/ob-tools
-	       - /kb_tools/obtools
-	     image: docker.io/apecloud/obtools
-</code></pre>
-<p>This example copies the &ldquo;/bin/ob-tools&rdquo; binary from the image to &ldquo;/kb_tools/obtools&rdquo;.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>mountPoint</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the directory path in the container where the tools-related files are to be copied.
-This field is typically used with an emptyDir volume to ensure a temporary, empty directory is provided at pod creation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>toolConfigs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1beta1.ToolConfig">
-[]ToolConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a list of settings of init containers that prepare tools for dynamic reload.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1beta1.ScriptConfig">ScriptConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">DownwardAPITriggeredAction</a>, <a href="#apps.kubeblocks.io/v1beta1.ShellTrigger">ShellTrigger</a>, <a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger</a>)
 </p>
 <div>
 </div>
@@ -22154,7 +22016,7 @@ If not specified, it defaults to the &ldquo;default&rdquo; namespace.</p>
 <h3 id="apps.kubeblocks.io/v1beta1.ShellTrigger">ShellTrigger
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">DynamicReloadAction</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.ReloadAction">ReloadAction</a>)
 </p>
 <div>
 <p>ShellTrigger allows to execute a custom shell script to reload the process.</p>
@@ -22213,7 +22075,7 @@ bool
 </tr>
 <tr>
 <td>
-<code>batchParametersTemplate</code><br/>
+<code>batchParamsFormatterTemplate</code><br/>
 <em>
 string
 </em>
@@ -22225,7 +22087,7 @@ It&rsquo;s used when <code>batchReload</code> is &lsquo;True&rsquo; to format da
 The template accesses key-value pairs of updated parameters via the &lsquo;$&rsquo; variable.
 This allows for custom formatting of the input data.</p>
 <p>Example template:</p>
-<pre><code class="language-yaml">batchParametersTemplate: |-
+<pre><code class="language-yaml">batchParamsFormatterTemplate: |-
 &#123;&#123;- range $pKey, $pValue := $ &#125;&#125;
 &#123;&#123; printf &quot;%s:%s&quot; $pKey $pValue &#125;&#125;
 &#123;&#123;- end &#125;&#125;
@@ -22240,6 +22102,40 @@ key3:value3
 key2=value2
 key3=value3
 </code></pre>
+</td>
+</tr>
+<tr>
+<td>
+<code>toolsSetup</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ToolsSetup">
+ToolsSetup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the tools container image used by ShellTrigger for dynamic reload.
+If the dynamic reload action is triggered by a ShellTrigger, this field is required.
+This image must contain all necessary tools for executing the ShellTrigger scripts.</p>
+<p>Usually the specified image is referenced by the init container,
+which is then responsible for copy the tools from the image to a bin volume.
+This ensures that the tools are available to the &lsquo;config-manager&rsquo; sidecar.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scriptConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ScriptConfig">
+ScriptConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
+The scripts are mounted as volumes and can be referenced and executed by the dynamic reload.</p>
 </td>
 </tr>
 </tbody>
@@ -22326,7 +22222,7 @@ key3=value3
 <h3 id="apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">DynamicReloadAction</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.ReloadAction">ReloadAction</a>)
 </p>
 <div>
 <p>TPLScriptTrigger Enables reloading process using a Go template script.</p>
@@ -22379,7 +22275,7 @@ updating the ConfigMap without waiting for the reload process to finish.</li>
 <h3 id="apps.kubeblocks.io/v1beta1.ToolConfig">ToolConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ReloadToolsImage">ReloadToolsImage</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ToolsSetup">ToolsSetup</a>)
 </p>
 <div>
 <p>ToolConfig specifies the settings of an init container that prepare tools for dynamic reload.</p>
@@ -22417,7 +22313,7 @@ This is useful for large tool images, such as those for C++ tools, which may dep
 numerous libraries (e.g., *.so files).</p>
 <p>If enabled, the tool image is deployed as a sidecar container image.</p>
 <p>Examples:</p>
-<pre><code class="language-yaml"> reloadToolsImage:
+<pre><code class="language-yaml"> toolsSetup::
    mountPoint: /kb_tools
    toolConfigs:
      - name: kb-tools
@@ -22480,10 +22376,67 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1beta1.ToolsSetup">ToolsSetup
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ShellTrigger">ShellTrigger</a>)
+</p>
+<div>
+<p>ToolsSetup prepares the tools for dynamic reloads used in ShellTrigger from a specified container image.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">
+toolsSetup:
+	 mountPoint: /kb_tools
+	 toolConfigs:
+	   - name: kb-tools
+	     command:
+	       - cp
+	       - /bin/ob-tools
+	       - /kb_tools/obtools
+	     image: docker.io/apecloud/obtools
+</code></pre>
+<p>This example copies the &ldquo;/bin/ob-tools&rdquo; binary from the image to &ldquo;/kb_tools/obtools&rdquo;.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>mountPoint</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the directory path in the container where the tools-related files are to be copied.
+This field is typically used with an emptyDir volume to ensure a temporary, empty directory is provided at pod creation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>toolConfigs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1beta1.ToolConfig">
+[]ToolConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of settings of init containers that prepare tools for dynamic reload.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1beta1.UnixSignalTrigger">UnixSignalTrigger
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.DynamicReloadAction">DynamicReloadAction</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReloadOptions">ReloadOptions</a>, <a href="#apps.kubeblocks.io/v1beta1.ReloadAction">ReloadAction</a>)
 </p>
 <div>
 <p>UnixSignalTrigger is used to trigger a reload by sending a specific Unix signal to the process.</p>

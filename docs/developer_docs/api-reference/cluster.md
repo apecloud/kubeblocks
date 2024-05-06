@@ -2560,7 +2560,8 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the Cluster resource that this operation is targeting.</p>
+<p>Deprecated: since v0.9, use clusterName instead.
+Specifies the name of the Cluster resource that this operation is targeting.</p>
 </td>
 </tr>
 <tr>
@@ -13750,7 +13751,8 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the Cluster resource that this operation is targeting.</p>
+<p>Deprecated: since v0.9, use clusterName instead.
+Specifies the name of the Cluster resource that this operation is targeting.</p>
 </td>
 </tr>
 <tr>
@@ -19046,7 +19048,8 @@ Backup
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the parameters to backup a Cluster.</p>
+<p>Deprecated: since v0.9, use backup instead.
+Specifies the parameters to backup a Cluster.</p>
 </td>
 </tr>
 <tr>
@@ -19075,7 +19078,8 @@ Restore
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the parameters to restore a Cluster.
+<p>Deprecated: since v0.9, use restore instead.
+Specifies the parameters to restore a Cluster.
 Note that this restore operation will roll back cluster services.</p>
 </td>
 </tr>

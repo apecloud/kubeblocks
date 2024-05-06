@@ -106,7 +106,8 @@ spec:
                     type: string
                 type: object
               backupSpec:
-                description: Specifies the parameters to backup a Cluster.
+                description: 'Deprecated: since v0.9, use backup instead. Specifies
+                  the parameters to backup a Cluster.'
                 properties:
                   backupMethod:
                     description: Specifies the name of BackupMethod. The specified
@@ -166,8 +167,8 @@ spec:
                 - message: forbidden to update spec.clusterName
                   rule: self == oldSelf
               clusterRef:
-                description: Specifies the name of the Cluster resource that this
-                  operation is targeting.
+                description: 'Deprecated: since v0.9, use clusterName instead. Specifies
+                  the name of the Cluster resource that this operation is targeting.'
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
@@ -3191,8 +3192,9 @@ spec:
                 - backupName
                 type: object
               restoreSpec:
-                description: Specifies the parameters to restore a Cluster. Note that
-                  this restore operation will roll back cluster services.
+                description: 'Deprecated: since v0.9, use restore instead. Specifies
+                  the parameters to restore a Cluster. Note that this restore operation
+                  will roll back cluster services.'
                 properties:
                   backupName:
                     description: Specifies the name of the Backup custom resource.

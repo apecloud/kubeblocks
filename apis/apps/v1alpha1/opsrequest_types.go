@@ -34,6 +34,7 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterName"
 	ClusterName string `json:"clusterName,omitempty"`
 
+	// Deprecated: since v0.9, use clusterName instead.
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
@@ -189,6 +190,7 @@ type SpecificOpsRequest struct {
 	// +optional
 	Backup *Backup `json:"backup,omitempty"`
 
+	// Deprecated: since v0.9, use backup instead.
 	// Specifies the parameters to backup a Cluster.
 	// +optional
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
@@ -200,6 +202,7 @@ type SpecificOpsRequest struct {
 	// +optional
 	Restore *Restore `json:"restore,omitempty"`
 
+	// Deprecated: since v0.9, use restore instead.
 	// Specifies the parameters to restore a Cluster.
 	// Note that this restore operation will roll back cluster services.
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"

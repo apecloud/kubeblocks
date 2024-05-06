@@ -700,8 +700,8 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 		})
-		
-		Context("create continuous backup", func(){
+
+		Context("create continuous backup", func() {
 			It("should fail when continuous backup don't have backupschedule label", func() {
 				By("create actionset with continuous backuptype")
 				actionSet := testdp.NewFakeActionSet(&testCtx)
@@ -711,7 +711,7 @@ var _ = Describe("Backup Controller test", func() {
 				}))
 				By("create continuous backup without backupschedule label")
 				backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, nil)
-				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup){
+				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup) {
 					bp.ObjectMeta.Name = "continuousbackup"
 					bp.Labels = map[string]string{}
 				})

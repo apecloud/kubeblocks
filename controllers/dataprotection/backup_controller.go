@@ -388,10 +388,10 @@ func (r *BackupReconciler) prepareBackupRequest(
 		}
 		request.ActionSet = actionSet
 
-		//check continuous backups should have backupschedule label
+		// check continuous backups should have backupschedule label
 		if request.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeContinuous {
-			if _, ok := request.Labels[dptypes.BackupScheduleLabelKey]; !ok{
-				return nil, fmt.Errorf("create continuous backup without backupschedule")
+			if _, ok := request.Labels[dptypes.BackupScheduleLabelKey]; !ok {
+				return nil, fmt.Errorf("continuous backup is only allowed to be created by backupSchedule")
 			}
 			backupSchedule := &dpv1alpha1.BackupSchedule{}
 			if err := request.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: backup.Labels[dptypes.BackupScheduleLabelKey],
@@ -399,7 +399,8 @@ func (r *BackupReconciler) prepareBackupRequest(
 				return nil, err
 			}
 			if backupSchedule.Status.Phase != dpv1alpha1.BackupSchedulePhaseAvailable {
-				return nil, fmt.Errorf("create continuous backup through failed backupschedule")
+				return nil, fmt.Errorf("create continuous backup by failed backupschedule %s/%s",
+					backupSchedule.Namespace, backupSchedule.Name)
 			}
 		}
 	}

@@ -64,7 +64,7 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 
 	for _, expose := range exposeMap {
 		clusterCompSpecName := ""
-		clusterCompDef := ""
+		compDef := ""
 		clusterCompDefRefName := ""
 		if len(expose.ComponentName) > 0 {
 			clusterCompSpec, ok := compMap[expose.ComponentName]
@@ -72,13 +72,13 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 				return fmt.Errorf("component spec not found: %s", expose.ComponentName)
 			}
 			clusterCompSpecName = clusterCompSpec.Name
-			clusterCompDef = clusterCompSpec.ComponentDef
+			compDef = clusterCompSpec.ComponentDef
 			clusterCompDefRefName = clusterCompSpec.ComponentDefRef
 		}
 
 		switch expose.Switch {
 		case appsv1alpha1.EnableExposeSwitch:
-			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, clusterCompSpecName, clusterCompDef, clusterCompDefRefName, expose.Services); err != nil {
+			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, clusterCompSpecName, compDef, clusterCompDefRefName, expose.Services); err != nil {
 				return err
 			}
 		case appsv1alpha1.DisableExposeSwitch:
@@ -268,7 +268,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpecName string,
-	clusterCompDefName string,
+	compDefName string,
 	clusterCompDefRefName string,
 	exposeServices []appsv1alpha1.OpsService) error {
 	if cluster == nil || len(exposeServices) == 0 {
@@ -327,8 +327,8 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 	}
 
 	defaultServicePortsFunc := func() ([]corev1.ServicePort, error) {
-		if clusterCompDefName != "" {
-			compDef, err := component.GetCompDefinition(reqCtx, cli, cluster, clusterCompSpecName)
+		if len(compDefName) > 0 {
+			compDef, err := component.GetCompDefByName(reqCtx, cli, compDefName)
 			if err != nil {
 				return nil, err
 			}
@@ -349,8 +349,8 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 	}
 
 	defaultRoleSelectorFunc := func() (string, error) {
-		if clusterCompDefName != "" {
-			compDef, err := component.GetCompDefinition(reqCtx, cli, cluster, clusterCompSpecName)
+		if len(compDefName) > 0 {
+			compDef, err := component.GetCompDefByName(reqCtx, cli, compDefName)
 			if err != nil {
 				return "", err
 			}

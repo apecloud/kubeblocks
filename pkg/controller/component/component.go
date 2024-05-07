@@ -216,25 +216,17 @@ func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, erro
 	return val, nil
 }
 
-// GetComponentDefName gets the name of referenced component definition.
-func GetComponentDefName(cluster *appsv1alpha1.Cluster, componentName string) string {
-	for _, component := range cluster.Spec.ComponentSpecs {
-		if componentName == component.Name {
-			return component.ComponentDef
-		}
+// GetComponentByName gets the component by component full name.
+func GetComponentByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compFullName, namespace string) (*appsv1alpha1.Component, error) {
+	comp := &appsv1alpha1.Component{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compFullName, Namespace: namespace}, comp); err != nil {
+		return nil, err
 	}
-	return ""
+	return comp, nil
 }
 
-// GetCompDefinition gets the component definition by component name.
-func GetCompDefinition(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	compName string) (*appsv1alpha1.ComponentDefinition, error) {
-	compDefName := GetComponentDefName(cluster, compName)
-	if len(compDefName) == 0 {
-		return nil, intctrlutil.NewNotFound(`can not found component definition by the component name "%s"`, compName)
-	}
+// GetCompDefByName gets the component definition by component definition name.
+func GetCompDefByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compDefName string) (*appsv1alpha1.ComponentDefinition, error) {
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
 		return nil, err

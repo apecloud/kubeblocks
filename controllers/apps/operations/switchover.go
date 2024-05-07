@@ -22,6 +22,7 @@ package operations
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"reflect"
 	"time"
 
@@ -64,7 +65,7 @@ func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestC
 	switchoverMessageMap := make(map[string]SwitchoverMessage)
 	for _, switchover := range opsRes.OpsRequest.Spec.SwitchoverList {
 		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
-		synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, compSpec)
+		synthesizedComp, err := buildSynthesizedComp(reqCtx, cli, opsRes, compSpec)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +128,7 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 	}
 	for _, switchover := range switchoverList {
 		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
-		synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, compSpec)
+		synthesizedComp, err := buildSynthesizedComp(reqCtx, cli, opsRes, compSpec)
 		if err != nil {
 			return err
 		}
@@ -284,4 +285,22 @@ func setComponentSwitchoverProgressDetails(recorder record.EventRecorder,
 		Phase:           phase,
 		ProgressDetails: componentProcessDetails,
 	}
+}
+
+// buildSynthesizedComp builds synthesized component for native component or generated component.
+func buildSynthesizedComp(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*component.SynthesizedComponent, error) {
+	if len(clusterCompSpec.ComponentDef) > 0 {
+		compObj, err := component.GetComponentByName(reqCtx, cli, constant.GenerateClusterComponentName(opsRes.Cluster.Name, clusterCompSpec.Name), opsRes.Cluster.Namespace)
+		if err != nil {
+			return nil, err
+		}
+		compDefObj, err := component.GetCompDefByName(reqCtx, cli, clusterCompSpec.ComponentDef)
+		if err != nil {
+			return nil, err
+		}
+		// build synthesized component for native component
+		return component.BuildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, compDefObj, compObj)
+	}
+	// build synthesized component for generated component
+	return component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, clusterCompSpec)
 }

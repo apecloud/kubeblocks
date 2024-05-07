@@ -116,7 +116,7 @@ spec:
   componentSpecs:
     - name: etcd
       componentDefRef: etcd
-      monitor: false
+      monitorEnabled: false
       replicas: 3
       resources:
         limits:

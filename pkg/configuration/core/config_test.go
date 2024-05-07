@@ -153,7 +153,7 @@ func TestConfigMapConfig(t *testing.T) {
 func TestGenerateVisualizedParamsList(t *testing.T) {
 	type args struct {
 		configPatch  *ConfigPatchInfo
-		formatConfig *appsv1beta1.FormatterConfig
+		formatConfig *appsv1beta1.FileFormatConfig
 		sets         *set.LinkedHashSetString
 	}
 
@@ -204,7 +204,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 			configPatch: &ConfigPatchInfo{
 				IsModify:     true,
 				UpdateConfig: map[string][]byte{"key": testUpdatedParams}},
-			formatConfig: &appsv1beta1.FormatterConfig{
+			formatConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.Ini,
 				FormatterAction: appsv1beta1.FormatterAction{IniConfig: &appsv1beta1.IniConfig{
 					SectionName: "mysqld",
@@ -233,7 +233,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				IsModify:  true,
 				AddConfig: map[string]interface{}{"key": testJSON},
 			},
-			formatConfig: &appsv1beta1.FormatterConfig{
+			formatConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.Ini,
 				FormatterAction: appsv1beta1.FormatterAction{IniConfig: &appsv1beta1.IniConfig{
 					SectionName: "mysqld",
@@ -259,7 +259,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				IsModify:     true,
 				DeleteConfig: map[string]interface{}{"key": testJSON},
 			},
-			formatConfig: &appsv1beta1.FormatterConfig{
+			formatConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.Ini,
 				FormatterAction: appsv1beta1.FormatterAction{IniConfig: &appsv1beta1.IniConfig{
 					SectionName: "mysqld",

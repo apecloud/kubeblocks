@@ -58,7 +58,7 @@ func (r *ConfigConstraint) validateShellTrigger() error {
 		return nil
 	}
 	if r.Spec.BatchReload() {
-		return validateBatchParametersTemplate(r.Spec.DynamicReloadAction.ShellTrigger.BatchParametersTemplate)
+		return validateBatchParametersTemplate(r.Spec.ReloadAction.ShellTrigger.BatchParamsFormatterTemplate)
 	}
 	return nil
 }

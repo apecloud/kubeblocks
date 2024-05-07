@@ -4,16 +4,17 @@ metadata:
   name: mysql-tree-node-template-8.0
   namespace: default
 spec:
-  dynamicReloadAction:
+  reloadAction:
     unixSignalTrigger:
       signal: SIGHUP
       processName: mysqld
 
-  # top level mysql configuration type
-  configSchemaTopLevelKey: MysqlParameter
 
   # ConfigurationSchema that impose restrictions on engine parameter's rule
   configSchema:
+    # top level mysql configuration type
+    topLevelKey: MysqlParameter
+
     # schema: auto generate from cue scripts
     # example: ../../pkg/configuration/testdata/mysql_openapi.json
     cue: |-
@@ -34,7 +35,7 @@ spec:
     - automatic_sp_privileges
 
   # mysql configuration file format
-  formatterConfig:
+  fileFormatConfig:
     format: ini
     iniConfig:
       sectionName: mysqld

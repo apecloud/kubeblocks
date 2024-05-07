@@ -173,7 +173,7 @@ func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail,
 	}
 	p.configPatch, _, err = cfgcore.CreateConfigPatch(p.ConfigMapObj.Data,
 		updatedData,
-		p.configConstraint.Spec.FormatterConfig.Format,
+		p.configConstraint.Spec.FileFormatConfig.Format,
 		p.configSpec.Keys,
 		false)
 	return err
@@ -195,14 +195,14 @@ func (p *pipeline) UpdateOpsLabel() *pipeline {
 	updateFn := func() error {
 		if len(p.updatedParameters) == 0 ||
 			p.configConstraint == nil ||
-			p.configConstraint.Spec.FormatterConfig == nil {
+			p.configConstraint.Spec.FileFormatConfig == nil {
 			return nil
 		}
 
 		request := p.resource.OpsRequest
 		newRequest := request.DeepCopy()
 		deepObject := client.MergeFrom(newRequest.DeepCopy())
-		formatter := p.configConstraint.Spec.FormatterConfig
+		formatter := p.configConstraint.Spec.FileFormatConfig
 		updateOpsLabelWithReconfigure(newRequest, p.updatedParameters, p.ConfigMapObj.Data, formatter)
 		return p.cli.Patch(p.reqCtx.Ctx, newRequest, deepObject)
 	}

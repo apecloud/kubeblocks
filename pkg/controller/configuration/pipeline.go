@@ -321,7 +321,7 @@ func (p *updatePipeline) ApplyParameters() *updatePipeline {
 
 		p.configPatch, _, err = core.CreateConfigPatch(cm.Data,
 			newData,
-			p.ConfigConstraintObj.Spec.FormatterConfig.Format,
+			p.ConfigConstraintObj.Spec.FileFormatConfig.Format,
 			p.configSpec.Keys,
 			false)
 		if err != nil {

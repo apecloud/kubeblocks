@@ -65,7 +65,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}),
 				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigConstraintSpec(&appsv1beta1.FormatterConfig{Format: appsv1beta1.RedisCfg}),
+				withConfigConstraintSpec(&appsv1beta1.FileFormatConfig{Format: appsv1beta1.RedisCfg}),
 				withConfigPatch(map[string]string{
 					"a": "c b e f",
 				}),
@@ -122,7 +122,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}),
 				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigConstraintSpec(&appsv1beta1.FormatterConfig{Format: appsv1beta1.RedisCfg}),
+				withConfigConstraintSpec(&appsv1beta1.FileFormatConfig{Format: appsv1beta1.RedisCfg}),
 				withConfigPatch(map[string]string{
 					"a": "c b e f",
 				}),
@@ -135,7 +135,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}}))
 
 			// add selector
-			mockParam.ConfigConstraint.DynamicReloadSelector = &metav1.LabelSelector{
+			mockParam.ConfigConstraint.ReloadedPodSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"primary": "true",
 				},

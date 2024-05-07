@@ -53,7 +53,7 @@ var _ = Describe("config_util", func() {
 		It("GetReloadOptions Should success without error", func() {
 			mockTpl := appsv1beta1.ConfigConstraint{
 				Spec: appsv1beta1.ConfigConstraintSpec{
-					DynamicReloadAction: &appsv1beta1.DynamicReloadAction{
+					ReloadAction: &appsv1beta1.ReloadAction{
 						UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{
 							Signal:      "HUB",
 							ProcessName: "for_test",
@@ -64,7 +64,7 @@ var _ = Describe("config_util", func() {
 			tests := []struct {
 				name    string
 				tpls    []v1alpha1.ComponentConfigSpec
-				want    *appsv1beta1.DynamicReloadAction
+				want    *appsv1beta1.ReloadAction
 				wantErr bool
 			}{{
 				// empty config templates
@@ -101,7 +101,7 @@ var _ = Describe("config_util", func() {
 					},
 					ConfigConstraintRef: "eg_v1",
 				}},
-				want:    mockTpl.Spec.DynamicReloadAction,
+				want:    mockTpl.Spec.ReloadAction,
 				wantErr: false,
 			}, {
 				// not exist config constraint
@@ -191,7 +191,7 @@ func TestApplyConfigPatch(t *testing.T) {
 	type args struct {
 		baseCfg           []byte
 		updatedParameters map[string]string
-		formatConfig      *appsv1beta1.FormatterConfig
+		formatConfig      *appsv1beta1.FileFormatConfig
 	}
 	tests := []struct {
 		name    string
@@ -207,7 +207,7 @@ test=test`),
 				"a":               "b",
 				"max_connections": "600",
 			},
-			formatConfig: &appsv1beta1.FormatterConfig{
+			formatConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.Ini,
 				FormatterAction: appsv1beta1.FormatterAction{
 					IniConfig: &appsv1beta1.IniConfig{
@@ -228,7 +228,7 @@ test=test
 				"a": "b",
 				"c": "d e f g",
 			},
-			formatConfig: &appsv1beta1.FormatterConfig{
+			formatConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.RedisCfg,
 			},
 		},
@@ -242,7 +242,7 @@ test=test
 				"ENABLE_MODULES":     "true",
 				"HUGGINGFACE_APIKEY": "kssdlsdjskwssl",
 			},
-			formatConfig: &appsv1beta1.FormatterConfig{
+			formatConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.Dotenv,
 			},
 		},

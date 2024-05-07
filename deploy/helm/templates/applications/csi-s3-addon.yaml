@@ -24,9 +24,6 @@ spec:
       {{- end }}
 
     installValues:
-      secretRefs:
-        - name: {{ include "kubeblocks.fullname" . }}-cloud-provider
-          key: csi-s3
 
       {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
       {{- if eq $cloudProvider "huaweiCloud" }}

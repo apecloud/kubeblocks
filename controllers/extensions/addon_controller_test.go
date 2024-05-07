@@ -665,7 +665,6 @@ var _ = Describe("Addon controller", func() {
 			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
 		})
 
-
 		It("should successfully reconcile a custom resource for Addon deleting with used by clusters", func() {
 			createAutoInstallAddon()
 
@@ -739,7 +738,6 @@ var _ = Describe("Addon controller", func() {
 			By("By checking addon with no used cluster")
 			disablingPhaseCheck(3)
 		})
-
 
 		It("should have provider and version in spec for Addon with provider and version in label initially", func() {
 			By("By create an addon with auto-install and labels contains provider and version information")

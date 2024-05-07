@@ -1747,19 +1747,6 @@ kubeblocks-csi-driver:
   enabled: false
 
 
-cloudProvider:
-  ## cloudProvider secret settings
-  ## @param cloudProvider.accessKey -- S3 Access Key.
-  ## @param cloudProvider.secretKey -- S3 Secret Key.
-  ## @param cloudProvider.region -- S3 region.
-  ## @param cloudProvider.cloud -- cloud name: [aws,aliyun].
-  ## @param cloudProvider.bucket -- S3 Bucket.
-  accessKey: ""
-  secretKey: ""
-  region: ""
-  name: ""
-  bucket: ""
-
 ## csi-s3 settings
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
 ##

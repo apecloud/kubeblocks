@@ -84,7 +84,13 @@ func (c *configReconcileContext) Workload() *configReconcileContext {
 
 func (c *configReconcileContext) SynthesizedComponent() *configReconcileContext {
 	return c.Wrap(func() (err error) {
-		c.BuiltinComponent, err = component.BuildSynthesizedComponentWrapper(c.reqCtx, c.Client, c.ClusterObj, c.ClusterComObj)
+		if c.ComponentDefObj != nil && c.ComponentObj != nil && len(c.ComponentObj.Spec.CompDef) > 0 {
+			// build synthesized component for native component
+			c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.reqCtx, c.Client, c.ClusterObj, c.ComponentDefObj, c.ComponentObj)
+		} else {
+			// build synthesized component for generated component
+			c.BuiltinComponent, err = component.BuildSynthesizedComponentWrapper(c.reqCtx, c.Client, c.ClusterObj, c.ClusterComObj)
+		}
 		return err
 	})
 }

@@ -57,15 +57,6 @@ var _ = Describe("StorageProvider controller", func() {
 		// delete rest mocked objects
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
-
-		// By("deleting the Namespace to perform the tests")
-		// Eventually(func(g Gomega) {
-		// 	namespace := testCtx.GetNamespaceObj()
-		// 	err := testCtx.Cli.Delete(testCtx.Ctx, &namespace)
-		// 	g.Expect(client.IgnoreNotFound(err)).To(Not(HaveOccurred()))
-		// 	g.Expect(client.IgnoreNotFound(testCtx.Cli.Get(
-		// 		testCtx.Ctx, testCtx.GetNamespaceKey(), &namespace))).To(Not(HaveOccurred()))
-		// }).Should(Succeed())
 	}
 
 	BeforeEach(func() {

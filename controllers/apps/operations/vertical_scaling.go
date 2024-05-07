@@ -147,7 +147,7 @@ func (vs verticalScalingHandler) podApplyCompOps(
 	pod *corev1.Pod,
 	compOps ComponentOpsInteface,
 	opsStartTime metav1.Time,
-	templateName string) bool {
+	insTemplateName string) bool {
 	verticalScaling := compOps.(appsv1alpha1.VerticalScaling)
 	matchResources := func(podResources, vsResources corev1.ResourceRequirements) bool {
 		if vsResources.Requests == nil {
@@ -169,11 +169,11 @@ func (vs verticalScalingHandler) podApplyCompOps(
 		}
 		return true
 	}
-	if templateName == "" {
+	if insTemplateName == "" {
 		return matchResources(pod.Spec.Containers[0].Resources, verticalScaling.ResourceRequirements)
 	}
 	for _, insTpl := range verticalScaling.Instances {
-		if insTpl.Name == templateName {
+		if insTpl.Name == insTemplateName {
 			return matchResources(pod.Spec.Containers[0].Resources, verticalScaling.ResourceRequirements)
 		}
 	}

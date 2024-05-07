@@ -22,8 +22,6 @@ package grpcserver
 import (
 	"context"
 	"encoding/json"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/custom"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -32,6 +30,8 @@ import (
 	. "github.com/onsi/gomega"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/custom"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations/replica"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"

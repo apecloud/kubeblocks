@@ -2,7 +2,7 @@
 title: Redis Cluster Mode
 description: A brief overview of Redis Cluster Mode and its basic operations
 keywords: [redis, redis cluster, feature]
-sidebar_position: 1
+sidebar_position: 7
 ---
 
 # Redis Cluster Mode
@@ -290,12 +290,11 @@ kubectl edit cluster redisc
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: horizontal-scaling-redisc-
+  name: horizontal-scaling-redisc
 spec:
-  clusterRef: redisc
+  clusterName: redisc
   horizontalScaling:
   - componentName: shard
-    isSharding: true
     replicas: 3
   type: HorizontalScaling
 ```
@@ -306,12 +305,11 @@ spec:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: vertical-scaling-redisc-
+  name: vertical-scaling-redisc
 spec:
-  clusterRef: redisc
+  clusterName: redisc
   verticalScaling:
   - componentName: shard
-    isSharding: true
     limits: 
       cpu: 2
       memory: 4Gi
@@ -327,12 +325,11 @@ spec:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: volume-expand-redisc-
+  name: volume-expand-redisc
 spec:
-  clusterRef: redisc
+  clusterName: redisc
   volumeExpansion:
   - componentName: shard
-    isSharding: true
     volumeClaimTemplates:
     - name: data
       storage: 200Gi
@@ -345,12 +342,11 @@ spec:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: restart-redisc-
+  name: restart-redisc
 spec:
-  clusterRef: redisc
+  clusterName: redisc
   restart:
   - componentName: shard
-    isSharding: true  
   type: Restart
 ```
 
@@ -360,9 +356,9 @@ spec:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: stop-redisc-
+  name: stop-redisc
 spec:
-  clusterRef: redisc
+  clusterName: redisc
   type: Stop
 ```
 
@@ -370,8 +366,8 @@ spec:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: start-redisc-
+  name: start-redisc
 spec:
-  clusterRef: redisc
+  clusterName: redisc
   type: Start
 ```

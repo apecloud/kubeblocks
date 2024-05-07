@@ -246,22 +246,10 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				ops.Status.Phase = appsv1alpha1.OpsRunningPhase
 			})).Should(Succeed())
 
-			By("expect these opsRequest should not in the queue of the clusters")
+			By("the first operations request is expected to be aborted.")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(firstOpsRequest))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
 			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
-			Expect(len(opsRequestSlice)).Should(Equal(2))
-			for _, v := range opsRequestSlice {
-				Expect(v.InQueue).Should(BeFalse())
-			}
-
-			By("reconcile the firstOpsRequest again")
-			opsRes.OpsRequest = firstOpsRequest
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-
-			By("expect the firstOpsRequest should be overwritten for the resources")
-			override := opsRes.OpsRequest.Status.Components[consensusComp].OverrideBy
-			Expect(override).ShouldNot(BeNil())
-			Expect(override.ResourceRequirements.String()).Should(Equal(ops.Spec.VerticalScalingList[0].ResourceRequirements.String()))
+			Expect(len(opsRequestSlice)).Should(Equal(1))
 		})
 	})
 })

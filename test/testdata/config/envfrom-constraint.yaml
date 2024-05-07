@@ -3,5 +3,5 @@ kind: ConfigConstraint
 metadata:
   name: env-from-config-test
 spec:
-  formatterConfig:
+  fileFormatConfig:
     format: properties

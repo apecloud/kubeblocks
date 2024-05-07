@@ -89,8 +89,8 @@ func GenerateWorkloadNamePattern(clusterName, compName string) string {
 }
 
 // GenerateServiceNamePattern generates the service name pattern
-func GenerateServiceNamePattern(rsmName string) string {
-	return fmt.Sprintf("%s-headless", rsmName)
+func GenerateServiceNamePattern(itsName string) string {
+	return fmt.Sprintf("%s-headless", itsName)
 }
 
 // GeneratePodName generates the connection credential name for component.

@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -41,7 +42,7 @@ type reconfiguringResult struct {
 	err                  error
 }
 
-func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.ParamPairs, orinalData map[string]string, formatter *appsv1beta1.FormatterConfig) {
+func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.ParamPairs, orinalData map[string]string, formatter *appsv1beta1.FileFormatConfig) {
 	var maxLabelCount = 16
 	updateLabel := func(param map[string]interface{}) {
 		if obj.Labels == nil {
@@ -83,7 +84,7 @@ func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.P
 	}
 }
 
-func fetchOriginalValue(keyFile, data string, params map[string]interface{}, formatter *appsv1beta1.FormatterConfig) (string, error) {
+func fetchOriginalValue(keyFile, data string, params map[string]interface{}, formatter *appsv1beta1.FileFormatConfig) (string, error) {
 	baseConfigObj, err := core.FromConfigObject(keyFile, data, formatter)
 	if err != nil {
 		return "", err
@@ -219,10 +220,12 @@ func updateFileContent(item *appsv1alpha1.ConfigurationItemDetail, key string, c
 	}
 }
 
-func updateParameters(item *appsv1alpha1.ConfigurationItemDetail, key string, parameters []appsv1alpha1.ParameterPair) {
+func updateParameters(item *appsv1alpha1.ConfigurationItemDetail, key string, parameters []appsv1alpha1.ParameterPair, filter validate.ValidatorOptions) {
 	updatedParams := make(map[string]*string, len(parameters))
 	for _, parameter := range parameters {
-		updatedParams[parameter.Key] = parameter.Value
+		if filter(parameter.Key) {
+			updatedParams[parameter.Key] = parameter.Value
+		}
 	}
 
 	params, ok := item.ConfigFileParams[key]

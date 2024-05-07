@@ -115,7 +115,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 func checkAndUpdateSharProcessNamespace(podSpec *corev1.PodSpec, buildParams *cfgcm.CfgManagerBuildParams, configSpecMetas []cfgcm.ConfigSpecMeta) {
 	shared := cfgcm.NeedSharedProcessNamespace(configSpecMetas)
 	if shared {
-		podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
+		podSpec.ShareProcessNamespace = cfgutil.ToPointer(true)
 	}
 	buildParams.ShareProcessNamespace = shared
 }
@@ -228,7 +228,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
 		return nil, err
 	}
-	if err := buildConfigToolsContainer(cfgManagerParams, podSpec, comp); err != nil {
+	if err := buildReloadToolsContainer(cfgManagerParams, podSpec); err != nil {
 		return nil, err
 	}
 	return cfgManagerParams, nil

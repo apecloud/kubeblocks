@@ -55,8 +55,8 @@ func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType app
 			},
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
-			ClusterRef: clusterName,
-			Type:       opsType,
+			ClusterName: clusterName,
+			Type:        opsType,
 		},
 	}
 }

@@ -96,7 +96,7 @@ func FromStringPointerMap(m map[string]string) map[string]*string {
 	return r
 }
 
-func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]*string, formatConfig *appsv1beta1.FormatterConfig) (string, error) {
+func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]*string, formatConfig *appsv1beta1.FileFormatConfig) (string, error) {
 	configLoaderOption := CfgOption{
 		Type:    CfgRawType,
 		Log:     log.FromContext(context.TODO()),
@@ -122,7 +122,7 @@ func NeedReloadVolume(config appsv1alpha1.ComponentConfigSpec) bool {
 	return config.ConfigConstraintRef != ""
 }
 
-func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1beta1.DynamicReloadAction, *appsv1beta1.FormatterConfig, error) {
+func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1beta1.ReloadAction, *appsv1beta1.FileFormatConfig, error) {
 	for _, configSpec := range configSpecs {
 		if !NeedReloadVolume(configSpec) {
 			continue
@@ -135,8 +135,8 @@ func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []apps
 		if err := cli.Get(ctx, ccKey, cfgConst); err != nil {
 			return nil, nil, WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 		}
-		if cfgConst.Spec.DynamicReloadAction != nil {
-			return cfgConst.Spec.DynamicReloadAction, cfgConst.Spec.FormatterConfig, nil
+		if cfgConst.Spec.ReloadAction != nil {
+			return cfgConst.Spec.ReloadAction, cfgConst.Spec.FileFormatConfig, nil
 		}
 	}
 	return nil, nil, nil

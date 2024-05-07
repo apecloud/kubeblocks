@@ -173,7 +173,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 	Context("statefulSet rolling reconfigure policy test", func() {
 		It("Should success without error", func() {
 
-			// for mock sts
+			// for mock its
 			var pods []corev1.Pod
 			{
 				mockParam.Component.WorkloadType = appsv1alpha1.Stateful

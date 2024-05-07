@@ -97,13 +97,13 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+      path: /mutate-workloads-kubeblocks-io-v1alpha1-instanceset
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
     {{- end }}
   failurePolicy: Fail
-  name: mreplicatedstatemachine.kb.io
+  name: minstanceset.kb.io
   rules:
     - apiGroups:
         - workloads.kubeblocks.io
@@ -113,7 +113,7 @@ webhooks:
         - CREATE
         - UPDATE
       resources:
-        - replicatedstatemachines
+        - instancesets
   sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -225,13 +225,13 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+      path: /validate-workloads-kubeblocks-io-v1alpha1-instanceset
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
     {{- end }}
   failurePolicy: Fail
-  name: vreplicatedstatemachine.kb.io
+  name: vinstanceset.kb.io
   rules:
     - apiGroups:
         - workloads.kubeblocks.io
@@ -241,7 +241,7 @@ webhooks:
         - CREATE
         - UPDATE
       resources:
-        - replicatedstatemachines
+        - instancesets
   sideEffects: None
 - admissionReviewVersions:
     - v1

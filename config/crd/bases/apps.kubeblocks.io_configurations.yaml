@@ -101,20 +101,19 @@ spec:
                         requirements and limitations."
                       properties:
                         asEnvFrom:
-                          description: "Deprecated: AsEnvFrom has been deprecated
-                            since 0.9.0 and will be removed in 0.10.0 Specifies the
-                            containers to inject the ConfigMap parameters as environment
-                            variables. \n This is useful when application images accept
-                            parameters through environment variables and generate
-                            the final configuration file in the startup script based
-                            on these variables. \n This field allows users to specify
-                            a list of container names, and KubeBlocks will inject
-                            the environment variables converted from the ConfigMap
-                            into these designated containers. This provides a flexible
-                            way to pass the configuration items from the ConfigMap
-                            to the container without modifying the image. \n Note:
-                            The field name `asEnvFrom` may be changed to `injectEnvTo`
-                            in future versions for better clarity."
+                          description: "Specifies the containers to inject the ConfigMap
+                            parameters as environment variables. \n This is useful
+                            when application images accept parameters through environment
+                            variables and generate the final configuration file in
+                            the startup script based on these variables. \n This field
+                            allows users to specify a list of container names, and
+                            KubeBlocks will inject the environment variables converted
+                            from the ConfigMap into these designated containers. This
+                            provides a flexible way to pass the configuration items
+                            from the ConfigMap to the container without modifying
+                            the image. \n Deprecated: `asEnvFrom` has been deprecated
+                            since 0.9.0 and will be removed in 0.10.0. Use `injectEnvTo`
+                            instead."
                           items:
                             type: string
                           type: array
@@ -424,8 +423,10 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     phase:
-                      description: Indicates the current status of the configuration
-                        item. This field is optional.
+                      description: "Indicates the current status of the configuration
+                        item. \n Possible values include \"Creating\", \"Init\", \"Running\",
+                        \"Pending\", \"Merged\", \"MergeFailed\", \"FailedAndPause\",
+                        \"Upgrading\", \"Deleting\", \"FailedAndRetry\", \"Finished\"."
                       enum:
                       - Creating
                       - Init

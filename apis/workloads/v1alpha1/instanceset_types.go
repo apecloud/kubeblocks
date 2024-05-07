@@ -274,27 +274,72 @@ type InstanceSetSpec struct {
 
 // InstanceSetStatus defines the observed state of InstanceSet
 type InstanceSetStatus struct {
-	appsv1.StatefulSetStatus `json:",inline"`
+	// observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
+	// InstanceSet's generation, which is updated on mutation by the API Server.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Defines the initial number of pods (members) when the cluster is first initialized.
+	// replicas is the number of instances created by the InstanceSet controller.
+	Replicas int32 `json:"replicas"`
+
+	// readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
+
+	// currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+	// indicated by CurrentRevisions.
+	CurrentReplicas int32 `json:"currentReplicas,omitempty"`
+
+	// updatedReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+	// indicated by UpdateRevisions.
+	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
+
+	// currentRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the
+	// sequence [0,currentReplicas).
+	CurrentRevision string `json:"currentRevision,omitempty"`
+
+	// updateRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the sequence
+	// [replicas-updatedReplicas,replicas)
+	UpdateRevision string `json:"updateRevision,omitempty"`
+
+	// Represents the latest available observations of an instanceset's current state.
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
+	//
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+	// Total number of available instances (ready for at least minReadySeconds) targeted by this InstanceSet.
+	//
+	// +optional
+	AvailableReplicas int32 `json:"availableReplicas"`
+
+	// Defines the initial number of instances when the cluster is first initialized.
 	// This value is set to spec.Replicas at the time of object creation and remains constant thereafter.
+	// Used only when spec.roles set.
+	//
+	// +optional
 	InitReplicas int32 `json:"initReplicas"`
 
-	// Represents the number of pods (members) that have already reached the MembersStatus during the cluster initialization stage.
+	// Represents the number of instances that have already reached the MembersStatus during the cluster initialization stage.
 	// This value remains constant once it equals InitReplicas.
+	// Used only when spec.roles set.
 	//
 	// +optional
 	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
-
-	// When not empty, indicates the version of the InstanceSet used to generate the underlying workload.
-	//
-	// +optional
-	CurrentGeneration int64 `json:"currentGeneration,omitempty"`
 
 	// Provides the status of each member in the cluster.
 	//
 	// +optional
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
+
+	// Indicates whether it is required for the InstanceSet to have at least one primary instance ready.
+	//
+	// +optional
+	ReadyWithoutPrimary bool `json:"readyWithoutPrimary,omitempty"`
 
 	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
@@ -564,15 +609,37 @@ type MemberStatus struct {
 	//
 	// +optional
 	ReplicaRole *ReplicaRole `json:"role,omitempty"`
+}
 
-	// Whether the corresponding Pod is in ready condition.
-	// +optional
-	Ready bool `json:"ready,omitempty"`
+type ConditionType string
 
-	// Indicates whether it is required for the InstanceSet to have at least one primary instance ready.
-	//
-	// +optional
-	ReadyWithoutPrimary bool `json:"readyWithoutPrimary"`
+const (
+	// InstanceReady is added in an instance set when at least one of its instances(pods) is in a Ready condition.
+	// ConditionStatus will be True if all its instances(pods) are in a Ready condition.
+	// Or, a NotReady reason with not ready instances encoded in the Message filed will be set.
+	InstanceReady ConditionType = "InstanceReady"
+
+	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.
+	InstanceFailure ConditionType = "InstanceFailure"
+)
+
+const (
+	// ReasonNotReady is a reason for condition InstanceReady.
+	ReasonNotReady = "NotReady"
+
+	// ReasonReady is a reason for condition InstanceReady.
+	ReasonReady = "Ready"
+
+	// ReasonInstanceFailure is a reason for condition InstanceFailure.
+	ReasonInstanceFailure = "InstanceFailure"
+)
+
+func (t *InstanceTemplate) GetName() string {
+	return t.Name
+}
+
+func (t *InstanceTemplate) GetReplicas() *int32 {
+	return t.Replicas
 }
 
 func init() {

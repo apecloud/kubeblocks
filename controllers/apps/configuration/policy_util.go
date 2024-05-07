@@ -35,7 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
-	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -85,7 +85,7 @@ func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	if params.SynthesizedComponent != nil {
-		rsmcore.SortPods(pods, rsmcore.ComposeRolePriorityMap(component.ConvertSynthesizeCompRoleToInstanceSetRole(params.SynthesizedComponent)), true)
+		instanceset.SortPods(pods, instanceset.ComposeRolePriorityMap(component.ConvertSynthesizeCompRoleToInstanceSetRole(params.SynthesizedComponent)), true)
 	}
 	return pods, nil
 }

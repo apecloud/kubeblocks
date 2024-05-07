@@ -41,10 +41,9 @@ const (
 
 var (
 	// default probe setting for volume protection.
-	defaultVolumeProtectionProbe = appsv1alpha1.ClusterDefinitionProbe{
-		PeriodSeconds:    60,
-		TimeoutSeconds:   5,
-		FailureThreshold: 3,
+	defaultVolumeProtectionProbe = appsv1alpha1.RoleProbe{
+		PeriodSeconds:  60,
+		TimeoutSeconds: 5,
 	}
 )
 
@@ -256,10 +255,8 @@ func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComp
 		}
 	}
 
-	// pass the volume protection spec to lorry container through env.
-	// TODO(xingran & leon):  volume protection should be based on componentDefinition.Spec.Volume
 	if volumeProtectionEnabled(synthesizeComp) {
-		envs = append(envs, buildEnv4VolumeProtection(*synthesizeComp.VolumeProtection))
+		envs = append(envs, buildEnv4VolumeProtection(synthesizeComp))
 	}
 	envs = append(envs, buildEnv4CronJobs(synthesizeComp)...)
 
@@ -281,7 +278,12 @@ func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {
-	return component.VolumeProtection != nil
+	for _, v := range component.Volumes {
+		if v.HighWatermark > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func buildVolumeProtectionProbeContainer(c *corev1.Container, probeSvcHTTPPort int) {
@@ -293,7 +295,7 @@ func buildVolumeProtectionProbeContainer(c *corev1.Container, probeSvcHTTPPort i
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = defaultVolumeProtectionProbe.PeriodSeconds
 	probe.TimeoutSeconds = defaultVolumeProtectionProbe.TimeoutSeconds
-	probe.FailureThreshold = defaultVolumeProtectionProbe.FailureThreshold
+	probe.FailureThreshold = 3
 	c.ReadinessProbe = probe
 }
 
@@ -348,7 +350,17 @@ func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *a
 	return envs
 }
 
-func buildEnv4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar {
+func buildEnv4VolumeProtection(synthesizedComp *SynthesizedComponent) corev1.EnvVar {
+	spec := &appsv1alpha1.VolumeProtectionSpec{}
+	for i, v := range synthesizedComp.Volumes {
+		if v.HighWatermark > 0 {
+			spec.Volumes = append(spec.Volumes, appsv1alpha1.ProtectedVolume{
+				Name:          v.Name,
+				HighWatermark: &synthesizedComp.Volumes[i].HighWatermark,
+			})
+		}
+	}
+
 	value, err := json.Marshal(spec)
 	if err != nil {
 		panic(fmt.Sprintf("marshal volume protection spec error: %s", err.Error()))

@@ -49,8 +49,7 @@ type TestResourceUnit struct {
 }
 
 func TestPodIsReady(t *testing.T) {
-	set := testk8s.NewFakeStatefulSet("foo", 3)
-	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	pod := testk8s.NewFakePod("foo", 1)
 	pod.Status.Conditions = []corev1.PodCondition{
 		{
 			Type:   corev1.PodReady,
@@ -83,26 +82,8 @@ func TestPodIsReady(t *testing.T) {
 	}
 }
 
-func TestPodIsControlledByLatestRevision(t *testing.T) {
-	set := testk8s.NewFakeStatefulSet("foo", 3)
-	pod := testk8s.NewFakeStatefulSetPod(set, 1)
-	pod.Labels = map[string]string{
-		appsv1.ControllerRevisionHashLabelKey: "test",
-	}
-	set.Generation = 1
-	set.Status.UpdateRevision = "test"
-	if PodIsControlledByLatestRevision(pod, set) {
-		t.Errorf("PodIsControlledByLatestRevision returned false positive")
-	}
-	set.Status.ObservedGeneration = 1
-	if !PodIsControlledByLatestRevision(pod, set) {
-		t.Errorf("PodIsControlledByLatestRevision returned false positive")
-	}
-}
-
 func TestGetPodRevision(t *testing.T) {
-	set := testk8s.NewFakeStatefulSet("foo", 3)
-	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	pod := testk8s.NewFakePod("foo", 1)
 	if GetPodRevision(pod) != "" {
 		t.Errorf("revision should be empty")
 	}

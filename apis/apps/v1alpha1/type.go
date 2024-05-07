@@ -155,7 +155,6 @@ type ComponentConfigSpec struct {
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 
-	// Deprecated: AsEnvFrom has been deprecated since 0.9.0 and will be removed in 0.10.0
 	// Specifies the containers to inject the ConfigMap parameters as environment variables.
 	//
 	// This is useful when application images accept parameters through environment variables and
@@ -165,7 +164,8 @@ type ComponentConfigSpec struct {
 	// variables converted from the ConfigMap into these designated containers. This provides a flexible way to
 	// pass the configuration items from the ConfigMap to the container without modifying the image.
 	//
-	// Note: The field name `asEnvFrom` may be changed to `injectEnvTo` in future versions for better clarity.
+	// Deprecated: `asEnvFrom` has been deprecated since 0.9.0 and will be removed in 0.10.0.
+	// Use `injectEnvTo` instead.
 	//
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +listType=set
@@ -320,7 +320,7 @@ const (
 
 // OpsPhase defines opsRequest phase.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Aborted,Failed,Succeed}
 type OpsPhase string
 
 const (
@@ -331,6 +331,7 @@ const (
 	OpsSucceedPhase    OpsPhase = "Succeed"
 	OpsCancelledPhase  OpsPhase = "Cancelled"
 	OpsFailedPhase     OpsPhase = "Failed"
+	OpsAbortedPhase    OpsPhase = "Aborted"
 )
 
 // PodSelectionPolicy pod selection strategy.
@@ -813,7 +814,7 @@ type HostNetwork struct {
 }
 
 type HostNetworkContainerPort struct {
-	// Container specifies the target container within the pod.
+	// Container specifies the target container within the Pod.
 	//
 	// +required
 	Container string `json:"container"`
@@ -864,9 +865,7 @@ type ComponentService struct {
 	// When set to true, a set of Services will be automatically generated for each Pod,
 	// and the `roleSelector` field will be ignored.
 	//
-	// The names of the generated Services will follow the same naming pattern: `$(serviceName)-$(podOrdinal)`.
-	//
-	// The podOrdinal is zero-based, meaning it starts from 0 for the first Pod and increments for each subsequent Pod.
+	// The names of the generated Services will follow the same suffix naming pattern: `$(serviceName)-$(podOrdinal)`.
 	// The total number of generated Services will be equal to the number of replicas specified for the Component.
 	//
 	// Example usage:
@@ -874,7 +873,8 @@ type ComponentService struct {
 	// ```yaml
 	// name: my-service
 	// serviceName: my-service
-	// generatePodOrdinalService: true
+	// podService: true
+	// disableAutoProvision: true
 	// spec:
 	//   type: NodePort
 	//   ports:
@@ -952,8 +952,8 @@ type Service struct {
 	// This means that the service will select and route traffic to Pods with the label
 	// "kubeblocks.io/role" set to "leader".
 	//
-	// Note that if `generatePodOrdinalService` sets to true, RoleSelector will be ignored.
-	// The `generatePodOrdinalService` flag takes precedence over `roleSelector` and generates a service for each Pod.
+	// Note that if `podService` sets to true, RoleSelector will be ignored.
+	// The `podService` flag takes precedence over `roleSelector` and generates a service for each Pod.
 	//
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
@@ -1028,6 +1028,10 @@ type VarSource struct {
 	// Selects a defined var of a ServiceRef.
 	// +optional
 	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
+
+	// Selects a defined var of a Component.
+	// +optional
+	ComponentVarRef *ComponentVarSelector `json:"componentVarRef,omitempty"`
 }
 
 // VarOption defines whether a variable is required or optional.
@@ -1069,6 +1073,13 @@ type ContainerVars struct {
 type ServiceVars struct {
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
+
+	// LoadBalancer represents the LoadBalancer ingress point of the service.
+	//
+	// If multiple ingress points are available, the first one will be used automatically, choosing between IP and Hostname.
+	//
+	// +optional
+	LoadBalancer *VarOption `json:"loadBalancer,omitempty"`
 
 	// Port references a port or node-port defined in the service.
 	//
@@ -1133,7 +1144,33 @@ type ServiceRefVarSelector struct {
 	ServiceRefVars `json:",inline"`
 }
 
-// ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.
+// ComponentVarSelector selects a var from a Component.
+type ComponentVarSelector struct {
+	// The Component to select from.
+	ClusterObjectReference `json:",inline"`
+
+	ComponentVars `json:",inline"`
+}
+
+type ComponentVars struct {
+	// Reference to the name of the Component object.
+	//
+	// +optional
+	ComponentName *VarOption `json:"componentName,omitempty"`
+
+	// Reference to the replicas of the component.
+	//
+	// +optional
+	Replicas *VarOption `json:"replicas,omitempty"`
+
+	// Reference to the instanceName list of the component.
+	// and the value will be presented in the following format: instanceName1,instanceName2...
+	//
+	// +optional
+	InstanceNames *VarOption `json:"instanceNames,omitempty"`
+}
+
+// ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.
 type ClusterObjectReference struct {
 	// CompDef specifies the definition used by the component that the referent object resident in.
 	// If not specified, the component itself will be used.

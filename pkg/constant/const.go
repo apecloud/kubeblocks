@@ -160,7 +160,7 @@ const (
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey               = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
-
+	DisableHAAnnotationKey                      = "kubeblocks.io/disable-ha"
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName         = "cluster.kubeblocks.io/finalizer"
 	DBComponentFinalizerName       = "component.kubeblocks.io/finalizer"
@@ -286,10 +286,6 @@ const (
 )
 
 const (
-	FeatureGateReplicatedStateMachine = "REPLICATED_STATE_MACHINE" // enable rsm
-)
-
-const (
 	KubernetesClusterDomainEnv = "KUBERNETES_CLUSTER_DOMAIN"
 	DefaultDNSDomain           = "cluster.local"
 )
@@ -302,15 +298,12 @@ const (
 )
 
 const (
-	BackupNameKeyForRestore          = "name"
-	BackupNamespaceKeyForRestore     = "namespace"
-	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
-	RestoreTimeKeyForRestore         = "restoreTime"
-	ConnectionPassword               = "connectionPassword"
-)
-
-const (
-	KBAppMultiClusterPlacementKey = "apps.kubeblocks.io/multi-cluster-placement"
+	BackupNameKeyForRestore           = "name"
+	BackupNamespaceKeyForRestore      = "namespace"
+	VolumeRestorePolicyKeyForRestore  = "volumeRestorePolicy"
+	DoReadyRestoreAfterClusterRunning = "doReadyRestoreAfterClusterRunning"
+	RestoreTimeKeyForRestore          = "restoreTime"
+	ConnectionPassword                = "connectionPassword"
 )
 
 const (

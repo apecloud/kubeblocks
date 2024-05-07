@@ -162,7 +162,10 @@ type ConfigurationItemDetailStatus struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Indicates the current status of the configuration item. This field is optional.
+	// Indicates the current status of the configuration item.
+	//
+	// Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+	// "Upgrading", "Deleting", "FailedAndRetry", "Finished".
 	//
 	// +optional
 	Phase ConfigurationPhase `json:"phase,omitempty"`
@@ -224,12 +227,12 @@ type ConfigurationStatus struct {
 	ConfigurationItemStatus []ConfigurationItemDetailStatus `json:"configurationStatus"`
 }
 
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+
 // Configuration represents the complete set of configurations for a specific Component of a Cluster.
 // This includes templates for each configuration file, their corresponding ConfigConstraints, volume mounts,
 // and other relevant details.
-//
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
 type Configuration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

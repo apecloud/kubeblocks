@@ -45,13 +45,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// BuildInstanceSet builds a InstanceSet object from SynthesizedComponent.
+// BuildInstanceSet builds an InstanceSet object from SynthesizedComponent.
 func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
 		clusterDefName     = synthesizedComp.ClusterDefName
@@ -119,7 +119,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		return nil, err
 	}
 
-	// update sts.spec.volumeClaimTemplates[].metadata.labels
+	// update its.spec.volumeClaimTemplates[].metadata.labels
 	// TODO(xingran): synthesizedComp.VolumeTypes has been removed, and the following code needs to be refactored.
 	if len(itsObj.Spec.VolumeClaimTemplates) > 0 && len(itsObj.GetLabels()) > 0 {
 		for index, vct := range itsObj.Spec.VolumeClaimTemplates {
@@ -157,7 +157,7 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, comp
 	if monitor == nil {
 		return nil
 	}
-	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor, container))
+	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor, container))
 }
 
 func isSupportedMonitor(componentDef *appsv1alpha1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) bool {
@@ -206,7 +206,7 @@ func setDefaultResourceLimits(its *workloads.InstanceSet) {
 	}
 }
 
-// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
+// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from component to pvc.
 func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
 	pvcTplName string) {
 	// strict args checking.
@@ -218,12 +218,10 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 	}
 	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvcTplName
 
-	if component.VolumeTypes != nil {
-		for _, t := range component.VolumeTypes {
-			if t.Name == pvcTplName {
-				pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
-				break
-			}
+	for _, t := range component.VolumeTypes {
+		if t.Name == pvcTplName {
+			pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
+			break
 		}
 	}
 }
@@ -313,8 +311,8 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(cluster.Name, synthesizedComp.Name),
 		"$(HEADLESS_SVC_FQDN)":                                 constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, synthesizedComp.Name),
 	}
-	if len(synthesizedComp.Services) > 0 {
-		for _, p := range synthesizedComp.Services[0].Spec.Ports {
+	if len(synthesizedComp.ComponentServices) > 0 {
+		for _, p := range synthesizedComp.ComponentServices[0].Spec.Ports {
 			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
 		}
 	}
@@ -460,7 +458,7 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	containerBuilder := builder.NewContainerBuilder(sidecarRenderedParam.ManagerName).
 		AddCommands("env").
 		AddArgs("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$(TOOLS_PATH)").
-		AddArgs("/bin/reloader").
+		AddArgs(getSidecarBinaryPath(sidecarRenderedParam)).
 		AddArgs(sidecarRenderedParam.Args...).
 		AddEnv(env...).
 		SetImage(sidecarRenderedParam.Image).
@@ -475,7 +473,14 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	return containerBuilder.GetObject(), nil
 }
 
-func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1beta1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
+func getSidecarBinaryPath(buildParams *cfgcm.CfgManagerBuildParams) string {
+	if buildParams.ConfigManagerReloadPath != "" {
+		return buildParams.ConfigManagerReloadPath
+	}
+	return constant.ConfigManagerToolPath
+}
+
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, toolsMetas []appsv1beta1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
 	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
 	for _, toolConfig := range toolsMetas {
 		toolContainerBuilder := builder.NewContainerBuilder(toolConfig.Name).

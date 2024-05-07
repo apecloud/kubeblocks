@@ -1,0 +1,53 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: qdrant-cluster
+  namespace: default
+spec:
+  # Specifies the behavior when a Cluster is deleted.
+  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
+  # - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations.
+  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
+  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
+  terminationPolicy: Delete
+  # Specifies a list of ClusterComponentSpec objects used to define the individual components that make up a Cluster. 
+  componentSpecs:
+    # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. 
+  - name: qdrant
+    # References the name of a ComponentDefinition. The ComponentDefinition specifies the behavior and characteristics of the Component. If both `componentDefRef` and `componentDef` are provided, the `componentDef` will take precedence over `componentDefRef`.
+    componentDef: qdrant
+    # Specifies a group of affinity scheduling rules for the Component. It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
+    affinity:
+      podAntiAffinity: Preferred
+      topologyKeys:
+      - kubernetes.io/hostname
+      tenancy: SharedNode
+    # Allows the Component to be scheduled onto nodes with matching taints. 
+    tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+    # Determines whether the metrics exporter needs to be published to the service endpoint.  
+    monitorEnabled: false
+    # Specifies the name of the ServiceAccount required by the running Component.   
+    serviceAccountName: kb-qdrant-cluster
+    # Each component supports running multiple replicas to provide high availability and persistence. This field can be used to specify the desired number of replicas.
+    replicas: 2
+    # Specifies the resources required by the Component. It allows defining the CPU, memory requirements and limits for the Component's containers.
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    # Specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component. 
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi

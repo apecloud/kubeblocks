@@ -85,8 +85,9 @@ const (
 	extensionsFlagKey flagName = "extensions"
 	workloadsFlagKey  flagName = "workloads"
 
-	multiClusterKubeConfigFlagKey flagName = "multi-cluster-kubeconfig"
-	multiClusterContextsFlagKey   flagName = "multi-cluster-contexts"
+	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
+	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
+	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
 )
 
 var (
@@ -131,7 +132,6 @@ func init() {
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
 	viper.SetDefault(constant.CfgHostPortIncludeRanges, "1025-65536")
 	viper.SetDefault(constant.CfgHostPortExcludeRanges, "6443,10250,10257,10259,2379-2380,30000-32767")
-	viper.SetDefault(constant.FeatureGateReplicatedStateMachine, true)
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
@@ -171,6 +171,7 @@ func setupFlags() {
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
+	flag.String(multiClusterContextsDisabledFlagKey.String(), "", "Kube contexts that mark as disabled.")
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
@@ -247,13 +248,14 @@ func validateRequiredToParseConfigs() error {
 
 func main() {
 	var (
-		metricsAddr            string
-		probeAddr              string
-		enableLeaderElection   bool
-		enableLeaderElectionID string
-		multiClusterKubeConfig string
-		multiClusterContexts   string
-		err                    error
+		metricsAddr                  string
+		probeAddr                    string
+		enableLeaderElection         bool
+		enableLeaderElectionID       string
+		multiClusterKubeConfig       string
+		multiClusterContexts         string
+		multiClusterContextsDisabled string
+		err                          error
 	)
 
 	setupFlags()
@@ -285,6 +287,7 @@ func main() {
 	enableLeaderElectionID = viper.GetString(leaderElectIDFlagKey.viperName())
 	multiClusterKubeConfig = viper.GetString(multiClusterKubeConfigFlagKey.viperName())
 	multiClusterContexts = viper.GetString(multiClusterContextsFlagKey.viperName())
+	multiClusterContextsDisabled = viper.GetString(multiClusterContextsDisabledFlagKey.viperName())
 
 	setupLog.Info("golang runtime metrics.", "featureGate", intctrlutil.EnabledRuntimeMetrics())
 	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
@@ -330,7 +333,8 @@ func main() {
 	}
 
 	// multi-cluster manager for all data-plane k8s
-	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetClient(), multiClusterKubeConfig, multiClusterContexts)
+	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetConfig(), mgr.GetClient(),
+		multiClusterKubeConfig, multiClusterContexts, multiClusterContextsDisabled)
 	if err != nil {
 		setupLog.Error(err, "unable to setup multi-cluster manager")
 		os.Exit(1)
@@ -500,7 +504,7 @@ func main() {
 		if err = (&workloadscontrollers.InstanceSetReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
+			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
 		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
 			os.Exit(1)

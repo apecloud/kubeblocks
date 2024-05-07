@@ -34,13 +34,13 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // componentWorkloadUpgradeTransformer upgrades the underlying workload from the legacy RSM API to the InstanceSet API.
@@ -111,7 +111,7 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 			l := items.Len()
 			for i := 0; i < l; i++ {
 				object := items.Index(i).Addr().Interface().(client.Object)
-				if _, ok := object.GetLabels()[rsmcore.WorkloadsManagedByLabelKey]; ok {
+				if _, ok := object.GetLabels()[instanceset.WorkloadsManagedByLabelKey]; ok {
 					continue
 				}
 				if _, ok := object.(*corev1.Service); ok && object.GetName() != defaultHeadlessSvc {
@@ -119,8 +119,8 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 				}
 				legacyFound = true
 				object.SetOwnerReferences([]metav1.OwnerReference{})
-				object.GetLabels()[rsmcore.WorkloadsManagedByLabelKey] = rsmcore.KindInstanceSet
-				object.GetLabels()[rsmcore.WorkloadsInstanceLabelKey] = comp.Name
+				object.GetLabels()[instanceset.WorkloadsManagedByLabelKey] = workloads.Kind
+				object.GetLabels()[instanceset.WorkloadsInstanceLabelKey] = comp.Name
 				if _, ok := object.(*corev1.Pod); ok {
 					if revision == "" {
 						revision, err = buildRevision(synthesizeComp, compDef)
@@ -162,6 +162,6 @@ func buildRevision(synthesizeComp *component.SynthesizedComponent, componentDef 
 	if err != nil {
 		return "", err
 	}
-	template := rsmcore.BuildPodTemplate(its, rsmcore.GetEnvConfigMapName(its.Name))
+	template := instanceset.BuildPodTemplate(its, instanceset.GetEnvConfigMapName(its.Name))
 	return instanceset.BuildInstanceTemplateRevision(template, its)
 }

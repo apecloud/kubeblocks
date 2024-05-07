@@ -38,12 +38,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// InstanceSetReconciler reconciles a InstanceSet object
+// InstanceSetReconciler reconciles an InstanceSet object
 type InstanceSetReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
@@ -109,7 +108,7 @@ func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterM
 }
 
 func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
-	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, rsm.WorkloadsManagedByLabelKey, rsm.KindInstanceSet, rsm.WorkloadsInstanceLabelKey)
+	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset.WorkloadsManagedByLabelKey, workloads.Kind, instanceset.WorkloadsInstanceLabelKey)
 	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).

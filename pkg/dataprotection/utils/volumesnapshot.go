@@ -41,7 +41,7 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, pvName stri
 		return false, nil
 	}
 	pv := &corev1.PersistentVolume{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: pvName}, pv, inDataContext()); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Name: pvName}, pv, multicluster.InDataContext()); err != nil {
 		return false, err
 	}
 	if pv.Spec.CSI == nil {
@@ -49,7 +49,7 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, pvName stri
 	}
 	vsCli := NewCompatClient(cli)
 	vscList := vsv1.VolumeSnapshotClassList{}
-	if err := vsCli.List(ctx, &vscList, inDataContext()); err != nil {
+	if err := vsCli.List(ctx, &vscList, multicluster.InDataContext()); err != nil {
 		return false, err
 	}
 	for _, vsc := range vscList.Items {
@@ -58,8 +58,4 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, pvName stri
 		}
 	}
 	return false, nil
-}
-
-func inDataContext() *multicluster.ClientOption {
-	return multicluster.InDataContext()
 }

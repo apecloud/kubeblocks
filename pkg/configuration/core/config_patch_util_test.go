@@ -314,7 +314,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 
 	type args struct {
 		data         map[string]string
-		formatConfig *appsv1beta1.FormatterConfig
+		formatConfig *appsv1beta1.FileFormatConfig
 		keys         []string
 	}
 	tests := []struct {
@@ -325,7 +325,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 		name: "test",
 		args: args{
 			data: map[string]string{"key": getFileContentFn("cue_testdata/mysql.cnf")},
-			formatConfig: &appsv1beta1.FormatterConfig{
+			formatConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.Ini,
 				FormatterAction: appsv1beta1.FormatterAction{
 					IniConfig: &appsv1beta1.IniConfig{
@@ -337,7 +337,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 		name: "test",
 		args: args{
 			data: map[string]string{"key": getFileContentFn("cue_testdata/pg14.conf")},
-			formatConfig: &appsv1beta1.FormatterConfig{
+			formatConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.Properties,
 			}},
 		wantErr: false,
@@ -349,7 +349,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 				"key2": getFileContentFn("cue_testdata/mysql.cnf"),
 			},
 			keys: []string{"key"},
-			formatConfig: &appsv1beta1.FormatterConfig{
+			formatConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.Properties,
 			}},
 		wantErr: false,
@@ -360,7 +360,7 @@ func TestLoadRawConfigObject(t *testing.T) {
 				"key": getFileContentFn("cue_testdata/pg14.conf"),
 			},
 			keys: []string{"key"},
-			formatConfig: &appsv1beta1.FormatterConfig{
+			formatConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.XML,
 			}},
 		wantErr: true,
@@ -391,13 +391,13 @@ systemLog:
 	tests := []struct {
 		name         string
 		fileName     string
-		formatConfig *appsv1beta1.FormatterConfig
+		formatConfig *appsv1beta1.FileFormatConfig
 		configData   []byte
 		expected     map[string]string
 	}{{
 		name:     "mysql-test",
 		fileName: "my.cnf",
-		formatConfig: &appsv1beta1.FormatterConfig{
+		formatConfig: &appsv1beta1.FileFormatConfig{
 			Format: appsv1beta1.Ini,
 			FormatterAction: appsv1beta1.FormatterAction{
 				IniConfig: &appsv1beta1.IniConfig{
@@ -413,7 +413,7 @@ systemLog:
 	}, {
 		name:     "mongodb-test",
 		fileName: "mongodb.conf",
-		formatConfig: &appsv1beta1.FormatterConfig{
+		formatConfig: &appsv1beta1.FileFormatConfig{
 			Format: appsv1beta1.YAML,
 			FormatterAction: appsv1beta1.FormatterAction{
 				IniConfig: &appsv1beta1.IniConfig{

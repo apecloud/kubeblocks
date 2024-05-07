@@ -63,24 +63,65 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	compOpsHelper := newComponentOpsHelper([]appsv1alpha1.ComponentOps{})
+	clusterVersion := &appsv1alpha1.ClusterVersion{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsRes.OpsRequest.Spec.Upgrade.ClusterVersionRef}, clusterVersion); err != nil {
+		return opsRes.OpsRequest.Status.Phase, 0, err
+	}
+	versionMap := map[string]appsv1alpha1.VersionsContext{}
+	for _, v := range clusterVersion.Spec.ComponentVersions {
+		versionMap[v.ComponentDefRef] = v.VersionsCtx
+	}
+	var (
+		compOpsList []appsv1alpha1.ComponentOps
+		compDefMap  = map[string]string{}
+	)
+	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
+		compOpsList = append(compOpsList, appsv1alpha1.ComponentOps{ComponentName: v.Name})
+		compDefMap[v.Name] = v.ComponentDefRef
+	}
+	for _, v := range opsRes.Cluster.Spec.ShardingSpecs {
+		compOpsList = append(compOpsList, appsv1alpha1.ComponentOps{ComponentName: v.Name})
+		compDefMap[v.Name] = v.Template.ComponentDefRef
+	}
+	imageApplied := func(podContainerStatus []corev1.ContainerStatus, expectContainers []corev1.Container) bool {
+		if len(expectContainers) == 0 {
+			return true
+		}
+		for _, v := range expectContainers {
+			for _, pv := range podContainerStatus {
+				if pv.Name == v.Name {
+					return pv.Image == v.Image
+				}
+			}
+		}
+		return false
+	}
+	podApplyCompOps := func(pod *corev1.Pod,
+		compOps ComponentOpsInteface,
+		opsStartTime metav1.Time,
+		insTemplateName string) bool {
+		compDef := compDefMap[compOps.GetComponentName()]
+		// TODO: Compatible with ComponentVersion API
+		if compDef == "" {
+			return true
+		}
+		versionCtx, ok := versionMap[compDef]
+		if !ok {
+			return true
+		}
+		return imageApplied(pod.Status.InitContainerStatuses, versionCtx.InitContainers) &&
+			imageApplied(pod.Status.ContainerStatuses, versionCtx.Containers)
+
+	}
 	handleUpgradeProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
 		opsRes *OpsResource,
 		pgRes progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, u.podApplyCompOps)
+		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
 	}
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade",
-		nil, handleUpgradeProgress)
-}
-
-func (u upgradeOpsHandler) podApplyCompOps(
-	pod *corev1.Pod,
-	compOps ComponentOpsInteface,
-	opsStartTime metav1.Time,
-	templateName string) bool {
-	return !pod.CreationTimestamp.Before(&opsStartTime)
+	compOpsHelper := newComponentOpsHelper(compOpsList)
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

@@ -20,15 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,7 +43,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
@@ -398,32 +396,28 @@ func (r *componentWorkloadOps) expandVolume() error {
 
 // horizontalScale handles workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
-	sts := rsmcore.ConvertInstanceSetToSTS(r.runningITS)
-	if sts.Status.ReadyReplicas == r.synthesizeComp.Replicas {
+	its := r.runningITS
+	if its.Status.ReadyReplicas == r.synthesizeComp.Replicas {
 		return nil
 	}
-	ret := r.horizontalScaling(r.synthesizeComp, sts)
+	ret := r.horizontalScaling(r.synthesizeComp, its)
 	if ret == 0 {
 		if err := r.postScaleIn(); err != nil {
 			return err
 		}
-		if err := r.postScaleOut(sts); err != nil {
+		if err := r.postScaleOut(its); err != nil {
 			return err
 		}
 		return nil
 	}
 	if ret < 0 {
-		if err := r.scaleIn(sts); err != nil {
+		if err := r.scaleIn(its); err != nil {
 			return err
 		}
 	} else {
-		if err := r.scaleOut(sts); err != nil {
+		if err := r.scaleOut(its); err != nil {
 			return err
 		}
-	}
-
-	if err := r.updatePodReplicaLabel4Scaling(r.synthesizeComp.Replicas); err != nil {
-		return err
 	}
 
 	r.reqCtx.Recorder.Eventf(r.cluster,
@@ -436,23 +430,23 @@ func (r *componentWorkloadOps) horizontalScale() error {
 }
 
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
-func (r *componentWorkloadOps) horizontalScaling(synthesizeComp *component.SynthesizedComponent, stsObj *apps.StatefulSet) int {
-	return int(synthesizeComp.Replicas - *stsObj.Spec.Replicas)
+func (r *componentWorkloadOps) horizontalScaling(synthesizeComp *component.SynthesizedComponent, itsObj *workloads.InstanceSet) int {
+	return int(synthesizeComp.Replicas - *itsObj.Spec.Replicas)
 }
 
 func (r *componentWorkloadOps) postScaleIn() error {
 	return nil
 }
 
-func (r *componentWorkloadOps) postScaleOut(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error {
 	var (
 		snapshotKey = types.NamespacedName{
-			Namespace: stsObj.Namespace,
-			Name:      constant.GenerateResourceNameWithScalingSuffix(stsObj.Name),
+			Namespace: itsObj.Namespace,
+			Name:      constant.GenerateResourceNameWithScalingSuffix(itsObj.Name),
 		}
 	)
 
-	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsObj, snapshotKey)
+	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, itsObj, snapshotKey)
 	if err != nil {
 		return err
 	}
@@ -472,7 +466,7 @@ func (r *componentWorkloadOps) postScaleOut(stsObj *apps.StatefulSet) error {
 	return nil
 }
 
-func (r *componentWorkloadOps) scaleIn(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) scaleIn(itsObj *workloads.InstanceSet) error {
 	// if scale in to 0, do not delete pvcs
 	if r.synthesizeComp.Replicas == 0 {
 		r.reqCtx.Log.Info("scale in to 0, keep all PVCs")
@@ -484,25 +478,24 @@ func (r *componentWorkloadOps) scaleIn(stsObj *apps.StatefulSet) error {
 		r.reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
 		return err
 	}
-	return r.deletePVCs4ScaleIn(stsObj)
+	return r.deletePVCs4ScaleIn(itsObj)
 }
 
-func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	var (
 		backupKey = types.NamespacedName{
-			Namespace: stsObj.Namespace,
-			Name:      constant.GenerateResourceNameWithScalingSuffix(stsObj.Name),
+			Namespace: itsObj.Namespace,
+			Name:      constant.GenerateResourceNameWithScalingSuffix(itsObj.Name),
 		}
 	)
 
-	// sts's replicas=0 means it's starting not scaling, skip all the scaling work.
-	if *stsObj.Spec.Replicas == 0 {
+	// its's replicas=0 means it's starting not scaling, skip all the scaling work.
+	if *itsObj.Spec.Replicas == 0 {
 		return nil
 	}
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Noop(r.dag, r.protoITS)
-	stsProto := rsmcore.ConvertInstanceSetToSTS(r.protoITS)
-	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
+	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, r.protoITS, backupKey)
 	if err != nil {
 		return err
 	}
@@ -518,7 +511,7 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	if succeed {
 		// pvcs are ready, ITS.replicas should be updated
 		graphCli.Update(r.dag, nil, r.protoITS)
-		return r.postScaleOut(stsObj)
+		return r.postScaleOut(itsObj)
 	} else {
 		graphCli.Noop(r.dag, r.protoITS)
 		// update objs will trigger reconcile, no need to requeue error
@@ -536,27 +529,9 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	}
 }
 
-func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) error {
-	graphCli := model.NewGraphClient(r.cli)
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
-	if err != nil {
-		return err
-	}
-	for _, pod := range pods {
-		obj := pod.DeepCopy()
-		if obj.Annotations == nil {
-			obj.Annotations = make(map[string]string)
-		}
-		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
-		graphCli.Update(r.dag, nil, obj, inDataContext4G())
-	}
-	return nil
-}
-
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
+	labels := constant.GetComponentWellKnownLabels(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.synthesizeComp.Namespace, labels, inDataContext4C())
 	if err != nil {
 		return err
 	}
@@ -642,20 +617,20 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	return err // TODO: use requeue-after
 }
 
-func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet) error {
 	graphCli := model.NewGraphClient(r.cli)
-	for i := r.synthesizeComp.Replicas; i < *stsObj.Spec.Replicas; i++ {
-		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+	for i := r.synthesizeComp.Replicas; i < *itsObj.Spec.Replicas; i++ {
+		for _, vct := range itsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
-				Namespace: stsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, itsObj.Name, i),
 			}
 			pvc := corev1.PersistentVolumeClaim{}
 			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
 				return err
 			}
-			// Since there are no order guarantee between updating STS and deleting PVCs, if there is any error occurred
-			// after updating STS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
+			// Since there are no order guarantee between updating ITS and deleting PVCs, if there is any error occurred
+			// after updating ITS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
 			graphCli.Delete(r.dag, &pvc, inDataContext4G())
@@ -739,15 +714,20 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 
 	// step 1: update pv to retain
 	pv := &corev1.PersistentVolume{}
-	pvKey := types.NamespacedName{
-		Namespace: pvcKey.Namespace,
-		Name:      newPVC.Spec.VolumeName,
-	}
-	if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
-		if apierrors.IsNotFound(err) {
-			pvNotFound = true
-		} else {
-			return err
+	if len(newPVC.Spec.VolumeName) == 0 {
+		// the PV may be under provisioning
+		pvNotFound = true
+	} else {
+		pvKey := types.NamespacedName{
+			Namespace: pvcKey.Namespace,
+			Name:      newPVC.Spec.VolumeName,
+		}
+		if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
+			if apierrors.IsNotFound(err) {
+				pvNotFound = true
+			} else {
+				return err
+			}
 		}
 	}
 
@@ -864,25 +844,6 @@ func (r *componentWorkloadOps) buildProtoITSWorkloadVertex() *model.ObjectVertex
 func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeComp *component.SynthesizedComponent,
 	itsObj *workloads.InstanceSet, dag *graph.DAG) error {
 	graphCli := model.NewGraphClient(cli)
-	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
-		labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
-		pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
-			generics.PersistentVolumeClaimSignature, itsObj.Namespace, labels, inDataContext4C())
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
-		matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
-		prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
-		for _, pvc := range pvcs {
-			if strings.HasPrefix(pvc.Name, prefix) {
-				matchedPVCs = append(matchedPVCs, pvc)
-			}
-		}
-		return matchedPVCs, nil
-	}
 
 	// PVCs which have been added to the dag because of volume expansion.
 	pvcNameSet := sets.New[string]()
@@ -891,7 +852,7 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 	}
 
 	for _, vct := range synthesizeComp.VolumeClaimTemplates {
-		pvcs, err := getRunningVolumes(vct.Name)
+		pvcs, err := getRunningVolumes(reqCtx.Ctx, cli, synthesizeComp, itsObj, vct.Name)
 		if err != nil {
 			return err
 		}
@@ -903,6 +864,27 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 		}
 	}
 	return nil
+}
+
+// getRunningVolumes gets the running volumes of the ITS.
+func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
+	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
+	labels := constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)
+	pvcs, err := component.ListObjWithLabelsInNamespace(ctx, cli, generics.PersistentVolumeClaimSignature, synthesizedComp.Namespace, labels, inDataContext4C())
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
+	prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
+	for _, pvc := range pvcs {
+		if strings.HasPrefix(pvc.Name, prefix) {
+			matchedPVCs = append(matchedPVCs, pvc)
+		}
+	}
+	return matchedPVCs, nil
 }
 
 func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *workloads.InstanceSet) {

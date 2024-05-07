@@ -124,7 +124,7 @@ var _ = Describe("builder", func() {
 				MountPath: "/mnt/config",
 			}},
 		}
-		return testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
+		return testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, "mock-its", clusterName, mysqlCompName).
 			AddAppNameLabel("mock-app").
 			AddAppInstanceLabel(clusterName).
 			AddAppComponentLabel(mysqlCompName).
@@ -222,7 +222,7 @@ var _ = Describe("builder", func() {
 			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
-			for _, s := range synthesizedComponent.Services[0].Spec.Ports {
+			for _, s := range synthesizedComponent.ComponentServices[0].Spec.Ports {
 				switch s.Name {
 				case "mysql":
 					mysqlPort = s
@@ -411,7 +411,7 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds cfg manager tools  correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			_, cluster, _ := newClusterObjs(nil)
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 				ManagerName:               constant.ConfigSidecarName,
 				SecreteName:               constant.GenerateDefaultConnCredential(cluster.Name),
@@ -423,7 +423,7 @@ var _ = Describe("builder", func() {
 				{Name: "test-tool", Image: "test-image", Command: []string{"sh"}},
 			}
 
-			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, synthesizedComponent, toolContainers, map[string]cfgcm.ConfigSpecMeta{})
+			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, toolContainers, map[string]cfgcm.ConfigSpecMeta{})
 			Expect(err).Should(BeNil())
 			Expect(obj).ShouldNot(BeEmpty())
 		})

@@ -128,7 +128,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		ve.initComponentStatus(opsRequest)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
-	storageMap := ve.getRequestStorageMap(opsRequest, compOpsHelper)
+	storageMap := ve.getRequestStorageMap(opsRequest)
 	var veHelpers []volumeExpansionHelper
 	setVeHelpers := func(compSpec appsv1alpha1.ClusterComponentSpec, compOps ComponentOpsInteface, fullComponentName string) {
 		volumeExpansion := compOps.(appsv1alpha1.VolumeExpansion)
@@ -164,7 +164,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		setVeHelpers(compSpec, compOps, compSpec.Name)
 	}
 	for _, shardingSpec := range opsRes.Cluster.Spec.ShardingSpecs {
-		compOps, ok := compOpsHelper.componentOpsSet[getShardingKey(shardingSpec.Name)]
+		compOps, ok := compOpsHelper.componentOpsSet[shardingSpec.Name]
 		if !ok {
 			continue
 		}
@@ -179,8 +179,8 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	// reconcile the status.components. when the volume expansion is successful,
 	// sync the volumeClaimTemplate status and component phase On the OpsRequest and Cluster.
 	for _, veHelper := range veHelpers {
-		opsCompStatus := compOpsHelper.getOpsComponentAndShardStatus(opsRequest, veHelper.compOps)
-		key := getComponentVCTKey(veHelper.compOps.GetShardingName(), veHelper.compOps.GetComponentName(), veHelper.templateName, veHelper.vctName)
+		opsCompStatus := opsRequest.Status.Components[veHelper.compOps.GetComponentName()]
+		key := getComponentVCTKey(veHelper.compOps.GetComponentName(), veHelper.templateName, veHelper.vctName)
 		requestStorage, ok := storageMap[key]
 		if !ok {
 			continue
@@ -193,7 +193,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		expectProgressCount += veHelper.expectCount
 		succeedProgressCount += succeedCount
 		completedProgressCount += completedCount
-		compOpsHelper.setOpsComponentAndShardStatus(opsRequest, opsCompStatus, veHelper.compOps)
+		opsRequest.Status.Components[veHelper.compOps.GetComponentName()] = opsCompStatus
 	}
 	if completedProgressCount != expectProgressCount {
 		requeueAfter = time.Minute
@@ -228,12 +228,12 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	compOpsHelper := newComponentOpsHelper(opsRequest.Spec.VolumeExpansionList)
-	storageMap := ve.getRequestStorageMap(opsRequest, compOpsHelper)
+	storageMap := ve.getRequestStorageMap(opsRequest)
 	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInteface) appsv1alpha1.LastComponentConfiguration {
 		getLastVCTs := func(vcts []appsv1alpha1.ClusterComponentVolumeClaimTemplate, templateName string) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
 			lastVCTs := make([]appsv1alpha1.ClusterComponentVolumeClaimTemplate, 0)
 			for _, vct := range vcts {
-				key := getComponentVCTKey(comOps.GetShardingName(), comOps.GetComponentName(), templateName, vct.Name)
+				key := getComponentVCTKey(comOps.GetComponentName(), comOps.GetComponentName(), templateName)
 				if _, ok := storageMap[key]; !ok {
 					continue
 				}
@@ -283,10 +283,10 @@ func (ve volumeExpansionOpsHandler) pvcIsResizing(pvc *corev1.PersistentVolumeCl
 	return isResizing
 }
 
-func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *appsv1alpha1.OpsRequest, compOpsHelper componentOpsHelper) map[string]resource.Quantity {
+func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *appsv1alpha1.OpsRequest) map[string]resource.Quantity {
 	storageMap := map[string]resource.Quantity{}
 	setStorageMap := func(vct appsv1alpha1.OpsRequestVolumeClaimTemplate, compOps appsv1alpha1.ComponentOps, templateName string) {
-		key := getComponentVCTKey(compOps.ShardingName, compOps.ComponentName, templateName, vct.Name)
+		key := getComponentVCTKey(compOps.GetComponentName(), templateName, vct.Name)
 		storageMap[key] = vct.Storage
 	}
 	for _, v := range opsRequest.Spec.VolumeExpansionList {
@@ -306,7 +306,7 @@ func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *appsv1alpha
 func (ve volumeExpansionOpsHandler) initComponentStatus(opsRequest *appsv1alpha1.OpsRequest) {
 	opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	for _, v := range opsRequest.Spec.VolumeExpansionList {
-		opsRequest.Status.Components[getCompOpsKey(v.ShardingName, v.ComponentName)] = appsv1alpha1.OpsRequestComponentStatus{}
+		opsRequest.Status.Components[v.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{}
 	}
 }
 
@@ -322,10 +322,6 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		completedCount int
 		err            error
 	)
-	messageKey := fmt.Sprintf("component: %s", veHelper.compOps.GetComponentName())
-	if veHelper.compOps.GetShardingName() != "" {
-		messageKey = fmt.Sprintf("sharding: %s", veHelper.compOps.GetShardingName())
-	}
 	matchingLabels := client.MatchingLabels{
 		constant.AppInstanceLabelKey:             opsRes.Cluster.Name,
 		constant.VolumeClaimTemplateNameLabelKey: veHelper.vctName,
@@ -368,16 +364,16 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 			v.Status.Phase == corev1.ClaimBound {
 			succeedCount += 1
 			completedCount += 1
-			message := fmt.Sprintf("Successfully expand volume: %s in %s", objectKey, messageKey)
+			message := fmt.Sprintf("Successfully expand volume: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
 			progressDetail.SetStatusAndMessage(appsv1alpha1.SucceedProgressStatus, message)
 			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, *progressDetail)
 			continue
 		}
 		if ve.pvcIsResizing(&v) {
-			message := fmt.Sprintf("Start expanding volume: %s in %s", objectKey, messageKey)
+			message := fmt.Sprintf("Start expanding volume: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
 			progressDetail.SetStatusAndMessage(appsv1alpha1.ProcessingProgressStatus, message)
 		} else {
-			message := fmt.Sprintf("Waiting for an external controller to process the pvc: %s in %s", objectKey, messageKey)
+			message := fmt.Sprintf("Waiting for an external controller to process the pvc: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
 			progressDetail.SetStatusAndMessage(appsv1alpha1.PendingProgressStatus, message)
 		}
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, *progressDetail)
@@ -385,15 +381,12 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	return succeedCount, completedCount, nil
 }
 
-func getComponentVCTKey(shardingName, cName, insTemplateName, vctName string) string {
+func getComponentVCTKey(compoName, insTemplateName, vctName string) string {
 	var instanceNameKey string
 	if insTemplateName != "" {
 		instanceNameKey = "." + insTemplateName
 	}
-	if shardingName != "" {
-		return fmt.Sprintf("sharding/%s%s.%s", shardingName, instanceNameKey, vctName)
-	}
-	return fmt.Sprintf("%s%s.%s", cName, insTemplateName, vctName)
+	return fmt.Sprintf("%s%s.%s", compoName, instanceNameKey, vctName)
 }
 
 func getPVCProgressObjectKey(pvcName string) string {

@@ -17,29 +17,61 @@ limitations under the License.
 package v1beta1
 
 func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
-	if in.DynamicActionCanBeMerged != nil {
-		return !*in.DynamicActionCanBeMerged
+	if in.MergeReloadAndRestart != nil {
+		return !*in.MergeReloadAndRestart
 	}
 	return false
 }
 
-func (in *ConfigConstraintSpec) DynamicParametersPolicy() DynamicParameterSelectedPolicy {
-	if in.DynamicParameterSelectedPolicy != nil {
-		return *in.DynamicParameterSelectedPolicy
+func (in *ConfigConstraintSpec) ReloadStaticParameters() bool {
+	if in.ReloadStaticParamsBeforeRestart != nil {
+		return *in.ReloadStaticParamsBeforeRestart
 	}
-	return SelectedDynamicParameters
+	return false
+}
+
+func (in *ConfigConstraintSpec) GetToolsSetup() *ToolsSetup {
+	if in.ReloadAction != nil && in.ReloadAction.ShellTrigger != nil {
+		return in.ReloadAction.ShellTrigger.ToolsSetup
+	}
+	return nil
+}
+
+func (in *ConfigConstraintSpec) GetScriptConfigs() []ScriptConfig {
+	scriptConfigs := make([]ScriptConfig, 0)
+	for _, action := range in.DownwardAPITriggeredActions {
+		if action.ScriptConfig != nil {
+			scriptConfigs = append(scriptConfigs, *action.ScriptConfig)
+		}
+	}
+	if in.ReloadAction == nil {
+		return scriptConfigs
+	}
+	if in.ReloadAction.ShellTrigger != nil && in.ReloadAction.ShellTrigger.ScriptConfig != nil {
+		scriptConfigs = append(scriptConfigs, *in.ReloadAction.ShellTrigger.ScriptConfig)
+	}
+	if in.ReloadAction.TPLScriptTrigger != nil {
+		scriptConfigs = append(scriptConfigs, in.ReloadAction.TPLScriptTrigger.ScriptConfig)
+	}
+	return scriptConfigs
 }
 
 func (in *ConfigConstraintSpec) ShellTrigger() bool {
-	return in.DynamicReloadAction != nil && in.DynamicReloadAction.ShellTrigger != nil
+	return in.ReloadAction != nil && in.ReloadAction.ShellTrigger != nil
 }
 
 func (in *ConfigConstraintSpec) BatchReload() bool {
 	return in.ShellTrigger() &&
-		in.DynamicReloadAction.ShellTrigger.BatchReload != nil &&
-		*in.DynamicReloadAction.ShellTrigger.BatchReload
+		in.ReloadAction.ShellTrigger.BatchReload != nil &&
+		*in.ReloadAction.ShellTrigger.BatchReload
 }
 
 func (cs *ConfigConstraintStatus) ConfigConstraintTerminalPhases() bool {
 	return cs.Phase == CCAvailablePhase
+}
+
+func (tc *ToolConfig) AsSidecarContainerImage() bool {
+	return tc != nil &&
+		tc.AsContainerImage != nil &&
+		*tc.AsContainerImage
 }

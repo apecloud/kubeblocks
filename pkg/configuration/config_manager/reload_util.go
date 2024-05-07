@@ -51,7 +51,7 @@ const (
 // for testing
 var newCommandChannel = NewCommandChannel
 
-func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *appsv1beta1.FormatterConfig, dataType, dsn string) (DynamicUpdater, error) {
+func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *appsv1beta1.FileFormatConfig, dataType, dsn string) (DynamicUpdater, error) {
 	tplContent, err := os.ReadFile(tplScriptPath)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func checkTPLScript(tplName string, tplContent string) error {
 	return err
 }
 
-func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent string, updatedParams map[string]string, formatConfig *appsv1beta1.FormatterConfig, dataType string, dsn string) error {
+func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent string, updatedParams map[string]string, formatConfig *appsv1beta1.FileFormatConfig, dataType string, dsn string) error {
 	var (
 		err            error
 		commandChannel DynamicParamUpdater
@@ -103,7 +103,7 @@ func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent str
 	return err
 }
 
-func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, formatConfig *appsv1beta1.FormatterConfig) *gotemplate.BuiltInObjectsFunc {
+func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, formatConfig *appsv1beta1.FileFormatConfig) *gotemplate.BuiltInObjectsFunc {
 	return &gotemplate.BuiltInObjectsFunc{
 		builtInExecFunctionName: func(command string, args ...string) (string, error) {
 			execCommand := exec.CommandContext(ctx, command, args...)
@@ -137,7 +137,7 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 	}
 }
 
-func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCfg *appsv1beta1.FormatterConfig) (map[string]string, error) {
+func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCfg *appsv1beta1.FileFormatConfig) (map[string]string, error) {
 	patchOption := core.CfgOption{
 		Type:    core.CfgTplType,
 		CfgType: formatCfg.Format,

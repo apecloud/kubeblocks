@@ -501,13 +501,15 @@ func buildEnvConfigData(its workloads.InstanceSet) map[string]string {
 	svcName := getHeadlessSvcName(its)
 	uid := string(its.UID)
 	strReplicas := strconv.Itoa(int(*its.Spec.Replicas))
-	generateReplicaEnv := func(prefix string) {
+	generateReplicaEnv := func(prefix string, podNames []string) {
 		// avoid to build too many envs
 		// TODO(free6om): don't hard code
 		maxEnv := 128
-		for i := 0; i < int(*its.Spec.Replicas) && i < maxEnv; i++ {
-			hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
-			hostNameTplValue := its.Name + "-" + strconv.Itoa(i)
+		podNames = podNames[:min(len(podNames), maxEnv)]
+		for _, podName := range podNames {
+			_, ordinal := ParseParentNameAndOrdinal(podName)
+			hostNameTplKey := prefix + strconv.Itoa(ordinal) + "_HOSTNAME"
+			hostNameTplValue := its.Name + "-" + strconv.Itoa(ordinal)
 			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 		}
 	}
@@ -541,9 +543,12 @@ func buildEnvConfigData(its workloads.InstanceSet) map[string]string {
 		return GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, instances, its.Spec.OfflineInstances)
 	}
 
+	// all pod names
+	podNames := generatePodNames()
+
 	prefix := constant.KBPrefix + "_ITS_"
 	envData[prefix+"N"] = strReplicas
-	generateReplicaEnv(prefix)
+	generateReplicaEnv(prefix, podNames)
 	generateMemberEnv(prefix)
 	// set owner uid to let pod know if the owner is recreated
 	envData[prefix+"OWNER_UID"] = uid
@@ -552,18 +557,17 @@ func buildEnvConfigData(its workloads.InstanceSet) map[string]string {
 	// have backward compatible handling for env generated in version prior 0.6.0
 	prefix = constant.KBPrefix + "_"
 	envData[prefix+"REPLICA_COUNT"] = strReplicas
-	generateReplicaEnv(prefix)
+	generateReplicaEnv(prefix, podNames)
 	generateMemberEnv(prefix)
 	// KB_POD_LIST
-	names := generatePodNames()
-	envData[prefix+"POD_LIST"] = strings.Join(names, ",")
+	envData[prefix+"POD_LIST"] = strings.Join(podNames, ",")
 
 	// have backward compatible handling for CM key with 'compDefName' being part of the key name, prior 0.5.0
 	// and introduce env/cm key naming reference complexity
 	componentDefName := its.Labels[constant.AppComponentLabelKey]
 	prefixWithCompDefName := prefix + strings.ToUpper(componentDefName) + "_"
 	envData[prefixWithCompDefName+"N"] = strReplicas
-	generateReplicaEnv(prefixWithCompDefName)
+	generateReplicaEnv(prefixWithCompDefName, podNames)
 	generateMemberEnv(prefixWithCompDefName)
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
 

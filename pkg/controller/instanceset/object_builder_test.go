@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -86,6 +88,30 @@ var _ = Describe("object generation transformer test.", func() {
 				_, ok := cfg[k]
 				Expect(ok).Should(BeTrue())
 			}
+		})
+
+		It("non-sequential ordinal", func() {
+			By("build env config data")
+			its.Spec.OfflineInstances = []string{
+				getPodName(its.Name, 1),
+			}
+			hostname := func(i int) string {
+				return fmt.Sprintf("%s.%s", getPodName(its.Name, i), getHeadlessSvcName(*its))
+			}
+			requiredKeys := map[string]string{
+				"KB_REPLICA_COUNT": "3",
+				"KB_0_HOSTNAME":    hostname(0),
+				"KB_2_HOSTNAME":    hostname(2),
+				"KB_3_HOSTNAME":    hostname(3),
+			}
+			cfg := buildEnvConfigData(*its)
+
+			By("builds Env Config correctly")
+			Expect(cfg).ShouldNot(BeNil())
+			for k, v := range requiredKeys {
+				Expect(cfg).Should(HaveKeyWithValue(k, v))
+			}
+			Expect(cfg).ShouldNot(HaveKey("KB_1_HOSTNAME"))
 		})
 	})
 

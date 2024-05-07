@@ -6,27 +6,18 @@ sidebar_position: 5
 sidebar_label: Stop/Start
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Stop/Start PostgreSQL Cluster
 
 You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
 
 ## Stop a cluster
 
-### Option 1. (Recommended) Use kbcli
+<Tabs>
 
-Configure the name of your cluster and run the command below to stop this cluster.
-
-```bash
-kbcli cluster stop <name>
-```
-
-***Example***
-
-```bash
-kbcli cluster stop pg-cluster
-```
-
-### Option 2. Create an OpsRequest
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 Run the command below to stop a cluster.
 
@@ -35,16 +26,18 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: pg-cluster
+  name: mycluster
   generateName: stop-
 spec:
   # cluster ref
-  clusterRef: pg-cluster
+  clusterRef: mycluster
   type: Stop
 EOF
 ```
 
-### Option 3. Change the YAML file of the cluster
+</TabItem>
+
+<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
 Configure replicas as 0 to delete pods.
 
@@ -52,13 +45,13 @@ Configure replicas as 0 to delete pods.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-    name: pg-cluster
+    name: mycluster
 spec:
   clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.7.0
+  clusterVersionRef: postgresql-14.8.0
   terminationPolicy: WipeOut
   componentSpecs:
-  - name: pg-replication
+  - name: postgresql
     componentDefRef: postgresql
     monitor: false  
     replicas: 0
@@ -73,23 +66,15 @@ spec:
             storage: 1Gi
 ```
 
+</TabItem>
+
+</Tabs>
+
 ## Start a cluster
   
-### Option 1. (Recommended) Use kbcli
+<Tabs>
 
-Configure the name of your cluster and run the command below to start this cluster.
-
-```bash
-kbcli cluster start <name>
-```
-
-***Example***
-
-```bash
-kbcli cluster start pg-cluster
-```
-
-### Option 2. Create an OpsRequest
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 Run the command below to start a cluster.
 
@@ -98,7 +83,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: pg-cluster
+  name: mycluster
   generateName: start-
 spec:
   # cluster ref
@@ -107,7 +92,9 @@ spec:
 EOF 
 ```
 
-### Option 3. Change the YAML file of the cluster
+</TabItem>
+
+<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
 Change replicas back to the original amount to start this cluster again.
 
@@ -115,13 +102,13 @@ Change replicas back to the original amount to start this cluster again.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-    name: pg-cluster
+    name: mycluster
 spec:
   clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.7.0
+  clusterVersionRef: postgresql-14.8.0
   terminationPolicy: WipeOut
   componentSpecs:
-  - name: pg-replication
+  - name: postgresql
     componentDefRef: postgresql
     monitor: false  
     replicas: 1
@@ -135,3 +122,7 @@ spec:
           requests:
             storage: 1Gi
 ```
+
+</TabItem>
+
+</Tabs>

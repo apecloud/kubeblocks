@@ -6,6 +6,9 @@ sidebar_position: 2
 sidebar_label: Scale
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Scale for a PostgreSQL cluster
 
 Currently, only vertical scaling for PostgreSQL is supported.
@@ -25,39 +28,19 @@ During the vertical scaling process, a concurrent restart is triggered and the l
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list <name>
-```
-
-***Example***
-
-```bash
-kbcli cluster list pg-cluster
+kubectl get cluster mycluster -n demo
 >
-NAME         NAMESPACE   CLUSTER-DEFINITION           VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:00 UTC+0800
+NAME        CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    AGE
+mycluster   postgresql           postgresql-14.8.0   Delete               Running   36m
 ```
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
+1. Change configuration. There are 2 ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
+   <Tabs>
 
-   Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ***Example***
-
-   ```bash
-   kbcli cluster vscale pg-cluster \
-   --components="pg-replication" \
-   --memory="4Gi" --cpu="2" \
-   ```
-
-   - `--components` describes the component name ready for vertical scaling.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-  
-   **Option 2.** Create an OpsRequest
+   <TabItem value="OpsRequest" label="OpsRequest" default>
   
    Run the command below to apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -74,80 +57,69 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
      - componentName: pg-replication
        requests:
          memory: "2Gi"
-         cpu: "1000m"
+         cpu: "1"
        limits:
          memory: "4Gi"
-         cpu: "2000m"
+         cpu: "2"
    EOF
    ```
   
-   **Option 3.** Change the YAML file of the cluster
+   </TabItem>
+
+    <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
    Change the configuration of `spec.components.resources` in the YAML file. `spec.components.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
    ***Example***
 
    ```YAML
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: pg-cluster
-     namespace: default
+   ......
    spec:
-     clusterDefinitionRef: postgresql-cluster
-     clusterVersionRef: postgre-14.7.0
+     affinity:
+       podAntiAffinity: Preferred
+       tenancy: SharedNode
+       topologyKeys:
+       - kubernetes.io/hostname
+     clusterDefinitionRef: postgresql
+     clusterVersionRef: postgresql-14.8.0
      componentSpecs:
-     - name: pg-replication
-       componentDefRef: postgresql
-       replicas: 1
-       resources: # Change the values of resources.
-         requests:
-           memory: "2Gi"
-           cpu: "1000m"
+     - componentDefRef: postgresql
+       enabledLogs:
+       - running
+       monitor: false
+       name: postgresql
+       replicas: 2
+       resources:
          limits:
-           memory: "4Gi"
-           cpu: "2000m"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Halt
+           cpu: "2"
+           memory: 4Gi
+         requests:
+           cpu: "1"
+           memory: 2Gi
    ```
 
-2. Validate the vertical scaling.
+   </TabItem>
 
-    Run the command below to check the cluster status to identify the vertical scaling status.
+   </Tabs>
 
-    ```bash
-    kbcli cluster list <name>
-    ```
+2. Validate the volume expansion.
 
-    ***Example***
-
-    ```bash
-    kbcli cluster list pg-cluster
-    >
-    NAME              NAMESPACE        CLUSTER-DEFINITION            VERSION                TERMINATION-POLICY   STATUS    CREATED-TIME
-    pg-cluster        default          postgresql-cluster            postgresql-14.7.0      Delete               Running   Mar 03,2023 18:00 UTC+0800
-    ```
-
-   - STATUS=VerticalScaling: it means the vertical scaling is in progress.
-   - STATUS=Running: it means the vertical scaling has been applied.
-   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal.
-     > To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.
-
-    :::note
-
-    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-    :::
-
-3. Check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe pg-cluster
-    ```
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   >
+   ......
+   Component Specs:
+    Component Def Ref:  postgresql
+    Enabled Logs:
+      running
+    Monitor:   false
+    Name:      postgresql
+    Replicas:  2
+    Resources:
+      Limits:
+        Cpu:     2
+        Memory:  4Gi
+      Requests:
+        Cpu:     1
+        Memory:  2Gi
+   ```

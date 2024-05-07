@@ -6,6 +6,9 @@ sidebar_position: 3
 sidebar_label: Expand volume
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Expand volume
 
 You can expand the storage volume size of each pod.
@@ -21,98 +24,86 @@ Volume expansion triggers a concurrent restart and the leader pod may change aft
 Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list <name>
-```
-
-***Example***
-
-```bash
-kbcli cluster list pg-cluster
+kubectl get cluster mycluster -n demo
 >
-NAME              NAMESPACE        CLUSTER-DEFINITION    VERSION                  TERMINATION-POLICY        STATUS         CREATED-TIME
-pg-cluster        default          postgresql            postgresql-14.7.0        Delete                    Running        Mar 3,2023 10:29 UTC+0800
+NAME        CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    AGE
+mycluster   postgresql           postgresql-14.8.0   Delete               Running   17m
 ```
 
 ## Steps
 
 1. Change configuration. There are 3 ways to apply volume expansion.
 
-  **Option 1.** (**Recommended**) Use kbcli
+   <Tabs>
 
-  Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
+   <TabItem value="OpsRequest" label="OpsRequest" default>
 
-  ```bash
-  kbcli cluster volume-expand pg-cluster --components="pg-replication" \
-  --volume-claim-templates="data" --storage="2Gi"
-  ```
+   Run the command below to expand the volume of a cluster.
 
-   - `--components` describes the component name for volume expansion.
-   - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
-   - `--storage` describes the volume storage size.
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-volume-expansion
+     namespace: demo
+   spec:
+     clusterRef: mycluster
+     type: VolumeExpansion
+     volumeExpansion:
+     - componentName: postgresql
+       volumeClaimTemplates:
+       - name: data
+         storage: "30Gi"
+   EOF
+   ```
 
-  **Option 2.** Create an OpsRequest
+   </TabItem>
 
-  Run the command below to expand the volume of a cluster.
+   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
-  ```bash
-  kubectl apply -f - <<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: ops-volume-expansion
-  spec:
-    clusterRef: pg-cluster
-    type: VolumeExpansion
-    volumeExpansion:
-    - componentName: pg-replication
-      volumeClaimTemplates:
-      - name: data
-        storage: "2Gi"
-  EOF
-  ```
+   Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
-  **Option 3.** Change the YAML file of the cluster
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: postgresql
+     clusterVersionRef: postgresql-14.8.0
+     componentSpecs:
+     - name: postgresql
+       componentDefRef: postgresql
+       replicas: 1
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 30Gi # Change the volume storage size.
+     terminationPolicy: Delete
+   ```
 
-  Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+   </TabItem>
 
-  ```yaml
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: Cluster
-  metadata:
-    name: pg-cluster
-    namespace: default
-  spec:
-    clusterDefinitionRef: postgresql
-    clusterVersionRef: postgresql-14.7.0
-    componentSpecs:
-    - name: pg-replication
-      componentDefRef: postgresql
-      replicas: 1
-      volumeClaimTemplates:
-      - name: data
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi # Change the volume storage size.
-    terminationPolicy: Halt
-  ```
+   </Tabs>
 
 2. Validate the volume expansion.
 
    ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***Example***
-
-   ```bash
-   kbcli cluster list pg-cluster
+   kubectl describe cluster mycluster -n demo
    >
-   NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   pg-cluster        default          postgresql                postgresql-14.7.0        Delete                    VolumeExpanding        Apr 10,2023 16:27 UTC+0800
+   ......
+   Volume Claim Templates:
+      Name:  data
+      Spec:
+        Access Modes:
+          ReadWriteOnce
+        Resources:
+          Requests:
+            Storage:   30Gi
    ```
-   
-   * STATUS=VolumeExpanding: it means the volume expansion is in progress.
-   * STATUS=Running: it means the volume expansion operation has been applied.

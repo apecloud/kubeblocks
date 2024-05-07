@@ -6,9 +6,6 @@ sidebar_position: 6
 sidebar_label: Switchover
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Switch over a PostgreSQL cluster
 
 You can initiate a switchover for a PostgreSQL Replication Cluster by executing the kbcli or kubectl command. Then KubeBlocks modifies the instance roles.
@@ -31,32 +28,6 @@ You can initiate a switchover for a PostgreSQL Replication Cluster by executing 
 ## Initiate the switchover
 
 You can switch over a secondary of a PostgreSQL PrimaeySecondary database to the primary role, and the former primary instance to a secondary.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-* Switchover with no primary instance specified
-
-    ```bash
-    kbcli cluster promote mycluster
-    ```
-
-* Switchover with a specified new primary instance
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-postgresql-2'
-    ```
-
-* If there are multiple components, you can use `--component` to specify a component.
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-postgresql-2' --component='postgresql'
-    ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 The value of `instanceName` decides whether a new primary instance is specified for the switchover.
 
@@ -93,10 +64,6 @@ The value of `instanceName` decides whether a new primary instance is specified 
       instanceName: 'mycluster-postgresql-2'
   >>
   ```
-
-</TabItem>
-
-</Tabs>
 
 ## Verify the switchover
 

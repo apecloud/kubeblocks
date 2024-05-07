@@ -5,6 +5,9 @@ sidebar_position: 3
 sidebar_label: Expand volume
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Expand volume
 
 You can expand the storage volume size of each pod.
@@ -20,7 +23,7 @@ Volume expansion triggers pod restart, all pods restart in the order of learner 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kubectl get cluster mycluster
+kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
 mycluster   mysql                mysql-8.0.33   Delete               Running   4d18h
@@ -49,7 +52,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
       - componentName: mysql
         volumeClaimTemplates:
         - name: data
-          storage: "2Gi"
+          storage: "20Gi"
     EOF
     ```
 
@@ -89,20 +92,18 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
 
     </Tabs>
 
-2. Validate the volume expansion operation.
+2. Validate the volume expansion.
 
    ```bash
-   kubectl get cluster mycluster
+   kubectl describe cluster mycluster -n demo
    >
-   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-   mycluster   mysql                mysql-8.0.33   Delete               Running   4d19h
-   ```
-
-   * STATUS=Updating: it means the volume expansion is in progress.
-   * STATUS=Running: it means the volume expansion operation has been applied.
-
-3. Check whether the corresponding resources change.
-
-   ```bash
-   kubectl describe cluster mycluster
+   ......
+   Volume Claim Templates:
+      Name:  data
+      Spec:
+        Access Modes:
+          ReadWriteOnce
+        Resources:
+          Requests:
+            Storage:   30Gi
    ```

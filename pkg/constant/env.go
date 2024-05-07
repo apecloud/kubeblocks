@@ -112,6 +112,7 @@ const (
 	// KBEnvRsmRoleUpdateMechanism defines the method to send events: DirectAPIServerEventUpdate(through lorry service), ReadinessProbeEventUpdate(through kubelet service)
 	KBEnvRsmRoleUpdateMechanism = "KB_RSM_ROLE_UPDATE_MECHANISM"
 	KBEnvRoleProbeTimeout       = "KB_RSM_ROLE_PROBE_TIMEOUT"
+	KBEnvRoleProbePeriod        = "KB_RSM_ROLE_PROBE_PERIOD"
 
 	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
 )

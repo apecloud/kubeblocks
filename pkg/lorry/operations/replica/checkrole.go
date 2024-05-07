@@ -105,7 +105,6 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		}
 	}
 	return nil
-
 }
 
 func (s *CheckRole) IsReadonly(ctx context.Context) bool {

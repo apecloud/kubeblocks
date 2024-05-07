@@ -119,7 +119,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 			return pair.RoleName, err
 		}
 		// event belongs to old pod with the same name, ignore it
-		if pod.Name == pair.PodName && pod.UID != event.InvolvedObject.UID {
+		if pod.Name == pair.PodName && string(pod.UID) != pair.PodUID {
 			return pair.RoleName, nil
 		}
 
@@ -157,6 +157,7 @@ func parseGlobalRoleSnapshot(role string, event *corev1.Event) *common.GlobalRol
 	pair := common.PodRoleNamePair{
 		PodName:  event.InvolvedObject.Name,
 		RoleName: role,
+		PodUID:   string(event.InvolvedObject.UID),
 	}
 	snapshot.PodRoleNamePairs = append(snapshot.PodRoleNamePairs, pair)
 	return snapshot

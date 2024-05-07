@@ -14,7 +14,7 @@ spec:
     - automatic_sp_privileges
 
   # mysql configuration file format
-  formatterConfig:
+  fileFormatConfig:
     format: ini
     iniConfig:
       sectionName: mysqld

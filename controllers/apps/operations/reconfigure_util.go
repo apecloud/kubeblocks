@@ -42,7 +42,7 @@ type reconfiguringResult struct {
 	err                  error
 }
 
-func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.ParamPairs, orinalData map[string]string, formatter *appsv1beta1.FormatterConfig) {
+func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.ParamPairs, orinalData map[string]string, formatter *appsv1beta1.FileFormatConfig) {
 	var maxLabelCount = 16
 	updateLabel := func(param map[string]interface{}) {
 		if obj.Labels == nil {
@@ -84,7 +84,7 @@ func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.P
 	}
 }
 
-func fetchOriginalValue(keyFile, data string, params map[string]interface{}, formatter *appsv1beta1.FormatterConfig) (string, error) {
+func fetchOriginalValue(keyFile, data string, params map[string]interface{}, formatter *appsv1beta1.FileFormatConfig) (string, error) {
 	baseConfigObj, err := core.FromConfigObject(keyFile, data, formatter)
 	if err != nil {
 		return "", err

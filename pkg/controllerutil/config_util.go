@@ -55,7 +55,7 @@ type Result struct {
 func MergeAndValidateConfigs(configConstraint appsv1beta1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []core.ParamPairs) (map[string]string, error) {
 	var (
 		err error
-		fc  = configConstraint.FormatterConfig
+		fc  = configConstraint.FileFormatConfig
 
 		newCfg         map[string]string
 		configOperator core.ConfigOperator

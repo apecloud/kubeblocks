@@ -22,7 +22,6 @@ package operations
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"reflect"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )

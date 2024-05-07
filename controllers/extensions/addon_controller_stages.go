@@ -1114,7 +1114,6 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 	return false
 }
 
-
 func CheckIfAddonUsedByCluster(ctx context.Context, c client.Client, addonName string, namespace string) (bool, error) {
 	labelSelector := metav1.LabelSelector{
 		MatchLabels: map[string]string{"clusterdefinition.kubeblocks.io/name": addonName},

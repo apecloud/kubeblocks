@@ -40,7 +40,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
   metadata:
     name: mycluster-switchover-jhkgl
   spec:
-    clusterRef: mycluster
+    clusterName: mycluster
     type: Switchover
     switchover:
     - componentName: apecloud-mysql
@@ -57,7 +57,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
   metadata:
     name: mycluster-switchover-jhkgl
   spec:
-    clusterRef: mycluster
+    clusterName: mycluster
     type: Switchover
     switchover:
     - componentName: apecloud-mysql

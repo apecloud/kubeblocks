@@ -30,7 +30,7 @@ metadata:
   generateName: stop-
 spec:
   # cluster ref
-  clusterRef: mycluster
+  clusterName: mycluster
   type: Stop
 EOF
 ```
@@ -87,7 +87,7 @@ metadata:
   generateName: start-
 spec:
   # cluster ref
-  clusterRef: mycluster
+  clusterName: mycluster
   type: Start
 EOF 
 ```

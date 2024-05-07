@@ -46,7 +46,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
     metadata:
       name: ops-volume-expansion
     spec:
-      clusterRef: mysql-cluster
+      clusterName: mycluster
       type: VolumeExpansion
       volumeExpansion:
       - componentName: mysql
@@ -68,11 +68,11 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: Cluster
     metadata:
-      name: mysql-cluster
+      name: mycluster
       namespace: default
     spec:
-      clusterDefinitionRef: apecloud-mysql
-      clusterVersionRef: ac-mysql-8.0.30
+      clusterDefinitionRef: mysql
+      clusterVersionRef: mysql-8.0.33
       componentSpecs:
       - name: mysql
         componentDefRef: mysql

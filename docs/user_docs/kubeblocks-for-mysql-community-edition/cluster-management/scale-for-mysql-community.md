@@ -49,7 +49,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
    metadata:
      name: ops-vertical-scaling
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: VerticalScaling 
      verticalScaling:
      - componentName: mysql
@@ -165,7 +165,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
    metadata:
      name: ops-horizontal-scaling
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
      - componentName: mysql

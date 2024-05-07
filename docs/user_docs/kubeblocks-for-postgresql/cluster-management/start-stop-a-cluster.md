@@ -30,7 +30,7 @@ metadata:
   generateName: stop-
 spec:
   # cluster ref
-  clusterRef: mycluster
+  clusterName: mycluster
   type: Stop
 EOF
 ```
@@ -86,8 +86,8 @@ metadata:
   name: mycluster
   generateName: start-
 spec:
-  # cluster ref
-  clusterRef: pg-cluster
+  # cluster name
+  clusterName: pg-cluster
   type: Start
 EOF 
 ```

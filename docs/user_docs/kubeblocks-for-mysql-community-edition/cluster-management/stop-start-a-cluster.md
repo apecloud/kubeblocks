@@ -29,7 +29,7 @@ metadata:
   generateName: stop-
 spec:
   # cluster ref
-  clusterRef: mysql-cluster
+  clusterName: mycluster
   type: Stop
 EOF
 ```
@@ -44,10 +44,10 @@ Configure replicas as 0 to delete pods.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-    name: mysql-cluster
+    name: mycluster
 spec:
-  clusterDefinitionRef: apecloud-mysql
-  clusterVersionRef: ac-mysql-8.0.30
+  clusterDefinitionRef: mysql
+  clusterVersionRef: mysql-8.0.33
   terminationPolicy: WipeOut
   componentSpecs:
   - name: mysql
@@ -84,18 +84,18 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mysql-cluster
+  name: mycluster
   generateName: start-
 spec:
   # cluster ref
-  clusterRef: mysql-cluster
+  clusterName: mycluster
   type: Start
 EOF 
 ```
 
 </TabItem>
 
-<TabItem value="Cluster YAML file" label="Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML File">
 
 Change replicas back to the original amount to start this cluster again.
 
@@ -103,10 +103,10 @@ Change replicas back to the original amount to start this cluster again.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-    name: mysql-cluster
+    name: mycluster
 spec:
-  clusterDefinitionRef: apecloud-mysql
-  clusterVersionRef: ac-mysql-8.0.30
+  clusterDefinitionRef: mysql
+  clusterVersionRef: mysql-8.0.33
   terminationPolicy: WipeOut
   componentSpecs:
   - name: mysql

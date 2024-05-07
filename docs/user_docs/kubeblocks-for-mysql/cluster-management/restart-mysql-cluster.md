@@ -27,7 +27,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    metadata:
      name: ops-restart
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: Restart 
      restart:
      - componentName: mysql

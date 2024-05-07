@@ -32,32 +32,6 @@ You can initiate a switchover for a MongoDB ReplicaSet by executing the kbcli or
 
 You can switch over a secondary of a MongoDB ReplicaSet to the primary role, and the former primary instance to a secondary.
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-* Switchover with no primary instance specified
-
-    ```bash
-    kbcli cluster promote mycluster
-    ```
-
-* Switchover with a specified new primary instance
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mongodb-2'
-    ```
-
-* If there are multiple components, you can use `--component` to specify a component.
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' --component='mongodb'
-    ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
 The value of `instanceName` decides whether a new primary instance is specified for the switchover.
 
 * Switchover with no specified primary instance
@@ -94,16 +68,12 @@ The value of `instanceName` decides whether a new primary instance is specified 
   >>
   ```
 
-</TabItem>
-
-</Tabs>
-
 ## Verify the switchover
 
 Check the instance status to verify whether the switchover is performed successfully.
 
 ```bash
-kbcli cluster list-instances
+kubectl get pods -n demo
 ```
 
 ## Handle an exception

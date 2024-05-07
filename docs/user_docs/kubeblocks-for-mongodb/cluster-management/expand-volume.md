@@ -15,48 +15,82 @@ You can expand the storage volume size of each pod.
 Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list mongodb-cluster
-```
-
-## Option 1. Use kbcli
-
-Use `kbcli cluster volume-expand` command, configure the resources required and enter the cluster name again to expand the volume.
-
-```bash
-kbcli cluster volume-expand --storage=30G --components=mongodb --volume-claim-templates=data mongodb-cluster
+kubectl get cluster mycluster -n demo
 >
-OpsRequest mongodb-cluster-volumeexpansion-gcfzp created successfully, you can view the progress:
-        kbcli cluster describe-ops mongodb-cluster-volumeexpansion-gcfzp -n default
+NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
+mycluster   mongodb              mongodb-5.0   Delete               Running   27m
 ```
 
-- `--components` describes the component name for volume expansion.
-- `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
-- `--storage` describes the volume storage size.
+## Steps
 
-## Option 2. Change the YAML file of the cluster
+1. Change configuration. There are 2 ways to apply volume expansion.
 
-Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+   <Tabs>
 
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: mongodb-cluster
-  namespace: default
-spec:
-  clusterDefinitionRef: mongodb
-  clusterVersionRef: mongodb-5.0
-  componentSpecs:
-  - name: mongodb 
-    componentDefRef: mongodb
-    replicas: 1
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi # Change the volume storage size.
-  terminationPolicy: Halt
-```
+   <TabItem value="OpsRequest" label="OpsRequest" default>
+
+   Run the command below to expand the volume of a cluster.
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-volume-expansion
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: VolumeExpansion
+     volumeExpansion:
+     - componentName: mongodb
+       volumeClaimTemplates:
+       - name: data
+         storage: "1Gi"
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+
+   Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: mongodb
+     clusterVersionRef: mongodb-5.0
+     componentSpecs:
+     - name: mongodb 
+       componentDefRef: mongodb
+       replicas: 1
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 1Gi # Change the volume storage size.
+     terminationPolicy: Halt
+   ```
+
+2. Validate the volume expansion.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   >
+   ......
+   Volume Claim Templates:
+      Name:  data
+      Spec:
+        Access Modes:
+          ReadWriteOnce
+        Resources:
+          Requests:
+            Storage:   1Gi
+   ```

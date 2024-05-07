@@ -1,17 +1,14 @@
 ---
-title: Scale for a PostgreSQL cluster
-description: How to vertically scale a PostgreSQL cluster
-keywords: [postgresql, vertical scale]
+title: Scale for MongoDB cluster
+description: How to vertically scale a MongoDB cluster
+keywords: [mongodb, vertical scaling, vertically scale a mongodb cluster]
 sidebar_position: 2
 sidebar_label: Scale
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
+# Scale for a MongoDB cluster
 
-# Scale for a PostgreSQL cluster
-
-Currently, only vertical scaling for PostgreSQL is supported.
+For MongoDB, vertical scaling is supported.
 
 ## Vertical scaling
 
@@ -19,7 +16,7 @@ You can vertically scale a cluster by changing resource requirements and limits 
 
 :::note
 
-During the vertical scaling process, a concurrent restart is triggered and the leader pod may change after the restarting.
+During the vertical scaling process, a restart is triggered and the primary pod may change after the restarting.
 
 :::
 
@@ -30,8 +27,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    AGE
-mycluster   postgresql           postgresql-14.8.0   Delete               Running   36m
+NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
+mycluster   mongodb              mongodb-5.0   Delete               Running   27m
 ```
 
 ### Steps
@@ -54,7 +51,7 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
      clusterName: mycluster
      type: VerticalScaling 
      verticalScaling:
-     - componentName: postgresql
+     - componentName: mongodb
        requests:
          memory: "2Gi"
          cpu: "1"
@@ -80,14 +77,14 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
        tenancy: SharedNode
        topologyKeys:
        - kubernetes.io/hostname
-     clusterDefinitionRef: postgresql
-     clusterVersionRef: postgresql-14.8.0
+     clusterDefinitionRef: mongodb
+     clusterVersionRef: mongodb-5.0
      componentSpecs:
-     - componentDefRef: postgresql
+     - componentDefRef: mongodb
        enabledLogs:
        - running
        monitor: false
-       name: postgresql
+       name: mongodb
        replicas: 2
        resources:
          limits:
@@ -109,11 +106,11 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
    >
    ......
    Component Specs:
-    Component Def Ref:  postgresql
+    Component Def Ref:  mongodb
     Enabled Logs:
       running
     Monitor:   false
-    Name:      postgresql
+    Name:      mongodb
     Replicas:  2
     Resources:
       Limits:

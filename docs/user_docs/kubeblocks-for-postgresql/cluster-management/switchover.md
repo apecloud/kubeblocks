@@ -40,7 +40,7 @@ The value of `instanceName` decides whether a new primary instance is specified 
   metadata:
     name: mycluster-switchover-jhkgl
   spec:
-    clusterRef: mycluster
+    clusterName: mycluster
     type: Switchover
     switchover:
     - componentName: postgresql
@@ -57,7 +57,7 @@ The value of `instanceName` decides whether a new primary instance is specified 
   metadata:
     name: mycluster-switchover-jhkgl
   spec:
-    clusterRef: mycluster
+    clusterName: mycluster
     type: Switchover
     switchover:
     - componentName: postgresql

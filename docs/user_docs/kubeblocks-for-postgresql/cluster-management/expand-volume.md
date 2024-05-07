@@ -32,7 +32,7 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
 
 ## Steps
 
-1. Change configuration. There are 3 ways to apply volume expansion.
+1. Change configuration. There are 2 ways to apply volume expansion.
 
    <Tabs>
 
@@ -48,7 +48,7 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
      name: ops-volume-expansion
      namespace: demo
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: VolumeExpansion
      volumeExpansion:
      - componentName: postgresql

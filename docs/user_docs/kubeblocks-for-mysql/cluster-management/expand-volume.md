@@ -46,7 +46,7 @@ mycluster        default          apecloud-mysql            ac-mysql-8.0.30     
     metadata:
       name: ops-volume-expansion
     spec:
-      clusterRef: mycluster
+      clusterName: mycluster
       type: VolumeExpansion
       volumeExpansion:
       - componentName: mysql

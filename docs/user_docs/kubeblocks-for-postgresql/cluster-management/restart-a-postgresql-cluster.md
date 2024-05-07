@@ -29,7 +29,7 @@ Restarting a PostgreSQL cluster triggers a concurrent restart and the leader may
      name: ops-restart
      namesapce: demo
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: Restart 
      restart:
      - componentName: postgresql
@@ -37,21 +37,3 @@ Restarting a PostgreSQL cluster triggers a concurrent restart and the leader may
    ```
 
 2. Validate the restarting.
-
-   Run the command below to check the cluster status to check the restarting status.
-
-   ```bash
-   kubectl get cluster mycluster -n demo
-   ```
-
-   ***Example***
-
-   ```bash
-   kbcli cluster list pg-cluster
-   >
-   NAME        CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    AGE
-   mycluster   postgresql           postgresql-14.8.0   Delete               Running   30m
-   ```
-
-   * STATUS=Restarting: it means the cluster restart is in progress.
-   * STATUS=Running: it means the cluster has been restarted.

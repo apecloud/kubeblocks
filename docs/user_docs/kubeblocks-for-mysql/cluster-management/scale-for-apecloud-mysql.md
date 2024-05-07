@@ -51,7 +51,7 @@ mycluster        demo             apecloud-mysql            ac-mysql-8.0.30     
    metadata:
      name: ops-vertical-scaling
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: VerticalScaling 
      verticalScaling:
      - componentName: mysql
@@ -165,7 +165,7 @@ mycluster        demo             apecloud-mysql            ac-mysql-8.0.30     
    metadata:
      name: ops-horizontal-scaling
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
      - componentName: mysql

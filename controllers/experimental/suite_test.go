@@ -49,9 +49,9 @@ const (
 )
 
 var (
-	tree        *kubebuilderx.ObjectTree
-	ncs         *experimentalv1alpha1.NodeCountScaler
-	clusterName = "foo"
+	tree           *kubebuilderx.ObjectTree
+	ncs            *experimentalv1alpha1.NodeCountScaler
+	clusterName    = "foo"
 	componentNames = []string{"bar-0", "bar-1"}
 )
 

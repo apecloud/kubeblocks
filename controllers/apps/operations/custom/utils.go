@@ -69,8 +69,12 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 	if len(opsDef.Spec.ComponentInfos) == 0 {
 		return nil
 	}
+	compObj, err := component.GetComponentByName(reqCtx, cli, fullCompName, cluster.Namespace)
+	if err != nil {
+		return err
+	}
 	// get component definition
-	compDef, err := component.GetCompDefinition(reqCtx, cli, cluster, comp.Name)
+	compDef, err := component.GetCompDefByName(reqCtx, cli, compObj.Spec.CompDef)
 	if err != nil {
 		return err
 	}

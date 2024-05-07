@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 
@@ -25,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -119,24 +117,13 @@ func setVolumeClaimStorageSizeZero(volumeClaimTemplates []ClusterComponentVolume
 // Validate Cluster.spec is legal
 func (r *Cluster) validate() error {
 	var (
-		allErrs    field.ErrorList
-		ctx        = context.Background()
-		clusterDef = &ClusterDefinition{}
+		allErrs field.ErrorList
 	)
 	if webhookMgr == nil {
 		return nil
 	}
 
-	r.validateClusterVersionRef(&allErrs)
-
-	err := webhookMgr.client.Get(ctx, types.NamespacedName{Name: r.Spec.ClusterDefRef}, clusterDef)
-
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDefinitionRef"),
-			r.Spec.ClusterDefRef, err.Error()))
-	} else {
-		r.validateComponents(&allErrs, clusterDef)
-	}
+	r.validateComponents(&allErrs)
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
@@ -146,49 +133,12 @@ func (r *Cluster) validate() error {
 	return nil
 }
 
-// ValidateClusterVersionRef validate spec.clusterVersionRef is legal
-func (r *Cluster) validateClusterVersionRef(allErrs *field.ErrorList) {
-	clusterVersion := &ClusterVersion{}
-	err := webhookMgr.client.Get(context.Background(), types.NamespacedName{
-		Namespace: r.Namespace,
-		Name:      r.Spec.ClusterVersionRef,
-	}, clusterVersion)
-	if err != nil {
-		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.clusterVersionRef"),
-			r.Spec.ClusterDefRef, err.Error()))
-	}
-}
-
 // ValidateComponents validate spec.components is legal
-func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *ClusterDefinition) {
-	var (
-		// invalid component slice
-		invalidComponentDefs = make([]string, 0)
-		componentNameMap     = make(map[string]struct{})
-		componentDefMap      = make(map[string]struct{})
-		componentMap         = make(map[string]ClusterComponentDefinition)
-	)
-
-	for _, v := range clusterDef.Spec.ComponentDefs {
-		componentDefMap[v.Name] = struct{}{}
-		componentMap[v.Name] = v
-	}
-
+func (r *Cluster) validateComponents(allErrs *field.ErrorList) {
 	for i, v := range r.Spec.ComponentSpecs {
-		if _, ok := componentDefMap[v.ComponentDefRef]; !ok {
-			invalidComponentDefs = append(invalidComponentDefs, v.ComponentDefRef)
-		}
-
-		componentNameMap[v.Name] = struct{}{}
 		r.validateComponentResources(allErrs, v.Resources, i)
 	}
-
 	r.validateComponentTLSSettings(allErrs)
-
-	if len(invalidComponentDefs) > 0 {
-		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
-			getComponentDefNotFoundMsg(invalidComponentDefs, r.Spec.ClusterDefRef)))
-	}
 }
 
 // validateComponentResources validate component resources

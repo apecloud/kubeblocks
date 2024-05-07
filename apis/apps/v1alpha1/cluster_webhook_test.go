@@ -66,10 +66,6 @@ var _ = Describe("cluster webhook", func() {
 
 	Context("When cluster create and update", func() {
 		It("Should webhook validate passed", func() {
-			By("By testing creating a new clusterDefinition when no clusterVersion and clusterDefinition")
-			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
-			Expect(testCtx.CreateObj(ctx, cluster).Error()).To(ContainSubstring("not found"))
-
 			By("By creating a new clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
@@ -87,7 +83,7 @@ var _ = Describe("cluster webhook", func() {
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)).Should(Succeed())
 
 			By("By creating a new Cluster")
-			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
 			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
 
 			By("By testing update spec.clusterDefinitionRef")
@@ -96,16 +92,6 @@ var _ = Describe("cluster webhook", func() {
 			Expect(k8sClient.Patch(ctx, cluster, patch).Error()).To(ContainSubstring("spec.clusterDefinitionRef"))
 			// restore
 			cluster.Spec.ClusterDefRef = clusterDefinitionName
-
-			// TODO: add it back on after the validation rule of "self==oldSelf" in ClusterComponentSpec issue is resolved
-			// By("By testing spec.components[?].type not found in clusterDefinitionRef")
-			// patch = client.MergeFrom(cluster.DeepCopy())
-			// cluster.Spec.ComponentSpecs[0].ComponentDefRef = "replicaset"
-			// Expect(k8sClient.Patch(ctx, cluster, patch).Error()).To(ContainSubstring("componentDefRef is immutable"))
-			// cluster.Spec.ComponentSpecs[0].ComponentDefRef = "replicasets"
-
-			// restore
-			cluster.Spec.ComponentSpecs[0].Name = "replicasets"
 
 			By("By updating spec.components[?].volumeClaimTemplates storage size, expect succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())

@@ -163,6 +163,10 @@ spec:
             - name: ENABLED_RUNTIME_METRICS
               value: "true"
             {{- end }}
+            {{- if .Values.controllers.experimental.enabled }}
+            - name: experimental
+              value: "true"
+            {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type InstanceTemplate interface {
@@ -322,7 +323,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 			}).GetObject()
 		volumeList = append(volumeList, *volume)
 	}
-	mergeList(&volumeList, &pod.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
+	intctrlutil.MergeList(&volumeList, &pod.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
 		return func(v corev1.Volume) bool {
 			return v.Name == item.Name
 		}
@@ -602,7 +603,7 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 			mergeCPUNMemory(&src.Requests, &dst.Requests)
 		}
 		if template.Env != nil {
-			mergeList(&template.Env, &templateExt.Spec.Containers[0].Env,
+			intctrlutil.MergeList(&template.Env, &templateExt.Spec.Containers[0].Env,
 				func(item corev1.EnvVar) func(corev1.EnvVar) bool {
 					return func(env corev1.EnvVar) bool {
 						return env.Name == item.Name
@@ -610,25 +611,25 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 				})
 		}
 	}
-	mergeList(&template.Tolerations, &templateExt.Spec.Tolerations,
+	intctrlutil.MergeList(&template.Tolerations, &templateExt.Spec.Tolerations,
 		func(item corev1.Toleration) func(corev1.Toleration) bool {
 			return func(t corev1.Toleration) bool {
 				return reflect.DeepEqual(item, t)
 			}
 		})
-	mergeList(&template.Volumes, &templateExt.Spec.Volumes,
+	intctrlutil.MergeList(&template.Volumes, &templateExt.Spec.Volumes,
 		func(item corev1.Volume) func(corev1.Volume) bool {
 			return func(v corev1.Volume) bool {
 				return v.Name == item.Name
 			}
 		})
-	mergeList(&template.VolumeMounts, &templateExt.Spec.Containers[0].VolumeMounts,
+	intctrlutil.MergeList(&template.VolumeMounts, &templateExt.Spec.Containers[0].VolumeMounts,
 		func(item corev1.VolumeMount) func(corev1.VolumeMount) bool {
 			return func(vm corev1.VolumeMount) bool {
 				return vm.Name == item.Name
 			}
 		})
-	mergeList(&template.VolumeClaimTemplates, &templateExt.VolumeClaimTemplates,
+	intctrlutil.MergeList(&template.VolumeClaimTemplates, &templateExt.VolumeClaimTemplates,
 		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
 			return func(claim corev1.PersistentVolumeClaim) bool {
 				return claim.Name == item.Name

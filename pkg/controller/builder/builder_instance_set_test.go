@@ -32,7 +32,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-var _ = Describe("replicated_state_machine builder", func() {
+var _ = Describe("instance_set builder", func() {
 	It("should work well", func() {
 		const (
 			name                         = "foo"

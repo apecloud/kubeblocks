@@ -32,9 +32,9 @@ import (
 	experimental "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type updateStatusReconciler struct{}
@@ -71,7 +71,7 @@ func (r *updateStatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 		}
 		statusList = append(statusList, status)
 	}
-	instanceset.MergeList(&statusList, &scaler.Status.ComponentStatuses,
+	intctrlutil.MergeList(&statusList, &scaler.Status.ComponentStatuses,
 		func(item experimental.ComponentStatus) func(experimental.ComponentStatus) bool {
 			return func(status experimental.ComponentStatus) bool {
 				return item.Name == status.Name

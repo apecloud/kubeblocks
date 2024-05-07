@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -38,62 +37,6 @@ var _ = Describe("utils test", func() {
 			SetRoles(roles).
 			GetObject()
 		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
-	})
-
-	Context("MergeList", func() {
-		It("should work well", func() {
-			src := []corev1.Volume{
-				{
-					Name: "pvc1",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvc1-pod-0",
-						},
-					},
-				},
-				{
-					Name: "pvc2",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvc2-pod-0",
-						},
-					},
-				},
-			}
-			dst := []corev1.Volume{
-				{
-					Name: "pvc0",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvc0-pod-0",
-						},
-					},
-				},
-				{
-					Name: "pvc1",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvc-pod-0",
-						},
-					},
-				},
-			}
-			MergeList(&src, &dst, func(v corev1.Volume) func(corev1.Volume) bool {
-				return func(volume corev1.Volume) bool {
-					return v.Name == volume.Name
-				}
-			})
-
-			Expect(dst).Should(HaveLen(3))
-			slices.SortStableFunc(dst, func(a, b corev1.Volume) bool {
-				return a.Name < b.Name
-			})
-			Expect(dst[0].Name).Should(Equal("pvc0"))
-			Expect(dst[1].Name).Should(Equal("pvc1"))
-			Expect(dst[1].PersistentVolumeClaim).ShouldNot(BeNil())
-			Expect(dst[1].PersistentVolumeClaim.ClaimName).Should(Equal("pvc1-pod-0"))
-			Expect(dst[2].Name).Should(Equal("pvc2"))
-		})
 	})
 
 	Context("mergeMap", func() {

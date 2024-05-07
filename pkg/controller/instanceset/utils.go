@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -194,21 +193,6 @@ func mergeMap[K comparable, V any](src, dst *map[K]V) {
 	}
 	for k, v := range *src {
 		(*dst)[k] = v
-	}
-}
-
-func MergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
-	if len(*src) == 0 {
-		return
-	}
-	for i := range *src {
-		item := (*src)[i]
-		index := slices.IndexFunc(*dst, f(item))
-		if index >= 0 {
-			(*dst)[index] = item
-		} else {
-			*dst = append(*dst, item)
-		}
 	}
 }
 

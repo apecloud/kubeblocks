@@ -50,9 +50,6 @@ func (in *ConfigConstraintSpec) GetScriptConfigs() []ScriptConfig {
 	if in.ReloadAction.ShellTrigger != nil && in.ReloadAction.ShellTrigger.ScriptConfig != nil {
 		scriptConfigs = append(scriptConfigs, *in.ReloadAction.ShellTrigger.ScriptConfig)
 	}
-	if in.ReloadAction.TPLScriptTrigger != nil {
-		scriptConfigs = append(scriptConfigs, in.ReloadAction.TPLScriptTrigger.ScriptConfig)
-	}
 	return scriptConfigs
 }
 

@@ -131,7 +131,7 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 	dst.Spec.ActiveDeadlineSeconds = src.Spec.ActiveDeadlineSeconds
 	// according to the Pod API spec, tolerations can only be appended.
 	// means old tolerations must be in new toleration list.
-	mergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
+	MergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
 		return func(t corev1.Toleration) bool {
 			return reflect.DeepEqual(item, t)
 		}

@@ -80,8 +80,28 @@ type ComponentStatus struct {
 	DesiredReplicas int32 `json:"desiredReplicas"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+type ConditionType string
+
+const (
+	// ScaleReady is added to a nodeawarescaler when all target components are ready.
+	ScaleReady ConditionType = "ScaleReady"
+)
+
+const (
+	// ReasonNotReady is a reason for condition ScaleReady.
+	ReasonNotReady = "NotReady"
+
+	// ReasonReady is a reason for condition ScaleReady.
+	ReasonReady = "Ready"
+)
+
+// +genclient
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks,all},shortName=nas
+// +kubebuilder:printcolumn:name="TARGET-CLUSTER-NAME",type="string",JSONPath=".spec.targetClusterName",description="target cluster name."
+// +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.componentStatuses",format="custom:{{range $index, $element := .}}{{if $index}}, {{end}}{{.Name}}: {{.CurrentReplicas}}/{{.DesiredReplicas}}{{end}}",description="ready replicas/desired replicas."
+// +kubebuilder:printcolumn:name="LAST-SCALE-TIME",type="date",JSONPath=".status.lastScaleTime"
 
 // NodeAwareScaler is the Schema for the nodeawarescalers API
 type NodeAwareScaler struct {

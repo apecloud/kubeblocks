@@ -20,6 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package experimental
 
 import (
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path/filepath"
 	"testing"
 
@@ -40,9 +46,58 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+const (
+	namespace = "foo"
+	name      = "bar"
+)
+
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
+
+var (
+	tree           *kubebuilderx.ObjectTree
+	nas            *experimentalv1alpha1.NodeAwareScaler
+	clusterName    = "foo"
+	componentNames = []string{"bar-0", "bar-1"}
+)
+
+func mockTestTree() *kubebuilderx.ObjectTree {
+	nas = builder.NewNodeAwareScalerBuilder(namespace, name).
+		SetTargetClusterName(clusterName).
+		SetTargetComponentNames(componentNames).
+		GetObject()
+
+	specs := []appsv1alpha1.ClusterComponentSpec{
+		{
+			Name: "foo-0",
+		},
+		{
+			Name: "foo-1",
+		},
+	}
+	cluster := builder.NewClusterBuilder(namespace, clusterName).SetComponentSpecs(specs).GetObject()
+	its0 := builder.NewInstanceSetBuilder(namespace, constant.GenerateClusterComponentName(clusterName, componentNames[0])).GetObject()
+	its1 := builder.NewInstanceSetBuilder(namespace, constant.GenerateClusterComponentName(clusterName, componentNames[1])).GetObject()
+	node0 := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "node-0",
+		},
+	}
+	node1 := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "node-1",
+		},
+	}
+
+	tree = kubebuilderx.NewObjectTree()
+	tree.SetRoot(nas)
+	Expect(tree.Add(cluster, its0, its1, node0, node1))
+
+	return tree
+}
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)

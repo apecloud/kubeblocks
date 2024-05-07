@@ -197,7 +197,7 @@ func mergeMap[K comparable, V any](src, dst *map[K]V) {
 	}
 }
 
-func mergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
+func MergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 	if len(*src) == 0 {
 		return
 	}

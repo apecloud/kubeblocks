@@ -40,7 +40,7 @@ var _ = Describe("utils test", func() {
 		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
 	})
 
-	Context("mergeList", func() {
+	Context("MergeList", func() {
 		It("should work well", func() {
 			src := []corev1.Volume{
 				{
@@ -78,7 +78,7 @@ var _ = Describe("utils test", func() {
 					},
 				},
 			}
-			mergeList(&src, &dst, func(v corev1.Volume) func(corev1.Volume) bool {
+			MergeList(&src, &dst, func(v corev1.Volume) func(corev1.Volume) bool {
 				return func(volume corev1.Volume) bool {
 					return v.Name == volume.Name
 				}

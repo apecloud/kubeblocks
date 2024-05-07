@@ -21,48 +21,57 @@ package experimental
 
 import (
 	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
+	experimental "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
 // NodeAwareScalerReconciler reconciles a NodeAwareScaler object
 type NodeAwareScalerReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=experimental.kubeblocks.io,resources=nodeawarescalers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=experimental.kubeblocks.io,resources=nodeawarescalers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=experimental.kubeblocks.io,resources=nodeawarescalers/finalizers,verbs=update
 
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;update;patch
+
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets/status,verbs=get
+
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the NodeAwareScaler object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *NodeAwareScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithValues("NodeAwareScaler", req.NamespacedName)
 
-	// TODO(user): your logic here
+	err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+		Prepare(objectTree()).
+		Do(scaleTargetCluster()).
+		Do(updateStatus()).
+		Commit()
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeAwareScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&experimentalv1alpha1.NodeAwareScaler{}).
+		For(&experimental.NodeAwareScaler{}).
 		Watches(&corev1.Node{}, &nodeScalingHandler{r.Client}).
 		Complete(r)
 }

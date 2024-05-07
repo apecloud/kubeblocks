@@ -9,13 +9,32 @@ metadata:
 spec:
   group: experimental.kubeblocks.io
   names:
+    categories:
+    - kubeblocks
+    - all
     kind: NodeAwareScaler
     listKind: NodeAwareScalerList
     plural: nodeawarescalers
+    shortNames:
+    - nas
     singular: nodeawarescaler
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: target cluster name.
+      jsonPath: .spec.targetClusterName
+      name: TARGET-CLUSTER-NAME
+      type: string
+    - description: ready replicas/desired replicas.
+      format: 'custom:{{range $index, $element := .}}{{if $index}}, {{end}}{{.Name}}:
+        {{.CurrentReplicas}}/{{.DesiredReplicas}}{{end}}'
+      jsonPath: .status.componentStatuses
+      name: REPLICAS
+      type: string
+    - jsonPath: .status.lastScaleTime
+      name: LAST-SCALE-TIME
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: NodeAwareScaler is the Schema for the nodeawarescalers API

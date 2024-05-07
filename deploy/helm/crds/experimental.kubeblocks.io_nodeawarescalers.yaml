@@ -26,15 +26,15 @@ spec:
       name: TARGET-CLUSTER-NAME
       type: string
     - description: scale ready.
-      jsonPath: .status.conditions[?(@.type==ScaleReady)].status
+      jsonPath: .status.conditions[?(@.type=="ScaleReady")].status
       name: READY
       type: string
     - description: reason.
-      jsonPath: .status.conditions[?(@.type==ScaleReady)].reason
+      jsonPath: .status.conditions[?(@.type=="ScaleReady")].reason
       name: REASON
       type: string
     - description: message.
-      jsonPath: .status.conditions[?(@.type==ScaleReady)].message
+      jsonPath: .status.conditions[?(@.type=="ScaleReady")].message
       name: MESSAGE
       type: string
     - jsonPath: .status.lastScaleTime

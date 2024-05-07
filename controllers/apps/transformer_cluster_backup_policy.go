@@ -85,7 +85,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	backupScheduleNames := map[string]struct{}{}
 	// Note: In a cluster with multiple components referencing the same componentDefinition,
 	// only the backupPolicy associated with the first component will be created.
-	// TODO: create backupPolicy by foreach component and sharding
+	// TODO: create backupPolicy by foreach component and sharding?
 	for _, tpl := range backupPolicyTPLs.Items {
 		r.isDefaultTemplate = tpl.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey]
 		r.tplIdentifier = tpl.Spec.Identifier
@@ -211,7 +211,7 @@ func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplates() (*appsv1alph
 // transformBackupPolicy transforms backup policy template to backup policy.
 func (r *clusterBackupPolicyTransformer) transformBackupPolicy(comp *appsv1alpha1.ClusterComponentSpec) (*dpv1alpha1.BackupPolicy, *dpv1alpha1.BackupPolicy) {
 	cluster := r.OrigCluster
-	backupPolicyName := generateBackupPolicyName(cluster.Name, r.compDefName(comp, nil), r.tplIdentifier)
+	backupPolicyName := generateBackupPolicyName(cluster.Name, comp.Name, r.tplIdentifier)
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	if err := r.Client.Get(r.Context, client.ObjectKey{
 		Namespace: cluster.Namespace,
@@ -755,11 +755,11 @@ func (r *clusterBackupPolicyTransformer) buildTargetPodLabels(targetTpl appsv1al
 }
 
 // generateBackupPolicyName generates the backup policy name which is created from backup policy template.
-func generateBackupPolicyName(clusterName, componentDef, identifier string) string {
+func generateBackupPolicyName(clusterName, componentName, identifier string) string {
 	if len(identifier) == 0 {
-		return fmt.Sprintf("%s-%s-backup-policy", clusterName, componentDef)
+		return fmt.Sprintf("%s-%s-backup-policy", clusterName, componentName)
 	}
-	return fmt.Sprintf("%s-%s-backup-policy-%s", clusterName, componentDef, identifier)
+	return fmt.Sprintf("%s-%s-backup-policy-%s", clusterName, componentName, identifier)
 }
 
 // generateBackupScheduleName generates the backup schedule name which is created from backup policy template.

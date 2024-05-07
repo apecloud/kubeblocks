@@ -303,7 +303,7 @@ func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 	for k, v := range targetSelectorLabels {
 		backup.Labels[k] = v
 	}
-	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
+	backup.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
 	backup.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name
 	backup.Labels[dptypes.BackupTypeLabelKey] = string(dpv1alpha1.BackupTypeContinuous)
 	backup.Labels[dptypes.AutoBackupLabelKey] = "true"

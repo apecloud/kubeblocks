@@ -518,12 +518,12 @@ func main() {
 	}
 
 	if viper.GetBool(experimentalFlagKey.viperName()) {
-		if err = (&experimentalcontrollers.NodeAwareScalerReconciler{
+		if err = (&experimentalcontrollers.NodeCountScalerReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("node-aware-scaler-controller"),
+			Recorder: mgr.GetEventRecorderFor("node-count-scaler-controller"),
 		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "NodeAwareScaler")
+			setupLog.Error(err, "unable to create controller", "controller", "NodeCountScaler")
 			os.Exit(1)
 		}
 	}

@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("node_aware_scaler builder", func() {
+var _ = Describe("node_count_scaler builder", func() {
 	It("should work well", func() {
 		const (
 			name = "foo"
@@ -33,14 +33,14 @@ var _ = Describe("node_aware_scaler builder", func() {
 		clusterName := "target-cluster-name"
 		componentNames := []string{"comp-1", "comp-2"}
 
-		nas := NewNodeAwareScalerBuilder(ns, name).
+		ncs := NewNodeCountScalerBuilder(ns, name).
 			SetTargetClusterName(clusterName).
 			SetTargetComponentNames(componentNames).
 			GetObject()
 
-		Expect(nas.Name).Should(Equal(name))
-		Expect(nas.Namespace).Should(Equal(ns))
-		Expect(nas.Spec.TargetClusterName).Should(Equal(clusterName))
-		Expect(nas.Spec.TargetComponentNames).Should(Equal(componentNames))
+		Expect(ncs.Name).Should(Equal(name))
+		Expect(ncs.Namespace).Should(Equal(ns))
+		Expect(ncs.Spec.TargetClusterName).Should(Equal(clusterName))
+		Expect(ncs.Spec.TargetComponentNames).Should(Equal(componentNames))
 	})
 })

@@ -790,7 +790,7 @@ rules:
 - apiGroups:
   - experimental.kubeblocks.io
   resources:
-  - nodeawarescalers
+  - nodecountscalers
   verbs:
   - create
   - delete
@@ -802,13 +802,13 @@ rules:
 - apiGroups:
   - experimental.kubeblocks.io
   resources:
-  - nodeawarescalers/finalizers
+  - nodecountscalers/finalizers
   verbs:
   - update
 - apiGroups:
   - experimental.kubeblocks.io
   resources:
-  - nodeawarescalers/status
+  - nodecountscalers/status
   verbs:
   - get
   - patch

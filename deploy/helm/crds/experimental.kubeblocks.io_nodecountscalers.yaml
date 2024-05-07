@@ -5,19 +5,19 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
-  name: nodeawarescalers.experimental.kubeblocks.io
+  name: nodecountscalers.experimental.kubeblocks.io
 spec:
   group: experimental.kubeblocks.io
   names:
     categories:
     - kubeblocks
     - all
-    kind: NodeAwareScaler
-    listKind: NodeAwareScalerList
-    plural: nodeawarescalers
+    kind: NodeCountScaler
+    listKind: NodeCountScalerList
+    plural: nodecountscalers
     shortNames:
-    - nas
-    singular: nodeawarescaler
+    - ncs
+    singular: nodecountscaler
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -43,7 +43,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NodeAwareScaler is the Schema for the nodeawarescalers API
+        description: NodeCountScaler is the Schema for the nodecountscalers API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -58,7 +58,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: NodeAwareScalerSpec defines the desired state of NodeAwareScaler
+            description: NodeCountScalerSpec defines the desired state of NodeCountScaler
             properties:
               targetClusterName:
                 description: Specified the target Cluster name this scaler applies
@@ -74,11 +74,11 @@ spec:
             - targetClusterName
             type: object
           status:
-            description: NodeAwareScalerStatus defines the observed state of NodeAwareScaler
+            description: NodeCountScalerStatus defines the observed state of NodeCountScaler
             properties:
               componentStatuses:
                 description: Records the current status information of all Components
-                  specified in the NodeAwareScalerSpec.
+                  specified in the NodeCountScalerSpec.
                 items:
                   properties:
                     availableReplicas:
@@ -113,7 +113,7 @@ spec:
                   type: object
                 type: array
               conditions:
-                description: 'Represents the latest available observations of a nodeawarescaler''s
+                description: 'Represents the latest available observations of a nodecountscaler''s
                   current state. Known .status.conditions.type are: "ScaleReady".
                   ScaleReady - All target components are ready.'
                 items:
@@ -187,7 +187,7 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               lastScaleTime:
-                description: LastScaleTime is the last time the NodeAwareScaler scaled
+                description: LastScaleTime is the last time the NodeCountScaler scaled
                   the number of instances.
                 format: date-time
                 type: string

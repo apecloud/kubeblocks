@@ -47,7 +47,7 @@ func (r *updateStatusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *ku
 }
 
 func (r *updateStatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	scaler, _ := tree.GetRoot().(*experimental.NodeAwareScaler)
+	scaler, _ := tree.GetRoot().(*experimental.NodeCountScaler)
 	itsList := tree.List(&workloads.InstanceSet{})
 	nodes := tree.List(&corev1.Node{})
 	// TODO(free6om): filter nodes that satisfy pod template spec of each component (by nodeSelector, nodeAffinity&nodeAntiAffinity, tolerations)
@@ -84,7 +84,7 @@ func (r *updateStatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 	return tree, nil
 }
 
-func buildScaleReadyCondition(scaler *experimental.NodeAwareScaler) *metav1.Condition {
+func buildScaleReadyCondition(scaler *experimental.NodeCountScaler) *metav1.Condition {
 	var (
 		ready         = true
 		notReadyNames []string

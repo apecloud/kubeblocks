@@ -23,22 +23,22 @@ import (
 	experimental "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 )
 
-type NodeAwareScalerBuilder struct {
-	BaseBuilder[experimental.NodeAwareScaler, *experimental.NodeAwareScaler, NodeAwareScalerBuilder]
+type NodeCountScalerBuilder struct {
+	BaseBuilder[experimental.NodeCountScaler, *experimental.NodeCountScaler, NodeCountScalerBuilder]
 }
 
-func NewNodeAwareScalerBuilder(namespace, name string) *NodeAwareScalerBuilder {
-	builder := &NodeAwareScalerBuilder{}
-	builder.init(namespace, name, &experimental.NodeAwareScaler{}, builder)
+func NewNodeCountScalerBuilder(namespace, name string) *NodeCountScalerBuilder {
+	builder := &NodeCountScalerBuilder{}
+	builder.init(namespace, name, &experimental.NodeCountScaler{}, builder)
 	return builder
 }
 
-func (builder *NodeAwareScalerBuilder) SetTargetClusterName(clusterName string) *NodeAwareScalerBuilder {
+func (builder *NodeCountScalerBuilder) SetTargetClusterName(clusterName string) *NodeCountScalerBuilder {
 	builder.get().Spec.TargetClusterName = clusterName
 	return builder
 }
 
-func (builder *NodeAwareScalerBuilder) SetTargetComponentNames(componentNames []string) *NodeAwareScalerBuilder {
+func (builder *NodeCountScalerBuilder) SetTargetComponentNames(componentNames []string) *NodeCountScalerBuilder {
 	builder.get().Spec.TargetComponentNames = componentNames
 	return builder
 }

@@ -252,7 +252,7 @@ resources:
   controller: true
   domain: kubeblocks.io
   group: experimental
-  kind: NodeAwareScaler
+  kind: NodeCountScaler
   path: github.com/apecloud/kubeblocks/apis/experimental/v1alpha1
   version: v1alpha1
 version: "3"

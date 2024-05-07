@@ -49,14 +49,14 @@ const (
 )
 
 var (
-	tree           *kubebuilderx.ObjectTree
-	nas            *experimentalv1alpha1.NodeAwareScaler
-	clusterName    = "foo"
+	tree        *kubebuilderx.ObjectTree
+	ncs         *experimentalv1alpha1.NodeCountScaler
+	clusterName = "foo"
 	componentNames = []string{"bar-0", "bar-1"}
 )
 
 func mockTestTree() *kubebuilderx.ObjectTree {
-	nas = builder.NewNodeAwareScalerBuilder(namespace, name).
+	ncs = builder.NewNodeCountScalerBuilder(namespace, name).
 		SetTargetClusterName(clusterName).
 		SetTargetComponentNames(componentNames).
 		GetObject()
@@ -86,7 +86,7 @@ func mockTestTree() *kubebuilderx.ObjectTree {
 	}
 
 	tree = kubebuilderx.NewObjectTree()
-	tree.SetRoot(nas)
+	tree.SetRoot(ncs)
 	Expect(tree.Add(cluster, its0, its1, node0, node1))
 
 	return tree

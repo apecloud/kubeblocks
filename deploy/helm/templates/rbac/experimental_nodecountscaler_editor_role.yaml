@@ -1,22 +1,26 @@
-# permissions for end users to view nodeawarescalers.
+# permissions for end users to edit nodecountscalers.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-  name: {{ include "kubeblocks.fullname" . }}-nodeawarescaler-viewer-role
+  name: {{ include "kubeblocks.fullname" . }}-nodecountscaler-editor-role
 rules:
 - apiGroups:
   - experimental.kubeblocks.io
   resources:
-  - nodeawarescalers
+  - nodecountscalers
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - experimental.kubeblocks.io
   resources:
-  - nodeawarescalers/status
+  - nodecountscalers/status
   verbs:
   - get

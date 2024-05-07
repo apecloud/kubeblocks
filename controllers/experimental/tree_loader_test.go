@@ -50,7 +50,7 @@ var _ = Describe("tree loader test", func() {
 
 			clusterName := "foo"
 			componentNames := []string{"bar-0", "bar-1"}
-			root := builder.NewNodeAwareScalerBuilder(namespace, name).SetTargetClusterName(clusterName).SetTargetComponentNames(componentNames).GetObject()
+			root := builder.NewNodeCountScalerBuilder(namespace, name).SetTargetClusterName(clusterName).SetTargetComponentNames(componentNames).GetObject()
 			cluster := builder.NewClusterBuilder(namespace, clusterName).GetObject()
 			its0 := builder.NewInstanceSetBuilder(namespace, constant.GenerateClusterComponentName(clusterName, componentNames[0])).GetObject()
 			its1 := builder.NewInstanceSetBuilder(namespace, constant.GenerateClusterComponentName(clusterName, componentNames[1])).GetObject()
@@ -68,8 +68,8 @@ var _ = Describe("tree loader test", func() {
 			}
 
 			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &experimental.NodeAwareScaler{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *experimental.NodeAwareScaler, _ ...client.GetOption) error {
+				Get(gomock.Any(), gomock.Any(), &experimental.NodeCountScaler{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *experimental.NodeCountScaler, _ ...client.GetOption) error {
 					*obj = *root
 					return nil
 				}).Times(1)

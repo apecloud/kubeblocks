@@ -43,7 +43,7 @@ func (r *scaleTargetClusterReconciler) PreCondition(tree *kubebuilderx.ObjectTre
 }
 
 func (r *scaleTargetClusterReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	scaler, _ := tree.GetRoot().(*experimental.NodeAwareScaler)
+	scaler, _ := tree.GetRoot().(*experimental.NodeCountScaler)
 	clusterKey := builder.NewClusterBuilder(scaler.Namespace, scaler.Spec.TargetClusterName).GetObject()
 	object, err := tree.Get(clusterKey)
 	if err != nil {

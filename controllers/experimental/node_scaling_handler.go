@@ -51,7 +51,7 @@ func (h *nodeScalingHandler) Generic(ctx context.Context, event event.GenericEve
 }
 
 func (h *nodeScalingHandler) mapAndEnqueue(ctx context.Context, q workqueue.RateLimitingInterface) {
-	scalerList := &experimental.NodeAwareScalerList{}
+	scalerList := &experimental.NodeCountScalerList{}
 	if err := h.Client.List(ctx, scalerList); err == nil {
 		for _, item := range scalerList.Items {
 			q.Add(ctrl.Request{NamespacedName: types.NamespacedName{Namespace: item.Namespace, Name: item.Name}})

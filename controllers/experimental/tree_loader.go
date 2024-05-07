@@ -39,7 +39,7 @@ import (
 type treeLoader struct{}
 
 func (t *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
-	tree, err := kubebuilderx.ReadObjectTree[*experimental.NodeAwareScaler](ctx, reader, req, nil)
+	tree, err := kubebuilderx.ReadObjectTree[*experimental.NodeCountScaler](ctx, reader, req, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (t *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	if root == nil {
 		return tree, nil
 	}
-	scaler, _ := root.(*experimental.NodeAwareScaler)
+	scaler, _ := root.(*experimental.NodeCountScaler)
 	key := types.NamespacedName{Namespace: scaler.Namespace, Name: scaler.Spec.TargetClusterName}
 	cluster := &appsv1alpha1.Cluster{}
 	if err = reader.Get(ctx, key, cluster); err != nil {

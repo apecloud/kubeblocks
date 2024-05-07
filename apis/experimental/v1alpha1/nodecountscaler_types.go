@@ -26,8 +26,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// NodeAwareScalerSpec defines the desired state of NodeAwareScaler
-type NodeAwareScalerSpec struct {
+// NodeCountScalerSpec defines the desired state of NodeCountScaler
+type NodeCountScalerSpec struct {
 	// Specified the target Cluster name this scaler applies to.
 	TargetClusterName string `json:"targetClusterName"`
 
@@ -38,14 +38,14 @@ type NodeAwareScalerSpec struct {
 	TargetComponentNames []string `json:"targetComponentNames,omitempty"`
 }
 
-// NodeAwareScalerStatus defines the observed state of NodeAwareScaler
-type NodeAwareScalerStatus struct {
-	// Records the current status information of all Components specified in the NodeAwareScalerSpec.
+// NodeCountScalerStatus defines the observed state of NodeCountScaler
+type NodeCountScalerStatus struct {
+	// Records the current status information of all Components specified in the NodeCountScalerSpec.
 	//
 	// +optional
 	ComponentStatuses []ComponentStatus `json:"componentStatuses,omitempty"`
 
-	// Represents the latest available observations of a nodeawarescaler's current state.
+	// Represents the latest available observations of a nodecountscaler's current state.
 	// Known .status.conditions.type are: "ScaleReady".
 	// ScaleReady - All target components are ready.
 	//
@@ -56,7 +56,7 @@ type NodeAwareScalerStatus struct {
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
-	// LastScaleTime is the last time the NodeAwareScaler scaled the number of instances.
+	// LastScaleTime is the last time the NodeCountScaler scaled the number of instances.
 	//
 	// +optional
 	LastScaleTime metav1.Time `json:"lastScaleTime,omitempty"`
@@ -83,7 +83,7 @@ type ComponentStatus struct {
 type ConditionType string
 
 const (
-	// ScaleReady is added to a nodeawarescaler when all target components are ready.
+	// ScaleReady is added to a nodecountscaler when all target components are ready.
 	ScaleReady ConditionType = "ScaleReady"
 )
 
@@ -98,31 +98,31 @@ const (
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},shortName=nas
+// +kubebuilder:resource:categories={kubeblocks,all},shortName=ncs
 // +kubebuilder:printcolumn:name="TARGET-CLUSTER-NAME",type="string",JSONPath=".spec.targetClusterName",description="target cluster name."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type==\"ScaleReady\")].status",description="scale ready."
 // +kubebuilder:printcolumn:name="REASON",type="string",JSONPath=".status.conditions[?(@.type==\"ScaleReady\")].reason",description="reason."
 // +kubebuilder:printcolumn:name="MESSAGE",type="string",JSONPath=".status.conditions[?(@.type==\"ScaleReady\")].message",description="message."
 // +kubebuilder:printcolumn:name="LAST-SCALE-TIME",type="date",JSONPath=".status.lastScaleTime"
 
-// NodeAwareScaler is the Schema for the nodeawarescalers API
-type NodeAwareScaler struct {
+// NodeCountScaler is the Schema for the nodecountscalers API
+type NodeCountScaler struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   NodeAwareScalerSpec   `json:"spec,omitempty"`
-	Status NodeAwareScalerStatus `json:"status,omitempty"`
+	Spec   NodeCountScalerSpec   `json:"spec,omitempty"`
+	Status NodeCountScalerStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// NodeAwareScalerList contains a list of NodeAwareScaler
-type NodeAwareScalerList struct {
+// NodeCountScalerList contains a list of NodeCountScaler
+type NodeCountScalerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NodeAwareScaler `json:"items"`
+	Items           []NodeCountScaler `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&NodeAwareScaler{}, &NodeAwareScalerList{})
+	SchemeBuilder.Register(&NodeCountScaler{}, &NodeCountScalerList{})
 }

@@ -51,7 +51,7 @@ func (h *clusterHandler) Generic(ctx context.Context, event event.GenericEvent, 
 }
 
 func (h *clusterHandler) mapAndEnqueue(ctx context.Context, q workqueue.RateLimitingInterface, object client.Object) {
-	scalerList := &experimental.NodeAwareScalerList{}
+	scalerList := &experimental.NodeCountScalerList{}
 	if err := h.Client.List(ctx, scalerList); err == nil {
 		for _, item := range scalerList.Items {
 			if item.Spec.TargetClusterName == object.GetName() &&

@@ -34,16 +34,16 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-// NodeAwareScalerReconciler reconciles a NodeAwareScaler object
-type NodeAwareScalerReconciler struct {
+// NodeCountScalerReconciler reconciles a NodeCountScaler object
+type NodeCountScalerReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=experimental.kubeblocks.io,resources=nodeawarescalers,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=experimental.kubeblocks.io,resources=nodeawarescalers/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=experimental.kubeblocks.io,resources=nodeawarescalers/finalizers,verbs=update
+//+kubebuilder:rbac:groups=experimental.kubeblocks.io,resources=nodecountscalers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=experimental.kubeblocks.io,resources=nodecountscalers/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=experimental.kubeblocks.io,resources=nodecountscalers/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;update;patch
 
@@ -57,8 +57,8 @@ type NodeAwareScalerReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
-func (r *NodeAwareScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithValues("NodeAwareScaler", req.NamespacedName)
+func (r *NodeCountScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("NodeCountScaler", req.NamespacedName)
 
 	err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(objectTree()).
@@ -70,9 +70,9 @@ func (r *NodeAwareScalerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *NodeAwareScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *NodeCountScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&experimental.NodeAwareScaler{}).
+		For(&experimental.NodeCountScaler{}).
 		Watches(&corev1.Node{}, &nodeScalingHandler{r.Client}).
 		Watches(&appsv1alpha1.Cluster{}, &clusterHandler{r.Client}).
 		Complete(r)

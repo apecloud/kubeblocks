@@ -275,6 +275,10 @@ func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *
 	probe.TimeoutSeconds = roleProbe.TimeoutSeconds
 	probe.FailureThreshold = 3
 	roleChangedContainer.ReadinessProbe = probe
+	roleChangedContainer.Env = append(roleChangedContainer.Env, corev1.EnvVar{
+		Name:  constant.KBEnvRoleProbePeriod,
+		Value: strconv.Itoa(int(roleProbe.PeriodSeconds)),
+	})
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {

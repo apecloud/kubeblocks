@@ -299,7 +299,8 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
       <TabItem value="PVC" label="PVC">
 
       ```bash
-      kbcli backuprepo create --provider pvc \
+      kbcli backuprepo create my-repo \
+        --provider pvc \
         --storage-class-name "nfs-storage" \
         --access-mode "ReadWriteMany" \
         --volume-capacity "100Gi" \

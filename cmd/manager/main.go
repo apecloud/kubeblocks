@@ -52,12 +52,14 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
+	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
@@ -81,9 +83,10 @@ const (
 	leaderElectIDFlagKey flagName = "leader-elect-id"
 
 	// switch flags key for API groups
-	appsFlagKey       flagName = "apps"
-	extensionsFlagKey flagName = "extensions"
-	workloadsFlagKey  flagName = "workloads"
+	appsFlagKey         flagName = "apps"
+	extensionsFlagKey   flagName = "extensions"
+	workloadsFlagKey    flagName = "workloads"
+	experimentalFlagKey flagName = "experimental"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
@@ -108,6 +111,7 @@ func init() {
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(legacy.AddToScheme(scheme))
 	utilruntime.Must(apiextv1.AddToScheme(scheme))
+	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -168,6 +172,8 @@ func setupFlags() {
 		"Enable the extensions controller manager.")
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager.")
+	flag.Bool(experimentalFlagKey.String(), false,
+		"Enable the experimental controller manager.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
@@ -507,6 +513,17 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
 		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(experimentalFlagKey.viperName()) {
+		if err = (&experimentalcontrollers.NodeCountScalerReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("node-count-scaler-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "NodeCountScaler")
 			os.Exit(1)
 		}
 	}

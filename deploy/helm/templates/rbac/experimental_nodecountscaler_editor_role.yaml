@@ -1,15 +1,15 @@
-# permissions for end users to edit instancesets.
+# permissions for end users to edit nodecountscalers.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-  name: {{ include "kubeblocks.fullname" . }}-instanceset-editor-role
+  name: {{ include "kubeblocks.fullname" . }}-nodecountscaler-editor-role
 rules:
 - apiGroups:
-  - workloads.kubeblocks.io
+  - experimental.kubeblocks.io
   resources:
-  - instancesets
+  - nodecountscalers
   verbs:
   - create
   - delete
@@ -19,8 +19,8 @@ rules:
   - update
   - watch
 - apiGroups:
-  - workloads.kubeblocks.io
+  - experimental.kubeblocks.io
   resources:
-  - instancesets/status
+  - nodecountscalers/status
   verbs:
   - get

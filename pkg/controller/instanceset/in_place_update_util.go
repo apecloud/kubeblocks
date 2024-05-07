@@ -33,6 +33,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -131,7 +132,7 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 	dst.Spec.ActiveDeadlineSeconds = src.Spec.ActiveDeadlineSeconds
 	// according to the Pod API spec, tolerations can only be appended.
 	// means old tolerations must be in new toleration list.
-	mergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
+	intctrlutil.MergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
 		return func(t corev1.Toleration) bool {
 			return reflect.DeepEqual(item, t)
 		}

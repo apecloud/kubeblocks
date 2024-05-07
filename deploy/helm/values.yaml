@@ -1902,3 +1902,7 @@ hostPorts:
   - "10259"
   - "2379-2380"
   - "30000-32767"
+
+controllers:
+  experimental:
+    enabled: false

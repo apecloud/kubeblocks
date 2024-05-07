@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: opengauss-cluster
+  clusterName: opengauss-cluster
   type: Restart
   # Lists Components to be restarted. ComponentOps specifies the Component to be operated on.
   restart:

@@ -4,7 +4,7 @@ metadata:
   name: mongo-switchover-specify
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: mongo-cluster
+  clusterName: mongo-cluster
   type: Switchover
   # Lists Switchover objects, each specifying a Component to perform the switchover operation.
   switchover:

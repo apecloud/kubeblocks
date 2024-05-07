@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: mongo-cluster
+  clusterName: mongo-cluster
   # Instructs the system to bypass pre-checks (including cluster state checks and customized pre-conditions hooks) and immediately execute the opsRequest, except for the opsRequest of 'Start' type, which will still undergo pre-checks even if `force` is true.  Note: Once set, the `force` field is immutable and cannot be updated.
   force: false
   # Specifies a component and its configuration updates. This field is deprecated and replaced by `reconfigures`.
@@ -32,5 +32,5 @@ spec:
       # Specifies the name of the configuration template.
       name: mongodb-config
   # Specifies the maximum number of seconds the OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed.
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0
   type: Reconfiguring

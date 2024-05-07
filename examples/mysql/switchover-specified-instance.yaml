@@ -4,7 +4,7 @@ metadata:
   name: mysql-switchover-specify
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: mysql-cluster
+  clusterName: mysql-cluster
   type: Switchover
   # Lists Switchover objects, each specifying a Component to perform the switchover operation.
   switchover:

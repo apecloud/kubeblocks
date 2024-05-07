@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: tdengine-cluster
+  clusterName: tdengine-cluster
   type: VolumeExpansion
   # Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates that requires storage expansion. 
   volumeExpansion:

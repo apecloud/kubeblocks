@@ -5,5 +5,5 @@ metadata:
   namespace: default
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: omysql-cluster
+  clusterName: omysql-cluster
   type: Stop

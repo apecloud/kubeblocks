@@ -4,7 +4,7 @@ metadata:
   name: oceanbase-switchover
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: oceanbase-cluster
+  clusterName: oceanbase-cluster
   type: Switchover
   # Lists Switchover objects, each specifying a Component to perform the switchover operation.
   switchover:

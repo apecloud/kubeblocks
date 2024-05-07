@@ -31,7 +31,7 @@ metadata:
   name: mogdb-cluster-switchover
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: mogdb-cluster
+  clusterName: mogdb-cluster
   type: Custom
   customSpec:
     components:
@@ -41,4 +41,4 @@ spec:
             value: mogdb-cluster-mogdb-1
     opsDefinitionRef: mogdb-switchover
     parallelism: 0
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0

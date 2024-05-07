@@ -26,15 +26,15 @@ spec:
       name: TARGET-CLUSTER-NAME
       type: string
     - description: scale ready.
-      jsonPath: .status.componentStatuses[?(@.type==ScaleReady)].status
+      jsonPath: .status.conditions[?(@.type==ScaleReady)].status
       name: READY
       type: string
     - description: reason.
-      jsonPath: .status.componentStatuses[?(@.type==ScaleReady)].reason
+      jsonPath: .status.conditions[?(@.type==ScaleReady)].reason
       name: REASON
       type: string
     - description: message.
-      jsonPath: .status.componentStatuses[?(@.type==ScaleReady)].message
+      jsonPath: .status.conditions[?(@.type==ScaleReady)].message
       name: MESSAGE
       type: string
     - jsonPath: .status.lastScaleTime
@@ -60,18 +60,18 @@ spec:
           spec:
             description: NodeAwareScalerSpec defines the desired state of NodeAwareScaler
             properties:
-              TargetComponentNames:
+              targetClusterName:
+                description: Specified the target Cluster name this scaler applies
+                  to.
+                type: string
+              targetComponentNames:
                 description: Specified the target Component names this scaler applies
                   to. All Components will be applied if not set.
                 items:
                   type: string
                 type: array
-              targetName:
-                description: Specified the target Cluster name this scaler applies
-                  to.
-                type: string
             required:
-            - targetName
+            - targetClusterName
             type: object
           status:
             description: NodeAwareScalerStatus defines the observed state of NodeAwareScaler

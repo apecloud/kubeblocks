@@ -32,31 +32,35 @@ import (
 	experimental "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 )
 
-type nodeScalingHandler struct {
+type clusterHandler struct {
 	client.Client
 }
 
-func (h *nodeScalingHandler) Create(ctx context.Context, event event.CreateEvent, limitingInterface workqueue.RateLimitingInterface) {
-	h.mapAndEnqueue(ctx, limitingInterface)
+func (h *clusterHandler) Create(ctx context.Context, event event.CreateEvent, limitingInterface workqueue.RateLimitingInterface) {
+	h.mapAndEnqueue(ctx, limitingInterface, event.Object)
 }
 
-func (h *nodeScalingHandler) Update(ctx context.Context, event event.UpdateEvent, limitingInterface workqueue.RateLimitingInterface) {
+func (h *clusterHandler) Update(ctx context.Context, event event.UpdateEvent, limitingInterface workqueue.RateLimitingInterface) {
+	h.mapAndEnqueue(ctx, limitingInterface, event.ObjectNew)
 }
 
-func (h *nodeScalingHandler) Delete(ctx context.Context, event event.DeleteEvent, limitingInterface workqueue.RateLimitingInterface) {
-	h.mapAndEnqueue(ctx, limitingInterface)
+func (h *clusterHandler) Delete(ctx context.Context, event event.DeleteEvent, limitingInterface workqueue.RateLimitingInterface) {
 }
 
-func (h *nodeScalingHandler) Generic(ctx context.Context, event event.GenericEvent, limitingInterface workqueue.RateLimitingInterface) {
+func (h *clusterHandler) Generic(ctx context.Context, event event.GenericEvent, limitingInterface workqueue.RateLimitingInterface) {
 }
 
-func (h *nodeScalingHandler) mapAndEnqueue(ctx context.Context, q workqueue.RateLimitingInterface) {
+func (h *clusterHandler) mapAndEnqueue(ctx context.Context, q workqueue.RateLimitingInterface, object client.Object) {
 	scalerList := &experimental.NodeAwareScalerList{}
 	if err := h.Client.List(ctx, scalerList); err == nil {
 		for _, item := range scalerList.Items {
-			q.Add(ctrl.Request{NamespacedName: types.NamespacedName{Namespace: item.Namespace, Name: item.Name}})
+			if item.Spec.TargetClusterName == object.GetName() &&
+				item.Namespace == object.GetNamespace() {
+				q.Add(ctrl.Request{NamespacedName: types.NamespacedName{Namespace: item.Namespace, Name: item.Name}})
+				break
+			}
 		}
 	}
 }
 
-var _ handler.EventHandler = &nodeScalingHandler{}
+var _ handler.EventHandler = &clusterHandler{}

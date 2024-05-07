@@ -21,6 +21,7 @@ package experimental
 
 import (
 	"context"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,5 +74,6 @@ func (r *NodeAwareScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&experimental.NodeAwareScaler{}).
 		Watches(&corev1.Node{}, &nodeScalingHandler{r.Client}).
+		Watches(&appsv1alpha1.Cluster{}, &clusterHandler{r.Client}).
 		Complete(r)
 }

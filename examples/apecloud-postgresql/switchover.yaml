@@ -4,7 +4,7 @@ metadata:
   name: ac-postgresql-switchover
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: ac-postgresql-cluster
+  clusterName: ac-postgresql-cluster
   type: Custom
   customSpec:
     components:
@@ -16,4 +16,4 @@ spec:
         value: ""
     opsDefinitionRef: switchover
     parallelism: 0
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0

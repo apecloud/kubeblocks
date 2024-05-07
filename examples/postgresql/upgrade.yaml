@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: pg-cluster
+  clusterName: pg-cluster
   type: Upgrade
   # Specifies the cluster version by specifying clusterVersionRef.
   upgrade:

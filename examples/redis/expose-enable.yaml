@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: redis-cluster
+  clusterName: redis-cluster
   # Lists Expose objects, each specifying a Component and its services to be exposed.
   expose:
     # Specifies the name of the Component.
@@ -17,5 +17,5 @@ spec:
     # Indicates whether the services will be exposed. 'Enable' exposes the services. while 'Disable' removes the exposed Service.
     switch: Enable
   # Specifies the maximum number of seconds the OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed.
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0
   type: Expose

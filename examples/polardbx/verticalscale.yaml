@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterRef: polardbx-cluster
+  clusterName: polardbx-cluster
   type: VerticalScaling
   # Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling. 
   verticalScaling:

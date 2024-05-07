@@ -22,11 +22,12 @@ package grpcserver
 import (
 	"context"
 	"encoding/json"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/custom"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	health "google.golang.org/grpc/health/grpc_health_v1"
@@ -41,7 +42,6 @@ var _ = Describe("GRPC Server", func() {
 	Context("new GRPC server", func() {
 		It("fail -- no check role operation", func() {
 			delete(operations.Operations(), strings.ToLower(string(util.CheckRoleOperation)))
-			mockDBManager.EXPECT().SubscribeRoleChange(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 			_, err := NewGRPCServer()
 			Expect(err).Should(HaveOccurred())
 		})
@@ -71,10 +71,11 @@ var _ = Describe("GRPC Server", func() {
 			viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
 			viper.Set("KB_RSM_ROLE_UPDATE_MECHANISM", "ReadinessProbeEventUpdate")
 
-			server, _ := NewGRPCServer()
+			customManager, err := custom.NewManager(nil)
+			Expect(err).Should(BeNil())
+			register.SetDBManager(customManager)
 
-			mockDBManager.EXPECT().IsDBStartupReady().Return(true)
-			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return("leader", nil)
+			server, _ := NewGRPCServer()
 			check, err := server.Check(context.Background(), nil)
 
 			Expect(err).Should(HaveOccurred())

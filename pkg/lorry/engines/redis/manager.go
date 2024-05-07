@@ -21,19 +21,15 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -48,9 +44,12 @@ type Manager struct {
 	clientSettings *Settings
 	sentinelClient *redis.SentinelClient
 
-	ctx     context.Context
-	cancel  context.CancelFunc
-	startAt time.Time
+	ctx                     context.Context
+	cancel                  context.CancelFunc
+	startAt                 time.Time
+	role                    string
+	roleSubscribeUpdateTime int64
+	roleProbePeriod         int64
 }
 
 var _ engines.DBManager = &Manager{}
@@ -71,7 +70,8 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		return nil, err
 	}
 	mgr := &Manager{
-		DBManagerBase: *managerBase,
+		DBManagerBase:   *managerBase,
+		roleProbePeriod: int64(viper.GetInt(constant.KBEnvRoleProbePeriod)),
 	}
 
 	mgr.startAt = time.Now()
@@ -88,6 +88,8 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	mgr.sentinelClient = newSentinelClient(mgr.clientSettings, mgr.ClusterCompName)
 
 	mgr.ctx, mgr.cancel = context.WithCancel(context.Background())
+
+	go mgr.SubscribeRoleChange(mgr.ctx, dcs.GetStore().GetClusterFromCache())
 	return mgr, nil
 }
 
@@ -115,56 +117,4 @@ func tokenizeCmd2Args(cmd string) []interface{} {
 		redisArgs = append(redisArgs, arg)
 	}
 	return redisArgs
-}
-
-func (mgr *Manager) SubscribeRoleChange(ctx context.Context, oriRole *string, cluster *dcs.Cluster) {
-	pubSub := mgr.sentinelClient.Subscribe(ctx, "+switch-master")
-
-	// go-redis periodically sends ping messages to test connection health
-	// and re-subscribes if ping can not receive for 30 seconds.
-	// so we don't need to retry
-	ch := pubSub.Channel()
-	var role, msgRole string
-	for msg := range ch {
-		// +switch-master <master name> <old ip> <old port> <new ip> <new port>
-		masterAddr := strings.Split(msg.Payload, " ")
-		masterName := strings.Split(masterAddr[3], ".")[0]
-
-		// When network partition occurs, the new primary needs to send global role change information to the controller.
-		if masterName == mgr.CurrentMemberName {
-			role = models.PRIMARY
-			roleSnapshot := &common.GlobalRoleSnapshot{}
-			oldMasterName := strings.Split(masterAddr[1], ".")[0]
-			roleSnapshot.PodRoleNamePairs = []common.PodRoleNamePair{
-				{
-					PodName:  oldMasterName,
-					RoleName: models.SECONDARY,
-					PodUID:   cluster.GetMemberWithName(oldMasterName).UID,
-				},
-				{
-					PodName:  masterName,
-					RoleName: models.PRIMARY,
-					PodUID:   cluster.GetMemberWithName(masterName).UID,
-				},
-			}
-			roleSnapshot.Version = time.Now().Format(time.RFC3339Nano)
-
-			b, _ := json.Marshal(roleSnapshot)
-			msgRole = string(b)
-		} else {
-			role = models.SECONDARY
-			msgRole = models.SECONDARY
-		}
-		if role != *oriRole {
-			err := util.SentEventForProbe(ctx, map[string]any{
-				"operation":    util.CheckRoleOperation,
-				"originalRole": *oriRole,
-				"role":         msgRole,
-				"event":        util.OperationSuccess,
-			})
-			if err == nil {
-				*oriRole = role
-			}
-		}
-	}
 }

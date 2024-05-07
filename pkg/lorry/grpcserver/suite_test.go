@@ -32,11 +32,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 )
-
-var mockDBManager *engines.MockDBManager
 
 func init() {
 	viper.AutomaticEnv()
@@ -54,9 +50,6 @@ func TestVolumeOperations(t *testing.T) {
 var _ = BeforeSuite(func() {
 	// Init mock dcs store
 	InitMockDCSStore()
-
-	// Init mock db manager
-	InitMockDBManager()
 })
 
 var _ = AfterSuite(func() {
@@ -67,10 +60,4 @@ func InitMockDCSStore() {
 	mockDCSStore := dcs.NewMockDCS(ctrl)
 	mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{}).AnyTimes()
 	dcs.SetStore(mockDCSStore)
-}
-
-func InitMockDBManager() {
-	ctrl := gomock.NewController(GinkgoT())
-	mockDBManager = engines.NewMockDBManager(ctrl)
-	register.SetDBManager(mockDBManager)
 }

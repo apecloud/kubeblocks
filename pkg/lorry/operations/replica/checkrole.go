@@ -46,7 +46,7 @@ type CheckRole struct {
 	operations.Base
 	logger                     logr.Logger
 	dcsStore                   dcs.DCS
-	OriRole                    *string
+	OriRole                    string
 	CheckRoleFailedCount       int
 	FailedEventReportFrequency int
 	Timeout                    time.Duration
@@ -105,14 +105,6 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		}
 	}
 
-	manager, err := register.GetDBManager(s.Command)
-	if err != nil {
-		return err
-	}
-	// In addition to active probing, if the database engine supports it, we also support passive subscription to role changes.
-	s.OriRole = new(string)
-	go manager.SubscribeRoleChange(ctx, s.OriRole, s.dcsStore.GetClusterFromCache())
-
 	return nil
 }
 
@@ -125,7 +117,7 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.CheckRoleOperation
-	resp.Data["originalRole"] = *s.OriRole
+	resp.Data["originalRole"] = s.OriRole
 	var role string
 	var err error
 
@@ -165,11 +157,11 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 	}
 
 	resp.Data["role"] = role
-	if *s.OriRole == role {
+	if s.OriRole == role {
 		return nil, nil
 	}
 	resp.Data["event"] = util.OperationSuccess
-	*s.OriRole = role
+	s.OriRole = role
 	err = util.SentEventForProbe(ctx, resp.Data)
 	return resp, err
 }

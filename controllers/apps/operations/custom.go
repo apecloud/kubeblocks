@@ -219,7 +219,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 	opsRes *OpsResource) error {
 	customSpec := opsRes.OpsRequest.Spec.CustomOps
 	if customSpec == nil {
-		return intctrlutil.NewFatalError("spec.customSpec can not be empty if opsType is Custom.")
+		return intctrlutil.NewFatalError("spec.custom can not be empty if opsType is Custom.")
 	}
 	opsDef := &appsv1alpha1.OpsDefinition{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: customSpec.OpsDefinitionName}, opsDef); err != nil {

@@ -294,7 +294,7 @@ func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1a
 			return restoreTimeStr, err
 		}
 	}
-	restoreTimeStr = restoreTime.Format(time.RFC3339)
+	restoreTimeStr = restoreTime.UTC().Format(time.RFC3339)
 	// TODO: check with Recoverable time
 	if !isTimeInRange(restoreTime, continuousBackup.Status.TimeRange.Start.Time, continuousBackup.Status.TimeRange.End.Time) {
 		return restoreTimeStr, fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+

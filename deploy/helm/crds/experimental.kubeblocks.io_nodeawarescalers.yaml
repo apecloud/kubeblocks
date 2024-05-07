@@ -25,11 +25,17 @@ spec:
       jsonPath: .spec.targetClusterName
       name: TARGET-CLUSTER-NAME
       type: string
-    - description: ready replicas/desired replicas.
-      format: 'custom:{{range $index, $element := .}}{{if $index}}, {{end}}{{.Name}}:
-        {{.CurrentReplicas}}/{{.DesiredReplicas}}{{end}}'
-      jsonPath: .status.componentStatuses
-      name: REPLICAS
+    - description: scale ready.
+      jsonPath: .status.componentStatuses[?(@.type==ScaleReady)].status
+      name: READY
+      type: string
+    - description: reason.
+      jsonPath: .status.componentStatuses[?(@.type==ScaleReady)].reason
+      name: REASON
+      type: string
+    - description: message.
+      jsonPath: .status.componentStatuses[?(@.type==ScaleReady)].message
+      name: MESSAGE
       type: string
     - jsonPath: .status.lastScaleTime
       name: LAST-SCALE-TIME

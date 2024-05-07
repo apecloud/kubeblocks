@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -53,9 +54,11 @@ var _ = Describe("scale target cluster reconciler test", func() {
 			Expect(err).Should(BeNil())
 			newCluster, ok := object.(*appsv1alpha1.Cluster)
 			Expect(ok).Should(BeTrue())
+			nodes := newTree.List(&corev1.Node{})
+			desiredReplicas := int32(len(nodes))
 			Expect(newCluster.Spec.ComponentSpecs).Should(HaveLen(2))
-			Expect(newCluster.Spec.ComponentSpecs[0].Replicas).Should(BeEquivalentTo(2))
-			Expect(newCluster.Spec.ComponentSpecs[1].Replicas).Should(BeEquivalentTo(2))
+			Expect(newCluster.Spec.ComponentSpecs[0].Replicas).Should(Equal(desiredReplicas))
+			Expect(newCluster.Spec.ComponentSpecs[1].Replicas).Should(Equal(desiredReplicas))
 		})
 	})
 })

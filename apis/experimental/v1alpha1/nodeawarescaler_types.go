@@ -100,7 +100,9 @@ const (
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=nas
 // +kubebuilder:printcolumn:name="TARGET-CLUSTER-NAME",type="string",JSONPath=".spec.targetClusterName",description="target cluster name."
-// +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.componentStatuses",format="custom:{{range $index, $element := .}}{{if $index}}, {{end}}{{.Name}}: {{.CurrentReplicas}}/{{.DesiredReplicas}}{{end}}",description="ready replicas/desired replicas."
+// +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.componentStatuses[?(@.type==ScaleReady)].status",description="scale ready."
+// +kubebuilder:printcolumn:name="REASON",type="string",JSONPath=".status.componentStatuses[?(@.type==ScaleReady)].reason",description="reason."
+// +kubebuilder:printcolumn:name="MESSAGE",type="string",JSONPath=".status.componentStatuses[?(@.type==ScaleReady)].message",description="message."
 // +kubebuilder:printcolumn:name="LAST-SCALE-TIME",type="date",JSONPath=".status.lastScaleTime"
 
 // NodeAwareScaler is the Schema for the nodeawarescalers API

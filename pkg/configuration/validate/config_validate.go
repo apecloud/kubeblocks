@@ -126,6 +126,10 @@ func WithKeySelector(keys []string) ValidatorOptions {
 }
 
 func NewConfigValidator(configConstraint *appsv1beta1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
+	if configConstraint == nil || configConstraint.FileFormatConfig == nil {
+		return &emptyValidator{}
+	}
+
 	var (
 		validator    ConfigValidator
 		configSchema = configConstraint.ConfigSchema

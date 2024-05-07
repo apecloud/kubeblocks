@@ -104,7 +104,6 @@ func (s *CheckRole) Init(ctx context.Context) error {
 			s.Command = roleProbeCmd
 		}
 	}
-
 	return nil
 }
 

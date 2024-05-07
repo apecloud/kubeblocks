@@ -6,6 +6,9 @@ sidebar_position: 2
 sidebar_label: Scale
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Scale for a MongoDB cluster
 
 For MongoDB, vertical scaling is supported.
@@ -63,7 +66,7 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
   
    </TabItem>
 
-    <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
    Change the configuration of `spec.components.resources` in the YAML file. `spec.components.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 

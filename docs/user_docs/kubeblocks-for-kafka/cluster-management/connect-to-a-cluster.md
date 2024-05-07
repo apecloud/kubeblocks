@@ -6,9 +6,6 @@ sidebar_position: 2
 sidebar_label: Connect
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 ## Overview
 
 Before you connect to the Kafka cluster, you must check your network environment, and from which network you would like to connect to the cluster.
@@ -92,16 +89,6 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 
 1. Set the value of `host-network-accessible` as true.
 
-    <Tabs>
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster create kafka --host-network-accessible=true
-    ```
-
-    </TabItem>
-    <TabItem value="kubectl" label="kubectl" >
-
     ```bash
     kubectl apply -f - <<EOF
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -141,10 +128,6 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
     EOF
     ```
 
-    </TabItem>
-
-    </Tabs>
-
 2. Get the corresponding ELB address.
 
    ```bash
@@ -174,17 +157,6 @@ The current version only supports Kafka broker with a single replica (combined: 
 ***Steps:***
 
 1. Set the `--publicly-accessible` value as true when creating cluster.
-
-    <Tabs>
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster create kafka --publicly-accessible=true
-    ```
-
-    </TabItem>
-
-    <TabItem value="kubectl" label="kubectl" >
 
     ```bash
     kubectl apply -f - <<EOF
@@ -225,10 +197,6 @@ The current version only supports Kafka broker with a single replica (combined: 
     EOF
     ```
 
-    </TabItem>
-
-    </Tabs>
-
 2. Get the corresponding ELB address.
 
    ```bash
@@ -244,6 +212,7 @@ The current version only supports Kafka broker with a single replica (combined: 
   :::
 
 3. Configure hostname mapping.
+
    1. Login to the remote machine.
    2. Check ELB address IP address.
 

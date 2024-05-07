@@ -6,6 +6,9 @@ sidebar_position: 2
 sidebar_label: Scale
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Scale for a Pulsar cluster
 
 ## Vertical scaling
@@ -28,21 +31,11 @@ kbcli cluster list pulsar
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
+1. Change configuration. There are 2 ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
+   <Tabs>
 
-   Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ```bash
-   kbcli cluster vscale pulsar --cpu=3 --memory=10Gi --components=broker,bookies  
-   ```
-
-   - `--components` describes the component name ready for vertical scaling.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-
-   **Option 2.** Create an OpsRequest
+   <TabItem value="OpsRequest" label="OpsRequest" default>
   
    Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -73,16 +66,22 @@ kbcli cluster list pulsar
    EOF
    ```
   
-   **Option 3.** Edit Pulsar cluster with `kubectl`.
+   </TabItem>
+
+   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
    ```bash
-   kubectl edit cluster pulsar
+   kubectl edit cluster mycluster -n demo
    ```
+
+   </TabItem>
+
+   </Tabs>
 
 2. Check the cluster status to validate the vertical scaling.
 
     ```bash
-    kbcli cluster list pulsar
+    kubectl get cluster mycluster -n demo
     ```
 
    - STATUS=VerticalScaling: it means the vertical scaling is in progress.
@@ -99,7 +98,7 @@ kbcli cluster list pulsar
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe pulsar
+    kubectl describe cluster mycluster -n demo
     ```
 
 ## Horizontal scaling
@@ -113,20 +112,11 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply horizontal scaling.
+1. Change configuration. There are 2 ways to apply horizontal scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
+   <Tabs>
 
-   Configure the parameters `--components` and `--replicas`, and run the command.
-
-   ```bash
-   kbcli cluster hscale pulsar --replicas=5 --components=broker,bookies                  Running        Jan 29,2023 14:29 UTC+0800
-   ```
-
-   - `--components` describes the component name ready for horizontal scaling.
-   - `--replicas` describes the replicas with the specified components.
-
-   **Option 2.** Create an OpsRequest
+   <TabItem value="OpsRequest" label="OpsRequest" default>
 
    Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
@@ -147,11 +137,17 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
     EOF
     ```
 
-   **Option 3.** Edit cluster with `kubectl`.
+   </TabItem>
+
+   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
    ```bash
    kubectl edit cluster pulsar
    ```
+
+   </TabItem>
+
+   </Tabs>
   
 2. Validate the horizontal scaling operation.
 
@@ -167,7 +163,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 3. Check whether the corresponding resources change.
 
    ```bash
-   kbcli cluster describe mysql-cluster
+   kubectl describe cluster mycluster -n demo
    ```
 
 ### Handle the snapshot exception

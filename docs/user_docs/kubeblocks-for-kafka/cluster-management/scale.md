@@ -6,6 +6,9 @@ sidebar_position: 3
 sidebar_label: Scale
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Scale for a Kafka cluster
 
 You can scale a Kafka cluster in two ways, vertical scaling and horizontal scaling.
@@ -25,31 +28,16 @@ During the vertical scaling process, all pods restart in the order of learner ->
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list
->
-NAME    NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME                 
-ivy85   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
+kubectl get cluster mycluster -n demo  
 ```
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
+1. Change configuration. There are 2 ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
+   <Tabs>
 
-   Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ```bash
-    kbcli cluster vscale ivy85 --components="broker" --memory="4Gi" --cpu="2" 
-   ```
-
-   - `--components` value can be `broker` or `controller`.
-     - broker: all nodes in the combined mode, or all the broker node in the separated node.
-     - controller: all the corresponding nodes in the separated mode.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-
-   **Option 2.** Create an OpsRequest
+   <TabItem value="OpsRequest" label="OpsRequest" default>
   
    Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -73,7 +61,9 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
    EOF
    ```
   
-   **Option 3.** Change the YAML file of the cluster
+   </TabItem>
+
+   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
    Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
@@ -95,10 +85,10 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
        resources: # Change the values of resources.
          requests:
            memory: "2Gi"
-           cpu: "1000m"
+           cpu: "1"
          limits:
            memory: "4Gi"
-           cpu: "2000m"
+           cpu: "2"
        volumeClaimTemplates:
        - name: data
          spec:
@@ -109,32 +99,32 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
                storage: 1Gi
      terminationPolicy: Halt
    ```
+
+   </TabItem>
+
+   </Tabs>
   
-2. Check the cluster status to validate the vertical scaling.
+2. Validate the volume expansion.
 
-    ```bash
-    kbcli cluster list mysql-cluster
-    >
-    NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS                 CREATED-TIME
-    ivy85                 default          kafka                kafka-3.3.2            Delete                    VerticalScaling        Jan 29,2023 14:29 UTC+0800
-    ```
-
-   - STATUS=VerticalScaling: it means the vertical scaling is in progress.
-   - STATUS=Running: it means the vertical scaling operation has been applied.
-   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
-     > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
-
-    :::note
-
-    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-    :::
-
-3. Check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe ivy85
-    ```
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   >
+   ......
+   Component Specs:
+    Component Def Ref:  kafka
+    Enabled Logs:
+      running
+    Monitor:   false
+    Name:      kafka
+    Replicas:  2
+    Resources:
+      Limits:
+        Cpu:     2
+        Memory:  4Gi
+      Requests:
+        Cpu:     1
+        Memory:  2Gi
+   ```
 
 ## Horizontal scaling
 
@@ -147,33 +137,16 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 - When scaling in horizontally, you must know the topic partition storage. If the topic has only one replication, data loss may caused when you scale in broker.
 
   ```bash
-  kbcli cluster list
-  >
-  NAME    NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME                 
-  ivy85   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
+  kubectl get cluster mycluster -n demo  
   ```
 
 ### Steps
 
 1. Change configuration. There are 3 ways to apply horizontal scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
+   <Tabs>
 
-   Configure the parameters `--components` and `--replicas`, and run the command.
-
-   ```bash
-   kbcli cluster hscale mysql-cluster \
-   --components="broker" --replicas=3
-   ```
-
- 
-   - `--components` value can be `broker` or `controller`.
-     - broker: all nodes in the combined mode, or all the broker node in the separated node.
-     - controller: all the corresponding nodes in the separated mode.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-
-   **Option 2.** Create an OpsRequest
+   <TabItem value="OpsRequest" label="OpsRequest" default>
 
    Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
@@ -192,7 +165,9 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    EOF
    ```
 
-   **Option 3.** Change the YAML file of the cluster
+   </TabItem>
+
+   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
    Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
@@ -225,22 +200,11 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
     terminationPolicy: Halt
    ```
 
+   </TabItem>
+
+   </Tabs>
+
 2. Validate the horizontal scaling operation.
-
-   Check the cluster STATUS to identify the horizontal scaling status.
-
-   ```bash
-   kbcli cluster list ivy85
-   ```
-
-   - STATUS=HorizontalScaling: it means horizontal scaling is in progress.
-   - STATUS=Running: it means horizontal scaling has been applied.
-
-3. Check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe ivy85
-    ```
 
 ### Handle the snapshot exception
 

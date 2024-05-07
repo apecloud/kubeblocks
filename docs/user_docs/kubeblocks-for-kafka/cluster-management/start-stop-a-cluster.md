@@ -12,24 +12,118 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 ## Stop a cluster
 
-***Steps:***
+You can stop a cluster by OpsRequest or changing the YAML file of the cluster.
 
-1. Configure the name of your cluster and run the command below to stop this cluster.
+<Tabs>
 
-    ```bash
-    kbcli cluster stop kafka
-    ```
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-2. Check the status of the cluster to see whether it is stopped.
+Run the command below to stop a cluster.
 
-    ```bash
-    kbcli cluster list
-    ```
+```bash
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: mycluster
+  generateName: stop-
+spec:
+  # cluster ref
+  clusterName: mycluster
+  type: Stop
+EOF
+```
+
+</TabItem>
+
+<TabItem value="Cluster YAML File" label="Cluster YAML File">
+
+Configure replicas as 0 to delete pods.
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+    name: mycluster
+spec:
+  clusterDefinitionRef: kafka
+  clusterVersionRef: kafka-3.3.2
+  terminationPolicy: WipeOut
+  componentSpecs:
+  - name: kafka
+    componentDefRef: kafka
+    monitor: false  
+    replicas: 0
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        storageClassName: standard
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Start a cluster
   
-Configure the name of your cluster and run the command below to start this cluster.
+You can stop a cluster by OpsRequest or changing the YAML file of the cluster.
+
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+Run the command below to start a cluster.
 
 ```bash
-kbcli cluster start kafka
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: mycluster
+  generateName: start-
+spec:
+  # cluster ref
+  clusterName: mycluster
+  type: Start
+EOF 
 ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML File">
+
+Change replicas back to the original amount to start this cluster again.
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+    name: mycluster
+spec:
+  clusterDefinitionRef: kafka
+  clusterVersionRef: kafka-3.3.2
+  terminationPolicy: WipeOut
+  componentSpecs:
+  - name: kafka
+    componentDefRef: kafka
+    monitor: false  
+    replicas: 3
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        storageClassName: standard
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+```
+
+</TabItem>
+
+</Tabs>

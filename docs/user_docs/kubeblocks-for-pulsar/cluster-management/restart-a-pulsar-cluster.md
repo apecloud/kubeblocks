@@ -21,37 +21,19 @@ Restarting a Kafka cluster triggers a concurrent restart and the leader may chan
 
 1. Restart a cluster.
 
-  You can use `kbcli` or create an OpsRequest to restart a cluster.
-  
-   **Option 1.** (**Recommended**) Use kbcli
-
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
-
    ```bash
-   kbcli cluster restart NAME --components="pulsar" \
-   --ttlSecondsAfterSucceed=30
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-restart
+   spec:
+     clusterRef: pulsar
+     type: Restart 
+     restart:
+     - componentName: pulsar
+   EOF
    ```
-
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
-
-  **Option 2.** Create an OpsRequest
-
-  Run the command below to apply the restarting to a cluster.
-
-  ```bash
-  kubectl apply -f - <<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: ops-restart
-  spec:
-    clusterRef: pulsar
-    type: Restart 
-    restart:
-    - componentName: pulsar
-  EOF
-  ```
 
 2. Validate the restarting.
 
@@ -64,12 +46,11 @@ Restarting a Kafka cluster triggers a concurrent restart and the leader may chan
    ***Example***
 
    ```bash
-   kbcli cluster list kafka
+   kubectl get cluster mycluster -n demo
    >
-   NAME    CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS     AGE
-   pulsar      pulsar                                pulsar-2.11    Delete                               Running    19m
+   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
+   mycluster   pulsar               pulsar-2.11    Delete               Running    19m
    ```
 
    * STATUS=Restarting: it means the cluster restart is in progress.
    * STATUS=Running: it means the cluster has been restarted.
-

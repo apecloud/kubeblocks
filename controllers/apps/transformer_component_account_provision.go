@@ -74,9 +74,10 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	}
 
 	lifecycleActions := transCtx.CompDef.Spec.LifecycleActions
-	if lifecycleActions == nil || lifecycleActions.AccountProvision == nil {
+	if !component.IsGenerated(transCtx.Component) && (lifecycleActions == nil || lifecycleActions.AccountProvision == nil) {
 		return nil
 	}
+
 	// TODO: support custom handler for account
 	// TODO: build lorry client if accountProvision is built-in
 	lorryCli, err := t.buildLorryClient(transCtx)

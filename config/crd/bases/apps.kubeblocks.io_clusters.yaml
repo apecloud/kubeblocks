@@ -2786,6 +2786,15 @@ spec:
                       required:
                       - name
                       type: object
+                    monitor:
+                      description: "Deprecated since v0.9 Determines whether metrics
+                        exporter information is annotated on the Component's headless
+                        Service. \n If set to true, the following annotations will
+                        be patched into the Service: \n - \"monitor.kubeblocks.io/path\"
+                        - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
+                        \n These annotations allow the Prometheus installed by KubeBlocks
+                        to discover and scrape metrics from the exporter."
+                      type: boolean
                     monitorIntegration:
                       description: It supports prometheus/victoriametrics operator.
                       properties:
@@ -10975,6 +10984,15 @@ spec:
                           required:
                           - name
                           type: object
+                        monitor:
+                          description: "Deprecated since v0.9 Determines whether metrics
+                            exporter information is annotated on the Component's headless
+                            Service. \n If set to true, the following annotations
+                            will be patched into the Service: \n - \"monitor.kubeblocks.io/path\"
+                            - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
+                            \n These annotations allow the Prometheus installed by
+                            KubeBlocks to discover and scrape metrics from the exporter."
+                          type: boolean
                         monitorIntegration:
                           description: It supports prometheus/victoriametrics operator.
                           properties:

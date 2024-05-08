@@ -47,13 +47,13 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 		if err != nil {
 			return core.WrapError(err, "failed to generate env configmap[%s]", cmName)
 		}
-		injectEnvFrom(podSpec.Containers, configSpec.AsEnvFrom, envConfigMap.Name)
-		injectEnvFrom(podSpec.InitContainers, configSpec.AsEnvFrom, envConfigMap.Name)
+		injectEnvFrom(podSpec.Containers, configSpec.ContainersInjectedTo(), envConfigMap.Name)
+		injectEnvFrom(podSpec.InitContainers, configSpec.ContainersInjectedTo(), envConfigMap.Name)
 		return nil
 	}
 
 	for _, template := range component.ConfigTemplates {
-		if len(template.AsEnvFrom) == 0 || template.ConfigConstraintRef == "" {
+		if !template.InjectEnvEnabled() || template.ConfigConstraintRef == "" {
 			continue
 		}
 		cmName := core.GetComponentCfgName(cluster.Name, component.Name, template.Name)
@@ -64,7 +64,7 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 		if err != nil {
 			return err
 		}
-		envMap, err := fromConfigmapFiles(fromConfigSpec(template, cm), cm, cc.FormatterConfig)
+		envMap, err := fromConfigmapFiles(fromConfigSpec(template, cm), cm, cc.FileFormatConfig)
 		if err != nil {
 			return err
 		}
@@ -87,13 +87,13 @@ func getConfigConstraint(template appsv1alpha1.ComponentConfigSpec, cli client.C
 	if err := cli.Get(ctx, ccKey, cc); err != nil {
 		return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 	}
-	if cc.Spec.FormatterConfig == nil {
+	if cc.Spec.FileFormatConfig == nil {
 		return nil, core.MakeError("ConfigConstraint[%v] is not a formatter", cc.Name)
 	}
 	return &cc.Spec, nil
 }
 
-func fromConfigmapFiles(keys []string, cm *corev1.ConfigMap, formatter *appsv1beta1.FormatterConfig) (map[string]string, error) {
+func fromConfigmapFiles(keys []string, cm *corev1.ConfigMap, formatter *appsv1beta1.FileFormatConfig) (map[string]string, error) {
 	mergeMap := func(dst, src map[string]string) {
 		for key, val := range src {
 			dst[key] = val
@@ -121,7 +121,7 @@ func fetchConfigmap(localObjs []client.Object, cmName, namespace string, cli cli
 	if localObject != nil {
 		return localObject.(*corev1.ConfigMap), nil
 	}
-	if err := cli.Get(ctx, cmKey, cmObj); err != nil {
+	if err := cli.Get(ctx, cmKey, cmObj, inDataContext()); err != nil {
 		return nil, err
 	}
 	return cmObj, nil
@@ -133,7 +133,7 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 		Namespace: originKey.Namespace,
 	}
 	cm := &corev1.ConfigMap{}
-	err := cli.Get(ctx, cmKey, cm)
+	err := cli.Get(ctx, cmKey, cm, inDataContext())
 	if err == nil {
 		return cm, nil
 	}
@@ -147,7 +147,7 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 	if err := intctrlutil.SetOwnerReference(cluster, cm); err != nil {
 		return nil, err
 	}
-	return cm, cli.Create(ctx, cm)
+	return cm, cli.Create(ctx, cm, inDataContext())
 }
 
 func CheckEnvFrom(container *corev1.Container, cmName string) bool {
@@ -160,8 +160,8 @@ func CheckEnvFrom(container *corev1.Container, cmName string) bool {
 	return false
 }
 
-func injectEnvFrom(containers []corev1.Container, asEnvFrom []string, cmName string) {
-	sets := cfgutil.NewSet(asEnvFrom...)
+func injectEnvFrom(containers []corev1.Container, injectEnvTo []string, cmName string) {
+	sets := cfgutil.NewSet(injectEnvTo...)
 	for i := range containers {
 		container := &containers[i]
 		if sets.InArray(container.Name) && !CheckEnvFrom(container, cmName) {
@@ -176,7 +176,7 @@ func injectEnvFrom(containers []corev1.Container, asEnvFrom []string, cmName str
 	}
 }
 
-func fromFileContent(format *appsv1beta1.FormatterConfig, configContext string) (map[string]string, error) {
+func fromFileContent(format *appsv1beta1.FileFormatConfig, configContext string) (map[string]string, error) {
 	keyValue, err := validate.LoadConfigObjectFromContent(format.Format, configContext)
 	if err != nil {
 		return nil, err
@@ -197,10 +197,10 @@ func fromConfigSpec(configSpec appsv1alpha1.ComponentConfigSpec, cm *corev1.Conf
 }
 
 func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1beta1.ConfigConstraintSpec, cli client.Client, ctx context.Context) error {
-	if len(configSpec.AsEnvFrom) == 0 || cc == nil || cc.FormatterConfig == nil {
+	if !configSpec.InjectEnvEnabled() || cc == nil || cc.FileFormatConfig == nil {
 		return nil
 	}
-	envMap, err := fromConfigmapFiles(fromConfigSpec(configSpec, cmObj), cmObj, cc.FormatterConfig)
+	envMap, err := fromConfigmapFiles(fromConfigSpec(configSpec, cmObj), cmObj, cc.FileFormatConfig)
 	if err != nil {
 		return err
 	}
@@ -211,6 +211,7 @@ func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1
 	return updateEnvFromConfigmap(client.ObjectKeyFromObject(cmObj), envMap, cli, ctx)
 }
 
+// TODO(leon)
 func updateEnvFromConfigmap(origObj client.ObjectKey, envMap map[string]string, cli client.Client, ctx context.Context) error {
 	cmKey := client.ObjectKey{
 		Name:      core.GenerateEnvFromName(origObj.Name),

@@ -176,15 +176,27 @@ var _ = Describe("Restore", func() {
 
 			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
 			synthesizedComponent = &component.SynthesizedComponent{
-				WorkloadType:          appsv1alpha1.Consensus,
 				PodSpec:               clusterCompDefObj.PodSpec,
-				Probes:                clusterCompDefObj.Probes,
 				LogConfigs:            clusterCompDefObj.LogConfigs,
 				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
 				VolumeClaimTemplates:  cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
 				Name:                  mysqlCompName,
 				VolumeTypes:           []appsv1alpha1.VolumeTypeSpec{{Name: testapps.DataVolumeName, Type: appsv1alpha1.VolumeTypeData}},
 				Replicas:              1,
+				Roles: []appsv1alpha1.ReplicaRole{
+					{
+						Name:        "leader",
+						Serviceable: true,
+						Writable:    true,
+						Votable:     true,
+					},
+					{
+						Name:        "follower",
+						Serviceable: true,
+						Writable:    false,
+						Votable:     true,
+					},
+				},
 			}
 			By("create component object")
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+synthesizedComponent.Name, "").
@@ -232,7 +244,7 @@ var _ = Describe("Restore", func() {
 			})).Should(Succeed())
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
 			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
-			err := restoreMGR.DoRestore(synthesizedComponent, compObj)
+			err := restoreMGR.DoRestore(synthesizedComponent, compObj, false)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			By("mock restore of prepareData stage to Completed")
@@ -257,7 +269,7 @@ var _ = Describe("Restore", func() {
 
 			By("wait for postReady restore created and mock it to Completed")
 			restoreMGR.Cluster = cluster
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj)
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, false)
 
 			// check if restore CR of postReady stage is created.
 			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady)
@@ -270,25 +282,12 @@ var _ = Describe("Restore", func() {
 			})()).ShouldNot(HaveOccurred())
 
 			By("clean up annotations after cluster running")
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj)
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, false)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
 		})
 
-		It("unsupported restore to different namespace", func() {
-			const fakeNamespace = "fake-namespace"
-			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s", "namespace":"%s"}}`, mysqlCompName, backup.Name, fakeNamespace)
-			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1alpha1.Cluster) {
-				tmpCluster.Annotations = map[string]string{
-					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
-				}
-			})).Should(Succeed())
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
-			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
-			err := restoreMGR.DoRestore(synthesizedComponent, compObj)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRestoreFailed)).Should(BeTrue())
-		})
 	})
 })
 

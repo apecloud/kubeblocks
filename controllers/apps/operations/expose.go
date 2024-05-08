@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -63,7 +64,7 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 
 	for _, expose := range exposeMap {
 		clusterCompSpecName := ""
-		clusterCompDef := ""
+		compDef := ""
 		clusterCompDefRefName := ""
 		if len(expose.ComponentName) > 0 {
 			clusterCompSpec, ok := compMap[expose.ComponentName]
@@ -71,13 +72,13 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 				return fmt.Errorf("component spec not found: %s", expose.ComponentName)
 			}
 			clusterCompSpecName = clusterCompSpec.Name
-			clusterCompDef = clusterCompSpec.ComponentDef
+			compDef = clusterCompSpec.ComponentDef
 			clusterCompDefRefName = clusterCompSpec.ComponentDefRef
 		}
 
 		switch expose.Switch {
 		case appsv1alpha1.EnableExposeSwitch:
-			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, clusterCompSpecName, clusterCompDef, clusterCompDefRefName, expose.Services); err != nil {
+			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, clusterCompSpecName, compDef, clusterCompDefRefName, expose.Services); err != nil {
 				return err
 			}
 		case appsv1alpha1.DisableExposeSwitch:
@@ -225,10 +226,15 @@ func (e ExposeOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, 
 }
 
 func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error {
-	componentNameSet := opsResource.OpsRequest.GetComponentNameSet()
+	compOpsSet := map[string]sets.Empty{}
+	for _, v := range opsResource.OpsRequest.Spec.ExposeList {
+		if v.ComponentName != "" {
+			compOpsSet[v.ComponentName] = sets.Empty{}
+		}
+	}
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsResource.Cluster.Spec.ComponentSpecs {
-		if _, ok := componentNameSet[v.Name]; !ok {
+		if _, ok := compOpsSet[v.Name]; !ok {
 			continue
 		}
 		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
@@ -262,7 +268,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpecName string,
-	clusterCompDefName string,
+	compDefName string,
 	clusterCompDefRefName string,
 	exposeServices []appsv1alpha1.OpsService) error {
 	if cluster == nil || len(exposeServices) == 0 {
@@ -321,8 +327,8 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 	}
 
 	defaultServicePortsFunc := func() ([]corev1.ServicePort, error) {
-		if clusterCompDefName != "" {
-			compDef, err := component.GetCompDefinition(reqCtx, cli, cluster, clusterCompSpecName)
+		if len(compDefName) > 0 {
+			compDef, err := component.GetCompDefByName(reqCtx, cli, compDefName)
 			if err != nil {
 				return nil, err
 			}
@@ -343,8 +349,8 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 	}
 
 	defaultRoleSelectorFunc := func() (string, error) {
-		if clusterCompDefName != "" {
-			compDef, err := component.GetCompDefinition(reqCtx, cli, cluster, clusterCompSpecName)
+		if len(compDefName) > 0 {
+			compDef, err := component.GetCompDefByName(reqCtx, cli, compDefName)
 			if err != nil {
 				return "", err
 			}
@@ -409,8 +415,8 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		}
 
 		// set service selector
-		if exposeService.Selector != nil {
-			clusterService.Spec.Selector = exposeService.Selector
+		if exposeService.PodSelector != nil {
+			clusterService.Spec.Selector = exposeService.PodSelector
 		}
 
 		// set service ports

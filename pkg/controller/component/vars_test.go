@@ -620,6 +620,350 @@ var _ = Describe("vars", func() {
 			Expect(err).Should(Succeed())
 			checkEnvVarWithValue(envVars, "pod-service-endpoint", strings.Join([]string{svcName0, svcName1}, ","))
 			checkEnvVarWithValue(envVars, "pod-service-port", strings.Join([]string{fmt.Sprintf("%s:300001", svcName0), fmt.Sprintf("%s:300002", svcName1)}, ","))
+
+			By("load balancer")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "lb",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "lb",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								LoadBalancer: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			lbSvcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										IP: "127.0.0.1",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			checkEnvVarWithValue(envVars, "lb", "127.0.0.1")
+
+			By("load balancer - pod service")
+			lbSvcName0 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb-0")
+			lbSvcName1 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb-1")
+			lbSvcName2 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb-2")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName0,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										IP: "127.0.0.1", // IP
+									},
+								},
+							},
+						},
+					},
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName1,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										Hostname: "127.0.0.2", // hostname
+									},
+								},
+							},
+						},
+					},
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName2,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{ // more than one ingress points
+									{
+										IP: "127.0.0.4", // IP
+									},
+									{
+										Hostname: "127.0.0.3", // hostname
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			endpoints := []string{
+				fmt.Sprintf("%s:127.0.0.1", lbSvcName0),
+				fmt.Sprintf("%s:127.0.0.2", lbSvcName1),
+				fmt.Sprintf("%s:127.0.0.4", lbSvcName2),
+			}
+			checkEnvVarWithValue(envVars, "lb", strings.Join(endpoints, ","))
+
+			By("load balancer - pod service in provisioning")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName0,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										IP: "127.0.0.1", // IP
+									},
+								},
+							},
+						},
+					},
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      lbSvcName1,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{}, // has no load balancer status, may be in provisioning
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
+
+			By("adaptive - has load balancer pod service")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "advertised",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "advertised",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host:         &appsv1alpha1.VarRequired, // both host and loadBalancer
+								LoadBalancer: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			advertisedSvcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "advertised-0")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      advertisedSvcName,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										IP: "127.0.0.1", // IP
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			endpoints = []string{
+				fmt.Sprintf("%s:127.0.0.1", advertisedSvcName),
+			}
+			checkEnvVarWithValue(envVars, "advertised", strings.Join(endpoints, ","))
+
+			By("adaptive - has no load balancer service")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      advertisedSvcName,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeClusterIP,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+					},
+				},
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			checkEnvVarWithValue(envVars, "advertised", advertisedSvcName)
+
+			By("adaptive - has load balancer service in provisioning")
+			// change to non pod-service
+			advertisedSvcName = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "advertised")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      advertisedSvcName,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{}, // has no load balancer status, may be in provisioning
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      advertisedSvcName,
+							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{
+									{
+										IP: "127.0.0.1", // IP
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			checkEnvVarWithValue(envVars, "advertised", "127.0.0.1")
 		})
 
 		It("credential vars", func() {
@@ -877,6 +1221,121 @@ var _ = Describe("vars", func() {
 			checkEnvVarWithValue(envVars, "serviceref-password", "password")
 		})
 
+		It("component vars", func() {
+			By("non-exist component with optional")
+			vars := []appsv1alpha1.EnvVar{
+				{
+					Name: "non-exist-component-var",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "non-exist",
+								Optional: optional(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								Replicas: &appsv1alpha1.VarOptional,
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).ShouldNot(HaveKey("non-exist-component-var"))
+			checkEnvVarNotExist(envVars, "non-exist-component-var")
+
+			By("non-exist component with required")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "non-exist-component-var",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "non-exist",
+								Optional: required(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								Replicas: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+
+			By("ok")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "component-name",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Optional: required(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								ComponentName: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
+					Name: "component-replicas",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Optional: required(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								Replicas: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
+					Name: "component-instanceNames",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Optional: required(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								InstanceNames: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&appsv1alpha1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
+						},
+						Spec: appsv1alpha1.ComponentSpec{
+							CompDef:  synthesizedComp.CompDefName,
+							Replicas: 3,
+						},
+					},
+				},
+			}
+			mockInstanceList := []string{
+				constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 0),
+				constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 1),
+				constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 2),
+			}
+			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			checkEnvVarWithValue(envVars, "component-name", constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name))
+			checkEnvVarWithValue(envVars, "component-replicas", fmt.Sprintf("%d", 3))
+			checkEnvVarWithValue(envVars, "component-instanceNames", strings.Join(mockInstanceList, ","))
+		})
+
 		It("resolve component", func() {
 			By("component not found w/ optional")
 			vars := []appsv1alpha1.EnvVar{
@@ -972,6 +1431,7 @@ var _ = Describe("vars", func() {
 				compName3             = synthesizedComp.Name + "-other-not-exist"
 				svcName1              = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName1, "service")
 				svcName2              = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName2, "service")
+				svcName3              = constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName3, "service")
 				credentialSecretName1 = constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName1, "credential")
 				credentialSecretName2 = constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName2, "credential")
 
@@ -984,8 +1444,9 @@ var _ = Describe("vars", func() {
 				compCredentialVarName1 = compVarName(compName1, "credential-username")
 				compCredentialVarName2 = compVarName(compName2, "credential-username")
 
-				combinedSvcVarValue          = fmt.Sprintf("%s:%s,%s:%s", compName1, svcName1, compName2, svcName2)
-				combinedSvcVarValueWithComp3 = fmt.Sprintf("%s:%s,%s:%s,%s:", compName1, svcName1, compName2, svcName2, compName3)
+				combinedSvcVarValue                 = fmt.Sprintf("%s:%s,%s:%s", compName1, svcName1, compName2, svcName2)
+				combinedSvcVarValueWithComp3KeyOnly = fmt.Sprintf("%s:%s,%s:%s,%s:", compName1, svcName1, compName2, svcName2, compName3)
+				combinedSvcVarValueWithComp3        = fmt.Sprintf("%s:%s,%s:%s,%s:%s", compName1, svcName1, compName2, svcName2, compName3, svcName3)
 
 				newVarSuffix          = "suffix"
 				newCombinedSvcVarName = fmt.Sprintf("%s_%s", "service-host", newVarSuffix)
@@ -1254,7 +1715,7 @@ var _ = Describe("vars", func() {
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("combined strategy doesn't support vars with valueFrom values"))
 
-			By("individual - partial objects")
+			By("individual - optional partial objects")
 			synthesizedComp.Comp2CompDefs = map[string]string{
 				compName1: synthesizedComp.CompDefName,
 				compName2: synthesizedComp.CompDefName,
@@ -1268,7 +1729,7 @@ var _ = Describe("vars", func() {
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
 								CompDef:  synthesizedComp.CompDefName,
 								Name:     "service",
-								Optional: required(),
+								Optional: optional(), // optional
 								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
 									Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
 								},
@@ -1293,7 +1754,7 @@ var _ = Describe("vars", func() {
 			// the new var for comp3 will still be created, but its values will be empty.
 			checkEnvVarWithValue(envVars, compSvcVarName3, "")
 
-			By("combined - partial objects")
+			By("individual - required partial objects")
 			vars = []appsv1alpha1.EnvVar{
 				{
 					Name: "service-host",
@@ -1302,7 +1763,58 @@ var _ = Describe("vars", func() {
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
 								CompDef:  synthesizedComp.CompDefName,
 								Name:     "service",
-								Optional: required(),
+								Optional: required(), // required
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
+								},
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("not found when resolving vars"))
+			// create service for comp3
+			reader.objs = append(reader.objs, &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      svcName3,
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port: int32(3306),
+						},
+					},
+				},
+			})
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(BeNil())
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName1, svcName1))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName2, svcName2))
+			Expect(templateVars).Should(HaveKeyWithValue(compSvcVarName3, svcName3))
+			checkEnvVarWithValue(envVars, "service-host", "")
+			checkEnvVarWithValue(envVars, compSvcVarName1, svcName1)
+			checkEnvVarWithValue(envVars, compSvcVarName2, svcName2)
+			checkEnvVarWithValue(envVars, compSvcVarName3, svcName3)
+			// remove service for comp3
+			reader.objs = reader.objs[:len(reader.objs)-1]
+
+			By("combined - optional partial objects")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: optional(),
 								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
 									Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
 								},
@@ -1317,15 +1829,66 @@ var _ = Describe("vars", func() {
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			// the combined value will have comp3 in it, but its value will be empty: "comp1:val1,comp2:val2,comp3:"
-			Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValueWithComp3))
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValueWithComp3KeyOnly))
 			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName1))
 			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName2))
 			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName3))
 			// the combined value will have comp3 in it, but its value will be empty: "comp1:val1,comp2:val2,comp3:"
+			checkEnvVarWithValue(envVars, "service-host", combinedSvcVarValueWithComp3KeyOnly)
+			checkEnvVarNotExist(envVars, compSvcVarName1)
+			checkEnvVarNotExist(envVars, compSvcVarName2)
+			checkEnvVarNotExist(envVars, compSvcVarName3)
+
+			By("combined - required partial objects")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: required(), // required
+								MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
+									Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
+								},
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("not found when resolving vars"))
+			// create service for comp3
+			reader.objs = append(reader.objs, &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      svcName3,
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port: int32(3306),
+						},
+					},
+				},
+			})
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValueWithComp3))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName1))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName2))
+			Expect(templateVars).ShouldNot(HaveKey(compSvcVarName3))
 			checkEnvVarWithValue(envVars, "service-host", combinedSvcVarValueWithComp3)
 			checkEnvVarNotExist(envVars, compSvcVarName1)
 			checkEnvVarNotExist(envVars, compSvcVarName2)
 			checkEnvVarNotExist(envVars, compSvcVarName3)
+			// remove service for comp3
+			reader.objs = reader.objs[:len(reader.objs)-1]
 		})
 
 		It("vars reference and escaping", func() {

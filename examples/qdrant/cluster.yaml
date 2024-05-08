@@ -1,0 +1,57 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: qdrant-cluster
+  namespace: default
+spec:
+  # Specifies the name of the ClusterDefinition to use when creating a Cluster.
+  clusterDefinitionRef: qdrant
+  # Refers to the ClusterVersion name. Deprecated since v0.9, use ComponentVersion instead. This field is maintained for backward compatibility and its use is discouraged. Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+  clusterVersionRef: qdrant-1.8.1
+  # Specifies the behavior when a Cluster is deleted.
+  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
+  # - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations.
+  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
+  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
+  terminationPolicy: Delete
+  # Defines a set of node affinity scheduling rules for the Cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.
+  affinity:
+   # Specifies the anti-affinity level of Pods within a Component. It determines how pods should be spread across nodes to improve availability and performance.
+    podAntiAffinity: Preferred
+    # Represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints. 
+    topologyKeys:
+    - kubernetes.io/hostname
+    # Determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. 
+    # - SharedNode: Allow that multiple Pods may share the same node, which is the default behavior of K8s. 
+    # - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node. 
+    tenancy: SharedNode
+  # An array that specifies tolerations attached to the Cluster's Pods, allowing them to be scheduled onto nodes with matching taints.
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+  # Specifies a list of ClusterComponentSpec objects used to define the individual components that make up a Cluster. This field allows for detailed configuration of each component within the Cluster.
+  # Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster.
+  # ClusterComponentSpec defines the specifications for a Component in a Cluster.
+  componentSpecs:
+  - name: qdrant
+    componentDefRef: qdrant
+    monitorEnabled: false
+    serviceAccountName: kb-qdrant-cluster
+    replicas: 2
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi

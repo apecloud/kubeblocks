@@ -1,8 +1,8 @@
 name: CICD-PULL-REQUEST
 
 on:
-  pull_request_review:
-    types: [submitted]
+  pull_request:
+    types: [ labeled ]
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -12,7 +12,7 @@ env:
 jobs:
   trigger-mode:
     name: trigger mode
-    if: github.event.review.state == 'approved'
+    if: github.event.action == 'labeled' && github.event.label.name == 'approved'
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
@@ -64,6 +64,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: install lib
         run: |
+          sudo rm /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libbtrfs-dev \
@@ -208,7 +209,7 @@ jobs:
   pr-check:
     name: make test
     needs: [ trigger-mode, test-parallel, make-test, check-image, check-tools-image, check-datascript-image, check-dataprotection-image, check-helm ]
-    if: ${{ github.event.review.state == 'approved' && always() }}
+    if: ${{ github.event.action == 'labeled' && github.event.label.name == 'approved' && always() }}
     runs-on: ubuntu-latest
     steps:
       - name: test parallel check

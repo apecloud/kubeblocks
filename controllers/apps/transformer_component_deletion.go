@@ -33,12 +33,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -139,7 +139,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	if len(snapshot) > 0 {
 		// delete the sub-resources owned by the component before deleting the component
 		for _, object := range snapshot {
-			if rsm.IsOwnedByRsm(object) {
+			if isOwnedByInstanceSet(object) {
 				continue
 			}
 			graphCli.Delete(dag, object)
@@ -169,12 +169,15 @@ func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformCo
 
 func compOwnedKinds() []client.ObjectList {
 	return []client.ObjectList{
-		&workloads.ReplicatedStateMachineList{},
+		&workloads.InstanceSetList{},
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
 		&batchv1.JobList{},
+		&dpv1alpha1.RestoreList{},
+		&dpv1alpha1.BackupList{},
+		&appsv1alpha1.ConfigurationList{},
 	}
 }
 

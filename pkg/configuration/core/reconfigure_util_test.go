@@ -288,7 +288,7 @@ func TestSetParametersUpdateSource(t *testing.T) {
 func TestValidateConfigPatch(t *testing.T) {
 	type args struct {
 		patch     *ConfigPatchInfo
-		formatCfg *appsv1beta1.FormatterConfig
+		formatCfg *appsv1beta1.FileFormatConfig
 	}
 	tests := []struct {
 		name    string
@@ -298,7 +298,7 @@ func TestValidateConfigPatch(t *testing.T) {
 		name: "test",
 		args: args{
 			patch:     &ConfigPatchInfo{},
-			formatCfg: &appsv1beta1.FormatterConfig{Format: appsv1beta1.YAML},
+			formatCfg: &appsv1beta1.FileFormatConfig{Format: appsv1beta1.YAML},
 		},
 		wantErr: false,
 	}, {
@@ -310,7 +310,7 @@ func TestValidateConfigPatch(t *testing.T) {
 					"file1": []byte(`{"a":"b"}`),
 				},
 			},
-			formatCfg: &appsv1beta1.FormatterConfig{Format: appsv1beta1.YAML},
+			formatCfg: &appsv1beta1.FileFormatConfig{Format: appsv1beta1.YAML},
 		},
 		wantErr: false,
 	}, {
@@ -322,7 +322,7 @@ func TestValidateConfigPatch(t *testing.T) {
 					"file1": []byte(`{"a":null}`),
 				},
 			},
-			formatCfg: &appsv1beta1.FormatterConfig{Format: appsv1beta1.YAML},
+			formatCfg: &appsv1beta1.FileFormatConfig{Format: appsv1beta1.YAML},
 		},
 		wantErr: true,
 	}}

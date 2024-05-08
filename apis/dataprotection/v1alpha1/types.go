@@ -231,6 +231,17 @@ const (
 	VolumeClaimRestorePolicySerial   VolumeClaimRestorePolicy = "Serial"
 )
 
+type DataRestorePolicy string
+
+const (
+	OneToOneRestorePolicy  DataRestorePolicy = "OneToOne"
+	OneToManyRestorePolicy DataRestorePolicy = "OneToMany"
+)
+
+const (
+	DefaultEncryptionAlgorithm = "AES-256-CFB"
+)
+
 // EncryptionConfig defines the parameters for encrypting backup data.
 type EncryptionConfig struct {
 	// Specifies the encryption algorithm. Currently supported algorithms are:

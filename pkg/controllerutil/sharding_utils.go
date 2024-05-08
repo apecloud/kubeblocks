@@ -74,7 +74,7 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 // listNCheckShardingComponents lists sharding components and checks if the sharding components are correct. It returns undeleted and deleting sharding components.
 func listNCheckShardingComponents(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]appsv1alpha1.Component, []appsv1alpha1.Component, error) {
-	shardingComps, err := listShardingComponents(ctx, cli, cluster, shardingSpec)
+	shardingComps, err := ListShardingComponents(ctx, cli, cluster, shardingSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -96,7 +96,7 @@ func listNCheckShardingComponents(ctx context.Context, cli client.Reader,
 	return undeletedShardingComps, deletingShardingComps, nil
 }
 
-func listShardingComponents(ctx context.Context, cli client.Reader,
+func ListShardingComponents(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]appsv1alpha1.Component, error) {
 	compList := &appsv1alpha1.ComponentList{}
 	ml := client.MatchingLabels{

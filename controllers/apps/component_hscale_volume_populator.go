@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -43,7 +43,7 @@ type dataClone interface {
 	// Succeed check if data clone succeeded
 	Succeed() (bool, error)
 	// CloneData do clone data, return objects that need to be created
-	CloneData(dataClone) ([]client.Object, error)
+	CloneData(dataClone) ([]client.Object, []client.Object, error)
 	// ClearTmpResources clear all the temporary resources created during data clone, return objects that need to be deleted
 	ClearTmpResources() ([]client.Object, error)
 
@@ -68,9 +68,8 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
-	stsObj *appsv1.StatefulSet,
-	stsProto *appsv1.StatefulSet,
-	key types.NamespacedName) (dataClone, error) {
+	itsObj, itsProto *workloads.InstanceSet,
+	backupKey types.NamespacedName) (dataClone, error) {
 	if component == nil {
 		return nil, nil
 	}
@@ -81,9 +80,9 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 				cli:       cli,
 				cluster:   cluster,
 				component: component,
-				stsObj:    stsObj,
-				stsProto:  stsProto,
-				key:       key,
+				itsObj:    itsObj,
+				itsProto:  itsProto,
+				backupKey: backupKey,
 			},
 		}, nil
 	}
@@ -94,9 +93,9 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 				cli:       cli,
 				cluster:   cluster,
 				component: component,
-				stsObj:    stsObj,
-				stsProto:  stsProto,
-				key:       key,
+				itsObj:    itsObj,
+				itsProto:  itsProto,
+				backupKey: backupKey,
 			},
 		}, nil
 	}
@@ -109,31 +108,31 @@ type baseDataClone struct {
 	cli       client.Client
 	cluster   *appsv1alpha1.Cluster
 	component *component.SynthesizedComponent
-	stsObj    *appsv1.StatefulSet
-	stsProto  *appsv1.StatefulSet
-	key       types.NamespacedName
+	itsObj    *workloads.InstanceSet
+	itsProto  *workloads.InstanceSet
+	backupKey types.NamespacedName
 }
 
-func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, error) {
+func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, []client.Object, error) {
 	objs := make([]client.Object, 0)
 
 	// check backup ready
 	status, err := realDataClone.CheckBackupStatus()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	switch status {
 	case backupStatusNotCreated:
 		// create backup
 		backupObjs, err := realDataClone.backup()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		objs = append(objs, backupObjs...)
-		return objs, nil
+		return objs, nil, nil
 	case backupStatusProcessing, backupStatusFailed:
 		// requeue to waiting for backup ready
-		return objs, nil
+		return objs, nil, nil
 	case backupStatusReadyToUse:
 		break
 	default:
@@ -141,16 +140,16 @@ func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, err
 			status, d.cluster.Name, d.component.Name))
 	}
 	// backup's ready, then start to check restore
-	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
 		restoreStatus, err := realDataClone.CheckRestoreStatus(i)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		switch restoreStatus {
 		case "":
 			restoreObjs, err := realDataClone.restore(i)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			objs = append(objs, restoreObjs...)
 		case dpv1alpha1.RestorePhaseCompleted:
@@ -160,27 +159,25 @@ func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, err
 	// create PVCs that do not need to restore
 	pvcObjs, err := d.createPVCs(d.excludeBackupVCTs())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	objs = append(objs, pvcObjs...)
-
-	return objs, nil
+	return objs, pvcObjs, nil
 }
 
 func (d *baseDataClone) isPVCExists(pvcKey types.NamespacedName) (bool, error) {
 	pvc := corev1.PersistentVolumeClaim{}
-	if err := d.cli.Get(d.reqCtx.Ctx, pvcKey, &pvc); err != nil {
+	if err := d.cli.Get(d.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 	return true, nil
 }
 
 func (d *baseDataClone) checkAllPVCsExist() (bool, error) {
-	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
 		for _, vct := range d.component.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
-				Namespace: d.stsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.stsObj.Name, i),
+				Namespace: d.itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.itsObj.Name, i),
 			}
 			// check pvc existence
 			pvcExists, err := d.isPVCExists(pvcKey)
@@ -221,11 +218,11 @@ func (d *baseDataClone) excludeBackupVCTs() []*corev1.PersistentVolumeClaimTempl
 
 func (d *baseDataClone) createPVCs(vcts []*corev1.PersistentVolumeClaimTemplate) ([]client.Object, error) {
 	objs := make([]client.Object, 0)
-	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
 		for _, vct := range vcts {
 			pvcKey := types.NamespacedName{
-				Namespace: d.stsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.stsObj.Name, i),
+				Namespace: d.itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.itsObj.Name, i),
 			}
 			if exist, err := d.isPVCExists(pvcKey); err != nil {
 				return nil, err
@@ -257,8 +254,9 @@ func (d *dummyDataClone) Succeed() (bool, error) {
 	return d.checkAllPVCsExist()
 }
 
-func (d *dummyDataClone) CloneData(dataClone) ([]client.Object, error) {
-	return d.createPVCs(d.allVCTs())
+func (d *dummyDataClone) CloneData(dataClone) ([]client.Object, []client.Object, error) {
+	pvcObjs, err := d.createPVCs(d.allVCTs())
+	return nil, pvcObjs, err
 }
 
 func (d *dummyDataClone) ClearTmpResources() ([]client.Object, error) {
@@ -299,7 +297,7 @@ func (d *backupDataClone) Succeed() (bool, error) {
 	if err != nil || !allPVCsExist {
 		return allPVCsExist, err
 	}
-	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
 		restoreStatus, err := d.CheckRestoreStatus(i)
 		if err != nil {
 			return false, err
@@ -333,16 +331,22 @@ func (d *backupDataClone) ClearTmpResources() ([]client.Object, error) {
 }
 
 func (d *backupDataClone) backup() ([]client.Object, error) {
-	objs := make([]client.Object, 0)
+	componentDef := func() string {
+		name := d.component.CompDefName
+		if name == "" {
+			name = d.component.ClusterCompDefName
+		}
+		return name
+	}()
 	backupPolicyTplName := d.component.HorizontalScalePolicy.BackupPolicyTemplateName
-	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, d.component.ClusterCompDefName, backupPolicyTplName)
+	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, componentDef, backupPolicyTplName)
 	if err != nil {
 		return nil, err
 	}
 	if backupPolicy == nil {
 		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
 	}
-	volumeSnapshotEnabled, err := isVolumeSnapshotEnabled(d.reqCtx.Ctx, d.cli, d.stsObj, backupVCT(d.component))
+	volumeSnapshotEnabled, err := isVolumeSnapshotEnabled(d.reqCtx.Ctx, d.cli, d.itsObj, backupVCT(d.component))
 	if err != nil {
 		return nil, err
 	}
@@ -352,14 +356,13 @@ func (d *backupDataClone) backup() ([]client.Object, error) {
 	} else if len(backupMethods) > 1 {
 		return nil, fmt.Errorf("more than one backup methods found in backup policy %s", backupPolicy.Name)
 	}
-	backup := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, backupMethods[0])
-	objs = append(objs, backup)
-	return objs, nil
+	backup := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.backupKey, backupMethods[0])
+	return []client.Object{backup}, nil
 }
 
 func (d *backupDataClone) CheckBackupStatus() (backupStatus, error) {
 	backup := dpv1alpha1.Backup{}
-	if err := d.cli.Get(d.reqCtx.Ctx, d.key, &backup); err != nil {
+	if err := d.cli.Get(d.reqCtx.Ctx, d.backupKey, &backup); err != nil {
 		if errors.IsNotFound(err) {
 			return backupStatusNotCreated, nil
 		} else {
@@ -379,7 +382,7 @@ func (d *backupDataClone) CheckBackupStatus() (backupStatus, error) {
 
 func (d *backupDataClone) restore(startingIndex int32) ([]client.Object, error) {
 	backup := &dpv1alpha1.Backup{}
-	if err := d.cli.Get(d.reqCtx.Ctx, d.key, backup); err != nil {
+	if err := d.cli.Get(d.reqCtx.Ctx, d.backupKey, backup); err != nil {
 		return nil, err
 	}
 	restoreMGR := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil, d.getBRLabels(), int32(1), startingIndex)
@@ -442,16 +445,16 @@ func backupVCT(component *component.SynthesizedComponent) *corev1.PersistentVolu
 }
 
 func isVolumeSnapshotEnabled(ctx context.Context, cli client.Client,
-	sts *appsv1.StatefulSet, vct *corev1.PersistentVolumeClaimTemplate) (bool, error) {
-	if sts == nil || vct == nil {
+	its *workloads.InstanceSet, vct *corev1.PersistentVolumeClaimTemplate) (bool, error) {
+	if its == nil || vct == nil {
 		return false, nil
 	}
 	pvcKey := types.NamespacedName{
-		Namespace: sts.Namespace,
-		Name:      fmt.Sprintf("%s-%s-%d", vct.Name, sts.Name, 0),
+		Namespace: its.Namespace,
+		Name:      fmt.Sprintf("%s-%s-%d", vct.Name, its.Name, 0),
 	}
 	pvc := corev1.PersistentVolumeClaim{}
-	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
+	if err := cli.Get(ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 

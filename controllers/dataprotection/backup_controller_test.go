@@ -36,7 +36,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
@@ -62,25 +61,24 @@ var _ = Describe("Backup Controller test", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
-		// namespaced
 		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 
-		// wait all backup to be deleted, otherwise the controller maybe create
+		// wait all backups to be deleted, otherwise the controller maybe create
 		// job to delete the backup between the ClearResources function delete
 		// the job and get the job list, resulting the ClearResources panic.
 		Eventually(testapps.List(&testCtx, generics.BackupSignature, inNS)).Should(HaveLen(0))
+
 		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 
-		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotClassSignature, ml)
 	}
@@ -146,7 +144,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("check backup status")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
-					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
+					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBaseBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
@@ -260,7 +258,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 
-			It("create an backup with backupMethod's", func() {
+			It("create an backup with backupMethod and target", func() {
 				By("Set backupMethod's target")
 				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 					backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
@@ -276,16 +274,14 @@ var _ = Describe("Backup Controller test", func() {
 					}
 				})).Should(Succeed())
 				By("check targets pod")
-				reqCtx := intctrlutil.RequestCtx{
-					Ctx: ctx,
-				}
-				targets, err := GetTargetPods(reqCtx, k8sClient, "", &backupPolicy.Spec.BackupMethods[0], backupPolicy)
+				reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+				targets, err := GetTargetPods(reqCtx, k8sClient, nil, backupPolicy, backupPolicy.Spec.BackupMethods[0].Target, dpv1alpha1.BackupTypeFull)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(targets).Should(HaveLen(1))
 				Expect(targets[0].Name).Should(Equal(testdp.ClusterName + "-" + testdp.ComponentName + "-1"))
 			})
 
-			It("create an backup with backupMethod's and podSelection strategy is All", func() {
+			It("create an backup with backupMethod and podSelection strategy is All", func() {
 				By("Set backupMethod's target and podSelection strategy to All")
 				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 					backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
@@ -301,13 +297,10 @@ var _ = Describe("Backup Controller test", func() {
 					}
 				})).Should(Succeed())
 				By("check targets pod")
-				reqCtx := intctrlutil.RequestCtx{
-					Ctx: ctx,
-				}
-				targets, err := GetTargetPods(reqCtx, k8sClient, "", &backupPolicy.Spec.BackupMethods[0], backupPolicy)
+				reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+				targets, err := GetTargetPods(reqCtx, k8sClient, nil, backupPolicy, backupPolicy.Spec.BackupMethods[0].Target, dpv1alpha1.BackupTypeFull)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(targets).Should(HaveLen(2))
-
 				By("create a backup")
 				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 					backup.Spec.RetentionPeriod = "1h"
@@ -318,7 +311,6 @@ var _ = Describe("Backup Controller test", func() {
 						Namespace: backup.Namespace,
 					}
 				}
-
 				By("mock jobs are completed and backup should be completed")
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(0), batchv1.JobComplete)
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(1), batchv1.JobComplete)
@@ -328,6 +320,45 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Expiration.Second()).Should(Equal(fetched.Status.CompletionTimestamp.Add(time.Hour).Second()))
 				})).Should(Succeed())
 			})
+		})
+
+		It("create an backup with backupMethod and multi targets", func() {
+			By("Set backupMethod's targets")
+			Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
+				podSelector := &dpv1alpha1.PodSelector{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							constant.AppInstanceLabelKey:    testdp.ClusterName,
+							constant.KBAppComponentLabelKey: testdp.ComponentName,
+						},
+					},
+					Strategy: dpv1alpha1.PodSelectionStrategyAny,
+				}
+				backupPolicy.Spec.BackupMethods[0].Targets = []dpv1alpha1.BackupTarget{
+					{Name: testdp.ComponentName + "-0", PodSelector: podSelector},
+					{Name: testdp.ComponentName + "-1", PodSelector: podSelector},
+				}
+			})).Should(Succeed())
+			By("check targets pod")
+			targets := backupPolicy.Spec.BackupMethods[0].Targets
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			targetPods, err := GetTargetPods(reqCtx, k8sClient, nil, backupPolicy, &targets[0], dpv1alpha1.BackupTypeFull)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(targetPods).Should(HaveLen(1))
+			By("create a backup")
+			backup := testdp.NewFakeBackup(&testCtx, nil)
+			getJobKey := func(targetName string) client.ObjectKey {
+				return client.ObjectKey{
+					Name:      dpbackup.GenerateBackupJobName(backup, fmt.Sprintf("%s-%s-0", dpbackup.BackupDataJobNamePrefix, targetName)),
+					Namespace: backup.Namespace,
+				}
+			}
+			By("mock backup jobs to completed and backup should be completed")
+			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[0].Name), batchv1.JobComplete)
+			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[1].Name), batchv1.JobComplete)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+				g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+			})).Should(Succeed())
 		})
 
 		Context("creates a backup with encryption", func() {
@@ -506,7 +537,7 @@ var _ = Describe("Backup Controller test", func() {
 				})
 				backupKey = client.ObjectKeyFromObject(backup)
 				vsKey = client.ObjectKey{
-					Name:      dputils.GetBackupVolumeSnapshotName(backup.Name, "data"),
+					Name:      dputils.GetBackupVolumeSnapshotName(backup.Name, "data", 0),
 					Namespace: backup.Namespace,
 				}
 			})
@@ -668,12 +699,34 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 		})
+
+		Context("create continuous backup", func() {
+			It("should fail when continuous backup don't have backupschedule label", func() {
+				By("create actionset with continuous backuptype")
+				actionSet := testdp.NewFakeActionSet(&testCtx)
+				actionSetKey := client.ObjectKeyFromObject(actionSet)
+				Eventually(testapps.GetAndChangeObj(&testCtx, actionSetKey, func(fetched *dpv1alpha1.ActionSet) {
+					fetched.Spec.BackupType = dpv1alpha1.BackupTypeContinuous
+				}))
+				By("create continuous backup without backupschedule label")
+				backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, nil)
+				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup) {
+					bp.ObjectMeta.Name = "continuousbackup"
+					bp.Labels = map[string]string{}
+				})
+				backupKey := client.ObjectKeyFromObject(backup)
+				By("check backup phase")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+		})
 	})
 
 	When("with backup repo", func() {
 		var (
 			repoPVCName string
-			sp          *storagev1alpha1.StorageProvider
+			sp          *dpv1alpha1.StorageProvider
 			repo        *dpv1alpha1.BackupRepo
 		)
 
@@ -758,7 +811,7 @@ var _ = Describe("Backup Controller test", func() {
 				var repoPVCName2 string
 				BeforeEach(func() {
 					By("creating a second backup repo")
-					sp2 := testdp.NewFakeStorageProvider(&testCtx, func(sp *storagev1alpha1.StorageProvider) {
+					sp2 := testdp.NewFakeStorageProvider(&testCtx, func(sp *dpv1alpha1.StorageProvider) {
 						sp.Name += "2"
 					})
 					_, repoPVCName2 = testdp.NewFakeBackupRepo(&testCtx, func(repo *dpv1alpha1.BackupRepo) {
@@ -785,8 +838,8 @@ var _ = Describe("Backup Controller test", func() {
 				It("should only repos in ready status can be selected as the default backup repo", func() {
 					By("making repo to failed status")
 					Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(sp),
-						func(fetched *storagev1alpha1.StorageProvider) {
-							fetched.Status.Phase = storagev1alpha1.StorageProviderNotReady
+						func(fetched *dpv1alpha1.StorageProvider) {
+							fetched.Status.Phase = dpv1alpha1.StorageProviderNotReady
 							fetched.Status.Conditions = nil
 						})).ShouldNot(HaveOccurred())
 					Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(repo),
@@ -889,7 +942,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("check backup status again")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
-					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
+					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBaseBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.KopiaRepoPath).Should(Equal(dpbackup.BuildKopiaRepoPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())

@@ -23,6 +23,7 @@ import (
 	"context"
 	"reflect"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -182,4 +183,19 @@ func DeleteOwnedResources[T generics.Object, PT generics.PObject[T], L generics.
 		}
 	}
 	return nil
+}
+
+func MergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
+	if len(*src) == 0 {
+		return
+	}
+	for i := range *src {
+		item := (*src)[i]
+		index := slices.IndexFunc(*dst, f(item))
+		if index >= 0 {
+			(*dst)[index] = item
+		} else {
+			*dst = append(*dst, item)
+		}
+	}
 }

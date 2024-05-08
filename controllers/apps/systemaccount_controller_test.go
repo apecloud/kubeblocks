@@ -176,18 +176,13 @@ var _ = Describe("SystemAccount Controller", func() {
 		_ = assureEndpoint(objectKey.Namespace, headlessServiceName, ips[0:clusterEndPointsSize])
 
 		By("Mock the underlying workloads to ready")
-		rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, objectKey, compName)
-		rsm := &rsmList.Items[0]
+		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, objectKey, compName)
+		its := &itsList.Items[0]
 		podName := fmt.Sprintf("%s-%s-0", objectKey.Name, compName)
-		pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, objectKey.Name, compName,
+		pod := testapps.MockInstanceSetPod(&testCtx, nil, objectKey.Name, compName,
 			podName, "leader", "ReadWrite")
-		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, objectKey.Name, compName).
-			SetReplicas(*rsm.Spec.Replicas).Create(&testCtx).GetObject()
-		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-			testk8s.MockStatefulSetReady(sts)
-		})).ShouldNot(HaveOccurred())
-		Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-			testk8s.MockRSMReady(rsm, pod)
+		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+			testk8s.MockInstanceSetReady(its, pod)
 		})).ShouldNot(HaveOccurred())
 
 		By("Wait cluster phase to be Running")
@@ -645,13 +640,13 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
 				}).Should(Succeed())
 
-				By("Enable monitor, no more jobs or secrets should be created")
-				// patch cluster, flip comp.Monitor
-				Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-					for _, comp := range cluster.Spec.ComponentSpecs {
-						comp.Monitor = !comp.Monitor
-					}
-				})).Should(Succeed())
+				// By("Enable monitor, no more jobs or secrets should be created")
+				// // patch cluster, flip comp.Monitor
+				// Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+				// 	for _, comp := range cluster.Spec.ComponentSpecs {
+				// 		comp.Monitor = !comp.Monitor
+				// 	}
+				// })).Should(Succeed())
 
 				jobs := &batchv1.JobList{}
 				Eventually(func(g Gomega) {

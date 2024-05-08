@@ -49,7 +49,8 @@ const (
 	rebuildFromAnnotation  = "apps.kubeblocks.io/rebuild-from"
 	rebuildTmpPVCNameLabel = "apps.kubeblocks.io/rebuild-tmp-pvc"
 
-	waitingForInstanceReadyMessage = "Waiting for the rebuilding instance to be ready"
+	waitingForInstanceReadyMessage   = "Waiting for the rebuilding instance to be ready"
+	waitingForPostReadyRestorePrefix = "Waiting for postReady Restore"
 )
 
 type rebuildInstanceOpsHandler struct{}
@@ -112,10 +113,7 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 				return err
 			}
-			isAvailable, err := r.instanceIsAvailable(synthesizedComp, targetPod)
-			if err != nil {
-				return err
-			}
+			isAvailable, _ := r.instanceIsAvailable(synthesizedComp, targetPod)
 			if isAvailable {
 				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is availabled, can not rebuild it`, ins.Name))
 			}
@@ -168,7 +166,7 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 				continue
 			}
 			// rebuild instance
-			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.EnvForRestore, &progressDetail, instance, v.BackupName, i)
+			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.RestoreEnv, &progressDetail, instance, v.BackupName, i)
 			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				// If a fatal error occurs, this instance rebuilds failed.
 				progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, err.Error())
@@ -340,7 +338,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 			return false, intctrlutil.NewFatalError(fmt.Sprintf(`pod "%s" rebuild failed, due to the Restore "%s" is Failed`, insHelper.targetPod.Name, restoreName))
 		}
 		if restore.Status.Phase != dpv1alpha1.RestorePhaseCompleted {
-			progressDetail.Message = fmt.Sprintf(`Waiting for Restore "%s" to be completed`, restoreName)
+			progressDetail.Message = fmt.Sprintf(`Waiting for %s Restore "%s" to be completed`, stage, restoreName)
 			return false, nil
 		}
 		return true, nil
@@ -360,7 +358,8 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 	if err != nil || !completed {
 		return false, err
 	}
-	if progressDetail.Message != waitingForInstanceReadyMessage {
+	if progressDetail.Message != waitingForInstanceReadyMessage &&
+		!strings.HasPrefix(progressDetail.Message, waitingForPostReadyRestorePrefix) {
 		// 2. rebuild source pvcs and recreate the instance by deleting it.
 		return false, r.rebuildSourcePVCsAndRecreateInstance(reqCtx, cli, opsRes.OpsRequest, progressDetail, insHelper)
 	}
@@ -529,13 +528,13 @@ func (r rebuildInstanceOpsHandler) createPostReadyRestore(reqCtx intctrlutil.Req
 	insHelper *instanceHelper,
 	restoreName string) error {
 	labels := r.getWellKnownLabels(insHelper.synthesizedComp)
-	// TODO: compatible rsm labels.
-	if insHelper.targetPod.Labels[constant.StatefulSetPodNameLabelKey] == insHelper.targetPod.Name {
-		labels[constant.StatefulSetPodNameLabelKey] = insHelper.targetPod.Name
+	if insHelper.targetPod.Labels[constant.KBAppPodNameLabelKey] == insHelper.targetPod.Name {
+		labels[constant.KBAppPodNameLabelKey] = insHelper.targetPod.Name
 	}
 	podSelector := metav1.LabelSelector{
 		MatchLabels: labels,
 	}
+	// TODO: support to rebuild instance from backup when the PodSelectionStrategy of source target is All .
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.buildRestoreMetaObject(opsRequest, restoreName),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -549,7 +548,10 @@ func (r rebuildInstanceOpsHandler) createPostReadyRestore(reqCtx intctrlutil.Req
 					Target: dpv1alpha1.ExecActionTarget{PodSelector: podSelector},
 				},
 				JobAction: &dpv1alpha1.JobAction{
-					Target: dpv1alpha1.JobActionTarget{PodSelector: podSelector},
+					Target: dpv1alpha1.JobActionTarget{PodSelector: dpv1alpha1.PodSelector{
+						LabelSelector: &podSelector,
+						Strategy:      dpv1alpha1.PodSelectionStrategyAny,
+					}},
 				},
 			},
 		},
@@ -775,7 +777,7 @@ func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 		return false, nil
 	}
 	// If roleProbe is not defined, return true.
-	if synthesizedComp.Roles == nil && !slices.Contains([]appsv1alpha1.WorkloadType{appsv1alpha1.Consensus, appsv1alpha1.Replication}, synthesizedComp.WorkloadType) {
+	if len(synthesizedComp.Roles) == 0 {
 		return true, nil
 	}
 	// check if the role detection is successfully.

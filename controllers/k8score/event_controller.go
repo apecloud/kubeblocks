@@ -28,8 +28,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -58,7 +60,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	reqCtx.Log.V(1).Info("event watcher")
 
 	event := &corev1.Event{}
-	if err := r.Client.Get(ctx, req.NamespacedName, event); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, event, multicluster.InDataContextUnspecified()); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
 	}
 
@@ -73,8 +75,13 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&corev1.Event{}).
-		Complete(r)
+func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+		For(&corev1.Event{})
+
+	if multiClusterMgr != nil {
+		multiClusterMgr.Watch(b, &corev1.Event{}, &handler.EnqueueRequestForObject{})
+	}
+
+	return b.Complete(r)
 }

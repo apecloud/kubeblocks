@@ -111,8 +111,8 @@ type reconfigureParams struct {
 	// TODO(xingran): remove this field when test case is refactored.
 	Component *appsv1alpha1.ClusterComponentDefinition
 
-	// List of ReplicatedStateMachine using this config template.
-	RSMUnits []workloads.ReplicatedStateMachine
+	// List of InstanceSet using this config template.
+	InstanceSetUnits []workloads.InstanceSet
 }
 
 var (
@@ -164,9 +164,9 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	}
 
 	var maxUnavailable *intstr.IntOrString
-	for _, rsm := range param.RSMUnits {
-		if rsm.Spec.UpdateStrategy.RollingUpdate != nil {
-			maxUnavailable = rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
+	for _, its := range param.InstanceSetUnits {
+		if its.Spec.UpdateStrategy.RollingUpdate != nil {
+			maxUnavailable = its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
 		}
 		if maxUnavailable != nil {
 			break
@@ -230,9 +230,9 @@ func NewReconfigurePolicy(cc *appsv1beta1.ConfigConstraintSpec, cfgPatch *core.C
 		// make decision
 		switch {
 		case !dynamicUpdate: // static parameters update
-		case configmanager.IsAutoReload(cc.DynamicReloadAction): // if core support hot update, don't need to do anything
+		case configmanager.IsAutoReload(cc.ReloadAction): // if core support hot update, don't need to do anything
 			policy = appsv1alpha1.AsyncDynamicReloadPolicy
-		case enableSyncTrigger(cc.DynamicReloadAction): // sync config-manager exec hot update
+		case enableSyncTrigger(cc.ReloadAction): // sync config-manager exec hot update
 			policy = appsv1alpha1.SyncDynamicReloadPolicy
 		default: // config-manager auto trigger to hot update
 			policy = appsv1alpha1.AsyncDynamicReloadPolicy
@@ -242,7 +242,7 @@ func NewReconfigurePolicy(cc *appsv1beta1.ConfigConstraintSpec, cfgPatch *core.C
 	// if not specify policy, or cannot decision policy, use default policy.
 	if policy == appsv1alpha1.NonePolicy {
 		policy = appsv1alpha1.NormalPolicy
-		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.DynamicReloadAction) {
+		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.ReloadAction) {
 			policy = appsv1alpha1.DynamicReloadAndRestartPolicy
 		}
 	}
@@ -257,7 +257,7 @@ func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
 	return !restart && policy == appsv1alpha1.NonePolicy
 }
 
-func enableSyncTrigger(options *appsv1beta1.DynamicReloadAction) bool {
+func enableSyncTrigger(options *appsv1beta1.ReloadAction) bool {
 	if options == nil {
 		return false
 	}
@@ -298,7 +298,7 @@ func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) 
 
 func fromWorkloadObjects(params reconfigureParams) []client.Object {
 	r := make([]client.Object, 0)
-	for _, unit := range params.RSMUnits {
+	for _, unit := range params.InstanceSetUnits {
 		r = append(r, &unit)
 	}
 	return r

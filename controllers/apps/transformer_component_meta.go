@@ -24,7 +24,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -38,9 +37,14 @@ func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *gr
 	transCtx, _ := ctx.(*componentTransformContext)
 	comp := transCtx.Component
 
+	if comp.Labels == nil {
+		comp.Labels = map[string]string{}
+	}
+	compDef := comp.Labels[constant.ComponentDefinitionLabelKey]
+	if compDef != comp.Spec.CompDef {
+		comp.Labels[constant.ComponentDefinitionLabelKey] = comp.Spec.CompDef
+	}
 	controllerutil.AddFinalizer(comp, constant.DBComponentFinalizerName)
-
-	t.setMetaLabels(comp)
 
 	if reflect.DeepEqual(transCtx.ComponentOrig.Finalizers, comp.Finalizers) &&
 		reflect.DeepEqual(transCtx.ComponentOrig.Labels, comp.Labels) {
@@ -51,12 +55,4 @@ func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *gr
 	graphCli.Update(dag, transCtx.ComponentOrig, comp)
 
 	return graph.ErrPrematureStop
-}
-
-func (t *componentMetaTransformer) setMetaLabels(comp *appsv1alpha1.Component) {
-	if comp.Labels == nil {
-		comp.Labels = map[string]string{}
-	}
-	comp.Labels[constant.ComponentDefinitionLabelKey] = comp.Spec.CompDef
-	comp.Labels[constant.KBAppServiceVersionLabelKey] = comp.Spec.ServiceVersion
 }

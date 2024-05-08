@@ -576,5 +576,75 @@ var _ = Describe("ComponentVersion Controller", func() {
 			Expect(resolvedServiceVersion).Should(Equal(serviceVersion("v4")))
 			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r6", "") // app is r6 and another one is ""
 		})
+
+		It("resolve images before and after new release", func() {
+			By("create new definition v4.0 with service version v4")
+			compDefObj := testapps.NewComponentDefinitionFactory(compDefName("v1")).
+				SetRuntime(&corev1.Container{Name: appName}).
+				GetObject()
+
+			releases := []appsv1alpha1.ComponentVersionRelease{
+				{
+					Name:           releaseID("r0"),
+					Changes:        "init release in v1",
+					ServiceVersion: serviceVersion("v1"),
+					Images: map[string]string{
+						appName: appImage(appName, releaseID("r0")),
+					},
+				},
+				{
+					Name:           releaseID("r1"),
+					Changes:        "new release in v2",
+					ServiceVersion: serviceVersion("v2"), // has different service version
+					Images: map[string]string{
+						appName: appImage(appName, releaseID("r1")),
+					},
+				},
+				{
+					Name:           releaseID("r2"),
+					Changes:        "new release in v1",
+					ServiceVersion: serviceVersion("v1"), // has same service version
+					Images: map[string]string{
+						appName: appImage(appName, releaseID("r2")),
+					},
+				},
+			}
+
+			By("first release for the definition")
+			compVersionObj := testapps.NewComponentVersionFactory(compVersionName).
+				SetSpec(appsv1alpha1.ComponentVersionSpec{
+					CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
+						{
+							CompDefs: []string{compDefName("v1")},
+							Releases: []string{releases[0].Name},
+						},
+					},
+					Releases: []appsv1alpha1.ComponentVersionRelease{releases[0]},
+				}).
+				GetObject()
+
+			By("with app image in r0")
+			err := resolveImagesWithCompVersions(compDefObj, []*appsv1alpha1.ComponentVersion{compVersionObj}, serviceVersion("v1"))
+			Expect(err).Should(Succeed())
+			Expect(compDefObj.Spec.Runtime.Containers[0].Image).Should(Equal(releases[0].Images[appName]))
+
+			By("publish a new release which has different service version")
+			compVersionObj.Spec.Releases = append(compVersionObj.Spec.Releases, releases[1])
+			compVersionObj.Spec.CompatibilityRules[0].Releases = append(compVersionObj.Spec.CompatibilityRules[0].Releases, releases[1].Name)
+
+			By("with app image still in r0")
+			err = resolveImagesWithCompVersions(compDefObj, []*appsv1alpha1.ComponentVersion{compVersionObj}, serviceVersion("v1"))
+			Expect(err).Should(Succeed())
+			Expect(compDefObj.Spec.Runtime.Containers[0].Image).Should(Equal(releases[0].Images[appName]))
+
+			By("publish a new release which has same service version")
+			compVersionObj.Spec.Releases = append(compVersionObj.Spec.Releases, releases[2])
+			compVersionObj.Spec.CompatibilityRules[0].Releases = append(compVersionObj.Spec.CompatibilityRules[0].Releases, releases[2].Name)
+
+			By("with app image in r2")
+			err = resolveImagesWithCompVersions(compDefObj, []*appsv1alpha1.ComponentVersion{compVersionObj}, serviceVersion("v1"))
+			Expect(err).Should(Succeed())
+			Expect(compDefObj.Spec.Runtime.Containers[0].Image).Should(Equal(releases[2].Images[appName]))
+		})
 	})
 })

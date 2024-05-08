@@ -26,10 +26,27 @@ func GetKBGenerationAnnotation(generation string) map[string]string {
 	}
 }
 
+func GetServiceVersionAnnotation(serviceVersion string) map[string]string {
+	return map[string]string{
+		KBAppServiceVersionKey: serviceVersion,
+	}
+}
+
 // GetKBReservedAnnotationKeys returns the reserved annotation keys for KubeBlocks
 func GetKBReservedAnnotationKeys() []string {
 	return []string{
 		KubeBlocksGenerationKey,
 		ReconcileAnnotationKey,
+		KBAppServiceVersionKey,
 	}
 }
+
+const (
+	HorizontalScaleBackupPolicyTemplateKey = "apps.kubeblocks.io/horizontal-scale-backup-policy-template"
+)
+
+// annotations for multi-cluster
+const (
+	KBAppMultiClusterPlacementKey   = "apps.kubeblocks.io/multi-cluster-placement"
+	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
+)

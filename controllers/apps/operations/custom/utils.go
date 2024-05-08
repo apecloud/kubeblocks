@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -65,16 +66,20 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 		{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(comp.Replicas))},
 		{Name: kbEnvCompHeadlessSVCName, Value: constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, comp.Name)},
 	}...)
-	if len(opsDef.Spec.ComponentDefinitionRefs) == 0 {
+	if len(opsDef.Spec.ComponentInfos) == 0 {
 		return nil
 	}
-	// get component definition
-	compDef, err := component.GetCompDefinition(reqCtx, cli, cluster, comp.Name)
+	compObj, err := component.GetComponentByName(reqCtx, cli, fullCompName, cluster.Namespace)
 	if err != nil {
 		return err
 	}
-	compDefRef := opsDef.GetComponentDefRef(compDef.Name)
-	if compDefRef == nil {
+	// get component definition
+	compDef, err := component.GetCompDefByName(reqCtx, cli, compObj.Spec.CompDef)
+	if err != nil {
+		return err
+	}
+	componentInfo := opsDef.GetComponentInfo(compDef.Name)
+	if componentInfo == nil {
 		return intctrlutil.NewFatalError(fmt.Sprintf(`componentDefinition "%s" is not support for this operations`, compDef.Name))
 	}
 
@@ -91,16 +96,16 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	// inject connect envs
-	if compDefRef.AccountName != "" {
-		accountSecretName := constant.GenerateAccountSecretName(cluster.Name, comp.Name, compDefRef.AccountName)
-		*env = append(*env, corev1.EnvVar{Name: kbEnvAccountUserName, Value: compDefRef.AccountName})
+	if componentInfo.AccountName != "" {
+		accountSecretName := constant.GenerateAccountSecretName(cluster.Name, comp.Name, componentInfo.AccountName)
+		*env = append(*env, corev1.EnvVar{Name: kbEnvAccountUserName, Value: componentInfo.AccountName})
 		*env = append(*env, corev1.EnvVar{Name: kbEnvAccountPassword, ValueFrom: buildSecretKeyRef(accountSecretName, constant.AccountPasswdForSecret)})
 	}
 
 	// inject SVC and SVC ports
-	if compDefRef.ServiceName != "" {
+	if componentInfo.ServiceName != "" {
 		for _, v := range compDef.Spec.Services {
-			if v.Name != compDefRef.ServiceName {
+			if v.Name != componentInfo.ServiceName {
 				continue
 			}
 			*env = append(*env, corev1.EnvVar{Name: kbEnvCompSVCName, Value: constant.GenerateComponentServiceName(cluster.Name, comp.Name, v.ServiceName)})
@@ -129,9 +134,9 @@ func buildEnvVars(reqCtx intctrlutil.RequestCtx,
 		envFromMap = map[string]map[string]*corev1.EnvVar{}
 	)
 	buildEnvVarByEnvRef := func(envVarRef *appsv1alpha1.EnvVarRef) (*corev1.EnvVar, error) {
-		container := intctrlutil.GetPodContainer(targetPod, envVarRef.ContainerName)
+		container := intctrlutil.GetPodContainer(targetPod, envVarRef.TargetContainerName)
 		if container == nil {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find container "%s" of the pod "%s"`, envVarRef.ContainerName, targetPod.Name))
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find container "%s" of the pod "%s"`, envVarRef.TargetContainerName, targetPod.Name))
 		}
 		envVar := buildVarWithEnv(targetPod, container, envVarRef.EnvName)
 		if envVar == nil {
@@ -155,11 +160,11 @@ func buildEnvVars(reqCtx intctrlutil.RequestCtx,
 		envVarRef := vars[i].ValueFrom.EnvVarRef
 		if envVarRef != nil {
 			envVar, err = buildEnvVarByEnvRef(envVarRef)
-		} else {
-			envVar, err = buildVarWithFieldPath(targetPod, vars[i].ValueFrom.FieldPath)
+		} else if vars[i].ValueFrom.FieldRef != nil {
+			envVar, err = buildVarWithFieldPath(targetPod, vars[i].ValueFrom.FieldRef.FieldPath)
 		}
 		if envVar == nil {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find the env "%s" in the container "%s"`, envVarRef.EnvName, envVarRef.ContainerName))
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find the env "%s" in the container "%s"`, envVarRef.EnvName, envVarRef.TargetContainerName))
 		}
 		envVar.Name = vars[i].Name
 		envVars = append(envVars, *envVar)
@@ -236,8 +241,8 @@ func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
 	opsDef *appsv1alpha1.OpsDefinition,
 	ops *appsv1alpha1.OpsRequest,
 	comp *appsv1alpha1.ClusterComponentSpec,
-	compCustomSpec *appsv1alpha1.CustomOpsComponent,
-	targetPodTemplate *appsv1alpha1.TargetPodTemplate,
+	compCustomItem *appsv1alpha1.CustomOpsComponent,
+	podInfoExtractor *appsv1alpha1.PodInfoExtractor,
 	targetPod *corev1.Pod) ([]corev1.EnvVar, error) {
 	var env = []corev1.EnvVar{
 		{
@@ -254,9 +259,9 @@ func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
-	if targetPodTemplate != nil {
+	if podInfoExtractor != nil {
 		// inject vars
-		envVars, err := buildEnvVars(reqCtx, cli, targetPod, targetPodTemplate.Vars)
+		envVars, err := buildEnvVars(reqCtx, cli, targetPod, podInfoExtractor.Env)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +269,7 @@ func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// inject params env
-	params := compCustomSpec.Parameters
+	params := compCustomItem.Parameters
 	for i := range params {
 		env = append(env, corev1.EnvVar{Name: params[i].Name, Value: params[i].Value})
 	}
@@ -280,10 +285,10 @@ func buildActionPodName(opsRequest *appsv1alpha1.OpsRequest,
 		common.CutString(opsRequest.Name, 30), compName, actionName, index, retries)
 }
 
-// getTargetPodTemplate gets the target pod template.
-func getTargetPodTemplate(opsDef *appsv1alpha1.OpsDefinition, targetPodTemplateName string) *appsv1alpha1.TargetPodTemplate {
-	for _, v := range opsDef.Spec.TargetPodTemplates {
-		if targetPodTemplateName == v.Name {
+// getTargetPodInfoExtractor gets the target pod template.
+func getTargetPodInfoExtractor(opsDef *appsv1alpha1.OpsDefinition, podInfoExtractorName string) *appsv1alpha1.PodInfoExtractor {
+	for _, v := range opsDef.Spec.PodInfoExtractors {
+		if podInfoExtractorName == v.Name {
 			return &v
 		}
 	}
@@ -293,13 +298,13 @@ func getTargetPodTemplate(opsDef *appsv1alpha1.OpsDefinition, targetPodTemplateN
 func getTargetTemplateAndPod(ctx context.Context,
 	cli client.Client,
 	opsDef *appsv1alpha1.OpsDefinition,
-	targetTemplateName,
+	podInfoExtractorName,
 	targetPodName,
-	podNamespace string) (*appsv1alpha1.TargetPodTemplate, *corev1.Pod, error) {
+	podNamespace string) (*appsv1alpha1.PodInfoExtractor, *corev1.Pod, error) {
 	if targetPodName == "" {
 		return nil, nil, nil
 	}
-	targetPodTemplate := getTargetPodTemplate(opsDef, targetTemplateName)
+	targetPodTemplate := getTargetPodInfoExtractor(opsDef, podInfoExtractorName)
 	targetPod := &corev1.Pod{}
 	if err := cli.Get(ctx,
 		client.ObjectKey{Name: targetPodName, Namespace: podNamespace}, targetPod); err != nil {
@@ -327,28 +332,21 @@ func getTargetPods(
 	if err != nil {
 		return nil, err
 	}
-
-	var targetPods []*corev1.Pod
-	for _, v := range podList.Items {
-		switch podSelector.Availability {
-		case appsv1alpha1.AvailablePolicy:
-			if intctrlutil.IsAvailable(&v, 0) {
-				targetPods = append(targetPods, &v)
-			}
-		case appsv1alpha1.UnAvailablePolicy:
-			if !intctrlutil.IsAvailable(&v, 0) {
-				targetPods = append(targetPods, &v)
-			}
-
-		default:
-			targetPods = append(targetPods, &v)
-		}
-		if podSelector.SelectionPolicy == appsv1alpha1.Any && len(targetPods) > 0 {
-			break
-		}
-	}
 	if len(podList.Items) == 0 {
 		return nil, intctrlutil.NewFatalError("can not find any pod which matches the podSelector for the component " + compName)
+	}
+	sort.Sort(intctrlutil.ByPodName(podList.Items))
+	var targetPods []*corev1.Pod
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		targetPods = append(targetPods, pod)
+		// Preferably select available pod.
+		if podSelector.MultiPodSelectionPolicy == appsv1alpha1.Any && intctrlutil.IsAvailable(pod, 0) {
+			return []*corev1.Pod{pod}, nil
+		}
+	}
+	if podSelector.MultiPodSelectionPolicy == appsv1alpha1.Any {
+		return targetPods[0:1], nil
 	}
 	return targetPods, nil
 }

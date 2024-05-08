@@ -20,13 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"reflect"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
-	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type componentRestoreTransformer struct {
@@ -41,22 +45,28 @@ func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag 
 	if cluster.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
 		return nil
 	}
-	reqCtx := ictrlutil.RequestCtx{
+	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,
 		Recorder: transCtx.EventRecorder,
 	}
 	commitError := func(err error) error {
-		if ictrlutil.IsTargetError(err, ictrlutil.ErrorTypeNeedWaiting) {
-			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, string(ictrlutil.ErrorTypeNeedWaiting), err.Error())
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
+			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, string(intctrlutil.ErrorTypeNeedWaiting), err.Error())
 			return graph.ErrPrematureStop
 		}
 		return err
 	}
 
 	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, transCtx.SynthesizeComponent.Replicas, 0)
-	if err := restoreMGR.DoRestore(transCtx.SynthesizeComponent, transCtx.Component); err != nil {
+	needDoPostProvision, _ := component.NeedDoPostProvision(transCtx.Context, transCtx.Client, cluster, transCtx.Component, transCtx.SynthesizeComponent)
+	if err := restoreMGR.DoRestore(transCtx.SynthesizeComponent, transCtx.Component, needDoPostProvision); err != nil {
 		return commitError(err)
+	}
+
+	if !reflect.DeepEqual(transCtx.ComponentOrig.Annotations, transCtx.Component.Annotations) {
+		graphCli, _ := transCtx.Client.(model.GraphClient)
+		graphCli.Update(dag, transCtx.ComponentOrig, transCtx.Component, &model.ReplaceIfExistingOption{})
 	}
 	return nil
 }

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"strings"
 
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -160,7 +161,8 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	saName := restore.Spec.ServiceAccountName
 	if saName == "" {
 		var err error
-		if saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace); err != nil {
+		// TODO: update the mcMgr param
+		if saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -197,16 +199,20 @@ func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc 
 	}
 	var populatePVC *corev1.PersistentVolumeClaim
 	for i, v := range restoreMgr.PrepareDataBackupSets {
+		target := utils.GetBackupStatusTarget(v.Backup, restoreMgr.Restore.Spec.Backup.SourceTargetName)
+		if target == nil {
+			return intctrlutil.NewFatalError("can not found any source targe in backup " + v.Backup.Name)
+		}
 		if populatePVC == nil {
 			populatePVC, err = r.getPopulatePVC(reqCtx, pvc, v,
-				restoreMgr.Restore.Spec.PrepareDataConfig.DataSourceRef.VolumeSource, nodeName)
+				restoreMgr.Restore, target, nodeName)
 			if err != nil {
 				return err
 			}
 		}
 
 		// 1. build populate job
-		job, err := restoreMgr.BuildVolumePopulateJob(reqCtx, r.Client, v, populatePVC, i)
+		job, err := restoreMgr.BuildVolumePopulateJob(reqCtx, r.Client, v, target, populatePVC, i)
 		if err != nil {
 			return err
 		}
@@ -323,7 +329,8 @@ func (r *VolumePopulatorReconciler) waitForPVCSelectedNode(reqCtx intctrlutil.Re
 func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	backupSet dprestore.BackupActionSet,
-	volumeSource,
+	restore *dpv1alpha1.Restore,
+	target *dpv1alpha1.BackupStatusTarget,
 	nodeName string) (*corev1.PersistentVolumeClaim, error) {
 	populatePVCName := getPopulatePVCName(pvc.UID)
 	populatePVC := &corev1.PersistentVolumeClaim{}
@@ -350,10 +357,35 @@ func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx
 				AnnSelectedNode: pvc.Annotations[AnnSelectedNode],
 			}
 		}
+
 		if backupSet.UseVolumeSnapshot {
+			// TODO: will be removed in 0.10.0, compatibility handling for version 0.8.
+			prepareDataConfig := restore.Spec.PrepareDataConfig
+			vsName := utils.GetOldBackupVolumeSnapshotName(backupSet.Backup.Name, prepareDataConfig.DataSourceRef.VolumeSource)
+			vsCli := utils.NewCompatClient(r.Client)
+			exist, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, vsCli,
+				types.NamespacedName{Namespace: backupSet.Backup.Namespace, Name: vsName},
+				&vsv1.VolumeSnapshot{})
+			if err != nil {
+				return nil, err
+			}
+			if !exist {
+				sourceTargetPodName, err := dprestore.GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
+				if err != nil {
+					return nil, err
+				}
+				if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
+					snapshotGroup := dprestore.GetVolumeSnapshotsBySourcePod(backupSet.Backup, sourceTargetPodName)
+					if snapshotGroup == nil {
+						message := fmt.Sprintf(`can not found the volumeSnapshot in status.actions, sourceTargetPod is "%s"`, sourceTargetPodName)
+						return nil, intctrlutil.NewFatalError(message)
+					}
+					vsName = snapshotGroup[prepareDataConfig.DataSourceRef.VolumeSource]
+				}
+			}
 			// restore from volume snapshot.
 			populatePVC.Spec.DataSourceRef = &corev1.TypedObjectReference{
-				Name:     utils.GetBackupVolumeSnapshotName(backupSet.Backup.Name, volumeSource),
+				Name:     vsName,
 				Kind:     constant.VolumeSnapshotKind,
 				APIGroup: &dprestore.VolumeSnapshotGroup,
 			}

@@ -66,6 +66,9 @@ type ComponentTemplateSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	VolumeName string `json:"volumeName"`
 
+	// Deprecated: DefaultMode is deprecated since 0.9.0 and will be removed in 0.10.0
+	// for scripts, auto set 0555
+	// for configs, auto set 0444
 	// Refers to the mode bits used to set permissions on created files by default.
 	//
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
@@ -76,6 +79,7 @@ type ComponentTemplateSpec struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
@@ -104,6 +108,8 @@ type ConfigTemplateExtension struct {
 	Policy MergedPolicy `json:"policy,omitempty"`
 }
 
+// LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
+// Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0
 type LegacyRenderedTemplateSpec struct {
 	// Extends the configuration template.
 	ConfigTemplateExtension `json:",inline"`
@@ -112,32 +118,83 @@ type LegacyRenderedTemplateSpec struct {
 type ComponentConfigSpec struct {
 	ComponentTemplateSpec `json:",inline"`
 
-	// Defines a list of keys.
-	// If left empty, ConfigConstraint applies to all keys in the configmap.
+	// Specifies the configuration files within the ConfigMap that support dynamic updates.
+	//
+	// A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
+	// configuration files.
+	// Each configuration file corresponds to a key in the ConfigMap.
+	// Some of these configuration files may support dynamic modification and reloading without requiring
+	// a pod restart.
+	//
+	// If empty or omitted, all configuration files in the ConfigMap are assumed to support dynamic updates,
+	// and ConfigConstraint applies to all keys.
 	//
 	// +listType=set
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
-	// An optional field that defines the secondary rendered config spec.
+	// Specifies the secondary rendered config spec for pod-specific customization.
 	//
+	// The template is rendered inside the pod (by the "config-manager" sidecar container) and merged with the main
+	// template's render result to generate the final configuration file.
+	//
+	// This field is intended to handle scenarios where different pods within the same Component have
+	// varying configurations. It allows for pod-specific customization of the configuration.
+	//
+	// Note: This field will be deprecated in future versions, and the functionality will be moved to
+	// `cluster.spec.componentSpecs[*].instances[*]`.
+	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +optional
 	LegacyRenderedConfigSpec *LegacyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
 
-	// An optional field that defines the name of the referenced configuration constraints object.
+	// Specifies the name of the referenced configuration constraints object.
 	//
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 
-	// An optional field where the list of containers will be injected into EnvFrom.
+	// Specifies the containers to inject the ConfigMap parameters as environment variables.
 	//
+	// This is useful when application images accept parameters through environment variables and
+	// generate the final configuration file in the startup script based on these variables.
+	//
+	// This field allows users to specify a list of container names, and KubeBlocks will inject the environment
+	// variables converted from the ConfigMap into these designated containers. This provides a flexible way to
+	// pass the configuration items from the ConfigMap to the container without modifying the image.
+	//
+	// Deprecated: `asEnvFrom` has been deprecated since 0.9.0 and will be removed in 0.10.0.
+	// Use `injectEnvTo` instead.
+	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +listType=set
 	// +optional
 	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
 
-	// An optional field defines which resources change trigger re-render config.
+	// Specifies the containers to inject the ConfigMap parameters as environment variables.
+	//
+	// This is useful when application images accept parameters through environment variables and
+	// generate the final configuration file in the startup script based on these variables.
+	//
+	// This field allows users to specify a list of container names, and KubeBlocks will inject the environment
+	// variables converted from the ConfigMap into these designated containers. This provides a flexible way to
+	// pass the configuration items from the ConfigMap to the container without modifying the image.
+	//
+	//
+	// +listType=set
+	// +optional
+	InjectEnvTo []string `json:"injectEnvTo,omitempty"`
+
+	// Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
+	//
+	// In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
+	// or cluster topology. Examples:
+	//
+	// - Redis: adjust maxmemory after v-scale operation.
+	// - MySQL: increase max connections after v-scale operation.
+	// - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
+	//
 	// +listType=set
 	// +optional
 	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`
@@ -145,12 +202,12 @@ type ComponentConfigSpec struct {
 
 // RerenderResourceType defines the resource requirements for a component.
 // +enum
-// +kubebuilder:validation:Enum={resources,replcias,tls}
+// +kubebuilder:validation:Enum={vscale,hscale,tls}
 type RerenderResourceType string
 
 const (
-	ComponentResourceType RerenderResourceType = "resources"
-	ComponentReplicasType RerenderResourceType = "replicas"
+	ComponentVScaleType RerenderResourceType = "vscale"
+	ComponentHScaleType RerenderResourceType = "hscale"
 )
 
 // MergedPolicy defines how to merge external imported templates into component templates.
@@ -263,7 +320,7 @@ const (
 
 // OpsPhase defines opsRequest phase.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Aborted,Failed,Succeed}
 type OpsPhase string
 
 const (
@@ -274,6 +331,7 @@ const (
 	OpsSucceedPhase    OpsPhase = "Succeed"
 	OpsCancelledPhase  OpsPhase = "Cancelled"
 	OpsFailedPhase     OpsPhase = "Failed"
+	OpsAbortedPhase    OpsPhase = "Aborted"
 )
 
 // PodSelectionPolicy pod selection strategy.
@@ -365,13 +423,27 @@ type UpdateStrategy string
 
 const (
 	// SerialStrategy indicates that updates are applied one at a time in a sequential manner.
+	// The operator waits for each replica to be updated and ready before proceeding to the next one.
+	// This ensures that only one replica is unavailable at a time during the update process.
 	SerialStrategy UpdateStrategy = "Serial"
 
-	// ParallelStrategy indicates that updates are applied simultaneously across all components.
+	// ParallelStrategy indicates that updates are applied simultaneously to all Pods of a Component.
+	// The replicas are updated in parallel, with the operator updating all replicas concurrently.
+	// This strategy provides the fastest update time but may lead to a period of reduced availability or
+	// capacity during the update process.
 	ParallelStrategy UpdateStrategy = "Parallel"
 
-	// BestEffortParallelStrategy indicates that updates are applied as quickly as possible, but not necessarily all at once.
-	// This strategy attempts to strike a balance between speed and stability.
+	// BestEffortParallelStrategy indicates that the replicas are updated in parallel, with the operator making
+	// a best-effort attempt to update as many replicas as possible concurrently
+	// while maintaining the component's availability.
+	// Unlike the `Parallel` strategy, the `BestEffortParallel` strategy aims to ensure that a minimum number
+	// of replicas remain available during the update process to maintain the component's quorum and functionality.
+	//
+	// For example, consider a component with 5 replicas. To maintain the component's availability and quorum,
+	// the operator may allow a maximum of 2 replicas to be simultaneously updated. This ensures that at least
+	// 3 replicas (a quorum) remain available and functional during the update process.
+	//
+	// The `BestEffortParallel` strategy strikes a balance between update speed and component availability.
 	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
 
@@ -382,6 +454,8 @@ var DefaultLeader = ConsensusMember{
 
 // WorkloadType defines the type of workload for the components of the ClusterDefinition.
 // It can be one of the following: `Stateless`, `Stateful`, `Consensus`, or `Replication`.
+//
+// Deprecated since v0.8.
 //
 // +enum
 // +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
@@ -719,8 +793,6 @@ func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }
 
-type ComponentNameSet map[string]struct{}
-
 var (
 	ErrWorkloadTypeIsUnknown   = errors.New("workloadType is unknown")
 	ErrWorkloadTypeIsStateless = errors.New("workloadType should not be stateless")
@@ -742,7 +814,7 @@ type HostNetwork struct {
 }
 
 type HostNetworkContainerPort struct {
-	// Container specifies the target container within the pod.
+	// Container specifies the target container within the Pod.
 	//
 	// +required
 	Container string `json:"container"`
@@ -755,30 +827,73 @@ type HostNetworkContainerPort struct {
 	Ports []string `json:"ports"`
 }
 
-// ClusterService defines the service of a cluster.
+// ClusterService defines a service that is exposed externally, allowing entities outside the cluster to access it.
+// For example, external applications, or other Clusters.
+// And another Cluster managed by the same KubeBlocks operator can resolve the address exposed by a ClusterService
+// using the `serviceRef` field.
+//
+// When a Component needs to access another Cluster's ClusterService using the `serviceRef` field,
+// it must also define the service type and version information in the `componentDefinition.spec.serviceRefDeclarations`
+// section.
 type ClusterService struct {
 	Service `json:",inline"`
 
 	// Extends the ServiceSpec.Selector by allowing the specification of a sharding name, which is defined in
-	// cluster.spec.shardingSpecs[x].name, to be used as a selector for the service.
-	// Note that this and the ComponentSelector are mutually exclusive and cannot be set simultaneously.
+	// `cluster.spec.shardingSpecs[*].name`, to be used as a selector for the service.
+	// Note that this and the `componentSelector` are mutually exclusive and cannot be set simultaneously.
 	//
 	// +optional
 	ShardingSelector string `json:"shardingSelector,omitempty"`
 
 	// Extends the ServiceSpec.Selector by allowing the specification of a component, to be used as a selector for the service.
-	// Note that this and the ShardingSelector are mutually exclusive and cannot be set simultaneously.
+	// Note that this and the `shardingSelector` are mutually exclusive and cannot be set simultaneously.
 	//
 	// +optional
 	ComponentSelector string `json:"componentSelector,omitempty"`
 }
 
+// ComponentService defines a service that would be exposed as an inter-component service within a Cluster.
+// A Service defined in the ComponentService is expected to be accessed by other Components within the same Cluster.
+//
+// When a Component needs to use a ComponentService provided by another Component within the same Cluster,
+// it can declare a variable in the `componentDefinition.spec.vars` section and bind it to the specific exposed address
+// of the ComponentService using the `serviceVarRef` field.
 type ComponentService struct {
 	Service `json:",inline"`
 
-	// Indicates whether to generate individual services for each pod.
-	// If set to true, a separate service will be created for each pod in the component.
+	// Indicates whether to create a corresponding Service for each Pod of the selected Component.
+	// When set to true, a set of Services will be automatically generated for each Pod,
+	// and the `roleSelector` field will be ignored.
 	//
+	// The names of the generated Services will follow the same suffix naming pattern: `$(serviceName)-$(podOrdinal)`.
+	// The total number of generated Services will be equal to the number of replicas specified for the Component.
+	//
+	// Example usage:
+	//
+	// ```yaml
+	// name: my-service
+	// serviceName: my-service
+	// podService: true
+	// disableAutoProvision: true
+	// spec:
+	//   type: NodePort
+	//   ports:
+	//   - name: http
+	//     port: 80
+	//     targetPort: 8080
+	// ```
+	//
+	// In this example, if the Component has 3 replicas, three Services will be generated:
+	// - my-service-0: Points to the first Pod (podOrdinal: 0)
+	// - my-service-1: Points to the second Pod (podOrdinal: 1)
+	// - my-service-2: Points to the third Pod (podOrdinal: 2)
+	//
+	// Each generated Service will have the specified spec configuration and will target its respective Pod.
+	//
+	// This feature is useful when you need to expose each Pod of a Component individually, allowing external access
+	// to specific instances of the Component.
+	//
+	// +kubebuilder:default=false
 	// +optional
 	PodService *bool `json:"podService,omitempty"`
 
@@ -825,7 +940,20 @@ type Service struct {
 	// +optional
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 
-	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
+	// Extends the above `serviceSpec.selector` by allowing you to specify defined role as selector for the service.
+	// When `roleSelector` is set, it adds a label selector "kubeblocks.io/role: {roleSelector}"
+	// to the `serviceSpec.selector`.
+	// Example usage:
+	//
+	//	  roleSelector: "leader"
+	//
+	// In this example, setting `roleSelector` to "leader" will add a label selector
+	// "kubeblocks.io/role: leader" to the `serviceSpec.selector`.
+	// This means that the service will select and route traffic to Pods with the label
+	// "kubeblocks.io/role" set to "leader".
+	//
+	// Note that if `podService` sets to true, RoleSelector will be ignored.
+	// The `podService` flag takes precedence over `roleSelector` and generates a service for each Pod.
 	//
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
@@ -857,12 +985,12 @@ type EnvVar struct {
 
 	// Optional: no more than one of the following may be specified.
 
-	// Variable references $(VAR_NAME) are expanded using the previously defined variables in the current context.
+	// Variable references `$(VAR_NAME)` are expanded using the previously defined variables in the current context.
 	//
 	// If a variable cannot be resolved, the reference in the input string will be unchanged.
-	// Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+	// Double `$$` are reduced to a single `$`, which allows for escaping the `$(VAR_NAME)` syntax: i.e.
 	//
-	// - "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+	// - `$$(VAR_NAME)` will produce the string literal `$(VAR_NAME)`.
 	//
 	// Escaped references will never be expanded, regardless of whether the variable exists or not.
 	// Defaults to "".
@@ -900,6 +1028,10 @@ type VarSource struct {
 	// Selects a defined var of a ServiceRef.
 	// +optional
 	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
+
+	// Selects a defined var of a Component.
+	// +optional
+	ComponentVarRef *ComponentVarSelector `json:"componentVarRef,omitempty"`
 }
 
 // VarOption defines whether a variable is required or optional.
@@ -941,6 +1073,13 @@ type ContainerVars struct {
 type ServiceVars struct {
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
+
+	// LoadBalancer represents the LoadBalancer ingress point of the service.
+	//
+	// If multiple ingress points are available, the first one will be used automatically, choosing between IP and Hostname.
+	//
+	// +optional
+	LoadBalancer *VarOption `json:"loadBalancer,omitempty"`
 
 	// Port references a port or node-port defined in the service.
 	//
@@ -1005,7 +1144,33 @@ type ServiceRefVarSelector struct {
 	ServiceRefVars `json:",inline"`
 }
 
-// ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.
+// ComponentVarSelector selects a var from a Component.
+type ComponentVarSelector struct {
+	// The Component to select from.
+	ClusterObjectReference `json:",inline"`
+
+	ComponentVars `json:",inline"`
+}
+
+type ComponentVars struct {
+	// Reference to the name of the Component object.
+	//
+	// +optional
+	ComponentName *VarOption `json:"componentName,omitempty"`
+
+	// Reference to the replicas of the component.
+	//
+	// +optional
+	Replicas *VarOption `json:"replicas,omitempty"`
+
+	// Reference to the instanceName list of the component.
+	// and the value will be presented in the following format: instanceName1,instanceName2...
+	//
+	// +optional
+	InstanceNames *VarOption `json:"instanceNames,omitempty"`
+}
+
+// ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.
 type ClusterObjectReference struct {
 	// CompDef specifies the definition used by the component that the referent object resident in.
 	// If not specified, the component itself will be used.
@@ -1099,3 +1264,25 @@ type MultipleClusterObjectValueFormatFlatten struct {
 	// +required
 	KeyValueDelimiter string `json:"keyValueDelimiter"`
 }
+
+// PrometheusProtocol defines the protocol of prometheus scrape metrics.
+//
+// +enum
+// +kubebuilder:validation:Enum={http,https}
+type PrometheusProtocol string
+
+const (
+	HTTPProtocol  = "http"
+	HTTPSProtocol = "https"
+)
+
+// MonitorKind defines the kind of monitor.
+// +enum
+// +kubebuilder:validation:Enum={metrics,logs,traces}
+type MonitorKind string
+
+const (
+	MetricsKind = "metrics"
+	LogsKind    = "logs"
+	TracesKind  = "traces"
+)

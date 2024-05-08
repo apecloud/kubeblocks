@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -140,4 +142,31 @@ func newClient(s *Settings) redis.UniversalClient {
 	}
 
 	return redis.NewClient(options)
+}
+
+func newSentinelClient(s *Settings, clusterCompName string) *redis.SentinelClient {
+	// TODO: use headless service directly
+	sentinelEnv := fmt.Sprintf("%s_SENTINEL_SERVICE", strings.ToUpper(strings.Join(strings.Split(clusterCompName, "-"), "_")))
+	sentinelHost := viper.GetString(fmt.Sprintf("%s_HOST", sentinelEnv))
+	sentinelPort := viper.GetString(fmt.Sprintf("%s_PORT", sentinelEnv))
+
+	opt := &redis.Options{
+		DB:              s.DB,
+		Addr:            fmt.Sprintf("%s:%s", sentinelHost, sentinelPort),
+		Password:        s.Password,
+		Username:        s.Username,
+		MaxRetries:      s.RedisMaxRetries,
+		MaxRetryBackoff: time.Duration(s.RedisMaxRetryInterval),
+		MinRetryBackoff: time.Duration(s.RedisMinRetryInterval),
+		DialTimeout:     time.Duration(s.DialTimeout),
+		ReadTimeout:     time.Duration(s.ReadTimeout),
+		WriteTimeout:    time.Duration(s.WriteTimeout),
+		PoolSize:        s.PoolSize,
+		MinIdleConns:    s.MinIdleConns,
+		PoolTimeout:     time.Duration(s.PoolTimeout),
+	}
+
+	sentinelClient := redis.NewSentinelClient(opt)
+
+	return sentinelClient
 }

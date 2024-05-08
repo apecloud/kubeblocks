@@ -32,9 +32,14 @@ import (
 )
 
 func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
-	ctx context.Context, cli client.Reader, _ func(T, PT, L, PL), namespace string, labels client.MatchingLabels) ([]PT, error) {
+	ctx context.Context, cli client.Reader, _ func(T, PT, L, PL), namespace string, labels client.MatchingLabels, opts ...client.ListOption) ([]PT, error) {
+	if opts == nil {
+		opts = make([]client.ListOption, 0)
+	}
+	opts = append(opts, []client.ListOption{labels, client.InNamespace(namespace)}...)
+
 	var objList L
-	if err := cli.List(ctx, PL(&objList), labels, client.InNamespace(namespace)); err != nil {
+	if err := cli.List(ctx, PL(&objList), opts...); err != nil {
 		return nil, err
 	}
 
@@ -46,10 +51,6 @@ func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 	return objs, nil
 }
 
-func ListRSMOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*workloads.ReplicatedStateMachine, error) {
-	return ListObjWithLabelsInNamespace(ctx, cli, generics.RSMSignature, namespace, labels)
-}
-
 // GetObjectListByComponentName gets k8s workload list with component
 func GetObjectListByComponentName(ctx context.Context, cli client.Reader, cluster appsv1alpha1.Cluster,
 	objectList client.ObjectList, componentName string) error {
@@ -58,17 +59,17 @@ func GetObjectListByComponentName(ctx context.Context, cli client.Reader, cluste
 	return cli.List(ctx, objectList, client.MatchingLabels(matchLabels), inNamespace)
 }
 
-// GetComponentRSMMinReadySeconds gets the statefulSet minReadySeconds of the component.
-func GetComponentRSMMinReadySeconds(ctx context.Context,
+// GetComponentMinReadySeconds gets the underlying workload's minReadySeconds of the component.
+func GetComponentMinReadySeconds(ctx context.Context,
 	cli client.Client,
 	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {
-	rsmList := &workloads.ReplicatedStateMachineList{}
-	if err = GetObjectListByComponentName(ctx, cli, cluster, rsmList, componentName); err != nil {
+	itsList := &workloads.InstanceSetList{}
+	if err = GetObjectListByComponentName(ctx, cli, cluster, itsList, componentName); err != nil {
 		return
 	}
-	if len(rsmList.Items) > 0 {
-		minReadySeconds = rsmList.Items[0].Spec.MinReadySeconds
+	if len(itsList.Items) > 0 {
+		minReadySeconds = itsList.Items[0].Spec.MinReadySeconds
 		return
 	}
 	return minReadySeconds, err

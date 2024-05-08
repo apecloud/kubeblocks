@@ -206,12 +206,10 @@ func (r *BackupScheduleReconciler) handleSchedule(
 	if err = r.patchScheduleMetadata(reqCtx, backupSchedule); err != nil {
 		return err
 	}
-	saName := backupPolicy.Spec.Target.ServiceAccountName
-	if saName == "" {
-		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, backupSchedule.Namespace)
-		if err != nil {
-			return err
-		}
+	// TODO: update the mcMgr param
+	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backupSchedule.Namespace, nil)
+	if err != nil {
+		return err
 	}
 	scheduler := dpbackup.Scheduler{
 		RequestCtx:           reqCtx,

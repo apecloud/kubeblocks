@@ -70,8 +70,8 @@ var _ = Describe("utils test", func() {
 					return nil
 				}).Times(1)
 			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(root)}
-			labelKeys := []string{"foo"}
-			tree, err := ReadObjectTree[*appsv1.StatefulSet](context.Background(), k8sMock, req, labelKeys, &corev1.PodList{})
+			ml := client.MatchingLabels{"foo": "bar"}
+			tree, err := ReadObjectTree[*appsv1.StatefulSet](context.Background(), k8sMock, req, ml, &corev1.PodList{})
 			Expect(err).Should(BeNil())
 			Expect(tree.GetRoot()).ShouldNot(BeNil())
 			Expect(tree.GetRoot()).Should(Equal(root))

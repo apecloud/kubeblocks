@@ -43,7 +43,7 @@ var _ = Describe("reconciler test", func() {
 			Expect(tree).Should(Equal(expectedTree))
 
 			By("SetRoot & GetRoot")
-			root := builder.NewReplicatedStateMachineBuilder(namespace, name).GetObject()
+			root := builder.NewInstanceSetBuilder(namespace, name).GetObject()
 			tree.SetRoot(root)
 			expectedTree.root = root
 			Expect(tree).Should(Equal(expectedTree))
@@ -76,6 +76,11 @@ var _ = Describe("reconciler test", func() {
 			treeCopied, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
 			Expect(treeCopied).Should(Equal(tree))
+
+			By("Set&Get Finalizer")
+			finalizer := "test"
+			tree.SetFinalizer(finalizer)
+			Expect(tree.GetFinalizer()).Should(Equal(finalizer))
 		})
 	})
 })

@@ -35,63 +35,119 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func Setup(scheme *runtime.Scheme, cli client.Client, kubeConfig, contexts string) (Manager, error) {
+var (
+	scheme *runtime.Scheme
+)
+
+func Setup(scheme *runtime.Scheme, cfg *rest.Config, cli client.Client, kubeConfig, contexts, disabledContexts string) (Manager, error) {
 	if len(contexts) == 0 {
 		return nil, nil
 	}
-	clients, caches, err := newClientsNCaches(scheme, kubeConfig, contexts)
+
+	mcc, err := newClientNCache(scheme, kubeConfig, contexts, disabledContexts)
 	if err != nil {
 		return nil, err
 	}
+	for k, c := range mcc {
+		if isSameContextWithControl(cfg, c) {
+			cc := mcc[k]
+			if isUnavailableClient(cc.client) {
+				return nil, fmt.Errorf("control cluster %s is disabled", cc.context)
+			}
+			// reset the cache and use default cli of control cluster
+			cc.cache = nil
+			cc.client = cli
+			mcc[k] = cc
+		}
+	}
+
+	clients := func() map[string]client.Client {
+		m := make(map[string]client.Client)
+		for _, c := range mcc {
+			m[c.context] = c.client
+		}
+		return m
+	}
+	caches := func() map[string]cache.Cache {
+		m := make(map[string]cache.Cache)
+		for _, c := range mcc {
+			m[c.context] = c.cache
+		}
+		return m
+	}
+	setupScheme(scheme)
 	return &manager{
-		cli:    NewClient(cli, clients),
-		caches: caches,
+		cli:    NewClient(cli, clients()),
+		caches: caches(),
 	}, nil
 }
 
-func newClientsNCaches(scheme *runtime.Scheme, kubeConfig, contexts string) (map[string]client.Client, map[string]cache.Cache, error) {
-	clients := make(map[string]client.Client)
-	caches := make(map[string]cache.Cache)
-	for _, context := range strings.Split(contexts, ",") {
-		cli, cache, err := newClientNCache4Context(scheme, kubeConfig, context)
-		if err != nil {
-			return nil, nil, err
-		}
-		if cli != nil && cache != nil {
-			clients[context] = cli
-			caches[context] = cache
-		}
-	}
-	return clients, caches, nil
+func setupScheme(s *runtime.Scheme) {
+	scheme = s
 }
 
-func newClientNCache4Context(scheme *runtime.Scheme, kubeConfig, context string) (client.Client, cache.Cache, error) {
+// isSameContextWithControl checks whether the context is the same as the control cluster.
+func isSameContextWithControl(cfg *rest.Config, mcc multiClusterContext) bool {
+	return cfg.Host == mcc.id
+}
+
+func newClientNCache(scheme *runtime.Scheme, kubeConfig, contexts, disabledContexts string) (map[string]multiClusterContext, error) {
+	merged := map[string]bool{}
+	for _, c := range strings.Split(contexts, ",") {
+		merged[c] = false
+	}
+	if len(disabledContexts) > 0 {
+		for _, c := range strings.Split(disabledContexts, ",") {
+			if _, ok := merged[c]; !ok {
+				return nil, fmt.Errorf("disabled context %s is not in contexts", c)
+			}
+			merged[c] = true
+		}
+	}
+
+	mcc := make(map[string]multiClusterContext)
+	for context, disabled := range merged {
+		cc, err := newClientNCache4Context(scheme, kubeConfig, context, disabled)
+		if err != nil {
+			return nil, err
+		}
+		if cc != nil {
+			mcc[context] = *cc
+		}
+	}
+	return mcc, nil
+}
+
+func newClientNCache4Context(scheme *runtime.Scheme, kubeConfig, context string, disabled bool) (*multiClusterContext, error) {
 	if len(context) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	config, err := getConfigWithContext(kubeConfig, context)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to get kubeconfig for context %s: %s", context, err.Error())
+		return nil, fmt.Errorf("unable to get kubeconfig for context %s: %s", context, err.Error())
 	}
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 
-	clientOpts, err := clientOptions(scheme, context, config)
+	var cli client.Client
+	var cache cache.Cache
+	if !disabled {
+		cli, cache, err = createClientNCache(scheme, config, context)
+	} else {
+		cli, cache, err = createUnavailableClientNCache(scheme, config, context)
+	}
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	cli, err := client.New(config, clientOpts)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create Client for context %s: %s", context, err.Error())
-	}
-	cache, err := cache.New(config, cacheOptions(clientOpts))
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create Cache for context %s: %s", context, err.Error())
-	}
-	return cli, cache, nil
+	return &multiClusterContext{
+		context: context,
+		id:      config.Host,
+		cache:   cache,
+		client:  cli,
+	}, nil
 }
 
 func getConfigWithContext(kubeConfig, context string) (*rest.Config, error) {
@@ -110,6 +166,22 @@ func getConfigWithContextFromSpecified(kubeConfig, context string) (*rest.Config
 			},
 			CurrentContext: context,
 		}).ClientConfig()
+}
+
+func createClientNCache(scheme *runtime.Scheme, config *rest.Config, context string) (client.Client, cache.Cache, error) {
+	clientOpts, err := clientOptions(scheme, context, config)
+	if err != nil {
+		return nil, nil, err
+	}
+	cli, err := client.New(config, clientOpts)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create Client for context %s: %s", context, err.Error())
+	}
+	cache, err := cache.New(config, cacheOptions(clientOpts))
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create Cache for context %s: %s", context, err.Error())
+	}
+	return cli, cache, nil
 }
 
 func clientOptions(scheme *runtime.Scheme, ctx string, config *rest.Config) (client.Options, error) {
@@ -140,4 +212,8 @@ func cacheOptions(opts client.Options) cache.Options {
 		Scheme:     opts.Scheme,
 		Mapper:     opts.Mapper,
 	}
+}
+
+func createUnavailableClientNCache(_ *runtime.Scheme, _ *rest.Config, context string) (client.Client, cache.Cache, error) {
+	return newUnavailableClient(context), nil, nil
 }

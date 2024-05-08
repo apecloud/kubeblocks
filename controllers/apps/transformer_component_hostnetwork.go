@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -66,12 +65,11 @@ func isHostNetworkEnabled(transCtx *componentTransformContext) bool {
 	if synthesizedComp.PodSpec.HostNetwork {
 		return true
 	}
-	// TODO: use component.annotations
-	cluster := transCtx.Cluster
-	if cluster.Annotations == nil {
+	comp := transCtx.Component
+	if comp.Annotations == nil {
 		return false
 	}
-	comps, ok := cluster.Annotations[constant.HostNetworkAnnotationKey]
+	comps, ok := comp.Annotations[constant.HostNetworkAnnotationKey]
 	if !ok {
 		return false
 	}
@@ -102,6 +100,12 @@ func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[str
 func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *component.SynthesizedComponent,
 	needAllocate func(string, string, int32) bool) (map[string]map[string]int32, error) {
 	ports := map[string]map[string]int32{}
+	insert := func(c, pk string, pv int32) {
+		if _, ok := ports[c]; !ok {
+			ports[c] = map[string]int32{}
+		}
+		ports[c][pk] = pv
+	}
 	for _, c := range synthesizedComp.PodSpec.Containers {
 		for _, p := range c.Ports {
 			portKey := intctrlutil.BuildHostPortName(synthesizedComp.ClusterName, synthesizedComp.Name, c.Name, p.Name)
@@ -110,7 +114,7 @@ func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *com
 				if err != nil {
 					return nil, err
 				}
-				ports[c.Name][p.Name] = port
+				insert(c.Name, p.Name, port)
 			} else {
 				if err := pm.UsePort(portKey, p.ContainerPort); err != nil {
 					return nil, err
@@ -135,41 +139,9 @@ func updateObjectsWithAllocatedPorts(synthesizedComp *component.SynthesizedCompo
 			}
 		}
 	}
-	if err := updateMonitorPorts(synthesizedComp, ports); err != nil {
-		return err
-	}
 	if err := updateLorrySpecAfterPortsChanged(synthesizedComp); err != nil {
 		return err
 	}
-	return nil
-}
-
-func updateMonitorPorts(synthesizedComp *component.SynthesizedComponent, ports map[string]map[string]int32) error {
-	if !synthesizedComp.Monitor.Enable {
-		return nil
-	}
-
-	portMapping := make(map[int32]int32)
-	for _, c := range synthesizedComp.PodSpec.Containers {
-		containerPorts, ok := ports[c.Name]
-		for _, p := range c.Ports {
-			portMapping[p.ContainerPort] = func() int32 {
-				if ok {
-					port, okk := containerPorts[p.Name]
-					if okk {
-						return port
-					}
-				}
-				return p.ContainerPort
-			}()
-		}
-	}
-
-	newScrapePort, ok := portMapping[synthesizedComp.Monitor.ScrapePort]
-	if !ok {
-		return fmt.Errorf("monitor scrape port %d not found", synthesizedComp.Monitor.ScrapePort)
-	}
-	synthesizedComp.Monitor.ScrapePort = newScrapePort
 	return nil
 }
 

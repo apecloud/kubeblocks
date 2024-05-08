@@ -1,0 +1,19 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: pika-restart
+  namespace: default
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterName: pika-cluster
+  type: Restart
+  # Lists Components to be restarted. ComponentOps specifies the Component to be operated on.
+  restart:
+    # Specifies the name of the Component.
+    # - pika-group
+    # - pika-group-1
+    # - etcd
+    # - codis-proxy
+    # - codis-fe
+    # - codis-dashboard
+  - componentName: pika-group

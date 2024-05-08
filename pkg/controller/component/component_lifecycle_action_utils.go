@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -182,6 +183,7 @@ func renderActionCmdJob(ctx context.Context,
 				Labels:    getActionCmdJobLabels(cluster.Name, synthesizeComp.Name, actionType),
 			},
 			Spec: batchv1.JobSpec{
+				BackoffLimit: pointer.Int32(2),
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: cluster.Namespace,
@@ -211,6 +213,9 @@ func renderActionCmdJob(ctx context.Context,
 		}
 		for i := range job.Spec.Template.Spec.Containers {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
+		}
+		if customAction.RetryPolicy != nil && customAction.RetryPolicy.MaxRetries > 0 {
+			job.Spec.BackoffLimit = pointer.Int32(int32(customAction.RetryPolicy.MaxRetries))
 		}
 		return job, nil
 	}

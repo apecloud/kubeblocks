@@ -62,6 +62,11 @@ func (b *statusBuilder) startTimestamp(timestamp *metav1.Time) *statusBuilder {
 	return b
 }
 
+func (b *statusBuilder) volumeSnapshots(volumeSnapshots []dpv1alpha1.VolumeSnapshotStatus) *statusBuilder {
+	b.status.VolumeSnapshots = volumeSnapshots
+	return b
+}
+
 func (b *statusBuilder) completionTimestamp(timestamp *metav1.Time) *statusBuilder {
 	t := timestamp
 	if t == nil {

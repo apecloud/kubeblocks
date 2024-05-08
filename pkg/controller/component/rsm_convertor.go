@@ -24,73 +24,74 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-// BuildRSMFrom builds a new Component object based on SynthesizedComponent.
-func BuildRSMFrom(synthesizeComp *SynthesizedComponent, protoRSM *workloads.ReplicatedStateMachine) (*workloads.ReplicatedStateMachine, error) {
+// BuildWorkloadFrom builds a new Component object based on SynthesizedComponent.
+func BuildWorkloadFrom(synthesizeComp *SynthesizedComponent, protoITS *workloads.InstanceSet) (*workloads.InstanceSet, error) {
 	if synthesizeComp == nil {
 		return nil, nil
 	}
-	if protoRSM == nil {
-		protoRSM = &workloads.ReplicatedStateMachine{}
+	if protoITS == nil {
+		protoITS = &workloads.InstanceSet{}
 	}
 	convertors := map[string]convertor{
-		"service":                   &rsmServiceConvertor{},
-		"alternativeservices":       &rsmAlternativeServicesConvertor{},
-		"roles":                     &rsmRolesConvertor{},
-		"roleprobe":                 &rsmRoleProbeConvertor{},
-		"credential":                &rsmCredentialConvertor{},
-		"membershipreconfiguration": &rsmMembershipReconfigurationConvertor{},
-		"memberupdatestrategy":      &rsmMemberUpdateStrategyConvertor{},
-		"podmanagementpolicy":       &rsmPodManagementPolicyConvertor{},
-		"updatestrategy":            &rsmUpdateStrategyConvertor{},
-		"instances":                 &rsmInstancesConvertor{},
-		"offlineinstances":          &rsmOfflineInstancesConvertor{},
+		"service":                   &itsServiceConvertor{},
+		"alternativeservices":       &itsAlternativeServicesConvertor{},
+		"roles":                     &itsRolesConvertor{},
+		"roleprobe":                 &itsRoleProbeConvertor{},
+		"credential":                &itsCredentialConvertor{},
+		"membershipreconfiguration": &itsMembershipReconfigurationConvertor{},
+		"memberupdatestrategy":      &itsMemberUpdateStrategyConvertor{},
+		"podmanagementpolicy":       &itsPodManagementPolicyConvertor{},
+		"updatestrategy":            &itsUpdateStrategyConvertor{},
+		"instances":                 &itsInstancesConvertor{},
+		"offlineinstances":          &itsOfflineInstancesConvertor{},
 	}
-	if err := covertObject(convertors, &protoRSM.Spec, synthesizeComp); err != nil {
+	if err := covertObject(convertors, &protoITS.Spec, synthesizeComp); err != nil {
 		return nil, err
 	}
-	return protoRSM, nil
+	return protoITS, nil
 }
 
-// rsmServiceConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Service.
-type rsmServiceConvertor struct{}
+// itsServiceConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Service.
+type itsServiceConvertor struct{}
 
-// rsmAlternativeServicesConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.AlternativeServices.
-type rsmAlternativeServicesConvertor struct{}
+// itsAlternativeServicesConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.AlternativeServices.
+type itsAlternativeServicesConvertor struct{}
 
-// rsmRolesConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Roles.
-type rsmRolesConvertor struct{}
+// itsRolesConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Roles.
+type itsRolesConvertor struct{}
 
-// rsmRoleProbeConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.RoleProbe.
-type rsmRoleProbeConvertor struct{}
+// itsRoleProbeConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.RoleProbe.
+type itsRoleProbeConvertor struct{}
 
-// rsmCredentialConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Credential.
-type rsmCredentialConvertor struct{}
+// itsCredentialConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Credential.
+type itsCredentialConvertor struct{}
 
-// rsmMembershipReconfigurationConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.MembershipReconfiguration.
-type rsmMembershipReconfigurationConvertor struct{}
+// itsMembershipReconfigurationConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.MembershipReconfiguration.
+type itsMembershipReconfigurationConvertor struct{}
 
-// rsmMemberUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.MemberUpdateStrategy.
-type rsmMemberUpdateStrategyConvertor struct{}
+// itsMemberUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.MemberUpdateStrategy.
+type itsMemberUpdateStrategyConvertor struct{}
 
-func (c *rsmMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
-	synthesizeComp, err := parseRSMConvertorArgs(args...)
+func (c *itsMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
+	synthesizeComp, err := parseITSConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
 	return getMemberUpdateStrategy(synthesizeComp), nil
 }
 
-// rsmPodManagementPolicyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.PodManagementPolicy.
-type rsmPodManagementPolicyConvertor struct{}
+// itsPodManagementPolicyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.PodManagementPolicy.
+type itsPodManagementPolicyConvertor struct{}
 
-func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
-	synthesizedComp, err := parseRSMConvertorArgs(args...)
+func (c *itsPodManagementPolicyConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseITSConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -104,11 +105,11 @@ func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
 	return appsv1.ParallelPodManagement, nil
 }
 
-// rsmUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Instances.
-type rsmUpdateStrategyConvertor struct{}
+// itsUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Instances.
+type itsUpdateStrategyConvertor struct{}
 
-func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
-	synthesizedComp, err := parseRSMConvertorArgs(args...)
+func (c *itsUpdateStrategyConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseITSConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -119,11 +120,11 @@ func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	return nil, nil
 }
 
-// rsmInstancesConvertor converts component instanceTemplate to rsm instanceTemplate
-type rsmInstancesConvertor struct{}
+// itsInstancesConvertor converts component instanceTemplate to ITS instanceTemplate
+type itsInstancesConvertor struct{}
 
-func (c *rsmInstancesConvertor) convert(args ...any) (any, error) {
-	synthesizedComp, err := parseRSMConvertorArgs(args...)
+func (c *itsInstancesConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseITSConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -135,11 +136,11 @@ func (c *rsmInstancesConvertor) convert(args ...any) (any, error) {
 	return instances, nil
 }
 
-// rsmOfflineInstancesConvertor converts component offlineInstances to rsm offlineInstances
-type rsmOfflineInstancesConvertor struct{}
+// itsOfflineInstancesConvertor converts component offlineInstances to ITS offlineInstances
+type itsOfflineInstancesConvertor struct{}
 
-func (c *rsmOfflineInstancesConvertor) convert(args ...any) (any, error) {
-	synthesizedComp, err := parseRSMConvertorArgs(args...)
+func (c *itsOfflineInstancesConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseITSConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -162,17 +163,29 @@ func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *wo
 		NodeName:             instance.NodeName,
 		NodeSelector:         instance.NodeSelector,
 		Tolerations:          instance.Tolerations,
-		RuntimeClassName:     instance.RuntimeClassName,
 		Resources:            instance.Resources,
 		Env:                  instance.Env,
 		Volumes:              instance.Volumes,
 		VolumeMounts:         instance.VolumeMounts,
-		VolumeClaimTemplates: instance.VolumeClaimTemplates,
+		VolumeClaimTemplates: toPersistentVolumeClaims(instance.VolumeClaimTemplates),
 	}
 }
 
-// parseRSMConvertorArgs parses the args of rsm convertor.
-func parseRSMConvertorArgs(args ...any) (*SynthesizedComponent, error) {
+func toPersistentVolumeClaims(vcts []appsv1alpha1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
+	var pvcs []corev1.PersistentVolumeClaim
+	for _, v := range vcts {
+		pvcs = append(pvcs, corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: v.Name,
+			},
+			Spec: v.Spec.ToV1PersistentVolumeClaimSpec(),
+		})
+	}
+	return pvcs
+}
+
+// parseITSConvertorArgs parses the args of ITS convertor.
+func parseITSConvertorArgs(args ...any) (*SynthesizedComponent, error) {
 	synthesizeComp, ok := args[0].(*SynthesizedComponent)
 	if !ok {
 		return nil, errors.New("args[0] not a SynthesizedComponent object")
@@ -201,13 +214,13 @@ func getMemberUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.M
 	}
 }
 
-// rsmServiceConvertor converts the given object into ReplicatedStateMachine.Spec.Service.
-// TODO(xingran): ComponentServices are not consistent with ReplicatedStateMachine.Spec.Service, If it is based on the new ComponentDefinition API,
-// the services is temporarily handled in the component controller, and the corresponding ReplicatedStateMachine.Spec.Service is temporarily set nil.
-func (c *rsmServiceConvertor) convert(args ...any) (any, error) {
+// itsServiceConvertor converts the given object into InstanceSet.Spec.Service.
+// TODO(xingran): ComponentServices are not consistent with InstanceSet.Spec.Service, If it is based on the new ComponentDefinition API,
+// the services is temporarily handled in the component controller, and the corresponding InstanceSet.Spec.Service is temporarily set nil.
+func (c *itsServiceConvertor) convert(args ...any) (any, error) {
 	/*
 		var compService appsv1alpha1.ComponentService
-		_, synthesizeComp, err := parseRSMConvertorArgs(args...)
+		_, synthesizeComp, err := parseITSConvertorArgs(args...)
 		if err != nil {
 			return nil, err
 		}
@@ -215,42 +228,42 @@ func (c *rsmServiceConvertor) convert(args ...any) (any, error) {
 		if len(compServices) == 0 {
 			return nil, nil
 		}
-		// get the first component service as the rsm service
+		// get the first component service as the ITS service
 		if len(compServices) > 0 {
 			compService = compServices[0]
 		}
 
-		// TODO(xingran): ComponentService.Name and ComponentService.RoleSelector are not used in ReplicatedStateMachine.Spec.Service
-		rsmService := &corev1.Service{
+		// TODO(xingran): ComponentService.Name and ComponentService.RoleSelector are not used in InstanceSet.Spec.Service
+		itsService := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: string(compService.ServiceName),
 			},
 			Spec: compService.ServiceSpec,
 		}
-		return rsmService, nil
+		return itsService, nil
 	*/
 	return nil, nil
 }
 
-// rsmAlternativeServicesConvertor converts the given object into ReplicatedStateMachine.Spec.AlternativeServices.
-// TODO: ComponentServices are not consistent with ReplicatedStateMachine.Spec.AlternativeServices, If it is based on the new ComponentDefinition API,
-// the services is temporarily handled in the component controller, and the corresponding ReplicatedStateMachine.Spec.AlternativeServices is temporarily set nil.
-func (c *rsmAlternativeServicesConvertor) convert(args ...any) (any, error) {
+// itsAlternativeServicesConvertor converts the given object into InstanceSet.Spec.AlternativeServices.
+// TODO: ComponentServices are not consistent with InstanceSet.Spec.AlternativeServices, If it is based on the new ComponentDefinition API,
+// the services is temporarily handled in the component controller, and the corresponding InstanceSet.Spec.AlternativeServices is temporarily set nil.
+func (c *itsAlternativeServicesConvertor) convert(args ...any) (any, error) {
 	return nil, nil
 }
 
-// rsmRolesConvertor converts the ComponentDefinition.Spec.Roles into ReplicatedStateMachine.Spec.Roles.
-func (c *rsmRolesConvertor) convert(args ...any) (any, error) {
-	synthesizeComp, err := parseRSMConvertorArgs(args...)
+// itsRolesConvertor converts the ComponentDefinition.Spec.Roles into InstanceSet.Spec.Roles.
+func (c *itsRolesConvertor) convert(args ...any) (any, error) {
+	synthesizeComp, err := parseITSConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
-	return ConvertSynthesizeCompRoleToRSMRole(synthesizeComp), nil
+	return ConvertSynthesizeCompRoleToInstanceSetRole(synthesizeComp), nil
 }
 
-// rsmRoleProbeConvertor converts the ComponentDefinition.Spec.LifecycleActions.RoleProbe into ReplicatedStateMachine.Spec.RoleProbe.
-func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
-	synthesizeComp, err := parseRSMConvertorArgs(args...)
+// itsRoleProbeConvertor converts the ComponentDefinition.Spec.LifecycleActions.RoleProbe into InstanceSet.Spec.RoleProbe.
+func (c *itsRoleProbeConvertor) convert(args ...any) (any, error) {
+	synthesizeComp, err := parseITSConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +272,7 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 		return nil, nil
 	}
 
-	rsmRoleProbe := &workloads.RoleProbe{
+	itsRoleProbe := &workloads.RoleProbe{
 		TimeoutSeconds:      synthesizeComp.LifecycleActions.RoleProbe.TimeoutSeconds,
 		PeriodSeconds:       synthesizeComp.LifecycleActions.RoleProbe.PeriodSeconds,
 		SuccessThreshold:    1,
@@ -269,25 +282,25 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 
 	if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
 		builtinHandler := string(*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler)
-		rsmRoleProbe.BuiltinHandler = &builtinHandler
-		return rsmRoleProbe, nil
+		itsRoleProbe.BuiltinHandler = &builtinHandler
+		return itsRoleProbe, nil
 	}
 
-	// TODO(xingran): RSM Action does not support args[] yet
+	// TODO(xingran): ITS Action does not support args[] yet
 	if synthesizeComp.LifecycleActions.RoleProbe.CustomHandler != nil {
-		rsmRoleProbeCmdAction := workloads.Action{
+		itsRoleProbeCmdAction := workloads.Action{
 			Image:   synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Image,
 			Command: synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Command,
 			Args:    synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Args,
 		}
-		rsmRoleProbe.CustomHandler = []workloads.Action{rsmRoleProbeCmdAction}
+		itsRoleProbe.CustomHandler = []workloads.Action{itsRoleProbeCmdAction}
 	}
 
-	return rsmRoleProbe, nil
+	return itsRoleProbe, nil
 }
 
-func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
-	synthesizeComp, err := parseRSMConvertorArgs(args...)
+func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
+	synthesizeComp, err := parseITSConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -335,13 +348,13 @@ func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
 	return credential, nil
 }
 
-func (c *rsmMembershipReconfigurationConvertor) convert(args ...any) (any, error) {
-	// synthesizeComp, err := parseRSMConvertorArgs(args...)
+func (c *itsMembershipReconfigurationConvertor) convert(args ...any) (any, error) {
+	// synthesizeComp, err := parseITSConvertorArgs(args...)
 	return "", nil // TODO
 }
 
-// ConvertSynthesizeCompRoleToRSMRole converts the component.SynthesizedComponent.Roles to workloads.ReplicaRole.
-func ConvertSynthesizeCompRoleToRSMRole(synthesizedComp *SynthesizedComponent) []workloads.ReplicaRole {
+// ConvertSynthesizeCompRoleToInstanceSetRole converts the component.SynthesizedComponent.Roles to workloads.ReplicaRole.
+func ConvertSynthesizeCompRoleToInstanceSetRole(synthesizedComp *SynthesizedComponent) []workloads.ReplicaRole {
 	if synthesizedComp.Roles == nil {
 		return nil
 	}
@@ -356,13 +369,13 @@ func ConvertSynthesizeCompRoleToRSMRole(synthesizedComp *SynthesizedComponent) [
 			return workloads.NoneMode
 		}
 	}
-	rsmReplicaRoles := make([]workloads.ReplicaRole, 0)
+	itsReplicaRoles := make([]workloads.ReplicaRole, 0)
 	for _, role := range synthesizedComp.Roles {
-		rsmReplicaRole := workloads.ReplicaRole{
+		itsReplicaRole := workloads.ReplicaRole{
 			Name:       role.Name,
 			AccessMode: accessMode(role),
 			CanVote:    role.Votable,
-			// HACK: Since the RSM relies on IsLeader field to determine whether a workload is available, we are using
+			// HACK: Since the InstanceSet relies on IsLeader field to determine whether a workload is available, we are using
 			// such a workaround to combine these two fields to provide the information.
 			// However, the condition will be broken if a service with multiple different roles that can be writable
 			// at the same time, such as Zookeeper.
@@ -370,7 +383,7 @@ func ConvertSynthesizeCompRoleToRSMRole(synthesizedComp *SynthesizedComponent) [
 			//  where the KB controller does not provide HA functionality.
 			IsLeader: role.Serviceable && role.Writable,
 		}
-		rsmReplicaRoles = append(rsmReplicaRoles, rsmReplicaRole)
+		itsReplicaRoles = append(itsReplicaRoles, itsReplicaRole)
 	}
-	return rsmReplicaRoles
+	return itsReplicaRoles
 }

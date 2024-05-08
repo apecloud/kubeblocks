@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -104,23 +103,29 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	// add namespaced objects deletion vertex
 	namespacedObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, cluster.Namespace, ml, toDeleteNamespacedKinds)
 	if err != nil {
-		return err
+		// PDB or CRDs that not present in data-plane clusters
+		if !strings.Contains(err.Error(), "the server could not find the requested resource") {
+			return err
+		}
 	}
 	delObjs := toDeleteObjs(namespacedObjs)
 
 	// add non-namespaced objects deletion vertex
 	nonNamespacedObjs, err := getOwningNonNamespacedObjects(transCtx.Context, transCtx.Client, ml, toDeleteNonNamespacedKinds)
 	if err != nil {
-		return err
+		// PDB or CRDs that not present in data-plane clusters
+		if !strings.Contains(err.Error(), "the server could not find the requested resource") {
+			return err
+		}
 	}
 	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
 
 	for _, o := range delObjs {
-		// skip the objects owned by the component and rsm controller
-		if shouldSkipObjOwnedByComp(o, *cluster) || rsm.IsOwnedByRsm(o) {
+		// skip the objects owned by the component and InstanceSet controller
+		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
 			continue
 		}
-		graphCli.Delete(dag, o)
+		graphCli.Delete(dag, o, inUniversalContext4G())
 	}
 	// set cluster action to noop until all the sub-resources deleted
 	if len(delObjs) == 0 {
@@ -170,6 +175,9 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 		&dpv1alpha1.BackupScheduleList{},
 		&dpv1alpha1.RestoreList{},
 		&batchv1.JobList{},
+		// The owner of the configuration in version 0.9 has been adjusted to component cr.
+		// for compatible with version 0.8
+		&appsv1alpha1.ConfigurationList{},
 	}
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},

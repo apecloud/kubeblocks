@@ -45,7 +45,9 @@ const (
 	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"
 
 	// customized encryption key for encrypting the password of connection credential.
-	CfgKeyDPEncryptionKey = "DP_ENCRYPTION_KEY"
+	CfgKeyDPEncryptionKey                = "DP_ENCRYPTION_KEY"
+	CfgKeyDPBackupEncryptionSecretKeyRef = "DP_BACKUP_ENCRYPTION_SECRET_KEY_REF"
+	CfgKeyDPBackupEncryptionAlgorithm    = "DP_BACKUP_ENCRYPTION_ALGORITHM"
 
 	CfgKBReconcileWorkers = "KUBEBLOCKS_RECONCILE_WORKERS"
 	CfgClientQPS          = "CLIENT_QPS"
@@ -94,7 +96,6 @@ const (
 
 	// kubeblocks.io labels
 	BackupProtectionLabelKey                 = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
-	AddonProviderLabelKey                    = "kubeblocks.io/provider"          // AddonProviderLabelKey marks the addon provider
 	RoleLabelKey                             = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	ReadyWithoutPrimaryKey                   = "kubeblocks.io/ready-without-primary"
 	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
@@ -107,7 +108,8 @@ const (
 	KBManagedByKey                           = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey          = "apps.kubeblocks.io/vct-name"
-	KBAppServiceVersionLabelKey              = "apps.kubeblocks.io/service-version"
+	KBAppComponentInstanceTemplatelabelKey   = "apps.kubeblocks.io/instance-template"
+	KBAppServiceVersionKey                   = "apps.kubeblocks.io/service-version"
 	WorkloadTypeLabelKey                     = "apps.kubeblocks.io/workload-type"
 	KBAppPodNameLabelKey                     = "apps.kubeblocks.io/pod-name"
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"
@@ -129,19 +131,16 @@ const (
 	OpsRequestNameLabelKey                   = "ops.kubeblocks.io/ops-name"
 	OpsRequestNamespaceLabelKey              = "ops.kubeblocks.io/ops-namespace"
 	ServiceDescriptorNameLabelKey            = "servicedescriptor.kubeblocks.io/name"
-	RestoreForHScaleLabelKey                 = "apps.kubeblocks.io/restore-for-hscale"
 	VolumeClaimTemplateNameLabelKeyForLegacy = "vct.kubeblocks.io/name" // Deprecated: only compatible with version 0.5, will be removed in 0.7
 
-	// StatefulSetPodNameLabelKey is used to mark the pod name of the StatefulSet
-	StatefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
-
 	// kubeblocks.io annotations
-	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"           // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
-	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version" // DefaultClusterVersionAnnotationKey specifies the default cluster version.
-	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request"                // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey                      = "kubeblocks.io/reconcile"                  // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey                        = "kubeblocks.io/restart"                    // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	RestoreFromBackupAnnotationKey              = "kubeblocks.io/restore-from-backup"        // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot" // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request"      // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey                      = "kubeblocks.io/reconcile"        // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey                        = "kubeblocks.io/restart"          // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	RestoreFromBackupAnnotationKey              = "kubeblocks.io/restore-from-backup"
+	RestoreDoneAnnotationKey                    = "kubeblocks.io/restore-done"
+	BackupSourceTargetAnnotationKey             = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
 	SnapShotForStartAnnotationKey               = "kubeblocks.io/snapshot-for-start"
 	ComponentReplicasAnnotationKey              = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
 	BackupPolicyTemplateAnnotationKey           = "apps.kubeblocks.io/backup-policy-template"
@@ -161,7 +160,7 @@ const (
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey               = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
-
+	DisableHAAnnotationKey                      = "kubeblocks.io/disable-ha"
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName         = "cluster.kubeblocks.io/finalizer"
 	DBComponentFinalizerName       = "component.kubeblocks.io/finalizer"
@@ -213,7 +212,6 @@ const (
 const (
 	DeploymentKind            = "Deployment"
 	StatefulSetKind           = "StatefulSet"
-	RSMKind                   = "ReplicatedStateMachine"
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJobKind               = "CronJob"
@@ -288,10 +286,6 @@ const (
 )
 
 const (
-	FeatureGateReplicatedStateMachine = "REPLICATED_STATE_MACHINE" // enable rsm
-)
-
-const (
 	KubernetesClusterDomainEnv = "KUBERNETES_CLUSTER_DOMAIN"
 	DefaultDNSDomain           = "cluster.local"
 )
@@ -304,15 +298,12 @@ const (
 )
 
 const (
-	BackupNameKeyForRestore          = "name"
-	BackupNamespaceKeyForRestore     = "namespace"
-	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
-	RestoreTimeKeyForRestore         = "restoreTime"
-	ConnectionPassword               = "connectionPassword"
-)
-
-const (
-	KBAppMultiClusterPlacementKey = "apps.kubeblocks.io/multi-cluster-placement"
+	BackupNameKeyForRestore           = "name"
+	BackupNamespaceKeyForRestore      = "namespace"
+	VolumeRestorePolicyKeyForRestore  = "volumeRestorePolicy"
+	DoReadyRestoreAfterClusterRunning = "doReadyRestoreAfterClusterRunning"
+	RestoreTimeKeyForRestore          = "restoreTime"
+	ConnectionPassword                = "connectionPassword"
 )
 
 const (
@@ -326,4 +317,8 @@ const (
 	SourceAPIVersion   = "source"
 	MigratedAPIVersion = "migrated"
 	ReviewAPIVersion   = "reviewer"
+)
+
+const (
+	FeatureGateIgnoreConfigTemplateDefaultMode = "IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE"
 )

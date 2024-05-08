@@ -27,13 +27,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const metricsPath = "/metrics/runtime"
 
 func RuntimeMetric() map[string]http.Handler {
-	if !constant.EnabledRuntimeMetrics() {
+	if !controllerutil.EnabledRuntimeMetrics() {
 		return nil
 	}
 

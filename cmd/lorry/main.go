@@ -79,16 +79,16 @@ func main() {
 	}
 	ctrl.SetLogger(kzap.New(kopts...))
 
-	// Initialize DB Manager
-	err = register.InitDBManager(configDir)
-	if err != nil {
-		panic(errors.Wrap(err, "DB manager initialize failed"))
-	}
-
 	// Initialize DCS (Distributed Control System)
 	err = dcs.InitStore()
 	if err != nil {
 		panic(errors.Wrap(err, "DCS initialize failed"))
+	}
+
+	// Initialize DB Manager
+	err = register.InitDBManager(configDir)
+	if err != nil {
+		panic(errors.Wrap(err, "DB manager initialize failed"))
 	}
 
 	// Start HA

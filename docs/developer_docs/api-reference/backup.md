@@ -11,9 +11,6 @@ sidebar_label: Backup
 <li>
 <a href="#dataprotection.kubeblocks.io%2fv1alpha1">dataprotection.kubeblocks.io/v1alpha1</a>
 </li>
-<li>
-<a href="#storage.kubeblocks.io%2fv1alpha1">storage.kubeblocks.io/v1alpha1</a>
-</li>
 </ul>
 <h2 id="dataprotection.kubeblocks.io/v1alpha1">dataprotection.kubeblocks.io/v1alpha1</h2>
 <div>
@@ -31,6 +28,8 @@ Resource Types:
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSchedule">BackupSchedule</a>
 </li><li>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.Restore">Restore</a>
+</li><li>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>
 </li></ul>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.ActionSet">ActionSet
 </h3>
@@ -443,6 +442,22 @@ BackupTarget
 <td>
 <p>Specifies the target information to back up, such as the target pod, the
 cluster connection credential.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targets</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
+[]BackupTarget
+</a>
+</em>
+</td>
+<td>
+<p>Specifies multiple target information for backup operations. This includes details
+such as the target pod and cluster connection credentials. All specified targets
+will be backed up collectively.
+optional</p>
 </td>
 </tr>
 <tr>
@@ -978,6 +993,170 @@ RestoreStatus
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider
+</h3>
+<div>
+<p>StorageProvider comprises specifications that provide guidance on accessing remote storage.
+Currently the supported access methods are via a dedicated CSI driver or the <code>datasafed</code> tool.
+In case of CSI driver, the specification expounds on provisioning PVCs for that driver.
+As for the <code>datasafed</code> tool, the specification provides insights on generating the necessary
+configuration file.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>dataprotection.kubeblocks.io/v1alpha1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>StorageProvider</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProviderSpec">
+StorageProviderSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>csiDriverName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the CSI driver used to access remote storage.
+This field can be empty, it indicates that the storage is not accessible via CSI.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>csiDriverSecretTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template that used to render and generate <code>k8s.io/api/core/v1.Secret</code>
+resources for a specific CSI driver.
+For example, <code>accessKey</code> and <code>secretKey</code> needed by CSI-S3 are stored in this
+<code>Secret</code> resource.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>storageClassTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template utilized to render and generate <code>kubernetes.storage.k8s.io.v1.StorageClass</code>
+resources. The `StorageClass&rsquo; created by this template is aimed at using the CSI driver.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template that renders and generates <code>k8s.io/api/core/v1.PersistentVolumeClaim</code>
+resources. This PVC can reference the <code>StorageClass</code> created from <code>storageClassTemplate</code>,
+allowing Pods to access remote storage by mounting the PVC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>datasafedConfigTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template used to render and generate <code>k8s.io/api/core/v1.Secret</code>.
+This <code>Secret</code> involves the configuration details required by the <code>datasafed</code> tool
+to access remote storage. For example, the <code>Secret</code> should contain <code>endpoint</code>,
+<code>bucket</code>, &lsquo;region&rsquo;, &lsquo;accessKey&rsquo;, &lsquo;secretKey&rsquo;, or something else for S3 storage.
+This field can be empty, it means this kind of storage is not accessible via
+the <code>datasafed</code> tool.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parametersSchema</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParametersSchema">
+ParametersSchema
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes the parameters required for storage.
+The parameters defined here can be referenced in the above templates,
+and <code>kbcli</code> uses this definition for dynamic command-line parameter parsing.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProviderStatus">
+StorageProviderStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.AccessMethod">AccessMethod
 (<code>string</code> alias)</h3>
 <p>
@@ -1283,6 +1462,17 @@ string
 <td>
 <em>(Optional)</em>
 <p>The name of the action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetPodName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Records the target pod name which has been backed up.</p>
 </td>
 </tr>
 <tr>
@@ -1699,6 +1889,21 @@ BackupTarget
 <p>Specifies the target information to back up, it will override the target in backup policy.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>targets</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
+[]BackupTarget
+</a>
+</em>
+</td>
+<td>
+<p>Specifies multiple target information for backup operations. This includes details
+such as the target pod and cluster connection credentials. All specified targets
+will be backed up collectively.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPhase">BackupPhase
@@ -1823,6 +2028,22 @@ cluster connection credential.</p>
 </tr>
 <tr>
 <td>
+<code>targets</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
+[]BackupTarget
+</a>
+</em>
+</td>
+<td>
+<p>Specifies multiple target information for backup operations. This includes details
+such as the target pod and cluster connection credentials. All specified targets
+will be backed up collectively.
+optional</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>backupMethods</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">
@@ -1932,7 +2153,7 @@ It refers to the BackupPolicy&rsquo;s generation, which is updated on mutation b
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreSpec">RestoreSpec</a>)
 </p>
 <div>
-<p>BackupRef describes the backup name and namespace.</p>
+<p>BackupRef describes the backup info.</p>
 </div>
 <table>
 <thead>
@@ -1962,6 +2183,17 @@ string
 </td>
 <td>
 <p>Specifies the backup namespace.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceTargetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the source target for restoration, identified by its name.</p>
 </td>
 </tr>
 </tbody>
@@ -2670,14 +2902,28 @@ this is the time range of recoverable data.</p>
 <td>
 <code>target</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
-BackupTarget
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatusTarget">
+BackupStatusTarget
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Records the target information for this backup.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targets</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatusTarget">
+[]BackupStatusTarget
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the targets information for this backup.</p>
 </td>
 </tr>
 <tr>
@@ -2751,10 +2997,10 @@ EncryptionConfig
 </tr>
 </tbody>
 </table>
-<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupStatusTarget">BackupStatusTarget
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicySpec">BackupPolicySpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatus">BackupStatus</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatus">BackupStatus</a>)
 </p>
 <div>
 </div>
@@ -2766,6 +3012,61 @@ EncryptionConfig
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>BackupTarget</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
+BackupTarget
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>BackupTarget</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selectedTargetPods</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Records the selected pods by the target info during backup.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicySpec">BackupPolicySpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatusTarget">BackupStatusTarget</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies a mandatory and unique identifier for each target when using the &ldquo;targets&rdquo; field.
+The backup data for the current target is stored in a uniquely named subdirectory.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>podSelector</code><br/>
@@ -3022,6 +3323,26 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.DataRestorePolicy">DataRestorePolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.RequiredPolicyForAllPodSelection">RequiredPolicyForAllPodSelection</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;OneToMany&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;OneToOne&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.EncryptionConfig">EncryptionConfig
 </h3>
 <p>
@@ -3262,6 +3583,21 @@ Kubernetes meta/v1.LabelSelector
 <tbody>
 <tr>
 <td>
+<code>requiredPolicyForAllPodSelection</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.RequiredPolicyForAllPodSelection">
+RequiredPolicyForAllPodSelection
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the restore policy, which is required when the pod selection strategy for the source target is &lsquo;All&rsquo;.
+This field is ignored if the pod selection strategy is &lsquo;Any&rsquo;.
+optional</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>target</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.JobActionTarget">
@@ -3270,8 +3606,7 @@ JobActionTarget
 </em>
 </td>
 <td>
-<p>Defines the pod that needs to be executed for the job action.
-A pod that meets the conditions will be selected for execution.</p>
+<p>Defines the pods that needs to be executed for the job action.</p>
 </td>
 </tr>
 </tbody>
@@ -3356,8 +3691,8 @@ ActionErrorMode
 <td>
 <code>podSelector</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
+<a href="#dataprotection.kubeblocks.io/v1alpha1.PodSelector">
+PodSelector
 </a>
 </em>
 </td>
@@ -3442,6 +3777,51 @@ The default value is empty.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ParametersSchema">ParametersSchema
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProviderSpec">StorageProviderSpec</a>)
+</p>
+<div>
+<p>ParametersSchema describes the parameters needed for a certain storage.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>openAPIV3Schema</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
+Kubernetes api extensions v1.JSONSchemaProps
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the parameters in OpenAPI V3.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialFields</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines which parameters are credential fields, which need to be handled specifically.
+For instance, these should be stored in a <code>Secret</code> instead of a <code>ConfigMap</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
@@ -3490,7 +3870,7 @@ selected for backup target</p>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.PodSelector">PodSelector
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.JobActionTarget">JobActionTarget</a>)
 </p>
 <div>
 </div>
@@ -3529,10 +3909,11 @@ PodSelectionStrategy
 </td>
 <td>
 <p>Specifies the strategy to select the target pod when multiple pods are selected.
-Valid values are: Any: select any one pod that match the labelsSelector.</p>
+Valid values are:</p>
 <ul>
 <li><code>Any</code>: select any one pod that match the labelsSelector.</li>
-<li><code>All</code>: select all pods that match the labelsSelector.</li>
+<li><code>All</code>: select all pods that match the labelsSelector. The backup data for the current pod
+will be stored in a subdirectory named after the pod.</li>
 </ul>
 </td>
 </tr>
@@ -3553,6 +3934,21 @@ Valid values are: Any: select any one pod that match the labelsSelector.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>requiredPolicyForAllPodSelection</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.RequiredPolicyForAllPodSelection">
+RequiredPolicyForAllPodSelection
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the restore policy, which is required when the pod selection strategy for the source target is &lsquo;All&rsquo;.
+This field is ignored if the pod selection strategy is &lsquo;Any&rsquo;.
+optional</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>dataSourceRef</code><br/>
@@ -3810,6 +4206,53 @@ ReadinessProbe
 <p>Defines a periodic probe of the service readiness.
 The controller will perform postReadyHooks of BackupScript.spec.restore
 after the service readiness when readinessProbe is configured.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.RequiredPolicyForAllPodSelection">RequiredPolicyForAllPodSelection
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.JobAction">JobAction</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.PrepareDataConfig">PrepareDataConfig</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>dataRestorePolicy</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.DataRestorePolicy">
+DataRestorePolicy
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the data restore policy. Options include:
+- OneToMany: Enables restoration of all volumes from a single data copy of the original target instance.
+The &lsquo;sourceOfOneToMany&rsquo; field must be set when using this policy.
+- OneToOne: Restricts data restoration such that each data piece can only be restored to a single target instance.
+This is the default policy. When the number of target instances specified for restoration surpasses the count of original backup target instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceOfOneToMany</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.SourceOfOneToMany">
+SourceOfOneToMany
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the name of the source target pod. This field is mandatory when the DataRestorePolicy is configured to &lsquo;OneToMany&rsquo;.</p>
 </td>
 </tr>
 </tbody>
@@ -4784,6 +5227,209 @@ If not specified, the pod will be dispatched by the default scheduler.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.SourceOfOneToMany">SourceOfOneToMany
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.RequiredPolicyForAllPodSelection">RequiredPolicyForAllPodSelection</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>targetPodName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the source target pod.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.StorageProviderPhase">StorageProviderPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProviderStatus">StorageProviderStatus</a>)
+</p>
+<div>
+<p>StorageProviderPhase defines phases of a <code>StorageProvider</code>.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;NotReady&#34;</p></td>
+<td><p>StorageProviderNotReady indicates that the <code>StorageProvider</code> is not ready,
+usually because the specified CSI driver is not yet installed.</p>
+</td>
+</tr><tr><td><p>&#34;Ready&#34;</p></td>
+<td><p>StorageProviderReady indicates that the <code>StorageProvider</code> is ready for use.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.StorageProviderSpec">StorageProviderSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>)
+</p>
+<div>
+<p>StorageProviderSpec defines the desired state of <code>StorageProvider</code>.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>csiDriverName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the CSI driver used to access remote storage.
+This field can be empty, it indicates that the storage is not accessible via CSI.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>csiDriverSecretTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template that used to render and generate <code>k8s.io/api/core/v1.Secret</code>
+resources for a specific CSI driver.
+For example, <code>accessKey</code> and <code>secretKey</code> needed by CSI-S3 are stored in this
+<code>Secret</code> resource.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>storageClassTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template utilized to render and generate <code>kubernetes.storage.k8s.io.v1.StorageClass</code>
+resources. The `StorageClass&rsquo; created by this template is aimed at using the CSI driver.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template that renders and generates <code>k8s.io/api/core/v1.PersistentVolumeClaim</code>
+resources. This PVC can reference the <code>StorageClass</code> created from <code>storageClassTemplate</code>,
+allowing Pods to access remote storage by mounting the PVC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>datasafedConfigTemplate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template used to render and generate <code>k8s.io/api/core/v1.Secret</code>.
+This <code>Secret</code> involves the configuration details required by the <code>datasafed</code> tool
+to access remote storage. For example, the <code>Secret</code> should contain <code>endpoint</code>,
+<code>bucket</code>, &lsquo;region&rsquo;, &lsquo;accessKey&rsquo;, &lsquo;secretKey&rsquo;, or something else for S3 storage.
+This field can be empty, it means this kind of storage is not accessible via
+the <code>datasafed</code> tool.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parametersSchema</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParametersSchema">
+ParametersSchema
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes the parameters required for storage.
+The parameters defined here can be referenced in the above templates,
+and <code>kbcli</code> uses this definition for dynamic command-line parameter parsing.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.StorageProviderStatus">StorageProviderStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>)
+</p>
+<div>
+<p>StorageProviderStatus defines the observed state of <code>StorageProvider</code>.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProviderPhase">
+StorageProviderPhase
+</a>
+</em>
+</td>
+<td>
+<p>The phase of the <code>StorageProvider</code>. Valid phases are <code>NotReady</code> and <code>Ready</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes the current state of the <code>StorageProvider</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.SyncProgress">SyncProgress
 </h3>
 <p>
@@ -5004,396 +5650,15 @@ string
 <p>The size of the volume snapshot.</p>
 </td>
 </tr>
-</tbody>
-</table>
-<hr/>
-<h2 id="storage.kubeblocks.io/v1alpha1">storage.kubeblocks.io/v1alpha1</h2>
-<div>
-</div>
-Resource Types:
-<ul><li>
-<a href="#storage.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>
-</li></ul>
-<h3 id="storage.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider
-</h3>
-<div>
-<p>StorageProvider comprises specifications that provide guidance on accessing remote storage.
-Currently the supported access methods are via a dedicated CSI driver or the <code>datasafed</code> tool.
-In case of CSI driver, the specification expounds on provisioning PVCs for that driver.
-As for the <code>datasafed</code> tool, the specification provides insights on generating the necessary
-configuration file.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
 <tr>
 <td>
-<code>apiVersion</code><br/>
-string</td>
-<td>
-<code>storage.kubeblocks.io/v1alpha1</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-string
-</td>
-<td><code>StorageProvider</code></td>
-</tr>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#storage.kubeblocks.io/v1alpha1.StorageProviderSpec">
-StorageProviderSpec
-</a>
-</em>
-</td>
-<td>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>csiDriverName</code><br/>
+<code>targetName</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Specifies the name of the CSI driver used to access remote storage.
-This field can be empty, it indicates that the storage is not accessible via CSI.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>csiDriverSecretTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A Go template that used to render and generate <code>k8s.io/api/core/v1.Secret</code>
-resources for a specific CSI driver.
-For example, <code>accessKey</code> and <code>secretKey</code> needed by CSI-S3 are stored in this
-<code>Secret</code> resource.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>storageClassTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A Go template utilized to render and generate <code>kubernetes.storage.k8s.io.v1.StorageClass</code>
-resources. The `StorageClass&rsquo; created by this template is aimed at using the CSI driver.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>persistentVolumeClaimTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A Go template that renders and generates <code>k8s.io/api/core/v1.PersistentVolumeClaim</code>
-resources. This PVC can reference the <code>StorageClass</code> created from <code>storageClassTemplate</code>,
-allowing Pods to access remote storage by mounting the PVC.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>datasafedConfigTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A Go template used to render and generate <code>k8s.io/api/core/v1.Secret</code>.
-This <code>Secret</code> involves the configuration details required by the <code>datasafed</code> tool
-to access remote storage. For example, the <code>Secret</code> should contain <code>endpoint</code>,
-<code>bucket</code>, &lsquo;region&rsquo;, &lsquo;accessKey&rsquo;, &lsquo;secretKey&rsquo;, or something else for S3 storage.
-This field can be empty, it means this kind of storage is not accessible via
-the <code>datasafed</code> tool.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parametersSchema</code><br/>
-<em>
-<a href="#storage.kubeblocks.io/v1alpha1.ParametersSchema">
-ParametersSchema
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Describes the parameters required for storage.
-The parameters defined here can be referenced in the above templates,
-and <code>kbcli</code> uses this definition for dynamic command-line parameter parsing.</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#storage.kubeblocks.io/v1alpha1.StorageProviderStatus">
-StorageProviderStatus
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="storage.kubeblocks.io/v1alpha1.ParametersSchema">ParametersSchema
-</h3>
-<p>
-(<em>Appears on:</em><a href="#storage.kubeblocks.io/v1alpha1.StorageProviderSpec">StorageProviderSpec</a>)
-</p>
-<div>
-<p>ParametersSchema describes the parameters needed for a certain storage.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>openAPIV3Schema</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
-Kubernetes api extensions v1.JSONSchemaProps
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the parameters in OpenAPI V3.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>credentialFields</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines which parameters are credential fields, which need to be handled specifically.
-For instance, these should be stored in a <code>Secret</code> instead of a <code>ConfigMap</code>.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="storage.kubeblocks.io/v1alpha1.StorageProviderPhase">StorageProviderPhase
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#storage.kubeblocks.io/v1alpha1.StorageProviderStatus">StorageProviderStatus</a>)
-</p>
-<div>
-<p>StorageProviderPhase defines phases of a <code>StorageProvider</code>.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;NotReady&#34;</p></td>
-<td><p>StorageProviderNotReady indicates that the <code>StorageProvider</code> is not ready,
-usually because the specified CSI driver is not yet installed.</p>
-</td>
-</tr><tr><td><p>&#34;Ready&#34;</p></td>
-<td><p>StorageProviderReady indicates that the <code>StorageProvider</code> is ready for use.</p>
-</td>
-</tr></tbody>
-</table>
-<h3 id="storage.kubeblocks.io/v1alpha1.StorageProviderSpec">StorageProviderSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#storage.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>)
-</p>
-<div>
-<p>StorageProviderSpec defines the desired state of <code>StorageProvider</code>.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>csiDriverName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the CSI driver used to access remote storage.
-This field can be empty, it indicates that the storage is not accessible via CSI.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>csiDriverSecretTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A Go template that used to render and generate <code>k8s.io/api/core/v1.Secret</code>
-resources for a specific CSI driver.
-For example, <code>accessKey</code> and <code>secretKey</code> needed by CSI-S3 are stored in this
-<code>Secret</code> resource.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>storageClassTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A Go template utilized to render and generate <code>kubernetes.storage.k8s.io.v1.StorageClass</code>
-resources. The `StorageClass&rsquo; created by this template is aimed at using the CSI driver.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>persistentVolumeClaimTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A Go template that renders and generates <code>k8s.io/api/core/v1.PersistentVolumeClaim</code>
-resources. This PVC can reference the <code>StorageClass</code> created from <code>storageClassTemplate</code>,
-allowing Pods to access remote storage by mounting the PVC.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>datasafedConfigTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A Go template used to render and generate <code>k8s.io/api/core/v1.Secret</code>.
-This <code>Secret</code> involves the configuration details required by the <code>datasafed</code> tool
-to access remote storage. For example, the <code>Secret</code> should contain <code>endpoint</code>,
-<code>bucket</code>, &lsquo;region&rsquo;, &lsquo;accessKey&rsquo;, &lsquo;secretKey&rsquo;, or something else for S3 storage.
-This field can be empty, it means this kind of storage is not accessible via
-the <code>datasafed</code> tool.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parametersSchema</code><br/>
-<em>
-<a href="#storage.kubeblocks.io/v1alpha1.ParametersSchema">
-ParametersSchema
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Describes the parameters required for storage.
-The parameters defined here can be referenced in the above templates,
-and <code>kbcli</code> uses this definition for dynamic command-line parameter parsing.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="storage.kubeblocks.io/v1alpha1.StorageProviderStatus">StorageProviderStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#storage.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>)
-</p>
-<div>
-<p>StorageProviderStatus defines the observed state of <code>StorageProvider</code>.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>phase</code><br/>
-<em>
-<a href="#storage.kubeblocks.io/v1alpha1.StorageProviderPhase">
-StorageProviderPhase
-</a>
-</em>
-</td>
-<td>
-<p>The phase of the <code>StorageProvider</code>. Valid phases are <code>NotReady</code> and <code>Ready</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>conditions</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
-[]Kubernetes meta/v1.Condition
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Describes the current state of the <code>StorageProvider</code>.</p>
+<p>Associates this volumeSnapshot with its corresponding target.</p>
 </td>
 </tr>
 </tbody>

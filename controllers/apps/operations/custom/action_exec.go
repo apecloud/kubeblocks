@@ -33,7 +33,7 @@ type ExecAction struct {
 	OpsRequest     *appsv1alpha1.OpsRequest
 	Cluster        *appsv1alpha1.Cluster
 	OpsDef         *appsv1alpha1.OpsDefinition
-	CompCustomSpec *appsv1alpha1.CustomOpsComponent
+	CustomCompOps  *appsv1alpha1.CustomOpsComponent
 	Comp           *appsv1alpha1.ClusterComponentSpec
 	progressDetail appsv1alpha1.ProgressStatusDetail
 }
@@ -41,14 +41,14 @@ type ExecAction struct {
 func NewExecAction(opsRequest *appsv1alpha1.OpsRequest,
 	cluster *appsv1alpha1.Cluster,
 	opsDef *appsv1alpha1.OpsDefinition,
-	comCustomSpec *appsv1alpha1.CustomOpsComponent,
+	customCompOps *appsv1alpha1.CustomOpsComponent,
 	comp *appsv1alpha1.ClusterComponentSpec,
 	progressDetail appsv1alpha1.ProgressStatusDetail) *ExecAction {
 	return &ExecAction{
 		OpsRequest:     opsRequest,
 		Cluster:        cluster,
 		OpsDef:         opsDef,
-		CompCustomSpec: comCustomSpec,
+		CustomCompOps:  customCompOps,
 		Comp:           comp,
 		progressDetail: progressDetail,
 	}
@@ -59,21 +59,21 @@ func (e *ExecAction) Execute(actionCtx ActionContext) (*ActionStatus, error) {
 		return nil, nil
 	}
 	var (
-		podTemplateName   = actionCtx.Action.Exec.TargetPodTemplate
-		targetPodTemplate *appsv1alpha1.TargetPodTemplate
-		actionStatus      = NewActiontatus()
+		podInfoExtractorName = actionCtx.Action.Exec.PodInfoExtractorName
+		podInfoExtractor     *appsv1alpha1.PodInfoExtractor
+		actionStatus         = NewActiontatus()
 	)
 	// get target pods
-	targetPodTemplate = getTargetPodTemplate(e.OpsDef, podTemplateName)
-	if targetPodTemplate == nil {
-		return nil, intctrlutil.NewFatalError("can not found the targetPodTemplate by " + podTemplateName)
+	podInfoExtractor = getTargetPodInfoExtractor(e.OpsDef, podInfoExtractorName)
+	if podInfoExtractor == nil {
+		return nil, intctrlutil.NewFatalError("can not found the podInfoExtractor: " + podInfoExtractorName)
 	}
-	targetPods, err := getTargetPods(actionCtx.ReqCtx.Ctx, actionCtx.Client, e.Cluster, targetPodTemplate.PodSelector, e.CompCustomSpec.ComponentName)
+	targetPods, err := getTargetPods(actionCtx.ReqCtx.Ctx, actionCtx.Client, e.Cluster, podInfoExtractor.PodSelector, e.CustomCompOps.ComponentName)
 	if err != nil {
 		return nil, err
 	}
 	for i := range targetPods {
-		podSpec, err := e.buildExecPodSpec(actionCtx, targetPodTemplate, targetPods[i])
+		podSpec, err := e.buildExecPodSpec(actionCtx, podInfoExtractor, targetPods[i])
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +97,7 @@ func (e *ExecAction) checkActionPodStatus(actionCtx ActionContext,
 	taskIndex int) (bool, bool, error) {
 	return actionCtx.checkPodTaskStatus(task, actionCtx.Action.Exec.BackoffLimit, func() error {
 		targetPodTemplate, targetPod, err := getTargetTemplateAndPod(actionCtx.ReqCtx.Ctx, actionCtx.Client,
-			e.OpsDef, actionCtx.Action.Exec.TargetPodTemplate, task.TargetPodName, e.OpsRequest.Namespace)
+			e.OpsDef, actionCtx.Action.Exec.PodInfoExtractorName, task.TargetPodName, e.OpsRequest.Namespace)
 		if err != nil {
 			return err
 		}
@@ -122,8 +122,8 @@ func (e *ExecAction) createExecPod(actionCtx ActionContext,
 	podName := buildActionPodName(e.OpsRequest, e.Comp.Name, actionCtx.Action.Name, targetPodIndex, retries)
 	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 	serviceAccountName := viper.GetString(constant.KBServiceAccountName)
-	if e.OpsRequest.Spec.CustomSpec.ServiceAccountName != nil {
-		serviceAccountName = *e.OpsRequest.Spec.CustomSpec.ServiceAccountName
+	if e.OpsRequest.Spec.CustomOps.ServiceAccountName != nil {
+		serviceAccountName = *e.OpsRequest.Spec.CustomOps.ServiceAccountName
 		namespace = e.OpsRequest.Namespace
 	}
 	pod := builder.NewPodBuilder(namespace, podName).
@@ -138,11 +138,11 @@ func (e *ExecAction) createExecPod(actionCtx ActionContext,
 }
 
 func (e *ExecAction) buildExecPodSpec(actionCtx ActionContext,
-	targetPodTemplate *appsv1alpha1.TargetPodTemplate,
+	podInfoExtractor *appsv1alpha1.PodInfoExtractor,
 	targetPod *corev1.Pod) (*corev1.PodSpec, error) {
 	// inject component and componentDef envs
 	env, err := buildActionPodEnv(actionCtx.ReqCtx, actionCtx.Client, e.Cluster, e.OpsDef,
-		e.OpsRequest, e.Comp, e.CompCustomSpec, targetPodTemplate, targetPod)
+		e.OpsRequest, e.Comp, e.CustomCompOps, podInfoExtractor, targetPod)
 	if err != nil {
 		return nil, err
 	}

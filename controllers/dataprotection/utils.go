@@ -42,6 +42,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
 	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
@@ -132,25 +133,21 @@ func HandleBackupRepo(request *dpbackup.Request) error {
 // it will return the pod which name is podName. Otherwise, it will return the
 // pods which are selected by BackupPolicy selector and strategy.
 func GetTargetPods(reqCtx intctrlutil.RequestCtx,
-	cli client.Client, podName string,
-	backupMethod *dpv1alpha1.BackupMethod,
+	cli client.Client,
+	selectedPodNames []string,
 	backupPolicy *dpv1alpha1.BackupPolicy,
-) ([]*corev1.Pod, error) {
-	if backupMethod == nil {
+	target *dpv1alpha1.BackupTarget,
+	backupType dpv1alpha1.BackupType) ([]*corev1.Pod, error) {
+	if target == nil {
 		return nil, nil
 	}
 	existPodSelector := func(selector *dpv1alpha1.PodSelector) bool {
 		return selector != nil && selector.LabelSelector != nil
 	}
-	var selector *dpv1alpha1.PodSelector
-	if backupMethod.Target != nil && existPodSelector(backupMethod.Target.PodSelector) {
-		selector = backupMethod.Target.PodSelector
-	} else {
-		// using global target policy.
-		selector = backupPolicy.Spec.Target.PodSelector
-		if !existPodSelector(selector) {
-			return nil, nil
-		}
+	// using global target policy.
+	selector := target.PodSelector
+	if !existPodSelector(selector) {
+		return nil, nil
 	}
 	labelSelector, err := metav1.LabelSelectorAsSelector(selector.LabelSelector)
 	if err != nil {
@@ -167,33 +164,45 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 		return nil, fmt.Errorf("failed to find target pods by backup policy %s/%s",
 			backupPolicy.Namespace, backupPolicy.Name)
 	}
-
+	sort.Sort(intctrlutil.ByPodName(pods.Items))
 	var targetPods []*corev1.Pod
-	if podName != "" && selector.Strategy == dpv1alpha1.PodSelectionStrategyAny {
+	if len(selectedPodNames) == 0 || backupType == dpv1alpha1.BackupTypeContinuous {
+		switch selector.Strategy {
+		case dpv1alpha1.PodSelectionStrategyAny:
+			// always selecting the first pod
+			pod := dputils.GetFirstIndexRunningPod(pods)
+			if pod != nil {
+				targetPods = append(targetPods, pod)
+			}
+		case dpv1alpha1.PodSelectionStrategyAll:
+			for i := range pods.Items {
+				targetPods = append(targetPods, &pods.Items[i])
+			}
+		}
+		return targetPods, nil
+	}
+	// if already selected target pods and backupType is not Continuous, we should re-use them.
+	switch selector.Strategy {
+	case dpv1alpha1.PodSelectionStrategyAny:
 		for _, pod := range pods.Items {
-			if pod.Name == podName {
+			if pod.Name == selectedPodNames[0] {
 				targetPods = append(targetPods, &pod)
 				break
 			}
 		}
-		if len(targetPods) > 0 {
-			return targetPods, nil
-		}
-	}
-	sort.Sort(intctrlutil.ByPodName(pods.Items))
-	// if pod selection strategy is Any, always return first pod
-	switch selector.Strategy {
-	case dpv1alpha1.PodSelectionStrategyAny:
-		pod := dputils.GetFirstIndexRunningPod(pods)
-		if pod != nil {
-			targetPods = append(targetPods, pod)
-		}
 	case dpv1alpha1.PodSelectionStrategyAll:
+		podMap := map[string]corev1.Pod{}
 		for i := range pods.Items {
-			targetPods = append(targetPods, &pods.Items[i])
+			podMap[pods.Items[i].Name] = pods.Items[i]
+		}
+		for _, podName := range selectedPodNames {
+			pod, ok := podMap[podName]
+			if !ok {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found the target pod "%s"`, podName))
+			}
+			targetPods = append(targetPods, &pod)
 		}
 	}
-
 	return targetPods, nil
 }
 
@@ -217,7 +226,7 @@ func getCluster(ctx context.Context,
 }
 
 func getClusterLabelKeys() []string {
-	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
+	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey, constant.KBAppShardingNameLabelKey}
 }
 
 // sendWarningEventForError sends warning event for backup controller error
@@ -283,7 +292,30 @@ func RecorderEventAndRequeue(reqCtx intctrlutil.RequestCtx, recorder record.Even
 	return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 }
 
-func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string) (string, error) {
+func UniversalContext(ctx context.Context, mcMgr multicluster.Manager) context.Context {
+	if mcMgr == nil {
+		return ctx
+	}
+	return multicluster.IntoContext(ctx, strings.Join(mcMgr.GetContexts(), ","))
+}
+
+func checkResourceUniversallyAvailable(ctx context.Context, cli client.Client, objKey client.ObjectKey, obj client.Object, mcMgr multicluster.Manager) error {
+	if mcMgr != nil {
+		for _, dataCluster := range mcMgr.GetContexts() {
+			getCtx := multicluster.IntoContext(ctx, dataCluster)
+			err := cli.Get(getCtx, objKey, obj, multicluster.Oneshot())
+			if err != nil {
+				return fmt.Errorf("get %s from the %s data cluster error: %w", objKey.String(), dataCluster, err)
+			}
+		}
+	}
+	if err := cli.Get(ctx, objKey, obj, multicluster.InControlContext()); err != nil {
+		return fmt.Errorf("get %s from the control cluster error: %w", objKey.String(), err)
+	}
+	return nil
+}
+
+func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string, mcMgr multicluster.Manager) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is empty")
 	}
@@ -293,10 +325,11 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 	}
 	sa := &corev1.ServiceAccount{}
 	saKey := client.ObjectKey{Namespace: namespace, Name: saName}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, saKey, sa)
-	if err != nil {
+	err := checkResourceUniversallyAvailable(reqCtx.Ctx, cli, saKey, sa, mcMgr)
+	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
+	saExists := err == nil
 
 	clusterRoleName := viper.GetString(dptypes.CfgKeyWorkerClusterRoleName)
 	if clusterRoleName == "" {
@@ -314,7 +347,9 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		}
 	}
 
-	if exists {
+	ctx := UniversalContext(reqCtx.Ctx, mcMgr)
+
+	if saExists {
 		// SA exists, check if annotations are consistent
 		saCopy := sa.DeepCopy()
 		if len(extraAnnotations) > 0 && sa.Annotations == nil {
@@ -325,7 +360,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 			}
 		}
 		if !reflect.DeepEqual(sa, saCopy) {
-			err := cli.Patch(reqCtx.Ctx, sa, client.MergeFrom(saCopy))
+			err := cli.Patch(ctx, sa, client.MergeFrom(saCopy), multicluster.InUniversalContext())
 			if err != nil {
 				return "", fmt.Errorf("failed to patch worker service account: %w", err)
 			}
@@ -348,7 +383,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 			Name:     clusterRoleName,
 			APIGroup: "rbac.authorization.k8s.io",
 		}
-		if err := cli.Create(reqCtx.Ctx, rb); err != nil {
+		if err := cli.Create(ctx, rb, multicluster.InUniversalContext()); err != nil {
 			return client.IgnoreAlreadyExists(err)
 		}
 		return nil
@@ -359,7 +394,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		sa.Name = saName
 		sa.Namespace = namespace
 		sa.Annotations = extraAnnotations
-		if err := cli.Create(reqCtx.Ctx, sa); err != nil {
+		if err := cli.Create(ctx, sa, multicluster.InUniversalContext()); err != nil {
 			return client.IgnoreAlreadyExists(err)
 		}
 		return nil

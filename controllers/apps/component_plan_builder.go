@@ -34,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -81,7 +82,6 @@ type componentPlanBuilder struct {
 type componentPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
-	cli      client.Client
 	transCtx *componentTransformContext
 }
 
@@ -97,10 +97,7 @@ func (c *componentPlanBuilder) Init() error {
 
 	c.transCtx.Component = comp
 	c.transCtx.ComponentOrig = comp.DeepCopy()
-	c.transformers = append(c.transformers, &componentInitTransformer{
-		Component:     c.transCtx.Component,
-		ComponentOrig: c.transCtx.ComponentOrig,
-	})
+	c.transformers = append(c.transformers, &componentInitTransformer{})
 	return nil
 }
 
@@ -126,7 +123,6 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 	plan := &componentPlan{
 		dag:      dag,
 		walkFunc: c.defaultWalkFuncWithLogging,
-		cli:      c.cli,
 		transCtx: c.transCtx,
 	}
 	return plan, err
@@ -141,9 +137,9 @@ func (p *componentPlan) Execute() error {
 }
 
 // newComponentPlanBuilder returns a componentPlanBuilder powered PlanBuilder
-func newComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
+func newComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client) graph.PlanBuilder {
 	return &componentPlanBuilder{
-		req: req,
+		req: ctx.Req,
 		cli: cli,
 		transCtx: &componentTransformContext{
 			Context:       ctx.Ctx,
@@ -227,7 +223,15 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 	// The additional removal of DBClusterFinalizerName in the component controller is to backward compatibility.
 	// In versions prior to 0.9.0, the component object's finalizers includes DBClusterFinalizerName.
 	// Therefore, it is necessary to remove DBClusterFinalizerName when the component is scaled-in independently.
-	finalizers := []string{constant.DBComponentFinalizerName, constant.DBClusterFinalizerName}
+	//
+	// Why remove RSM finalizer here:
+	// The RSM API has been replaced by the InstanceSet API starting from version 0.9.0.
+	// An automated upgrade process is performed in the component controller.
+	// As part of the upgrade, the RSM object and some of its secondary objects are deleted.
+	// These secondary objects are protected by the RSM finalizer to ensure their proper cleanup.
+	// By removing the RSM finalizer here, we allow the automated upgrade process to delete the RSM object
+	// and perform the necessary cleanup of its associated resources.
+	finalizers := []string{constant.DBComponentFinalizerName, constant.DBClusterFinalizerName, instanceset.LegacyRSMFinalizerName}
 	for _, finalizer := range finalizers {
 		if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 			err := c.cli.Update(ctx, vertex.Obj, clientOption(vertex))
@@ -238,7 +242,12 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 	}
 
 	if !model.IsObjectDeleting(vertex.Obj) {
-		err := c.cli.Delete(ctx, vertex.Obj, clientOption(vertex))
+		var opts []client.DeleteOption
+		opts = append(opts, clientOption(vertex))
+		if len(vertex.PropagationPolicy) > 0 {
+			opts = append(opts, vertex.PropagationPolicy)
+		}
+		err := c.cli.Delete(ctx, vertex.Obj, opts...)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}

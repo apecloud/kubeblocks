@@ -38,10 +38,9 @@ const (
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"
 
-	ReplicationPodRoleVolume         = "pod-role"
-	ReplicationRoleLabelFieldPath    = "metadata.labels['kubeblocks.io/role']"
-	DefaultReplicationCandidateIndex = 0
-	DefaultReplicationReplicas       = 2
+	ReplicationPodRoleVolume      = "pod-role"
+	ReplicationRoleLabelFieldPath = "metadata.labels['kubeblocks.io/role']"
+	DefaultReplicationReplicas    = 2
 
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
 	DefaultMySQLContainerName = "mysql"
@@ -55,9 +54,8 @@ const (
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"
 
-	StorageClassName = "test-sc"
-	EnvKeyImageTag   = "IMAGE_TAG"
-	DefaultImageTag  = "test"
+	EnvKeyImageTag  = "IMAGE_TAG"
+	DefaultImageTag = "test"
 
 	DefaultConfigSpecName          = "config-cm"
 	DefaultConfigSpecTplRef        = "env-from-config-tpl"
@@ -472,5 +470,26 @@ var (
 			InitContainers: []corev1.Container{defaultRedisInitContainer},
 			Containers:     []corev1.Container{defaultRedisContainer},
 		},
+	}
+
+	defaultComponentVerSpec = func(compDef string) appsv1alpha1.ComponentVersionSpec {
+		return appsv1alpha1.ComponentVersionSpec{
+			CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
+				{
+					CompDefs: []string{compDef},
+					Releases: []string{"8.0.30-r1"},
+				},
+			},
+			Releases: []appsv1alpha1.ComponentVersionRelease{
+				{
+					Name:           "8.0.30-r1",
+					Changes:        "init release",
+					ServiceVersion: "8.0.30",
+					Images: map[string]string{
+						defaultMySQLContainer.Name: defaultMySQLContainer.Image,
+					},
+				},
+			},
+		}
 	}
 )

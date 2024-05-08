@@ -20,21 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type componentInitTransformer struct {
-	Component     *appsv1alpha1.Component
-	ComponentOrig *appsv1alpha1.Component
-}
+type componentInitTransformer struct{}
 
 var _ graph.Transformer = &componentInitTransformer{}
 
 func (t *componentInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	// put the Component object first, it will be root vertex of DAG
-	rootVertex := &model.ObjectVertex{Obj: t.Component, OriObj: t.ComponentOrig, Action: model.ActionStatusPtr()}
+	transCtx, _ := ctx.(*componentTransformContext)
+
+	// init dag
+	rootVertex := &model.ObjectVertex{Obj: transCtx.Component, OriObj: transCtx.ComponentOrig, Action: model.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)
+
+	// init placement
+	transCtx.Context = intoContext(transCtx.Context, placement(transCtx.Component))
+
 	return nil
 }

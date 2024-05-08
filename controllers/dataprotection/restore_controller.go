@@ -46,6 +46,7 @@ import (
 	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -264,7 +265,8 @@ func (r *RestoreReconciler) handleRunningPhase(reqCtx intctrlutil.RequestCtx, re
 	if err == nil {
 		saName := restore.Spec.ServiceAccountName
 		if saName == "" {
-			saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace)
+			// TODO: update the mcMgr param
+			saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace, nil)
 		}
 		restoreMgr.WorkerServiceAccount = saName
 	}
@@ -409,6 +411,10 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	backupSet dprestore.BackupActionSet,
 	stage dpv1alpha1.RestoreStage,
 	step int) (bool, error) {
+	target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMgr.Restore.Spec.Backup.SourceTargetName)
+	if target == nil {
+		return false, intctrlutil.NewFatalError("can not found any source targe in backup " + backupSet.Backup.Name)
+	}
 	handleFailed := func(restore *dpv1alpha1.Restore, backupName string) error {
 		errorMsg := fmt.Sprintf(`restore failed for backup "%s", more information can be found in status.actions.%s`, backupName, stage)
 		dprestore.SetRestoreStageCondition(restore, stage, dprestore.ReasonFailed, errorMsg)
@@ -437,14 +443,14 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	switch stage {
 	case dpv1alpha1.PrepareData:
 		if backupSet.UseVolumeSnapshot {
-			if err = restoreMgr.RestorePVCFromSnapshot(reqCtx, r.Client, backupSet); err != nil {
+			if err = restoreMgr.RestorePVCFromSnapshot(reqCtx, r.Client, backupSet, target); err != nil {
 				return false, nil
 			}
 		}
-		jobs, err = restoreMgr.BuildPrepareDataJobs(reqCtx, r.Client, backupSet, actionName)
+		jobs, err = restoreMgr.BuildPrepareDataJobs(reqCtx, r.Client, backupSet, target, actionName)
 	case dpv1alpha1.PostReady:
 		// 2. build jobs for postReady action
-		jobs, err = restoreMgr.BuildPostReadyActionJobs(reqCtx, r.Client, backupSet, step)
+		jobs, err = restoreMgr.BuildPostReadyActionJobs(reqCtx, r.Client, backupSet, target, step)
 	}
 	if err != nil {
 		return false, err

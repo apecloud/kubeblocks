@@ -93,16 +93,16 @@ func generatedComponent4LegacyCluster(transCtx *componentTransformContext) (bool
 	}
 
 	synthesizedComp := transCtx.SynthesizeComponent
-	rsmObj := &workloads.ReplicatedStateMachine{}
-	rsmKey := types.NamespacedName{
+	itsObj := &workloads.InstanceSet{}
+	itsKey := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
-		Name:      constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+		Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
 	}
-	if err := transCtx.Client.Get(transCtx.Context, rsmKey, rsmObj); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, itsKey, itsObj); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 
-	return !model.IsOwnerOf(transCtx.ComponentOrig, rsmObj), nil
+	return !model.IsOwnerOf(transCtx.ComponentOrig, itsObj), nil
 }
 
 func buildEnvVarsNData(synthesizedComp *component.SynthesizedComponent, vars []corev1.EnvVar, legacy bool) ([]corev1.EnvVar, map[string]string) {
@@ -167,7 +167,7 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data
 		}
 	)
 	envObj := &corev1.ConfigMap{}
-	err := transCtx.Client.Get(transCtx.Context, envKey, envObj)
+	err := transCtx.Client.Get(transCtx.Context, envKey, envObj, inDataContext4C())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -178,11 +178,11 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data
 			AddLabelsInMap(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 			SetData(data).
 			GetObject()
-		graphCli.Create(dag, obj)
+		graphCli.Create(dag, obj, inDataContext4G())
 	} else if !reflect.DeepEqual(envObj.Data, data) {
 		envObjCopy := envObj.DeepCopy()
 		envObjCopy.Data = data
-		graphCli.Update(dag, envObj, envObjCopy)
+		graphCli.Update(dag, envObj, envObjCopy, inDataContext4G())
 	}
 	return nil
 }

@@ -83,14 +83,14 @@ func GenerateDefaultServiceAccountName(name string) string {
 	return fmt.Sprintf("%s-%s", KBLowerPrefix, name)
 }
 
-// GenerateRSMNamePattern generates rsm name pattern
-func GenerateRSMNamePattern(clusterName, compName string) string {
+// GenerateWorkloadNamePattern generates the workload name pattern
+func GenerateWorkloadNamePattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
 
-// GenerateRSMServiceNamePattern generates rsm name pattern
-func GenerateRSMServiceNamePattern(rsmName string) string {
-	return fmt.Sprintf("%s-headless", rsmName)
+// GenerateServiceNamePattern generates the service name pattern
+func GenerateServiceNamePattern(itsName string) string {
+	return fmt.Sprintf("%s-headless", itsName)
 }
 
 // GeneratePodName generates the connection credential name for component.

@@ -12,4 +12,4 @@ maintainer responsibilities.
 | Ziang Guo   | [iziang](https://github.com/iziang)     | [ApeCloud](https://github.com/apecloud/) |
 | Songlu Tsai | [nayutah](https://github.com/nayutah)   | [ApeCloud](https://github.com/apecloud/) |
 | Wei Cao     | [weicao](https://github.com/weicao)     | [ApeCloud](https://github.com/apecloud/) |
-
+| Xueqiang Wu | [free6om](https://github.com/free6om)   | [ApeCloud](https://github.com/apecloud/) |

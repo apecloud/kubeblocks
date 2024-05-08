@@ -33,10 +33,9 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // componentAccountTransformer handles component system accounts.
@@ -69,7 +68,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		if err != nil {
 			return err
 		}
-		graphCli.Create(dag, secret)
+		graphCli.Create(dag, secret, inUniversalContext4G())
 	}
 	return nil
 }
@@ -126,12 +125,10 @@ func (t *componentAccountTransformer) buildPassword(ctx *componentTransformConte
 		return t.generatePassword(account)
 	}
 	// get restore password if exists during recovery.
-	password, ok := ctx.Cluster.Annotations[constant.ConnectionPassword]
-	if !ok {
+	password := factory.GetRestorePassword(ctx.Cluster, ctx.SynthesizeComponent)
+	if password == "" {
 		return t.generatePassword(account)
 	}
-	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-	password, _ = e.Decrypt([]byte(password))
 	return []byte(password)
 }
 

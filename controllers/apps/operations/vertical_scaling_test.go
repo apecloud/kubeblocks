@@ -120,7 +120,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("create VerticalScaling ops")
 			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
@@ -150,7 +150,8 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				pod.Kind = constant.PodKind
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-				testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, pod.Name, "leader", "ReadWrite")
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
+					pod.Name, "leader", "ReadWrite", ops.Spec.VerticalScalingList[0].ResourceRequirements)
 			}
 
 			By("mock podList[0] rolling update successfully by re-creating it")
@@ -162,7 +163,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			By("the progress status of pod[0] should be Succeed ")
 			progressDetails := opsRes.OpsRequest.Status.Components[consensusComp].ProgressDetails
-			progressDetail := findStatusProgressDetail(progressDetails, getProgressObjectKey("", podList[0].Name))
+			progressDetail := findStatusProgressDetail(progressDetails, getProgressObjectKey(constant.PodKind, podList[0].Name))
 			Expect(progressDetail.Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 
 			By("cancel verticalScaling opsRequest")
@@ -182,7 +183,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			Expect(opsRequest.Status.Progress).Should(Equal("1/1"))
 			progressDetails = opsRequest.Status.Components[consensusComp].ProgressDetails
 			Expect(len(progressDetails)).Should(Equal(1))
-			progressDetail = findStatusProgressDetail(progressDetails, getProgressObjectKey("", podList[0].Name))
+			progressDetail = findStatusProgressDetail(progressDetails, getProgressObjectKey(constant.PodKind, podList[0].Name))
 			Expect(progressDetail.Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 			Expect(progressDetail.Message).Should(ContainSubstring("with rollback"))
 		})
@@ -245,22 +246,10 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				ops.Status.Phase = appsv1alpha1.OpsRunningPhase
 			})).Should(Succeed())
 
-			By("expect these opsRequest should not in the queue of the clusters")
+			By("the first operations request is expected to be aborted.")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(firstOpsRequest))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
 			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
-			Expect(len(opsRequestSlice)).Should(Equal(2))
-			for _, v := range opsRequestSlice {
-				Expect(v.InQueue).Should(BeFalse())
-			}
-
-			By("reconcile the firstOpsRequest again")
-			opsRes.OpsRequest = firstOpsRequest
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-
-			By("expect the firstOpsRequest should be overwritten for the resources")
-			override := opsRes.OpsRequest.Status.Components[consensusComp].OverrideBy
-			Expect(override).ShouldNot(BeNil())
-			Expect(override.ResourceRequirements.String()).Should(Equal(ops.Spec.VerticalScalingList[0].ResourceRequirements.String()))
+			Expect(len(opsRequestSlice)).Should(Equal(1))
 		})
 	})
 })

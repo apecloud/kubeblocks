@@ -90,7 +90,7 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, false)).Should(Succeed())
 
 		reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-		saName, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace)
+		saName, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace, nil)
 		Expect(err).To(BeNil())
 		Expect(saName).To(Equal(defaultWorkerServiceAccountName))
 
@@ -122,14 +122,14 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 
 	It("should update ServiceAccount's annotation if it's changed", func() {
 		reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-		saName, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace)
+		saName, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace, nil)
 		Expect(err).To(BeNil())
 		Expect(saName).To(Equal(defaultWorkerServiceAccountName))
 
 		By("updating annotation env")
 		viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, `{"role-arn":"arn:changed","newfield":"newvalue"}`)
 		By("calling EnsureWorkerServiceAccount() again")
-		saName, err = EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace)
+		saName, err = EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace, nil)
 		Expect(err).To(BeNil())
 		Expect(saName).To(Equal(defaultWorkerServiceAccountName))
 
@@ -152,7 +152,7 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 
 		It("should return error if namespace is empty", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, "")
+			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, "", nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("namespace is empty"))
 		})
@@ -160,7 +160,7 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		It("should return error if CfgKeyWorkerServiceAccountName is empty", func() {
 			defer updateDefaultEnv(dptypes.CfgKeyWorkerServiceAccountName, "")()
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace)
+			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("worker service account name is empty"))
 		})
@@ -168,7 +168,7 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		It("should return error if CfgKeyWorkerServiceAccountAnnotations is invalid json", func() {
 			defer updateDefaultEnv(dptypes.CfgKeyWorkerServiceAccountAnnotations, `{"bad": "json`)()
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace)
+			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to unmarshal worker service account annotations"))
 		})
@@ -176,7 +176,7 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		It("should return error if CfgKeyWorkerClusterRoleName is empty", func() {
 			defer updateDefaultEnv(dptypes.CfgKeyWorkerClusterRoleName, "")()
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace)
+			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("worker cluster role name is empty"))
 		})

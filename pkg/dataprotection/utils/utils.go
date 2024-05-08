@@ -84,12 +84,18 @@ func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {
 	return false, "", ""
 }
 
-func GetAssociatedPodsOfJob(ctx context.Context, cli client.Client, namespace, jobName string) (*corev1.PodList, error) {
+func GetAssociatedPodsOfJob(ctx context.Context, cli client.Client, namespace, jobName string, opts ...client.ListOption) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	// from https://github.com/kubernetes/kubernetes/issues/24709
-	err := cli.List(ctx, podList, client.InNamespace(namespace), client.MatchingLabels{
-		"job-name": jobName,
-	})
+	opts = append(
+		[]client.ListOption{
+			client.InNamespace(namespace),
+			client.MatchingLabels{
+				"job-name": jobName,
+			},
+		},
+		opts...)
+	err := cli.List(ctx, podList, opts...)
 	return podList, err
 }
 
@@ -152,7 +158,11 @@ func GetPodListByLabelSelector(reqCtx intctrlutil.RequestCtx,
 	return targetPodList, nil
 }
 
-func GetBackupVolumeSnapshotName(backupName, volumeSource string) string {
+func GetBackupVolumeSnapshotName(backupName, volumeSource string, index int) string {
+	return fmt.Sprintf("%s-%d-%s", backupName, index, volumeSource)
+}
+
+func GetOldBackupVolumeSnapshotName(backupName, volumeSource string) string {
 	return fmt.Sprintf("%s-%s", backupName, volumeSource)
 }
 
@@ -320,4 +330,32 @@ func ExistTargetVolume(targetVolumes *dpv1alpha1.TargetVolumeInfo, volumeName st
 		}
 	}
 	return false
+}
+
+// GetBackupTargets gets the backup targets by 'backupMethod' and 'backupPolicy'. 'backupMethod' has a higher priority than the global targets in 'backupPolicy'.
+func GetBackupTargets(backupPolicy *dpv1alpha1.BackupPolicy, backupMethod *dpv1alpha1.BackupMethod) []dpv1alpha1.BackupTarget {
+	var targets []dpv1alpha1.BackupTarget
+	switch {
+	case backupMethod.Target != nil:
+		targets = append(targets, *backupMethod.Target)
+	case len(backupMethod.Targets) > 0:
+		targets = backupMethod.Targets
+	case backupPolicy.Spec.Target != nil:
+		targets = append(targets, *backupPolicy.Spec.Target)
+	case len(backupPolicy.Spec.Targets) > 0:
+		targets = backupPolicy.Spec.Targets
+	}
+	return targets
+}
+
+func GetBackupStatusTarget(backupObj *dpv1alpha1.Backup, sourceTargetName string) *dpv1alpha1.BackupStatusTarget {
+	if backupObj.Status.Target != nil {
+		return backupObj.Status.Target
+	}
+	for _, v := range backupObj.Status.Targets {
+		if sourceTargetName == v.Name {
+			return &v
+		}
+	}
+	return nil
 }

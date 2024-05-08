@@ -91,18 +91,16 @@ func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedC
 }
 
 func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, configSpec appsv1alpha1.ConfigurationItem, componentName string) (*configctrl.Fetcher, error) {
-	ops := &opsRes.OpsRequest.Spec
 	fetcher := configctrl.NewResourceFetcher(&configctrl.ResourceCtx{
 		Context:       reqCtx.Ctx,
 		Client:        cli,
 		Namespace:     opsRes.Cluster.Namespace,
-		ClusterName:   ops.ClusterRef,
+		ClusterName:   opsRes.Cluster.Name,
 		ComponentName: componentName,
 	})
 
-	err := fetcher.Cluster().
-		// ClusterDef().
-		// ClusterVer().
+	fetcher.ClusterObj = opsRes.Cluster
+	err := fetcher.
 		Configuration().
 		ConfigMap(configSpec.Name).
 		Complete()

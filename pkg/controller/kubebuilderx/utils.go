@@ -21,17 +21,23 @@ package kubebuilderx
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 // ReadObjectTree reads all objects owned by the root object which is type of 'T' with key in 'req'.
-func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, req ctrl.Request, labelKeys []string, kinds ...client.ObjectList) (*ObjectTree, error) {
+func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, req ctrl.Request, ml client.MatchingLabels, kinds ...client.ObjectList) (*ObjectTree, error) {
 	tree := NewObjectTree()
 
 	// read root object
@@ -50,11 +56,13 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 	}
 	tree.SetRoot(root)
 
+	// init placement
+	ctx = intoContext(ctx, placement(root))
+
 	// read child objects
-	ml := getMatchLabels(root, labelKeys)
 	inNS := client.InNamespace(req.Namespace)
 	for _, list := range kinds {
-		if err := reader.List(ctx, list, inNS, ml); err != nil {
+		if err := reader.List(ctx, list, inNS, ml, inDataContext4C()); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items
@@ -63,7 +71,7 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			if !model.IsOwnerOf(root, object) {
+			if len(object.GetOwnerReferences()) > 0 && !model.IsOwnerOf(root, object) {
 				continue
 			}
 			if err := tree.Add(object); err != nil {
@@ -75,10 +83,47 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 	return tree, nil
 }
 
-func getMatchLabels(root client.Object, labelKeys []string) client.MatchingLabels {
-	labels := make(map[string]string, len(labelKeys))
-	for _, key := range labelKeys {
-		labels[key] = root.GetLabels()[key]
+func placement(obj client.Object) string {
+	if obj == nil || obj.GetAnnotations() == nil {
+		return ""
 	}
-	return labels
+	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
+}
+
+func assign(ctx context.Context, obj client.Object) client.Object {
+	switch obj.(type) {
+	// only handle Pod and PersistentVolumeClaim
+	case *corev1.Pod, *corev1.PersistentVolumeClaim:
+		ordinal := func() int {
+			subs := strings.Split(obj.GetName(), "-")
+			o, _ := strconv.Atoi(subs[len(subs)-1])
+			return o
+		}
+		return multicluster.Assign(ctx, obj, ordinal)
+	default:
+		return obj
+	}
+}
+
+func intoContext(ctx context.Context, placement string) context.Context {
+	return multicluster.IntoContext(ctx, placement)
+}
+
+func inDataContext4C() *multicluster.ClientOption {
+	return multicluster.InDataContext()
+}
+
+func inDataContext4G() model.GraphOption {
+	return model.WithClientOption(multicluster.InDataContext())
+}
+
+func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
+	if v.ClientOpt != nil {
+		opt, ok := v.ClientOpt.(*multicluster.ClientOption)
+		if ok {
+			return opt
+		}
+		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
+	}
+	return multicluster.InControlContext()
 }

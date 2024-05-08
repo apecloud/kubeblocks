@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -100,9 +101,9 @@ func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecM
 			}
 			switch param.ReloadType {
 			case appsv1beta1.TPLScriptType:
-				return core.IsWatchModuleForTplTrigger(param.DynamicReloadAction.TPLScriptTrigger)
+				return core.IsWatchModuleForTplTrigger(param.ReloadAction.TPLScriptTrigger)
 			case appsv1beta1.ShellType:
-				return core.IsWatchModuleForShellTrigger(param.DynamicReloadAction.ShellTrigger)
+				return core.IsWatchModuleForShellTrigger(param.ReloadAction.ShellTrigger)
 			default:
 				return true
 			}
@@ -205,12 +206,12 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		if err := controllerutil.SetOwnerReference(manager.Cluster, cmObj, scheme); err != nil {
 			return err
 		}
-		return cli.Create(ctx, cmObj)
+		return cli.Create(ctx, cmObj, inDataContext())
 	}
 	updateConfigCM := func(cm *corev1.ConfigMap, newConfig string) error {
 		patch := client.MergeFrom(cm.DeepCopy())
 		cm.Data[configManagerConfig] = newConfig
-		return cli.Patch(ctx, cm, patch)
+		return cli.Patch(ctx, cm, patch, inDataContext())
 	}
 
 	config, err := cfgutil.ToYamlConfig(configInfo)
@@ -222,7 +223,7 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		Namespace: manager.Cluster.GetNamespace(),
 		Name:      fmt.Sprintf("%s%s-%s-config-manager-config", configManagerCMPrefix, manager.Cluster.GetName(), manager.ComponentName),
 	}
-	err = cli.Get(ctx, cmKey, cmObj)
+	err = cli.Get(ctx, cmKey, cmObj, inDataContext())
 	switch {
 	default:
 		return err
@@ -298,7 +299,7 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	return nil
 }
 
-func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1beta1.DownwardAction) {
+func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1beta1.DownwardAPITriggeredAction) {
 	manager.DownwardAPIVolumes = append(manager.DownwardAPIVolumes, corev1.VolumeMount{
 		Name:      fieldInfo.Name,
 		MountPath: fieldInfo.MountPoint,
@@ -357,7 +358,7 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 	if err = cli.Get(ctx, referenceCM, &refCM); err != nil {
 		return err
 	}
-	if err = cli.Get(ctx, scriptCMKey, &sidecarCM); err != nil {
+	if err = cli.Get(ctx, scriptCMKey, &sidecarCM, inDataContext()); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -376,14 +377,14 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 		if err := controllerutil.SetOwnerReference(cluster, &sidecarCM, scheme); err != nil {
 			return err
 		}
-		if err := cli.Create(ctx, &sidecarCM); err != nil {
+		if err := cli.Create(ctx, &sidecarCM, inDataContext()); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig appsv1beta1.FormatterConfig) (map[string]string, error) {
+func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig appsv1beta1.FileFormatConfig) (map[string]string, error) {
 	configObject := make(map[string]interface{})
 	if content, ok := data[reloadConfig]; ok {
 		if err := yaml.Unmarshal([]byte(content), &configObject); err != nil {
@@ -451,4 +452,8 @@ func buildConfigManagerCommonArgs(volumeDirs []corev1.VolumeMount) []string {
 		args = append(args, "--volume-dir", volume.MountPath)
 	}
 	return args
+}
+
+func inDataContext() *multicluster.ClientOption {
+	return multicluster.InDataContext()
 }

@@ -40,6 +40,11 @@ func NewComponentFactory(namespace, name, componentDefinition string) *MockCompo
 	return f
 }
 
+func (factory *MockComponentFactory) SetServiceVersion(serviceVersion string) *MockComponentFactory {
+	factory.Get().Spec.ServiceVersion = serviceVersion
+	return factory
+}
+
 func (factory *MockComponentFactory) SetAffinity(affinity *appsv1alpha1.Affinity) *MockComponentFactory {
 	factory.Get().Spec.Affinity = affinity
 	return factory
@@ -70,10 +75,10 @@ func (factory *MockComponentFactory) SetResources(resources corev1.ResourceRequi
 	return factory
 }
 
-func (factory *MockComponentFactory) SetMonitor(monitor bool) *MockComponentFactory {
-	factory.Get().Spec.Monitor = monitor
-	return factory
-}
+// func (factory *MockComponentFactory) SetMonitor(monitor bool) *MockComponentFactory {
+// 	factory.Get().Spec.Monitor = monitor
+// 	return factory
+// }
 
 func (factory *MockComponentFactory) SetTLSConfig(enable bool, issuer *appsv1alpha1.Issuer) *MockComponentFactory {
 	if enable {

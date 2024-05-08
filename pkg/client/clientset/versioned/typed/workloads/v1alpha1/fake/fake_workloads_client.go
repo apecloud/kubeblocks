@@ -28,8 +28,8 @@ type FakeWorkloadsV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeWorkloadsV1alpha1) ReplicatedStateMachines(namespace string) v1alpha1.ReplicatedStateMachineInterface {
-	return &FakeReplicatedStateMachines{c, namespace}
+func (c *FakeWorkloadsV1alpha1) InstanceSets(namespace string) v1alpha1.InstanceSetInterface {
+	return &FakeInstanceSets{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

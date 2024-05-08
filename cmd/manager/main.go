@@ -34,6 +34,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	discoverycli "k8s.io/client-go/discovery"
@@ -46,23 +47,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	// +kubebuilder:scaffold:imports
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
+	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm2"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/metrics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -80,12 +83,14 @@ const (
 	leaderElectIDFlagKey flagName = "leader-elect-id"
 
 	// switch flags key for API groups
-	appsFlagKey       flagName = "apps"
-	extensionsFlagKey flagName = "extensions"
-	workloadsFlagKey  flagName = "workloads"
+	appsFlagKey         flagName = "apps"
+	extensionsFlagKey   flagName = "extensions"
+	workloadsFlagKey    flagName = "workloads"
+	experimentalFlagKey flagName = "experimental"
 
-	multiClusterKubeConfigFlagKey flagName = "multi-cluster-kubeconfig"
-	multiClusterContextsFlagKey   flagName = "multi-cluster-contexts"
+	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
+	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
+	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
 )
 
 var (
@@ -104,6 +109,9 @@ func init() {
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(legacy.AddToScheme(scheme))
+	utilruntime.Must(apiextv1.AddToScheme(scheme))
+	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -128,15 +136,13 @@ func init() {
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
 	viper.SetDefault(constant.CfgHostPortIncludeRanges, "1025-65536")
 	viper.SetDefault(constant.CfgHostPortExcludeRanges, "6443,10250,10257,10259,2379-2380,30000-32767")
-	viper.SetDefault(constant.FeatureGateReplicatedStateMachine, true)
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
-	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
-	viper.SetDefault(rsm2.FeatureGateRSMReplicaProvider, string(rsm2.PodProvider))
-	viper.SetDefault(rsm2.MaxPlainRevisionCount, 1024)
-	viper.SetDefault(rsm2.FeatureGateIgnorePodVerticalScaling, false)
-	viper.SetDefault(constant.FeatureGateEnableRuntimeMetrics, false)
+	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
+	viper.SetDefault(instanceset.FeatureGateIgnorePodVerticalScaling, false)
+	viper.SetDefault(intctrlutil.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
+	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 }
 
 type flagName string
@@ -166,9 +172,12 @@ func setupFlags() {
 		"Enable the extensions controller manager.")
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager.")
+	flag.Bool(experimentalFlagKey.String(), false,
+		"Enable the experimental controller manager.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
+	flag.String(multiClusterContextsDisabledFlagKey.String(), "", "Kube contexts that mark as disabled.")
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
@@ -245,13 +254,14 @@ func validateRequiredToParseConfigs() error {
 
 func main() {
 	var (
-		metricsAddr            string
-		probeAddr              string
-		enableLeaderElection   bool
-		enableLeaderElectionID string
-		multiClusterKubeConfig string
-		multiClusterContexts   string
-		err                    error
+		metricsAddr                  string
+		probeAddr                    string
+		enableLeaderElection         bool
+		enableLeaderElectionID       string
+		multiClusterKubeConfig       string
+		multiClusterContexts         string
+		multiClusterContextsDisabled string
+		err                          error
 	)
 
 	setupFlags()
@@ -283,8 +293,9 @@ func main() {
 	enableLeaderElectionID = viper.GetString(leaderElectIDFlagKey.viperName())
 	multiClusterKubeConfig = viper.GetString(multiClusterKubeConfigFlagKey.viperName())
 	multiClusterContexts = viper.GetString(multiClusterContextsFlagKey.viperName())
+	multiClusterContextsDisabled = viper.GetString(multiClusterContextsDisabledFlagKey.viperName())
 
-	setupLog.Info("golang runtime metrics.", "featureGate", constant.EnabledRuntimeMetrics())
+	setupLog.Info("golang runtime metrics.", "featureGate", intctrlutil.EnabledRuntimeMetrics())
 	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
@@ -328,7 +339,8 @@ func main() {
 	}
 
 	// multi-cluster manager for all data-plane k8s
-	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetClient(), multiClusterKubeConfig, multiClusterContexts)
+	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetConfig(), mgr.GetClient(),
+		multiClusterKubeConfig, multiClusterContexts, multiClusterContextsDisabled)
 	if err != nil {
 		setupLog.Error(err, "unable to setup multi-cluster manager")
 		os.Exit(1)
@@ -346,9 +358,10 @@ func main() {
 
 	if viper.GetBool(appsFlagKey.viperName()) {
 		if err = (&appscontrollers.ClusterReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("cluster-controller"),
+			Client:          client,
+			Scheme:          mgr.GetScheme(),
+			Recorder:        mgr.GetEventRecorderFor("cluster-controller"),
+			MultiClusterMgr: multiClusterMgr,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 			os.Exit(1)
@@ -376,7 +389,7 @@ func main() {
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Component")
 			os.Exit(1)
 		}
@@ -430,7 +443,7 @@ func main() {
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 			os.Exit(1)
 		}
@@ -439,7 +452,7 @@ func main() {
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
 			os.Exit(1)
 		}
@@ -457,7 +470,7 @@ func main() {
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("event-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Event")
 			os.Exit(1)
 		}
@@ -494,12 +507,23 @@ func main() {
 	}
 
 	if viper.GetBool(workloadsFlagKey.viperName()) {
-		if err = (&workloadscontrollers.ReplicatedStateMachineReconciler{
+		if err = (&workloadscontrollers.InstanceSetReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
+			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(experimentalFlagKey.viperName()) {
+		if err = (&experimentalcontrollers.NodeCountScalerReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("node-count-scaler-controller"),
 		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
+			setupLog.Error(err, "unable to create controller", "controller", "NodeCountScaler")
 			os.Exit(1)
 		}
 	}
@@ -543,8 +567,8 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&workloadsv1alpha1.ReplicatedStateMachine{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ReplicatedStateMachine")
+		if err = (&workloadsv1alpha1.InstanceSet{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "InstanceSet")
 			os.Exit(1)
 		}
 

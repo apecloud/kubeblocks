@@ -27,13 +27,6 @@ import (
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-type MonitorConfig struct {
-	Enable     bool   `json:"enable"`
-	BuiltIn    bool   `json:"builtIn"`
-	ScrapePort int32  `json:"scrapePort,omitempty"`
-	ScrapePath string `json:"scrapePath,omitempty"`
-}
-
 type SynthesizedComponent struct {
 	Namespace            string                                 `json:"namespace,omitempty"`
 	ClusterName          string                                 `json:"clusterName,omitempty"`
@@ -43,11 +36,11 @@ type SynthesizedComponent struct {
 	Name                 string                                 `json:"name,omitempty"`          // the name of the component w/o clusterName prefix
 	FullCompName         string                                 `json:"fullCompName,omitempty"`  // the full name of the component w/ clusterName prefix
 	CompDefName          string                                 `json:"compDefName,omitempty"`   // the name of the componentDefinition
+	ServiceVersion       string                                 `json:"serviceVersion,omitempty"`
 	Replicas             int32                                  `json:"replicas"`
 	Resources            corev1.ResourceRequirements            `json:"resources,omitempty"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	Monitor              *MonitorConfig                         `json:"monitor,omitempty"`
 	LogConfigs           []v1alpha1.LogConfig                   `json:"logConfigs,omitempty"`
 	ConfigTemplates      []v1alpha1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
 	ScriptTemplates      []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
@@ -76,18 +69,13 @@ type SynthesizedComponent struct {
 	HostNetwork         *v1alpha1.HostNetwork               `json:"hostNetwork,omitempty"`
 	ComponentServices   []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
 	MinReadySeconds     int32                               `json:"minReadySeconds,omitempty"`
-
-	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.
-	Probes           *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`           // The Probes will be replaced with LifecycleActions.RoleProbe in the future.
-	VolumeTypes      []v1alpha1.VolumeTypeSpec         `json:"volumeTypes,omitempty"`      // The VolumeTypes will be replaced with Volumes in the future.
-	VolumeProtection *v1alpha1.VolumeProtectionSpec    `json:"volumeProtection,omitempty"` // The VolumeProtection will be replaced with Volumes in the future.
-	Services         []corev1.Service                  `json:"services,omitempty"`         // The Services will be replaced with ComponentServices in the future.
-	TLS              bool                              `json:"tls"`                        // The TLS will be replaced with TLSConfig in the future.
+	Sidecars            []string                            `json:"sidecars,omitempty"`
+	MonitorEnabled      bool                                `json:"monitorEnabled,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0
 	ClusterDefName        string                          `json:"clusterDefName,omitempty"`     // the name of the clusterDefinition
-	ClusterCompDefName    string                          `json:"clusterCompDefName,omitempty"` // the name of the clusterDefinition.Spec.ComponentDefs[*].Name or cluster.Spec.ComponentSpecs[*].ComponentDefRef
+	ClusterCompDefName    string                          `json:"clusterCompDefName,omitempty"` // the name of the clusterDefinition.Spec.ComponentDefs[*].Name
 	CharacterType         string                          `json:"characterType,omitempty"`
-	WorkloadType          v1alpha1.WorkloadType           `json:"workloadType,omitempty"`
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
+	VolumeTypes           []v1alpha1.VolumeTypeSpec       `json:"volumeTypes,omitempty"` // The VolumeTypes will be replaced with Volumes in the future.
 }

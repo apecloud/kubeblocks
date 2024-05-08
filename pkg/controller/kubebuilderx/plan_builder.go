@@ -36,7 +36,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsm1 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 type transformContext struct {
@@ -97,30 +96,23 @@ func (b *PlanBuilder) AddParallelTransformer(_ ...graph.Transformer) graph.PlanB
 }
 
 func (b *PlanBuilder) Build() (graph.Plan, error) {
-	vertices := buildOrderedVertices(b.currentTree, b.desiredTree)
+	vertices := buildOrderedVertices(b.transCtx.GetContext(), b.currentTree, b.desiredTree)
 	plan := &Plan{
-		walkFunc: b.rsmWalkFunc,
+		walkFunc: b.defaultWalkFunc,
 		vertices: vertices,
 	}
 	return plan, nil
 }
 
-func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*model.ObjectVertex {
+func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredTree *ObjectTree) []*model.ObjectVertex {
 	var vertices []*model.ObjectVertex
-	newVertex := func(oldObj, newObj client.Object, action *model.Action) *model.ObjectVertex {
-		return &model.ObjectVertex{
-			Obj:    newObj,
-			OriObj: oldObj,
-			Action: action,
-		}
-	}
 
 	// handle root object
 	if desiredTree.GetRoot() == nil {
-		root := newVertex(currentTree.GetRoot(), currentTree.GetRoot(), model.ActionDeletePtr())
+		root := model.NewObjectVertex(currentTree.GetRoot(), currentTree.GetRoot(), model.ActionDeletePtr())
 		vertices = append(vertices, root)
 	} else {
-		root := newVertex(currentTree.GetRoot(), desiredTree.GetRoot(), model.ActionStatusPtr())
+		root := model.NewObjectVertex(currentTree.GetRoot(), desiredTree.GetRoot(), model.ActionStatusPtr())
 		vertices = append(vertices, root)
 		// if annotations, labels or finalizers updated, do both meta patch and status update.
 		if !reflect.DeepEqual(currentTree.GetRoot().GetAnnotations(), desiredTree.GetRoot().GetAnnotations()) ||
@@ -128,7 +120,7 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 			!reflect.DeepEqual(currentTree.GetRoot().GetFinalizers(), desiredTree.GetRoot().GetFinalizers()) {
 			currentRoot, _ := currentTree.GetRoot().DeepCopyObject().(client.Object)
 			desiredRoot, _ := desiredTree.GetRoot().DeepCopyObject().(client.Object)
-			patchRoot := newVertex(currentRoot, desiredRoot, model.ActionPatchPtr())
+			patchRoot := model.NewObjectVertex(currentRoot, desiredRoot, model.ActionPatchPtr())
 			vertices = append(vertices, patchRoot)
 		}
 	}
@@ -159,7 +151,7 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 	}
 	createNewObjects := func() {
 		for name := range createSet {
-			v := newVertex(nil, newSnapshot[name], model.ActionCreatePtr())
+			v := model.NewObjectVertex(nil, assign(ctx, newSnapshot[name]), model.ActionCreatePtr(), inDataContext4G())
 			findAndAppend(v)
 		}
 	}
@@ -168,14 +160,17 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 			oldObj := oldSnapshot[name]
 			newObj := newSnapshot[name]
 			if !reflect.DeepEqual(oldObj, newObj) {
-				v := newVertex(oldObj, newObj, model.ActionUpdatePtr())
+				v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
 				findAndAppend(v)
 			}
 		}
 	}
+	finalizer := currentTree.GetFinalizer()
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
-			v := newVertex(nil, oldSnapshot[name], model.ActionDeletePtr())
+			object := oldSnapshot[name]
+			keepFinalizer(object, finalizer)
+			v := model.NewObjectVertex(nil, object, model.ActionDeletePtr(), inDataContext4G())
 			findAndAppend(v)
 		}
 	}
@@ -195,6 +190,21 @@ func buildOrderedVertices(currentTree *ObjectTree, desiredTree *ObjectTree) []*m
 	return vertices
 }
 
+func keepFinalizer(object client.Object, finalizer string) {
+	var finalizers []string
+	if len(finalizer) > 0 {
+		finalizers = append(finalizers, finalizer)
+	}
+	object.SetFinalizers(finalizers)
+}
+
+func getRemainingFinalizer(obj client.Object) string {
+	if len(obj.GetFinalizers()) > 0 {
+		return obj.GetFinalizers()[0]
+	}
+	return ""
+}
+
 // Plan implementation
 
 func (p *Plan) Execute() error {
@@ -209,7 +219,7 @@ func (p *Plan) Execute() error {
 
 // Do the real works
 
-func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
+func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 	vertex, ok := v.(*model.ObjectVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", v)
@@ -234,7 +244,7 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 }
 
 func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := b.cli.Create(ctx, vertex.Obj, rsm1.ClientOption(vertex))
+	err := b.cli.Create(ctx, vertex.Obj, clientOption(vertex))
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -242,7 +252,7 @@ func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := b.cli.Update(ctx, vertex.Obj, rsm1.ClientOption(vertex))
+	err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -251,7 +261,7 @@ func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVert
 
 func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	patch := client.MergeFrom(vertex.OriObj)
-	err := b.cli.Patch(ctx, vertex.Obj, patch, rsm1.ClientOption(vertex))
+	err := b.cli.Patch(ctx, vertex.Obj, patch, clientOption(vertex))
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -259,16 +269,16 @@ func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVerte
 }
 
 func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	finalizer := rsm1.GetFinalizer(vertex.Obj)
-	if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
-		err := b.cli.Update(ctx, vertex.Obj, rsm1.ClientOption(vertex))
+	finalizer := getRemainingFinalizer(vertex.Obj)
+	if len(finalizer) > 0 && controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
+		err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {
 			b.transCtx.logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
 			return err
 		}
 	}
 	if !model.IsObjectDeleting(vertex.Obj) {
-		err := b.cli.Delete(ctx, vertex.Obj, rsm1.ClientOption(vertex))
+		err := b.cli.Delete(ctx, vertex.Obj, clientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -277,7 +287,7 @@ func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 func (b *PlanBuilder) statusObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	if err := b.cli.Status().Update(ctx, vertex.Obj, rsm1.ClientOption(vertex)); err != nil {
+	if err := b.cli.Status().Update(ctx, vertex.Obj, clientOption(vertex)); err != nil {
 		return err
 	}
 	return nil

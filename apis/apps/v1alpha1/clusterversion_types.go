@@ -21,7 +21,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ClusterVersionSpec defines the desired state of ClusterVersion
+// ClusterVersionSpec defines the desired state of ClusterVersion.
+//
+// Deprecated since v0.9.
+// This struct is maintained for backward compatibility and its use is discouraged.
 type ClusterVersionSpec struct {
 	// Specifies a reference to the ClusterDefinition.
 	//
@@ -40,7 +43,10 @@ type ClusterVersionSpec struct {
 	ComponentVersions []ClusterComponentVersion `json:"componentVersions" patchStrategy:"merge,retainKeys" patchMergeKey:"componentDefRef"`
 }
 
-// ClusterVersionStatus defines the observed state of ClusterVersion
+// ClusterVersionStatus defines the observed state of ClusterVersion.
+//
+// Deprecated since v0.9.
+// This struct is maintained for backward compatibility and its use is discouraged.
 type ClusterVersionStatus struct {
 	// The current phase of the ClusterVersion.
 	//
@@ -68,6 +74,9 @@ func (r ClusterVersionStatus) GetTerminalPhases() []Phase {
 }
 
 // ClusterComponentVersion is an application version component spec.
+//
+// Deprecated since v0.9.
+// This struct is maintained for backward compatibility and its use is discouraged.
 type ClusterComponentVersion struct {
 	// Specifies a reference to one of the cluster component definition names in the ClusterDefinition API (spec.componentDefs.name).
 	//
@@ -106,6 +115,9 @@ type ClusterComponentVersion struct {
 }
 
 // SystemAccountShortSpec represents a condensed version of the SystemAccountSpec.
+//
+// Deprecated since v0.9.
+// This struct is maintained for backward compatibility and its use is discouraged.
 type SystemAccountShortSpec struct {
 	// Configures the method for obtaining the client SDK and executing statements.
 	//
@@ -114,6 +126,9 @@ type SystemAccountShortSpec struct {
 }
 
 // SwitchoverShortSpec represents a condensed version of the SwitchoverSpec.
+//
+// Deprecated since v0.9.
+// This struct is maintained for backward compatibility and its use is discouraged.
 type SwitchoverShortSpec struct {
 	// Represents the configuration for the command executor.
 	//
@@ -121,6 +136,8 @@ type SwitchoverShortSpec struct {
 	CmdExecutorConfig *CommandExecutorEnvItem `json:"cmdExecutorConfig"`
 }
 
+// VersionsContext is deprecated since v0.9.
+// This struct is maintained for backward compatibility and its use is discouraged.
 type VersionsContext struct {
 	// Provides override values for ClusterDefinition.spec.componentDefs.podSpec.initContainers.
 	// Typically used in scenarios such as updating application container images.
@@ -156,7 +173,10 @@ type VersionsContext struct {
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:deprecatedversion:warning="The ClusterVersion CRD has been deprecated since 0.9.0"
 
-// ClusterVersion is the Schema for the ClusterVersions API
+// ClusterVersion is the Schema for the ClusterVersions API.
+//
+// Deprecated: ClusterVersion has been replaced by ComponentVersion since v0.9.
+// This struct is maintained for backward compatibility and its use is discouraged.
 type ClusterVersion struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -167,7 +187,7 @@ type ClusterVersion struct {
 
 // +kubebuilder:object:root=true
 
-// ClusterVersionList contains a list of ClusterVersion
+// ClusterVersionList contains a list of ClusterVersion.
 type ClusterVersionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

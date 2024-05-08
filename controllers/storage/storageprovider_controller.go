@@ -35,14 +35,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // StorageProviderReconciler reconciles a StorageProvider object
 type StorageProviderReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme          *runtime.Scheme
+	Recorder        record.EventRecorder
+	MultiClusterMgr multicluster.Manager
 
 	mu                 sync.Mutex
 	driverDependencies map[string][]string // driver name => list of provider names
@@ -74,7 +76,7 @@ func (r *StorageProviderReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get StorageProvider")
 	}
 
-	// add dependency to CSIDrive
+	// add dependency to CSIDriver
 	r.ensureDependency(provider)
 
 	// handle finalizer
@@ -144,8 +146,27 @@ func (r *StorageProviderReconciler) updateStatus(reqCtx intctrlutil.RequestCtx,
 }
 
 func (r *StorageProviderReconciler) checkCSIDriver(reqCtx intctrlutil.RequestCtx, driverName string) error {
-	// check existence of CSIDriver
-	return r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: driverName}, &storagev1.CSIDriver{})
+	if r.MultiClusterMgr != nil {
+		if err := r.checkCSIDriverMultiCluster(reqCtx, driverName); err != nil {
+			return err
+		}
+	}
+	// check existence of CSIDriver in the control cluster
+	return r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: driverName}, &storagev1.CSIDriver{},
+		multicluster.InControlContext())
+}
+
+func (r *StorageProviderReconciler) checkCSIDriverMultiCluster(reqCtx intctrlutil.RequestCtx, driverName string) error {
+	objKey := client.ObjectKey{Name: driverName}
+	for _, cluster := range r.MultiClusterMgr.GetContexts() {
+		driver := &storagev1.CSIDriver{}
+		getCtx := multicluster.IntoContext(reqCtx.Ctx, cluster)
+		err := r.Get(getCtx, objKey, driver, multicluster.Oneshot())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *StorageProviderReconciler) ensureDependency(provider *storagev1alpha1.StorageProvider) {
@@ -191,23 +212,28 @@ func (r *StorageProviderReconciler) deleteExternalResources(
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *StorageProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&storagev1alpha1.StorageProvider{}).
-		Watches(&storagev1.CSIDriver{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
-				r.mu.Lock()
-				defer r.mu.Unlock()
-				driverName := object.GetName()
-				list := r.driverDependencies[driverName]
-				var ret []reconcile.Request
-				for _, x := range list {
-					ret = append(ret, reconcile.Request{
-						NamespacedName: client.ObjectKey{
-							Name: x,
-						},
-					})
-				}
-				return ret
-			})).
-		Complete(r)
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+		For(&storagev1alpha1.StorageProvider{})
+
+	mapCSIDriverToProvider := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		driverName := object.GetName()
+		list := r.driverDependencies[driverName]
+		var ret []reconcile.Request
+		for _, x := range list {
+			ret = append(ret, reconcile.Request{
+				NamespacedName: client.ObjectKey{
+					Name: x,
+				},
+			})
+		}
+		return ret
+	})
+	b = b.Watches(&storagev1.CSIDriver{}, mapCSIDriverToProvider)
+	if r.MultiClusterMgr != nil {
+		r.MultiClusterMgr.Watch(b, &storagev1.CSIDriver{}, mapCSIDriverToProvider)
+	}
+
+	return b.Complete(r)
 }

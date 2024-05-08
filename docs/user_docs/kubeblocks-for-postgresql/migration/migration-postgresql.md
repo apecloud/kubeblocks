@@ -1,12 +1,12 @@
 ---
-title: Migrate data in PostgreSQL to KubeBlocks
-description: How to migrate data in PostgreSQL v14 to KubeBlocks by kbcli migration
-keywords: [postgresql, migration, kbcli migration, migrate data in PostgreSQL to KubeBlocks]
+title: Migrate data in PostgreSQL by KubeBlocks
+description: How to migrate data in PostgreSQL v14 by KubeBlocks by kbcli migration
+keywords: [postgresql, migration, kbcli migration, migrate data in PostgreSQL by KubeBlocks]
 sidebar_position: 2
 sidebar_label: Migration
 ---
 
-# Migrate data in PostgreSQL to KubeBlocks
+# Migrate data in PostgreSQL by KubeBlocks
 
 ## Environment and aim
 

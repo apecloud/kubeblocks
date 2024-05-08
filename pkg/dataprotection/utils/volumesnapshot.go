@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -40,7 +41,7 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, pvName stri
 		return false, nil
 	}
 	pv := &corev1.PersistentVolume{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: pvName}, pv); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Name: pvName}, pv, multicluster.InDataContext()); err != nil {
 		return false, err
 	}
 	if pv.Spec.CSI == nil {
@@ -48,7 +49,7 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, pvName stri
 	}
 	vsCli := NewCompatClient(cli)
 	vscList := vsv1.VolumeSnapshotClassList{}
-	if err := vsCli.List(ctx, &vscList); err != nil {
+	if err := vsCli.List(ctx, &vscList, multicluster.InDataContext()); err != nil {
 		return false, err
 	}
 	for _, vsc := range vscList.Items {

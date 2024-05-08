@@ -152,7 +152,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *BackupReconciler) filterBackupPods(ctx context.Context, obj client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 	labels := obj.GetLabels()
-	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != dptypes.AppName {
 		return requests
 	}
 	backupName, ok := labels[dptypes.BackupNameLabelKey]
@@ -204,7 +204,8 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		Scheme:     r.Scheme,
 	}
 
-	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace)
+	// TODO: update the mcMgr param
+	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get worker service account: %w", err)
 	}
@@ -263,7 +264,11 @@ func (r *BackupReconciler) handleNewPhase(
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
-
+	// record the status.target/status.targets infos for continuous backup.
+	if err = r.recordBackupStatusTargets(reqCtx, request); err != nil {
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+	}
+	backupStatusCopy := request.Backup.Status.DeepCopy()
 	// set and patch backup object meta, including labels, annotations and finalizers
 	// if the backup object meta is changed, the backup object will be patched.
 	if wait, err := PatchBackupObjectMeta(backup, request); err != nil {
@@ -271,12 +276,66 @@ func (r *BackupReconciler) handleNewPhase(
 	} else if wait {
 		return intctrlutil.Reconciled()
 	}
-
+	request.Backup.Status = *backupStatusCopy
 	// set and patch backup status
 	if err = r.patchBackupStatus(backup, request); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 	}
 	return intctrlutil.Reconciled()
+}
+
+// recordBackupStatusTargets records the backup status target or targets for next reconcile.
+func (r *BackupReconciler) recordBackupStatusTargets(
+	reqCtx intctrlutil.RequestCtx,
+	request *dpbackup.Request) error {
+	if request.Backup.Status.Target != nil || len(request.Backup.Status.Targets) > 0 {
+		return nil
+	}
+	buildStatusTarget := func(target *dpv1alpha1.BackupTarget) (*dpv1alpha1.BackupStatusTarget, error) {
+		if err := r.prepareRequestTargetInfo(reqCtx, request, target); err != nil {
+			return nil, err
+		}
+		var selectedTargetPods []string
+		for i := range request.TargetPods {
+			selectedTargetPods = append(selectedTargetPods, request.TargetPods[i].Name)
+		}
+		return &dpv1alpha1.BackupStatusTarget{
+			BackupTarget:       *target,
+			SelectedTargetPods: selectedTargetPods,
+		}, nil
+	}
+	setStatusTarget := func(target *dpv1alpha1.BackupTarget) error {
+		if statusTarget, err := buildStatusTarget(target); err != nil {
+			return err
+		} else {
+			request.Status.Target = statusTarget
+		}
+		return nil
+	}
+	setStatusTargets := func(targets []dpv1alpha1.BackupTarget) error {
+		for i := range targets {
+			if statusTarget, err := buildStatusTarget(&targets[i]); err != nil {
+				return err
+			} else {
+				request.Status.Targets = append(request.Status.Targets, *statusTarget)
+			}
+		}
+		return nil
+	}
+	var err error
+	switch {
+	case request.BackupMethod.Target != nil:
+		err = setStatusTarget(request.BackupMethod.Target)
+	case len(request.BackupMethod.Targets) > 0:
+		err = setStatusTargets(request.BackupMethod.Targets)
+	case request.BackupPolicy.Spec.Target != nil:
+		err = setStatusTarget(request.BackupPolicy.Spec.Target)
+	case len(request.BackupPolicy.Spec.Targets) > 0:
+		err = setStatusTargets(request.BackupPolicy.Spec.Targets)
+	default:
+		return intctrlutil.NewFatalError(fmt.Sprintf(`backup target/targets can not be empty in backupPolicy "%s"`, request.BackupPolicy.Name))
+	}
+	return err
 }
 
 // prepareBackupRequest prepares a request for a backup, with all references to
@@ -302,6 +361,9 @@ func (r *BackupReconciler) prepareBackupRequest(
 	if err != nil {
 		return nil, err
 	}
+	if backupPolicy.Status.Phase == dpv1alpha1.UnavailablePhase {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`phase of backupPolicy "%s" is Unavailable`, backupPolicy.Name))
+	}
 
 	backupMethod := dputils.GetBackupMethodByName(backup.Spec.BackupMethod, backupPolicy)
 	if backupMethod == nil {
@@ -325,6 +387,22 @@ func (r *BackupReconciler) prepareBackupRequest(
 			return nil, err
 		}
 		request.ActionSet = actionSet
+
+		// check continuous backups should have backupschedule label
+		if request.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeContinuous {
+			if _, ok := request.Labels[dptypes.BackupScheduleLabelKey]; !ok {
+				return nil, fmt.Errorf("continuous backup is only allowed to be created by backupSchedule")
+			}
+			backupSchedule := &dpv1alpha1.BackupSchedule{}
+			if err := request.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: backup.Labels[dptypes.BackupScheduleLabelKey],
+				Namespace: backup.Namespace}, backupSchedule); err != nil {
+				return nil, err
+			}
+			if backupSchedule.Status.Phase != dpv1alpha1.BackupSchedulePhaseAvailable {
+				return nil, fmt.Errorf("create continuous backup by failed backupschedule %s/%s",
+					backupSchedule.Namespace, backupSchedule.Name)
+			}
+		}
 	}
 
 	// check encryption config
@@ -347,25 +425,40 @@ func (r *BackupReconciler) prepareBackupRequest(
 		}
 	}
 	request.BackupMethod = backupMethod
+	return request, nil
+}
 
+// prepareRequestTargetInfo prepares the backup target info for request object.
+func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCtx,
+	request *dpbackup.Request,
+	target *dpv1alpha1.BackupTarget) error {
+	backupStatusTarget := dputils.GetBackupStatusTarget(request.Backup, target.Name)
+	var selectedPods []string
+	if backupStatusTarget != nil {
+		selectedPods = backupStatusTarget.SelectedTargetPods
+	}
+	request.Target = target
+	backupType := dpv1alpha1.BackupTypeFull
+	if request.ActionSet != nil {
+		backupType = request.ActionSet.Spec.BackupType
+	}
 	targetPods, err := GetTargetPods(reqCtx, r.Client,
-		backup.Annotations[dptypes.BackupTargetPodLabelKey], backupMethod, backupPolicy)
+		selectedPods, request.BackupPolicy, target, backupType)
 	if err != nil || len(targetPods) == 0 {
-		return nil, fmt.Errorf("failed to get target pods by backup policy %s/%s",
-			backupPolicy.Namespace, backupPolicy.Name)
+		return fmt.Errorf("failed to get target pods by backup policy %s/%s",
+			request.BackupPolicy.Namespace, request.BackupPolicy.Name)
 	}
 	request.TargetPods = targetPods
-
-	saName := backupPolicy.Spec.Target.ServiceAccountName
+	saName := target.ServiceAccountName
 	if saName == "" {
-		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace)
+		// TODO: update the mcMgr param
+		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, request.Backup.Namespace, nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get worker service account: %w", err)
+			return fmt.Errorf("failed to get worker service account: %w", err)
 		}
 	}
 	request.WorkerServiceAccount = saName
-
-	return request, nil
+	return nil
 }
 
 func (r *BackupReconciler) patchBackupStatus(
@@ -373,10 +466,9 @@ func (r *BackupReconciler) patchBackupStatus(
 	request *dpbackup.Request) error {
 	request.Status.FormatVersion = dpbackup.FormatVersion
 	if !request.SnapshotVolumes {
-		request.Status.Path = dpbackup.BuildBackupPath(
+		request.Status.Path = dpbackup.BuildBaseBackupPath(
 			request.Backup, request.BackupRepo.Spec.PathPrefix, request.BackupPolicy.Spec.PathPrefix)
 	}
-	request.Status.Target = request.BackupPolicy.Spec.Target
 	request.Status.BackupMethod = request.BackupMethod
 	if request.BackupRepo != nil {
 		request.Status.BackupRepoName = request.BackupRepo.Name
@@ -396,12 +488,14 @@ func (r *BackupReconciler) patchBackupStatus(
 	if err != nil {
 		return err
 	}
-	request.Status.Actions = make([]dpv1alpha1.ActionStatus, len(actions))
-	for i, act := range actions {
-		request.Status.Actions[i] = dpv1alpha1.ActionStatus{
-			Name:       act.GetName(),
-			Phase:      dpv1alpha1.ActionPhaseNew,
-			ActionType: act.Type(),
+	for targetPodName, acts := range actions {
+		for _, act := range acts {
+			request.Status.Actions = append(request.Status.Actions, dpv1alpha1.ActionStatus{
+				Name:          act.GetName(),
+				TargetPodName: targetPodName,
+				Phase:         dpv1alpha1.ActionPhaseNew,
+				ActionType:    act.Type(),
+			})
 		}
 	}
 
@@ -422,8 +516,11 @@ func (r *BackupReconciler) handleRunningPhase(
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
-
 	if request.ActionSet != nil && request.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeContinuous {
+		// record the status.target/status.targets infos.
+		if err = r.recordBackupStatusTargets(reqCtx, request); err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+		}
 		// check if the continuous backup is completed.
 		if completed, err := r.checkIsCompletedDuringRunning(reqCtx, request); err != nil {
 			return RecorderEventAndRequeue(reqCtx, r.Recorder, backup, err)
@@ -431,47 +528,64 @@ func (r *BackupReconciler) handleRunningPhase(
 			return intctrlutil.Reconciled()
 		}
 	}
-
-	// there are actions not completed, continue to handle following actions
-	actions, err := request.BuildActions()
-	if err != nil {
-		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
-	}
-
-	actionCtx := action.ActionContext{
-		Ctx:              reqCtx.Ctx,
-		Client:           r.Client,
-		Recorder:         r.Recorder,
-		Scheme:           r.Scheme,
-		RestClientConfig: r.RestConfig,
-	}
-
-	// check all actions status, if any action failed, update backup status to failed
-	// if all actions completed, update backup status to completed, otherwise,
-	// continue to handle following actions.
-	for i, act := range actions {
-		status, err := act.Execute(actionCtx)
+	var (
+		existFailedAction bool
+		waiting           bool
+		actionCtx         = action.ActionContext{
+			Ctx:              reqCtx.Ctx,
+			Client:           r.Client,
+			Recorder:         r.Recorder,
+			Scheme:           r.Scheme,
+			RestClientConfig: r.RestConfig,
+		}
+		targets = dputils.GetBackupTargets(request.BackupPolicy, request.BackupMethod)
+	)
+	for i := range targets {
+		if err = r.prepareRequestTargetInfo(reqCtx, request, &targets[i]); err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+		}
+		// there are actions not completed, continue to handle following actions
+		actions, err := request.BuildActions()
 		if err != nil {
 			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 		}
-		request.Status.Actions[i] = mergeActionStatus(&request.Status.Actions[i], status)
-
-		switch status.Phase {
-		case dpv1alpha1.ActionPhaseCompleted:
-			updateBackupStatusByActionStatus(&request.Status)
-			continue
-		case dpv1alpha1.ActionPhaseFailed:
-			return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
-				fmt.Errorf("action %s failed, %s", act.GetName(), status.FailureReason))
-		case dpv1alpha1.ActionPhaseRunning:
-			// update status
-			if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
-				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		// check all actions status, if any action failed, update backup status to failed
+		// if all actions completed, update backup status to completed, otherwise,
+		// continue to handle following actions.
+		for targetPodName, acts := range actions {
+		actions:
+			for _, act := range acts {
+				status, err := act.Execute(actionCtx)
+				if err != nil {
+					return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+				}
+				status.TargetPodName = targetPodName
+				mergeActionStatus(request, status)
+				switch status.Phase {
+				case dpv1alpha1.ActionPhaseCompleted:
+					updateBackupStatusByActionStatus(&request.Status)
+					continue
+				case dpv1alpha1.ActionPhaseFailed:
+					existFailedAction = true
+					break actions
+				case dpv1alpha1.ActionPhaseRunning:
+					// update status
+					if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
+						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+					}
+					waiting = true
+					break actions
+				}
 			}
-			return intctrlutil.Reconciled()
 		}
 	}
-
+	if waiting {
+		return intctrlutil.Reconciled()
+	}
+	if existFailedAction {
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
+			fmt.Errorf("there are failed actions, you can obtain the more informations in the status.actions"))
+	}
 	// all actions completed, update backup status to completed
 	request.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 	request.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
@@ -653,7 +767,9 @@ func PatchBackupObjectMeta(
 		request.Labels[v] = targetPod.Labels[v]
 	}
 
-	request.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
+	if _, ok := request.Labels[constant.AppManagedByLabelKey]; !ok {
+		request.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
+	}
 	request.Labels[dptypes.BackupTypeLabelKey] = request.GetBackupType()
 	request.Labels[dptypes.BackupPolicyLabelKey] = request.Spec.BackupPolicyName
 	// wait for the backup repo controller to prepare the essential resource.
@@ -667,9 +783,6 @@ func PatchBackupObjectMeta(
 		}
 	}
 
-	// set annotations
-	request.Annotations[dptypes.BackupTargetPodLabelKey] = targetPod.Name
-
 	// set finalizer
 	controllerutil.AddFinalizer(request.Backup, dptypes.DataProtectionFinalizerName)
 
@@ -680,12 +793,23 @@ func PatchBackupObjectMeta(
 	return wait, request.Client.Patch(request.Ctx, request.Backup, client.MergeFrom(original))
 }
 
-func mergeActionStatus(original, new *dpv1alpha1.ActionStatus) dpv1alpha1.ActionStatus {
-	as := new.DeepCopy()
-	if original.StartTimestamp != nil {
-		as.StartTimestamp = original.StartTimestamp
+func mergeActionStatus(request *dpbackup.Request, status *dpv1alpha1.ActionStatus) {
+	var exist bool
+	for i := range request.Status.Actions {
+		if request.Status.Actions[i].Name == status.Name {
+			as := status.DeepCopy()
+			if request.Status.Actions[i].StartTimestamp != nil {
+				as.StartTimestamp = request.Status.Actions[i].StartTimestamp
+			}
+			request.Status.Actions[i] = *as
+			exist = true
+			break
+		}
 	}
-	return *as
+	if !exist {
+		status.StartTimestamp = &metav1.Time{Time: time.Now()}
+		request.Status.Actions = append(request.Status.Actions, *status)
+	}
 }
 
 func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
@@ -702,7 +826,7 @@ func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
 // setConnectionPasswordAnnotation sets the encrypted password of the connection credential to the backup's annotations
 func setConnectionPasswordAnnotation(request *dpbackup.Request) error {
 	encryptPassword := func() (string, error) {
-		target := request.BackupPolicy.Spec.Target
+		target := request.Target
 		if target == nil || target.ConnectionCredential == nil {
 			return "", nil
 		}

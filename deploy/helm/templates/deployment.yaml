@@ -12,6 +12,7 @@ spec:
   selector:
     matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: "apps"
   {{- if .Values.updateStrategy }}
   strategy:
     {{ toYaml .Values.updateStrategy | nindent 4 | trim }}
@@ -24,6 +25,7 @@ spec:
       {{- end }}
       labels:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: "apps"
     spec:
       priorityClassName: {{ template "kubeblocks.priorityClassName" . }}
       {{- with .Values.image.imagePullSecrets }}
@@ -73,6 +75,9 @@ spec:
             {{- end }}
             {{- if .Values.multiCluster.contexts }}
             - "--multi-cluster-contexts={{ .Values.multiCluster.contexts }}"
+            {{- end }}
+            {{- if .Values.multiCluster.contextsDisabled }}
+            - "--multi-cluster-contexts-disabled={{ .Values.multiCluster.contextsDisabled }}"
             {{- end }}
           env:
             - name: CM_NAMESPACE
@@ -139,8 +144,13 @@ spec:
             - name: DP_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kubeblocks.fullname" . }}-secret
-                  key: dataProtectionEncryptionKey
+                  {{- include "dataprotection.encryptionKeySecretKeyRef" . | nindent 18 }}
+            {{- if .Values.dataProtection.enableBackupEncryption }}
+            - name: DP_BACKUP_ENCRYPTION_SECRET_KEY_REF
+              value: {{ include "dataprotection.encryptionKeySecretKeyRef" . | fromYaml | toJson | quote }}
+            - name: DP_BACKUP_ENCRYPTION_ALGORITHM
+              value: {{ include "dataprotection.backupEncryptionAlgorithm" . }}
+            {{- end }}
             - name: KUBE_PROVIDER
               value: {{ .Values.provider | quote }}
             - name: HOST_PORT_INCLUDE_RANGES
@@ -151,6 +161,10 @@ spec:
               value: {{ include "kubeblocks.fullname" . }}-host-ports
             {{- if .Values.serviceMonitor.goRuntime.enabled }}
             - name: ENABLED_RUNTIME_METRICS
+              value: "true"
+            {{- end }}
+            {{- if .Values.controllers.experimental.enabled }}
+            - name: experimental
               value: "true"
             {{- end }}
           {{- with .Values.securityContext }}

@@ -231,13 +231,13 @@ func IgnoreIsAlreadyExists(err error) error {
 }
 
 // BackgroundDeleteObject deletes the object in the background, usually used in the Reconcile method
-func BackgroundDeleteObject(cli client.Client, ctx context.Context, obj client.Object) error {
+func BackgroundDeleteObject(cli client.Client, ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	deletePropagation := metav1.DeletePropagationBackground
 	deleteOptions := &client.DeleteOptions{
 		PropagationPolicy: &deletePropagation,
 	}
 
-	if err := cli.Delete(ctx, obj, deleteOptions); err != nil {
+	if err := cli.Delete(ctx, obj, append([]client.DeleteOption{deleteOptions}, opts...)...); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 	return nil
@@ -255,7 +255,7 @@ func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer st
 			return err
 		}
 	}
-	if !controllerutil.ContainsFinalizer(obj, finalizer) {
+	if len(finalizer) > 0 && !controllerutil.ContainsFinalizer(obj, finalizer) {
 		// pvc objects do not need to add finalizer
 		_, ok := obj.(*corev1.PersistentVolumeClaim)
 		if !ok {

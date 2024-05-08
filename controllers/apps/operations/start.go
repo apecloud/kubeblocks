@@ -24,7 +24,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -58,17 +57,34 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	cluster := opsRes.Cluster
 	componentReplicasMap, err := getComponentReplicasSnapshot(cluster.Annotations)
 	if err != nil {
-		return err
+		return intctrlutil.NewFatalError(err.Error())
 	}
-	for i, v := range cluster.Spec.ComponentSpecs {
-		replicasOfSnapshot := componentReplicasMap[v.Name]
+	applyReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string) {
+		componentKey := getComponentKeyForStartSnapshot(componentName, "")
+		replicasOfSnapshot := componentReplicasMap[componentKey]
 		if replicasOfSnapshot == 0 {
-			continue
+			return
 		}
 		// only reset the component whose replicas number is 0
-		if v.Replicas == 0 {
-			cluster.Spec.ComponentSpecs[i].Replicas = replicasOfSnapshot
+		if compSpec.Replicas == 0 {
+			compSpec.Replicas = replicasOfSnapshot
+			for i := range compSpec.Instances {
+				componentKey = getComponentKeyForStartSnapshot(componentName, compSpec.Instances[i].Name)
+				replicasOfSnapshot = componentReplicasMap[componentKey]
+				if replicasOfSnapshot == 0 {
+					continue
+				}
+				compSpec.Instances[i].Replicas = &replicasOfSnapshot
+			}
 		}
+	}
+	for i := range cluster.Spec.ComponentSpecs {
+		compSpec := &cluster.Spec.ComponentSpecs[i]
+		applyReplicas(compSpec, compSpec.Name)
+	}
+	for i := range cluster.Spec.ShardingSpecs {
+		shardingSpec := &cluster.Spec.ShardingSpecs[i]
+		applyReplicas(&shardingSpec.Template, shardingSpec.Name)
 	}
 	// delete the replicas snapshot of components from the cluster.
 	delete(cluster.Annotations, constant.SnapShotForStartAnnotationKey)
@@ -78,13 +94,10 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for start opsRequest.
 func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, componentName string) *int32 {
-		compStatus := opsRequest.Status.Components[componentName]
-		if compStatus.OverrideBy != nil {
-			return compStatus.OverrideBy.Replicas
-		}
+	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32 {
 		componentReplicasMap, _ := getComponentReplicasSnapshot(opsRequest.Annotations)
-		replicas, ok := componentReplicasMap[componentName]
+		componentKey := getComponentKeyForStartSnapshot(compOps.GetComponentName(), "")
+		replicas, ok := componentReplicasMap[componentKey]
 		if !ok {
 			return nil
 		}
@@ -98,32 +111,20 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, getExpectReplicas)
 	}
-	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "start", syncOverrideByOpsForScaleReplicas, handleComponentProgress)
+	compOpsHelper := newComponentOpsHelper([]appsv1alpha1.ComponentOps{})
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "start", handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (start StartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	opsRequest := opsRes.OpsRequest
-	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	componentReplicasMap, err := getComponentReplicasSnapshot(opsRes.Cluster.Annotations)
 	if err != nil {
-		return err
+		return intctrlutil.NewFatalError(err.Error())
 	}
 	if err = start.setOpsAnnotation(reqCtx, cli, opsRes, componentReplicasMap); err != nil {
 		return err
 	}
-	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-		replicasOfSnapshot := componentReplicasMap[v.Name]
-		if replicasOfSnapshot == 0 {
-			continue
-		}
-		if v.Replicas == 0 {
-			lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
-				Replicas: pointer.Int32(v.Replicas),
-			}
-		}
-	}
-	opsRequest.Status.LastConfiguration.Components = lastComponentInfo
+	saveLastConfigurationForStopAndStart(opsRes)
 	return nil
 }
 

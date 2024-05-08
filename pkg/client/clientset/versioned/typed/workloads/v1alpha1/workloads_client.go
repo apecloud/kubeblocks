@@ -28,7 +28,7 @@ import (
 
 type WorkloadsV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	ReplicatedStateMachinesGetter
+	InstanceSetsGetter
 }
 
 // WorkloadsV1alpha1Client is used to interact with features provided by the workloads.kubeblocks.io group.
@@ -36,8 +36,8 @@ type WorkloadsV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *WorkloadsV1alpha1Client) ReplicatedStateMachines(namespace string) ReplicatedStateMachineInterface {
-	return newReplicatedStateMachines(c, namespace)
+func (c *WorkloadsV1alpha1Client) InstanceSets(namespace string) InstanceSetInterface {
+	return newInstanceSets(c, namespace)
 }
 
 // NewForConfig creates a new WorkloadsV1alpha1Client for the given config.

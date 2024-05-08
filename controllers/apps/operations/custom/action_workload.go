@@ -33,7 +33,7 @@ type WorkloadAction struct {
 	OpsRequest     *appsv1alpha1.OpsRequest
 	Cluster        *appsv1alpha1.Cluster
 	OpsDef         *appsv1alpha1.OpsDefinition
-	CompCustomSpec *appsv1alpha1.CustomOpsComponent
+	CustomCompOps  *appsv1alpha1.CustomOpsComponent
 	Comp           *appsv1alpha1.ClusterComponentSpec
 	progressDetail appsv1alpha1.ProgressStatusDetail
 }
@@ -41,14 +41,14 @@ type WorkloadAction struct {
 func NewWorkloadAction(opsRequest *appsv1alpha1.OpsRequest,
 	cluster *appsv1alpha1.Cluster,
 	opsDef *appsv1alpha1.OpsDefinition,
-	comCustomSpec *appsv1alpha1.CustomOpsComponent,
+	customCompOps *appsv1alpha1.CustomOpsComponent,
 	comp *appsv1alpha1.ClusterComponentSpec,
 	progressDetail appsv1alpha1.ProgressStatusDetail) *WorkloadAction {
 	return &WorkloadAction{
 		OpsRequest:     opsRequest,
 		Cluster:        cluster,
 		OpsDef:         opsDef,
-		CompCustomSpec: comCustomSpec,
+		CustomCompOps:  customCompOps,
 		Comp:           comp,
 		progressDetail: progressDetail,
 	}
@@ -59,24 +59,24 @@ func (w *WorkloadAction) Execute(actionCtx ActionContext) (*ActionStatus, error)
 		return nil, nil
 	}
 	var (
-		podTemplateName   = actionCtx.Action.Workload.TargetPodTemplate
-		targetPods        []*corev1.Pod
-		err               error
-		targetPodTemplate *appsv1alpha1.TargetPodTemplate
-		actionStatus      = NewActiontatus()
+		podInfoExtractorName = actionCtx.Action.Workload.PodInfoExtractorName
+		targetPods           []*corev1.Pod
+		err                  error
+		podInfoExtractor     *appsv1alpha1.PodInfoExtractor
+		actionStatus         = NewActiontatus()
 	)
-	if podTemplateName != "" {
+	if podInfoExtractorName != "" {
 		// get target pods
-		targetPodTemplate = getTargetPodTemplate(w.OpsDef, podTemplateName)
-		if targetPodTemplate == nil {
-			return nil, intctrlutil.NewFatalError("can not found the targetPodTemplate by " + podTemplateName)
+		podInfoExtractor = getTargetPodInfoExtractor(w.OpsDef, podInfoExtractorName)
+		if podInfoExtractor == nil {
+			return nil, intctrlutil.NewFatalError("can not found the podInfoExtractor: " + podInfoExtractorName)
 		}
-		targetPods, err = getTargetPods(actionCtx.ReqCtx.Ctx, actionCtx.Client, w.Cluster, targetPodTemplate.PodSelector, w.CompCustomSpec.ComponentName)
+		targetPods, err = getTargetPods(actionCtx.ReqCtx.Ctx, actionCtx.Client, w.Cluster, podInfoExtractor.PodSelector, w.CustomCompOps.ComponentName)
 		if err != nil {
 			return nil, err
 		}
 	}
-	executeAction := func(podTemplate *appsv1alpha1.TargetPodTemplate, targetPod *corev1.Pod, index int) (*appsv1alpha1.ActionTask, error) {
+	executeAction := func(podTemplate *appsv1alpha1.PodInfoExtractor, targetPod *corev1.Pod, index int) (*appsv1alpha1.ActionTask, error) {
 		podSpec, err := w.buildPodSpec(actionCtx, podTemplate, targetPod)
 		if err != nil {
 			return nil, err
@@ -96,7 +96,7 @@ func (w *WorkloadAction) Execute(actionCtx ActionContext) (*ActionStatus, error)
 		return actionStatus, err
 	}
 	for i := range targetPods {
-		actionTask, err := executeAction(targetPodTemplate, targetPods[i], i)
+		actionTask, err := executeAction(podInfoExtractor, targetPods[i], i)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +133,7 @@ func (w *WorkloadAction) createWorkload(actionCtx ActionContext,
 }
 
 func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
-	targetPodTemplate *appsv1alpha1.TargetPodTemplate,
+	podInfoExtractor *appsv1alpha1.PodInfoExtractor,
 	targetPod *corev1.Pod) (*corev1.PodSpec, error) {
 
 	var (
@@ -144,13 +144,13 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 	)
 
 	env, err := buildActionPodEnv(actionCtx.ReqCtx, actionCtx.Client, w.Cluster, w.OpsDef, w.OpsRequest,
-		w.Comp, w.CompCustomSpec, targetPodTemplate, targetPod)
+		w.Comp, w.CustomCompOps, podInfoExtractor, targetPod)
 	if err != nil {
 		return nil, err
 	}
-	if targetPodTemplate != nil {
+	if podInfoExtractor != nil {
 		// mount the target pod's volumes.
-		for _, volumeMount := range targetPodTemplate.VolumeMounts {
+		for _, volumeMount := range podInfoExtractor.VolumeMounts {
 			for _, volume := range targetPod.Spec.Volumes {
 				if volume.Name != volumeMount.Name {
 					continue
@@ -178,9 +178,9 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 		podSpec.Tolerations = w.Comp.Tolerations
 	}
 	switch {
-	case w.OpsRequest.Spec.CustomSpec.ServiceAccountName != nil:
+	case w.OpsRequest.Spec.CustomOps.ServiceAccountName != nil:
 		// prioritize using the input sa.
-		podSpec.ServiceAccountName = *w.OpsRequest.Spec.CustomSpec.ServiceAccountName
+		podSpec.ServiceAccountName = *w.OpsRequest.Spec.CustomOps.ServiceAccountName
 	case w.Comp.ServiceAccountName != "":
 		// using the component sa.
 		podSpec.ServiceAccountName = w.Comp.ServiceAccountName

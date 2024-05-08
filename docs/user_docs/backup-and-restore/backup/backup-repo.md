@@ -118,7 +118,7 @@ You can specify the BackupRepo information in a YAML configuration file when ins
 
 * For KubeBlocks v0.8.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, `pvc`, `ftp`, and `nfs`.
 * For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
-* Execute the command `kubectl get storageproviders.storage.kubeblocks.io` to view the supported `storageProvider` options.
+* Execute the command `kubectl get storageproviders.dataprotection.kubeblocks.io` to view the supported `storageProvider` options.
 
 :::
 
@@ -297,7 +297,8 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
       <TabItem value="PVC" label="PVC">
 
       ```bash
-      kbcli backuprepo create --provider pvc \
+      kbcli backuprepo create my-repo \
+        --provider pvc \
         --storage-class-name "nfs-storage" \
         --access-mode "ReadWriteMany" \
         --volume-capacity "100Gi" \
@@ -311,7 +312,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
       * `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
       * `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using kbcli to create BackupRepo can avoid such problems because kbcli checks whether there is another default repository before creating a new one.
-      * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, `ftp`, and `nas`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers. Please note that `--provider` is mandatory in configuration.
+      * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, `ftp`, and `nfs`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers. Please note that `--provider` is mandatory in configuration.
 
       After `kbcli backuprepo create` is executed successfully, the system creates the K8s resource whose type is `BackupRepo`. You can modify the annotation of this resource to adjust the default repository.
 

@@ -44,7 +44,7 @@ func EnabledRuntimeMetrics() bool {
 	return viper.GetBool(FeatureGateEnableRuntimeMetrics)
 }
 
-func GetScrapeAnnotations(scrapeConfig appsv1alpha1.PrometheusScrapeConfig, container *corev1.Container) map[string]string {
+func GetScrapeAnnotations(scrapeConfig appsv1alpha1.PrometheusExporter, container *corev1.Container) map[string]string {
 	return map[string]string{
 		PrometheusScrapeAnnotationPath:   fromScrapePath(scrapeConfig),
 		PrometheusScrapeAnnotationPort:   fromContainerPort(scrapeConfig, container),
@@ -54,29 +54,26 @@ func GetScrapeAnnotations(scrapeConfig appsv1alpha1.PrometheusScrapeConfig, cont
 	}
 }
 
-func fromScrapePath(config appsv1alpha1.PrometheusScrapeConfig) string {
-	if config.MetricsPath != "" {
-		return config.MetricsPath
+func fromScrapePath(config appsv1alpha1.PrometheusExporter) string {
+	if config.ScrapePath != "" {
+		return config.ScrapePath
 	}
 	return defaultScrapePath
 }
 
-func fromContainerPort(config appsv1alpha1.PrometheusScrapeConfig, container *corev1.Container) string {
-	if config.MetricsPort != "" {
-		return config.MetricsPort
+func fromContainerPort(config appsv1alpha1.PrometheusExporter, container *corev1.Container) string {
+	if config.ScrapePort != "" {
+		return config.ScrapePort
 	}
-
-	if config.MetricsPort == "" && len(container.Ports) > 0 {
+	if config.ScrapePort == "" && len(container.Ports) > 0 {
 		return container.Ports[0].Name
 	}
-
-	// TODO: webhook should have already validated.
 	return ""
 }
 
-func fromScheme(config appsv1alpha1.PrometheusScrapeConfig) string {
-	if config.Protocol != "" {
-		return string(config.Protocol)
+func fromScheme(config appsv1alpha1.PrometheusExporter) string {
+	if config.ScrapeScheme != "" {
+		return string(config.ScrapeScheme)
 	}
 	return defaultScrapeScheme
 }

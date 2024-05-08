@@ -485,63 +485,31 @@ type ServiceRefDeclarationSpec struct {
 	ServiceVersion string `json:"serviceVersion"`
 }
 
-type PrometheusScrapeConfig struct {
-	// Specifies the http/https url path to scrape for metrics.
-	// If empty, Prometheus uses the default value (e.g. `/metrics`).
-	//
-	// +kubebuilder:validation:default="/metrics"
-	// +optional
-	MetricsPath string `json:"metricsPath,omitempty"`
-
-	// Specifies the port name to scrape for metrics.
-	//
-	// +optional
-	MetricsPort string `json:"metricsPort,omitempty"`
-
-	// Specifies the schema to use for scraping.
-	// `http` and `https` are the expected values unless you rewrite the `__scheme__` label via relabeling.
-	// If empty, Prometheus uses the default value `http`.
-	//
-	// +kubebuilder:validation:default="http"
-	// +optional
-	Protocol PrometheusProtocol `json:"protocol,omitempty"`
-}
-
-type MonitorSource struct {
-	// Defines the kind of monitor, such as metrics or logs.
+type ExporterConfig struct {
+	// scrapePort is exporter port for Time Series Database to scrape metrics.
 	// +kubebuilder:validation:Required
-	SidecarKind MonitorKind `json:"kind"`
+	// +kubebuilder:validation:XIntOrString
+	ScrapePort intstr.IntOrString `json:"scrapePort"`
 
-	// Defines the scrape configuration for the prometheus.
-	//
+	// scrapePath is exporter url path for Time Series Database to scrape metrics.
+	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:default="/metrics"
 	// +optional
-	ScrapeConfig *PrometheusScrapeConfig `json:"scrapeConfig,omitempty"`
+	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
-type SidecarContainerSource struct {
-	// Defines the function or purpose of the container, such as the monitor type sidecar.
-	//
+type MonitorConfig struct {
+	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
+	// If BuiltIn is set to true, monitor metrics will be scraped automatically.
+	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
+	// +kubebuilder:default=false
 	// +optional
-	Monitor *MonitorSource `json:"monitor,omitempty"`
-}
+	BuiltIn bool `json:"builtIn,omitempty"`
 
-type SidecarContainerSpec struct {
-	corev1.Container `json:",inline"`
-
-	// Define the function or purpose of the container, such as the monitor type sidecar.
-	// In order to allow prometheus to scrape metrics from the sidecar container, the schema, port, and url will be injected into the annotation of the service.
-	//
+	// exporterConfig provided by provider, which specify necessary information to Time Series Database.
+	// exporterConfig is valid when builtIn is false.
 	// +optional
-	*SidecarContainerSource `json:",inline"`
-}
-
-type BuiltinMonitorContainerRef struct {
-	// Specifies the name of the built-in metrics exporter container.
-	//
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	PrometheusScrapeConfig `json:",inline"`
+	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
 // ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
@@ -721,22 +689,33 @@ type ClusterComponentDefinition struct {
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
 
-	// Defines the sidecar containers that will be attached to the component's main container.
+	// Defines the metrics exporter.
 	//
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +kubebuilder:validation:MinItems= 1
-	// +kubebuilder:validation:MaxItems= 32
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
 	// +optional
-	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarContainerSpecs,omitempty"`
+	PrometheusExporter *PrometheusExporter `json:"exporter,omitempty"`
 
-	// Defines the built-in metrics exporter container.
+	// Deprecated since v0.9
+	// monitor is monitoring config which provided by provider.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
-	BuiltinMonitorContainer *BuiltinMonitorContainerRef `json:"builtinMonitorContainer,omitempty"`
+	Monitor *MonitorConfig `json:"monitor,omitempty"`
+}
+
+func (r *ClusterComponentDefinition) GetPrometheusExporter() *PrometheusExporter {
+	if r.PrometheusExporter != nil {
+		return r.PrometheusExporter
+	}
+
+	// Compatible with previous versions of kb
+	if r.Monitor == nil || r.Monitor.Exporter == nil {
+		return nil
+	}
+
+	return &PrometheusExporter{
+		ScrapePath: r.Monitor.Exporter.ScrapePath,
+		ScrapePort: r.Monitor.Exporter.ScrapePort.String(),
+	}
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {

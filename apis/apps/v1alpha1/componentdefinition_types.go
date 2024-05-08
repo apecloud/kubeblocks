@@ -193,23 +193,10 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
-	// Defines the sidecar containers that will be attached to the component's main container.
-	//
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +kubebuilder:validation:MinItems:= 1
-	// +kubebuilder:validation:MaxItems:= 32
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	// +optional
-	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarContainerSpecs,omitempty"`
-
 	// Defines the built-in metrics exporter container.
 	//
 	// +optional
-	BuiltinMonitorContainer *BuiltinMonitorContainerRef `json:"builtinMonitorContainer,omitempty"`
+	PrometheusExporter *PrometheusExporter `json:"exporter,omitempty"`
 
 	// Defines variables which are determined after Cluster instantiation and reflect
 	// dynamic or runtime attributes of instantiated Clusters.
@@ -627,6 +614,33 @@ type SystemAccount struct {
 	//
 	// +optional
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+}
+
+type PrometheusExporter struct {
+	// Specifies the name of the built-in metrics exporter container.
+	//
+	// +optional
+	ContainerName string `json:"containerName,omitempty"`
+
+	// Specifies the http/https url path to scrape for metrics.
+	// If empty, Prometheus uses the default value (e.g. `/metrics`).
+	//
+	// +kubebuilder:validation:default="/metrics"
+	// +optional
+	ScrapePath string `json:"scrapePath,omitempty"`
+
+	// Specifies the port name to scrape for metrics.
+	//
+	// +optional
+	ScrapePort string `json:"scrapePort,omitempty"`
+
+	// Specifies the schema to use for scraping.
+	// `http` and `https` are the expected values unless you rewrite the `__scheme__` label via relabeling.
+	// If empty, Prometheus uses the default value `http`.
+	//
+	// +kubebuilder:validation:default="http"
+	// +optional
+	ScrapeScheme PrometheusScheme `json:"scrapeScheme,omitempty"`
 }
 
 // RoleArbitrator defines how to arbitrate the role of replicas.

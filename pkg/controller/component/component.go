@@ -86,7 +86,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetSchedulingPolicy(schedulingPolicy).
 		SetMonitorIntegration(compSpec.MonitorIntegration).
-		DisableExporter(compSpec.DisableExporter).
+		DisableExporter(compSpec.GetDisableExporter()).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).

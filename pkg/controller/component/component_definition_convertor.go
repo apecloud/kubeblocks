@@ -62,7 +62,7 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
-		"sidecarcontainerspecs":  &compDefSidecarContainersConvertor{},
+		"prometheusexporter":     &compDefExporterConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer); err != nil {
@@ -701,9 +701,9 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 	}
 }
 
-type compDefSidecarContainersConvertor struct{}
+type compDefExporterConvertor struct{}
 
-func (c *compDefSidecarContainersConvertor) convert(args ...any) (any, error) {
+func (c *compDefExporterConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.SidecarContainerSpecs, nil
+	return clusterCompDef.GetPrometheusExporter(), nil
 }

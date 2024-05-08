@@ -26,13 +26,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"golang.org/x/exp/slices"
+	v1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -278,6 +281,19 @@ func (r *deletionStage) Handle(ctx context.Context) {
 func (r *installableCheckStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
 		r.reqCtx.Log.V(1).Info("installableCheckStage", "phase", addon.Status.Phase)
+
+		// check the annotations constraint about Kubeblocks Version
+		check, err := checkAnnotationsConstraint(ctx, r.reconciler, addon)
+		if err != nil {
+			res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
+			r.updateResultNErr(&res, err)
+			return
+		}
+		if !check {
+			r.setReconciled()
+			return
+		}
+
 		if addon.Spec.Installable == nil {
 			return
 		}
@@ -1097,6 +1113,118 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 		return true
 	}
 	return false
+}
+
+func getKubeBlocksDeploy(ctx context.Context, r *AddonReconciler) (*v1.Deployment, error) {
+	deploys := &v1.DeploymentList{}
+	labelSelector := labels.SelectorFromSet(map[string]string{
+		constant.AppNameLabelKey:      constant.AppName,
+		constant.AppComponentLabelKey: "apps",
+	})
+	if err := r.Client.List(ctx, deploys, client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS)),
+		client.MatchingLabelsSelector{Selector: labelSelector}); err != nil {
+		return nil, err
+	}
+	if deploys.Items == nil || len(deploys.Items) == 0 {
+		return nil, fmt.Errorf("there is no KubeBlocks deployment, please check your cluster")
+	}
+	if len(deploys.Items) > 1 {
+		return nil, fmt.Errorf("found multiple KubeBlocks deployments, please check your cluster")
+	}
+	return &deploys.Items[0], nil
+}
+
+func getKubeBlocksVersion(ctx context.Context, r *AddonReconciler) (string, error) {
+	deploy, err := getKubeBlocksDeploy(ctx, r)
+	if err != nil {
+		return "", err
+	}
+	labels := deploy.GetLabels()
+	if labels == nil {
+		return "", fmt.Errorf("KubeBlocks deployment has no labels")
+	}
+
+	v, ok := labels[constant.AppVersionLabelKey]
+	if !ok {
+		return "", fmt.Errorf("KubeBlocks deployment has no version label")
+	}
+	return v, nil
+}
+
+// this function checks if we try to install or enable an addon directly
+func enableOrInstall(addon *extensionsv1alpha1.Addon) bool {
+	return addon.Status.Phase == "" && addon.Spec.InstallSpec == nil ||
+		addon.Status.Phase == extensionsv1alpha1.AddonFailed && addon.Spec.InstallSpec != nil && addon.Spec.InstallSpec.Enabled ||
+		addon.Status.Phase == extensionsv1alpha1.AddonDisabled && addon.Spec.InstallSpec != nil && addon.Spec.InstallSpec.Enabled
+}
+
+// check the annotations constraint when install or enable an addon
+func checkAnnotationsConstraint(ctx context.Context, reconciler *AddonReconciler, addon *extensionsv1alpha1.Addon) (bool, error) {
+	if addon.Annotations == nil || len(addon.Annotations[KBVersionValidate]) == 0 {
+		// there is no constraint
+		return true, nil
+	}
+	// check when installing or enabling
+	if enableOrInstall(addon) {
+		kbVersion, err := getKubeBlocksVersion(ctx, reconciler)
+		if err != nil {
+			return false, err
+		}
+		if ok, err := validateVersion(addon.Annotations[KBVersionValidate], kbVersion); err == nil && !ok {
+			// kb version is mismatch, set the event and modify the status of the addon
+			reconciler.Event(addon, corev1.EventTypeWarning, "Kubeblocks Version Mismatch",
+				fmt.Sprintf("The version of kubeblocks needs to be %s, current is %s", addon.Annotations[KBVersionValidate], kbVersion))
+			if addon.Status.Phase != extensionsv1alpha1.AddonFailed || meta.FindStatusCondition(addon.Status.Conditions, extensionsv1alpha1.ConditionTypeFailed) == nil {
+				patch := client.MergeFrom(addon.DeepCopy())
+				addon.Status.Phase = extensionsv1alpha1.AddonFailed
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:               extensionsv1alpha1.ConditionTypeFailed,
+					Status:             metav1.ConditionFalse,
+					Reason:             InstallableRequirementUnmatched,
+					LastTransitionTime: metav1.Now(),
+					Message:            fmt.Sprintf("The version of kubeblocks needs to be %s, current is %s", addon.Annotations[KBVersionValidate], kbVersion),
+				})
+				if err := reconciler.Status().Patch(ctx, addon, patch); err != nil {
+					return false, err
+				}
+			}
+			return false, nil
+		} else if err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+func validateVersion(annotations, kbVersion string) (bool, error) {
+	if kbVersion == "" {
+		return false, nil
+	}
+	addPreReleaseInfo := func(constraint string) string {
+		constraint = strings.Trim(constraint, " ")
+		split := strings.Split(constraint, "-")
+		if len(split) == 1 && (strings.HasPrefix(constraint, ">") || strings.Contains(constraint, "<")) {
+			constraint += "-0"
+		}
+		return constraint
+	}
+	if strings.Contains(kbVersion, "-") {
+		rules := strings.Split(annotations, ",")
+		for i := range rules {
+			rules[i] = addPreReleaseInfo(rules[i])
+		}
+		annotations = strings.Join(rules, ",")
+	}
+	constraint, err := semver.NewConstraint(annotations)
+	if err != nil {
+		return false, err
+	}
+	v, err := semver.NewVersion(kbVersion)
+	if err != nil {
+		return false, err
+	}
+	validate, _ := constraint.Validate(v)
+	return validate, nil
 }
 
 func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {

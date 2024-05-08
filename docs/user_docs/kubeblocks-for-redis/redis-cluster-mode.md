@@ -371,3 +371,37 @@ spec:
   clusterName: redisc
   type: Start
 ```
+
+### Back up & Restore
+
+To back up a cluster:
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: backup-redisc-1
+spec:
+  clusterName: redisc
+  type: Backup
+  backup:
+    backupMethod: datafile
+    backupName: backup-redisc-1
+    backupPolicyName: redisc-redis-backup-policy
+    deletionPolicy: Delete
+```
+
+To restore a cluster:
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: restore-redisc-backup
+spec:
+  clusterName: restore-redisc
+  type: Backup
+  restore:
+    backupName: backup-redisc-1
+```
+

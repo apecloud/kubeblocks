@@ -88,7 +88,7 @@ func (i componentPrometheusIntegrationTransformer) buildPrometheusMonitorService
 			strings.HasPrefix(obj.Name, monitorIntegration.ServiceMonitorTemplate.Name)
 	}
 	index := slices.IndexFunc(objects, cmp)
-	if index > 0 {
+	if index >= 0 {
 		running = objects[index].DeepCopy()
 		objects = slices.Delete(objects, index, index+1)
 	}
@@ -144,7 +144,10 @@ func createMonitorService(transCtx *componentTransformContext, template *appsv1a
 	return service, nil
 }
 
-func (i componentPrometheusIntegrationTransformer) buildVMMonitorService(ctx *componentTransformContext, integration *appsv1alpha1.MonitorIntegration, cli model.GraphClient) error {
+func (i componentPrometheusIntegrationTransformer) buildVMMonitorService(transCtx *componentTransformContext, integration *appsv1alpha1.MonitorIntegration, graphCli model.GraphClient) error {
 	// TODO: support vm operator
+	if integration.VMMonitorTemplate == nil {
+		return nil
+	}
 	return fmt.Errorf("not support vm")
 }

@@ -14,6 +14,7 @@ spec:
   selector:
     matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: "dataprotection"
   {{- if .Values.updateStrategy }}
   strategy:
     {{ toYaml .Values.updateStrategy | nindent 4 | trim }}
@@ -26,6 +27,7 @@ spec:
       {{- end }}
       labels:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: "dataprotection"
     spec:
       priorityClassName: {{ template "kubeblocks.priorityClassName" . }}
       {{- with .Values.dataProtection.image.imagePullSecrets }}
@@ -60,6 +62,15 @@ spec:
             {{- end }}
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
+            {{- end }}
+            {{- if .Values.multiCluster.kubeConfig }}
+            - "--multi-cluster-kubeconfig={{ .Values.multiCluster.mountPath }}/kubeconfig"
+            {{- end }}
+            {{- if .Values.multiCluster.contexts }}
+            - "--multi-cluster-contexts={{ .Values.multiCluster.contexts }}"
+            {{- end }}
+            {{- if .Values.multiCluster.contextsDisabled }}
+            - "--multi-cluster-contexts-disabled={{ .Values.multiCluster.contextsDisabled }}"
             {{- end }}
           env:
             - name: CM_NAMESPACE
@@ -108,8 +119,7 @@ spec:
             - name: DP_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kubeblocks.fullname" . }}-secret
-                  key: dataProtectionEncryptionKey
+                  {{- include "dataprotection.encryptionKeySecretKeyRef" . | nindent 18 }}
             - name: DATASAFED_IMAGE
               value: "{{ .Values.dataProtection.image.registry | default $dataProtectionImageRegistry }}/{{ .Values.dataProtection.image.datasafed.repository }}:{{ .Values.dataProtection.image.datasafed.tag | default "latest" }}"
             - name: GC_FREQUENCY_SECONDS
@@ -160,6 +170,11 @@ spec:
               name: cert
               readOnly: true
             {{- end }}
+            {{- if .Values.multiCluster.kubeConfig }}
+            - mountPath: {{ .Values.multiCluster.mountPath }}
+              name: multi-cluster-kubeconfig
+              readOnly: true
+            {{- end }}
       {{- if .Values.hostNetwork }}
       hostNetwork: {{ .Values.hostNetwork }}
       {{- end }}
@@ -192,5 +207,11 @@ spec:
           secret:
             defaultMode: 420
             secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+        {{- end }}
+        {{- if .Values.multiCluster.kubeConfig }}
+        - name: multi-cluster-kubeconfig
+          secret:
+            secretName: {{ .Values.multiCluster.kubeConfig }}
+            defaultMode: 420
         {{- end }}
 {{- end }}

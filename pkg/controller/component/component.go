@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -67,28 +68,27 @@ func IsGenerated(comp *appsv1alpha1.Component) bool {
 func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec,
 	labels, annotations map[string]string) (*appsv1alpha1.Component, error) {
 	compName := FullName(cluster.Name, compSpec.Name)
-	affinities := BuildAffinity(cluster, compSpec)
-	tolerations, err := BuildTolerations(cluster, compSpec)
-	if err != nil {
-		return nil, err
-	}
 	compDefName := func() string {
 		if strings.HasPrefix(compSpec.ComponentDef, constant.KBGeneratedVirtualCompDefPrefix) {
 			return ""
 		}
 		return compSpec.ComponentDef
+	}()
+	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
+	if err != nil {
+		return nil, err
 	}
-	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, compDefName()).
+	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, compDefName).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddAnnotations(constant.KBAppMultiClusterPlacementKey, cluster.Annotations[constant.KBAppMultiClusterPlacementKey]).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
-		SetAffinity(affinities).
-		SetTolerations(tolerations).
+		SetSchedulingPolicy(schedulingPolicy).
+		SetSidecarContainers(compSpec.Sidecars).
+		SetMonitor(compSpec.MonitorEnabled).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
-		SetMonitor(compSpec.Monitor).
 		SetServiceAccountName(compSpec.ServiceAccountName).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetEnabledLogs(compSpec.EnabledLogs).
@@ -216,25 +216,17 @@ func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, erro
 	return val, nil
 }
 
-// GetComponentDefName gets the name of referenced component definition.
-func GetComponentDefName(cluster *appsv1alpha1.Cluster, componentName string) string {
-	for _, component := range cluster.Spec.ComponentSpecs {
-		if componentName == component.Name {
-			return component.ComponentDef
-		}
+// GetComponentByName gets the component by component full name.
+func GetComponentByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compFullName, namespace string) (*appsv1alpha1.Component, error) {
+	comp := &appsv1alpha1.Component{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compFullName, Namespace: namespace}, comp); err != nil {
+		return nil, err
 	}
-	return ""
+	return comp, nil
 }
 
-// GetCompDefinition gets the component definition by component name.
-func GetCompDefinition(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	compName string) (*appsv1alpha1.ComponentDefinition, error) {
-	compDefName := GetComponentDefName(cluster, compName)
-	if len(compDefName) == 0 {
-		return nil, intctrlutil.NewNotFound(`can not found component definition by the component name "%s"`, compName)
-	}
+// GetCompDefByName gets the component definition by component definition name.
+func GetCompDefByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compDefName string) (*appsv1alpha1.ComponentDefinition, error) {
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
 		return nil, err

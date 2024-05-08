@@ -31,7 +31,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: OpsDefinition is the Schema for the opsdefinitions API
+        description: OpsDefinition is the Schema for the OpsDefinitions API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -46,42 +46,53 @@ spec:
           metadata:
             type: object
           spec:
-            description: OpsDefinitionSpec defines the desired state of OpsDefinition
+            description: OpsDefinitionSpec defines the desired state of OpsDefinition.
             properties:
               actions:
-                description: The actions to be executed in the opsRequest are performed
-                  sequentially.
+                description: Specifies a list of OpsAction where each customized action
+                  is executed sequentially.
                 items:
+                  description: "OpsAction specifies a custom action defined in OpsDefinition
+                    for execution in a \"Custom\" OpsRequest. \n OpsAction can be
+                    of three types: \n - workload: Creates a Job or Pod to run custom
+                    scripts, ideal for isolated or long-running tasks. - exec: Executes
+                    commands directly within an existing container using the kubectl
+                    exec interface, suitable for immediate, short-lived operations.
+                    - resourceModifier: Modifies a K8s object using JSON patches,
+                    useful for updating the spec of some resource."
                   properties:
                     exec:
-                      description: Represents the exec action. This will call the
-                        kubectl exec interface.
+                      description: Specifies the configuration for a 'exec' action.
+                        It creates a Pod and invokes a 'kubectl exec' to run command
+                        inside a specified container with the target Pod.
                       properties:
                         backoffLimit:
                           default: 0
-                          description: Specifies the number of retries before marking
-                            the action as failed.
+                          description: Specifies the number of retries allowed before
+                            marking the action as failed.
                           format: int32
                           minimum: 0
                           type: integer
                         command:
-                          description: The command to execute.
+                          description: The command to be executed via 'kubectl exec
+                            --'.
                           items:
                             type: string
                           minItems: 1
                           type: array
                         containerName:
-                          description: The name of the container in the target pod
-                            to execute the command. If not set, the first container
-                            is used.
+                          description: "The name of the container in the target pod
+                            where the command should be executed. This corresponds
+                            to the `-c {containerName}` option in `kubectl exec`.
+                            \n If not set, the first container is used."
                           type: string
-                        targetPodTemplate:
-                          description: Refers to the spec.targetPodTemplates. Defines
-                            the target pods that need to execute exec actions.
+                        podInfoExtractorName:
+                          description: Specifies a PodInfoExtractor defined in the
+                            `opsDefinition.spec.podInfoExtractors`.
                           type: string
                       required:
                       - command
-                      - targetPodTemplate
+                      - podInfoExtractorName
                       type: object
                     failurePolicy:
                       allOf:
@@ -92,32 +103,34 @@ spec:
                         - Ignore
                         - Fail
                       default: Fail
-                      description: 'failurePolicy is the failure policy of the action.
-                        valid values Fail and Ignore. - Fail: if the action failed,
-                        the opsRequest will be failed. - Ignore: opsRequest will ignore
-                        the failure if the action is failed.'
+                      description: "Specifies the failure policy of the OpsAction.
+                        Valid values are: \n - \"Fail\": Marks the entire OpsRequest
+                        as failed if the action fails. - \"Ignore\": The OpsRequest
+                        continues processing despite the failure of the action."
                       type: string
                     name:
-                      description: action name.
+                      description: Specifies the name of the OpsAction.
                       maxLength: 20
                       type: string
                     parameters:
-                      description: Refers to the parameter of the ParametersSchema.
-                        The parameter will be used in the action. If it is a 'workload'
-                        and 'exec' Action, they will be injected into the corresponding
-                        environment variable. If it is a 'resourceModifier' Action,
-                        parameter can be referenced using $() in completionProbe.matchExpressions
-                        and JsonPatches[*].Value.
+                      description: "Specifies the parameters for the OpsAction. Their
+                        usage varies based on the action type: \n - For 'workload'
+                        or 'exec' actions, parameters are injected as environment
+                        variables. - For 'resourceModifier' actions, parameter can
+                        be referenced using $() in fields `resourceModifier.completionProbe.matchExpressions`
+                        and `resourceModifier.jsonPatches[*].value`."
                       items:
                         type: string
                       type: array
                     resourceModifier:
-                      description: Specifies the resource modifier to update the custom
-                        resource.
+                      description: "Specifies the configuration for a 'resourceModifier'
+                        action. This action allows for modifications to existing K8s
+                        objects. \n Note: This feature has not been implemented yet."
                       properties:
                         completionProbe:
-                          description: Provides a method to check if the action has
-                            been completed.
+                          description: "Specifies a method to determine if the action
+                            has been completed. \n Note: This feature has not been
+                            implemented yet."
                           properties:
                             initialDelaySeconds:
                               default: 5
@@ -134,7 +147,7 @@ spec:
                                 has been completed.
                               properties:
                                 failure:
-                                  description: Defines a failure condition for an
+                                  description: Specifies a failure condition for an
                                     action using a Go template expression. Should
                                     evaluate to either `true` or `false`. The current
                                     resource object is parsed into the Go template.
@@ -142,7 +155,7 @@ spec:
                                     1 }}'.
                                   type: string
                                 success:
-                                  description: Defines a success condition for an
+                                  description: Specifies a success condition for an
                                     action using a Go template expression. Should
                                     evaluate to either `true` or `false`. The current
                                     resource object is parsed into the Go template.
@@ -153,7 +166,7 @@ spec:
                               type: object
                             periodSeconds:
                               default: 5
-                              description: Indicates the frequency (in seconds) at
+                              description: Specifies the frequency (in seconds) at
                                 which the probe should be performed. The default value
                                 is 5 seconds, with a minimum value of 1.
                               format: int32
@@ -161,7 +174,7 @@ spec:
                               type: integer
                             timeoutSeconds:
                               default: 60
-                              description: Defines the number of seconds after which
+                              description: Specifies the number of seconds after which
                                 the probe times out. The default value is 60 seconds,
                                 with a minimum value of 1.
                               format: int32
@@ -171,12 +184,12 @@ spec:
                           - matchExpressions
                           type: object
                         jsonPatches:
-                          description: Defines the set of patches that are used to
-                            perform updates on the resource object.
+                          description: Specifies a list of patches for modifying the
+                            object.
                           items:
                             properties:
                               op:
-                                description: 'Represents the type of JSON patch operation.
+                                description: 'Specifies the type of JSON patch operation.
                                   It supports the following values: ''add'', ''remove'',
                                   ''replace''.'
                                 enum:
@@ -185,10 +198,10 @@ spec:
                                 - replace
                                 type: string
                               path:
-                                description: Represents the json patch path.
+                                description: Specifies the json patch path.
                                 type: string
                               value:
-                                description: Represents the value to be used in the
+                                description: Specifies the value to be used in the
                                   JSON patch operation.
                                 type: string
                             required:
@@ -199,11 +212,10 @@ spec:
                           minItems: 1
                           type: array
                         resource:
-                          description: Refers to the Kubernetes objects that are required
-                            to be updated.
+                          description: Specifies the K8s object that is to be updated.
                           properties:
                             apiGroup:
-                              description: Defines the group for the resource being
+                              description: Specifies the group for the resource being
                                 referenced. If not specified, the referenced Kind
                                 must belong to the core API group. For all third-party
                                 types, this is mandatory.
@@ -226,18 +238,23 @@ spec:
                       - resource
                       type: object
                     workload:
-                      description: Indicates the workload action and a corresponding
-                        workload will be created to execute this action.
+                      description: Specifies the configuration for a 'workload' action.
+                        This action leads to the creation of a K8s workload, such
+                        as a Pod or Job, to execute specified tasks.
                       properties:
                         backoffLimit:
                           default: 0
-                          description: Specifies the number of retries before marking
-                            the action as failed.
+                          description: Specifies the number of retries allowed before
+                            marking the action as failed.
                           format: int32
                           minimum: 0
                           type: integer
+                        podInfoExtractorName:
+                          description: Specifies a PodInfoExtractor defined in the
+                            `opsDefinition.spec.podInfoExtractors`.
+                          type: string
                         podSpec:
-                          description: Represents the pod spec of the workload.
+                          description: Specifies the PodSpec of the 'workload' action.
                           properties:
                             activeDeadlineSeconds:
                               description: Optional duration in seconds the pod may
@@ -8344,16 +8361,12 @@ spec:
                           required:
                           - containers
                           type: object
-                        targetPodTemplate:
-                          description: Refers to the spec.targetPodTemplates. This
-                            field defines the target pod for the current action.
-                          type: string
                         type:
-                          description: Defines the workload type of the action. Valid
-                            values include "Job" and "Pod". "Job" creates a job to
-                            execute the action. "Pod" creates a pod to execute the
-                            action. Note that unlike jobs, if a pod is manually deleted,
-                            it will not consume backoffLimit times.
+                          description: "Defines the workload type of the action. Valid
+                            values include \"Job\" and \"Pod\". \n - \"Job\": Creates
+                            a Job to execute the action. - \"Pod\": Creates a Pod
+                            to execute the action. Note: unlike Jobs, manually deleting
+                            a Pod does not affect the `backoffLimit`."
                           enum:
                           - Job
                           - Pod
@@ -8373,127 +8386,72 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
-              componentDefinitionRefs:
-                description: Specifies the types of componentDefinitions supported
-                  by the operation. It can reference certain variables of the componentDefinition.
-                  If set, any component not meeting these conditions will be intercepted.
+              componentInfos:
+                description: Specifies a list of ComponentDefinition for Components
+                  associated with this OpsDefinition. It also includes connection
+                  credentials (address and account) for each Component.
                 items:
                   properties:
                     accountName:
-                      description: Represents the account name of the component. If
-                        provided, the account username and password will be injected
-                        into the job environment variables `KB_ACCOUNT_USERNAME` and
-                        `KB_ACCOUNT_PASSWORD`.
+                      description: Specifies the account name associated with the
+                        Component. If set, the corresponding account username and
+                        password are injected into containers' environment variables
+                        `KB_ACCOUNT_USERNAME` and `KB_ACCOUNT_PASSWORD`.
                       type: string
-                    name:
-                      description: Refers to the name of the component definition.
-                        This is a required field with a maximum length of 32 characters.
+                    componentDefinitionName:
+                      description: Specifies the name of the ComponentDefinition.
                       maxLength: 32
                       type: string
                     serviceName:
-                      description: References the name of the service. If provided,
-                        the service name and ports will be mapped to the job environment
-                        variables `KB_COMP_SVC_NAME` and `KB_COMP_SVC_PORT_$(portName)`.
-                        Note that the portName will replace the characters '-' with
-                        '_' and convert to uppercase.
+                      description: Specifies the name of the Service. If set, the
+                        service name is injected as the `KB_COMP_SVC_NAME` environment
+                        variable in the containers, and each service port is mapped
+                        to a corresponding environment variable named `KB_COMP_SVC_PORT_$(portName)`.
+                        The `portName` is transformed by replacing '-' with '_' and
+                        converting to uppercase.
                       type: string
                   required:
-                  - name
+                  - componentDefinitionName
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:
-                - name
+                - componentDefinitionName
                 x-kubernetes-list-type: map
               parametersSchema:
-                description: Describes the schema used for validation, pruning, and
-                  defaulting.
+                description: Specifies the schema for validating the data types and
+                  value ranges of parameters in OpsActions before their usage.
                 properties:
                   openAPIV3Schema:
-                    description: 'Defines the OpenAPI v3 schema used for the parameter
-                      schema. The supported property types include: - string - number
+                    description: 'Defines the schema for parameters using the OpenAPI
+                      v3. The supported property types include: - string - number
                       - integer - array: Note that only items of string type are supported.'
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
-              preConditions:
-                description: Specifies the preconditions that must be met to run the
-                  actions for the operation. if set, it will check the condition before
-                  the component run this operation.
+              podInfoExtractors:
+                description: Specifies a list of PodInfoExtractor, each designed to
+                  select a specific Pod and extract selected runtime info from its
+                  PodSpec. The extracted information, such as environment variables,
+                  volumes and tolerations, are then injected into Jobs or Pods that
+                  execute the OpsActions defined in `actions`.
                 items:
                   properties:
-                    rule:
-                      description: Defines the conditions under which the operation
-                        can be executed.
-                      properties:
-                        expression:
-                          description: 'Defines how the operation can be executed
-                            using a Go template expression. Should return either `true`
-                            or `false`. The built-in objects available for use in
-                            the expression include: - `params`: These are the input
-                            parameters. - `cluster`: This is the referenced cluster
-                            object. - `component`: This is the referenced component
-                            object.'
-                          type: string
-                        message:
-                          description: Reported if the rule is not matched.
-                          type: string
-                      required:
-                      - expression
-                      - message
-                      type: object
-                  type: object
-                type: array
-              targetPodTemplates:
-                description: Defines the targetPodTemplate to be referenced by the
-                  action.
-                items:
-                  properties:
-                    name:
-                      description: Represents the template name.
-                      maxLength: 32
-                      type: string
-                    podSelector:
-                      description: Used to identify the target pod.
-                      properties:
-                        availability:
-                          default: PreferredAvailable
-                          description: 'Indicates the desired availability status
-                            of the pods to be selected. valid values: - ''Available'':
-                            selects only available pods and terminates the action
-                            if none are found. - ''PreferredAvailable'': prioritizes
-                            the selection of available pods。 - ''None'': there are
-                            no requirements for the availability of pods.'
-                          enum:
-                          - Available
-                          - PreferredAvailable
-                          - None
-                          type: string
-                        role:
-                          description: Specifies the role of the target pod.
-                          type: string
-                        selectionPolicy:
-                          default: Any
-                          description: Defines the policy for selecting the target
-                            pod when multiple pods match the podSelector. It can be
-                            either 'Any' (select any one pod that matches the podSelector)
-                            or 'All' (select all pods that match the podSelector).
-                          enum:
-                          - All
-                          - Any
-                          type: string
-                      type: object
-                    vars:
-                      description: Defines the environment variables that need to
-                        be referenced from the target component pod, and will be injected
-                        into the pod's containers.
+                    env:
+                      description: Specifies a list of environment variables to be
+                        extracted from a selected Pod, and injected into the containers
+                        executing each OpsAction.
                       items:
                         properties:
                           name:
-                            description: Specifies the name of the variable. This
-                              must be a C_IDENTIFIER.
+                            description: Specifies the name of the environment variable
+                              to be injected into Pods executing OpsActions. It must
+                              conform to the C_IDENTIFIER format, which includes only
+                              alphanumeric characters and underscores, and cannot
+                              begin with a digit.
                             type: string
                           valueFrom:
-                            description: Defines the source for the variable's value.
+                            description: Specifies the source of the environment variable's
+                              value.
                             properties:
                               envRef:
                                 description: Specifies a reference to a specific environment
@@ -8501,25 +8459,37 @@ spec:
                                   source of the variable, which can be either "env"
                                   or "envFrom".
                                 properties:
-                                  containerName:
-                                    description: Specifies the name of the container
-                                      as defined in the componentDefinition or as
-                                      injected by the kubeBlocks controller. If not
-                                      specified, the first container will be used
-                                      by default.
-                                    type: string
                                   envName:
                                     description: Defines the name of the environment
-                                      variable.
+                                      variable. This name can originate from an 'env'
+                                      entry or be a data key from an 'envFrom' source.
+                                    type: string
+                                  targetContainerName:
+                                    description: Specifies the container name in the
+                                      target Pod. If not specified, the first container
+                                      will be used by default.
                                     type: string
                                 required:
                                 - envName
                                 type: object
                               fieldPath:
-                                description: Represents the JSONPath of the target
-                                  pod. This is used to specify the exact location
-                                  of the data within the JSON structure of the pod.
-                                type: string
+                                description: Represents the JSONPath expression pointing
+                                  to the specific data within the JSON structure of
+                                  the target Pod. It is used to extract precise data
+                                  locations for operations on the Pod.
+                                properties:
+                                  apiVersion:
+                                    description: Version of the schema the FieldPath
+                                      is written in terms of, defaults to "v1".
+                                    type: string
+                                  fieldPath:
+                                    description: Path of the field to select in the
+                                      specified API version.
+                                    type: string
+                                required:
+                                - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
                             type: object
                             x-kubernetes-validations:
                             - message: either fieldPath and envRef.
@@ -8529,9 +8499,34 @@ spec:
                         - valueFrom
                         type: object
                       type: array
+                    name:
+                      description: Specifies the name of the PodInfoExtractor.
+                      maxLength: 32
+                      type: string
+                    podSelector:
+                      description: Used to select the target Pod from which environment
+                        variables and volumes are extracted from its PodSpec.
+                      properties:
+                        multiPodSelectionPolicy:
+                          default: Any
+                          description: Defines the policy for selecting the target
+                            pod when multiple pods match the podSelector. It can be
+                            either 'Any' (select any one pod that matches the podSelector)
+                            or 'All' (select all pods that match the podSelector).
+                          enum:
+                          - All
+                          - Any
+                          type: string
+                        role:
+                          description: Specifies the role of the target Pod.
+                          type: string
+                      type: object
                     volumeMounts:
-                      description: Specifies the mount points for the volumes defined
-                        in the `Volumes` section for the action pod.
+                      description: Specifies a list of volumes, along with their respective
+                        mount points, that are to be extracted from a selected Pod,
+                        and mounted onto the containers executing each OpsAction.
+                        This allows the containers to access shared or persistent
+                        data necessary for the operation.
                       items:
                         description: VolumeMount describes a mounting of a Volume
                           within a container.
@@ -8578,6 +8573,37 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              preConditions:
+                description: 'Specifies the preconditions that must be met to run
+                  the actions for the operation. if set, it will check the condition
+                  before the Component runs this operation. Example: ```yaml preConditions:
+                  - rule: expression: ''{{ eq .component.status.phase "Running" }}''
+                  message: Component is not in Running status. ```'
+                items:
+                  properties:
+                    rule:
+                      description: Specifies the conditions that must be met for the
+                        operation to execute.
+                      properties:
+                        expression:
+                          description: "Specifies a Go template expression that determines
+                            how the operation can be executed. The return value must
+                            be either `true` or `false`. Available built-in objects
+                            that can be referenced in the expression include: \n -
+                            `params`: Input parameters. - `cluster`: The referenced
+                            Cluster object. - `component`: The referenced Component
+                            object."
+                          type: string
+                        message:
+                          description: Specifies the error or status message reported
+                            if the `expression` does not evaluate to `true`.
+                          type: string
+                      required:
+                      - expression
+                      - message
+                      type: object
+                  type: object
+                type: array
             required:
             - actions
             type: object
@@ -8588,14 +8614,14 @@ spec:
                 description: Provides additional information about the current phase.
                 type: string
               observedGeneration:
-                description: Refers to the most recent generation observed for this
+                description: Represents the most recent generation observed of this
                   OpsDefinition.
                 format: int64
                 type: integer
               phase:
                 description: Represents the current state of the OpsDefinition. Valid
-                  values are ``, `Available`, `Unavailable`. When the state is `Available`,
-                  the OpsDefinition is ready and can be used for related objects.
+                  values are "", "Available", "Unavailable". When it equals to "Available",
+                  the OpsDefinition is ready and can be used in a "Custom" OpsRequest.
                 enum:
                 - Available
                 - Unavailable

@@ -762,6 +762,68 @@ var _ = Describe("Addon controller", func() {
 			}).Should(Succeed())
 			viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 		})
+
+		It("should have provider and version in spec for Addon with provider and version in label initially", func() {
+			By("By create an addon with auto-install and labels contains provider and version information")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Labels = map[string]string{
+					AddonProvider: "apecloud",
+					AddonVersion:  "0.9.0",
+				}
+				newOjb.Spec.Installable.AutoInstall = true
+			})
+
+			By("By setting the provider and version in spec for Addon")
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Spec.Provider).Should(Equal("apecloud"))
+				g.Expect(addon.Spec.Version).Should(Equal("0.9.0"))
+			}).Should(Succeed())
+		})
+
+		It("should have provider and version in spec for Addon after creating, before enabled", func() {
+			By("By create an addon with auto-install and labels contains provider and version information")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Labels = map[string]string{
+					AddonProvider: "apecloud",
+					AddonVersion:  "0.9.0",
+				}
+				newOjb.Spec.Installable.AutoInstall = true
+			})
+
+			By("By Checking spec.provider and spec.version of the addon after one reconcile, before enabled")
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Spec.Provider).Should(Equal("apecloud"))
+				g.Expect(addon.Spec.Version).Should(Equal("0.9.0"))
+			}).Should(Succeed())
+		})
+
+		It("should have provider and version in labels for Addon with provider and version in spec after creating, before enabled", func() {
+			By("By create an addon with auto-install and labels contains provider and version information")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Provider = "apecloud"
+				newOjb.Spec.Version = "0.9.0"
+				newOjb.Spec.Installable.AutoInstall = true
+			})
+
+			By("By Checking spec.provider and spec.version of the addon after one reconcile, before enabled")
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Labels).Should(HaveKeyWithValue(AddonProvider, "apecloud"))
+				g.Expect(addon.Labels).Should(HaveKeyWithValue(AddonVersion, "0.9.0"))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
+			}).Should(Succeed())
+		})
 	})
 
 	Context("Addon controller SetupWithManager", func() {

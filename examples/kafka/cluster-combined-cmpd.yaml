@@ -1,0 +1,87 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: kafka-cluster
+  namespace: default
+  annotations:
+    # kafka broker's jvm heap setting
+    "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false", "KB_KAFKA_BROKER_NODEPORT": "false"}'
+    # Define kafka cluster annotation keys for nodeport feature gate.
+    kubeblocks.io/enabled-pod-ordinal-svc: broker
+    # enable NodePort
+    # kubeblocks.io/enabled-node-port-svc: broker
+    # kubeblocks.io/disabled-cluster-ip-svc: broker
+spec:
+  # Specifies the behavior when a Cluster is deleted.
+  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
+  # - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations.
+  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
+  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
+  terminationPolicy: Delete
+  # Defines the list of services that are exposed by a Cluster. This field allows selected components, either from `componentSpecs` or `shardingSpecs`, to be exposed as cluster-level services. Services defined here can be referenced by other clusters using the ServiceRefClusterSelector.
+  services:
+    # Defines the list of services that are exposed by a Cluster. This field allows selected components, either from `componentSpecs` or `shardingSpecs`, to be exposed as cluster-level services. Services defined here can be referenced by other clusters using the ServiceRefClusterSelector.
+  - name: bootstrap
+    # Defines the list of services that are exposed by a Cluster. This field allows selected components, either from `componentSpecs` or `shardingSpecs`, to be exposed as cluster-level services. Services defined here can be referenced by other clusters using the ServiceRefClusterSelector.
+    serviceName: bootstrap
+    # Defines the list of services that are exposed by a Cluster. This field allows selected components, either from `componentSpecs` or `shardingSpecs`, to be exposed as cluster-level services. Services defined here can be referenced by other clusters using the ServiceRefClusterSelector.
+    componentSelector: broker
+    # Defines the list of services that are exposed by a Cluster. This field allows selected components, either from `componentSpecs` or `shardingSpecs`, to be exposed as cluster-level services. Services defined here can be referenced by other clusters using the ServiceRefClusterSelector.
+    spec:
+      # - ClusterIP
+      # - NodePort
+      type: ClusterIP
+      ports:
+      - name: kafka-client
+        targetPort: 9092
+        port: 9092
+  # Specifies a list of ClusterComponentSpec objects used to define the individual components that make up a Cluster. This field allows for detailed configuration of each component within the Cluster. Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster. ClusterComponentSpec defines the specifications for a Component in a Cluster.
+  componentSpecs:
+  - name: broker
+    componentDef: kafka-combine
+    tls: false
+    replicas: 1
+    affinity:
+      podAntiAffinity: Preferred
+      topologyKeys:
+      - kubernetes.io/hostname
+      tenancy: SharedNode
+    tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+    serviceAccountName: kb-kafka-cluster
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+    - name: metadata
+      spec:
+        storageClassName: null
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: metrics-exp
+    componentDef: kafka-exporter
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi

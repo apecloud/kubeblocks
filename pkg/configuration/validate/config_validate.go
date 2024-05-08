@@ -126,6 +126,10 @@ func WithKeySelector(keys []string) ValidatorOptions {
 }
 
 func NewConfigValidator(configConstraint *appsv1beta1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
+	if configConstraint == nil || configConstraint.FileFormatConfig == nil {
+		return &emptyValidator{}
+	}
+
 	var (
 		validator    ConfigValidator
 		configSchema = configConstraint.ConfigSchema
@@ -139,7 +143,7 @@ func NewConfigValidator(configConstraint *appsv1beta1.ConfigConstraintSpec, opti
 			cmKeySelector: cmKeySelector{
 				keySelector: options,
 			},
-			cfgType:   configConstraint.FormatterConfig.Format,
+			cfgType:   configConstraint.FileFormatConfig.Format,
 			cueScript: configSchema.CUE,
 		}
 	case configSchema.SchemaInJSON != nil:
@@ -147,8 +151,8 @@ func NewConfigValidator(configConstraint *appsv1beta1.ConfigConstraintSpec, opti
 			cmKeySelector: cmKeySelector{
 				keySelector: options,
 			},
-			typeName: configConstraint.ConfigSchemaTopLevelKey,
-			cfgType:  configConstraint.FormatterConfig.Format,
+			typeName: configSchema.TopLevelKey,
+			cfgType:  configConstraint.FileFormatConfig.Format,
 			schema:   configSchema.SchemaInJSON,
 		}
 	default:

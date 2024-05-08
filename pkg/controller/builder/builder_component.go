@@ -45,23 +45,8 @@ func (builder *ComponentBuilder) SetServiceVersion(serviceVersion string) *Compo
 	return builder
 }
 
-func (builder *ComponentBuilder) SetAffinity(affinity *appsv1alpha1.Affinity) *ComponentBuilder {
-	builder.get().Spec.Affinity = affinity
-	return builder
-}
-
-func (builder *ComponentBuilder) SetToleration(toleration corev1.Toleration) *ComponentBuilder {
-	tolerations := builder.get().Spec.Tolerations
-	if len(tolerations) == 0 {
-		tolerations = []corev1.Toleration{}
-	}
-	tolerations = append(tolerations, toleration)
-	builder.get().Spec.Tolerations = tolerations
-	return builder
-}
-
-func (builder *ComponentBuilder) SetTolerations(tolerations []corev1.Toleration) *ComponentBuilder {
-	builder.get().Spec.Tolerations = tolerations
+func (builder *ComponentBuilder) SetSchedulingPolicy(schedulingPolicy *appsv1alpha1.SchedulingPolicy) *ComponentBuilder {
+	builder.get().Spec.SchedulingPolicy = schedulingPolicy
 	return builder
 }
 
@@ -80,13 +65,18 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
-func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBuilder {
-	builder.get().Spec.EnabledLogs = logNames
+func (builder *ComponentBuilder) SetSidecarContainers(sidecars []string) *ComponentBuilder {
+	builder.get().Spec.Sidecars = sidecars
 	return builder
 }
 
-func (builder *ComponentBuilder) SetMonitor(monitor bool) *ComponentBuilder {
-	builder.get().Spec.Monitor = monitor
+func (builder *ComponentBuilder) SetMonitor(monitorEnabled *bool) *ComponentBuilder {
+	builder.get().Spec.MonitorEnabled = monitorEnabled
+	return builder
+}
+
+func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBuilder {
+	builder.get().Spec.EnabledLogs = logNames
 	return builder
 }
 

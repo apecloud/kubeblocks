@@ -55,8 +55,7 @@ func (mgr *Manager) GetReplicaRoleForMember(ctx context.Context, cluster *dcs.Cl
 
 	db := mgr.DB
 	if member != nil && member.Name != mgr.CurrentMemberName {
-		addr := cluster.GetMemberAddrWithPort(*member)
-		db, err = config.GetDBConnWithAddr(addr)
+		db, err = config.GetMemberRootDBConn(cluster, member)
 		if err != nil {
 			return "", errors.Wrap(err, "new db connection failed")
 		}

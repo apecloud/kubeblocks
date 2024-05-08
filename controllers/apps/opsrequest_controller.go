@@ -92,7 +92,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
 		}).
 		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).
-		Watches(&workloadsv1alpha1.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForRSM)).
+		Watches(&workloadsv1alpha1.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstanceSet)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
@@ -140,14 +140,14 @@ func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRe
 	}
 	if opsBehaviour.IsClusterCreation {
 		// check if the cluster already exists
-		cluster.Name = opsRes.OpsRequest.Spec.ClusterRef
+		cluster.Name = opsRes.OpsRequest.Spec.GetClusterName()
 		cluster.Namespace = opsRes.OpsRequest.GetNamespace()
 		opsRes.Cluster = cluster
 		return nil, nil
 	}
 	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
 		Namespace: opsRes.OpsRequest.GetNamespace(),
-		Name:      opsRes.OpsRequest.Spec.ClusterRef,
+		Name:      opsRes.OpsRequest.Spec.GetClusterName(),
 	}, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
 			_ = operations.PatchClusterNotFound(reqCtx.Ctx, r.Client, opsRes)
@@ -263,14 +263,14 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 	opsRequest := opsRes.OpsRequest
 	clusterName := opsRequest.Labels[constant.AppInstanceLabelKey]
 	opsType := opsRequest.Labels[constant.OpsRequestTypeLabelKey]
-	if clusterName == opsRequest.Spec.ClusterRef && opsType == string(opsRequest.Spec.Type) {
+	if clusterName == opsRequest.Spec.GetClusterName() && opsType == string(opsRequest.Spec.Type) {
 		return nil, nil
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	if opsRequest.Labels == nil {
 		opsRequest.Labels = map[string]string{}
 	}
-	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
+	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.GetClusterName()
 	opsRequest.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	if err := controllerutil.SetOwnerReference(opsRes.Cluster, opsRequest, scheme); err != nil {
@@ -379,14 +379,14 @@ func (r *OpsRequestReconciler) parseRunningOpsRequests(ctx context.Context, obje
 	return r.getRunningOpsRequestsFromCluster(cluster)
 }
 
-func (r *OpsRequestReconciler) parseRunningOpsRequestsForRSM(ctx context.Context, object client.Object) []reconcile.Request {
-	rsm := object.(*workloadsv1alpha1.ReplicatedStateMachine)
-	clusterName := rsm.Labels[constant.AppInstanceLabelKey]
+func (r *OpsRequestReconciler) parseRunningOpsRequestsForInstanceSet(ctx context.Context, object client.Object) []reconcile.Request {
+	its := object.(*workloadsv1alpha1.InstanceSet)
+	clusterName := its.Labels[constant.AppInstanceLabelKey]
 	if clusterName == "" {
 		return nil
 	}
 	cluster := &appsv1alpha1.Cluster{}
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: rsm.Namespace}, cluster); err != nil {
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: its.Namespace}, cluster); err != nil {
 		return nil
 	}
 	return r.getRunningOpsRequestsFromCluster(cluster)

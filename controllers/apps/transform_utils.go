@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -242,6 +243,16 @@ func removeOwnerRefOfType(obj client.Object, gvk schema.GroupVersionKind) {
 func isOwnedByComp(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
 		if ref.Kind == appsv1alpha1.ComponentKind && ref.Controller != nil && *ref.Controller {
+			return true
+		}
+	}
+	return false
+}
+
+// isOwnedByInstanceSet is used to judge if the obj is owned by the InstanceSet controller
+func isOwnedByInstanceSet(obj client.Object) bool {
+	for _, ref := range obj.GetOwnerReferences() {
+		if ref.Kind == workloads.Kind && ref.Controller != nil && *ref.Controller {
 			return true
 		}
 	}

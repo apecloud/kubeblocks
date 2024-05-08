@@ -1,0 +1,21 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: nebula-volumeexpansion
+  namespace: default
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterName: nebula-cluster
+  type: VolumeExpansion
+  # Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates that requires storage expansion. 
+  volumeExpansion:
+    # Specifies the name of the Component.
+    # - nebula-console
+    # - nebula-graphd
+    # - nebula-metad
+    # - nebula-storaged
+  - componentName: nebula-storaged
+    # volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.
+    volumeClaimTemplates:
+    - name: data
+      storage: 30Gi

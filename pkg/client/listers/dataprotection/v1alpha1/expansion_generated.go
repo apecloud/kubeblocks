@@ -57,3 +57,7 @@ type RestoreListerExpansion interface{}
 // RestoreNamespaceListerExpansion allows custom methods to be added to
 // RestoreNamespaceLister.
 type RestoreNamespaceListerExpansion interface{}
+
+// StorageProviderListerExpansion allows custom methods to be added to
+// StorageProviderLister.
+type StorageProviderListerExpansion interface{}

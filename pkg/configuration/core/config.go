@@ -229,7 +229,7 @@ func NewCfgOptions(filename string, options ...Option) CfgOpOption {
 	return context
 }
 
-func WithFormatterConfig(formatConfig *appsv1beta1.FormatterConfig) Option {
+func WithFormatterConfig(formatConfig *appsv1beta1.FileFormatConfig) Option {
 	return func(ctx *CfgOpOption) {
 		if formatConfig.Format == appsv1beta1.Ini && formatConfig.IniConfig != nil {
 			ctx.IniContext = &IniContext{
@@ -239,7 +239,7 @@ func WithFormatterConfig(formatConfig *appsv1beta1.FormatterConfig) Option {
 	}
 }
 
-func NestedPrefixField(formatConfig *appsv1beta1.FormatterConfig) string {
+func NestedPrefixField(formatConfig *appsv1beta1.FileFormatConfig) string {
 	if formatConfig != nil && formatConfig.Format == appsv1beta1.Ini && formatConfig.IniConfig != nil {
 		return formatConfig.IniConfig.SectionName
 	}
@@ -304,7 +304,7 @@ func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
 	return cmKeySet
 }
 
-func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *appsv1beta1.FormatterConfig, sets *set.LinkedHashSetString) []VisualizedParam {
+func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *appsv1beta1.FileFormatConfig, sets *set.LinkedHashSetString) []VisualizedParam {
 	if !configPatch.IsModify {
 		return nil
 	}

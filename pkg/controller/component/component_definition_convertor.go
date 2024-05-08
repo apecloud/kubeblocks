@@ -52,7 +52,6 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"services":               &compDefServicesConvertor{},
 		"configs":                &compDefConfigsConvertor{},
 		"logconfigs":             &compDefLogConfigsConvertor{},
-		"monitor":                &compDefMonitorConvertor{},
 		"scripts":                &compDefScriptsConvertor{},
 		"policyrules":            &compDefPolicyRulesConvertor{},
 		"labels":                 &compDefLabelsConvertor{},
@@ -63,6 +62,7 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
+		"sidecarcontainerspecs":  &compDefSidecarContainersConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer); err != nil {
@@ -183,18 +183,22 @@ func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
 
 	if clusterCompDef.VolumeProtectionSpec != nil {
 		defaultHighWatermark := clusterCompDef.VolumeProtectionSpec.HighWatermark
-		for i := range volumes {
-			volumes[i].HighWatermark = defaultHighWatermark
+		highWatermark := func(v appsv1alpha1.ProtectedVolume) int {
+			if v.HighWatermark != nil {
+				return *v.HighWatermark
+			}
+			return defaultHighWatermark
 		}
-		for _, v := range clusterCompDef.VolumeProtectionSpec.Volumes {
-			if v.HighWatermark != nil && *v.HighWatermark != defaultHighWatermark {
-				for i, vv := range volumes {
-					if v.Name != vv.Name {
-						continue
-					}
-					volumes[i].HighWatermark = *v.HighWatermark
+		setHighWatermark := func(protectedVol appsv1alpha1.ProtectedVolume) {
+			for i, v := range volumes {
+				if v.Name == protectedVol.Name {
+					volumes[i].HighWatermark = highWatermark(protectedVol)
+					break
 				}
 			}
+		}
+		for _, v := range clusterCompDef.VolumeProtectionSpec.Volumes {
+			setHighWatermark(v)
 		}
 	}
 	return volumes, nil
@@ -246,17 +250,6 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 		SetType(corev1.ServiceTypeClusterIP).
 		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...).
 		GetObject()
-
-	headlessSvcBuilder := builder.NewHeadlessServiceBuilder("", "").
-		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...).
-		SetPublishNotReadyAddresses(true)
-	if clusterCompDef.PodSpec != nil {
-		for _, container := range clusterCompDef.PodSpec.Containers {
-			headlessSvcBuilder = headlessSvcBuilder.AddContainerPorts(container.Ports...)
-		}
-	}
-	headlessSvc := c.removeDuplicatePorts(headlessSvcBuilder.GetObject())
-
 	services := []appsv1alpha1.ComponentService{
 		{
 			Service: appsv1alpha1.Service{
@@ -266,29 +259,8 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 				RoleSelector: c.roleSelector(clusterCompDef),
 			},
 		},
-		{
-			Service: appsv1alpha1.Service{
-				Name:         "headless",
-				ServiceName:  "headless",
-				Spec:         headlessSvc.Spec,
-				RoleSelector: c.roleSelector(clusterCompDef),
-			},
-		},
 	}
 	return services, nil
-}
-
-func (c *compDefServicesConvertor) removeDuplicatePorts(svc *corev1.Service) *corev1.Service {
-	ports := make(map[int32]bool)
-	servicePorts := make([]corev1.ServicePort, 0)
-	for _, port := range svc.Spec.Ports {
-		if !ports[port.Port] {
-			ports[port.Port] = true
-			servicePorts = append(servicePorts, port)
-		}
-	}
-	svc.Spec.Ports = servicePorts
-	return svc
 }
 
 func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) string {
@@ -336,14 +308,6 @@ type compDefLogConfigsConvertor struct{}
 func (c *compDefLogConfigsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
 	return clusterCompDef.LogConfigs, nil
-}
-
-// compDefMonitorConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Monitor.
-type compDefMonitorConvertor struct{}
-
-func (c *compDefMonitorConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Monitor, nil
 }
 
 // compDefScriptsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Scripts.
@@ -446,7 +410,7 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 
 	// if rsm spec is not nil, convert rsm role first.
 	if clusterCompDef.RSMSpec != nil {
-		return c.convertRsmRole(clusterCompDef)
+		return c.convertInstanceSetRole(clusterCompDef)
 	}
 
 	switch clusterCompDef.WorkloadType {
@@ -477,7 +441,7 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 	}
 }
 
-func (c *compDefRolesConvertor) convertRsmRole(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (any, error) {
+func (c *compDefRolesConvertor) convertInstanceSetRole(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (any, error) {
 	if clusterCompDef.RSMSpec == nil {
 		return nil, nil
 	}
@@ -735,4 +699,11 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 		WithoutCandidate:    withoutCandidateAction,
 		ScriptSpecSelectors: mergeScriptSpec(),
 	}
+}
+
+type compDefSidecarContainersConvertor struct{}
+
+func (c *compDefSidecarContainersConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.SidecarContainerSpecs, nil
 }

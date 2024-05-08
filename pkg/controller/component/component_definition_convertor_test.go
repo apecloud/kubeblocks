@@ -96,16 +96,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						TimeoutSeconds:   5,
 					},
 				},
-				Monitor: &appsv1alpha1.MonitorConfig{
-					BuiltIn: false,
-					Exporter: &appsv1alpha1.ExporterConfig{
-						ScrapePort: intstr.IntOrString{
-							Type:   intstr.Int,
-							IntVal: 8080,
-						},
-						ScrapePath: "/metrics",
-					},
-				},
 				LogConfigs: []appsv1alpha1.LogConfig{
 					{
 						Name:            "error",
@@ -443,7 +433,7 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				expectedVolumes := make([]appsv1alpha1.ComponentVolume, 0)
 				for _, vol := range clusterCompDef.VolumeTypes {
-					highWatermark := defaultHighWatermark
+					highWatermark := 0
 					if vol.Name == logVolumeName {
 						highWatermark = lowerHighWatermark
 					}
@@ -542,7 +532,7 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				services, ok := res.([]appsv1alpha1.ComponentService)
 				Expect(ok).Should(BeTrue())
-				Expect(services).Should(HaveLen(2))
+				Expect(services).Should(HaveLen(1))
 
 				// service
 				Expect(services[0].ServiceName).Should(BeEmpty())
@@ -556,22 +546,6 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(services[0].Spec.ClusterIP).Should(BeEmpty())
 				Expect(services[0].RoleSelector).Should(BeEquivalentTo(constant.Leader))
 
-				// headless service
-				Expect(services[1].ServiceName).Should(BeEquivalentTo("headless"))
-				// service ports and containers ports are order and value
-				Expect(len(services[1].Spec.Ports)).Should(Equal(len(clusterCompDef.Service.Ports)))
-				for i := range clusterCompDef.Service.Ports {
-					Expect(services[1].Spec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
-					Expect(services[1].Spec.Ports[i].Port).Should(Equal(clusterCompDef.Service.Ports[i].Port))
-					Expect(services[1].Spec.Ports[i].TargetPort).Should(Equal(clusterCompDef.Service.Ports[i].TargetPort))
-				}
-				for i, port := range clusterCompDef.PodSpec.Containers[0].Ports {
-					Expect(services[1].Spec.Ports[i].Port).Should(Equal(port.ContainerPort))
-				}
-				Expect(services[1].Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
-				Expect(services[1].Spec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
-				Expect(services[1].RoleSelector).Should(BeEquivalentTo(constant.Leader))
-
 				// consensus role selector
 				clusterCompDef.WorkloadType = appsv1alpha1.Consensus
 				clusterCompDef.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{
@@ -583,7 +557,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				res2, _ := convertor.convert(clusterCompDef, clusterName)
 				services2, ok2 := res2.([]appsv1alpha1.ComponentService)
 				Expect(ok2).Should(BeTrue())
-				Expect(services2).Should(HaveLen(2))
+				Expect(services2).Should(HaveLen(1))
 				Expect(services2[0].RoleSelector).Should(BeEquivalentTo(constant.Primary))
 			})
 		})
@@ -628,15 +602,6 @@ var _ = Describe("Component Definition Convertor", func() {
 
 			logConfigs := res.([]appsv1alpha1.LogConfig)
 			Expect(logConfigs).Should(BeEquivalentTo(clusterCompDef.LogConfigs))
-		})
-
-		It("monitor", func() {
-			convertor := &compDefMonitorConvertor{}
-			res, err := convertor.convert(clusterCompDef)
-			Expect(err).Should(Succeed())
-
-			monitor := res.(*appsv1alpha1.MonitorConfig)
-			Expect(*monitor).Should(BeEquivalentTo(*clusterCompDef.Monitor))
 		})
 
 		It("scripts", func() {
@@ -769,7 +734,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(res).Should(BeEquivalentTo(expectedRoles))
 			})
 
-			It("rsm spec roles convertor", func() {
+			It("InstanceSet spec roles convertor", func() {
 				convertor := &compDefRolesConvertor{}
 				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
 					Roles: []workloads.ReplicaRole{
@@ -933,19 +898,19 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(*actions.RoleProbe).Should(BeEquivalentTo(*expectedRoleProbe))
 			})
 
-			It("rsm spec role probe convertor", func() {
+			It("ITS spec role probe convertor", func() {
 				convertor := &compDefLifecycleActionsConvertor{}
 				mockCommand := []string{
-					"mock-rsm-role-probe-command",
+					"mock-its-role-probe-command",
 				}
 				mockArgs := []string{
-					"mock-rsm-role-probe-args",
+					"mock-its-role-probe-args",
 				}
 				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
 					RoleProbe: &workloads.RoleProbe{
 						CustomHandler: []workloads.Action{
 							{
-								Image:   "mock-rsm-role-probe-image",
+								Image:   "mock-its-role-probe-image",
 								Command: mockCommand,
 								Args:    mockArgs,
 							},
@@ -959,7 +924,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
 				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.WeSQLBuiltinActionHandler))
 				Expect(actions.RoleProbe.CustomHandler).ShouldNot(BeNil())
-				Expect(actions.RoleProbe.CustomHandler.Image).Should(BeEquivalentTo("mock-rsm-role-probe-image"))
+				Expect(actions.RoleProbe.CustomHandler.Image).Should(BeEquivalentTo("mock-its-role-probe-image"))
 				Expect(actions.RoleProbe.CustomHandler.Exec.Command).Should(BeEquivalentTo(mockCommand))
 				Expect(actions.RoleProbe.CustomHandler.Exec.Args).Should(BeEquivalentTo(mockArgs))
 			})

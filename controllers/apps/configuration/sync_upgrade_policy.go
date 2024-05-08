@@ -54,7 +54,7 @@ func (o *syncPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 		return makeReturnedStatus(ESNone), nil
 	}
 
-	funcs := GetRSMRollingUpgradeFuncs()
+	funcs := GetInstanceSetRollingUpgradeFuncs()
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
@@ -90,14 +90,14 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		versionHash = params.getTargetVersionHash()
 	)
 
-	if params.ConfigConstraint.DynamicReloadSelector != nil {
-		pods, err = matchLabel(pods, params.ConfigConstraint.DynamicReloadSelector)
+	if params.ConfigConstraint.ReloadedPodSelector != nil {
+		pods, err = matchLabel(pods, params.ConfigConstraint.ReloadedPodSelector)
 	}
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 	if len(pods) == 0 {
-		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %s", params.ConfigConstraint.DynamicReloadSelector.String()))
+		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %s", params.ConfigConstraint.ReloadedPodSelector.String()))
 		return makeReturnedStatus(ESRetry), nil
 	}
 
@@ -131,12 +131,12 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1beta1.ConfigConstraintSpec) map[string]string {
 	r := make(map[string]string)
 	dynamicAction := cc.NeedDynamicReloadAction()
-	selectedPolicy := cc.DynamicParametersPolicy()
-	parameters := core.GenerateVisualizedParamsList(configPatch, cc.FormatterConfig, nil)
+	needReloadStaticParameters := cc.ReloadStaticParameters()
+	parameters := core.GenerateVisualizedParamsList(configPatch, cc.FileFormatConfig, nil)
 	for _, key := range parameters {
 		if key.UpdateType == core.UpdatedType {
 			for _, p := range key.Parameters {
-				if dynamicAction && selectedPolicy == appsv1beta1.SelectedDynamicParameters && !core.IsDynamicParameter(p.Key, cc) {
+				if dynamicAction && !needReloadStaticParameters && !core.IsDynamicParameter(p.Key, cc) {
 					continue
 				}
 				if p.Value != nil {

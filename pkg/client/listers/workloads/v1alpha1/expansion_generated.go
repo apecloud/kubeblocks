@@ -18,10 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
-// ReplicatedStateMachineListerExpansion allows custom methods to be added to
-// ReplicatedStateMachineLister.
-type ReplicatedStateMachineListerExpansion interface{}
+// InstanceSetListerExpansion allows custom methods to be added to
+// InstanceSetLister.
+type InstanceSetListerExpansion interface{}
 
-// ReplicatedStateMachineNamespaceListerExpansion allows custom methods to be added to
-// ReplicatedStateMachineNamespaceLister.
-type ReplicatedStateMachineNamespaceListerExpansion interface{}
+// InstanceSetNamespaceListerExpansion allows custom methods to be added to
+// InstanceSetNamespaceLister.
+type InstanceSetNamespaceListerExpansion interface{}

@@ -22,20 +22,18 @@ package operations
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -66,155 +64,10 @@ type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 
 type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error
 
-type syncOverrideByOps func(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error
-
 func isFailedOrAbnormal(phase appsv1alpha1.ClusterComponentPhase) bool {
 	return slices.Index([]appsv1alpha1.ClusterComponentPhase{
 		appsv1alpha1.FailedClusterCompPhase,
 		appsv1alpha1.AbnormalClusterCompPhase}, phase) != -1
-}
-
-// reconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
-// the common function to reconcile opsRequest status when the opsRequest will affect the lifecycle of the components.
-func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	opsMessageKey string,
-	syncOverrideBy syncOverrideByOps,
-	handleStatusProgress handleStatusProgressWithComponent,
-) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	if opsRes == nil {
-		return "", 0, nil
-	}
-	var (
-		opsRequestPhase          = appsv1alpha1.OpsRunningPhase
-		opsRequest               = opsRes.OpsRequest
-		isFailed                 bool
-		ok                       bool
-		expectProgressCount      int32
-		completedProgressCount   int32
-		checkAllClusterComponent bool
-		requeueTimeAfterFailed   time.Duration
-		err                      error
-		clusterDef               *appsv1alpha1.ClusterDefinition
-	)
-	if opsRes.Cluster.Spec.ClusterDefRef != "" {
-		if clusterDef, err = getClusterDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Spec.ClusterDefRef); err != nil {
-			return opsRequestPhase, 0, err
-		}
-	}
-	componentNameMap := opsRequest.GetComponentNameSet()
-	// if no specified components, we should check the all components phase of cluster.
-	if len(componentNameMap) == 0 {
-		checkAllClusterComponent = true
-	}
-	oldOpsRequest := opsRequest.DeepCopy()
-	patch := client.MergeFrom(oldOpsRequest)
-	if opsRequest.Status.Components == nil {
-		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
-	}
-	if syncOverrideBy != nil {
-		if err = syncOverrideBy(reqCtx, cli, opsRes); err != nil {
-			return "", 0, nil
-		}
-	}
-	opsIsCompleted := opsRequestHasProcessed(reqCtx, cli, *opsRes)
-	for k, v := range opsRes.Cluster.Status.Components {
-		if _, ok = componentNameMap[k]; !ok && !checkAllClusterComponent {
-			continue
-		}
-		var compStatus appsv1alpha1.OpsRequestComponentStatus
-		if compStatus, ok = opsRequest.Status.Components[k]; !ok {
-			compStatus = appsv1alpha1.OpsRequestComponentStatus{}
-		}
-		lastFailedTime := compStatus.LastFailedTime
-		if isFailedOrAbnormal(v.Phase) {
-			isFailed = true
-			if lastFailedTime.IsZero() {
-				lastFailedTime = metav1.Now()
-			}
-			if time.Now().Before(lastFailedTime.Add(componentFailedTimeout)) {
-				requeueTimeAfterFailed = componentFailedTimeout - time.Since(lastFailedTime.Time)
-			}
-		} else if !lastFailedTime.IsZero() {
-			// reset lastFailedTime if component is not failed
-			lastFailedTime = metav1.Time{}
-		}
-		if compStatus.Phase != v.Phase {
-			compStatus.Phase = v.Phase
-			compStatus.LastFailedTime = lastFailedTime
-		}
-		clusterComponent := opsRes.Cluster.Spec.GetComponentByName(k)
-		var componentDefinition *appsv1alpha1.ComponentDefinition
-		if clusterComponent.ComponentDef != "" {
-			componentDefinition, err = intctrlcomp.GetCompDefinition(reqCtx, cli, opsRes.Cluster, k)
-			if err != nil {
-				return opsRequestPhase, 0, err
-			}
-		}
-		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, progressResource{
-			opsMessageKey:    opsMessageKey,
-			clusterComponent: clusterComponent,
-			clusterDef:       clusterDef,
-			componentDef:     componentDefinition,
-			opsIsCompleted:   opsIsCompleted,
-		}, &compStatus)
-		if err != nil {
-			if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
-				return opsRequestPhase, time.Second, nil
-			}
-			return opsRequestPhase, 0, err
-		}
-		expectProgressCount += expectCount
-		completedProgressCount += completedCount
-		opsRequest.Status.Components[k] = compStatus
-	}
-	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedProgressCount, expectProgressCount)
-	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
-		if err = cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
-			return opsRequestPhase, 0, err
-		}
-	}
-	// check if the cluster has applied the changes of the opsRequest and wait for the cluster to finish processing the ops.
-	if !opsIsCompleted {
-		return opsRequestPhase, 0, nil
-	}
-
-	if isFailed {
-		if requeueTimeAfterFailed != 0 {
-			// component failure may be temporary, waiting for component failure timeout.
-			return opsRequestPhase, requeueTimeAfterFailed, nil
-		}
-		return appsv1alpha1.OpsFailedPhase, 0, nil
-	}
-	if completedProgressCount != expectProgressCount {
-		return opsRequestPhase, time.Second, nil
-	}
-	return appsv1alpha1.OpsSucceedPhase, 0, nil
-}
-
-// opsRequestHasProcessed checks if the opsRequest has been processed.
-func opsRequestHasProcessed(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes OpsResource) bool {
-	if opsRes.ToClusterPhase == opsRes.Cluster.Status.Phase {
-		return false
-	}
-	// if all pods of all components are with latest revision, ops has processed
-	rsmList := &workloads.ReplicatedStateMachineList{}
-	if err := cli.List(reqCtx.Ctx, rsmList,
-		client.InNamespace(opsRes.Cluster.Namespace),
-		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
-		return false
-	}
-	for _, rsm := range rsmList.Items {
-		isLatestRevision, err := intctrlcomp.IsComponentPodsWithLatestRevision(reqCtx.Ctx, cli, opsRes.Cluster, &rsm)
-		if err != nil {
-			return false
-		}
-		if !isLatestRevision {
-			return false
-		}
-	}
-	return true
 }
 
 // getClusterDefByName gets the ClusterDefinition object by the name.
@@ -273,7 +126,7 @@ func PatchOpsStatus(ctx context.Context,
 
 // PatchClusterNotFound patches ClusterNotFound condition to the OpsRequest.status.conditions.
 func PatchClusterNotFound(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
-	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.ClusterRef)
+	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.GetClusterName())
 	condition := appsv1alpha1.NewValidateFailedCondition(appsv1alpha1.ReasonClusterNotFound, message)
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
@@ -355,35 +208,6 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 	return handleReconfigureStatus(cmStatus)
 }
 
-func getTargetResourcesOfLastComponent(lastConfiguration appsv1alpha1.LastConfiguration, compName string, resourceKey appsv1alpha1.ComponentResourceKey) []string {
-	lastComponentConfigs := lastConfiguration.Components[compName]
-	return lastComponentConfigs.TargetResources[resourceKey]
-}
-
-// cancelComponentOps the common function to cancel th opsRequest which updates the component attributes.
-func cancelComponentOps(ctx context.Context,
-	cli client.Client,
-	opsRes *OpsResource,
-	updateComp func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) error) error {
-	opsRequest := opsRes.OpsRequest
-	lastCompInfos := opsRequest.Status.LastConfiguration.Components
-	if lastCompInfos == nil {
-		return nil
-	}
-	for index, comp := range opsRes.Cluster.Spec.ComponentSpecs {
-		lastConfig, ok := lastCompInfos[comp.Name]
-		if !ok {
-			continue
-		}
-		if err := updateComp(&lastConfig, &comp); err != nil {
-			return err
-		}
-		opsRes.Cluster.Spec.ComponentSpecs[index] = comp
-		lastCompInfos[comp.Name] = lastConfig
-	}
-	return cli.Update(ctx, opsRes.Cluster)
-}
-
 // validateOpsWaitingPhase validates whether the current cluster phase is expected, and whether the waiting time exceeds the limit.
 // only requests with `Pending` phase will be validated.
 func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
@@ -402,7 +226,7 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 	}
 	// check if entry-condition is met
 	// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
-	if ops.Spec.TTLSecondsBeforeAbort == nil || (time.Now().After(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.TTLSecondsBeforeAbort) * time.Second))) {
+	if ops.Spec.PreConditionDeadlineSeconds == nil || (time.Now().After(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.PreConditionDeadlineSeconds) * time.Second))) {
 		return nil
 	}
 
@@ -413,114 +237,75 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 	}
 }
 
-func getRunningOpsNamesWithSameKind(cluster *appsv1alpha1.Cluster, types ...appsv1alpha1.OpsType) ([]string, error) {
-	opsRequestSlice, err := opsutil.GetOpsRequestSliceFromCluster(cluster)
+func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	sameKinds []appsv1alpha1.OpsType,
+	matchAbortCondition func(earlierOps *appsv1alpha1.OpsRequest) bool) error {
+	opsRequestSlice, err := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
 	if err != nil {
-		return nil, err
-	}
-	var runningVScaleOps []string
-	for _, v := range opsRequestSlice {
-		if slices.Contains(types, v.Type) && !v.InQueue {
-			runningVScaleOps = append(runningVScaleOps, v.Name)
-		}
-	}
-	return runningVScaleOps, nil
-}
-
-// getRunningOpsRequestWithSameKind gets the running opsRequests with the same kind.
-func getRunningOpsRequestsWithSameKind(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, types ...appsv1alpha1.OpsType) ([]*appsv1alpha1.OpsRequest, error) {
-	runningVScaleOps, err := getRunningOpsNamesWithSameKind(cluster, types...)
-	if err != nil {
-		return nil, err
-	}
-	runningVScaleOpsLen := len(runningVScaleOps)
-	if runningVScaleOpsLen == 1 {
-		// If there are no concurrent executions opsRequests of the same type, return
-		return nil, nil
-	}
-
-	// get the opsRequests by sorting in reverse order according to queue order
-	var runningOpsRequests []*appsv1alpha1.OpsRequest
-	for i := runningVScaleOpsLen - 1; i >= 0; i-- {
-		ops := &appsv1alpha1.OpsRequest{}
-		if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: runningVScaleOps[i], Namespace: cluster.Namespace}, ops); err != nil {
-			return nil, err
-		}
-		if ops.Status.Phase == appsv1alpha1.OpsRunningPhase {
-			runningOpsRequests = append(runningOpsRequests, ops)
-		}
-	}
-	return runningOpsRequests, nil
-}
-
-func syncOverrideByOpsForScaleReplicas(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	runningOpsRequests, err := getRunningOpsRequestsWithSameKind(reqCtx, cli, opsRes.Cluster, appsv1alpha1.HorizontalScalingType, appsv1alpha1.StopType, appsv1alpha1.StartType)
-	if err != nil || len(runningOpsRequests) == 0 {
 		return err
 	}
-
-	// get the latest opsName which has the same replicas with the component replicas.
-	getTheLatestOpsName := func(compName string, compReplicas int32) string {
-		for _, ops := range runningOpsRequests {
-			switch ops.Spec.Type {
-			case appsv1alpha1.HorizontalScalingType:
-				for _, v := range ops.Spec.HorizontalScalingList {
-					if v.ComponentName == compName && v.Replicas == compReplicas {
-						return ops.Name
-					}
-				}
-			case appsv1alpha1.StopType:
-				if compReplicas == 0 {
-					return ops.Name
-				}
-			case appsv1alpha1.StartType:
-				opsCompReplicasMap, _ := getComponentReplicasSnapshot(ops.Annotations)
-				if replicas, ok := opsCompReplicasMap[compName]; ok && replicas == compReplicas {
-					return ops.Name
-				}
-			}
+	// get the running opsRequest before this opsRequest to running.
+	var earlierRunningOpsSlice []appsv1alpha1.OpsRecorder
+	for i := range opsRequestSlice {
+		if !slices.Contains(sameKinds, opsRequestSlice[i].Type) {
+			continue
 		}
-		return ""
+		if opsRequestSlice[i].Name == opsRes.OpsRequest.Name {
+			break
+		}
+		earlierRunningOpsSlice = append(earlierRunningOpsSlice, opsRequestSlice[i])
 	}
-
-	compReplicasMap := map[string]int32{}
-	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
-		compReplicasMap[comp.Name] = comp.Replicas
+	if len(earlierRunningOpsSlice) == 0 {
+		return nil
 	}
-	doComponentOverrideBy := func(compName string, desiredCompReplicas int32) {
-		compReplicas, ok := compReplicasMap[compName]
-		if !ok || desiredCompReplicas == compReplicas {
-			return
-		}
-		componentStatus := opsRes.OpsRequest.Status.Components[compName]
-		componentStatus.OverrideBy = &appsv1alpha1.OverrideBy{
-			OpsName: getTheLatestOpsName(compName, compReplicas),
-			LastComponentConfiguration: appsv1alpha1.LastComponentConfiguration{
-				Replicas: &compReplicas,
-			},
-		}
-		opsRes.OpsRequest.Status.Components[compName] = componentStatus
-	}
-	// checks if the number of replicas applied by the current opsRequest matches the desired number of replicas for the component.
-	// if not matched, set the Override info in the opsRequest.status.components.
-	switch opsRes.OpsRequest.Spec.Type {
-	case appsv1alpha1.HorizontalScalingType:
-		for _, opsComp := range opsRes.OpsRequest.Spec.HorizontalScalingList {
-			doComponentOverrideBy(opsComp.ComponentName, opsComp.Replicas)
-		}
-	case appsv1alpha1.StopType:
-		for compName := range opsRes.OpsRequest.Status.Components {
-			doComponentOverrideBy(compName, 0)
-		}
-	case appsv1alpha1.StartType:
-		opsCompReplicasMap, _ := getComponentReplicasSnapshot(opsRes.OpsRequest.Annotations)
-		for compName := range opsRes.OpsRequest.Status.Components {
-			replicas, ok := opsCompReplicasMap[compName]
-			if !ok {
+	for _, v := range earlierRunningOpsSlice {
+		earlierOps := &appsv1alpha1.OpsRequest{}
+		err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: v.Name, Namespace: opsRes.OpsRequest.Namespace}, earlierOps)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
 				continue
 			}
-			doComponentOverrideBy(compName, replicas)
+			return err
+		}
+		if slices.Contains([]appsv1alpha1.OpsPhase{appsv1alpha1.OpsSucceedPhase, appsv1alpha1.OpsFailedPhase,
+			appsv1alpha1.OpsCancelledPhase}, earlierOps.Status.Phase) {
+			continue
+		}
+		if matchAbortCondition(earlierOps) {
+			// abort the opsRequest that matches the abort condition.
+			patch := client.MergeFrom(earlierOps.DeepCopy())
+			earlierOps.Status.Phase = appsv1alpha1.OpsAbortedPhase
+			abortedCondition := appsv1alpha1.NewAbortedCondition(earlierOps)
+			earlierOps.SetStatusCondition(abortedCondition)
+			earlierOps.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
+			if err = cli.Status().Patch(reqCtx.Ctx, earlierOps, patch); err != nil {
+				return err
+			}
+			opsRes.Recorder.Event(earlierOps, corev1.EventTypeNormal, abortedCondition.Type, abortedCondition.Message)
+			index, _ := GetOpsRecorderFromSlice(opsRequestSlice, earlierOps.Name)
+			if index != -1 {
+				opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
+			}
 		}
 	}
-	return nil
+	return opsutil.UpdateClusterOpsAnnotations(reqCtx.Ctx, cli, opsRes.Cluster, opsRequestSlice)
+}
+
+func updateHAConfigIfNecessary(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, switchBoolStr string) error {
+	haConfigName, ok := opsRequest.Annotations[constant.DisableHAAnnotationKey]
+	if !ok {
+		return nil
+	}
+	haConfig := &corev1.ConfigMap{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: haConfigName, Namespace: opsRequest.Namespace}, haConfig); err != nil {
+		return err
+	}
+	val, ok := haConfig.Annotations["enable"]
+	if !ok || val == switchBoolStr {
+		return nil
+	}
+	haConfig.Annotations["enable"] = switchBoolStr
+	return cli.Update(reqCtx.Ctx, haConfig)
 }

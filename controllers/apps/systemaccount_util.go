@@ -33,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	componetutil "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -328,11 +329,11 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 
 	// add toleration
 	clusterComp := cluster.Spec.GetComponentByName(compKey.componentName)
-	tolerations, err := componetutil.BuildTolerations(cluster, clusterComp)
+	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, clusterComp)
 	if err != nil {
 		return err
 	}
-	job.Spec.Template.Spec.Tolerations = tolerations
+	job.Spec.Template.Spec.Tolerations = schedulingPolicy.Tolerations
 
 	return nil
 }

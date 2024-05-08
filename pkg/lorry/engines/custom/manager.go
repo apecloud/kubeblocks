@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -62,12 +63,12 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		DBManagerBase:  *managerBase,
 	}
 
-	err = mgr.InitASMActions()
+	err = mgr.InitInstanceSetActions()
 	if err != nil {
-		mgr.Logger.Info("init RSM commands failed", "error", err.Error())
+		mgr.Logger.Info("init InstanceSet commands failed", "error", err.Error())
 		return nil, err
 	}
-	err = mgr.InitComponentDefintionActions()
+	err = mgr.InitComponentDefinitionActions()
 	if err != nil {
 		mgr.Logger.Info("init component definition commands failed", "error", err.Error())
 		return nil, err
@@ -75,7 +76,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	return mgr, nil
 }
 
-func (mgr *Manager) InitASMActions() error {
+func (mgr *Manager) InitInstanceSetActions() error {
 	actionSvcList := viper.GetString("KB_RSM_ACTION_SVC_LIST")
 	if actionSvcList == "" || actionSvcList == "null" {
 		return nil
@@ -102,7 +103,7 @@ func (mgr *Manager) InitASMActions() error {
 	return nil
 }
 
-func (mgr *Manager) InitComponentDefintionActions() error {
+func (mgr *Manager) InitComponentDefinitionActions() error {
 	actionJSON := viper.GetString(constant.KBEnvActionCommands)
 	if actionJSON != "" {
 		err := json.Unmarshal([]byte(actionJSON), &mgr.actionCommands)
@@ -169,11 +170,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 		// return errors.New("member leave command is empty!")
 		return nil
 	}
-	envs, err := util.GetGlobalSharedEnvs()
-	if err != nil {
-		return err
-	}
-
+	envs := os.Environ()
 	if cluster.Leader != nil && cluster.Leader.Name != "" {
 		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
 		fqdn := cluster.GetMemberAddr(*leaderMember)

@@ -1,5 +1,5 @@
 # cos is a storage provider for [Tencent Cloud Object Storage](https://cloud.tencent.com/product/cos)
-apiVersion: storage.kubeblocks.io/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: StorageProvider
 metadata:
   name: cos

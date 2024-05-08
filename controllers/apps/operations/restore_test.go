@@ -190,10 +190,12 @@ func createRestoreOpsObj(clusterName, restoreOpsName, backupName string) *appsv1
 			},
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
-			ClusterRef: clusterName,
-			Type:       appsv1alpha1.RestoreType,
-			RestoreSpec: &appsv1alpha1.RestoreSpec{
-				BackupName: backupName,
+			ClusterName: clusterName,
+			Type:        appsv1alpha1.RestoreType,
+			SpecificOpsRequest: appsv1alpha1.SpecificOpsRequest{
+				Restore: &appsv1alpha1.Restore{
+					BackupName: backupName,
+				},
 			},
 		},
 	}

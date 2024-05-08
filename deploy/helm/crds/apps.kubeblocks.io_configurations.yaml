@@ -18,7 +18,10 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Configuration is the Schema for the configurations API
+        description: Configuration represents the complete set of configurations for
+          a specific Component of a Cluster. This includes templates for each configuration
+          file, their corresponding ConfigConstraints, volume mounts, and other relevant
+          details.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -37,25 +40,31 @@ spec:
               resource.
             properties:
               clusterRef:
-                description: Specifies the name of the cluster that this configuration
+                description: Specifies the name of the Cluster that this configuration
                   is associated with.
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
               componentName:
-                description: Represents the name of the cluster component that this
-                  configuration pertains to.
+                description: Represents the name of the Component that this configuration
+                  pertains to.
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
               configItemDetails:
-                description: An array of ConfigurationItemDetail objects that describe
-                  user-defined configuration templates.
+                description: "ConfigItemDetails is an array of ConfigurationItemDetail
+                  objects. \n Each ConfigurationItemDetail corresponds to a configuration
+                  template, which is a ConfigMap that contains multiple configuration
+                  files. Each configuration file is stored as a key-value pair within
+                  the ConfigMap. \n The ConfigurationItemDetail includes information
+                  such as: \n - The configuration template (a ConfigMap) - The corresponding
+                  ConfigConstraint (constraints and validation rules for the configuration)
+                  - Volume mounts (for mounting the configuration files)"
                 items:
-                  description: ConfigurationItemDetail represents a specific configuration
-                    item within a configuration template.
+                  description: ConfigurationItemDetail corresponds to settings of
+                    a configuration template (a ConfigMap).
                   properties:
                     configFileParams:
                       additionalProperties:
@@ -75,47 +84,102 @@ spec:
                               configuration file.
                             type: object
                         type: object
-                      description: Used to set the parameters to be updated. It is
-                        optional.
+                      description: "Specifies the user-defined configuration parameters.
+                        \n When provided, the parameter values in `configFileParams`
+                        override the default configuration parameters. This allows
+                        users to override the default configuration according to their
+                        specific needs."
                       type: object
                     configSpec:
-                      description: Used to set the configuration template. It is optional.
+                      description: "Specifies the name of the configuration template
+                        (a ConfigMap), ConfigConstraint, and other miscellaneous options.
+                        \n The configuration template is a ConfigMap that contains
+                        multiple configuration files. Each configuration file is stored
+                        as a key-value pair within the ConfigMap. \n ConfigConstraint
+                        allows defining constraints and validation rules for configuration
+                        parameters. It ensures that the configuration adheres to certain
+                        requirements and limitations."
                       properties:
                         asEnvFrom:
-                          description: An optional field where the list of containers
-                            will be injected into EnvFrom.
+                          description: "Specifies the containers to inject the ConfigMap
+                            parameters as environment variables. \n This is useful
+                            when application images accept parameters through environment
+                            variables and generate the final configuration file in
+                            the startup script based on these variables. \n This field
+                            allows users to specify a list of container names, and
+                            KubeBlocks will inject the environment variables converted
+                            from the ConfigMap into these designated containers. This
+                            provides a flexible way to pass the configuration items
+                            from the ConfigMap to the container without modifying
+                            the image. \n Deprecated: `asEnvFrom` has been deprecated
+                            since 0.9.0 and will be removed in 0.10.0. Use `injectEnvTo`
+                            instead."
                           items:
                             type: string
                           type: array
                           x-kubernetes-list-type: set
                         constraintRef:
-                          description: An optional field that defines the name of
-                            the referenced configuration constraints object.
+                          description: Specifies the name of the referenced configuration
+                            constraints object.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         defaultMode:
-                          description: "Refers to the mode bits used to set permissions
-                            on created files by default. \n Must be an octal value
-                            between 0000 and 0777 or a decimal value between 0 and
-                            511. YAML accepts both octal and decimal values, JSON
-                            requires decimal values for mode bits. Defaults to 0644.
-                            \n Directories within the path are not affected by this
-                            setting. This might be in conflict with other options
-                            that affect the file mode, like fsGroup, and the result
-                            can be other mode bits set."
+                          description: "Deprecated: DefaultMode is deprecated since
+                            0.9.0 and will be removed in 0.10.0 for scripts, auto
+                            set 0555 for configs, auto set 0444 Refers to the mode
+                            bits used to set permissions on created files by default.
+                            \n Must be an octal value between 0000 and 0777 or a decimal
+                            value between 0 and 511. YAML accepts both octal and decimal
+                            values, JSON requires decimal values for mode bits. Defaults
+                            to 0644. \n Directories within the path are not affected
+                            by this setting. This might be in conflict with other
+                            options that affect the file mode, like fsGroup, and the
+                            result can be other mode bits set."
                           format: int32
                           type: integer
+                        injectEnvTo:
+                          description: "Specifies the containers to inject the ConfigMap
+                            parameters as environment variables. \n This is useful
+                            when application images accept parameters through environment
+                            variables and generate the final configuration file in
+                            the startup script based on these variables. \n This field
+                            allows users to specify a list of container names, and
+                            KubeBlocks will inject the environment variables converted
+                            from the ConfigMap into these designated containers. This
+                            provides a flexible way to pass the configuration items
+                            from the ConfigMap to the container without modifying
+                            the image."
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: set
                         keys:
-                          description: Defines a list of keys. If left empty, ConfigConstraint
-                            applies to all keys in the configmap.
+                          description: "Specifies the configuration files within the
+                            ConfigMap that support dynamic updates. \n A configuration
+                            template (provided in the form of a ConfigMap) may contain
+                            templates for multiple configuration files. Each configuration
+                            file corresponds to a key in the ConfigMap. Some of these
+                            configuration files may support dynamic modification and
+                            reloading without requiring a pod restart. \n If empty
+                            or omitted, all configuration files in the ConfigMap are
+                            assumed to support dynamic updates, and ConfigConstraint
+                            applies to all keys."
                           items:
                             type: string
                           type: array
                           x-kubernetes-list-type: set
                         legacyRenderedConfigSpec:
-                          description: An optional field that defines the secondary
-                            rendered config spec.
+                          description: "Specifies the secondary rendered config spec
+                            for pod-specific customization. \n The template is rendered
+                            inside the pod (by the \"config-manager\" sidecar container)
+                            and merged with the main template's render result to generate
+                            the final configuration file. \n This field is intended
+                            to handle scenarios where different pods within the same
+                            Component have varying configurations. It allows for pod-specific
+                            customization of the configuration. \n Note: This field
+                            will be deprecated in future versions, and the functionality
+                            will be moved to `cluster.spec.componentSpecs[*].instances[*]`."
                           properties:
                             namespace:
                               default: default
@@ -157,14 +221,20 @@ spec:
                           pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                           type: string
                         reRenderResourceTypes:
-                          description: An optional field defines which resources change
-                            trigger re-render config.
+                          description: "Specifies whether the configuration needs
+                            to be re-rendered after v-scale or h-scale operations
+                            to reflect changes. \n In some scenarios, the configuration
+                            may need to be updated to reflect the changes in resource
+                            allocation or cluster topology. Examples: \n - Redis:
+                            adjust maxmemory after v-scale operation. - MySQL: increase
+                            max connections after v-scale operation. - Zookeeper:
+                            update zoo.cfg with new node addresses after h-scale operation."
                           items:
                             description: RerenderResourceType defines the resource
                               requirements for a component.
                             enum:
-                            - resources
-                            - replcias
+                            - vscale
+                            - hscale
                             - tls
                             type: string
                           type: array
@@ -190,7 +260,11 @@ spec:
                       - volumeName
                       type: object
                     importTemplateRef:
-                      description: Specifies the configuration template. It is optional.
+                      description: "Specifies the user-defined configuration template.
+                        \n When provided, the `importTemplateRef` overrides the default
+                        configuration template specified in `configSpec.templateRef`.
+                        This allows users to customize the configuration template
+                        according to their specific requirements."
                       properties:
                         namespace:
                           default: default
@@ -219,17 +293,20 @@ spec:
                       - templateRef
                       type: object
                     name:
-                      description: Defines the unique identifier of the configuration
-                        template. It must be a string of maximum 63 characters, and
-                        can only include lowercase alphanumeric characters, hyphens,
+                      description: "Defines the unique identifier of the configuration
+                        template. \n It must be a string of maximum 63 characters,
+                        and can only include lowercase alphanumeric characters, hyphens,
                         and periods. The name must start and end with an alphanumeric
-                        character.
+                        character."
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     payload:
-                      description: Holds the configuration-related rerender. Preserves
-                        unknown fields and is optional.
+                      description: "External controllers can trigger a configuration
+                        rerender by modifying this field. \n Note: Currently, the
+                        `payload` field is opaque and its content is not interpreted
+                        by the system. Modifying this field will cause a rerender,
+                        regardless of the specific content of this field."
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                     version:
@@ -249,6 +326,8 @@ spec:
             - componentName
             type: object
           status:
+            description: ConfigurationStatus represents the observed state of a Configuration
+              resource.
             properties:
               conditions:
                 description: Provides detailed status information for opsRequest.
@@ -344,8 +423,10 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     phase:
-                      description: Indicates the current status of the configuration
-                        item. This field is optional.
+                      description: "Indicates the current status of the configuration
+                        item. \n Possible values include \"Creating\", \"Init\", \"Running\",
+                        \"Pending\", \"Merged\", \"MergeFailed\", \"FailedAndPause\",
+                        \"Upgrading\", \"Deleting\", \"FailedAndRetry\", \"Finished\"."
                       enum:
                       - Creating
                       - Init

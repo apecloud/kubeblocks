@@ -448,7 +448,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
-			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
+			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil).Times(2)
 			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
 			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))
 		})
@@ -457,7 +457,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(4)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil).Times(2)
-			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
+			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil).Times(3)
 			// first leave
 			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
 			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))

@@ -38,8 +38,8 @@ type configReconcileContext struct {
 	ConfigMap        *corev1.ConfigMap
 	BuiltinComponent *component.SynthesizedComponent
 
-	Containers []string
-	RSMList    []workloads.ReplicatedStateMachine
+	Containers      []string
+	InstanceSetList []workloads.InstanceSet
 
 	reqCtx intctrlutil.RequestCtx
 }
@@ -62,18 +62,18 @@ func (c *configReconcileContext) GetRelatedObjects() error {
 	return c.Cluster().
 		ComponentAndComponentDef().
 		ComponentSpec().
-		RSM().
+		Workload().
 		SynthesizedComponent().
 		Complete()
 }
 
-func (c *configReconcileContext) RSM() *configReconcileContext {
+func (c *configReconcileContext) Workload() *configReconcileContext {
 	stsFn := func() (err error) {
-		c.RSMList, c.Containers, err = retrieveRelatedComponentsByConfigmap(
+		c.InstanceSetList, c.Containers, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
 			c.Context,
 			c.Name,
-			generics.RSMSignature,
+			generics.InstanceSetSignature,
 			client.ObjectKeyFromObject(c.ConfigMap),
 			client.InNamespace(c.Namespace),
 			c.MatchingLabels)
@@ -84,7 +84,13 @@ func (c *configReconcileContext) RSM() *configReconcileContext {
 
 func (c *configReconcileContext) SynthesizedComponent() *configReconcileContext {
 	return c.Wrap(func() (err error) {
-		c.BuiltinComponent, err = component.BuildSynthesizedComponentWrapper(c.reqCtx, c.Client, c.ClusterObj, c.ClusterComObj)
+		if c.ComponentDefObj != nil && c.ComponentObj != nil && len(c.ComponentObj.Spec.CompDef) > 0 {
+			// build synthesized component for native component
+			c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.reqCtx, c.Client, c.ClusterObj, c.ComponentDefObj, c.ComponentObj)
+		} else {
+			// build synthesized component for generated component
+			c.BuiltinComponent, err = component.BuildSynthesizedComponentWrapper(c.reqCtx, c.Client, c.ClusterObj, c.ClusterComObj)
+		}
 		return err
 	})
 }

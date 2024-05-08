@@ -79,12 +79,14 @@ var _ = Describe("CustomOps", func() {
 		opsName := "custom-ops-" + testCtx.GetRandomStr()
 		ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 			cluster.Name, appsv1alpha1.CustomType)
-		ops.Spec.CustomSpec = &appsv1alpha1.CustomOpsSpec{
-			OpsDefinitionRef: opsDef.Name,
+		ops.Spec.CustomOps = &appsv1alpha1.CustomOps{
+			OpsDefinitionName: opsDef.Name,
 			CustomOpsComponents: []appsv1alpha1.CustomOpsComponent{
 				{
-					ComponentName: comp,
-					Parameters:    params,
+					ComponentOps: appsv1alpha1.ComponentOps{
+						ComponentName: comp,
+					},
+					Parameters: params,
 				},
 			},
 		}

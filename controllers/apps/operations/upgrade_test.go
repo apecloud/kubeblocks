@@ -20,9 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -70,9 +72,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By("create Upgrade Ops")
 			newClusterVersionName := "clusterversion-upgrade-" + randomStr
 			_ = testapps.NewClusterVersionFactory(newClusterVersionName, clusterDefinitionName).
-				AddComponentVersion(statelessComp).AddContainerShort(testapps.DefaultNginxContainerName, "nginx:1.14.2").
 				AddComponentVersion(consensusComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).
-				AddComponentVersion(statefulComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).
 				Create(&testCtx).GetObject()
 			ops := testapps.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterObject.Name, appsv1alpha1.UpgradeType)
@@ -92,9 +92,27 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			By("Test OpsManager.MainEnter function ")
+			By("expect upgrade successfully")
+			_ = testapps.MockInstanceSetPod(&testCtx, nil, clusterName, statelessComp, fmt.Sprintf(clusterName+"-"+statelessComp+"-0"), "", "")
+			_ = testapps.MockInstanceSetPods(&testCtx, nil, clusterName, statefulComp)
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)
+			for i := range pods {
+				pod := pods[i]
+				Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+					pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+						{
+							Name:  testapps.DefaultMySQLContainerName,
+							Image: mysqlImageForUpdate,
+						},
+					}
+				})).Should(Succeed())
+			}
+			// mock component to running
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.RunningClusterCompPhase,
+				consensusComp, statelessComp, statefulComp)
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 	})
 })

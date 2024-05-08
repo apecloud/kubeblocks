@@ -45,7 +45,7 @@ var _ = Describe("controller test", func() {
 		It("should work well", func() {
 			ctx := context.Background()
 			req := ctrl.Request{}
-			logger := log.FromContext(ctx).WithValues("ReplicatedStateMachine", "test")
+			logger := log.FromContext(ctx).WithValues("InstanceSet", "test")
 			controller := NewController(context.Background(), nil, req, nil, logger)
 			tree := NewObjectTree()
 

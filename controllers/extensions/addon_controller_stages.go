@@ -124,6 +124,10 @@ type genIDProceedCheckStage struct {
 	stageCtx
 }
 
+type metadataCheckStage struct {
+	stageCtx
+}
+
 type installableCheckStage struct {
 	stageCtx
 }
@@ -204,6 +208,18 @@ func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 				r.setReconciled()
 				return
 			}
+		}
+	})
+	r.next.Handle(ctx)
+}
+
+func (r *metadataCheckStage) Handle(ctx context.Context) {
+	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("metadataCheckStage", "phase", addon.Status.Phase)
+		setAddonProviderAndVersion(ctx, &r.stageCtx, addon)
+		if err := r.reconciler.Client.Update(ctx, addon); err != nil {
+			r.setRequeueWithErr(err, "")
+			return
 		}
 	})
 	r.next.Handle(ctx)
@@ -1209,4 +1225,24 @@ func validateVersion(annotations, kbVersion string) (bool, error) {
 	}
 	validate, _ := constraint.Validate(v)
 	return validate, nil
+}
+
+func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {
+	// if not set provider and version in spec, set it from labels
+	if addon.Labels == nil {
+		addon.Labels = map[string]string{}
+	}
+	if addon.Spec.Provider == "" {
+		addon.Spec.Provider = addon.Labels[AddonProvider]
+	}
+	if addon.Spec.Version == "" {
+		addon.Spec.Version = addon.Labels[AddonVersion]
+	}
+	// handle the reverse logic
+	if len(addon.Labels[AddonProvider]) == 0 && len(addon.Spec.Provider) != 0 {
+		addon.Labels[AddonProvider] = addon.Spec.Provider
+	}
+	if len(addon.Labels[AddonVersion]) == 0 && len(addon.Spec.Version) != 0 {
+		addon.Labels[AddonVersion] = addon.Spec.Version
+	}
 }

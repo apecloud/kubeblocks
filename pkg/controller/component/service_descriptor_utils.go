@@ -72,7 +72,7 @@ func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader
 		switch {
 		case serviceRef.Cluster != "":
 			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, *serviceRef, serviceRefDecl, true)
-		case serviceRef.ClusterRef != nil:
+		case serviceRef.ClusterServiceSelector != nil:
 			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, *serviceRef, serviceRefDecl, false)
 		case serviceRef.ServiceDescriptor != "":
 			sd, err = handleServiceRefFromServiceDescriptor(ctx, cli, namespace, *serviceRef, serviceRefDecl)
@@ -131,13 +131,13 @@ func referencedVars(ctx context.Context, cli client.Reader, namespace string, se
 func referencedServiceVars(ctx context.Context, cli client.Reader, namespace string,
 	serviceRef appsv1alpha1.ServiceRef) (*appsv1alpha1.CredentialVar, *appsv1alpha1.CredentialVar, error) {
 	var (
-		clusterRef     = serviceRef.ClusterRef
+		selector       = serviceRef.ClusterServiceSelector
 		endpoint, port *appsv1alpha1.CredentialVar
 		obj            any
 		err            error
 	)
 
-	if clusterRef.Service == nil {
+	if selector.Service == nil {
 		return nil, nil, nil
 	}
 
@@ -145,19 +145,19 @@ func referencedServiceVars(ctx context.Context, cli client.Reader, namespace str
 		namespace = serviceRef.Namespace
 	}
 	switch {
-	case len(clusterRef.Service.Component) == 0:
-		obj, err = clusterServiceGetter(ctx, cli, namespace, clusterRef.Cluster, clusterRef.Service.Service)
-	case clusterRef.Service.Service == "headless":
-		obj, err = headlessCompServiceGetter(ctx, cli, namespace, clusterRef.Cluster, clusterRef.Service.Component)
+	case len(selector.Service.Component) == 0:
+		obj, err = clusterServiceGetter(ctx, cli, namespace, selector.Cluster, selector.Service.Service)
+	case selector.Service.Service == "headless":
+		obj, err = headlessCompServiceGetter(ctx, cli, namespace, selector.Cluster, selector.Service.Component)
 	default:
-		obj, err = compServiceGetter(ctx, cli, namespace, clusterRef.Cluster, clusterRef.Service.Component, clusterRef.Service.Service)
+		obj, err = compServiceGetter(ctx, cli, namespace, selector.Cluster, selector.Service.Component, selector.Service.Service)
 	}
 	if err != nil {
 		return nil, nil, err
 	}
 
 	endpoint = &appsv1alpha1.CredentialVar{Value: composeHostValueFromServices(obj)}
-	if p := composePortValueFromServices(obj, clusterRef.Service.Port); p != nil {
+	if p := composePortValueFromServices(obj, selector.Service.Port); p != nil {
 		port = &appsv1alpha1.CredentialVar{Value: *p}
 	}
 	return endpoint, port, nil
@@ -166,17 +166,17 @@ func referencedServiceVars(ctx context.Context, cli client.Reader, namespace str
 func referencedCredentialVars(ctx context.Context, cli client.Reader, namespace string,
 	serviceRef appsv1alpha1.ServiceRef) (*appsv1alpha1.CredentialVar, *appsv1alpha1.CredentialVar, error) {
 	var (
-		clusterRef = serviceRef.ClusterRef
-		vars       = []*appsv1alpha1.CredentialVar{nil, nil}
+		selector = serviceRef.ClusterServiceSelector
+		vars     = []*appsv1alpha1.CredentialVar{nil, nil}
 	)
 
-	if clusterRef.Credential == nil {
+	if selector.Credential == nil {
 		return nil, nil, nil
 	}
 
 	secretKey := types.NamespacedName{
 		Namespace: namespace,
-		Name:      constant.GenerateAccountSecretName(clusterRef.Cluster, clusterRef.Credential.Component, clusterRef.Credential.Name),
+		Name:      constant.GenerateAccountSecretName(selector.Cluster, selector.Credential.Component, selector.Credential.Name),
 	}
 	if serviceRef.Namespace != "" {
 		secretKey.Namespace = serviceRef.Namespace

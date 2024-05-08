@@ -30,6 +30,10 @@ const (
 	AddonDefaultIsEmpty  = "addons.extensions.kubeblocks.io/default-is-empty"
 	KBVersionValidate    = "addon.kubeblocks.io/kubeblocks-version"
 
+	// label keys
+	AddonProvider = "addon.kubeblocks.io/provider"
+	AddonVersion  = "addon.kubeblocks.io/version"
+
 	// condition reasons
 	AddonDisabled = "AddonDisabled"
 	AddonEnabled  = "AddonEnabled"

@@ -22,123 +22,147 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
-// BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
+// BackupPolicyTemplateSpec contains the settings in a BackupPolicyTemplate.
 type BackupPolicyTemplateSpec struct {
-	// Specifies a reference to the ClusterDefinition name. This is an immutable attribute that cannot be changed after creation.
+	// Specifies the name of a ClusterDefinition.
+	//
+	// This is an immutable attribute that cannot be changed after creation.
 	//
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
-	// Represents an array of backup policy templates for the specified ComponentDefinition.
+	// Represents an array of BackupPolicy templates, with each template corresponding to a specified ComponentDefinition
+	// or to a group of ComponentDefinitions that are different versions of definitions of the same component.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	BackupPolicies []BackupPolicy `json:"backupPolicies"`
 
-	// Acts as a unique identifier for this BackupPolicyTemplate. This identifier will be used as a suffix for the automatically generated backupPolicy name.
-	// It is required when multiple BackupPolicyTemplates exist to prevent backupPolicy override.
+	// Specifies a unique identifier for the BackupPolicyTemplate.
+	//
+	// This identifier will be used as the suffix of the name of automatically generated BackupPolicy.
+	// This prevents unintended overwriting of BackupPolicies due to name conflicts when multiple BackupPolicyTemplates
+	// are present.
+	// For instance, using "backup-policy" for regular backups and "backup-policy-hscale" for horizontal-scale ops
+	// can differentiate the policies.
 	//
 	// +optional
 	// +kubebuilder:validation:MaxLength=20
 	Identifier string `json:"identifier,omitempty"`
 }
 
+// BackupPolicy is the template corresponding to a specified ComponentDefinition
+// or to a group of ComponentDefinitions that are different versions of definitions of the same component.
 type BackupPolicy struct {
-	// References a componentDef defined in the ClusterDefinition spec.
+	// Specifies the name of ClusterComponentDefinition defined in the ClusterDefinition.
 	// Must comply with the IANA Service Naming rule.
+	//
+	// Deprecated since v0.9, should use `componentDefs` instead.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
 	//
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
-	// Specifies that this componentDef is a shading component definition.
-	// +optional
-	IsSharding bool `json:"isSharding,omitempty"`
-
-	// References to componentDefinitions.
-	// Must comply with the IANA Service Naming rule.
+	// Specifies a list of names of ComponentDefinitions that the specified ClusterDefinition references.
+	// They should be different versions of definitions of the same component,
+	// thus allowing them to share a single BackupPolicy.
+	// Each name must adhere to the IANA Service Naming rule.
 	//
 	// +optional
 	ComponentDefs []string `json:"componentDefs,omitempty"`
 
-	// The instance to be backed up.
+	// Defines the selection criteria of instance to be backed up, and the connection credential to be used
+	// during the backup process.
 	//
 	// +optional
 	Target TargetInstance `json:"target"`
 
-	// Define the policy for backup scheduling.
+	// Defines the execution plans for backup tasks, specifying when and how backups should occur,
+	// and the retention period of backup files.
 	//
 	// +optional
 	Schedules []SchedulePolicy `json:"schedules,omitempty"`
 
-	// Define the methods to be used for backups.
+	// Defines an array of BackupMethods to be used.
 	//
 	// +kubebuilder:validation:Required
 	BackupMethods []BackupMethod `json:"backupMethods"`
 
-	// Specifies the number of retries before marking the backup as failed.
+	// Specifies the maximum number of retry attempts for a backup before it is considered a failure.
 	//
 	// +optional
+	// +kubebuilder:default=2
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=10
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 }
 
 type BackupMethod struct {
-	// Method for backup
+	// Specifies the name of dataprotection.BackupMethod.
 	dpv1alpha1.BackupMethod `json:",inline"`
 
-	// Specifies the instance where the backup will be stored.
+	// If set, specifies the method for selecting the replica to be backed up using the criteria defined here.
+	// If this field is not set, the selection method specified in `backupPolicy.target` is used.
+	//
+	// This field provides a way to override the global `backupPolicy.target` setting for specific BackupMethod.
 	//
 	// +optional
 	Target *TargetInstance `json:"target"`
 
-	// Defines the mapping between the environment variables of the cluster and the keys of the environment values.
+	// Specifies a mapping of an environment variable key to the appropriate version of the tool image
+	// required for backups, as determined by ClusterVersion and ComponentDefinition.
+	// The environment variable is then injected into the container executing the backup task.
 	//
 	// +optional
 	EnvMapping []EnvMappingVar `json:"envMapping,omitempty"`
 }
 
 type EnvMappingVar struct {
-	// Specifies the environment variable key that requires mapping.
+	// Specifies the environment variable key in the mapping.
 	//
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 
-	// Defines the source from which the environment variable value is derived.
+	// Specifies the source used to derive the value of the environment variable,
+	// which typically represents the tool image required for backup operation.
 	//
 	// +kubebuilder:validation:Required
 	ValueFrom ValueFrom `json:"valueFrom"`
 }
 
 type ValueFrom struct {
-	// Maps to the environment value. This is an optional field.
+	// Determine the appropriate version of the backup tool image from ClusterVersion.
 	//
+	// Deprecated since v0.9, since ClusterVersion is deprecated.
 	// +optional
 	ClusterVersionRef []ValueMapping `json:"clusterVersionRef,omitempty"`
 
-	// Maps to the environment value. This is also an optional field.
+	// Determine the appropriate version of the backup tool image from ComponentDefinition.
 	//
 	// +optional
 	ComponentDef []ValueMapping `json:"componentDef,omitempty"`
 }
 
 type ValueMapping struct {
-	// Represents an array of ClusterVersion names that can be mapped to an environment variable value.
+	// Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
+	// the appropriate version of the backup tool image.
+	//
+	// This mapping allows different versions of component images to correspond to specific versions of backup tool images.
 	//
 	// +kubebuilder:validation:Required
 	Names []string `json:"names"`
 
-	// The value that corresponds to the specified ClusterVersion names.
+	// Specifies the appropriate version of the backup tool image.
 	//
 	// +kubebuilder:validation:Required
 	MappingValue string `json:"mappingValue"`
 }
 
 type SchedulePolicy struct {
-
 	// Specifies whether the backup schedule is enabled or not.
 	//
 	// +optional
@@ -174,22 +198,24 @@ type SchedulePolicy struct {
 }
 
 type TargetInstance struct {
-	// Specifies the instance of the corresponding role for backup. The roles can be:
+	// Specifies the role to select one or more replicas for backup.
 	//
-	// - Leader, Follower, or Leaner for the Consensus component.
-	// - Primary or Secondary for the Replication component.
-	//
-	// Invalid roles of the component will be ignored. For example, if the workload type is Replication and the component's replicas is 1,
-	// the secondary role is invalid. It will also be ignored when the component is Stateful or Stateless.
-	//
-	// The role will be transformed into a role LabelSelector for the BackupPolicy's target attribute.
+	// - If no replica with the specified role exists, the backup task will fail.
+	//   Special case: If there is only one replica in the cluster, it will be used for backup,
+	//   even if its role differs from the specified one.
+	//   For example, if you specify backing up on a secondary replica, but the cluster is single-node
+	//   with only one primary replica, the primary will be used for backup.
+	//   Future versions will address this special case using role priorities.
+	// - If multiple replicas satisfy the specified role, the choice (`Any` or `All`) will be made according to
+	//   the `strategy` field below.
 	Role string `json:"role"`
 
-	// Refers to spec.componentDef.systemAccounts.accounts[*].name in the ClusterDefinition.
-	// The secret created by this account will be used to connect to the database.
-	// If not set, the secret created by spec.ConnectionCredential of the ClusterDefinition will be used.
+	// If `backupPolicy.componentDefs` is set, this field is required to specify the system account name.
+	// This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.
+	// The corresponding secret created by this account is used to connect to the database.
 	//
-	// It will be transformed into a secret for the BackupPolicy's target secret.
+	// If `backupPolicy.componentDefRef` (a legacy and deprecated API) is set, the secret defined in
+	// `clusterDefinition.spec.ConnectionCredential` is used instead.
 	//
 	// +optional
 	Account string `json:"account,omitempty"`
@@ -204,38 +230,44 @@ type TargetInstance struct {
 	// +optional
 	Strategy dpv1alpha1.PodSelectionStrategy `json:"strategy,omitempty"`
 
-	// Defines the connection credential key in the secret
-	// created by spec.ConnectionCredential of the ClusterDefinition.
-	// It will be ignored when the "account" is set.
+	// Specifies the keys of the connection credential secret defined in `clusterDefinition.spec.ConnectionCredential`.
+	// It will be ignored when the `account` is set.
 	//
 	// +optional
 	ConnectionCredentialKey ConnectionCredentialKey `json:"connectionCredentialKey,omitempty"`
 }
 
 type ConnectionCredentialKey struct {
-	// Represents the key of the password in the ConnectionCredential secret.
+	// Represents the key of the password in the connection credential secret.
 	// If not specified, the default key "password" is used.
 	//
 	// +optional
 	PasswordKey *string `json:"passwordKey,omitempty"`
 
-	// Represents the key of the username in the ConnectionCredential secret.
+	// Represents the key of the username in the connection credential secret.
 	// If not specified, the default key "username" is used.
 	//
 	// +optional
 	UsernameKey *string `json:"usernameKey,omitempty"`
 
-	// Defines the map key of the host in the connection credential secret.
+	// Defines the key of the host in the connection credential secret.
 	HostKey *string `json:"hostKey,omitempty"`
 
-	// Indicates the map key of the port in the connection credential secret.
+	// Indicates map key of the port in the connection credential secret.
 	PortKey *string `json:"portKey,omitempty"`
 }
 
-// BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate
+// BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate.
 type BackupPolicyTemplateStatus struct {
 }
 
+// BackupPolicyTemplate should be provided by addon developers and is linked to a ClusterDefinition
+// and its associated ComponentDefinitions.
+// It is responsible for generating BackupPolicies for Components that require backup operations,
+// also determining the suitable backup methods and strategies.
+// This template is automatically selected based on the specified ClusterDefinition and ComponentDefinitions
+// when a Cluster is created.
+//
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:openapi-gen=true
@@ -244,8 +276,6 @@ type BackupPolicyTemplateStatus struct {
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=bpt
 // +kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-
-// BackupPolicyTemplate is the Schema for the BackupPolicyTemplates API (defined by provider)
 type BackupPolicyTemplate struct {
 	// The metadata for the API version and kind of the BackupPolicyTemplate.
 	metav1.TypeMeta `json:",inline"`

@@ -101,9 +101,9 @@ func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecM
 			}
 			switch param.ReloadType {
 			case appsv1beta1.TPLScriptType:
-				return core.IsWatchModuleForTplTrigger(param.DynamicReloadAction.TPLScriptTrigger)
+				return core.IsWatchModuleForTplTrigger(param.ReloadAction.TPLScriptTrigger)
 			case appsv1beta1.ShellType:
-				return core.IsWatchModuleForShellTrigger(param.DynamicReloadAction.ShellTrigger)
+				return core.IsWatchModuleForShellTrigger(param.ReloadAction.ShellTrigger)
 			default:
 				return true
 			}
@@ -299,7 +299,7 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	return nil
 }
 
-func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1beta1.DownwardAction) {
+func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1beta1.DownwardAPITriggeredAction) {
 	manager.DownwardAPIVolumes = append(manager.DownwardAPIVolumes, corev1.VolumeMount{
 		Name:      fieldInfo.Name,
 		MountPath: fieldInfo.MountPoint,
@@ -384,7 +384,7 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 	return nil
 }
 
-func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig appsv1beta1.FormatterConfig) (map[string]string, error) {
+func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig appsv1beta1.FileFormatConfig) (map[string]string, error) {
 	configObject := make(map[string]interface{})
 	if content, ok := data[reloadConfig]; ok {
 		if err := yaml.Unmarshal([]byte(content), &configObject); err != nil {

@@ -98,9 +98,19 @@ type OpsManager struct {
 type progressResource struct {
 	// opsMessageKey progress message key of specified OpsType, it is a verb and will form the message of progressDetail
 	// such as "vertical scale" of verticalScaling OpsRequest.
-	opsMessageKey    string
-	clusterComponent *appsv1alpha1.ClusterComponentSpec
-	clusterDef       *appsv1alpha1.ClusterDefinition
-	componentDef     *appsv1alpha1.ComponentDefinition
-	opsIsCompleted   bool
+	opsMessageKey string
+	// cluster component name. By default, it is the componentSpec.name.
+	// but if it is a sharding component, the componentName is generated randomly.
+	fullComponentName string
+	// checks if the component is a sharding component
+	isShardingComponent bool
+	clusterComponent    *appsv1alpha1.ClusterComponentSpec
+	clusterDef          *appsv1alpha1.ClusterDefinition
+	componentDef        *appsv1alpha1.ComponentDefinition
+	// record which pods need to updated during this operation.
+	updatedPodSet map[string]string
+	compOps       ComponentOpsInteface
+	// checks if it needs to wait the component to complete.
+	// if only updates a part of pods, set it to false.
+	noWaitComponentCompleted bool
 }

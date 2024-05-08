@@ -26,7 +26,6 @@ import (
 	"net/netip"
 	"strconv"
 
-	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,7 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
-	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -45,8 +44,8 @@ import (
 // GetComponentPods gets all pods of the component.
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
-	for i := range params.RSMUnits {
-		pods, err := intctrlutil.GetPodListByRSM(params.Ctx.Ctx, params.Client, &params.RSMUnits[i])
+	for i := range params.InstanceSetUnits {
+		pods, err := intctrlutil.GetPodListByInstanceSet(params.Ctx.Ctx, params.Client, &params.InstanceSetUnits[i])
 		if err != nil {
 			return nil, err
 		}
@@ -72,11 +71,11 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 }
 
 func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
-	if len(params.RSMUnits) > 1 {
-		return nil, core.MakeError("component require only one rsm, actual %d components", len(params.RSMUnits))
+	if len(params.InstanceSetUnits) > 1 {
+		return nil, core.MakeError("component require only one InstanceSet, actual %d components", len(params.InstanceSetUnits))
 	}
 
-	if len(params.RSMUnits) == 0 {
+	if len(params.InstanceSetUnits) == 0 {
 		return nil, nil
 	}
 
@@ -86,7 +85,7 @@ func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	if params.SynthesizedComponent != nil {
-		rsmcore.SortPods(pods, rsmcore.ComposeRolePriorityMap(component.ConvertSynthesizeCompRoleToRSMRole(params.SynthesizedComponent)), true)
+		instanceset.SortPods(pods, instanceset.ComposeRolePriorityMap(component.ConvertSynthesizeCompRoleToInstanceSetRole(params.SynthesizedComponent)), true)
 	}
 	return pods, nil
 }
@@ -219,12 +218,8 @@ func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey s
 	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 	for _, obj := range objs {
 		switch w := obj.(type) {
-		case *appv1.StatefulSet:
-			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.StatefulSetSignature)
-		case *appv1.Deployment:
-			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.DeploymentSignature)
-		case *workloads.ReplicatedStateMachine:
-			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.RSMSignature)
+		case *workloads.InstanceSet:
+			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.InstanceSetSignature)
 		default:
 			// ignore other types workload
 		}

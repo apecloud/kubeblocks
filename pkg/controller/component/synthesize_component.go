@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -31,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -141,12 +142,16 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
+	comp2CompDef, err := buildComp2CompDefs(reqCtx.Ctx, cli, cluster, clusterCompSpec)
+	if err != nil {
+		return nil, err
+	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
 		Namespace:          comp.Namespace,
 		ClusterName:        clusterName,
 		ClusterUID:         clusterUID,
-		Comp2CompDefs:      buildComp2CompDefs(cluster, clusterCompSpec),
+		Comp2CompDefs:      comp2CompDef,
 		Name:               compName,
 		FullCompName:       comp.Name,
 		CompDefName:        compDef.Name,
@@ -154,6 +159,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		ClusterGeneration:  clusterGeneration(cluster, comp),
 		PodSpec:            &compDef.Spec.Runtime,
 		HostNetwork:        compDefObj.Spec.HostNetwork,
+		ComponentServices:  compDefObj.Spec.Services,
 		LogConfigs:         compDefObj.Spec.LogConfigs,
 		ConfigTemplates:    compDefObj.Spec.Configs,
 		ScriptTemplates:    compDefObj.Spec.Scripts,
@@ -170,6 +176,8 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		ServiceAccountName: comp.Spec.ServiceAccountName,
 		Instances:          comp.Spec.Instances,
 		OfflineInstances:   comp.Spec.OfflineInstances,
+		Sidecars:           comp.Spec.Sidecars,
+		MonitorEnabled:     buildMonitorEnabled(comp),
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -184,9 +192,9 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
 	}
 
-	// build affinity and tolerations
-	if err := buildAffinitiesAndTolerations(comp, synthesizeComp); err != nil {
-		reqCtx.Log.Error(err, "build affinities and tolerations failed.")
+	// build scheduling policy for workload
+	if err = buildSchedulingPolicy(synthesizeComp, comp); err != nil {
+		reqCtx.Log.Error(err, "failed to build scheduling policy")
 		return nil, err
 	}
 
@@ -202,10 +210,10 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	limitSharedMemoryVolumeSize(synthesizeComp, comp)
 
 	// build componentService
-	buildComponentServices(synthesizeComp, compDefObj, comp)
+	buildComponentServices(synthesizeComp, comp)
 
 	// build monitor
-	buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
+	// buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
 
 	// build serviceAccountName
 	buildServiceAccountName(synthesizeComp)
@@ -238,6 +246,13 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alp
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
 }
 
+func buildMonitorEnabled(comp *appsv1alpha1.Component) bool {
+	if comp.Spec.MonitorEnabled != nil {
+		return *comp.Spec.MonitorEnabled
+	}
+	return false
+}
+
 func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
 	if comp != nil && comp.Annotations != nil {
 		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
@@ -248,25 +263,43 @@ func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Compone
 	return strconv.FormatInt(cluster.Generation, 10)
 }
 
-func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) map[string]string {
+func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (map[string]string, error) {
 	if cluster == nil {
-		return nil
-	}
-	if len(cluster.Spec.ComponentSpecs) == 0 {
-		if clusterCompSpec == nil || len(clusterCompSpec.ComponentDef) == 0 {
-			return nil
-		}
-		return map[string]string{
-			clusterCompSpec.Name: clusterCompSpec.ComponentDef,
-		}
+		return nil, nil
 	}
 	mapping := make(map[string]string)
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if len(comp.ComponentDef) > 0 {
-			mapping[comp.Name] = comp.ComponentDef
+
+	// Build from ComponentSpecs
+	if len(cluster.Spec.ComponentSpecs) == 0 {
+		if clusterCompSpec != nil && len(clusterCompSpec.ComponentDef) > 0 {
+			mapping[clusterCompSpec.Name] = clusterCompSpec.ComponentDef
+		}
+	} else {
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			if len(comp.ComponentDef) > 0 {
+				mapping[comp.Name] = comp.ComponentDef
+			}
 		}
 	}
-	return mapping
+
+	// Build from ShardingSpecs
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, &shardingSpec)
+		if err != nil {
+			return nil, err
+		}
+		for _, shardingComp := range shardingComps {
+			if len(shardingComp.Spec.CompDef) > 0 {
+				compShortName, err := ShortName(cluster.Name, shardingComp.Name)
+				if err != nil {
+					return nil, err
+				}
+				mapping[compShortName] = shardingComp.Spec.CompDef
+			}
+		}
+	}
+
+	return mapping, nil
 }
 
 // buildLabelsAndAnnotations builds labels and annotations for synthesizedComponent.
@@ -306,16 +339,25 @@ func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *
 	}
 }
 
-// buildAffinitiesAndTolerations builds affinities and tolerations for component.
-func buildAffinitiesAndTolerations(comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) error {
-	podAffinity, err := BuildPodAffinity(synthesizeComp.ClusterName, synthesizeComp.Name, comp.Spec.Affinity)
-	if err != nil {
-		return err
+func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	var (
+		schedulingPolicy = comp.Spec.SchedulingPolicy
+		err              error
+	)
+	if schedulingPolicy == nil {
+		// for compatibility, we need to build scheduling policy from component's affinity and tolerations
+		schedulingPolicy, err = scheduling.BuildSchedulingPolicy4Component(synthesizedComp.ClusterName,
+			synthesizedComp.Name, comp.Spec.Affinity, comp.Spec.Tolerations)
+		if err != nil {
+			return err
+		}
 	}
-	synthesizeComp.PodSpec.Affinity = podAffinity
-	synthesizeComp.PodSpec.TopologySpreadConstraints =
-		BuildPodTopologySpreadConstraints(synthesizeComp.ClusterName, synthesizeComp.Name, comp.Spec.Affinity)
-	synthesizeComp.PodSpec.Tolerations = comp.Spec.Tolerations
+	synthesizedComp.PodSpec.SchedulerName = schedulingPolicy.SchedulerName
+	synthesizedComp.PodSpec.NodeSelector = schedulingPolicy.NodeSelector
+	synthesizedComp.PodSpec.NodeName = schedulingPolicy.NodeName
+	synthesizedComp.PodSpec.Affinity = schedulingPolicy.Affinity
+	synthesizedComp.PodSpec.Tolerations = schedulingPolicy.Tolerations
+	synthesizedComp.PodSpec.TopologySpreadConstraints = schedulingPolicy.TopologySpreadConstraints
 	return nil
 }
 
@@ -372,15 +414,14 @@ func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1a
 	}
 }
 
-func buildComponentServices(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) {
+func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+	if len(synthesizeComp.ComponentServices) == 0 || len(comp.Spec.Services) == 0 {
+		return
+	}
+
 	services := map[string]appsv1alpha1.ComponentService{}
 	for i, svc := range comp.Spec.Services {
 		services[svc.Name] = comp.Spec.Services[i]
-	}
-
-	synthesizeComp.ComponentServices = compDef.Spec.Services
-	if len(synthesizeComp.ComponentServices) == 0 || len(services) == 0 {
-		return
 	}
 
 	override := func(svc *appsv1alpha1.ComponentService) {
@@ -436,52 +477,29 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	buildWorkload := func() {
 		synthesizeComp.ClusterDefName = clusterDef.Name
 		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
-		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
-		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
-		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
-		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
-		if synthesizeComp.TLSConfig != nil {
-			synthesizeComp.TLS = true
-		}
 	}
 
-	// Services is a backward compatible field, which will be replaced with ComponentServices in the future.
-	buildServices := func() {
-		if clusterCompDef.Service != nil {
-			service := corev1.Service{Spec: clusterCompDef.Service.ToSVCSpec()}
-			service.Spec.Type = corev1.ServiceTypeClusterIP
-			synthesizeComp.Services = append(synthesizeComp.Services, service)
+	buildClusterCompServices := func() {
+		if len(synthesizeComp.ComponentServices) > 0 {
+			service := corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: synthesizeComp.ComponentServices[0].Spec.Ports,
+				},
+			}
 			for _, item := range clusterCompSpec.Services {
-				service = corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
+				svc := appsv1alpha1.ComponentService{
+					Service: appsv1alpha1.Service{
 						Name:        item.Name,
+						ServiceName: item.Name,
 						Annotations: item.Annotations,
+						Spec:        *service.Spec.DeepCopy(),
 					},
-					Spec: service.Spec,
 				}
-				service.Spec.Type = item.ServiceType
-				synthesizeComp.Services = append(synthesizeComp.Services, service)
-			}
-		}
-	}
-
-	mergeClusterCompVersion := func() {
-		var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-		if clusterVer != nil {
-			clusterCompVer = clusterVer.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
-		}
-		if clusterCompVer != nil {
-			// only accept 1st ClusterVersion override context
-			synthesizeComp.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, synthesizeComp.ConfigTemplates)
-			// override component.PodSpec.InitContainers and component.PodSpec.Containers
-			for _, c := range clusterCompVer.VersionsCtx.InitContainers {
-				synthesizeComp.PodSpec.InitContainers = appendOrOverrideContainerAttr(synthesizeComp.PodSpec.InitContainers, c)
-			}
-			for _, c := range clusterCompVer.VersionsCtx.Containers {
-				synthesizeComp.PodSpec.Containers = appendOrOverrideContainerAttr(synthesizeComp.PodSpec.Containers, c)
+				svc.Spec.Type = item.ServiceType
+				synthesizeComp.ComponentServices = append(synthesizeComp.ComponentServices, svc)
 			}
 		}
 	}
@@ -500,11 +518,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	// build workload
 	buildWorkload()
 
-	// merge clusterCompVersion
-	mergeClusterCompVersion()
-
-	// build services
-	buildServices()
+	buildClusterCompServices()
 
 	// build pod management policy
 	buildPodManagementPolicy()

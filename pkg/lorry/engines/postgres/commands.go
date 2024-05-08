@@ -49,8 +49,8 @@ func NewCommands() engines.ClusterCommands {
 		examples: map[models.ClientType]engines.BuildConnectExample{
 			models.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# psql client connection example
-psql -h%s -p %s -U %s %s
-`, info.Host, info.Port, info.User, info.Database)
+PGPASSWORD=%s psql -h %s -p %s -U %s %s
+`, info.Password, info.Host, info.Port, info.User, info.Database)
 			},
 
 			models.DJANGO: func(info *engines.ConnectionInfo) string {

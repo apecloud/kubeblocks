@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"reflect"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -292,3 +295,50 @@ z2=y2
 	})
 
 })
+
+func Test_createImmutableParamsFilter(t *testing.T) {
+	type args struct {
+		cc     *appsv1beta1.ConfigConstraint
+		inputs []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []bool
+	}{{
+		name: "test",
+		args: args{
+			inputs: []string{"abcd", "ef"},
+		},
+		want: []bool{true, true},
+	}, {
+		name: "test",
+		args: args{
+			cc: &appsv1beta1.ConfigConstraint{
+				Spec: appsv1beta1.ConfigConstraintSpec{
+					ImmutableParameters: []string{"a", "b", "c", "d"},
+				},
+			},
+			inputs: []string{"a", "ef", "efg", "d"},
+		},
+		want: []bool{false, true, true, false},
+	}, {
+		name: "test",
+		args: args{
+			cc:     &appsv1beta1.ConfigConstraint{},
+			inputs: []string{"a", "ef", "efg", "d"},
+		},
+		want: []bool{true, true, true, true},
+	},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := createImmutableParamsFilter(tt.args.cc)
+			for i, key := range tt.args.inputs {
+				if got := filter(key); !reflect.DeepEqual(got, tt.want[i]) {
+					t.Errorf("createImmutableParamsFilter() = %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}

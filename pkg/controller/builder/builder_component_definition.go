@@ -25,7 +25,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -129,7 +128,7 @@ func (builder *ComponentDefinitionBuilder) AddServiceExt(name, serviceName strin
 }
 
 func (builder *ComponentDefinitionBuilder) AddConfigTemplate(name, configTemplateRef, configConstraintRef,
-	namespace, volumeName string, asEnvFrom ...string) *ComponentDefinitionBuilder {
+	namespace, volumeName string, injectEnvTo ...string) *ComponentDefinitionBuilder {
 	config := appsv1alpha1.ComponentConfigSpec{
 		ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 			Name:        name,
@@ -138,7 +137,7 @@ func (builder *ComponentDefinitionBuilder) AddConfigTemplate(name, configTemplat
 			VolumeName:  volumeName,
 		},
 		ConfigConstraintRef: configConstraintRef,
-		AsEnvFrom:           asEnvFrom,
+		InjectEnvTo:         injectEnvTo,
 	}
 	if builder.get().Spec.Configs == nil {
 		builder.get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)
@@ -159,16 +158,16 @@ func (builder *ComponentDefinitionBuilder) AddLogConfig(name, filePathPattern st
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) SetMonitor(builtIn bool, scrapePort intstr.IntOrString, scrapePath string) *ComponentDefinitionBuilder {
-	builder.get().Spec.Monitor = &appsv1alpha1.MonitorConfig{
-		BuiltIn: builtIn,
-		Exporter: &appsv1alpha1.ExporterConfig{
-			ScrapePort: scrapePort,
-			ScrapePath: scrapePath,
-		},
-	}
-	return builder
-}
+// func (builder *ComponentDefinitionBuilder) SetMonitor(builtIn bool, scrapePort intstr.IntOrString, scrapePath string) *ComponentDefinitionBuilder {
+// 	builder.get().Spec.Monitor = &appsv1alpha1.MonitorConfig{
+// 		BuiltIn: builtIn,
+// 		Exporter: &appsv1alpha1.ExporterConfig{
+// 			ScrapePort: scrapePort,
+// 			ScrapePath: scrapePath,
+// 		},
+// 	}
+// 	return builder
+// }
 
 func (builder *ComponentDefinitionBuilder) AddScriptTemplate(name, configTemplateRef, namespace, volumeName string,
 	mode *int32) *ComponentDefinitionBuilder {

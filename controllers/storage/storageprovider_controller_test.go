@@ -37,6 +37,9 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+var storageProviderSignature = func(_ storagev1alpha1.StorageProvider, _ *storagev1alpha1.StorageProvider, _ storagev1alpha1.StorageProviderList, _ *storagev1alpha1.StorageProviderList) {
+}
+
 var _ = Describe("StorageProvider controller", func() {
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
@@ -46,7 +49,7 @@ var _ = Describe("StorageProvider controller", func() {
 		By("clean resources")
 		// non-namespaced
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.StorageProviderSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, storageProviderSignature, true, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CSIDriverSignature, ml)
 
 		// namespaced

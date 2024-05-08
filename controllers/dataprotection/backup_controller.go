@@ -152,7 +152,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *BackupReconciler) filterBackupPods(ctx context.Context, obj client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 	labels := obj.GetLabels()
-	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != dptypes.AppName {
 		return requests
 	}
 	backupName, ok := labels[dptypes.BackupNameLabelKey]
@@ -204,7 +204,8 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		Scheme:     r.Scheme,
 	}
 
-	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace)
+	// TODO: update the mcMgr param
+	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get worker service account: %w", err)
 	}
@@ -386,6 +387,22 @@ func (r *BackupReconciler) prepareBackupRequest(
 			return nil, err
 		}
 		request.ActionSet = actionSet
+
+		// check continuous backups should have backupschedule label
+		if request.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeContinuous {
+			if _, ok := request.Labels[dptypes.BackupScheduleLabelKey]; !ok {
+				return nil, fmt.Errorf("continuous backup is only allowed to be created by backupSchedule")
+			}
+			backupSchedule := &dpv1alpha1.BackupSchedule{}
+			if err := request.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: backup.Labels[dptypes.BackupScheduleLabelKey],
+				Namespace: backup.Namespace}, backupSchedule); err != nil {
+				return nil, err
+			}
+			if backupSchedule.Status.Phase != dpv1alpha1.BackupSchedulePhaseAvailable {
+				return nil, fmt.Errorf("create continuous backup by failed backupschedule %s/%s",
+					backupSchedule.Namespace, backupSchedule.Name)
+			}
+		}
 	}
 
 	// check encryption config
@@ -434,7 +451,8 @@ func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCt
 	request.TargetPods = targetPods
 	saName := target.ServiceAccountName
 	if saName == "" {
-		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, request.Backup.Namespace)
+		// TODO: update the mcMgr param
+		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, request.Backup.Namespace, nil)
 		if err != nil {
 			return fmt.Errorf("failed to get worker service account: %w", err)
 		}
@@ -749,7 +767,9 @@ func PatchBackupObjectMeta(
 		request.Labels[v] = targetPod.Labels[v]
 	}
 
-	request.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
+	if _, ok := request.Labels[constant.AppManagedByLabelKey]; !ok {
+		request.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
+	}
 	request.Labels[dptypes.BackupTypeLabelKey] = request.GetBackupType()
 	request.Labels[dptypes.BackupPolicyLabelKey] = request.Spec.BackupPolicyName
 	// wait for the backup repo controller to prepare the essential resource.

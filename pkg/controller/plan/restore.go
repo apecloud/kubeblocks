@@ -37,6 +37,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
@@ -51,12 +53,13 @@ type RestoreManager struct {
 	Scheme  *k8sruntime.Scheme
 
 	// private
-	namespace           string
-	restoreTime         string
-	volumeRestorePolicy dpv1alpha1.VolumeClaimRestorePolicy
-	startingIndex       int32
-	replicas            int32
-	restoreLabels       map[string]string
+	namespace                         string
+	restoreTime                       string
+	volumeRestorePolicy               dpv1alpha1.VolumeClaimRestorePolicy
+	doReadyRestoreAfterClusterRunning bool
+	startingIndex                     int32
+	replicas                          int32
+	restoreLabels                     map[string]string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -200,11 +203,12 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	if compObj.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 		return nil
 	}
+	if r.doReadyRestoreAfterClusterRunning && r.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+		return nil
+	}
 	jobActionLabels := constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name)
-	if comp.WorkloadType == appsv1alpha1.Consensus || comp.WorkloadType == appsv1alpha1.Replication {
-		// TODO: use rsm constant
-		rsmAccessModeLabelKey := "rsm.workloads.kubeblocks.io/access-mode"
-		jobActionLabels[rsmAccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
+	if len(comp.Roles) > 0 {
+		jobActionLabels[instanceset.AccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
 	}
 	sourceTargetName := compObj.Annotations[constant.BackupSourceTargetAnnotationKey]
 	restore := &dpv1alpha1.Restore{
@@ -261,18 +265,15 @@ func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStat
 }
 
 func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent) (dpv1alpha1.SchedulingSpec, error) {
-	var err error
-	schedulingSpec := dpv1alpha1.SchedulingSpec{}
-	compSpec := r.Cluster.Spec.GetComponentByName(comp.Name)
-	affinity := component.BuildAffinity(r.Cluster, compSpec)
-	if schedulingSpec.Affinity, err = component.BuildPodAffinity(r.Cluster.Name, comp.Name, affinity); err != nil {
-		return schedulingSpec, err
+	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(r.Cluster, r.Cluster.Spec.GetComponentByName(comp.Name))
+	if err != nil {
+		return dpv1alpha1.SchedulingSpec{}, err
 	}
-	schedulingSpec.TopologySpreadConstraints = component.BuildPodTopologySpreadConstraints(r.Cluster.Name, comp.Name, affinity)
-	if schedulingSpec.Tolerations, err = component.BuildTolerations(r.Cluster, compSpec); err != nil {
-		return schedulingSpec, err
-	}
-	return schedulingSpec, nil
+	return dpv1alpha1.SchedulingSpec{
+		Affinity:                  schedulingPolicy.Affinity,
+		Tolerations:               schedulingPolicy.Tolerations,
+		TopologySpreadConstraints: schedulingPolicy.TopologySpreadConstraints,
+	}, nil
 }
 
 func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedComponent, stage dpv1alpha1.RestoreStage) metav1.ObjectMeta {
@@ -315,6 +316,10 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 		r.volumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(volumeRestorePolicy)
 	}
 	r.restoreTime = backupSource[constant.RestoreTimeKeyForRestore]
+	doReadyRestoreAfterClusterRunning := backupSource[constant.DoReadyRestoreAfterClusterRunning]
+	if doReadyRestoreAfterClusterRunning == "true" {
+		r.doReadyRestoreAfterClusterRunning = true
+	}
 	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, synthesizedComponent.Name, r.Cluster.Namespace)
 }
 

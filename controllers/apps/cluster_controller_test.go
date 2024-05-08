@@ -36,10 +36,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -379,19 +379,16 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterObj.Namespace,
 			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+		compObj := &appsv1alpha1.Component{}
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
 
-		By("Wait RSM created")
-		rsmkey := compKey
-		rsm := &workloads.ReplicatedStateMachine{}
-		Eventually(testapps.CheckObjExists(&testCtx, rsmkey, rsm, true)).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(cluster.Spec.ComponentSpecs).Should(HaveLen(1))
 			clusterJSON, err := json.Marshal(cluster.Spec.ComponentSpecs[0].Instances)
 			g.Expect(err).Should(BeNil())
-			rsmJSON, err := json.Marshal(rsm.Spec.Instances)
+			itsJSON, err := json.Marshal(compObj.Spec.Instances)
 			g.Expect(err).Should(BeNil())
-			g.Expect(clusterJSON).Should(Equal(rsmJSON))
+			g.Expect(clusterJSON).Should(Equal(itsJSON))
 		})).Should(Succeed())
 	}
 
@@ -619,14 +616,20 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		By("Checking the Affinity and Toleration")
+		schedulingPolicy, err := scheduling.BuildSchedulingPolicy4Component(clusterObj.Name, compName, &affinity, []corev1.Toleration{toleration})
+		Expect(err).Should(BeNil())
+
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
 			Name:      component.FullName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-			g.Expect(*comp.Spec.Affinity).Should(BeEquivalentTo(affinity))
-			g.Expect(comp.Spec.Tolerations).Should(HaveLen(2))
-			g.Expect(comp.Spec.Tolerations[0]).Should(BeEquivalentTo(toleration))
+			g.Expect(comp.Spec.Affinity).Should(BeNil())
+			g.Expect(comp.Spec.Tolerations).Should(HaveLen(0))
+			g.Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
+			g.Expect(comp.Spec.SchedulingPolicy.Affinity).Should(BeEquivalentTo(schedulingPolicy.Affinity))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations).Should(HaveLen(2))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations[0]).Should(BeEquivalentTo(toleration))
 		})).Should(Succeed())
 	}
 
@@ -683,14 +686,20 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		By("Checking the Affinity and Toleration")
+		schedulingPolicy, err := scheduling.BuildSchedulingPolicy4Component(clusterObj.Name, compName, &compAffinity, []corev1.Toleration{compToleration})
+		Expect(err).Should(BeNil())
+
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
 			Name:      component.FullName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-			g.Expect(*comp.Spec.Affinity).Should(BeEquivalentTo(compAffinity))
-			g.Expect(comp.Spec.Tolerations).Should(HaveLen(2))
-			g.Expect(comp.Spec.Tolerations[0]).Should(BeEquivalentTo(compToleration))
+			g.Expect(comp.Spec.Affinity).Should(BeNil())
+			g.Expect(comp.Spec.Tolerations).Should(HaveLen(0))
+			g.Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
+			g.Expect(comp.Spec.SchedulingPolicy.Affinity).Should(BeEquivalentTo(schedulingPolicy.Affinity))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations).Should(HaveLen(2))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations[0]).Should(BeEquivalentTo(compToleration))
 		})).Should(Succeed())
 	}
 

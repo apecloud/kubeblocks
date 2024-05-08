@@ -54,6 +54,7 @@ import (
 	dpcontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -75,6 +76,10 @@ const (
 	metricsAddrFlagKey   flagName = "metrics-bind-address"
 	leaderElectFlagKey   flagName = "leader-elect"
 	leaderElectIDFlagKey flagName = "leader-elect-id"
+
+	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
+	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
+	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
 )
 
 var (
@@ -115,10 +120,13 @@ func init() {
 
 func main() {
 	var (
-		metricsAddr            string
-		enableLeaderElection   bool
-		enableLeaderElectionID string
-		probeAddr              string
+		metricsAddr                  string
+		enableLeaderElection         bool
+		enableLeaderElectionID       string
+		probeAddr                    string
+		multiClusterKubeConfig       string
+		multiClusterContexts         string
+		multiClusterContextsDisabled string
 	)
 
 	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
@@ -130,6 +138,10 @@ func main() {
 	flag.String(leaderElectIDFlagKey.String(), "abd03fda",
 		"The leader election ID prefix for controller manager. "+
 			"This ID must be unique to controller manager.")
+
+	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
+	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
+	flag.String(multiClusterContextsDisabledFlagKey.String(), "", "Kube contexts that mark as disabled.")
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
@@ -173,6 +185,9 @@ func main() {
 	probeAddr = viper.GetString(probeAddrFlagKey.viperName())
 	enableLeaderElection = viper.GetBool(leaderElectFlagKey.viperName())
 	enableLeaderElectionID = viper.GetString(leaderElectIDFlagKey.viperName())
+	multiClusterKubeConfig = viper.GetString(multiClusterKubeConfigFlagKey.viperName())
+	multiClusterContexts = viper.GetString(multiClusterContextsFlagKey.viperName())
+	multiClusterContextsDisabled = viper.GetString(multiClusterContextsDisabledFlagKey.viperName())
 
 	setupLog.Info(fmt.Sprintf("config settings: %v", viper.AllSettings()))
 	if err := validateRequiredToParseConfigs(); err != nil {
@@ -239,6 +254,19 @@ func main() {
 	}
 	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
 
+	// multi-cluster manager for all data-plane k8s
+	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetConfig(), mgr.GetClient(),
+		multiClusterKubeConfig, multiClusterContexts, multiClusterContextsDisabled)
+	if err != nil {
+		setupLog.Error(err, "unable to setup multi-cluster manager")
+		os.Exit(1)
+	}
+
+	client := mgr.GetClient()
+	if multiClusterMgr != nil {
+		client = multiClusterMgr.GetClient()
+	}
+
 	if err = (&dpcontrollers.ActionSetReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
@@ -295,19 +323,31 @@ func main() {
 	}
 
 	if err = (&dpcontrollers.BackupRepoReconciler{
-		Client:     mgr.GetClient(),
-		Scheme:     mgr.GetScheme(),
-		Recorder:   mgr.GetEventRecorderFor("backup-repo-controller"),
-		RestConfig: mgr.GetConfig(),
+		Client:          client,
+		Scheme:          mgr.GetScheme(),
+		Recorder:        mgr.GetEventRecorderFor("backup-repo-controller"),
+		RestConfig:      mgr.GetConfig(),
+		MultiClusterMgr: multiClusterMgr,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BackupRepo")
 		os.Exit(1)
 	}
 
 	if err = (&storagecontrollers.StorageProviderReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("storage-provider-controller"),
+		Client:          client,
+		Scheme:          mgr.GetScheme(),
+		Recorder:        mgr.GetEventRecorderFor("storage-provider-controller"),
+		MultiClusterMgr: multiClusterMgr,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.StorageProviderReconciler{
+		Client:          client,
+		Scheme:          mgr.GetScheme(),
+		Recorder:        mgr.GetEventRecorderFor("storage-provider-controller"),
+		MultiClusterMgr: multiClusterMgr,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
 		os.Exit(1)
@@ -340,6 +380,12 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
+	if multiClusterMgr != nil {
+		if err := multiClusterMgr.Bind(mgr); err != nil {
+			setupLog.Error(err, "failed to bind multi-cluster manager to manager")
+			os.Exit(1)
+		}
+	}
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

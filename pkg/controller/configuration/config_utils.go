@@ -115,7 +115,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 func checkAndUpdateSharProcessNamespace(podSpec *corev1.PodSpec, buildParams *cfgcm.CfgManagerBuildParams, configSpecMetas []cfgcm.ConfigSpecMeta) {
 	shared := cfgcm.NeedSharedProcessNamespace(configSpecMetas)
 	if shared {
-		podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
+		podSpec.ShareProcessNamespace = cfgutil.ToPointer(true)
 	}
 	buildParams.ShareProcessNamespace = shared
 }
@@ -228,7 +228,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
 		return nil, err
 	}
-	if err := buildConfigToolsContainer(cfgManagerParams, podSpec, comp); err != nil {
+	if err := buildReloadToolsContainer(cfgManagerParams, podSpec); err != nil {
 		return nil, err
 	}
 	return cfgManagerParams, nil
@@ -258,7 +258,7 @@ func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *comp
 	for i := range config.ConfigItemDetails {
 		configSpec := &config.ConfigItemDetails[i]
 		// check v-scale operation
-		if enableResourceTrigger(configSpec.ConfigSpec) {
+		if enableVScaleTrigger(configSpec.ConfigSpec) {
 			resourcePayload := intctrlutil.ResourcesPayloadForComponent(component.Resources)
 			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload)
 			if err != nil {
@@ -267,7 +267,7 @@ func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *comp
 			updated = updated || ret
 		}
 		// check h-scale operation
-		if enableReplicasTrigger(configSpec.ConfigSpec) {
+		if enableHScaleTrigger(configSpec.ConfigSpec) {
 			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas)
 			if err != nil {
 				return false, err
@@ -282,10 +282,18 @@ func validRerenderResources(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
 	return configSpec != nil && len(configSpec.ReRenderResourceTypes) != 0
 }
 
-func enableReplicasTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
-	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentReplicasType)
+func enableHScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
+	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentHScaleType)
 }
 
-func enableResourceTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
-	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentResourceType)
+func enableVScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
+	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentVScaleType)
+}
+
+func configSetFromComponent(templates []appsv1alpha1.ComponentConfigSpec) []string {
+	configSet := make([]string, 0)
+	for _, template := range templates {
+		configSet = append(configSet, template.Name)
+	}
+	return configSet
 }

@@ -54,8 +54,6 @@ type TestContext struct {
 	CheckedCreateObj                   func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
 }
 
-var ErrUninitError = fmt.Errorf("cli uninitialized error")
-
 const (
 	envExistingClusterType   = "EXISTING_CLUSTER_TYPE"
 	envUseExistingCluster    = "USE_EXISTING_CLUSTER"

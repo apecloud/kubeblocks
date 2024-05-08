@@ -25,42 +25,85 @@ import (
 
 // ConfigConstraintSpec defines the desired state of ConfigConstraint
 type ConfigConstraintSpec struct {
-	// Specifies the dynamic reload actions supported by the engine. If set, the controller call the scripts defined in the actions for a dynamic parameter upgrade.
-	// The actions are called only when the modified parameter is defined in dynamicParameters part && ReloadOptions != nil
+	// Specifies the dynamic reload action supported by the engine.
+	// When set, the controller executes the method defined here to execute hot parameter updates.
 	//
+	// Dynamic reloading is triggered only if both of the following conditions are met:
+	//
+	// 1. The modified parameters are listed in the `dynamicParameters` field.
+	//    If `dynamicParameterSelectedPolicy` is set to "all", modifications to `staticParameters`
+	//    can also trigger a reload.
+	// 2. `reloadOptions` is set.
+	//
+	// If `reloadOptions` is not set or the modified parameters are not listed in `dynamicParameters`,
+	// dynamic reloading will not be triggered.
+	//
+	// Example:
+	// ```yaml
+	// reloadOptions:
+	//  tplScriptTrigger:
+	//    namespace: kb-system
+	//    scriptConfigMapRef: mysql-reload-script
+	//    sync: true
+	// ```
 	// +optional
 	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
 
-	// Indicates the dynamic reload action and restart action can be merged to a restart action.
+	// Indicates whether to consolidate dynamic reload and restart actions into a single restart.
 	//
-	// When a batch of parameters updates incur both restart & dynamic reload, it works as:
-	// - set to true, the two actions merged to only one restart action
-	// - set to false, the two actions cannot be merged, the actions executed in order [dynamic reload, restart]
+	// - If true, updates requiring both actions will result in only a restart, merging the actions.
+	// - If false, updates will trigger both actions executed sequentially: first dynamic reload, then restart.
+	//
+	// This flag allows for more efficient handling of configuration changes by potentially eliminating
+	// an unnecessary reload step.
 	//
 	// +optional
 	DynamicActionCanBeMerged *bool `json:"dynamicActionCanBeMerged,omitempty"`
 
-	// Specifies the policy for selecting the parameters of dynamic reload actions.
+	// Configures whether the dynamic reload specified in `reloadOptions` applies only to dynamic parameters or
+	// to all parameters (including static parameters).
+	//
+	// - false (default): Only modifications to the dynamic parameters listed in `dynamicParameters`
+	//   will trigger a dynamic reload.
+	// - true: Modifications to both dynamic parameters listed in `dynamicParameters` and static parameters
+	//   listed in `staticParameters` will trigger a dynamic reload.
+	//   The "all" option is for certain engines that require static parameters to be set
+	//   via SQL statements before they can take effect on restart.
 	//
 	// +optional
-	DynamicParameterSelectedPolicy *appsv1beta1.DynamicParameterSelectedPolicy `json:"dynamicParameterSelectedPolicy,omitempty"`
+	ReloadStaticParamsBeforeRestart *bool `json:"reloadStaticParamsBeforeRestart,omitempty"`
 
-	// Tools used by the dynamic reload actions.
-	// Usually it is referenced by the 'init container' for 'cp' it to a binary volume.
+	// Specifies the tools container image used by ShellTrigger for dynamic reload.
+	// If the dynamic reload action is triggered by a ShellTrigger, this field is required.
+	// This image must contain all necessary tools for executing the ShellTrigger scripts.
+	//
+	// Usually the specified image is referenced by the init container,
+	// which is then responsible for copy the tools from the image to a bin volume.
+	// This ensures that the tools are available to the 'config-manager' sidecar.
 	//
 	// +optional
-	ToolsImageSpec *appsv1beta1.ReloadToolsImage `json:"toolsImageSpec,omitempty"`
+	ToolsImageSpec *appsv1beta1.ToolsSetup `json:"toolsImageSpec,omitempty"`
 
-	// A set of actions for regenerating local configs.
+	// Specifies a list of actions to execute specified commands based on Pod labels.
 	//
-	// It works when:
-	// - different engine roles have different config, such as redis primary & secondary
-	// - after a role switch, the local config will be regenerated with the help of DownwardActions
+	// It utilizes the K8s Downward API to mount label information as a volume into the pod.
+	// The 'config-manager' sidecar container watches for changes in the role label and dynamically invoke
+	// registered commands (usually execute some SQL statements) when a change is detected.
+	//
+	// It is designed for scenarios where:
+	//
+	// - Replicas with different roles have different configurations, such as Redis primary & secondary replicas.
+	// - After a role switch (e.g., from secondary to primary), some changes in configuration are needed
+	//   to reflect the new role.
 	//
 	// +optional
-	DownwardAPIOptions []appsv1beta1.DownwardAction `json:"downwardAPIOptions,omitempty"`
+	DownwardAPIOptions []appsv1beta1.DownwardAPITriggeredAction `json:"downwardAPIOptions,omitempty"`
 
-	// A list of ScriptConfig used by the actions defined in dynamic reload and downward actions.
+	// A list of ScriptConfig Object.
+	//
+	// Each ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
+	// The scripts are mounted as volumes and can be referenced and executed by the dynamic reload
+	// and DownwardAction to perform specific tasks or configurations.
 	//
 	// +optional
 	// +patchMergeKey=scriptConfigMapRef
@@ -69,52 +112,68 @@ type ConfigConstraintSpec struct {
 	// +listMapKey=scriptConfigMapRef
 	ScriptConfigs []appsv1beta1.ScriptConfig `json:"scriptConfigs,omitempty"`
 
-	// Top level key used to get the cue rules to validate the config file.
-	// It must exist in 'ConfigSchema'
+	// Specifies the top-level key in the 'configurationSchema.cue' that organizes the validation rules for parameters.
+	// This key must exist within the CUE script defined in 'configurationSchema.cue'.
 	//
 	// +optional
 	CfgSchemaTopLevelName string `json:"cfgSchemaTopLevelName,omitempty"`
 
-	// List constraints rules for each config parameters.
+	// Defines a list of parameters including their names, default values, descriptions,
+	// types, and constraints (permissible values or the range of valid values).
 	//
 	// +optional
 	ConfigurationSchema *CustomParametersValidation `json:"configurationSchema,omitempty"`
 
-	// A list of StaticParameter. Modifications of static parameters trigger a process restart.
+	// List static parameters.
+	// Modifications to any of these parameters require a restart of the process to take effect.
 	//
 	// +listType=set
 	// +optional
 	StaticParameters []string `json:"staticParameters,omitempty"`
 
-	// A list of DynamicParameter. Modifications of dynamic parameters trigger a reload action without process restart.
+	// List dynamic parameters.
+	// Modifications to these parameters trigger a configuration reload without requiring a process restart.
 	//
 	// +listType=set
 	// +optional
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
-	// Describes parameters that are prohibited to do any modifications.
+	// Lists the parameters that cannot be modified once set.
+	// Attempting to change any of these parameters will be ignored.
 	//
 	// +listType=set
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
-	// Used to match labels on the pod to do a dynamic reload
+	// Used to match labels on the pod to determine whether a dynamic reload should be performed.
+	//
+	// In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
+	// The `selector` allows you to specify label selectors to target the desired pods for the reload process.
+	//
+	// If the `selector` is not specified or is nil, all pods managed by the workload will be considered for the dynamic
+	// reload.
 	//
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
-	// Describes the format of the config file.
-	// The controller works as follows:
-	// 1. Parse the config file
-	// 2. Get the modified parameters
-	// 3. Trigger the corresponding action
+	// Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+	// Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.
 	//
+	// Each format may have its own set of parameters that can be configured.
+	// For instance, when using the `ini` format, you can specify the section name.
+	//
+	// Example:
+	// ```
+	// formatterConfig:
+	//  format: ini
+	//  iniConfig:
+	//    sectionName: mysqld
+	// ```
 	// +kubebuilder:validation:Required
-	FormatterConfig *appsv1beta1.FormatterConfig `json:"formatterConfig"`
+	FormatterConfig *appsv1beta1.FileFormatConfig `json:"formatterConfig"`
 }
 
-// Represents the observed state of a ConfigConstraint.
-
+// ConfigConstraintStatus represents the observed state of a ConfigConstraint.
 type ConfigConstraintStatus struct {
 
 	// Specifies the status of the configuration template.
@@ -134,40 +193,51 @@ type ConfigConstraintStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
+// CustomParametersValidation Defines a list of configuration items with their names, default values, descriptions,
+// types, and constraints.
 type CustomParametersValidation struct {
-	// Transforms the schema from CUE to json for further OpenAPI validation
+	// Hold a string that contains a script written in CUE language that defines a list of configuration items.
+	// Each item is detailed with its name, default value, description, type (e.g. string, integer, float),
+	// and constraints (permissible values or the valid range of values).
+	//
+	// CUE (Configure, Unify, Execute) is a declarative language designed for defining and validating
+	// complex data configurations.
+	// It is particularly useful in environments like K8s where complex configurations and validation rules are common.
+	//
+	// This script functions as a validator for user-provided configurations, ensuring compliance with
+	// the established specifications and constraints.
+	//
+	// +optional
+	CUE string `json:"cue,omitempty"`
+
+	// Generated from the 'cue' field and transformed into a JSON format.
 	//
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:ComponentDefRef=object
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Schema *apiext.JSONSchemaProps `json:"schema,omitempty"`
-
-	// Enables providers to verify user configurations using the CUE language.
-	//
-	// +optional
-	CUE string `json:"cue,omitempty"`
 }
 
-// Defines the options for reloading a service or application within the Kubernetes cluster.
-// Only one of its members may be specified at a time.
-
+// ReloadOptions defines the mechanisms available for dynamically reloading a process within K8s without requiring a restart.
+//
+// Only one of the mechanisms can be specified at a time.
 type ReloadOptions struct {
-	// Used to trigger a reload by sending a Unix signal to the process.
+	// Used to trigger a reload by sending a specific Unix signal to the process.
 	//
 	// +optional
 	UnixSignalTrigger *appsv1beta1.UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
 
-	// Used to perform the reload command in shell script.
+	// Allows to execute a custom shell script to reload the process.
 	//
 	// +optional
 	ShellTrigger *appsv1beta1.ShellTrigger `json:"shellTrigger,omitempty"`
 
-	// Used to perform the reload command by Go template script.
+	// Enables reloading process using a Go template script.
 	//
 	// +optional
 	TPLScriptTrigger *appsv1beta1.TPLScriptTrigger `json:"tplScriptTrigger"`
 
-	// Used to automatically perform the reload command when conditions are met.
+	// Automatically perform the reload when specified conditions are met.
 	//
 	// +optional
 	AutoTrigger *appsv1beta1.AutoTrigger `json:"autoTrigger,omitempty"`
@@ -182,7 +252,14 @@ type ReloadOptions struct {
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ConfigConstraint is the Schema for the configconstraint API
+// ConfigConstraint manages the parameters across multiple configuration files contained in a single configure template.
+// These configuration files should have the same format (e.g. ini, xml, properties, json).
+//
+// It provides the following functionalities:
+//
+// 1. **Parameter Value Validation**: Validates and ensures compliance of parameter values with defined constraints.
+// 2. **Dynamic Reload on Modification**: Monitors parameter changes and triggers dynamic reloads to apply updates.
+// 3. **Parameter Rendering in Templates**: Injects parameters into templates to generate up-to-date configuration files.
 type ConfigConstraint struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -191,9 +268,9 @@ type ConfigConstraint struct {
 	Status ConfigConstraintStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:object:root=true
-
 // ConfigConstraintList contains a list of ConfigConstraints.
+//
+// +kubebuilder:object:root=true
 type ConfigConstraintList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

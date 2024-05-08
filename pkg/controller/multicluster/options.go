@@ -45,11 +45,24 @@ func InUniversalContext() *ClientOption {
 	}
 }
 
+func Oneshot() *ClientOption {
+	return &ClientOption{
+		oneshot: true,
+	}
+}
+
+func MultiCheck() *ClientOption {
+	return &ClientOption{
+		multiCheck: true,
+	}
+}
+
 type ClientOption struct {
 	control     bool // control plane
 	universal   bool // both control and data planes
 	unspecified bool // data planes, but don't know which ones exactly
 	oneshot     bool
+	multiCheck  bool // only support the Get operation
 }
 
 func (o *ClientOption) ApplyToGet(*client.GetOptions) {

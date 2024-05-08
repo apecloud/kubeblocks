@@ -45,7 +45,9 @@ const (
 	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"
 
 	// customized encryption key for encrypting the password of connection credential.
-	CfgKeyDPEncryptionKey = "DP_ENCRYPTION_KEY"
+	CfgKeyDPEncryptionKey                = "DP_ENCRYPTION_KEY"
+	CfgKeyDPBackupEncryptionSecretKeyRef = "DP_BACKUP_ENCRYPTION_SECRET_KEY_REF"
+	CfgKeyDPBackupEncryptionAlgorithm    = "DP_BACKUP_ENCRYPTION_ALGORITHM"
 
 	CfgKBReconcileWorkers = "KUBEBLOCKS_RECONCILE_WORKERS"
 	CfgClientQPS          = "CLIENT_QPS"
@@ -106,6 +108,7 @@ const (
 	KBManagedByKey                           = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey          = "apps.kubeblocks.io/vct-name"
+	KBAppComponentInstanceTemplatelabelKey   = "apps.kubeblocks.io/instance-template"
 	KBAppServiceVersionKey                   = "apps.kubeblocks.io/service-version"
 	WorkloadTypeLabelKey                     = "apps.kubeblocks.io/workload-type"
 	KBAppPodNameLabelKey                     = "apps.kubeblocks.io/pod-name"
@@ -157,7 +160,7 @@ const (
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey               = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
-
+	DisableHAAnnotationKey                      = "kubeblocks.io/disable-ha"
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName         = "cluster.kubeblocks.io/finalizer"
 	DBComponentFinalizerName       = "component.kubeblocks.io/finalizer"
@@ -209,7 +212,6 @@ const (
 const (
 	DeploymentKind            = "Deployment"
 	StatefulSetKind           = "StatefulSet"
-	RSMKind                   = "ReplicatedStateMachine"
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJobKind               = "CronJob"
@@ -284,10 +286,6 @@ const (
 )
 
 const (
-	FeatureGateReplicatedStateMachine = "REPLICATED_STATE_MACHINE" // enable rsm
-)
-
-const (
 	KubernetesClusterDomainEnv = "KUBERNETES_CLUSTER_DOMAIN"
 	DefaultDNSDomain           = "cluster.local"
 )
@@ -300,15 +298,12 @@ const (
 )
 
 const (
-	BackupNameKeyForRestore          = "name"
-	BackupNamespaceKeyForRestore     = "namespace"
-	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
-	RestoreTimeKeyForRestore         = "restoreTime"
-	ConnectionPassword               = "connectionPassword"
-)
-
-const (
-	KBAppMultiClusterPlacementKey = "apps.kubeblocks.io/multi-cluster-placement"
+	BackupNameKeyForRestore           = "name"
+	BackupNamespaceKeyForRestore      = "namespace"
+	VolumeRestorePolicyKeyForRestore  = "volumeRestorePolicy"
+	DoReadyRestoreAfterClusterRunning = "doReadyRestoreAfterClusterRunning"
+	RestoreTimeKeyForRestore          = "restoreTime"
+	ConnectionPassword                = "connectionPassword"
 )
 
 const (
@@ -322,4 +317,8 @@ const (
 	SourceAPIVersion   = "source"
 	MigratedAPIVersion = "migrated"
 	ReviewAPIVersion   = "reviewer"
+)
+
+const (
+	FeatureGateIgnoreConfigTemplateDefaultMode = "IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE"
 )

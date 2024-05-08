@@ -37,7 +37,7 @@ import (
 )
 
 // ReadObjectTree reads all objects owned by the root object which is type of 'T' with key in 'req'.
-func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, req ctrl.Request, labelKeys []string, kinds ...client.ObjectList) (*ObjectTree, error) {
+func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, req ctrl.Request, ml client.MatchingLabels, kinds ...client.ObjectList) (*ObjectTree, error) {
 	tree := NewObjectTree()
 
 	// read root object
@@ -60,7 +60,6 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 	ctx = intoContext(ctx, placement(root))
 
 	// read child objects
-	ml := getMatchLabels(root, labelKeys)
 	inNS := client.InNamespace(req.Namespace)
 	for _, list := range kinds {
 		if err := reader.List(ctx, list, inNS, ml, inDataContext4C()); err != nil {
@@ -72,7 +71,7 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			if !model.IsOwnerOf(root, object) {
+			if len(object.GetOwnerReferences()) > 0 && !model.IsOwnerOf(root, object) {
 				continue
 			}
 			if err := tree.Add(object); err != nil {
@@ -82,14 +81,6 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 	}
 
 	return tree, nil
-}
-
-func getMatchLabels(root client.Object, labelKeys []string) client.MatchingLabels {
-	labels := make(map[string]string, len(labelKeys))
-	for _, key := range labelKeys {
-		labels[key] = root.GetLabels()[key]
-	}
-	return labels
 }
 
 func placement(obj client.Object) string {

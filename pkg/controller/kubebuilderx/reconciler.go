@@ -39,6 +39,9 @@ type ObjectTree struct {
 
 	root     client.Object
 	children model.ObjectSnapshot
+
+	// finalizer to protect all objects of this tree
+	finalizer string
 }
 
 type TreeLoader interface {
@@ -82,6 +85,7 @@ func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 		children[key] = childCopied
 	}
 	out.children = children
+	out.finalizer = t.finalizer
 	out.EventRecorder = t.EventRecorder
 	out.Logger = t.Logger
 	return out, nil
@@ -161,6 +165,14 @@ func (t *ObjectTree) Delete(objects ...client.Object) error {
 
 func (t *ObjectTree) DeleteSecondaryObjects() {
 	t.children = make(model.ObjectSnapshot)
+}
+
+func (t *ObjectTree) SetFinalizer(finalizer string) {
+	t.finalizer = finalizer
+}
+
+func (t *ObjectTree) GetFinalizer() string {
+	return t.finalizer
 }
 
 func NewObjectTree() *ObjectTree {

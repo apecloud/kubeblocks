@@ -165,7 +165,7 @@ func checkConfigurationObject(object client.Object) bool {
 }
 
 func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, resources *reconfigureRelatedResource) (ctrl.Result, error) {
-	configPatch, forceRestart, err := createConfigPatch(configMap, resources.configConstraintObj.Spec.FormatterConfig, resources.configSpec.Keys)
+	configPatch, forceRestart, err := createConfigPatch(configMap, resources.configConstraintObj.Spec.FileFormatConfig, resources.configSpec.Keys)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
@@ -206,7 +206,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return intctrlutil.Reconciled()
 	}
 
-	if len(reconcileContext.RSMList) == 0 {
+	if len(reconcileContext.InstanceSetList) == 0 {
 		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
 		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotUsingMessage)
@@ -221,10 +221,10 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		Ctx:                      reqCtx,
 		Cluster:                  reconcileContext.ClusterObj,
 		ContainerNames:           reconcileContext.Containers,
-		RSMUnits:                 reconcileContext.RSMList,
+		InstanceSetUnits:         reconcileContext.InstanceSetList,
 		ClusterComponent:         reconcileContext.ClusterComObj,
 		SynthesizedComponent:     reconcileContext.BuiltinComponent,
-		Restart:                  forceRestart || !cfgcm.IsSupportReload(resources.configConstraintObj.Spec.DynamicReloadAction),
+		Restart:                  forceRestart || !cfgcm.IsSupportReload(resources.configConstraintObj.Spec.ReloadAction),
 		ReconfigureClientFactory: GetClientFactory(),
 	})
 }

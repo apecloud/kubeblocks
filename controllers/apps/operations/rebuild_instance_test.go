@@ -98,7 +98,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 		prepareOpsRes := func(backupName string) *OpsResource {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
 
 			// fake to create the source pvc.
 			for i := range podList {
@@ -224,7 +224,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("fake th rebuild pods to ready ")
 			// recreate the instances and fake it to ready.
-			_ = initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+			_ = initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
 		}
 
 		It("test rebuild instance with no backup", func() {

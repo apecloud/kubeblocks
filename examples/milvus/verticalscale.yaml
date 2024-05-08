@@ -1,0 +1,27 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: milvus-verticalscaling
+  namespace: default
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterName: milvus-cluster
+  type: VerticalScaling
+  # Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.
+  verticalScaling:
+    # - standalone: milvus
+    # - standalone: etcd
+    # - standalone: minio
+    # - distributed: proxy
+    # - distributed: mixcoord
+    # - distributed: datanode
+    # - distributed: indexnode
+    # - distributed: querynode
+  - componentName: milvus
+    # VerticalScaling refers to the process of adjusting the compute resources (e.g., CPU, memory) allocated to a Component. It defines the parameters required for the operation.
+    requests:
+      cpu: '1'
+      memory: 1Gi
+    limits:
+      cpu: '1'
+      memory: 1Gi

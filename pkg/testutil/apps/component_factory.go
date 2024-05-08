@@ -75,10 +75,10 @@ func (factory *MockComponentFactory) SetResources(resources corev1.ResourceRequi
 	return factory
 }
 
-func (factory *MockComponentFactory) SetMonitor(monitor bool) *MockComponentFactory {
-	factory.Get().Spec.Monitor = monitor
-	return factory
-}
+// func (factory *MockComponentFactory) SetMonitor(monitor bool) *MockComponentFactory {
+// 	factory.Get().Spec.Monitor = monitor
+// 	return factory
+// }
 
 func (factory *MockComponentFactory) SetTLSConfig(enable bool, issuer *appsv1alpha1.Issuer) *MockComponentFactory {
 	if enable {

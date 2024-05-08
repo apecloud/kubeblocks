@@ -1,0 +1,44 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mogdb-cluster-switchover-role
+  labels:
+    app.kubernetes.io/instance: mogdb-cluster
+rules:
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mogdb-cluster-switchover
+  labels:
+    app.kubernetes.io/instance: mogdb-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mogdb-cluster-switchover-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-mogdb-cluster
+    namespace: default
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: mogdb-cluster-switchover
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterName: mogdb-cluster
+  type: Custom
+  customSpec:
+    components:
+      - componentName: mogdb
+        parameters:
+          - name: candidate
+            value: mogdb-cluster-mogdb-1
+    opsDefinitionRef: mogdb-switchover
+    parallelism: 0
+  preConditionDeadlineSeconds: 0

@@ -101,7 +101,13 @@ func (s *Scheduler) handleSchedulePolicy(index int) error {
 				if err = s.reconfigure(schedulePolicy); err != nil {
 					return err
 				}
-				return s.reconcileForContinuous(schedulePolicy)
+				var targetSelectorLabels map[string]string
+				if method.Target != nil {
+					targetSelectorLabels = method.Target.PodSelector.MatchLabels
+				} else if s.BackupPolicy.Spec.Target != nil {
+					targetSelectorLabels = s.BackupPolicy.Spec.Target.PodSelector.MatchLabels
+				}
+				return s.reconcileForContinuous(schedulePolicy, targetSelectorLabels)
 			}
 		}
 	}
@@ -281,7 +287,8 @@ func (s *Scheduler) generateBackupName(schedulePolicy *dpv1alpha1.SchedulePolicy
 	return backupNamePrefix + "-$(date -u +'%Y%m%d%H%M%S')"
 }
 
-func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
+func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy,
+	targetSelectorLabels map[string]string) error {
 	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
 	backup := &dpv1alpha1.Backup{}
 	exists, err := intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
@@ -293,7 +300,10 @@ func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 	if backup.Labels == nil {
 		backup.Labels = map[string]string{}
 	}
-	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
+	for k, v := range targetSelectorLabels {
+		backup.Labels[k] = v
+	}
+	backup.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
 	backup.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name
 	backup.Labels[dptypes.BackupTypeLabelKey] = string(dpv1alpha1.BackupTypeContinuous)
 	backup.Labels[dptypes.AutoBackupLabelKey] = "true"
@@ -382,19 +392,21 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 			},
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
-			Type:       appsv1alpha1.ReconfiguringType,
-			ClusterRef: targetPodSelector.MatchLabels[constant.AppInstanceLabelKey],
-			Reconfigure: &appsv1alpha1.Reconfigure{
-				ComponentOps: appsv1alpha1.ComponentOps{
-					ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
-				},
-				Configurations: []appsv1alpha1.ConfigurationItem{
-					{
-						Name: configRef.Name,
-						Keys: []appsv1alpha1.ParameterConfig{
-							{
-								Key:        configRef.Key,
-								Parameters: parameters,
+			Type:        appsv1alpha1.ReconfiguringType,
+			ClusterName: targetPodSelector.MatchLabels[constant.AppInstanceLabelKey],
+			SpecificOpsRequest: appsv1alpha1.SpecificOpsRequest{
+				Reconfigure: &appsv1alpha1.Reconfigure{
+					ComponentOps: appsv1alpha1.ComponentOps{
+						ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
+					},
+					Configurations: []appsv1alpha1.ConfigurationItem{
+						{
+							Name: configRef.Name,
+							Keys: []appsv1alpha1.ParameterConfig{
+								{
+									Key:        configRef.Key,
+									Parameters: parameters,
+								},
 							},
 						},
 					},

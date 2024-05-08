@@ -29,7 +29,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -61,8 +60,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			inNS := client.InNamespace(testCtx.DefaultNamespace)
 			ml := client.HasLabels{testCtx.TestObjLabelKey}
-			// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-			// testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
 			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
 		}
 
@@ -132,15 +129,15 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 
 			By("watch warning event from workload, but mismatch condition ")
-			rsmKey := types.NamespacedName{
+			key := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
 				Name:      clusterKey.Name + "-" + statefulMySQLCompName,
 			}
-			Eventually(testapps.CheckObjExists(&testCtx, rsmKey, &workloads.ReplicatedStateMachine{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, key, &workloads.InstanceSet{}, true)).Should(Succeed())
 
 			involvedObject := corev1.ObjectReference{
-				Name:      rsmKey.Name,
-				Kind:      constant.RSMKind,
+				Name:      key.Name,
+				Kind:      workloads.Kind,
 				Namespace: testCtx.DefaultNamespace,
 			}
 			event.InvolvedObject = involvedObject

@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -122,8 +121,8 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
 
 	for _, o := range delObjs {
-		// skip the objects owned by the component and rsm controller
-		if shouldSkipObjOwnedByComp(o, *cluster) || rsm.IsOwnedByRsm(o) {
+		// skip the objects owned by the component and InstanceSet controller
+		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
 			continue
 		}
 		graphCli.Delete(dag, o, inUniversalContext4G())

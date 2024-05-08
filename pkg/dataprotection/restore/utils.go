@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -295,7 +294,7 @@ func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1a
 			return restoreTimeStr, err
 		}
 	}
-	restoreTimeStr = restoreTime.Format(time.RFC3339)
+	restoreTimeStr = restoreTime.UTC().Format(time.RFC3339)
 	// TODO: check with Recoverable time
 	if !isTimeInRange(restoreTime, continuousBackup.Status.TimeRange.Start.Time, continuousBackup.Status.TimeRange.End.Time) {
 		return restoreTimeStr, fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
@@ -308,7 +307,7 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }
 
-func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1alpha1.Cluster, volumeRestorePolicy, restoreTime string, effectiveCommonComponentDef bool) (string, error) {
+func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy, restoreTime string, doReadyRestoreAfterClusterRunning bool) (string, error) {
 	componentName := backup.Labels[constant.KBAppShardingNameLabelKey]
 	if len(componentName) == 0 {
 		componentName = backup.Labels[constant.KBAppComponentLabelKey]
@@ -320,6 +319,7 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1al
 	restoreInfoMap[constant.BackupNameKeyForRestore] = backup.Name
 	restoreInfoMap[constant.BackupNamespaceKeyForRestore] = backup.Namespace
 	restoreInfoMap[constant.VolumeRestorePolicyKeyForRestore] = volumeRestorePolicy
+	restoreInfoMap[constant.DoReadyRestoreAfterClusterRunning] = strconv.FormatBool(doReadyRestoreAfterClusterRunning)
 	if restoreTime != "" {
 		restoreInfoMap[constant.RestoreTimeKeyForRestore] = restoreTime
 	}
@@ -329,33 +329,6 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1al
 	}
 	restoreForClusterMap := map[string]map[string]string{}
 	restoreForClusterMap[componentName] = restoreInfoMap
-	if effectiveCommonComponentDef {
-		// build restore annotation for all components which refer to the common componentDef.
-		compSpecs := cluster.Spec.ComponentSpecs
-		for i := range cluster.Spec.ShardingSpecs {
-			compSpecs = append(compSpecs, cluster.Spec.ShardingSpecs[i].Template)
-		}
-		getCompDefOfCompSpec := func(compSpec appsv1alpha1.ClusterComponentSpec) string {
-			if compSpec.ComponentDef != "" {
-				return compSpec.ComponentDef
-			}
-			return compSpec.ComponentDefRef
-		}
-		getCompDef := func() string {
-			for i := range compSpecs {
-				if compSpecs[i].Name == componentName {
-					return getCompDefOfCompSpec(compSpecs[i])
-				}
-			}
-			return ""
-		}
-		backupCompDef := getCompDef()
-		for i := range compSpecs {
-			if getCompDefOfCompSpec(compSpecs[i]) == backupCompDef {
-				restoreForClusterMap[compSpecs[i].Name] = restoreInfoMap
-			}
-		}
-	}
 	bytes, err := json.Marshal(restoreForClusterMap)
 	if err != nil {
 		return "", err

@@ -179,7 +179,9 @@ func CheckAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1al
 
 func (p *pipeline) UpdatePodVolumes() *pipeline {
 	return p.Wrap(func() error {
-		return intctrlutil.CreateOrUpdatePodVolumes(p.ctx.PodSpec, p.renderWrapper.volumes)
+		return intctrlutil.CreateOrUpdatePodVolumes(p.ctx.PodSpec,
+			p.renderWrapper.volumes,
+			configSetFromComponent(p.ctx.SynthesizedComponent.ConfigTemplates))
 	})
 }
 
@@ -319,7 +321,7 @@ func (p *updatePipeline) ApplyParameters() *updatePipeline {
 
 		p.configPatch, _, err = core.CreateConfigPatch(cm.Data,
 			newData,
-			p.ConfigConstraintObj.Spec.FormatterConfig.Format,
+			p.ConfigConstraintObj.Spec.FileFormatConfig.Format,
 			p.configSpec.Keys,
 			false)
 		if err != nil {

@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -81,6 +82,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 			}
 			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 		}
+		// TODO: abort last OpsRequest if using 'force' and intersecting with cluster component name or shard name.
 		if opsBehaviour.QueueByCluster || opsBehaviour.QueueBySelf {
 			// if ToClusterPhase is not empty, enqueue OpsRequest to the cluster Annotation.
 			opsRecorde, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, cli, opsRes, opsBehaviour)
@@ -103,6 +105,9 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 		return &ctrl.Result{}, patchOpsRequestToCreating(reqCtx, cli, opsRes, opsDeepCopy, opsBehaviour.OpsHandler)
 	}
 
+	if err = updateHAConfigIfNecessary(reqCtx, cli, opsRes.OpsRequest, "false"); err != nil {
+		return nil, err
+	}
 	if err = opsBehaviour.OpsHandler.Action(reqCtx, cli, opsRes); err != nil {
 		// patch the status.phase to Failed when the error is Fatal, which means the operation is failed and there is no need to retry
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
@@ -145,18 +150,29 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	}
 	switch opsRequestPhase {
 	case appsv1alpha1.OpsSucceedPhase:
-		if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
-			return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase, appsv1alpha1.NewCancelSucceedCondition(opsRequest.Name))
-		}
-		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewSucceedCondition(opsRequest))
+		return 0, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsRequestPhase,
+			appsv1alpha1.NewCancelSucceedCondition(opsRequest.Name), appsv1alpha1.NewSucceedCondition(opsRequest))
 	case appsv1alpha1.OpsFailedPhase:
-		if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
-			return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase, appsv1alpha1.NewCancelFailedCondition(opsRequest, err))
-		}
-		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewFailedCondition(opsRequest, err))
+		return 0, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsRequestPhase,
+			appsv1alpha1.NewCancelFailedCondition(opsRequest, err), appsv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
 		return requeueAfter, nil
 	}
+}
+
+func (opsMgr *OpsManager) handleOpsCompleted(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	opsRequestPhase appsv1alpha1.OpsPhase,
+	cancelledCondition,
+	completedCondition *metav1.Condition) error {
+	if err := updateHAConfigIfNecessary(reqCtx, cli, opsRes.OpsRequest, "true"); err != nil {
+		return err
+	}
+	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
+		return PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase, cancelledCondition)
+	}
+	return PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, completedCondition)
 }
 
 func GetOpsManager() *OpsManager {

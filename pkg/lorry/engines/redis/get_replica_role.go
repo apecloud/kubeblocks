@@ -21,36 +21,91 @@ package redis
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
+	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
-func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
-	section := "Replication"
+func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string, error) {
+	// To ensure that the role information obtained through subscription is always delivered.
+	if mgr.role != "" && mgr.roleSubscribeUpdateTime+mgr.roleProbePeriod*2 < time.Now().Unix() {
+		return mgr.role, nil
+	}
 
-	var role string
-	result, err := mgr.client.Info(ctx, section).Result()
+	// We use the role obtained from Sentinel as the sole source of truth.
+	masterAddr, err := mgr.sentinelClient.GetMasterAddrByName(ctx, mgr.ClusterCompName).Result()
 	if err != nil {
-		mgr.Logger.Error(err, "Role query error")
-		return role, err
-	} else {
-		// split the result into lines
-		lines := strings.Split(result, "\r\n")
-		// find the line with role
-		for _, line := range lines {
-			if strings.HasPrefix(line, "role:") {
-				role = strings.Split(line, ":")[1]
-				break
+		// when we can't get role from sentinel, we query redis instead
+		var role string
+		result, err := mgr.client.Info(ctx, "Replication").Result()
+		if err != nil {
+			mgr.Logger.Error(err, "Role query error")
+			return role, err
+		} else {
+			// split the result into lines
+			lines := strings.Split(result, "\r\n")
+			// find the line with role
+			for _, line := range lines {
+				if strings.HasPrefix(line, "role:") {
+					role = strings.Split(line, ":")[1]
+					break
+				}
 			}
 		}
+		if role == models.MASTER {
+			return models.PRIMARY, nil
+		} else {
+			return models.SECONDARY, nil
+		}
 	}
-	if role == models.MASTER {
-		return models.PRIMARY, nil
-	}
-	if role == models.SLAVE {
+
+	masterName := strings.Split(masterAddr[0], ".")[0]
+	// if current member is not master from sentinel, just return secondary to avoid double master
+	if masterName != mgr.CurrentMemberName {
 		return models.SECONDARY, nil
 	}
-	return role, nil
+	return models.PRIMARY, nil
+}
+
+func (mgr *Manager) SubscribeRoleChange(ctx context.Context, cluster *dcs.Cluster) {
+	pubSub := mgr.sentinelClient.Subscribe(ctx, "+switch-master")
+
+	// go-redis periodically sends ping messages to test connection health
+	// and re-subscribes if ping can not receive for 30 seconds.
+	// so we don't need to retry
+	ch := pubSub.Channel()
+	for msg := range ch {
+		// +switch-master <master name> <old ip> <old port> <new ip> <new port>
+		masterAddr := strings.Split(msg.Payload, " ")
+		masterName := strings.Split(masterAddr[3], ".")[0]
+
+		// When network partition occurs, the new primary needs to send global role change information to the controller.
+		if masterName == mgr.CurrentMemberName {
+			roleSnapshot := &common.GlobalRoleSnapshot{}
+			oldMasterName := strings.Split(masterAddr[1], ".")[0]
+			roleSnapshot.PodRoleNamePairs = []common.PodRoleNamePair{
+				{
+					PodName:  oldMasterName,
+					RoleName: models.SECONDARY,
+					PodUID:   cluster.GetMemberWithName(oldMasterName).UID,
+				},
+				{
+					PodName:  masterName,
+					RoleName: models.PRIMARY,
+					PodUID:   cluster.GetMemberWithName(masterName).UID,
+				},
+			}
+			roleSnapshot.Version = time.Now().Format(time.RFC3339Nano)
+
+			b, _ := json.Marshal(roleSnapshot)
+			mgr.role = string(b)
+		} else {
+			mgr.role = models.SECONDARY
+		}
+		mgr.roleSubscribeUpdateTime = time.Now().Unix()
+	}
 }

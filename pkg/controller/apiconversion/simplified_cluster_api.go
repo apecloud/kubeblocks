@@ -55,7 +55,7 @@ func HasSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster) bool {
 		!cluster.Spec.Resources.CPU.IsZero() ||
 		!cluster.Spec.Resources.Memory.IsZero() ||
 		!cluster.Spec.Storage.Size.IsZero() ||
-		cluster.Spec.Monitor.MonitoringInterval != nil ||
+		// cluster.Spec.Monitor.MonitoringInterval != nil ||
 		cluster.Spec.Network != nil ||
 		len(cluster.Spec.Tenancy) > 0 ||
 		len(cluster.Spec.AvailabilityPolicy) > 0
@@ -101,14 +101,14 @@ func fillSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster, clusterCompDef *app
 			},
 		}
 	}
-	if cluster.Spec.Monitor.MonitoringInterval != nil {
-		if len(cluster.Spec.Monitor.MonitoringInterval.StrVal) == 0 && cluster.Spec.Monitor.MonitoringInterval.IntVal == 0 {
-			clusterCompSpec.Monitor = false
-		} else {
-			clusterCompSpec.Monitor = true
-			// TODO: should also set interval
-		}
-	}
+	// if cluster.Spec.Monitor.MonitoringInterval != nil {
+	// 	if len(cluster.Spec.Monitor.MonitoringInterval.StrVal) == 0 && cluster.Spec.Monitor.MonitoringInterval.IntVal == 0 {
+	// 		clusterCompSpec.Monitor = false
+	// 	} else {
+	// 		clusterCompSpec.Monitor = true
+	// 		// TODO: should also set interval
+	// 	}
+	// }
 	if cluster.Spec.Network != nil {
 		clusterCompSpec.Services = []appsv1alpha1.ClusterComponentService{}
 		if cluster.Spec.Network.HostNetworkAccessible {

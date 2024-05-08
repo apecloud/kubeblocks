@@ -84,8 +84,8 @@ type clientReader struct {
 var _ client.Reader = &clientReader{}
 
 func (c *clientReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	request := func(cli client.Client) error {
-		return cli.Get(ctx, key, obj, opts...)
+	request := func(cc contextCli, o client.Object) error {
+		return cc.cli.Get(ctx, key, o, opts...)
 	}
 	return anyOf(c.mctx, ctx, obj, request, opts)
 }
@@ -113,7 +113,8 @@ func (c *clientReader) List(ctx context.Context, list client.ObjectList, opts ..
 	if objects.Len() != 0 {
 		items.Set(objects)
 	}
-	return err
+	// TODO: ignore the unavailable error slightly, need to handle it correctly in the future
+	return ignoreUnavailableError(err)
 }
 
 type clientWriter struct {
@@ -215,8 +216,8 @@ type subResourceReader struct {
 var _ client.SubResourceReader = &subResourceReader{}
 
 func (c *subResourceReader) Get(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceGetOption) error {
-	request := func(cli client.Client) error {
-		return cli.SubResource(c.subResource).Get(ctx, obj, subResource, opts...)
+	request := func(cc contextCli, o client.Object) error {
+		return cc.cli.SubResource(c.subResource).Get(ctx, o, subResource, opts...)
 	}
 	return anyOf(c.mctx, ctx, obj, request, opts)
 }
@@ -261,25 +262,72 @@ func (c *subResourceWriter) Patch(ctx context.Context, obj client.Object, patch 
 }
 
 func allOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
-	var err error
+	var err, uerr error
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
 		if e := request(cc, obj); e != nil {
-			if err == nil {
+			switch {
+			case !isUnavailableError(e) && err == nil:
 				err = e
+			case isUnavailableError(e) && uerr == nil:
+				uerr = e
 			}
 		}
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return uerr // TODO: handle the error
 }
 
-func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(client.Client) error, opts any) error {
-	var err error
+func anyOf(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
+	o := hasClientOption(opts)
+	if o == nil || !o.multiCheck {
+		return anyOf_(mctx, ctx, obj, request, opts)
+	}
+	return anyOfWithMultiCheck(mctx, ctx, obj, request, opts)
+}
+
+func anyOf_(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
+	var err, uerr error
 	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
-		if err = request(cc.cli); err == nil {
+		e := request(cc, obj)
+		switch {
+		case e == nil:
 			return nil
+		case !isUnavailableError(e) && err == nil:
+			err = e
+		case isUnavailableError(e) && uerr == nil:
+			uerr = e
 		}
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return uerr // all clusters are unavailable?
+}
+
+func anyOfWithMultiCheck(mctx mcontext, ctx context.Context, obj client.Object, request func(contextCli, client.Object) error, opts any) error {
+	var err, uerr error
+	objs := make([]client.Object, 0)
+	for _, cc := range resolvedClients(mctx, ctx, obj, opts) {
+		o := obj.DeepCopyObject().(client.Object)
+		e := request(cc, o)
+		switch {
+		case e == nil:
+			objs = append(objs, o)
+		case !isUnavailableError(e) && err == nil:
+			err = e
+		case isUnavailableError(e) && uerr == nil:
+			uerr = e
+		}
+	}
+	if len(objs) > 0 {
+		reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(objs[0]).Elem())
+	}
+	if err != nil {
+		return err
+	}
+	return uerr // TODO: handle the error
 }
 
 type contextCli struct {
@@ -307,7 +355,7 @@ func resolvedClients(mctx mcontext, ctx context.Context, obj client.Object, opts
 	}
 
 	if o.universal {
-		return append([]contextCli{{"", mctx.control}}, dataClients(mctx, fromContext(ctx))...)
+		return removeDuplicate(append([]contextCli{{"", mctx.control}}, dataClients(mctx, fromContext(ctx))...))
 	}
 
 	if o.oneshot {
@@ -339,6 +387,18 @@ func dataClients(mctx mcontext, workers []string) []contextCli {
 	for _, c := range workers {
 		if cli, ok := mctx.workers[c]; ok {
 			l = append(l, contextCli{c, cli})
+		}
+	}
+	return l
+}
+
+func removeDuplicate(clients []contextCli) []contextCli {
+	m := make(map[string]bool)
+	l := make([]contextCli, 0)
+	for i, c := range clients {
+		if !m[c.context] {
+			m[c.context] = true
+			l = append(l, clients[i])
 		}
 	}
 	return l

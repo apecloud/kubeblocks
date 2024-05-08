@@ -24,7 +24,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -35,5 +35,5 @@ type EventHandler interface {
 var EventHandlerMap = map[string]EventHandler{}
 
 func init() {
-	EventHandlerMap["rsm-event-handler"] = &rsm.PodRoleEventHandler{}
+	EventHandlerMap["its-event-handler"] = &instanceset.PodRoleEventHandler{}
 }

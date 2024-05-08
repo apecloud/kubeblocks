@@ -24,12 +24,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -59,6 +60,7 @@ var _ = Describe("OpsUtil functions", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -93,7 +95,19 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("expect for opsRequest is running")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsPhase, _, err := reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", syncOverrideByOpsForScaleReplicas, handleComponentStatusProgress)
+			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
+
+			hs := horizontalScalingOpsHandler{}
+			handleComponentProgress := func(
+				reqCtx intctrlutil.RequestCtx,
+				cli client.Client,
+				opsRes *OpsResource,
+				pgRes progressResource,
+				compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
+				return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, hs.getExpectReplicas)
+			}
+			opsPhase, _, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleComponentProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
@@ -101,10 +115,61 @@ var _ = Describe("OpsUtil functions", func() {
 			compStatus := opsRes.OpsRequest.Status.Components[consensusComp]
 			compStatus.LastFailedTime = metav1.Time{Time: compStatus.LastFailedTime.Add(-1 * componentFailedTimeout).Add(-1 * time.Second)}
 			opsRes.OpsRequest.Status.Components[consensusComp] = compStatus
-			opsPhase, _, err = reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", syncOverrideByOpsForScaleReplicas, handleComponentStatusProgress)
+			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsFailedPhase))
+		})
 
+		It("Test opsRequest with disable ha", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+
+			By("Test the functions in ops_util.go")
+			ops := testapps.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, appsv1alpha1.RestartType)
+			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{{ComponentName: consensusComp}}
+			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+				opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
+				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
+			})).Should(Succeed())
+
+			By("create ha configmap and do horizontalScaling with disable ha")
+			haConfigName := "ha-config"
+			haConfig := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      haConfigName,
+					Namespace: testCtx.DefaultNamespace,
+					Annotations: map[string]string{
+						"enable": "true",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, haConfig)).Should(Succeed())
+			opsRes.OpsRequest.Annotations = map[string]string{
+				constant.DisableHAAnnotationKey: haConfigName,
+			}
+
+			By("mock instance set")
+			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+
+			By("expect to disable ha")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(haConfig), func(g Gomega, cm *corev1.ConfigMap) {
+				cm.Annotations["enable"] = "false"
+			})).Should(Succeed())
+
+			By("mock restart ops to succeed and expect to enable ha")
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
+			_ = initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(haConfig), func(g Gomega, cm *corev1.ConfigMap) {
+				cm.Annotations["enable"] = "true"
+			})).Should(Succeed())
 		})
 
 		It("Test opsRequest Queue functions", func() {

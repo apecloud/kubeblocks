@@ -1116,7 +1116,7 @@ func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1
 
 func CheckIfAddonUsedByCluster(ctx context.Context, c client.Client, addonName string, namespace string) (bool, error) {
 	labelSelector := metav1.LabelSelector{
-		MatchLabels: map[string]string{"clusterdefinition.kubeblocks.io/name": addonName},
+		MatchLabels: map[string]string{constant.ClusterDefLabelKey: addonName},
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
@@ -1134,11 +1134,7 @@ func CheckIfAddonUsedByCluster(ctx context.Context, c client.Client, addonName s
 		return false, err
 	}
 
-	if len(clusters.Items) > 0 {
-		return true, nil
-	}
-
-	return false, nil
+	return len(clusters.Items) > 0, nil
 }
 
 func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {

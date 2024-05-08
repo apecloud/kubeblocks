@@ -57,14 +57,42 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+
+		// non-namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentDefinitionSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentVersionSignature, true, ml)
+
 	}
 
 	BeforeEach(cleanEnv)
 
 	AfterEach(cleanEnv)
 
+	mockUpgradeOpsIsRunning := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource) {
+		By("mock upgrade OpsRequest phase is Running")
+		_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+		Expect(err).ShouldNot(HaveOccurred())
+		Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+		// do upgrade
+		_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+		Expect(err).ShouldNot(HaveOccurred())
+		mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase,
+			consensusComp, statelessComp, statefulComp)
+	}
+
+	mockClusterRunning := func(clusterObject *appsv1alpha1.Cluster) {
+		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+			clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
+			clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+				consensusComp: {
+					Phase: appsv1alpha1.RunningClusterCompPhase,
+				},
+			}
+		})).Should(Succeed())
+	}
+
 	Context("Test OpsRequest", func() {
-		It("Test upgrade OpsRequest", func() {
+		It("Test upgrade OpsRequest with ClusterVersion", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
@@ -80,17 +108,9 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase,
-				consensusComp, statelessComp, statefulComp) // appsv1alpha1.VerticalScalingPhase
-			// TODO: add status condition for VerticalScalingPhase
 
 			By("mock upgrade OpsRequest phase is Running")
-			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
-			// do upgrade
-			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
+			mockUpgradeOpsIsRunning(reqCtx, opsRes)
 
 			By("expect upgrade successfully")
 			_ = testapps.MockInstanceSetPod(&testCtx, nil, clusterName, statelessComp, fmt.Sprintf(clusterName+"-"+statelessComp+"-0"), "", "")
@@ -110,7 +130,140 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			// mock component to running
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.RunningClusterCompPhase,
 				consensusComp, statelessComp, statefulComp)
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+		})
+
+		It("Test upgrade OpsRequest with ComponentDef", func() {
+			By("init operations resources ")
+			compDef1 := testapps.NewComponentDefinitionFactory(testapps.CompDefName(testapps.CompDefNames[0])).
+				SetServiceVersion(testapps.ServiceVersion(testapps.ServiceVersions[0])).SetRuntime(&corev1.Container{
+				Name: testapps.DefaultMySQLContainerName, Image: testapps.AppImage(testapps.AppName, testapps.ReleaseID("r0")),
+			}).Create(&testCtx).GetObject()
+
+			compDef2 := testapps.NewComponentDefinitionFactory(testapps.CompDefName(testapps.CompDefNames[1])).
+				SetServiceVersion(testapps.ServiceVersion(testapps.ServiceVersions[1])).SetRuntime(&corev1.Container{
+				Name: testapps.DefaultMySQLContainerName, Image: testapps.AppImage(testapps.AppName, testapps.ReleaseID("r1")),
+			}).Create(&testCtx).GetObject()
+			clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "", "").
+				AddComponentV2(consensusComp, compDef1.Name).
+				SetReplicas(int32(3)).Create(&testCtx).GetObject()
+			opsRes := &OpsResource{
+				Cluster:  clusterObject,
+				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+			}
+			// mock component phase to running
+			mockClusterRunning(clusterObject)
+
+			By("create Upgrade Ops")
+			ops := testapps.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterObject.Name, appsv1alpha1.UpgradeType)
+			ops.Spec.Upgrade = &appsv1alpha1.Upgrade{
+				Components: []appsv1alpha1.UpgradeComponent{
+					{
+						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+						ComponentDefinitionName: compDef2.Name,
+					},
+				},
+			}
+			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+
+			By("mock upgrade OpsRequest phase is Running")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			mockUpgradeOpsIsRunning(reqCtx, opsRes)
+
+			By("expect upgrade successfully")
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)
+			for i := range pods {
+				pod := pods[i]
+				Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+					pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+						{
+							Name:  testapps.DefaultMySQLContainerName,
+							Image: testapps.AppImage(testapps.AppName, testapps.ReleaseID("r1")),
+						},
+					}
+				})).Should(Succeed())
+			}
+			// mock component to running
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.RunningClusterCompPhase, consensusComp)
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+		})
+
+		It("Test upgrade OpsRequest with ComponentDef and ComponentVersion", func() {
+			By("init operations resources")
+			compDefObjs := testapps.CreateCompDefinitionObjs(&testCtx, false)
+			compVersion := testapps.CreateCompVersionObj(&testCtx, false)
+			// label the componentDef info to the ComponentVersion
+			Expect(testapps.ChangeObj(&testCtx, compVersion, func(version *appsv1alpha1.ComponentVersion) {
+				if version.Labels == nil {
+					version.Labels = map[string]string{}
+				}
+				for _, v := range compDefObjs {
+					version.Labels[v.Name] = v.Name
+				}
+			})).Should(Succeed())
+			// mock ComponentVersion to Available
+			Expect(testapps.ChangeObjStatus(&testCtx, compVersion, func() {
+				compVersion.Status.Phase = appsv1alpha1.AvailablePhase
+				compVersion.Status.ObservedGeneration = compVersion.Generation
+			})).Should(Succeed())
+			clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "", "").
+				AddComponentV2(consensusComp, compDefObjs[0].Name).
+				SetReplicas(int32(3)).Create(&testCtx).GetObject()
+			opsRes := &OpsResource{
+				Cluster:  clusterObject,
+				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+			}
+			// mock component phase to running
+			mockClusterRunning(clusterObject)
+
+			By("create Upgrade Ops")
+			ops := testapps.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterObject.Name, appsv1alpha1.UpgradeType)
+			ops.Spec.Upgrade = &appsv1alpha1.Upgrade{
+				Components: []appsv1alpha1.UpgradeComponent{
+					{
+						ComponentOps:   appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+						ServiceVersion: testapps.ServiceVersion("v1"),
+					},
+				},
+			}
+			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+
+			By("mock upgrade OpsRequest phase is Running")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			mockUpgradeOpsIsRunning(reqCtx, opsRes)
+
+			By("expect upgrade successfully")
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)
+			for i := range pods {
+				pod := pods[i]
+				Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+					pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+						{
+							Name: testapps.AppName,
+							// the latest release version will be selected.
+							Image: testapps.AppImage(testapps.AppName, testapps.ReleaseID("r4")),
+						},
+						{
+							Name: testapps.AppNameSamePrefix,
+							// the latest release version will be selected.
+							Image: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID("r4")),
+						},
+					}
+				})).Should(Succeed())
+			}
+			// mock component to running
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.RunningClusterCompPhase, consensusComp)
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})

@@ -3476,8 +3476,34 @@ spec:
                       for the upgrade. \n This field is deprecated since v0.9 because
                       ClusterVersion is deprecated."
                     type: string
-                required:
-                - clusterVersionRef
+                  components:
+                    description: Lists components to be upgrade based on desired ComponentDefinition
+                      or ServiceVersion.
+                    items:
+                      properties:
+                        componentDefinitionName:
+                          description: Specifies the name of the ComponentDefinition.
+                          type: string
+                        componentName:
+                          description: Specifies the name of the Component.
+                          type: string
+                        serviceVersion:
+                          description: Specifies the version of the Service expected
+                            to be provisioned by this Component. Referring to the
+                            ServiceVersion defined by the ComponentDefinition and
+                            ComponentVersion.
+                          type: string
+                      required:
+                      - componentName
+                      type: object
+                      x-kubernetes-validations:
+                      - message: at least one componentDefinitionName or serviceVersion
+                        rule: has(self.componentDefinitionName) || has(self.serviceVersion)
+                    maxItems: 1024
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - componentName
+                    x-kubernetes-list-type: map
                 type: object
                 x-kubernetes-validations:
                 - message: forbidden to update spec.upgrade
@@ -3487,7 +3513,7 @@ spec:
                   and its desired compute resources for vertical scaling.
                 items:
                   description: VerticalScaling refers to the process of adjusting
-                    the compute resources (e.g., CPU, memory) allocated to a Component.
+                    compute resources (e.g., CPU, memory) allocated to a Component.
                     It defines the parameters required for the operation.
                   properties:
                     claims:
@@ -3979,6 +4005,10 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
+                        componentDefinitionName:
+                          description: Records the name of the ComponentDefinition
+                            prior to any changes.
+                          type: string
                         instances:
                           description: Records the InstanceTemplate list of the Component
                             prior to any changes.
@@ -6381,6 +6411,10 @@ spec:
                             otherwise to an implementation-defined value. Requests
                             cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
+                        serviceVersion:
+                          description: Records the version of the Service expected
+                            to be provisioned by this Component prior to any changes.
+                          type: string
                         services:
                           description: Records the ClusterComponentService list of
                             the Component prior to any changes.

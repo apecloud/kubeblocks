@@ -311,12 +311,33 @@ type Upgrade struct {
 	//
 	// This field is deprecated since v0.9 because ClusterVersion is deprecated.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	ClusterVersionRef string `json:"clusterVersionRef"`
+	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
+
+	// Lists components to be upgrade based on desired ComponentDefinition or ServiceVersion.
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	// +kubebuilder:validation:MaxItems=1024
+	Components []UpgradeComponent `json:"components,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 }
 
-// VerticalScaling refers to the process of adjusting the compute resources (e.g., CPU, memory) allocated to a Component.
+// +kubebuilder:validation:XValidation:rule="has(self.componentDefinitionName) || has(self.serviceVersion)",message="at least one componentDefinitionName or serviceVersion"
+
+type UpgradeComponent struct {
+	// Specifies the name of the Component.
+	ComponentOps `json:",inline"`
+
+	// Specifies the name of the ComponentDefinition.
+	ComponentDefinitionName string `json:"componentDefinitionName,omitempty"`
+
+	// Specifies the version of the Service expected to be provisioned by this Component.
+	// Referring to the ServiceVersion defined by the ComponentDefinition and ComponentVersion.
+	ServiceVersion string `json:"serviceVersion,omitempty"`
+}
+
+// VerticalScaling refers to the process of adjusting compute resources (e.g., CPU, memory) allocated to a Component.
 // It defines the parameters required for the operation.
 type VerticalScaling struct {
 	// Specifies the name of the Component.
@@ -1093,6 +1114,12 @@ type LastComponentConfiguration struct {
 	// Records the offline instances of the Component prior to any changes.
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
+
+	// Records the version of the Service expected to be provisioned by this Component prior to any changes.
+	ServiceVersion string `json:"serviceVersion,omitempty"`
+
+	// Records the name of the ComponentDefinition prior to any changes.
+	ComponentDefinitionName string `json:"componentDefinitionName,omitempty"`
 }
 
 type LastConfiguration struct {

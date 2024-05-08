@@ -285,14 +285,16 @@ func (r *OpsRequest) validateRestart(cluster *Cluster) error {
 // validateUpgrade validates spec.clusterOps.upgrade
 func (r *OpsRequest) validateUpgrade(ctx context.Context,
 	k8sClient client.Client) error {
-	if r.Spec.Upgrade == nil {
+	upgrade := r.Spec.Upgrade
+	if upgrade == nil {
 		return notEmptyError("spec.upgrade")
 	}
-
-	clusterVersion := &ClusterVersion{}
-	clusterVersionRef := r.Spec.Upgrade.ClusterVersionRef
-	if err := k8sClient.Get(ctx, types.NamespacedName{Name: clusterVersionRef}, clusterVersion); err != nil {
-		return fmt.Errorf("get clusterVersion: %s failed, err: %s", clusterVersionRef, err.Error())
+	if upgrade.ClusterVersionRef != "" {
+		// TODO: remove this deprecated api after v0.9
+		return k8sClient.Get(ctx, types.NamespacedName{Name: upgrade.ClusterVersionRef}, &ClusterVersion{})
+	}
+	if len(r.Spec.Upgrade.Components) == 0 {
+		return notEmptyError("spec.upgrade.components")
 	}
 	return nil
 }

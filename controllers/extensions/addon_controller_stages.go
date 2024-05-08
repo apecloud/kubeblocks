@@ -27,6 +27,11 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/apps/v1"
@@ -39,11 +44,6 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type stageCtx struct {
@@ -177,6 +177,20 @@ func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
 	}
 	r.reqCtx.Log.V(1).Info("get addon", "generation", addon.Generation, "observedGeneration", addon.Status.ObservedGeneration)
 	r.reqCtx.UpdateCtxValue(operandValueKey, addon)
+
+	// CheckIfAddonUsedByCluster, if err, skip the deletion stage
+	if !addon.GetDeletionTimestamp().IsZero() || (addon.Spec.InstallSpec != nil && !addon.Spec.InstallSpec.GetEnabled()) {
+		used, err := CheckIfAddonUsedByCluster(ctx, r.reconciler.Client, addon.Name, r.reqCtx.Req.Namespace)
+		if err != nil {
+			r.setRequeueWithErr(err, "")
+			return
+		} else if used {
+			r.reconciler.Event(addon, corev1.EventTypeNormal, "Addon is used by some clusters",
+				"Addon is used by cluster, please check")
+			r.setRequeueAfter(time.Second, "Waiting for the cluster to end")
+			return
+		}
+	}
 	res, err := intctrlutil.HandleCRDeletion(*r.reqCtx, r.reconciler, addon, addonFinalizerName, func() (*ctrl.Result, error) {
 		r.deletionStage.Handle(ctx)
 		return r.deletionStage.doReturn()
@@ -1225,6 +1239,29 @@ func validateVersion(annotations, kbVersion string) (bool, error) {
 	}
 	validate, _ := constraint.Validate(v)
 	return validate, nil
+}
+
+func CheckIfAddonUsedByCluster(ctx context.Context, c client.Client, addonName string, namespace string) (bool, error) {
+	labelSelector := metav1.LabelSelector{
+		MatchLabels: map[string]string{constant.ClusterDefLabelKey: addonName},
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	if err != nil {
+		return false, err
+	}
+
+	var clusters appsv1alpha1.ClusterList
+	listOpts := []client.ListOption{
+		client.InNamespace(namespace),
+		client.MatchingLabelsSelector{Selector: selector},
+		client.Limit(1),
+	}
+	if err := c.List(ctx, &clusters, listOpts...); err != nil {
+		return false, err
+	}
+
+	return len(clusters.Items) > 0, nil
 }
 
 func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {

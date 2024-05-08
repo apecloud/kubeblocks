@@ -145,7 +145,7 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, comp
 		return nil
 	}
 
-	exporter := componentDef.Spec.PrometheusExporter
+	exporter := componentDef.Spec.Exporter
 	if exporter == nil {
 		return nil
 	}

@@ -692,7 +692,7 @@ type ClusterComponentDefinition struct {
 	// Defines the metrics exporter.
 	//
 	// +optional
-	PrometheusExporter *PrometheusExporter `json:"exporter,omitempty"`
+	Exporter *Exporter `json:"exporter,omitempty"`
 
 	// Deprecated since v0.9
 	// monitor is monitoring config which provided by provider.
@@ -702,9 +702,9 @@ type ClusterComponentDefinition struct {
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 }
 
-func (r *ClusterComponentDefinition) GetPrometheusExporter() *PrometheusExporter {
-	if r.PrometheusExporter != nil {
-		return r.PrometheusExporter
+func (r *ClusterComponentDefinition) GetPrometheusExporter() *Exporter {
+	if r.Exporter != nil {
+		return r.Exporter
 	}
 
 	// Compatible with previous versions of kb
@@ -712,7 +712,7 @@ func (r *ClusterComponentDefinition) GetPrometheusExporter() *PrometheusExporter
 		return nil
 	}
 
-	return &PrometheusExporter{
+	return &Exporter{
 		ScrapePath: r.Monitor.Exporter.ScrapePath,
 		ScrapePort: r.Monitor.Exporter.ScrapePort.String(),
 	}

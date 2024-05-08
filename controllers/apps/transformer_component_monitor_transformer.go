@@ -50,12 +50,12 @@ func (c componentMonitorContainerTransformer) Transform(ctx graph.TransformConte
 	}
 
 	if !synthesizeComp.MonitorEnabled {
-		removeMonitorContainer(compDef.Spec.PrometheusExporter, synthesizeComp)
+		removeMonitorContainer(compDef.Spec.Exporter, synthesizeComp)
 	}
 	return
 }
 
-func removeMonitorContainer(exporter *appsv1alpha1.PrometheusExporter, synthesizeComp *component.SynthesizedComponent) {
+func removeMonitorContainer(exporter *appsv1alpha1.Exporter, synthesizeComp *component.SynthesizedComponent) {
 	if exporter == nil || exporter.ContainerName == "" {
 		return
 	}

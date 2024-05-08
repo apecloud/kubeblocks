@@ -62,7 +62,7 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
-		"prometheusexporter":     &compDefExporterConvertor{},
+		"exporter":               &compDefExporterConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer); err != nil {

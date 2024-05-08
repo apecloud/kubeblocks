@@ -196,7 +196,7 @@ type ComponentDefinitionSpec struct {
 	// Defines the built-in metrics exporter container.
 	//
 	// +optional
-	PrometheusExporter *PrometheusExporter `json:"exporter,omitempty"`
+	Exporter *Exporter `json:"exporter,omitempty"`
 
 	// Defines variables which are determined after Cluster instantiation and reflect
 	// dynamic or runtime attributes of instantiated Clusters.
@@ -616,7 +616,7 @@ type SystemAccount struct {
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
-type PrometheusExporter struct {
+type Exporter struct {
 	// Specifies the name of the built-in metrics exporter container.
 	//
 	// +optional

@@ -3161,7 +3161,7 @@ spec:
                         - selector
                         type: object
                     type: object
-                  vmServiceScrapeSpec:
+                  vmMonitorTemplate:
                     description: "Specifies the VMServiceScrape template used in the
                       Component. \n ```yaml name: vm-scrape namespace: default labels:
                       k8s-app: node-exporter vmServiceScrapeSpec: selector: matchLabels:

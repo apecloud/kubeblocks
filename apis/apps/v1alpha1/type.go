@@ -1352,5 +1352,5 @@ type MonitorIntegration struct {
 	// ```
 	//
 	// +optional
-	VMServiceScrapeSpec *VMMonitorTemplate `json:"vmServiceScrapeSpec,omitempty"`
+	VMMonitorTemplate *VMMonitorTemplate `json:"vmMonitorTemplate,omitempty"`
 }

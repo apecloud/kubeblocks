@@ -3661,8 +3661,8 @@ func (in *MonitorIntegration) DeepCopyInto(out *MonitorIntegration) {
 		*out = new(ServiceMonitorTemplate)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.VMServiceScrapeSpec != nil {
-		in, out := &in.VMServiceScrapeSpec, &out.VMServiceScrapeSpec
+	if in.VMMonitorTemplate != nil {
+		in, out := &in.VMMonitorTemplate, &out.VMMonitorTemplate
 		*out = new(VMMonitorTemplate)
 		(*in).DeepCopyInto(*out)
 	}

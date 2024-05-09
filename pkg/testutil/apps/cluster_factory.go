@@ -21,6 +21,7 @@ package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -315,5 +316,24 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 			comp.UserResourceRefs = userResourcesRefs
 		}
 		userResourcesRefs.ConfigMapRefs = append(userResourcesRefs.ConfigMapRefs, cmResource)
+	})
+}
+
+func (factory *MockClusterFactory) SetPrometheusIntegration(need bool, name, ns string) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		if comp.MetricsStoreIntegration == nil {
+			comp.MetricsStoreIntegration = &appsv1alpha1.MetricsStoreIntegration{}
+		}
+
+		if need && comp.MetricsStoreIntegration.ServiceMonitorTemplate == nil {
+			comp.MetricsStoreIntegration.ServiceMonitorTemplate = &appsv1alpha1.ServiceMonitorTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: ns,
+				},
+			}
+		} else {
+			comp.MetricsStoreIntegration.ServiceMonitorTemplate = nil
+		}
 	})
 }

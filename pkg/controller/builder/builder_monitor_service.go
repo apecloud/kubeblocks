@@ -20,7 +20,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/common"
 )
 
 type MonitorServiceBuilder struct {
@@ -48,9 +48,12 @@ func (builder *MonitorServiceBuilder) SetDefaultEndpoint(exporter *appsv1alpha1.
 	}
 
 	endpoint := monitoringv1.Endpoint{
-		Port:   exporter.ScrapePort,
-		Path:   controllerutil.FromScrapePath(*exporter),
-		Scheme: controllerutil.FromScheme(*exporter),
+		Port: exporter.ScrapePort,
+		// TODO: deprecated: use `port` instead.
+		// Compatible with previous versions of kb, the old addon supports int type port.
+		TargetPort: exporter.TargetPort,
+		Path:       common.FromScrapePath(*exporter),
+		Scheme:     common.FromScheme(*exporter),
 	}
 
 	builder.get().Spec.Endpoints = []monitoringv1.Endpoint{endpoint}

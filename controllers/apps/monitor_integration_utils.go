@@ -39,15 +39,16 @@ func listMonitorServices[T intctrlutil.Object, PT intctrlutil.PObject[T], L intc
 	var objects []T
 
 	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:       clusterName,
-		constant.KBAppShardingNameLabelKey: componentName,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: componentName,
 	}
 	if err := cli.List(ctx, PL(&objList), client.InNamespace(corev1.NamespaceAll), ml); err != nil {
 		return nil, err
 	}
 
-	for _, object := range toObjects[T, L, PL](&objList) {
-		if obj := toResourceObject(object); isOwnerRef(obj, component) {
+	items := toObjects[T, L, PL](&objList)
+	for _, object := range items {
+		if isOwnerRef(PT(&object), component) {
 			objects = append(objects, object)
 		}
 	}
@@ -55,20 +56,31 @@ func listMonitorServices[T intctrlutil.Object, PT intctrlutil.PObject[T], L intc
 }
 
 func toObjects[T intctrlutil.Object, L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](compList PL) []T {
-	return reflect.ValueOf(compList).Elem().FieldByName("Items").Interface().([]T)
+	fValue := reflect.ValueOf(compList).Elem().FieldByName("Items")
+	if !fValue.CanInterface() {
+		return nil
+	}
+	value := fValue.Interface()
+	switch v := value.(type) {
+	case []T:
+		return v
+	case []*T:
+		var rets []T
+		for _, item := range v {
+			rets = append(rets, *item)
+		}
+		return rets
+	}
+	return nil
 }
 
 func isOwnerRef(target, owner client.Object) bool {
 	for _, ownerRef := range target.GetOwnerReferences() {
-		if ownerRef.Name == owner.GetName() && ownerRef.UID != owner.GetUID() {
+		if ownerRef.Name == owner.GetName() && ownerRef.UID == owner.GetUID() {
 			return true
 		}
 	}
 	return false
-}
-
-func toResourceObject(obj any) client.Object {
-	return obj.(client.Object)
 }
 
 func deleteObjects[T intctrlutil.Object, PT intctrlutil.PObject[T]](objects []T, graphCli model.GraphClient, dag *graph.DAG) {

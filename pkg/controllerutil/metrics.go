@@ -20,63 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
-	corev1 "k8s.io/api/core/v1"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const FeatureGateEnableRuntimeMetrics = "ENABLED_RUNTIME_METRICS"
 
-const (
-	PrometheusScrapeAnnotationPath    = "monitor.kubeblocks.io/path"
-	PrometheusScrapeAnnotationPort    = "monitor.kubeblocks.io/port"
-	PrometheusScrapeAnnotationScheme  = "monitor.kubeblocks.io/scheme"
-	PrometheusScrapeAnnotationEnabled = "monitor.kubeblocks.io/scrape"
-)
-
-const (
-	defaultScrapePath   = "/metrics"
-	defaultScrapeScheme = string(appsv1alpha1.HTTPProtocol)
-)
-
 func EnabledRuntimeMetrics() bool {
 	return viper.GetBool(FeatureGateEnableRuntimeMetrics)
-}
-
-func GetScrapeAnnotations(scrapeConfig appsv1alpha1.Exporter, container *corev1.Container) map[string]string {
-	return map[string]string{
-		PrometheusScrapeAnnotationPath:   FromScrapePath(scrapeConfig),
-		PrometheusScrapeAnnotationPort:   FromContainerPort(scrapeConfig, container),
-		PrometheusScrapeAnnotationScheme: FromScheme(scrapeConfig),
-		// Compatible with previous versions of kubeblocks.
-		PrometheusScrapeAnnotationEnabled: "true",
-	}
-}
-
-func FromScrapePath(config appsv1alpha1.Exporter) string {
-	if config.ScrapePath != "" {
-		return config.ScrapePath
-	}
-	return defaultScrapePath
-}
-
-func FromContainerPort(config appsv1alpha1.Exporter, container *corev1.Container) string {
-	if config.ScrapePort != "" {
-		return config.ScrapePort
-	}
-	if container != nil && len(container.Ports) > 0 {
-		return container.Ports[0].Name
-	}
-	if config.TargetPort != nil {
-		return config.TargetPort.String()
-	}
-	return ""
-}
-
-func FromScheme(config appsv1alpha1.Exporter) string {
-	if config.ScrapeScheme != "" {
-		return string(config.ScrapeScheme)
-	}
-	return defaultScrapeScheme
 }

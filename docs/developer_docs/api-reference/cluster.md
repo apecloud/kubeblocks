@@ -11554,6 +11554,23 @@ PrometheusScheme
 If empty, Prometheus uses the default value <code>http</code>.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>targetPort</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Deprecated: use <code>scrapePort</code> instead.
+Compatible with previous versions of kb.</p>
+<p>Name or number of the target port of the <code>Pod</code> object behind the
+Service. The port must be specified with the container&rsquo;s port property.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ExporterConfig">ExporterConfig

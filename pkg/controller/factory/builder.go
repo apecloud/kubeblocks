@@ -34,6 +34,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/klog/v2"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
@@ -153,9 +154,10 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, comp
 	// Node: If it is an old addon, containerName may be empty.
 	container := getBuiltinContainer(synthesizedComp, exporter.ContainerName)
 	if container == nil && exporter.ScrapePort == "" && exporter.TargetPort == nil {
+		klog.Warningf("invalid exporter port and ignore for component: %s, componentDef: %s", synthesizedComp.Name, componentDef.Name)
 		return nil
 	}
-	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*exporter, container))
+	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, common.GetScrapeAnnotations(*exporter, container))
 }
 
 func getBuiltinContainer(synthesizedComp *component.SynthesizedComponent, containerName string) *corev1.Container {

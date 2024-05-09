@@ -105,6 +105,7 @@ func createOrUpdateMonitorService(transCtx *componentTransformContext, existing 
 
 	if existing == nil {
 		graphCli.Create(dag, expected, inDataContext4G())
+		return nil
 	}
 
 	objCopy := existing.DeepCopy()
@@ -121,13 +122,13 @@ func createMonitorService(transCtx *componentTransformContext, template *appsv1a
 	monitorService := builder.NewMonitorServiceBuilder(template.Namespace, genName).
 		AddLabelsInMap(template.Labels).
 		AddLabels(constant.AppInstanceLabelKey, transCtx.Cluster.Name).
-		AddLabels(constant.KBAppShardingNameLabelKey, transCtx.Component.Name).
+		AddLabels(constant.KBAppComponentLabelKey, transCtx.Component.Name).
 		SetMonitorServiceSpec(template.ServiceMonitorSpec).
 		SetDefaultEndpoint(component.GetExporter(transCtx.CompDef.Spec)).
 		GetObject()
 
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	if err := controllerutil.SetOwnerReference(monitorService, owner, scheme); err != nil {
+	if err := controllerutil.SetOwnerReference(owner, monitorService, scheme); err != nil {
 		return nil, err
 	}
 	return monitorService, nil

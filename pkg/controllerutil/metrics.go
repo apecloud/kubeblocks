@@ -65,7 +65,7 @@ func fromContainerPort(config appsv1alpha1.Exporter, container *corev1.Container
 	if config.ScrapePort != "" {
 		return config.ScrapePort
 	}
-	if config.ScrapePort == "" && len(container.Ports) > 0 {
+	if config.ScrapePort == "" && container != nil && len(container.Ports) > 0 {
 		return container.Ports[0].Name
 	}
 	return ""

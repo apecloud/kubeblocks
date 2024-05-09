@@ -151,6 +151,9 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, comp
 	}
 
 	container := getBuiltinContainer(synthesizedComp, exporter.ContainerName)
+	if container == nil && exporter.ScrapePort == "" {
+		return nil
+	}
 	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*exporter, container))
 }
 

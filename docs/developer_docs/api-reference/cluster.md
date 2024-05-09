@@ -18209,7 +18209,7 @@ int64
 <tbody>
 <tr>
 <td>
-<code>metadata</code><br/>
+<code>ObjectMeta</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
@@ -18217,6 +18217,9 @@ Kubernetes meta/v1.ObjectMeta
 </em>
 </td>
 <td>
+<p>
+(Members of <code>ObjectMeta</code> are embedded into this type.)
+</p>
 <em>(Optional)</em>
 <p>Standard k8s object&rsquo;s metadata.</p>
 Refer to the Kubernetes API documentation for the fields of the
@@ -20414,7 +20417,7 @@ string
 <tbody>
 <tr>
 <td>
-<code>metadata</code><br/>
+<code>ObjectMeta</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
@@ -20422,6 +20425,9 @@ Kubernetes meta/v1.ObjectMeta
 </em>
 </td>
 <td>
+<p>
+(Members of <code>ObjectMeta</code> are embedded into this type.)
+</p>
 <em>(Optional)</em>
 <p>Standard k8s object&rsquo;s metadata.</p>
 Refer to the Kubernetes API documentation for the fields of the

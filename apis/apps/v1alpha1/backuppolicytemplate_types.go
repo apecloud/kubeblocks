@@ -26,7 +26,7 @@ import (
 type BackupPolicyTemplateSpec struct {
 	// Specifies the name of a ClusterDefinition.
 	// This is an immutable attribute that cannot be changed after creation.
-	// And this field is deprecated since v0.9 because ClusterVersion is deprecated.
+	// And this field is deprecated since v0.9.
 	//
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"

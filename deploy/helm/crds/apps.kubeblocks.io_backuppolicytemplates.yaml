@@ -973,7 +973,7 @@ spec:
               clusterDefinitionRef:
                 description: Specifies the name of a ClusterDefinition. This is an
                   immutable attribute that cannot be changed after creation. And this
-                  field is deprecated since v0.9 because ClusterVersion is deprecated.
+                  field is deprecated since v0.9.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
                 x-kubernetes-validations:

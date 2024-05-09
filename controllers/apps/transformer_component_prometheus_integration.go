@@ -56,6 +56,9 @@ func (i componentPrometheusIntegrationTransformer) Transform(ctx graph.Transform
 	synthesizeComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
+	if synthesizeComp.MonitorIntegration == nil {
+		return nil
+	}
 	if err := i.buildPrometheusMonitorService(transCtx, synthesizeComp.MonitorIntegration, graphCli, dag); err != nil {
 		return err
 	}
@@ -64,10 +67,6 @@ func (i componentPrometheusIntegrationTransformer) Transform(ctx graph.Transform
 
 func (i componentPrometheusIntegrationTransformer) buildPrometheusMonitorService(transCtx *componentTransformContext, monitorIntegration *appsv1alpha1.MonitorIntegration, graphCli model.GraphClient, dag *graph.DAG) error {
 	var running *monitoringv1.ServiceMonitor
-
-	if monitorIntegration == nil {
-		return nil
-	}
 
 	objects, err := listMonitorServices(transCtx.GetContext(),
 		i.Client,

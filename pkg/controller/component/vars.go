@@ -591,28 +591,30 @@ func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedCo
 
 func composePortValueFromServices(obj any, targetPortName string) *string {
 	hasNodePort := func(svc *corev1.Service, svcPort corev1.ServicePort) bool {
-		return (svc.Spec.Type == corev1.ServiceTypeNodePort || svc.Spec.Type == corev1.ServiceTypeLoadBalancer) && svcPort.NodePort > 0
-	}
-
-	port := func(svc *corev1.Service, svcPort corev1.ServicePort) int {
-		if hasNodePort(svc, svcPort) {
-			return int(svcPort.NodePort)
-		}
-		return int(svcPort.Port)
+		return svc.Spec.Type == corev1.ServiceTypeNodePort ||
+			svc.Spec.Type == corev1.ServiceTypeLoadBalancer && svc.Spec.AllocateLoadBalancerNodePorts != nil && *svc.Spec.AllocateLoadBalancerNodePorts
 	}
 
 	selector := func(services []*corev1.Service) map[string]string {
 		ports := make(map[string]string)
+		insert := func(svc *corev1.Service, svcPort corev1.ServicePort) {
+			port := svcPort.Port
+			if hasNodePort(svc, svcPort) {
+				port = svcPort.NodePort
+			}
+			if port > 0 {
+				ports[svc.Name] = strconv.Itoa(int(port))
+			}
+		}
 		for _, svc := range services {
 			for _, svcPort := range svc.Spec.Ports {
 				if svcPort.Name == targetPortName {
-					ports[svc.Name] = strconv.Itoa(port(svc, svcPort))
+					insert(svc, svcPort)
 					break
 				}
 			}
-
 			if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(targetPortName) == 0) {
-				ports[svc.Name] = strconv.Itoa(port(svc, svc.Spec.Ports[0]))
+				insert(svc, svc.Spec.Ports[0])
 			}
 		}
 		return ports

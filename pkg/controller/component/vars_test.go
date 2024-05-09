@@ -541,6 +541,104 @@ var _ = Describe("vars", func() {
 			checkEnvVarWithValue(envVars, "service-port", strconv.Itoa(svcPort))
 			checkEnvVarWithValue(envVars, "service-port-wo-name", strconv.Itoa(svcPort+1))
 
+			By("node port")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-node-port",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "service",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Port: &appsv1alpha1.NamedVar{
+									Name:   "default",
+									Option: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+				},
+			}
+			nodePort := 30001
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      svcName,
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeNodePort,
+							Ports: []corev1.ServicePort{
+								{
+									Name:     "default",
+									Port:     int32(svcPort),
+									NodePort: int32(nodePort),
+								},
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("service-node-port", strconv.Itoa(nodePort)))
+			checkEnvVarWithValue(envVars, "service-node-port", strconv.Itoa(nodePort))
+
+			By("node port in provisioning")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-node-port",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "service",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Port: &appsv1alpha1.NamedVar{
+									Name:   "default",
+									Option: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+				},
+			}
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      svcName,
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeNodePort,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+									// the node port is not assigned
+								},
+							},
+						},
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
+			// assign a node port to the service
+			reader.objs[0].(*corev1.Service).Spec.Ports[0].NodePort = int32(nodePort + 1)
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("service-node-port", strconv.Itoa(nodePort+1)))
+			checkEnvVarWithValue(envVars, "service-node-port", strconv.Itoa(nodePort+1))
+
 			By("pod service")
 			vars = []appsv1alpha1.EnvVar{
 				{

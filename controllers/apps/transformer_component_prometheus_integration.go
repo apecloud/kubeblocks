@@ -56,16 +56,16 @@ func (i componentPrometheusIntegrationTransformer) Transform(ctx graph.Transform
 	synthesizeComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	if synthesizeComp.MonitorIntegration == nil {
+	if synthesizeComp.MetricsStoreIntegration == nil {
 		return nil
 	}
-	if err := i.buildPrometheusMonitorService(transCtx, synthesizeComp.MonitorIntegration, graphCli, dag); err != nil {
+	if err := i.buildPrometheusMonitorService(transCtx, synthesizeComp.MetricsStoreIntegration, graphCli, dag); err != nil {
 		return err
 	}
-	return i.buildVMMonitorService(transCtx, synthesizeComp.MonitorIntegration, graphCli)
+	return i.buildVMMonitorService(transCtx, synthesizeComp.MetricsStoreIntegration, graphCli)
 }
 
-func (i componentPrometheusIntegrationTransformer) buildPrometheusMonitorService(transCtx *componentTransformContext, monitorIntegration *appsv1alpha1.MonitorIntegration, graphCli model.GraphClient, dag *graph.DAG) error {
+func (i componentPrometheusIntegrationTransformer) buildPrometheusMonitorService(transCtx *componentTransformContext, msi *appsv1alpha1.MetricsStoreIntegration, graphCli model.GraphClient, dag *graph.DAG) error {
 	var running *monitoringv1.ServiceMonitor
 
 	objects, err := listMonitorServices(transCtx.GetContext(),
@@ -77,14 +77,14 @@ func (i componentPrometheusIntegrationTransformer) buildPrometheusMonitorService
 	if err != nil {
 		return err
 	}
-	if monitorIntegration.ServiceMonitorTemplate == nil {
+	if msi.ServiceMonitorTemplate == nil {
 		deleteObjects(objects, graphCli, dag)
 		return nil
 	}
 
 	cmp := func(obj monitoringv1.ServiceMonitor) bool {
-		return obj.Namespace == monitorIntegration.ServiceMonitorTemplate.Namespace &&
-			strings.HasPrefix(obj.Name, monitorIntegration.ServiceMonitorTemplate.Name)
+		return obj.Namespace == msi.ServiceMonitorTemplate.Namespace &&
+			strings.HasPrefix(obj.Name, msi.ServiceMonitorTemplate.Name)
 	}
 	index := slices.IndexFunc(objects, cmp)
 	if index >= 0 {
@@ -93,7 +93,7 @@ func (i componentPrometheusIntegrationTransformer) buildPrometheusMonitorService
 	}
 
 	deleteObjects(objects, graphCli, dag)
-	return createOrUpdateMonitorService(transCtx, running, monitorIntegration.ServiceMonitorTemplate, graphCli, dag)
+	return createOrUpdateMonitorService(transCtx, running, msi.ServiceMonitorTemplate, graphCli, dag)
 }
 
 func createOrUpdateMonitorService(transCtx *componentTransformContext, existing *monitoringv1.ServiceMonitor, template *appsv1alpha1.ServiceMonitorTemplate, graphCli model.GraphClient, dag *graph.DAG) error {
@@ -143,7 +143,7 @@ func createMonitorService(transCtx *componentTransformContext, template *appsv1a
 	return service, nil
 }
 
-func (i componentPrometheusIntegrationTransformer) buildVMMonitorService(transCtx *componentTransformContext, integration *appsv1alpha1.MonitorIntegration, graphCli model.GraphClient) error {
+func (i componentPrometheusIntegrationTransformer) buildVMMonitorService(transCtx *componentTransformContext, integration *appsv1alpha1.MetricsStoreIntegration, graphCli model.GraphClient) error {
 	// TODO: support vm operator
 	if integration.VMMonitorTemplate == nil {
 		return nil

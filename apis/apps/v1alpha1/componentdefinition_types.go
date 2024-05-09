@@ -193,6 +193,13 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
+	// Deprecated since v0.9
+	// monitor is monitoring config which provided by provider.
+	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
+	// +optional
+	Monitor *MonitorConfig `json:"monitor,omitempty"`
+
 	// Defines the built-in metrics exporter container.
 	//
 	// +optional

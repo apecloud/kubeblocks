@@ -1080,10 +1080,10 @@ string
 </tr>
 <tr>
 <td>
-<code>monitorIntegration</code><br/>
+<code>metricsStoreIntegration</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorIntegration">
-MonitorIntegration
+<a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">
+MetricsStoreIntegration
 </a>
 </em>
 </td>
@@ -1339,6 +1339,21 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>monitor</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
+MonitorConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Deprecated since v0.9
+monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 <tr>
@@ -5012,10 +5027,10 @@ The administrator must manually manage the cleanup and removal of these resource
 </tr>
 <tr>
 <td>
-<code>monitorIntegration</code><br/>
+<code>metricsStoreIntegration</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorIntegration">
-MonitorIntegration
+<a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">
+MetricsStoreIntegration
 </a>
 </em>
 </td>
@@ -7346,6 +7361,21 @@ These instance-specific overrides can be specified in <code>cluster.spec.compone
 </tr>
 <tr>
 <td>
+<code>monitor</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
+MonitorConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Deprecated since v0.9
+monitor is monitoring config which provided by provider.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>exporter</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.Exporter">
@@ -8800,10 +8830,10 @@ string
 </tr>
 <tr>
 <td>
-<code>monitorIntegration</code><br/>
+<code>metricsStoreIntegration</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorIntegration">
-MonitorIntegration
+<a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">
+MetricsStoreIntegration
 </a>
 </em>
 </td>
@@ -12959,53 +12989,7 @@ for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>builtIn</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>builtIn is a switch to enable KubeBlocks builtIn monitoring.
-If BuiltIn is set to true, monitor metrics will be scraped automatically.
-If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>exporterConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ExporterConfig">
-ExporterConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>exporterConfig provided by provider, which specify necessary information to Time Series Database.
-exporterConfig is valid when builtIn is false.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorIntegration">MonitorIntegration
+<h3 id="apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">MetricsStoreIntegration
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
@@ -13069,6 +13053,52 @@ vmServiceScrapeSpec:
     matchLabels:
       app: app-exporter
 </code></pre>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>builtIn</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>builtIn is a switch to enable KubeBlocks builtIn monitoring.
+If BuiltIn is set to true, monitor metrics will be scraped automatically.
+If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>exporterConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ExporterConfig">
+ExporterConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>exporterConfig provided by provider, which specify necessary information to Time Series Database.
+exporterConfig is valid when builtIn is false.</p>
 </td>
 </tr>
 </tbody>
@@ -18148,7 +18178,7 @@ int64
 <h3 id="apps.kubeblocks.io/v1alpha1.ServiceMonitorTemplate">ServiceMonitorTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorIntegration">MonitorIntegration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">MetricsStoreIntegration</a>)
 </p>
 <div>
 </div>
@@ -20353,7 +20383,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.VMMonitorTemplate">VMMonitorTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorIntegration">MonitorIntegration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">MetricsStoreIntegration</a>)
 </p>
 <div>
 </div>

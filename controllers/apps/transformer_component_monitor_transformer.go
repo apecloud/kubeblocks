@@ -50,7 +50,7 @@ func (c componentMonitorContainerTransformer) Transform(ctx graph.TransformConte
 	}
 
 	if synthesizeComp.DisableExporter != nil && *synthesizeComp.DisableExporter {
-		removeMonitorContainer(compDef.Spec.Exporter, synthesizeComp)
+		removeMonitorContainer(component.GetExporter(compDef.Spec), synthesizeComp)
 	}
 	return
 }

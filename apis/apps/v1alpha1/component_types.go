@@ -219,7 +219,7 @@ type ComponentSpec struct {
 	// It supports prometheus/victoriametrics operator.
 	//
 	// +optional
-	MonitorIntegration *MonitorIntegration `json:"monitorIntegration,omitempty"`
+	MetricsStoreIntegration *MetricsStoreIntegration `json:"metricsStoreIntegration,omitempty"`
 
 	// Determines whether metrics exporter information is annotated on the Component's headless Service.
 	//

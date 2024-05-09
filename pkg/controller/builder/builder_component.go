@@ -70,8 +70,8 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
-func (builder *ComponentBuilder) SetMonitorIntegration(monitorIntegration *appsv1alpha1.MonitorIntegration) *ComponentBuilder {
-	builder.get().Spec.MonitorIntegration = monitorIntegration
+func (builder *ComponentBuilder) SetMetricsStoreIntegration(msi *appsv1alpha1.MetricsStoreIntegration) *ComponentBuilder {
+	builder.get().Spec.MetricsStoreIntegration = msi
 	return builder
 }
 

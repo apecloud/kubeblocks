@@ -85,7 +85,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetSchedulingPolicy(schedulingPolicy).
-		SetMonitorIntegration(compSpec.MonitorIntegration).
+		SetMetricsStoreIntegration(compSpec.MetricsStoreIntegration).
 		DisableExporter(compSpec.GetDisableExporter()).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
@@ -289,4 +289,20 @@ func GetHostNetworkRelatedComponents(podSpec *corev1.PodSpec, ctx context.Contex
 		return nil, nil
 	}
 	return CheckAndGetClusterComponents(ctx, cli, cluster)
+}
+
+func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *appsv1alpha1.Exporter {
+	if componentDef.Exporter != nil {
+		return componentDef.Exporter
+	}
+
+	// Compatible with previous versions of kb
+	if componentDef.Monitor == nil || componentDef.Monitor.Exporter == nil {
+		return nil
+	}
+
+	return &appsv1alpha1.Exporter{
+		ScrapePath: componentDef.Monitor.Exporter.ScrapePath,
+		ScrapePort: componentDef.Monitor.Exporter.ScrapePort.String(),
+	}
 }

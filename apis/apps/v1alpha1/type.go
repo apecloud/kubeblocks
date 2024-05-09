@@ -1316,7 +1316,7 @@ type VMMonitorTemplate struct {
 	VMServiceScrapeSpec vmv1beta1.VMServiceScrapeSpec `json:"vmServiceScrapeSpec,omitempty"`
 }
 
-type MonitorIntegration struct {
+type MetricsStoreIntegration struct {
 	// Specifies the ServiceMonitor template used in the Component.
 	//
 	// Example usage:
@@ -1338,6 +1338,7 @@ type MonitorIntegration struct {
 	// +optional
 	ServiceMonitorTemplate *ServiceMonitorTemplate `json:"serviceMonitorTemplate,omitempty"`
 
+	// TODO: vm is currently not supported yet.
 	// Specifies the VMServiceScrape template used in the Component.
 	//
 	// ```yaml

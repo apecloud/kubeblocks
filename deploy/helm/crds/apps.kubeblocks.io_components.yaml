@@ -2368,7 +2368,7 @@ spec:
                   - name
                   type: object
                 type: array
-              monitorIntegration:
+              metricsStoreIntegration:
                 description: It supports prometheus/victoriametrics operator.
                 properties:
                   serviceMonitorTemplate:
@@ -3162,10 +3162,11 @@ spec:
                         type: object
                     type: object
                   vmMonitorTemplate:
-                    description: "Specifies the VMServiceScrape template used in the
-                      Component. \n ```yaml name: vm-scrape namespace: default labels:
-                      k8s-app: node-exporter vmServiceScrapeSpec: selector: matchLabels:
-                      app: app-exporter ```"
+                    description: "TODO: vm is currently not supported yet. Specifies
+                      the VMServiceScrape template used in the Component. \n ```yaml
+                      name: vm-scrape namespace: default labels: k8s-app: node-exporter
+                      vmServiceScrapeSpec: selector: matchLabels: app: app-exporter
+                      ```"
                     properties:
                       metadata:
                         description: Standard k8s object's metadata.

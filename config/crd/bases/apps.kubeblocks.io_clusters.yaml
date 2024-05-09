@@ -2786,16 +2786,7 @@ spec:
                       required:
                       - name
                       type: object
-                    monitor:
-                      description: "Deprecated since v0.9 Determines whether metrics
-                        exporter information is annotated on the Component's headless
-                        Service. \n If set to true, the following annotations will
-                        be patched into the Service: \n - \"monitor.kubeblocks.io/path\"
-                        - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
-                        \n These annotations allow the Prometheus installed by KubeBlocks
-                        to discover and scrape metrics from the exporter."
-                      type: boolean
-                    monitorIntegration:
+                    metricsStoreIntegration:
                       description: It supports prometheus/victoriametrics operator.
                       properties:
                         serviceMonitorTemplate:
@@ -3635,10 +3626,11 @@ spec:
                               type: object
                           type: object
                         vmMonitorTemplate:
-                          description: "Specifies the VMServiceScrape template used
-                            in the Component. \n ```yaml name: vm-scrape namespace:
-                            default labels: k8s-app: node-exporter vmServiceScrapeSpec:
-                            selector: matchLabels: app: app-exporter ```"
+                          description: "TODO: vm is currently not supported yet. Specifies
+                            the VMServiceScrape template used in the Component. \n
+                            ```yaml name: vm-scrape namespace: default labels: k8s-app:
+                            node-exporter vmServiceScrapeSpec: selector: matchLabels:
+                            app: app-exporter ```"
                           properties:
                             metadata:
                               description: Standard k8s object's metadata.
@@ -4731,6 +4723,15 @@ spec:
                               type: object
                           type: object
                       type: object
+                    monitor:
+                      description: "Deprecated since v0.9 Determines whether metrics
+                        exporter information is annotated on the Component's headless
+                        Service. \n If set to true, the following annotations will
+                        be patched into the Service: \n - \"monitor.kubeblocks.io/path\"
+                        - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
+                        \n These annotations allow the Prometheus installed by KubeBlocks
+                        to discover and scrape metrics from the exporter."
+                      type: boolean
                     name:
                       description: "Specifies the Component's name. It's part of the
                         Service DNS name and must comply with the IANA service naming
@@ -10984,16 +10985,7 @@ spec:
                           required:
                           - name
                           type: object
-                        monitor:
-                          description: "Deprecated since v0.9 Determines whether metrics
-                            exporter information is annotated on the Component's headless
-                            Service. \n If set to true, the following annotations
-                            will be patched into the Service: \n - \"monitor.kubeblocks.io/path\"
-                            - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
-                            \n These annotations allow the Prometheus installed by
-                            KubeBlocks to discover and scrape metrics from the exporter."
-                          type: boolean
-                        monitorIntegration:
+                        metricsStoreIntegration:
                           description: It supports prometheus/victoriametrics operator.
                           properties:
                             serviceMonitorTemplate:
@@ -11860,11 +11852,11 @@ spec:
                                   type: object
                               type: object
                             vmMonitorTemplate:
-                              description: "Specifies the VMServiceScrape template
-                                used in the Component. \n ```yaml name: vm-scrape
-                                namespace: default labels: k8s-app: node-exporter
-                                vmServiceScrapeSpec: selector: matchLabels: app: app-exporter
-                                ```"
+                              description: "TODO: vm is currently not supported yet.
+                                Specifies the VMServiceScrape template used in the
+                                Component. \n ```yaml name: vm-scrape namespace: default
+                                labels: k8s-app: node-exporter vmServiceScrapeSpec:
+                                selector: matchLabels: app: app-exporter ```"
                               properties:
                                 metadata:
                                   description: Standard k8s object's metadata.
@@ -13006,6 +12998,15 @@ spec:
                                   type: object
                               type: object
                           type: object
+                        monitor:
+                          description: "Deprecated since v0.9 Determines whether metrics
+                            exporter information is annotated on the Component's headless
+                            Service. \n If set to true, the following annotations
+                            will be patched into the Service: \n - \"monitor.kubeblocks.io/path\"
+                            - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
+                            \n These annotations allow the Prometheus installed by
+                            KubeBlocks to discover and scrape metrics from the exporter."
+                          type: boolean
                         name:
                           description: "Specifies the Component's name. It's part
                             of the Service DNS name and must comply with the IANA

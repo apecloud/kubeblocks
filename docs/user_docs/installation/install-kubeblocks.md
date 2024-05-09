@@ -125,8 +125,14 @@ kubectl -n kb-system get pods
 If the KubeBlocks Workloads are all ready, KubeBlocks has been installed successfully.
 
 ```bash
-NAME                                            READY   STATUS    RESTARTS      AGE
-kb-addon-snapshot-controller-649f8b9949-2wzzk   1/1     Running   2 (24m ago)   147d
-kubeblocks-dataprotection-f6dbdbf7f-5fdr9       1/1     Running   2 (24m ago)   147d
-kubeblocks-6497f7947-mc7vc                      1/1     Running   2 (24m ago)   147d
+NAME                                                     READY   STATUS       AGE
+kb-addon-snapshot-controller-7b447684d4-q86zf            1/1     Running      33d
+kb-addon-csi-hostpath-driver-0                           8/8     Running      33d
+kb-addon-grafana-54b9cbf65d-k8522                        3/3     Running      33d
+kb-addon-apecloud-otel-collector-j4thb                   1/1     Running      33d
+kubeblocks-5b5648bfd9-8jpvv                              1/1     Running      33d
+kubeblocks-dataprotection-f54c9486c-2nfmr                1/1     Running      33d
+kb-addon-alertmanager-webhook-adaptor-76b87f9df8-xb74g   2/2     Running      33d
+kb-addon-prometheus-server-0                             2/2     Running      33d
+kb-addon-prometheus-alertmanager-0                       2/2     Running      33d
 ```

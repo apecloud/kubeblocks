@@ -3676,7 +3676,7 @@ string
 <td>
 <p>Specifies the name of a ClusterDefinition.
 This is an immutable attribute that cannot be changed after creation.
-And this field is deprecated since v0.9.</p>
+And this field is deprecated since v0.9, consider using the ComponentDef instead.</p>
 </td>
 </tr>
 <tr>
@@ -3754,7 +3754,7 @@ string
 <td>
 <p>Specifies the name of a ClusterDefinition.
 This is an immutable attribute that cannot be changed after creation.
-And this field is deprecated since v0.9.</p>
+And this field is deprecated since v0.9, consider using the ComponentDef instead.</p>
 </td>
 </tr>
 <tr>

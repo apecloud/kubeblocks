@@ -58,46 +58,46 @@ cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
+  labels:
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: 8.0.30
+    helm.sh/chart: apecloud-mysql-cluster-0.8.0
   name: mycluster
   namespace: demo
-  labels:
-    helm.sh/chart: apecloud-mysql-cluster-0.8.0
-    app.kubernetes.io/version: "8.0.30"
-    app.kubernetes.io/instance: mycluster
 spec:
-  clusterVersionRef: ac-mysql-8.0.30
-  terminationPolicy: Delete
   affinity:
     podAntiAffinity: Required
-    topologyKeys:
-      - kubernetes.io/hostname
     tenancy: SharedNode
-  clusterDefinitionRef: apecloud-mysql # ref clusterdefinition.name
+    topologyKeys:
+    - kubernetes.io/hostname
+  clusterDefinitionRef: apecloud-mysql
+  clusterVersionRef: ac-mysql-8.0.30
   componentSpecs:
-    - name: mysql
-      componentDefRef: mysql # ref clusterdefinition componentDefs.name
-      monitor: false
-      replicas: 3
-      enabledLogs:
-        - slow
-        - error
-      serviceAccountName:
-      resources:
-        limits:
-          cpu: "2"
-          memory: "2Gi"
-        requests:
-          cpu: "2"
-          memory: "2Gi"
-      volumeClaimTemplates:
-        - name: data # ref clusterDefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-      services:
+  - componentDefRef: mysql
+    enabledLogs:
+    - slow
+    - error
+    monitor: false
+    name: mysql
+    replicas: 3
+    resources:
+      limits:
+        cpu: "0.5"
+        memory: 0.5Gi
+      requests:
+        cpu: "0.5"
+        memory: 0.5Gi
+    serviceAccountName: null
+    services: null
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  terminationPolicy: Delete
 EOF
 ```
 
@@ -109,6 +109,55 @@ EOF
 * `spec.componentSpecs.name` is the name of the component.
 * `spec.componentSpecs.replicas` is the number of replicas of the component.
 * `spec.componentSpecs.resources` is the resource requirements of the component.
+
+If you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`.
+
+```yaml
+cat <<EOF | kubectl apply -f -
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  labels:
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: 8.0.30
+    helm.sh/chart: apecloud-mysql-cluster-0.8.0
+  name: mycluster
+  namespace: demo
+spec:
+  affinity:
+    podAntiAffinity: Required
+    tenancy: SharedNode
+    topologyKeys: null
+  clusterDefinitionRef: apecloud-mysql
+  clusterVersionRef: ac-mysql-8.0.30
+  componentSpecs:
+  - componentDefRef: mysql
+    enabledLogs:
+    - slow
+    - error
+    monitor: false
+    name: mysql
+    replicas: 3
+    resources:
+      limits:
+        cpu: "0.5"
+        memory: 0.5Gi
+      requests:
+        cpu: "0.5"
+        memory: 0.5Gi
+    serviceAccountName: null
+    services: null
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  terminationPolicy: Delete
+EOF
+```
 
 KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mysql-cluster -n demo`.
 

@@ -8,41 +8,177 @@ sidebar_label: Configuration
 
 # Configure cluster parameters
 
-The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter configuration, searching the parameter user guide, and validating parameter effectiveness.
+This guide shows how to configure cluster parameters by creating an opsRequest.
 
-From v0.6.0, KubeBlocks supports both `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
+KubeBlocks supports dynamic configuration. When the specification of a database instance changes (e.g., a user vertically scales a cluster), KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is because different specifications of a database instance may require different optimal configurations to optimize performance and resource utilization. When you choose a different database instance specification, KubeBlocks automatically detects and determines the best database configuration for the new specification, ensuring optimal performance and configuration of the database under the new specifications.
 
-## View parameter information
+This feature simplifies the process ofconfiguring parameters, which saves you from manually configuring database parameters as KubeBlocks handles the updates and configurations automatically to adapt to the new specifications. This saves time and effort and reduces performance issues caused by incorrect configuration.
 
-View the current configuration file of a cluster.
+But it's also important to note that the dynamic parameter configuration doesn't apply to all parameters. Some parameters may require manual configuration. Additionally, if you have manually modified database parameters before, KubeBlocks may overwrite your customized configurations when refreshing the database configuration template. Therefore, when using the dynamic configuration feature, it is recommended to back up and record your custom configuration so that you can restore them if needed.
+
+## Before you start
+
+1. [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+2. [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
+
+## Configure cluster parameters with OpsRequest
+
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+
+   ```bash
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-configuring-demo
+     namespace:demo
+   spec:
+     clusterName: mycluster
+     reconfigure:
+       componentName: mysql
+       configurations:
+       - keys:
+         - key: my.cnf
+           parameters:
+           - key: max_connections
+             value:"600"
+         name: mysql-configuration
+     ttlSecondBeforeAbort: 0
+     type: Reconfiguring
+   EOF
+   ```
+
+   * `metadata.name` specifies the name of this OpsRequest.
+   * `metadata.namespace` specifies the namespace where this cluster is created.
+   * `spec.clusterName` specifies the cluster name.
+   * `spec.reconfigure` specifies the configuration information. `componentName`specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
+
+2. Apply the configuration opsRequest.
+
+   ```bash
+   kubectl apply -f mycluster-configuring-demo.yaml
+   ```
+
+3. Connect to this cluster to verify whether the configuration takes effect.
+
+   1. Get the username and password.
+
+      ```bash
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      >
+      root
+
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      >
+      2gvztbvz
+      ```
+
+   2. Connect to this cluster and verify whether the parameters are configured as expected.
+
+      ```bash
+      kubectl exec -ti -n demo mycluster-mysql-0 -- bash
+
+      mysql -uroot -p2gvztbvz
+      >
+      mysql> show variables like 'max_connections';
+      +-----------------+-------+
+      | Variable_name   | Value |
+      +-----------------+-------+
+      | max_connections | 600   |
+      +-----------------+-------+
+      1 row in set (0.00 sec)
+      ```
+
+## Configure cluster parameters by configuration file
+
+1. Get the configuration file of this cluster.
+
+   ```bash
+   kubectl edit configurations.apps.kubeblocks.io mycluster-mysql -n demo
+   ```
+
+2. Configure parameters according to your needs. The example below adds the `- configFileParams` part to configure `max_connections`.
+
+   ```yaml
+   spec:
+     clusterRef: mycluster
+     componentName: mysql
+     configItemDetails:
+     - configFileParams:
+         my.cnf:
+           parameters:
+             max_connections: "600"
+       configSpec:
+         constraintRef: mysql8.0-config-constraints
+         name: mysql-consensusset-config
+         namespace: kb-system
+         templateRef: mysql8.0-config-template
+         volumeName: mysql-config
+       name: mysql-consensusset-config
+     - configSpec:
+         defaultMode: 292
+   ```
+
+3. Connect to this cluster to verify whether the configuration takes effect.
+
+   1. Get the username and password.
+
+      ```bash
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      >
+      root
+
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      >
+      2gvztbvz
+      ```
+
+   2. Connect to this cluster and verify whether the parameters are configured as expected.
+
+      ```bash
+      kubectl exec -ti -n demo mycluster-mysql-0 -- bash
+
+      mysql -uroot -p2gvztbvz
+      >
+      mysql> show variables like 'max_connections';
+      +-----------------+-------+
+      | Variable_name   | Value |
+      +-----------------+-------+
+      | max_connections | 600   |
+      +-----------------+-------+
+      1 row in set (0.00 sec)
+      ```
+
+:::note
+
+Just in case you cannot find the configuration file of your cluster, you can use `kbcli` to view the current configuration file of a cluster.
 
 ```bash
-kbcli cluster describe-config mysql-cluster  
+kbcli cluster describe-config mycluster -n demo
 ```
 
-From the meta information, the cluster `mysql-cluster` has a configuration file named `my.cnf`.
+From the meta information, the cluster `mycluster` has a configuration file named `my.cnf`.
 
 You can also view the details of this configuration file and parameters.
 
 * View the details of the current configuration file.
 
    ```bash
-   kbcli cluster describe-config mysql-cluster --show-detail
+   kbcli cluster describe-config mycluster --show-detail -n demo
    ```
 
 * View the parameter description.
 
   ```bash
-  kbcli cluster explain-config mysql-cluster | head -n 20
+  kbcli cluster explain-config mycluster -n demo | head -n 20
   ```
 
 * View the user guide of a specified parameter.
   
   ```bash
-  kbcli cluster explain-config mysql-cluster --param=innodb_buffer_pool_size --config-spec=mysql-consensusset-config
+  kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-spec=mysql-consensusset-config -n demo
   ```
 
-  `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mysql-cluster` to view the all template names.
+  `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
 
   <details>
 
@@ -50,7 +186,7 @@ You can also view the details of this configuration file and parameters.
 
   ```bash
   template meta:
-    ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mysql-cluster
+    ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mycluster
 
   Configure Constraint:
     Parameter Name:     innodb_buffer_pool_size
@@ -68,200 +204,4 @@ You can also view the details of this configuration file and parameters.
     * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online.
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make the configuration effective.
   * Description: It describes the parameter definition.
-
-## Configure parameters
-
-### Configure parameters with configure command
-
-The example below takes configuring `max_connections` and `innodb_buffer_pool_size` as an example.
-
-1. View the current values of `max_connections` and `innodb_buffer_pool_size`.
-
-   ```bash
-   kbcli cluster connect mysql-cluster
-   ```
-
-   ```bash
-   mysql> show variables like '%max_connections%';
-   >
-   +-----------------+-------+
-   | Variable_name   | Value |
-   +-----------------+-------+
-   | max_connections | 167   |
-   +-----------------+-------+
-   1 row in set (0.04 sec)
-   ```
-
-   ```bash
-   mysql> show variables like '%innodb_buffer_pool_size%';
-   >
-   +-------------------------+-----------+
-   | Variable_name           | Value     |
-   +-------------------------+-----------+
-   | innodb_buffer_pool_size | 134217728 |
-   +-------------------------+-----------+
-   1 row in set (0.00 sec)
-   ```
-
-2. Adjust the values of `max_connections` and `innodb_buffer_pool_size`.
-
-   ```bash
-   kbcli cluster configure mysql-cluster --set=max_connections=600,innodb_buffer_pool_size=512M
-   ```
-
-   :::note
-
-   Make sure the value you set is within the Allowed Values of this parameter. If you set a value that does not meet the value range, the system prompts an error. For example,
-
-   ```bash
-   kbcli cluster configure mysql-cluster  --set=max_connections=200,innodb_buffer_pool_size=2097152
-   error: failed to validate updated config: [failed to cue template render configure: [mysqld.innodb_buffer_pool_size: invalid value 2097152 (out of bound >=5242880):
-    343:34
-   ]
-   ]
-   ```
-
-   :::
-
-3. Search the status of the parameter configuration.
-
-   `Status.Progress` shows the overall status of the parameter configuration and `Conditions` show the details.
-
-   ```bash
-   kbcli cluster describe-ops mysql-cluster-reconfiguring-z2wvn -n default
-   ```
-
-   <details>
-
-   <summary>Output</summary>
-
-   ```bash
-   Spec:
-     Name: mysql-cluster-reconfiguring-z2wvn        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
-
-    Command:
-      kbcli cluster configure mysql-cluster --components=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set innodb_buffer_pool_size=512M --set max_connections=600
-
-    Status:
-      Start Time:         Mar 13,2023 02:55 UTC+0800
-      Completion Time:    Mar 13,2023 02:55 UTC+0800
-      Duration:           1s
-      Status:             Succeed
-      Progress:           1/1
-
-    Conditions:
-    LAST-TRANSITION-TIME         TYPE                 REASON                            STATUS   MESSAGE
-    Mar 13,2023 02:55 UTC+0800   Progressing          OpsRequestProgressingStarted      True     Start to process the OpsRequest: mysql-cluster-reconfiguring-z2wvn in Cluster: mysql-cluster
-    Mar 13,2023 02:55 UTC+0800   Validated            ValidateOpsRequestPassed          True     OpsRequest: mysql-cluster-reconfiguring-z2wvn is validated
-    Mar 13,2023 02:55 UTC+0800   Reconfigure          ReconfigureStarted                True     Start to reconfigure in Cluster: mysql-cluster, Component: mysql
-    Mar 13,2023 02:55 UTC+0800   ReconfigureMerged    ReconfigureMerged                 True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-consensusset-config, info: updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
-    Mar 13,2023 02:55 UTC+0800   ReconfigureSucceed   ReconfigureSucceed                True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-consensusset-config, info: updated policy: <autoReload>, updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
-    Mar 13,2023 02:55 UTC+0800   Succeed              OpsRequestProcessedSuccessfully   True     Successfully processed the OpsRequest: mysql-cluster-reconfiguring-z2wvn in Cluster: mysql-cluster
-    ```
-
-    </details>
-
-4. Connect to the database to verify whether the parameters are configured as expected.
-
-   The whole searching process has a 30-second delay since it takes some time for kubelet to synchronize modifications to the volume of the pod.
-
-   ```bash
-   kbcli cluster connect mysql-cluster
-   ```
-
-   ```bash
-   mysql> show variables like '%max_connections%';
-   >
-   +-----------------+-------+
-   | Variable_name   | Value |
-   +-----------------+-------+
-   | max_connections | 600   |
-   +-----------------+-------+
-   1 row in set (0.04 sec)
-   ```
-  
-   ```bash
-   mysql> show variables like '%innodb_buffer_pool_size%';
-   >
-   +-------------------------+-----------+
-   | Variable_name           | Value     |
-   +-------------------------+-----------+
-   | innodb_buffer_pool_size | 536870912 |
-   +-------------------------+-----------+
-   1 row in set (0.00 sec)
-   ```
-
-### Configure parameters with edit-config command
-
-For your convenience, KubeBlocks offers a tool `edit-config` to help you configure parameters in a visualized way.
-
-For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on the notepad.
-
-The following steps take configuring MySQL Standalone as an example.
-
-1. Edit the configuration file.
-
-   ```bash
-   kbcli cluster edit-config mysql-cluster --config-spec=mysql-consensusset-config
-   ```
-
-   :::note
-
-   * Since ApeCloud MySQL currently supports multiple templates, it is required to use `--config-spec` to specify a configuration template. You can run `kbcli cluster describe-config mysql-cluster` to view all template names.
-   * If there are multiple components in a cluster, use `--component` to specify a component.
-
-   :::
-
-2. View the status of the parameter configuration.
-
-   ```bash
-   kbcli cluster describe-ops xxx -n default
-   ```
-
-3. Connect to the database to verify whether the parameters are configured as expected.
-
-   ```bash
-   kbcli cluster connect mysql-cluster
-   ```
-
-   :::note
-
-   1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
-   2. Deleting a parameter will be supported later.
-
-   :::
-
-## View history and compare differences
-
-After the configuration is completed, you can search the configuration history and compare the parameter differences.
-
-View the parameter configuration history.
-
-```bash
-kbcli cluster describe-config mysql-cluster
->
-ConfigSpecs Meta:
-CONFIG-SPEC-NAME            FILE     ENABLED   TEMPLATE                   CONSTRAINT                    RENDERED                                  COMPONENT   CLUSTER                
-mysql-consensusset-config   my.cnf   true      mysql8.0-config-template   mysql8.0-config-constraints   mysql-cluster-mysql-mysql-config   mysql       mysql-cluster   
-
-History modifications:
-OPS-NAME                            CLUSTER         COMPONENT   CONFIG-SPEC-NAME            FILE     STATUS    POLICY   PROGRESS   CREATED-TIME                 VALID-UPDATED                                                                                                                     
-mysql-cluster-reconfiguring-4q5kv   mysql-cluster   mysql       mysql-consensusset-config   my.cnf   Succeed   reload   -/-        Mar 16,2023 15:44 UTC+0800   {"my.cnf":"{\"mysqld\":{\"max_connections\":\"3000\",\"read_buffer_size\":\"24288\"}}"}                                           
-mysql-cluster-reconfiguring-cclvm   mysql-cluster   mysql       mysql-consensusset-config   my.cnf   Succeed   reload   -/-        Mar 16,2023 17:28 UTC+0800   {"my.cnf":"{\"mysqld\":{\"innodb_buffer_pool_size\":\"1G\",\"max_connections\":\"600\"}}"}   
-mysql-cluster-reconfiguring-gx58r   mysql-cluster   mysql       mysql-consensusset-config   my.cnf   Succeed            -/-        Mar 16,2023 17:28 UTC+0800                       
-```
-
-From the above results, there are three parameter modifications.
-
-Compare these modifications to view the configured parameters and their different values for different versions.
-
-```bash
-kbcli cluster diff-config mysql-cluster-reconfiguring-4q5kv mysql-cluster-reconfiguring-gx58r
->
-DIFF-CONFIGURE RESULT:
-  ConfigFile: my.cnf    TemplateName: mysql-consensusset-config ComponentName: mysql    ClusterName: mysql-cluster       UpdateType: update      
-
-PARAMETERNAME             MYSQL-CLUSTER-RECONFIGURING-4Q5KV   MYSQL-CLUSTER-RECONFIGURING-GX58R   
-max_connections           3000                                600                                        
-innodb_buffer_pool_size   128M                                1G 
-```
+:::

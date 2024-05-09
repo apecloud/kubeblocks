@@ -61,45 +61,43 @@ cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
+  labels:
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: 5.0.14
+    helm.sh/chart: mongodb-cluster-0.8.0
   name: mycluster
   namespace: demo
-  labels:
-    helm.sh/chart: mongodb-cluster-0.8.0
-    app.kubernetes.io/version: "5.0.14"
-    app.kubernetes.io/instance: mycluster
-  # annotations:
-  #   kubeblocks.io/enabled-pod-ordinal-svc: mongodb
 spec:
-  clusterVersionRef: mongodb-5.0
-  terminationPolicy: Delete
   affinity:
     podAntiAffinity: Preferred
-    topologyKeys:
-      - kubernetes.io/hostname
     tenancy: SharedNode
+    topologyKeys:
+    - kubernetes.io/hostname
   clusterDefinitionRef: mongodb
+  clusterVersionRef: mongodb-5.0
   componentSpecs:
-    - name: mongodb
-      componentDefRef: mongodb
-      monitor: false
-      replicas: 1
-      serviceAccountName:
-      resources:
-        limits:
-          cpu: "0.5"
-          memory: "0.5Gi"
-        requests:
-          cpu: "0.5"
-          memory: "0.5Gi"
-      volumeClaimTemplates:
-        - name: data # ref clusterDefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-      services:
+  - componentDefRef: mongodb
+    monitor: false
+    name: mongodb
+    replicas: 1
+    resources:
+      limits:
+        cpu: "0.5"
+        memory: 0.5Gi
+      requests:
+        cpu: "0.5"
+        memory: 0.5Gi
+    serviceAccountName: null
+    services: null
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  terminationPolicy: Delete
 EOF
 ```
 

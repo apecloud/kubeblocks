@@ -49,7 +49,7 @@ func (c componentMonitorContainerTransformer) Transform(ctx graph.TransformConte
 		return
 	}
 
-	if !synthesizeComp.MonitorEnabled {
+	if synthesizeComp.DisableExporter != nil && *synthesizeComp.DisableExporter {
 		removeMonitorContainer(compDef.Spec.Exporter, synthesizeComp)
 	}
 	return

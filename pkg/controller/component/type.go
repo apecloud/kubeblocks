@@ -70,7 +70,7 @@ type SynthesizedComponent struct {
 	ComponentServices   []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
 	MinReadySeconds     int32                               `json:"minReadySeconds,omitempty"`
 	Sidecars            []string                            `json:"sidecars,omitempty"`
-	MonitorEnabled      bool                                `json:"monitorEnabled,omitempty"`
+	DisableExporter     *bool                               `json:"disableExporter,omitempty"`
 	MonitorIntegration  *v1alpha1.MonitorIntegration        `json:"monitorIntegration,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0

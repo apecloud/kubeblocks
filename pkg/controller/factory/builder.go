@@ -141,7 +141,7 @@ func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeC
 
 // getMonitorAnnotations returns the annotations for the monitor.
 func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) map[string]string {
-	if !synthesizedComp.MonitorEnabled || componentDef == nil {
+	if synthesizedComp.DisableExporter == nil || *synthesizedComp.DisableExporter || componentDef == nil {
 		return nil
 	}
 

@@ -891,14 +891,13 @@ int32
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">
-[]ComponentConfigSpec
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentConfig">
+[]ClusterComponentConfig
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Reserved field for future use.</p>
 </td>
 </tr>
 <tr>
@@ -4046,6 +4045,84 @@ bool
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentConfig">ClusterComponentConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+<p>ClusterComponentConfig represents a config with its source bound.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the config.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ClusterComponentConfigSource</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentConfigSource">
+ClusterComponentConfigSource
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterComponentConfigSource</code> are embedded into this type.)
+</p>
+<p>The source of the config.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentConfigSource">ClusterComponentConfigSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentConfig">ClusterComponentConfig</a>)
+</p>
+<div>
+<p>ClusterComponentConfigSource represents the source of a config.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>configMap</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#configmapvolumesource-v1-core">
+Kubernetes core/v1.ConfigMapVolumeSource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ConfigMap source for the config.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition
 </h3>
 <p>
@@ -4810,6 +4887,19 @@ These templates are used to dynamically provision persistent volumes for the Com
 <td>
 <em>(Optional)</em>
 <p>Overrides services defined in referenced ComponentDefinition and expose endpoints that can be accessed by clients.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentConfig">
+[]ClusterComponentConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 </td>
 </tr>
 <tr>
@@ -6939,7 +7029,7 @@ MatchExpressions
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">ClusterComponentVersion</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">ClusterComponentVersion</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
 </p>
 <div>
 </div>
@@ -8567,14 +8657,13 @@ int32
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">
-[]ComponentConfigSpec
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentConfig">
+[]ClusterComponentConfig
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Reserved field for future use.</p>
 </td>
 </tr>
 <tr>
@@ -8977,6 +9066,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the name of the referenced configuration template ConfigMap object.</p>
 </td>
 </tr>

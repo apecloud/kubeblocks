@@ -45,13 +45,14 @@ type ComponentTemplateSpec struct {
 
 	// Specifies the name of the referenced configuration template ConfigMap object.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
 	TemplateRef string `json:"templateRef"`
 
 	// Specifies the namespace of the referenced configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
+	//
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:default="default"
@@ -61,6 +62,7 @@ type ComponentTemplateSpec struct {
 	// Refers to the volume name of PodTemplate. The configuration file produced through the configuration
 	// template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`

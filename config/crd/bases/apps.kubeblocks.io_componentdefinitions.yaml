@@ -122,8 +122,7 @@ spec:
                   files, with each file being a key in the ConfigMap. \n The rendered
                   configuration files will be mounted into the Component's containers
                   according to the specified volume mount parameters. \n This field
-                  is immutable. \n TODO: support referencing configs from other components
-                  or clusters."
+                  is immutable."
                 items:
                   properties:
                     asEnvFrom:
@@ -277,7 +276,6 @@ spec:
                       type: string
                   required:
                   - name
-                  - templateRef
                   - volumeName
                   type: object
                 type: array
@@ -12666,7 +12664,6 @@ spec:
                       type: string
                   required:
                   - name
-                  - templateRef
                   - volumeName
                   type: object
                 type: array

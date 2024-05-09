@@ -728,6 +728,9 @@ type ClusterComponentSpec struct {
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
+	// +optional
+	Configs []ClusterComponentConfig `json:"configs,omitempty"`
+
 	// Defines the strategy for switchover and failover when workloadType is Replication.
 	//
 	// Deprecated since v0.9.
@@ -1204,6 +1207,31 @@ type ClusterComponentService struct {
 	//
 	// +optional
 	PodService *bool `json:"podService,omitempty"`
+}
+
+// ClusterComponentConfig represents a config with its source bound.
+type ClusterComponentConfig struct {
+	// The name of the config.
+	//
+	// +optional
+	Name *string `json:"name,omitempty"`
+
+	// The source of the config.
+	ClusterComponentConfigSource `json:",inline"`
+}
+
+// ClusterComponentConfigSource represents the source of a config.
+type ClusterComponentConfigSource struct {
+	// ConfigMap source for the config.
+	//
+	// +optional
+	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty"`
+
+	// TODO: support more diverse sources:
+	// - Config template of other components within the same cluster
+	// - Config template of components from other clusters
+	// - Secret
+	// - Local file
 }
 
 // ClusterNetwork is deprecated since v0.9.

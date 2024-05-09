@@ -95,10 +95,8 @@ type ComponentSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
-	// Reserved field for future use.
-	//
 	// +optional
-	Configs []ComponentConfigSpec `json:"configs,omitempty"`
+	Configs []ClusterComponentConfig `json:"configs,omitempty"`
 
 	// Specifies which types of logs should be collected for the Cluster.
 	// The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.

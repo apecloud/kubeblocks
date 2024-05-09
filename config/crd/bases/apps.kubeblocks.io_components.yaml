@@ -2378,26 +2378,22 @@ spec:
                       selector: matchLabels: app: app-exporter k8s-app: app-exporter
                       endpoints: - port: metrics_port jobLabel: k8s-app ```"
                     properties:
-                      metadata:
-                        description: Standard k8s object's metadata.
-                        properties:
-                          annotations:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          finalizers:
-                            items:
-                              type: string
-                            type: array
-                          labels:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          name:
-                            type: string
-                          namespace:
-                            type: string
+                      annotations:
+                        additionalProperties:
+                          type: string
                         type: object
+                      finalizers:
+                        items:
+                          type: string
+                        type: array
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      name:
+                        type: string
+                      namespace:
+                        type: string
                       serviceMonitorSpec:
                         description: ServiceMonitorSpec contains specification parameters
                           for a ServiceMonitor
@@ -3168,26 +3164,22 @@ spec:
                       vmServiceScrapeSpec: selector: matchLabels: app: app-exporter
                       ```"
                     properties:
-                      metadata:
-                        description: Standard k8s object's metadata.
-                        properties:
-                          annotations:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          finalizers:
-                            items:
-                              type: string
-                            type: array
-                          labels:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          name:
-                            type: string
-                          namespace:
-                            type: string
+                      annotations:
+                        additionalProperties:
+                          type: string
                         type: object
+                      finalizers:
+                        items:
+                          type: string
+                        type: array
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      name:
+                        type: string
+                      namespace:
+                        type: string
                       vmServiceScrapeSpec:
                         description: VMServiceScrapeSpec defines the desired state
                           of VMServiceScrape

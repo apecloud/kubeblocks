@@ -23,6 +23,7 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -76,8 +77,14 @@ func (i componentPrometheusIntegrationTransformer) buildPrometheusMonitorService
 		transCtx.Component,
 		intctrlutil.MonitorServiceSignature)
 	if err != nil {
-		return err
+		// if the k8s cluster does not have the related crd installed, ignore it.
+		if !meta.IsNoMatchError(err) {
+			return err
+		}
+		return nil
 	}
+
+	// clean up the created monitorService objects.
 	if msi.ServiceMonitorTemplate == nil {
 		deleteObjects(objects, graphCli, dag)
 		return nil

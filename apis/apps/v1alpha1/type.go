@@ -1296,7 +1296,7 @@ type ServiceMonitorTemplate struct {
 	// Standard k8s object's metadata.
 	//
 	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:",inline"`
 
 	// ServiceMonitorSpec contains specification parameters for a ServiceMonitor
 	//
@@ -1308,7 +1308,7 @@ type VMMonitorTemplate struct {
 	// Standard k8s object's metadata.
 	//
 	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:",inline"`
 
 	// VMServiceScrapeSpec defines the desired state of VMServiceScrape
 	//

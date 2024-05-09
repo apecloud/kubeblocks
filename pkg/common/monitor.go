@@ -17,7 +17,7 @@ limitations under the License.
 package common
 
 import (
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -41,7 +41,7 @@ func FromScrapePath(config appsv1alpha1.Exporter) string {
 	return defaultScrapePath
 }
 
-func FromContainerPort(config appsv1alpha1.Exporter, container *v1.Container) string {
+func FromContainerPort(config appsv1alpha1.Exporter, container *corev1.Container) string {
 	if config.ScrapePort != "" {
 		return config.ScrapePort
 	}
@@ -61,7 +61,7 @@ func FromScheme(config appsv1alpha1.Exporter) string {
 	return defaultScrapeScheme
 }
 
-func GetScrapeAnnotations(scrapeConfig appsv1alpha1.Exporter, container *v1.Container) map[string]string {
+func GetScrapeAnnotations(scrapeConfig appsv1alpha1.Exporter, container *corev1.Container) map[string]string {
 	return map[string]string{
 		PrometheusScrapeAnnotationPath:   FromScrapePath(scrapeConfig),
 		PrometheusScrapeAnnotationPort:   FromContainerPort(scrapeConfig, container),

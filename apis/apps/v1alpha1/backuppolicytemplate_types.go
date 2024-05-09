@@ -25,12 +25,12 @@ import (
 // BackupPolicyTemplateSpec contains the settings in a BackupPolicyTemplate.
 type BackupPolicyTemplateSpec struct {
 	// Specifies the name of a ClusterDefinition.
-	//
 	// This is an immutable attribute that cannot be changed after creation.
+	// And this field is deprecated since v0.9 because ClusterVersion is deprecated.
 	//
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
-	ClusterDefRef string `json:"clusterDefinitionRef"`
+	ClusterDefRef string `json:"clusterDefinitionRef,omitempty"`
 
 	// Represents an array of BackupPolicy templates, with each template corresponding to a specified ComponentDefinition
 	// or to a group of ComponentDefinitions that are different versions of definitions of the same component.

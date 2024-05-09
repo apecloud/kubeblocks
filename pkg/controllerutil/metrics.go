@@ -46,32 +46,35 @@ func EnabledRuntimeMetrics() bool {
 
 func GetScrapeAnnotations(scrapeConfig appsv1alpha1.Exporter, container *corev1.Container) map[string]string {
 	return map[string]string{
-		PrometheusScrapeAnnotationPath:   fromScrapePath(scrapeConfig),
-		PrometheusScrapeAnnotationPort:   fromContainerPort(scrapeConfig, container),
-		PrometheusScrapeAnnotationScheme: fromScheme(scrapeConfig),
+		PrometheusScrapeAnnotationPath:   FromScrapePath(scrapeConfig),
+		PrometheusScrapeAnnotationPort:   FromContainerPort(scrapeConfig, container),
+		PrometheusScrapeAnnotationScheme: FromScheme(scrapeConfig),
 		// Compatible with previous versions of kubeblocks.
 		PrometheusScrapeAnnotationEnabled: "true",
 	}
 }
 
-func fromScrapePath(config appsv1alpha1.Exporter) string {
+func FromScrapePath(config appsv1alpha1.Exporter) string {
 	if config.ScrapePath != "" {
 		return config.ScrapePath
 	}
 	return defaultScrapePath
 }
 
-func fromContainerPort(config appsv1alpha1.Exporter, container *corev1.Container) string {
+func FromContainerPort(config appsv1alpha1.Exporter, container *corev1.Container) string {
 	if config.ScrapePort != "" {
 		return config.ScrapePort
 	}
-	if config.ScrapePort == "" && container != nil && len(container.Ports) > 0 {
+	if container != nil && len(container.Ports) > 0 {
 		return container.Ports[0].Name
+	}
+	if config.TargetPort != nil {
+		return config.TargetPort.String()
 	}
 	return ""
 }
 
-func fromScheme(config appsv1alpha1.Exporter) string {
+func FromScheme(config appsv1alpha1.Exporter) string {
 	if config.ScrapeScheme != "" {
 		return string(config.ScrapeScheme)
 	}

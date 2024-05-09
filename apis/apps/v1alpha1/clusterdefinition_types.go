@@ -714,7 +714,7 @@ func (r *ClusterComponentDefinition) GetPrometheusExporter() *Exporter {
 
 	return &Exporter{
 		ScrapePath: r.Monitor.Exporter.ScrapePath,
-		ScrapePort: r.Monitor.Exporter.ScrapePort.String(),
+		TargetPort: &r.Monitor.Exporter.ScrapePort,
 	}
 }
 

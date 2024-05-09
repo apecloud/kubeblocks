@@ -150,8 +150,9 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, comp
 		return nil
 	}
 
+	// Node: If it is an old addon, containerName may be empty.
 	container := getBuiltinContainer(synthesizedComp, exporter.ContainerName)
-	if container == nil && exporter.ScrapePort == "" {
+	if container == nil && exporter.ScrapePort == "" && exporter.TargetPort == nil {
 		return nil
 	}
 	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*exporter, container))

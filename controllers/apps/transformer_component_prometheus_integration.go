@@ -23,13 +23,14 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"golang.org/x/exp/slices"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
@@ -117,30 +118,19 @@ func createOrUpdateMonitorService(transCtx *componentTransformContext, existing 
 
 func createMonitorService(transCtx *componentTransformContext, template *appsv1alpha1.ServiceMonitorTemplate, owner client.Object) (*monitoringv1.ServiceMonitor, error) {
 	genName := common.SimpleNameGenerator.GenerateName(template.Name)
-	service := &monitoringv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      genName,
-			Namespace: template.Namespace,
-			Labels: map[string]string{
-				constant.AppInstanceLabelKey:       transCtx.Cluster.Name,
-				constant.KBAppShardingNameLabelKey: transCtx.Component.Name,
-			},
-		},
-		Spec: template.ServiceMonitorSpec,
-	}
-
-	for key, value := range template.Labels {
-		if _, ok := service.Labels[key]; !ok {
-			service.Labels[key] = value
-		}
-	}
+	monitorService := builder.NewMonitorServiceBuilder(template.Namespace, genName).
+		AddLabelsInMap(template.Labels).
+		AddLabels(constant.AppInstanceLabelKey, transCtx.Cluster.Name).
+		AddLabels(constant.KBAppShardingNameLabelKey, transCtx.Component.Name).
+		SetMonitorServiceSpec(template.ServiceMonitorSpec).
+		SetDefaultEndpoint(component.GetExporter(transCtx.CompDef.Spec)).
+		GetObject()
 
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	if err := controllerutil.SetOwnerReference(service, owner, scheme); err != nil {
+	if err := controllerutil.SetOwnerReference(monitorService, owner, scheme); err != nil {
 		return nil, err
 	}
-
-	return service, nil
+	return monitorService, nil
 }
 
 func (i componentPrometheusIntegrationTransformer) buildVMMonitorService(transCtx *componentTransformContext, integration *appsv1alpha1.MetricsStoreIntegration, graphCli model.GraphClient) error {

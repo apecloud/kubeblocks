@@ -303,6 +303,6 @@ func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *appsv1alpha
 
 	return &appsv1alpha1.Exporter{
 		ScrapePath: componentDef.Monitor.Exporter.ScrapePath,
-		ScrapePort: componentDef.Monitor.Exporter.ScrapePort.String(),
+		TargetPort: &componentDef.Monitor.Exporter.ScrapePort,
 	}
 }

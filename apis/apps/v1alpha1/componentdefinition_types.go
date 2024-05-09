@@ -648,6 +648,15 @@ type Exporter struct {
 	// +kubebuilder:validation:default="http"
 	// +optional
 	ScrapeScheme PrometheusScheme `json:"scrapeScheme,omitempty"`
+
+	// Deprecated: use `scrapePort` instead.
+	// Compatible with previous versions of kb.
+	//
+	// Name or number of the target port of the `Pod` object behind the
+	// Service. The port must be specified with the container's port property.
+	//
+	// +optional
+	TargetPort *intstr.IntOrString `json:"targetPort,omitempty"`
 }
 
 // RoleArbitrator defines how to arbitrate the role of replicas.

@@ -212,6 +212,10 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build componentService
 	buildComponentServices(synthesizeComp, comp)
 
+	if err = overrideConfigTemplates(synthesizeComp, comp); err != nil {
+		return nil, err
+	}
+
 	// build monitor
 	// buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
 
@@ -438,6 +442,42 @@ func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1al
 	for i := range synthesizeComp.ComponentServices {
 		override(&synthesizeComp.ComponentServices[i])
 	}
+}
+
+func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	if comp == nil || len(comp.Spec.Configs) == 0 {
+		return nil
+	}
+
+	templates := make(map[string]*appsv1alpha1.ComponentConfigSpec)
+	for i, template := range synthesizedComp.ConfigTemplates {
+		templates[template.Name] = &synthesizedComp.ConfigTemplates[i]
+	}
+
+	for _, config := range comp.Spec.Configs {
+		if config.Name == nil || len(*config.Name) == 0 {
+			continue // not supported now
+		}
+		template := templates[*config.Name]
+		if template == nil {
+			return fmt.Errorf("the config template %s is not defined in definition", *config.Name)
+		}
+
+		specified := func() bool {
+			return config.ConfigMap != nil && len(config.ConfigMap.Name) > 0
+		}
+		switch {
+		case len(template.TemplateRef) == 0 && !specified():
+			return fmt.Errorf("there is no content provided for config template %s", *config.Name)
+		case len(template.TemplateRef) > 0 && specified():
+			return fmt.Errorf("partial overriding is not supported, config template: %s", *config.Name)
+		case specified():
+			template.TemplateRef = config.ConfigMap.Name
+		default:
+			// do nothing
+		}
+	}
+	return nil
 }
 
 // buildServiceAccountName builds serviceAccountName for component and podSpec.

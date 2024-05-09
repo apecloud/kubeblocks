@@ -366,6 +366,85 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    configs:
+                      items:
+                        description: ClusterComponentConfig represents a config with
+                          its source bound.
+                        properties:
+                          configMap:
+                            description: ConfigMap source for the config.
+                            properties:
+                              defaultMode:
+                                description: 'defaultMode is optional: mode bits used
+                                  to set permissions on created files by default.
+                                  Must be an octal value between 0000 and 0777 or
+                                  a decimal value between 0 and 511. YAML accepts
+                                  both octal and decimal values, JSON requires decimal
+                                  values for mode bits. Defaults to 0644. Directories
+                                  within the path are not affected by this setting.
+                                  This might be in conflict with other options that
+                                  affect the file mode, like fsGroup, and the result
+                                  can be other mode bits set.'
+                                format: int32
+                                type: integer
+                              items:
+                                description: items if unspecified, each key-value
+                                  pair in the Data field of the referenced ConfigMap
+                                  will be projected into the volume as a file whose
+                                  name is the key and content is the value. If specified,
+                                  the listed keys will be projected into the specified
+                                  paths, and unlisted keys will not be present. If
+                                  a key is specified which is not present in the ConfigMap,
+                                  the volume setup will error unless it is marked
+                                  optional. Paths must be relative and may not contain
+                                  the '..' path or start with '..'.
+                                items:
+                                  description: Maps a string key to a path within
+                                    a volume.
+                                  properties:
+                                    key:
+                                      description: key is the key to project.
+                                      type: string
+                                    mode:
+                                      description: 'mode is Optional: mode bits used
+                                        to set permissions on this file. Must be an
+                                        octal value between 0000 and 0777 or a decimal
+                                        value between 0 and 511. YAML accepts both
+                                        octal and decimal values, JSON requires decimal
+                                        values for mode bits. If not specified, the
+                                        volume defaultMode will be used. This might
+                                        be in conflict with other options that affect
+                                        the file mode, like fsGroup, and the result
+                                        can be other mode bits set.'
+                                      format: int32
+                                      type: integer
+                                    path:
+                                      description: path is the relative path of the
+                                        file to map the key to. May not be an absolute
+                                        path. May not contain the path element '..'.
+                                        May not start with the string '..'.
+                                      type: string
+                                  required:
+                                  - key
+                                  - path
+                                  type: object
+                                type: array
+                              name:
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  TODO: Add other useful fields. apiVersion, kind,
+                                  uid?'
+                                type: string
+                              optional:
+                                description: optional specify whether the ConfigMap
+                                  or its keys must be defined
+                                type: boolean
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          name:
+                            description: The name of the config.
+                            type: string
+                        type: object
+                      type: array
                     enabledLogs:
                       description: "Specifies which types of logs should be collected
                         for the Component. The log types are defined in the `componentDefinition.spec.logConfigs`
@@ -6416,6 +6495,90 @@ spec:
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
+                        configs:
+                          items:
+                            description: ClusterComponentConfig represents a config
+                              with its source bound.
+                            properties:
+                              configMap:
+                                description: ConfigMap source for the config.
+                                properties:
+                                  defaultMode:
+                                    description: 'defaultMode is optional: mode bits
+                                      used to set permissions on created files by
+                                      default. Must be an octal value between 0000
+                                      and 0777 or a decimal value between 0 and 511.
+                                      YAML accepts both octal and decimal values,
+                                      JSON requires decimal values for mode bits.
+                                      Defaults to 0644. Directories within the path
+                                      are not affected by this setting. This might
+                                      be in conflict with other options that affect
+                                      the file mode, like fsGroup, and the result
+                                      can be other mode bits set.'
+                                    format: int32
+                                    type: integer
+                                  items:
+                                    description: items if unspecified, each key-value
+                                      pair in the Data field of the referenced ConfigMap
+                                      will be projected into the volume as a file
+                                      whose name is the key and content is the value.
+                                      If specified, the listed keys will be projected
+                                      into the specified paths, and unlisted keys
+                                      will not be present. If a key is specified which
+                                      is not present in the ConfigMap, the volume
+                                      setup will error unless it is marked optional.
+                                      Paths must be relative and may not contain the
+                                      '..' path or start with '..'.
+                                    items:
+                                      description: Maps a string key to a path within
+                                        a volume.
+                                      properties:
+                                        key:
+                                          description: key is the key to project.
+                                          type: string
+                                        mode:
+                                          description: 'mode is Optional: mode bits
+                                            used to set permissions on this file.
+                                            Must be an octal value between 0000 and
+                                            0777 or a decimal value between 0 and
+                                            511. YAML accepts both octal and decimal
+                                            values, JSON requires decimal values for
+                                            mode bits. If not specified, the volume
+                                            defaultMode will be used. This might be
+                                            in conflict with other options that affect
+                                            the file mode, like fsGroup, and the result
+                                            can be other mode bits set.'
+                                          format: int32
+                                          type: integer
+                                        path:
+                                          description: path is the relative path of
+                                            the file to map the key to. May not be
+                                            an absolute path. May not contain the
+                                            path element '..'. May not start with
+                                            the string '..'.
+                                          type: string
+                                      required:
+                                      - key
+                                      - path
+                                      type: object
+                                    type: array
+                                  name:
+                                    description: 'Name of the referent. More info:
+                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                      TODO: Add other useful fields. apiVersion, kind,
+                                      uid?'
+                                    type: string
+                                  optional:
+                                    description: optional specify whether the ConfigMap
+                                      or its keys must be defined
+                                    type: boolean
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              name:
+                                description: The name of the config.
+                                type: string
+                            type: object
+                          type: array
                         enabledLogs:
                           description: "Specifies which types of logs should be collected
                             for the Component. The log types are defined in the `componentDefinition.spec.logConfigs`

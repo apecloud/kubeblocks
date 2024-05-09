@@ -295,6 +295,15 @@ func (r *deletionStage) Handle(ctx context.Context) {
 
 func (r *installableCheckStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
+		// XValidation was introduced as an alpha feature in Kubernetes v1.23 and requires additional enablement.
+		// It became more stable after Kubernetes 1.25. Users may encounter error in Kubernetes versions prior to 1.25.
+		// additional check to the addon YAML to ensure support for Kubernetes versions prior to 1.25
+		if err := checkAddonSpec(addon); err != nil {
+			setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, AddonCheckError, err.Error())
+			r.setReconciled()
+			return
+		}
+
 		r.reqCtx.Log.V(1).Info("installableCheckStage", "phase", addon.Status.Phase)
 
 		// check the annotations constraint about Kubeblocks Version
@@ -1263,6 +1272,15 @@ func CheckIfAddonUsedByCluster(ctx context.Context, c client.Client, addonName s
 	}
 
 	return len(clusters.Items) > 0, nil
+}
+
+func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
+	if addon.Spec.Type == extensionsv1alpha1.HelmType {
+		if addon.Spec.Helm == nil {
+			return fmt.Errorf("invalid Helm configuration: either 'Helm' is not specified")
+		}
+	}
+	return nil
 }
 
 func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {

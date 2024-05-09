@@ -181,14 +181,13 @@ func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
 
 	// CheckIfAddonUsedByCluster, if err, skip the deletion stage
 	if !addon.GetDeletionTimestamp().IsZero() || (addon.Spec.InstallSpec != nil && !addon.Spec.InstallSpec.GetEnabled()) {
-		used, err := CheckIfAddonUsedByCluster(ctx, r.reconciler.Client, addon.Name, r.reqCtx.Req.Namespace)
-		if err != nil {
-			r.setRequeueWithErr(err, "")
-			return
-		} else if used {
-			r.reconciler.Event(addon, corev1.EventTypeNormal, "Addon is used by some clusters",
+		recordEvent := func() {
+			r.reconciler.Event(addon, corev1.EventTypeWarning, "Addon is used by some clusters",
 				"Addon is used by cluster, please check")
-			r.setRequeueAfter(time.Second, "Waiting for the cluster to end")
+		}
+		if res, err := intctrlutil.ValidateReferenceCR(*r.reqCtx, r.reconciler.Client, addon, constant.ClusterDefLabelKey,
+			recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+			r.updateResultNErr(res, err)
 			return
 		}
 	}
@@ -1249,29 +1248,6 @@ func validateVersion(annotations, kbVersion string) (bool, error) {
 	}
 	validate, _ := constraint.Validate(v)
 	return validate, nil
-}
-
-func CheckIfAddonUsedByCluster(ctx context.Context, c client.Client, addonName string, namespace string) (bool, error) {
-	labelSelector := metav1.LabelSelector{
-		MatchLabels: map[string]string{constant.ClusterDefLabelKey: addonName},
-	}
-
-	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
-	if err != nil {
-		return false, err
-	}
-
-	var clusters appsv1alpha1.ClusterList
-	listOpts := []client.ListOption{
-		client.InNamespace(namespace),
-		client.MatchingLabelsSelector{Selector: selector},
-		client.Limit(1),
-	}
-	if err := c.List(ctx, &clusters, listOpts...); err != nil {
-		return false, err
-	}
-
-	return len(clusters.Items) > 0, nil
 }
 
 func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {

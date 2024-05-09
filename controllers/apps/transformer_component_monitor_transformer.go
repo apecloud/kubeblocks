@@ -60,7 +60,8 @@ func removeMonitorContainer(exporter *appsv1alpha1.Exporter, synthesizeComp *com
 		return
 	}
 
-	_ = slices.DeleteFunc(synthesizeComp.PodSpec.Containers, func(container corev1.Container) bool {
+	cmp := func(container corev1.Container) bool {
 		return container.Name == exporter.ContainerName
-	})
+	}
+	synthesizeComp.PodSpec.Containers = slices.DeleteFunc(synthesizeComp.PodSpec.Containers, cmp)
 }

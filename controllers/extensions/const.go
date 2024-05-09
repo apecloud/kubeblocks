@@ -50,6 +50,7 @@ const (
 	UninstallationFailed            = "UninstallationFailed"
 	UninstallationFailedLogs        = "UninstallationFailedLogs"
 	AddonRefObjError                = "ReferenceObjectError"
+	AddonCheckError                 = "AddonCheckError"
 
 	// config keys used in viper
 	maxConcurrentReconcilesKey = "MAXCONCURRENTRECONCILES_ADDON"

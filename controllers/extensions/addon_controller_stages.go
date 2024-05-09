@@ -1237,9 +1237,9 @@ func validateVersion(annotations, kbVersion string) (bool, error) {
 }
 
 func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
-	if addon.Spec.Type == "Helm" {
-		if addon.Spec.Helm == nil || addon.Spec.Helm.ChartLocationURL == "" {
-			return fmt.Errorf("invalid Helm configuration: either 'Helm' is not specified or 'ChartLocationURL' is empty")
+	if addon.Spec.Type == constant.AddonHelmSpecType {
+		if addon.Spec.Helm == nil {
+			return fmt.Errorf("invalid Helm configuration: either 'Helm' is not specified")
 		}
 	}
 	return nil

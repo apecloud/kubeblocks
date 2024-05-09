@@ -44,10 +44,6 @@ const (
 )
 
 var (
-
-	// compDefinitionObjs []*appsv1alpha1.ComponentDefinition
-	//compVersionObj *appsv1alpha1.ComponentVersion
-
 	CompDefNames    = []string{CompDefName("v1.0"), CompDefName("v1.1"), CompDefName("v2.0"), CompDefName("v3.0")}
 	ServiceVersions = []string{ServiceVersion("v1"), ServiceVersion("v2"), ServiceVersion("v3")}
 )

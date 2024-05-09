@@ -221,7 +221,7 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
-		return r.validateUpgrade(ctx, k8sClient)
+		return r.validateUpgrade(ctx, k8sClient, cluster)
 	case VerticalScalingType:
 		return r.validateVerticalScaling(cluster)
 	case HorizontalScalingType:
@@ -284,7 +284,8 @@ func (r *OpsRequest) validateRestart(cluster *Cluster) error {
 
 // validateUpgrade validates spec.clusterOps.upgrade
 func (r *OpsRequest) validateUpgrade(ctx context.Context,
-	k8sClient client.Client) error {
+	k8sClient client.Client,
+	cluster *Cluster) error {
 	upgrade := r.Spec.Upgrade
 	if upgrade == nil {
 		return notEmptyError("spec.upgrade")
@@ -295,6 +296,13 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 	}
 	if len(r.Spec.Upgrade.Components) == 0 {
 		return notEmptyError("spec.upgrade.components")
+	}
+	if cluster.Spec.ClusterDefRef == "" {
+		for _, v := range r.Spec.Upgrade.Components {
+			if v.ComponentDefinitionName == "" {
+				return fmt.Errorf(`componentDefinitionName can not be empty when cluster.spec.clusterDefRef is empty`)
+			}
+		}
 	}
 	return nil
 }

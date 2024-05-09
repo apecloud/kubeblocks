@@ -3477,8 +3477,22 @@ spec:
                       ClusterVersion is deprecated."
                     type: string
                   components:
-                    description: Lists components to be upgrade based on desired ComponentDefinition
-                      or ServiceVersion.
+                    description: 'Lists components to be upgrade based on desired
+                      ComponentDefinition and ServiceVersion. Support the following
+                      user scenarios: 1. empty componentDefinitionName + non-empty
+                      serviceVersion: Upgrade to the specified version and latest
+                      compatible ComponentDefinition. But the prerequisite for this
+                      scenario is that cluster.spec.clusterDefinition must not be
+                      empty. 2. non-empty componentDefinitionName + empty serviceVersion:
+                      If ComponentVersion of the ComponentDefinition is not defined,
+                      the images specified in ComponentDefinition will be used. Otherwise,
+                      the latest available version of the ComponentDefinition will
+                      be used. 3. non-empty componentDefinitionName + serviceVersion:
+                      Upgrade to the specified ComponentDefinition and service version.
+                      4. empty componentDefinition + serviceVersion: Upgrade to the
+                      latest service version and ComponentDefinition. But the prerequisite
+                      for this scenario is that cluster.spec.clusterDefinition must
+                      not be empty.'
                     items:
                       properties:
                         componentDefinitionName:
@@ -3491,7 +3505,9 @@ spec:
                           description: Specifies the version of the Service expected
                             to be provisioned by this Component. Referring to the
                             ServiceVersion defined by the ComponentDefinition and
-                            ComponentVersion.
+                            ComponentVersion. And ServiceVersion in ClusterComponentSpec
+                            is optional, when no version is specified, use the latest
+                            available version in ComponentVersion.
                           type: string
                       required:
                       - componentName

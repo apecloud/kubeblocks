@@ -65,12 +65,8 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		compOpsSet := newComponentOpsHelper(upgradeSpec.Components)
 		compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
 			upgradeComp := obj.(appsv1alpha1.UpgradeComponent)
-			if upgradeComp.ComponentDefinitionName != "" {
-				compSpec.ComponentDef = upgradeComp.ComponentDefinitionName
-			}
-			if upgradeComp.ServiceVersion != "" {
-				compSpec.ServiceVersion = upgradeComp.ServiceVersion
-			}
+			compSpec.ComponentDef = upgradeComp.ComponentDefinitionName
+			compSpec.ServiceVersion = upgradeComp.ServiceVersion
 		})
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
@@ -88,13 +84,13 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	)
 	if upgradeSpec.ClusterVersionRef != "" {
 		// TODO: remove this deprecated API after v0.9
-		compOpsHelper = newComponentOpsHelper(u.getCompOpsListByClusterVersion(opsRes))
+		compOpsHelper = newComponentOpsHelper(u.getCompOpsListForClusterVersion(opsRes))
 		if componentVersionMap, err = u.getClusterComponentVersionMap(reqCtx.Ctx, cli, upgradeSpec.ClusterVersionRef); err != nil {
 			return opsRes.OpsRequest.Status.Phase, 0, err
 		}
 	} else {
 		compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-		if componentDefMap, err = u.getUpgradeComponentDefMap(reqCtx, cli, opsRes); err != nil {
+		if componentDefMap, err = u.getComponentDefMapWithUpdatedImages(reqCtx, cli, opsRes); err != nil {
 			return opsRes.OpsRequest.Status.Phase, 0, err
 		}
 	}
@@ -114,6 +110,13 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 			}
 			return u.podImageApplied(pod.Status.InitContainerStatuses, compVersion.VersionsCtx.InitContainers) &&
 				u.podImageApplied(pod.Status.ContainerStatuses, compVersion.VersionsCtx.Containers)
+		}
+		upgradeComponent := compOps.(appsv1alpha1.UpgradeComponent)
+		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[compOps.GetComponentName()]
+		if lastCompConfiguration.ServiceVersion == upgradeComponent.ServiceVersion &&
+			lastCompConfiguration.ComponentDefinitionName == upgradeComponent.ComponentDefinitionName {
+			// if componentDefinition and serviceVersion no changes, return true
+			return true
 		}
 		compDef, ok := componentDefMap[compOps.GetComponentName()]
 		if !ok {
@@ -160,7 +163,7 @@ func (u upgradeOpsHandler) getClusterComponentVersionMap(ctx context.Context,
 	return components, nil
 }
 
-func (u upgradeOpsHandler) getCompOpsListByClusterVersion(opsRes *OpsResource) []appsv1alpha1.ComponentOps {
+func (u upgradeOpsHandler) getCompOpsListForClusterVersion(opsRes *OpsResource) []appsv1alpha1.ComponentOps {
 	var compOpsList []appsv1alpha1.ComponentOps
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 		compOpsList = append(compOpsList, appsv1alpha1.ComponentOps{ComponentName: v.Name})
@@ -171,8 +174,9 @@ func (u upgradeOpsHandler) getCompOpsListByClusterVersion(opsRes *OpsResource) [
 	return compOpsList
 }
 
-// getUpgradeComponentDefMap gets the desired componentDefinition map that is intended to be upgraded.
-func (u upgradeOpsHandler) getUpgradeComponentDefMap(reqCtx intctrlutil.RequestCtx,
+// getComponentDefMapWithUpdatedImages gets the desired componentDefinition map
+// that is updated with the corresponding images of the ComponentDefinition and service version.
+func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource) (map[string]*appsv1alpha1.ComponentDefinition, error) {
 	compDefMap := map[string]*appsv1alpha1.ComponentDefinition{}

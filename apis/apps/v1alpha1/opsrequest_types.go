@@ -314,7 +314,20 @@ type Upgrade struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
 
-	// Lists components to be upgrade based on desired ComponentDefinition or ServiceVersion.
+	// Lists components to be upgrade based on desired ComponentDefinition and ServiceVersion.
+	// Support the following user scenarios:
+	// 1. empty componentDefinitionName + non-empty serviceVersion:
+	//    Upgrade to the specified version and latest compatible ComponentDefinition.
+	//    But the prerequisite for this scenario is that cluster.spec.clusterDefinition must not be empty.
+	// 2. non-empty componentDefinitionName + empty serviceVersion:
+	//    If ComponentVersion of the ComponentDefinition is not defined,
+	//    the images specified in ComponentDefinition will be used.
+	//    Otherwise, the latest available version of the ComponentDefinition will be used.
+	// 3. non-empty componentDefinitionName + serviceVersion:
+	//    Upgrade to the specified ComponentDefinition and service version.
+	// 4. empty componentDefinition + serviceVersion:
+	//    Upgrade to the latest service version and ComponentDefinition.
+	//    But the prerequisite for this scenario is that cluster.spec.clusterDefinition must not be empty.
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
@@ -330,10 +343,14 @@ type UpgradeComponent struct {
 	ComponentOps `json:",inline"`
 
 	// Specifies the name of the ComponentDefinition.
+	// +optional
 	ComponentDefinitionName string `json:"componentDefinitionName,omitempty"`
 
 	// Specifies the version of the Service expected to be provisioned by this Component.
 	// Referring to the ServiceVersion defined by the ComponentDefinition and ComponentVersion.
+	// And ServiceVersion in ClusterComponentSpec is optional, when no version is specified,
+	// use the latest available version in ComponentVersion.
+	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 }
 
@@ -1116,9 +1133,11 @@ type LastComponentConfiguration struct {
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
 	// Records the version of the Service expected to be provisioned by this Component prior to any changes.
+	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
 	// Records the name of the ComponentDefinition prior to any changes.
+	// +optional
 	ComponentDefinitionName string `json:"componentDefinitionName,omitempty"`
 }
 

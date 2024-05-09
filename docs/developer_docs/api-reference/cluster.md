@@ -12500,6 +12500,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Records the version of the Service expected to be provisioned by this Component prior to any changes.</p>
 </td>
 </tr>
@@ -12511,6 +12512,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Records the name of the ComponentDefinition prior to any changes.</p>
 </td>
 </tr>
@@ -20159,7 +20161,20 @@ string
 </em>
 </td>
 <td>
-<p>Lists components to be upgrade based on desired ComponentDefinition or ServiceVersion.</p>
+<p>Lists components to be upgrade based on desired ComponentDefinition and ServiceVersion.
+Support the following user scenarios:
+1. empty componentDefinitionName + non-empty serviceVersion:
+   Upgrade to the specified version and latest compatible ComponentDefinition.
+   But the prerequisite for this scenario is that cluster.spec.clusterDefinition must not be empty.
+2. non-empty componentDefinitionName + empty serviceVersion:
+   If ComponentVersion of the ComponentDefinition is not defined,
+   the images specified in ComponentDefinition will be used.
+   Otherwise, the latest available version of the ComponentDefinition will be used.
+3. non-empty componentDefinitionName + serviceVersion:
+   Upgrade to the specified ComponentDefinition and service version.
+4. empty componentDefinition + serviceVersion:
+   Upgrade to the latest service version and ComponentDefinition.
+But the prerequisite for this scenario is that cluster.spec.clusterDefinition must not be empty.</p>
 </td>
 </tr>
 </tbody>
@@ -20203,6 +20218,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the name of the ComponentDefinition.</p>
 </td>
 </tr>
@@ -20214,8 +20230,11 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the version of the Service expected to be provisioned by this Component.
-Referring to the ServiceVersion defined by the ComponentDefinition and ComponentVersion.</p>
+Referring to the ServiceVersion defined by the ComponentDefinition and ComponentVersion.
+And ServiceVersion in ClusterComponentSpec is optional, when no version is specified,
+use the latest available version in ComponentVersion.</p>
 </td>
 </tr>
 </tbody>

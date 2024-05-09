@@ -3448,24 +3448,10 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.NodeName != nil {
-		in, out := &in.NodeName, &out.NodeName
-		*out = new(string)
-		**out = **in
-	}
-	if in.NodeSelector != nil {
-		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
-	if in.Tolerations != nil {
-		in, out := &in.Tolerations, &out.Tolerations
-		*out = make([]v1.Toleration, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
+	if in.SchedulingPolicy != nil {
+		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy
+		*out = new(SchedulingPolicy)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources

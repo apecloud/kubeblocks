@@ -20147,8 +20147,8 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the target ClusterVersion for the upgrade.</p>
-<p>This field is deprecated since v0.9 because ClusterVersion is deprecated.</p>
+<p>Deprecated: since v0.9 because ClusterVersion is deprecated.
+Specifies the name of the target ClusterVersion for the upgrade.</p>
 </td>
 </tr>
 <tr>
@@ -20162,19 +20162,11 @@ string
 </td>
 <td>
 <p>Lists components to be upgrade based on desired ComponentDefinition and ServiceVersion.
-Support the following user scenarios:
-1. empty componentDefinitionName + non-empty serviceVersion:
-   Upgrade to the specified version and latest compatible ComponentDefinition.
-   And the original ComponentDefinition will be reused if cluster.spec.clusterDefinition is empty but cluster.spec.components[<em>].componentDef is not empty.
-2. non-empty componentDefinitionName + empty serviceVersion:
-   If it doesn&rsquo;t exist any ComponentVersion CR that provides the releases compatibility information
-   about this ComponentDefinition CR, then the images specified in the ComponentDefinition CR will be used as a fallback.
-   Otherwise, the images from the release of the latest version will be used instead.
-3. non-empty componentDefinitionName + serviceVersion:
-   Upgrade to the specified ComponentDefinition and service version.
-4. empty componentDefinition + serviceVersion:
-   Upgrade to the latest service version and ComponentDefinition.
-And the original ComponentDefinition will be reused if cluster.spec.clusterDefinition is empty but cluster.spec.components[</em>].componentDef is not empty.</p>
+From the perspective of cluster API, the reasonable combinations should be:
+1. (comp-def, service-ver) - upgrade to the specified service version and component definition, the user takes the responsibility to ensure that they are compatible.
+2. (&ldquo;&rdquo;, service-ver) - upgrade to the specified service version, let the operator choose the latest compatible component definition.
+3. (comp-def, &ldquo;&rdquo;) - upgrade to the specified component definition, let the operator choose the latest compatible service version.
+4. (&ldquo;&rdquo;, &ldquo;&rdquo;) - upgrade to the latest service version and component definition, the operator will ensure the compatibility between the selected versions.</p>
 </td>
 </tr>
 </tbody>

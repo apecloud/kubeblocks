@@ -307,32 +307,24 @@ type Switchover struct {
 
 // Upgrade defines the parameters for an upgrade operation.
 type Upgrade struct {
+	// Deprecated: since v0.9 because ClusterVersion is deprecated.
 	// Specifies the name of the target ClusterVersion for the upgrade.
 	//
-	// This field is deprecated since v0.9 because ClusterVersion is deprecated.
-	//
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
+	ClusterVersionRef *string `json:"clusterVersionRef,omitempty"`
 
 	// Lists components to be upgrade based on desired ComponentDefinition and ServiceVersion.
-	// Support the following user scenarios:
-	// 1. empty componentDefinitionName + non-empty serviceVersion:
-	//    Upgrade to the specified version and latest compatible ComponentDefinition.
-	//    And the original ComponentDefinition will be reused if cluster.spec.clusterDefinition is empty but cluster.spec.components[*].componentDef is not empty.
-	// 2. non-empty componentDefinitionName + empty serviceVersion:
-	//    If it doesn't exist any ComponentVersion CR that provides the releases compatibility information
-	//    about this ComponentDefinition CR, then the images specified in the ComponentDefinition CR will be used as a fallback.
-	//    Otherwise, the images from the release of the latest version will be used instead.
-	// 3. non-empty componentDefinitionName + serviceVersion:
-	//    Upgrade to the specified ComponentDefinition and service version.
-	// 4. empty componentDefinition + serviceVersion:
-	//    Upgrade to the latest service version and ComponentDefinition.
-	//    And the original ComponentDefinition will be reused if cluster.spec.clusterDefinition is empty but cluster.spec.components[*].componentDef is not empty.
+	// From the perspective of cluster API, the reasonable combinations should be:
+	// 1. (comp-def, service-ver) - upgrade to the specified service version and component definition, the user takes the responsibility to ensure that they are compatible.
+	// 2. ("", service-ver) - upgrade to the specified service version, let the operator choose the latest compatible component definition.
+	// 3. (comp-def, "") - upgrade to the specified component definition, let the operator choose the latest compatible service version.
+	// 4. ("", "") - upgrade to the latest service version and component definition, the operator will ensure the compatibility between the selected versions.
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
 	// +kubebuilder:validation:MaxItems=1024
+	// +optional
 	Components []UpgradeComponent `json:"components,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 }
 
@@ -343,15 +335,17 @@ type UpgradeComponent struct {
 	ComponentOps `json:",inline"`
 
 	// Specifies the name of the ComponentDefinition.
+	// +kubebuilder:validation:MaxLength=64
 	// +optional
-	ComponentDefinitionName string `json:"componentDefinitionName,omitempty"`
+	ComponentDefinitionName *string `json:"componentDefinitionName,omitempty"`
 
 	// Specifies the version of the Service expected to be provisioned by this Component.
 	// Referring to the ServiceVersion defined by the ComponentDefinition and ComponentVersion.
 	// And ServiceVersion in ClusterComponentSpec is optional, when no version is specified,
 	// use the latest available version in ComponentVersion.
+	// +kubebuilder:validation:MaxLength=32
 	// +optional
-	ServiceVersion string `json:"serviceVersion,omitempty"`
+	ServiceVersion *string `json:"serviceVersion,omitempty"`
 }
 
 // VerticalScaling refers to the process of adjusting compute resources (e.g., CPU, memory) allocated to a Component.

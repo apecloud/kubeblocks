@@ -290,9 +290,9 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 	if upgrade == nil {
 		return notEmptyError("spec.upgrade")
 	}
-	if upgrade.ClusterVersionRef != "" {
+	if upgrade.ClusterVersionRef != nil && *upgrade.ClusterVersionRef != "" {
 		// TODO: remove this deprecated api after v0.9
-		return k8sClient.Get(ctx, types.NamespacedName{Name: upgrade.ClusterVersionRef}, &ClusterVersion{})
+		return k8sClient.Get(ctx, types.NamespacedName{Name: *upgrade.ClusterVersionRef}, &ClusterVersion{})
 	}
 	if len(r.Spec.Upgrade.Components) == 0 {
 		return notEmptyError("spec.upgrade.components")

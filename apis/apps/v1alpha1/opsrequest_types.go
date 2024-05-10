@@ -318,16 +318,16 @@ type Upgrade struct {
 	// Support the following user scenarios:
 	// 1. empty componentDefinitionName + non-empty serviceVersion:
 	//    Upgrade to the specified version and latest compatible ComponentDefinition.
-	//    But the prerequisite for this scenario is that cluster.spec.clusterDefinition must not be empty.
+	//    And the original ComponentDefinition will be reused if cluster.spec.clusterDefinition is empty but cluster.spec.components[*].componentDef is not empty.
 	// 2. non-empty componentDefinitionName + empty serviceVersion:
-	//    If ComponentVersion of the ComponentDefinition is not defined,
-	//    the images specified in ComponentDefinition will be used.
-	//    Otherwise, the latest available version of the ComponentDefinition will be used.
+	//    If it doesn't exist any ComponentVersion CR that provides the releases compatibility information
+	//    about this ComponentDefinition CR, then the images specified in the ComponentDefinition CR will be used as a fallback.
+	//    Otherwise, the images from the release of the latest version will be used instead.
 	// 3. non-empty componentDefinitionName + serviceVersion:
 	//    Upgrade to the specified ComponentDefinition and service version.
 	// 4. empty componentDefinition + serviceVersion:
 	//    Upgrade to the latest service version and ComponentDefinition.
-	//    But the prerequisite for this scenario is that cluster.spec.clusterDefinition must not be empty.
+	//    And the original ComponentDefinition will be reused if cluster.spec.clusterDefinition is empty but cluster.spec.components[*].componentDef is not empty.
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map

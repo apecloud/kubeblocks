@@ -297,13 +297,6 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 	if len(r.Spec.Upgrade.Components) == 0 {
 		return notEmptyError("spec.upgrade.components")
 	}
-	if cluster.Spec.ClusterDefRef == "" {
-		for _, v := range r.Spec.Upgrade.Components {
-			if v.ComponentDefinitionName == "" {
-				return fmt.Errorf(`componentDefinitionName can not be empty when cluster.spec.clusterDefRef is empty`)
-			}
-		}
-	}
 	return nil
 }
 

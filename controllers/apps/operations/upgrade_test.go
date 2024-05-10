@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -267,9 +266,13 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 
-			By(" expect for this opsRequest is Running")
+			By("expect for this opsRequest is Running")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDefObjs[0].Name))
+				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(testapps.ServiceVersion("v1")))
+			})).Should(Succeed())
 
 			By("expect upgrade successfully")
 			pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)
@@ -277,9 +280,9 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			expectOpsSucceed(reqCtx, opsRes, consensusComp)
 		})
 
-		It("Test upgrade OpsRequest with ComponentDefinitionName but the cluster is created without clusterDefinition", func() {
+		It("Test upgrade OpsRequest without ComponentDefinitionName but the cluster is created without clusterDefinition", func() {
 			By("init operations resources")
-			_, opsRes := initOpsResWithComponentDef()
+			compDefs, opsRes := initOpsResWithComponentDef()
 
 			By("create Upgrade Ops")
 			ops := testapps.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
@@ -296,15 +299,19 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 
-			By("test without componentDefinitionName, expect for this ops is Failed")
+			By("reuse the original ComponentDefinition and expect for this opsRequest is Running")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, opsRequest *appsv1alpha1.OpsRequest) {
-				g.Expect(opsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
-				condition := meta.FindStatusCondition(opsRequest.Status.Conditions, appsv1alpha1.ConditionTypeValidated)
-				g.Expect(condition.Message).Should(Equal("componentDefinitionName can not be empty when cluster.spec.clusterDefRef is empty"))
-			}))
+			makeUpgradeOpsIsRunning(reqCtx, opsRes)
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDefs[0].Name))
+				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(testapps.ServiceVersion("v1")))
+			})).Should(Succeed())
+
+			By("expect upgrade successfully")
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)
+			checkPodImages(pods, "r4")
+			expectOpsSucceed(reqCtx, opsRes, consensusComp)
 		})
 
 		It("Test upgrade OpsRequest when specified serviceVersion is empty", func() {
@@ -329,6 +336,10 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By(" expect for this opsRequest is Running")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDefObjs[0].Name))
+				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(BeEmpty())
+			})).Should(Succeed())
 
 			By("looking forward to using the latest serviceVersion")
 			pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)

@@ -65,7 +65,11 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		compOpsSet := newComponentOpsHelper(upgradeSpec.Components)
 		compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
 			upgradeComp := obj.(appsv1alpha1.UpgradeComponent)
-			compSpec.ComponentDef = upgradeComp.ComponentDefinitionName
+			if upgradeComp.ComponentDefinitionName != "" ||
+				(upgradeComp.ComponentDefinitionName == "" && opsRes.Cluster.Spec.ClusterDefRef != "") {
+				// we will ignore the empty ComponentDefinitionName if cluster.Spec.ClusterDefRef is empty.
+				compSpec.ComponentDef = upgradeComp.ComponentDefinitionName
+			}
 			compSpec.ServiceVersion = upgradeComp.ServiceVersion
 		})
 	}
@@ -94,6 +98,17 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 			return opsRes.OpsRequest.Status.Phase, 0, err
 		}
 	}
+	componentUpgraded := func(cluster *appsv1alpha1.Cluster,
+		lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
+		upgradeComp appsv1alpha1.UpgradeComponent) bool {
+		newCompDefName := upgradeComp.ComponentDefinitionName
+		if cluster.Spec.ClusterDefRef == "" && upgradeComp.ComponentDefinitionName == "" {
+			// will reuse the original ComponentDefinition in this case.
+			newCompDefName = lastCompConfiguration.ComponentDefinitionName
+		}
+		return lastCompConfiguration.ServiceVersion != upgradeComp.ServiceVersion ||
+			lastCompConfiguration.ComponentDefinitionName != newCompDefName
+	}
 	podApplyCompOps := func(pod *corev1.Pod,
 		compOps ComponentOpsInteface,
 		opsStartTime metav1.Time,
@@ -113,8 +128,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 		upgradeComponent := compOps.(appsv1alpha1.UpgradeComponent)
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[compOps.GetComponentName()]
-		if lastCompConfiguration.ServiceVersion == upgradeComponent.ServiceVersion &&
-			lastCompConfiguration.ComponentDefinitionName == upgradeComponent.ComponentDefinitionName {
+		if !componentUpgraded(opsRes.Cluster, lastCompConfiguration, upgradeComponent) {
 			// if componentDefinition and serviceVersion no changes, return true
 			return true
 		}

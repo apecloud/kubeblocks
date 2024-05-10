@@ -37,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -143,7 +142,7 @@ func (t *clusterComponentTransformer) handleComps(transCtx *clusterTransformCont
 		}
 	}
 	if len(unmatched) > 0 {
-		return controllerutil.NewDelayedRequeueError(0, fmt.Sprintf("retry later: %s are not ready", strings.Join(unmatched, ",")))
+		return ictrlutil.NewDelayedRequeueError(0, fmt.Sprintf("retry later: %s are not ready", strings.Join(unmatched, ",")))
 	}
 	return nil
 }

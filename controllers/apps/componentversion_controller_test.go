@@ -184,7 +184,6 @@ var _ = Describe("ComponentVersion Controller", func() {
 
 	Context("reconcile component version", func() {
 		BeforeEach(func() {
-			// compDefinitionObjs = createCompDefinitionObjs()
 			createCompDefinitionObjs()
 			compVersionObj = createCompVersionObj()
 		})
@@ -346,7 +345,6 @@ var _ = Describe("ComponentVersion Controller", func() {
 
 	Context("resolve component definition, service version and images", func() {
 		BeforeEach(func() {
-			// compDefinitionObjs = createCompDefinitionObjs()
 			createCompDefinitionObjs()
 			compVersionObj = createCompVersionObj()
 		})

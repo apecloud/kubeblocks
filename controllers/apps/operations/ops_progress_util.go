@@ -27,7 +27,6 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -161,7 +160,7 @@ func handleComponentStatusProgress(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	pgRes progressResource,
+	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	podApplyOps func(*corev1.Pod, ComponentOpsInteface, metav1.Time, string) bool) (int32, int32, error) {
 	var (
@@ -208,7 +207,7 @@ func handleComponentStatusProgress(
 func handleProgressForPodsRollingUpdate(
 	opsRes *OpsResource,
 	pods []*corev1.Pod,
-	pgRes progressResource,
+	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	minReadySeconds int32,
 	podApplyOps func(*corev1.Pod, ComponentOpsInteface, metav1.Time, string) bool) int32 {
@@ -236,7 +235,7 @@ func handleProgressForPodsRollingUpdate(
 func handleCancelProgressForPodsRollingUpdate(
 	opsRes *OpsResource,
 	pods []*corev1.Pod,
-	pgRes progressResource,
+	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	minReadySeconds int32) int32 {
 	var newProgressDetails []appsv1alpha1.ProgressStatusDetail
@@ -267,7 +266,7 @@ func handleCancelProgressForPodsRollingUpdate(
 	return completedCount
 }
 
-func podIsAvailable(pgRes progressResource, pod *corev1.Pod, minReadySeconds int32) bool {
+func podIsAvailable(pgRes *progressResource, pod *corev1.Pod, minReadySeconds int32) bool {
 	if pod == nil {
 		return false
 	}
@@ -275,6 +274,7 @@ func podIsAvailable(pgRes progressResource, pod *corev1.Pod, minReadySeconds int
 	if pgRes.componentDef != nil {
 		needCheckRole = len(pgRes.componentDef.Spec.Roles) > 0
 	} else if pgRes.clusterDef != nil {
+		// TODO: get the componentDefinition by clusterDefinition after v0.9
 		compDef := pgRes.clusterDef.GetComponentDefByName(pgRes.clusterComponent.ComponentDefRef)
 		needCheckRole = compDef != nil && (compDef.WorkloadType == appsv1alpha1.Replication || compDef.WorkloadType == appsv1alpha1.Consensus)
 	}
@@ -296,7 +296,7 @@ func handlePendingProgressDetail(opsRes *OpsResource,
 
 // handleSucceedProgressDetail handles the successful progressDetail and sets it to progressDetails.
 func handleSucceedProgressDetail(opsRes *OpsResource,
-	pgRes progressResource,
+	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	progressDetail appsv1alpha1.ProgressStatusDetail,
 ) {
@@ -308,7 +308,7 @@ func handleSucceedProgressDetail(opsRes *OpsResource,
 
 // handleFailedOrProcessingProgressDetail handles failed or processing progressDetail and sets it to progressDetails.
 func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
-	pgRes progressResource,
+	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	progressDetail appsv1alpha1.ProgressStatusDetail,
 	pod *corev1.Pod) (completedCount int32) {
@@ -354,7 +354,7 @@ func podIsFailedDuringOperation(
 // podProcessedSuccessful checks if the pod has been processed successfully:
 // 1. the pod is recreated after OpsRequest.status.startTime and pod is available.
 // 2. the component is running and pod is available.
-func podProcessedSuccessful(pgRes progressResource,
+func podProcessedSuccessful(pgRes *progressResource,
 	opsStartTime metav1.Time,
 	pod *corev1.Pod,
 	minReadySeconds int32,
@@ -393,79 +393,70 @@ func getFailedPodMessage(cluster *appsv1alpha1.Cluster, componentName string, po
 func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	pgRes progressResource,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	getExpectReplicas func(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32) (int32, int32, error) {
+	pgRes *progressResource,
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 	var (
 		pods             []*corev1.Pod
 		clusterComponent = pgRes.clusterComponent
 		opsRequest       = opsRes.OpsRequest
 		err              error
+		updatedPodCount  = int32(len(pgRes.createdPodSet) + len(pgRes.deletedPodSet))
+		completedCount   int32
 	)
 	if clusterComponent == nil {
-		return 0, 0, nil
-	}
-	expectReplicas := getExpectReplicas(opsRequest, pgRes.compOps)
-	if expectReplicas == nil {
 		return 0, 0, nil
 	}
 	lastComponentReplicas := opsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()].Replicas
 	if lastComponentReplicas == nil {
 		return 0, 0, nil
 	}
-	// if replicas are not changed, return
-	if *lastComponentReplicas == *expectReplicas {
+	// if no any pod needs to create or delete, return
+	if updatedPodCount == 0 {
 		return 0, 0, nil
 	}
 	if pods, err = intctrlcomp.ListOwnedPods(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName); err != nil {
 		return 0, 0, err
 	}
-	actualPodsLen := int32(len(pods))
-	if compStatus.Phase == appsv1alpha1.RunningClusterCompPhase && pgRes.clusterComponent.Replicas != actualPodsLen {
-		return 0, 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of component to be synchronized")
+	if len(pgRes.createdPodSet) > 0 {
+		scaleOutCompletedCount, scaleOutErr := handleScaleOutProgress(reqCtx, cli, opsRes, pgRes, pods, compStatus)
+		if scaleOutErr != nil {
+			err = scaleOutErr
+		}
+		completedCount += scaleOutCompletedCount
 	}
-	if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
-		lastComponentReplicas = expectReplicas
-		expectReplicas = opsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()].Replicas
+	if len(pgRes.deletedPodSet) > 0 {
+		scaleDownCompletedCount, scaleDownErr := handleScaleDownProgress(opsRes, pgRes, pods, compStatus)
+		if scaleDownErr != nil {
+			err = fmt.Errorf(scaleDownErr.Error(), err)
+		}
+		completedCount += scaleDownCompletedCount
 	}
-	var (
-		expectProgressCount int32
-		completedCount      int32
-		dValue              = *expectReplicas - *lastComponentReplicas
-	)
-	if dValue > 0 {
-		expectProgressCount = dValue
-		completedCount, err = handleScaleOutProgress(reqCtx, cli, opsRes, pgRes, pods, compStatus, *lastComponentReplicas, *expectReplicas)
-	} else {
-		expectProgressCount = dValue * -1
-		completedCount, err = handleScaleDownProgress(opsRes, pgRes, pods, compStatus, *lastComponentReplicas, *expectReplicas)
-	}
-	return getFinalExpectCount(completedCount, expectProgressCount), completedCount, err
+	return updatedPodCount, completedCount, err
 }
 
 // handleScaleOutProgress handles the progressDetails of scaled out replicas.
 func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	pgRes progressResource,
+	pgRes *progressResource,
 	pods []*corev1.Pod,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	lastComponentReplicas,
-	expectReplicas int32) (int32, error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	var componentName = pgRes.clusterComponent.Name
 	minReadySeconds, err := intctrlcomp.GetMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
 	if err != nil {
 		return 0, err
 	}
-	// Calculate the pods that need to be created based on replicas and handle them.
-	createPodSet := getUpdatedPodsForHorizontalScaling(opsRes, pgRes, lastComponentReplicas, expectReplicas, false)
+	podMap := map[string]*corev1.Pod{}
+	for _, v := range pods {
+		podMap[v.Name] = v
+	}
 	var completedCount int32
 	for _, v := range pods {
-		if _, ok := createPodSet[v.Name]; !ok {
+		if _, ok := pgRes.createdPodSet[v.Name]; !ok {
 			continue
 		}
 		objectKey := getProgressObjectKey(constant.PodKind, v.Name)
-		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
+		progressDetail := appsv1alpha1.ProgressStatusDetail{Group: fmt.Sprintf("%s/Create", pgRes.fullComponentName), ObjectKey: objectKey}
 		pgRes.opsMessageKey = "create"
 		if podIsAvailable(pgRes, v, minReadySeconds) {
 			completedCount += 1
@@ -480,19 +471,17 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 // handleScaleDownProgress handles the progressDetails of scaled down replicas.
 func handleScaleDownProgress(
 	opsRes *OpsResource,
-	pgRes progressResource,
+	pgRes *progressResource,
 	pods []*corev1.Pod,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	lastComponentReplicas,
-	expectReplicas int32) (completedCount int32, err error) {
-	podMap := map[string]corev1.Pod{}
-	for _, v := range pods {
-		objectKey := getProgressObjectKey(constant.PodKind, v.Name)
-		podMap[objectKey] = *v
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
+	podMap := map[string]*corev1.Pod{}
+	for i := range pods {
+		objectKey := getProgressObjectKey(constant.PodKind, pods[i].Name)
+		podMap[objectKey] = pods[i]
 	}
 	updateProgressDetail := func(objectKey string, status appsv1alpha1.ProgressStatus) {
 		progressDetail := appsv1alpha1.ProgressStatusDetail{
-			Group:     pgRes.fullComponentName,
+			Group:     fmt.Sprintf("%s/Delete", pgRes.fullComponentName),
 			ObjectKey: objectKey,
 			Status:    status,
 		}
@@ -510,9 +499,7 @@ func handleScaleDownProgress(
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 			&compStatus.ProgressDetails, progressDetail)
 	}
-	// Calculate the pods that need to be deleted based on replicas and handle them.
-	deletePodSet := getUpdatedPodsForHorizontalScaling(opsRes, pgRes, lastComponentReplicas, expectReplicas, true)
-	for k := range deletePodSet {
+	for k := range pgRes.deletedPodSet {
 		objectKey := getProgressObjectKey(constant.PodKind, k)
 		pod, ok := podMap[objectKey]
 		if !ok {
@@ -528,35 +515,6 @@ func handleScaleDownProgress(
 	return completedCount, nil
 }
 
-// getUpdatedPodsForHorizontalScaling gets the updated pods.
-// TODO: support instances operation for hscale in next PR.
-func getUpdatedPodsForHorizontalScaling(opsRes *OpsResource,
-	pgRes progressResource,
-	lastComponentReplicas,
-	expectReplicas int32,
-	scaleDown bool) map[string]sets.Empty {
-	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, pgRes.fullComponentName)
-	lastPods, _ := instanceset.GenerateInstanceNames(workloadName, "",
-		lastComponentReplicas, 0, pgRes.clusterComponent.OfflineInstances)
-	lastPodSet := sets.New(lastPods...)
-	currPods, _ := instanceset.GenerateInstanceNames(workloadName, "",
-		expectReplicas, 0, pgRes.clusterComponent.OfflineInstances)
-	currPodSet := sets.New(currPods...)
-	if scaleDown {
-		return lastPodSet.Difference(currPodSet)
-	}
-	return currPodSet.Difference(lastPodSet)
-}
-
-// getFinalExpectCount gets the number of pods which has been processed by controller.
-func getFinalExpectCount(completedCount, expectProgressCount int32) int32 {
-	// completedCount maybe greater than expectProgressCount when exists failed pods.
-	if completedCount > expectProgressCount {
-		return completedCount
-	}
-	return expectProgressCount
-}
-
 func syncProgressToOpsRequest(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -569,4 +527,33 @@ func syncProgressToOpsRequest(
 		return cli.Status().Patch(reqCtx.Ctx, opsRes.OpsRequest, client.MergeFrom(oldOpsRequest))
 	}
 	return nil
+}
+
+func getPodSetForComponent(
+	instances []appsv1alpha1.InstanceTemplate,
+	offlineInstances []string,
+	clusterName,
+	fullCompName string,
+	compReplicas int32) map[string]string {
+	workloadName := constant.GenerateWorkloadNamePattern(clusterName, fullCompName)
+	podSet := map[string]string{}
+	insTplReplicasCnt := int32(0)
+	// get the pods these are created by insTemplate
+	for _, ins := range instances {
+		insReplicas := intctrlutil.TemplateReplicas(ins)
+		insTplReplicasCnt += insReplicas
+		templatePodNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, ins.Name, insReplicas, offlineInstances)
+		for _, podName := range templatePodNames {
+			podSet[podName] = ins.Name
+		}
+	}
+	// get the pods these are created without any insTemplate
+	if insTplReplicasCnt < compReplicas {
+		podNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "",
+			compReplicas-insTplReplicasCnt, offlineInstances)
+		for _, podName := range podNames {
+			podSet[podName] = ""
+		}
+	}
+	return podSet
 }

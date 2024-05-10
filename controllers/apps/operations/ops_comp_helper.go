@@ -218,13 +218,11 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		}
 	}
 	var waitComponentCompleted bool
-	for _, pgResource := range progressResources {
+	for i := range progressResources {
+		pgResource := progressResources[i]
 		opsCompStatus := opsRequest.Status.Components[pgResource.compOps.GetComponentName()]
-		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, pgResource, &opsCompStatus)
+		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, &pgResource, &opsCompStatus)
 		if err != nil {
-			if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
-				return opsRequestPhase, time.Second, nil
-			}
 			return opsRequestPhase, 0, err
 		}
 		expectProgressCount += expectCount

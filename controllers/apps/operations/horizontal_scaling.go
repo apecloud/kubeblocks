@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"slices"
 	"time"
 
+	"golang.org/x/exp/maps"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -60,56 +63,239 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		appsv1alpha1.StoppingClusterPhase}, opsRes.Cluster.Status.Phase) {
 		return intctrlutil.NewFatalError("please start the cluster before scaling the cluster horizontally")
 	}
-	applyHorizontalScaling := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
-		horizontalScaling := obj.(appsv1alpha1.HorizontalScaling)
-		instances := buildInstances(*compSpec, horizontalScaling)
-		compSpec.Instances = instances
-		if horizontalScaling.OfflineInstances != nil {
-			compSpec.OfflineInstances = horizontalScaling.OfflineInstances
-		}
-		compSpec.Replicas = horizontalScaling.Replicas
-	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
 	// abort earlier running vertical scaling opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.HorizontalScalingType, appsv1alpha1.StartType},
-		func(earlierOps *appsv1alpha1.OpsRequest) bool {
+		func(earlierOps *appsv1alpha1.OpsRequest) (bool, error) {
 			if slices.Contains([]appsv1alpha1.OpsType{appsv1alpha1.StartType, appsv1alpha1.StopType}, earlierOps.Spec.Type) {
-				return true
+				return true, nil
 			}
 			for _, v := range earlierOps.Spec.HorizontalScalingList {
-				// abort the earlierOps if exists the same component.
-				if _, ok := compOpsSet.componentOpsSet[v.ComponentName]; ok {
-					return true
+				compOps, ok := compOpsSet.componentOpsSet[v.ComponentName]
+				if !ok {
+					return false, nil
+				}
+				currHorizontalScaling := compOps.(appsv1alpha1.HorizontalScaling)
+				// When an earlier opsRequest has overlapping components with the current opsRequest,
+				// and this operation for the component is an overwrite operation, it needs to be aborted.
+				if v.Operator == appsv1alpha1.HScaleOverwriteOP || currHorizontalScaling.Operator == appsv1alpha1.HScaleOverwriteOP {
+					return true, nil
+				}
+				// if the earlier opsRequest is pending and not `Overwrite` operator, return false.
+				if earlierOps.Status.Phase == appsv1alpha1.OpsPendingPhase {
+					return false, nil
+				}
+				if v.Operator != currHorizontalScaling.Operator {
+					errMsg := fmt.Sprintf(`opsRequests only can run together with the same operator. `+
+						`However, the opsRequest "%s" is currently running using the "%s" operator`,
+						earlierOps.Name, v.Operator)
+					return false, intctrlutil.NewFatalError(errMsg)
+				}
+				// check if the instance that needs to be offline was created by another opsRequest
+				if currHorizontalScaling.Operator == appsv1alpha1.HScaleAddOP && currHorizontalScaling.OfflineInstance != nil {
+					// TODO: check for sharding spec?
+					lastCompConfiguration := earlierOps.Status.LastConfiguration.Components[v.ComponentName]
+					compSpec := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
+					if compSpec != nil {
+						createdPodSet, _ := hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *compSpec, v, v.ComponentName)
+						for _, offlineIns := range currHorizontalScaling.OfflineInstance.InstanceNames {
+							if _, ok = createdPodSet[offlineIns]; ok {
+								errMsg := fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest "%s"`,
+									offlineIns, earlierOps.Name)
+								return false, intctrlutil.NewFatalError(errMsg)
+							}
+						}
+					}
 				}
 			}
-			return false
+			return false, nil
 		}); err != nil {
 		return err
 	}
 
-	compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyHorizontalScaling)
+	compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
+		horizontalScaling := obj.(appsv1alpha1.HorizontalScaling)
+		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[obj.GetComponentName()]
+		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(compSpec,
+			lastCompConfiguration, horizontalScaling, opsRes.Cluster.Name)
+	})
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
-func buildInstances(componentSpec appsv1alpha1.ClusterComponentSpec, horizontalScaling appsv1alpha1.HorizontalScaling) []appsv1alpha1.InstanceTemplate {
-	if componentSpec.Instances == nil && horizontalScaling.Instances == nil {
-		return nil
+// getExpectedCompValues gets the expected replicas, instances, offlineInstances.
+func (hs horizontalScalingOpsHandler) getExpectedCompValues(
+	compSpec *appsv1alpha1.ClusterComponentSpec,
+	lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
+	horizontalScaling appsv1alpha1.HorizontalScaling,
+	clusterName string) (int32, []appsv1alpha1.InstanceTemplate, []string) {
+	compReplicas := compSpec.Replicas
+	compInstanceTpls := compSpec.Instances
+	compOfflineInstances := compSpec.OfflineInstances
+	if horizontalScaling.Operator != appsv1alpha1.HScaleOverwriteOP {
+		// `Add` and `Delete` operations require the use of recorded component snapshot information.
+		compReplicas = *lastCompConfiguration.Replicas
+		compInstanceTpls = lastCompConfiguration.Instances
+		compOfflineInstances = lastCompConfiguration.OfflineInstances
 	}
-	templates := componentSpec.Instances
-	for _, instance := range horizontalScaling.Instances {
-		found := false
-		for i := range templates {
-			if templates[i].Name != instance.Name {
+	expectOfflineInstances := hs.getCompExpectedOfflineInstances(compOfflineInstances, horizontalScaling)
+	compReplicas, compInstanceTpls = hs.autoSyncReplicas(horizontalScaling, compReplicas,
+		compInstanceTpls, compOfflineInstances, expectOfflineInstances, clusterName)
+	return hs.getCompExpectReplicas(horizontalScaling, compReplicas),
+		hs.getCompExpectedInstances(compInstanceTpls, horizontalScaling),
+		expectOfflineInstances
+}
+
+// autoSyncReplicas auto-sync the replicas of the component and instance templates.
+func (hs horizontalScalingOpsHandler) autoSyncReplicas(
+	horizontalScaling appsv1alpha1.HorizontalScaling,
+	compReplicas int32,
+	compInstanceTpls []appsv1alpha1.InstanceTemplate,
+	compOfflineInstances,
+	expectCompOfflineInstances []string,
+	clusterName string) (int32, []appsv1alpha1.InstanceTemplate) {
+	if !horizontalScaling.AutoSyncReplicas() {
+		return compReplicas, compInstanceTpls
+	}
+	var (
+		// pods will be added to offlineInstances slice.
+		toAddOfflineInstances []string
+		// pods will be deleted from offlineInstances slice.
+		toDeleteOfflineInstances []string
+	)
+	switch horizontalScaling.Operator {
+	case appsv1alpha1.HScaleAddOP:
+		toAddOfflineInstances = horizontalScaling.OfflineInstance.InstanceNames
+	case appsv1alpha1.HScaleDeleteOP:
+		toDeleteOfflineInstances = horizontalScaling.OfflineInstance.InstanceNames
+	default:
+		currOfflineInsSet := sets.New(horizontalScaling.OfflineInstance.InstanceNames...)
+		oldOfflineInsSet := sets.New(compOfflineInstances...)
+		toDeleteOfflineInstances = maps.Keys(oldOfflineInsSet.Difference(currOfflineInsSet))
+		toAddOfflineInstances = maps.Keys(currOfflineInsSet.Difference(oldOfflineInsSet))
+	}
+	handleAutoSyncReplicas := func(podSet map[string]string, diffOfflineInstances []string, deleteOfflineInstance bool) {
+		diffReplicasMap := map[string]int32{}
+		for _, podName := range diffOfflineInstances {
+			tplName, ok := podSet[podName]
+			if !ok {
 				continue
 			}
-			templates[i].Replicas = instance.Replicas
-			found = true
+			diffReplicasMap[tplName] += 1
+			if deleteOfflineInstance {
+				// scale out the instance which is removed fromm the offlineInstances slice.
+				compReplicas += 1
+			} else {
+				compReplicas -= 1
+			}
 		}
-		if !found {
-			templates = append(templates, instance)
+		for i, insTpl := range compInstanceTpls {
+			diffReplicas, ok := diffReplicasMap[insTpl.Name]
+			if !ok {
+				continue
+			}
+			if deleteOfflineInstance {
+				compInstanceTpls[i].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(insTpl) + diffReplicas)
+			} else {
+				compInstanceTpls[i].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(insTpl) - diffReplicas)
+			}
 		}
 	}
-	return templates
+
+	if len(toDeleteOfflineInstances) > 0 {
+		// scale out the specified instances by removing the instance from offlineInstances slice.
+		podSet := getPodSetForComponent(compInstanceTpls, expectCompOfflineInstances,
+			clusterName, horizontalScaling.ComponentName, compReplicas)
+		handleAutoSyncReplicas(podSet, toDeleteOfflineInstances, true)
+	}
+	if len(toAddOfflineInstances) > 0 {
+		// cale in the specified instances by adding the instance to offlineInstances slice.
+		podSet := getPodSetForComponent(compInstanceTpls, compOfflineInstances,
+			clusterName, horizontalScaling.ComponentName, compReplicas)
+		handleAutoSyncReplicas(podSet, toAddOfflineInstances, false)
+	}
+
+	return compReplicas, compInstanceTpls
+}
+
+// getCompExpectReplicas gets the expected replicas of the component.
+func (hs horizontalScalingOpsHandler) getCompExpectReplicas(horizontalScaling appsv1alpha1.HorizontalScaling,
+	compSyncedReplicas int32) int32 {
+	if horizontalScaling.Replicas == nil {
+		return compSyncedReplicas
+	}
+	switch horizontalScaling.Operator {
+	case appsv1alpha1.HScaleAddOP:
+		return compSyncedReplicas + *horizontalScaling.Replicas
+	case appsv1alpha1.HScaleDeleteOP:
+		return compSyncedReplicas - *horizontalScaling.Replicas
+	default:
+		return *horizontalScaling.Replicas
+	}
+}
+
+// getCompExpectedOfflineInstances gets the expected instance templates of the component.
+func (hs horizontalScalingOpsHandler) getCompExpectedInstances(
+	compSyncedInstanceTpls []appsv1alpha1.InstanceTemplate,
+	horizontalScaling appsv1alpha1.HorizontalScaling,
+) []appsv1alpha1.InstanceTemplate {
+	if len(horizontalScaling.Instances) == 0 {
+		// delete instance template is not supported, return directly.
+		return compSyncedInstanceTpls
+	}
+
+	compInsTplSet := map[string]int{}
+	for i := range compSyncedInstanceTpls {
+		compInsTplSet[compSyncedInstanceTpls[i].Name] = i
+	}
+	for i := range horizontalScaling.Instances {
+		insTpl := horizontalScaling.Instances[i]
+		compInsIndex, ok := compInsTplSet[insTpl.Name]
+		if !ok && horizontalScaling.Operator != appsv1alpha1.HScaleDeleteOP {
+			// only support to add an instance template.
+			compSyncedInstanceTpls = append(compSyncedInstanceTpls, insTpl)
+			continue
+		}
+		if horizontalScaling.Instances[i].Replicas == nil {
+			// ignore the changes if the replicas of the instance template is empty.
+			continue
+		}
+		switch horizontalScaling.Operator {
+		case appsv1alpha1.HScaleAddOP:
+			compSyncedInstanceTpls[compInsIndex].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(compSyncedInstanceTpls[compInsIndex]) + *insTpl.Replicas)
+		case appsv1alpha1.HScaleDeleteOP:
+			compSyncedInstanceTpls[compInsIndex].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(compSyncedInstanceTpls[compInsIndex]) - *insTpl.Replicas)
+		default:
+			compSyncedInstanceTpls[compInsIndex].Replicas = insTpl.Replicas
+		}
+	}
+	return compSyncedInstanceTpls
+}
+
+// getCompExpectedOfflineInstances gets the expected offlineInstances of the component.
+func (hs horizontalScalingOpsHandler) getCompExpectedOfflineInstances(
+	compOfflineInstances []string,
+	horizontalScaling appsv1alpha1.HorizontalScaling,
+) []string {
+	if horizontalScaling.OfflineInstance == nil {
+		return compOfflineInstances
+	}
+	handleOfflineInstances := func(compOfflineInstances, hScaleOfflineInstances, newOfflineInstances []string) []string {
+		compOfflineInsSet := sets.New(compOfflineInstances...)
+		for _, offlineIns := range horizontalScaling.OfflineInstance.InstanceNames {
+			if _, ok := compOfflineInsSet[offlineIns]; !ok {
+				newOfflineInstances = append(newOfflineInstances, offlineIns)
+			}
+		}
+		return newOfflineInstances
+	}
+	switch horizontalScaling.Operator {
+	case appsv1alpha1.HScaleAddOP:
+		return handleOfflineInstances(compOfflineInstances, horizontalScaling.OfflineInstance.InstanceNames, compOfflineInstances)
+	case appsv1alpha1.HScaleDeleteOP:
+		return handleOfflineInstances(compOfflineInstances, horizontalScaling.OfflineInstance.InstanceNames, make([]string, 0))
+	default:
+		return horizontalScaling.OfflineInstance.InstanceNames
+	}
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -119,9 +305,15 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
 		opsRes *OpsResource,
-		pgRes progressResource,
+		pgRes *progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, hs.getExpectReplicas)
+		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
+		horizontalScaling := pgRes.compOps.(appsv1alpha1.HorizontalScaling)
+		pgRes.createdPodSet, pgRes.deletedPodSet = hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *pgRes.clusterComponent, horizontalScaling, pgRes.fullComponentName)
+		if horizontalScaling.Operator != appsv1alpha1.HScaleOverwriteOP {
+			pgRes.noWaitComponentCompleted = true
+		}
+		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
@@ -131,24 +323,10 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
 	getLastComponentInfo := func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInteface) appsv1alpha1.LastComponentConfiguration {
-		var (
-			copyInstances        []appsv1alpha1.InstanceTemplate
-			copyOfflineInstances []string
-		)
-		if len(compSpec.Instances) > 0 {
-			var instances []appsv1alpha1.InstanceTemplate
-			instances = append(instances, compSpec.Instances...)
-			copyInstances = instances
-		}
-		if len(compSpec.OfflineInstances) > 0 {
-			var offlineInstances []string
-			offlineInstances = append(offlineInstances, compSpec.OfflineInstances...)
-			copyOfflineInstances = offlineInstances
-		}
 		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
 			Replicas:         pointer.Int32(compSpec.Replicas),
-			Instances:        copyInstances,
-			OfflineInstances: copyOfflineInstances,
+			Instances:        compSpec.Instances,
+			OfflineInstances: compSpec.OfflineInstances,
 		}
 		return lastCompConfiguration
 	}
@@ -156,28 +334,41 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 	return nil
 }
 
-func (hs horizontalScalingOpsHandler) getExpectReplicas(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32 {
-	for _, v := range opsRequest.Spec.HorizontalScalingList {
-		if v.ComponentName == compOps.GetComponentName() {
-			return &v.Replicas
+// getCreateAndDeletePodSet gets the pod set that are created and deleted in this opsRequest.
+func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResource,
+	lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
+	currCompSpec appsv1alpha1.ClusterComponentSpec,
+	horizontalScaling appsv1alpha1.HorizontalScaling,
+	fullCompName string) (map[string]string, map[string]string) {
+	clusterName := opsRes.Cluster.Name
+	lastPodSet := getPodSetForComponent(lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances, clusterName, fullCompName, *lastCompConfiguration.Replicas)
+	expectReplicas, expectInstanceTpls, expectOfflineInstances := hs.getExpectedCompValues(&currCompSpec, lastCompConfiguration, horizontalScaling, clusterName)
+	currPodSet := getPodSetForComponent(expectInstanceTpls, expectOfflineInstances, clusterName, fullCompName, expectReplicas)
+	createPodSet := map[string]string{}
+	deletePodSet := map[string]string{}
+	for k, v := range currPodSet {
+		if _, ok := lastPodSet[k]; !ok {
+			createPodSet[k] = v
 		}
 	}
-	return nil
+	for k, v := range lastPodSet {
+		if _, ok := currPodSet[k]; !ok {
+			deletePodSet[k] = v
+		}
+	}
+	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
+		// when cancelling this opsRequest, revert the changes.
+		return deletePodSet, createPodSet
+	}
+	return createPodSet, deletePodSet
 }
 
 // Cancel this function defines the cancel horizontalScaling action.
 func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
 	return compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) {
-		if lastConfig.Replicas == nil {
-			return
-		}
 		comp.Replicas = *lastConfig.Replicas
-		if lastConfig.Instances != nil {
-			comp.Instances = lastConfig.Instances
-		}
-		if lastConfig.OfflineInstances != nil {
-			comp.OfflineInstances = lastConfig.OfflineInstances
-		}
+		comp.Instances = lastConfig.Instances
+		comp.OfflineInstances = lastConfig.OfflineInstances
 	})
 }

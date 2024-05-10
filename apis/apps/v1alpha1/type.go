@@ -391,6 +391,17 @@ const (
 	CustomType            OpsType = "Custom"          // use opsDefinition
 )
 
+// HScaleOperator defines the operator for this horizontal scaling.
+// +enum
+// +kubebuilder:validation:Enum={Overwrite, Add, Delete}
+type HScaleOperator string
+
+const (
+	HScaleAddOP       HScaleOperator = "Add"
+	HScaleDeleteOP    HScaleOperator = "Delete"
+	HScaleOverwriteOP HScaleOperator = "Overwrite"
+)
+
 // ComponentResourceKey defines the resource key of component, such as pod/pvc.
 // +enum
 // +kubebuilder:validation:Enum={pods}

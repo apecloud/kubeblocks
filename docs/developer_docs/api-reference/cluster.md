@@ -11735,6 +11735,29 @@ The policy can be set to <code>None</code>, <code>CloneVolume</code>, or <code>S
 </td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HScaleOperator">HScaleOperator
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>)
+</p>
+<div>
+<p>HScaleOperator defines the operator for this horizontal scaling.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Add&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Delete&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Overwrite&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HTTPAction">HTTPAction
 </h3>
 <p>
@@ -11941,7 +11964,7 @@ int32
 </em>
 </td>
 <td>
-<p>Specifies the number of total replicas.</p>
+<p>Specifies the number of the replicas.</p>
 </td>
 </tr>
 <tr>
@@ -11974,13 +11997,36 @@ New instances are created based on the provided InstanceTemplate.</li>
 <td>
 <code>offlineInstances</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.OfflineInstance">
+OfflineInstance
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the names of instances to be scaled down.
-This provides control over which specific instances are targeted for termination when reducing the replica count.</p>
+<p>Scale down or up the specified instances based on the operator.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>operator</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HScaleOperator">
+HScaleOperator
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the operator for this HorizontalScaling operation.
+Valid options are <code>Overwrite</code>, <code>Add</code>, and <code>Delete</code>.</p>
+<ul>
+<li><code>Overwrite</code>: Overwrite the replicas, instances, offlineInstances to the specified component. This is the default option.</li>
+<li><code>Add</code>: Create the specified number of replicas and instances, and scale down the specified instances.
+This is the &lsquo;Add&rsquo; operation at the data structure level of replicas, instances, and offlineInstances.</li>
+<li><code>Delete</code>: Delete the specified number of replicas and instances, and scale up the specified instances.
+This is the &lsquo;Delete&rsquo; operation at the data structure level of replicas, instances, and offlineInstances.</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -13314,6 +13360,46 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.OfflineInstance">OfflineInstance
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>instanceNames</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Specifies the instance name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>autoSyncReplicas</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Replicas will be automatically synchronized based on the offline instances when it is set to true and no any replicas are specified.</p>
 </td>
 </tr>
 </tbody>

@@ -416,12 +416,72 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 	if len(horizontalScalingList) == 0 {
 		return notEmptyError("spec.horizontalScaling")
 	}
-
+	for _, v := range r.Spec.HorizontalScalingList {
+		if v.Operator != HScaleDeleteOP {
+			continue
+		}
+		for _, comSpec := range cluster.Spec.ComponentSpecs {
+			if err := r.validateHorizontalScalingSpec(v, comSpec, comSpec.Name, false); err != nil {
+				return err
+			}
+		}
+		for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+			if err := r.validateHorizontalScalingSpec(v, shardingSpec.Template, shardingSpec.Name, true); err != nil {
+				return err
+			}
+		}
+	}
 	compOpsList := make([]ComponentOps, len(horizontalScalingList))
 	for i, v := range horizontalScalingList {
 		compOpsList[i] = v.ComponentOps
 	}
 	return r.checkComponentExistence(cluster, compOpsList)
+}
+
+func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec ClusterComponentSpec, componentName string, isSharding bool) error {
+	if hScale.ComponentName != componentName {
+		return nil
+	}
+	if hScale.AutoSyncReplicas() {
+		if isSharding {
+			return fmt.Errorf("can not auto-sync replicas when the specified component is a sharding component")
+		}
+		if hScale.Replicas != nil || len(hScale.Instances) > 0 {
+			return fmt.Errorf("replicas and instances must be empty when offlineInstance.autoSyncReplicas is true")
+		}
+	}
+	if hScale.Replicas != nil && *hScale.Replicas > compSpec.Replicas {
+		return fmt.Errorf("replicas can not greater than %d when operator is Delete", hScale.Replicas)
+	}
+
+	insTplMap := map[string]int32{}
+	for _, v := range compSpec.Instances {
+		if v.Replicas == nil {
+			insTplMap[v.Name] = 1
+		} else {
+			insTplMap[v.Name] = *v.Replicas
+		}
+	}
+	for _, v := range hScale.Instances {
+		insReplicas, ok := insTplMap[v.Name]
+		if !ok {
+			return fmt.Errorf(`can not found the instanceTemplate "%s" in component "%s"`, v.Name, componentName)
+		}
+		if v.Replicas != nil && *v.Replicas > insReplicas {
+			return fmt.Errorf(`replicas of instanceTemplate "%s" can not greater than %d when operator is Delete`,
+				v.Name, *v.Replicas)
+		}
+	}
+	if hScale.OfflineInstance == nil || hScale.Operator != HScaleDeleteOP {
+		return nil
+	}
+	offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
+	for _, offlineInsName := range hScale.OfflineInstance.InstanceNames {
+		if _, ok := offlineInstanceSet[offlineInsName]; !ok {
+			return fmt.Errorf(`can not found the offlined instance "%s" in component "%s"`, offlineInsName, componentName)
+		}
+	}
+	return nil
 }
 
 // validateVolumeExpansion validates volumeExpansion api when spec.type is VolumeExpansion

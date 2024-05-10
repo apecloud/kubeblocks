@@ -425,11 +425,11 @@ type HorizontalScaling struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
 
-	// Specifies the number of total replicas.
+	// Specifies the number of the replicas.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
-	Replicas int32 `json:"replicas"`
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Contains a list of InstanceTemplate objects.
 	// Each InstanceTemplate object allows for modifying replica counts or specifying configurations for new instances during scaling.
@@ -448,11 +448,33 @@ type HorizontalScaling struct {
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
 
-	// Specifies the names of instances to be scaled down.
-	// This provides control over which specific instances are targeted for termination when reducing the replica count.
+	// Scale down or up the specified instances based on the operator.
 	//
 	// +optional
-	OfflineInstances []string `json:"offlineInstances,omitempty"`
+	OfflineInstance *OfflineInstance `json:"offlineInstances,omitempty"`
+
+	// Specifies the operator for this HorizontalScaling operation.
+	// Valid options are `Overwrite`, `Add`, and `Delete`.
+	//
+	// - `Overwrite`: Overwrite the replicas, instances, offlineInstances to the specified component. This is the default option.
+	// - `Add`: Create the specified number of replicas and instances, and scale down the specified instances.
+	//    This is the 'Add' operation at the data structure level of replicas, instances, and offlineInstances.
+	// - `Delete`: Delete the specified number of replicas and instances, and scale up the specified instances.
+	//    This is the 'Delete' operation at the data structure level of replicas, instances, and offlineInstances.
+	// +kubebuilder:default=Overwrite
+	// +optional
+	Operator HScaleOperator `json:"operator"`
+}
+
+type OfflineInstance struct {
+
+	// Specifies the instance name.
+	// +kubebuilder:validation:Required
+	InstanceNames []string `json:"instanceNames"`
+
+	// Replicas will be automatically synchronized based on the offline instances when it is set to true and no any replicas are specified.
+	// +optional
+	AutoSyncReplicas bool `json:"autoSyncReplicas,omitempty"`
 }
 
 // Reconfigure defines the parameters for updating a Component's configuration.
@@ -1362,4 +1384,8 @@ func (r OpsRequestSpec) GetRestore() *Restore {
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {
 	p.Message = message
 	p.Status = status
+}
+
+func (h HorizontalScaling) AutoSyncReplicas() bool {
+	return h.OfflineInstance != nil && h.OfflineInstance.AutoSyncReplicas
 }

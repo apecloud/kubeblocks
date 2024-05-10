@@ -344,15 +344,18 @@ var _ = Describe("OpsRequest webhook", func() {
 		hScalingList := []HorizontalScaling{
 			{
 				ComponentOps: ComponentOps{ComponentName: "hs-not-exist"},
-				Replicas:     2,
+				Replicas:     pointer.Int32(2),
+				Operator:     HScaleOverwriteOP,
 			},
 			{
 				ComponentOps: ComponentOps{ComponentName: proxyComponentName},
-				Replicas:     2,
+				Replicas:     pointer.Int32(2),
+				Operator:     HScaleOverwriteOP,
 			},
 			{
 				ComponentOps: ComponentOps{ComponentName: componentName},
-				Replicas:     2,
+				Replicas:     pointer.Int32(2),
+				Operator:     HScaleOverwriteOP,
 			},
 		}
 
@@ -387,7 +390,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("test min, max is zero")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[2]}
-		opsRequest.Spec.HorizontalScalingList[0].Replicas = 5
+		opsRequest.Spec.HorizontalScalingList[0].Replicas = pointer.Int32(5)
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 	}
 

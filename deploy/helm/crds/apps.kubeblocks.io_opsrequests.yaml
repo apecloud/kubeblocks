@@ -2738,20 +2738,47 @@ spec:
                         type: object
                       type: array
                     offlineInstances:
-                      description: Specifies the names of instances to be scaled down.
-                        This provides control over which specific instances are targeted
-                        for termination when reducing the replica count.
-                      items:
-                        type: string
-                      type: array
+                      description: Scale down or up the specified instances based
+                        on the operator.
+                      properties:
+                        autoSyncReplicas:
+                          description: Replicas will be automatically synchronized
+                            based on the offline instances when it is set to true
+                            and no any replicas are specified.
+                          type: boolean
+                        instanceNames:
+                          description: Specifies the instance name.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - instanceNames
+                      type: object
+                    operator:
+                      default: Overwrite
+                      description: "Specifies the operator for this HorizontalScaling
+                        operation. Valid options are `Overwrite`, `Add`, and `Delete`.
+                        \n - `Overwrite`: Overwrite the replicas, instances, offlineInstances
+                        to the specified component. This is the default option. -
+                        `Add`: Create the specified number of replicas and instances,
+                        and scale down the specified instances. This is the 'Add'
+                        operation at the data structure level of replicas, instances,
+                        and offlineInstances. - `Delete`: Delete the specified number
+                        of replicas and instances, and scale up the specified instances.
+                        This is the 'Delete' operation at the data structure level
+                        of replicas, instances, and offlineInstances."
+                      enum:
+                      - Overwrite
+                      - Add
+                      - Delete
+                      type: string
                     replicas:
-                      description: Specifies the number of total replicas.
+                      description: Specifies the number of the replicas.
                       format: int32
                       minimum: 0
                       type: integer
                   required:
                   - componentName
-                  - replicas
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:

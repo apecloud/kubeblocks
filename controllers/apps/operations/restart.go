@@ -66,8 +66,8 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 	// abort earlier running vertical scaling opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.RestartType},
-		func(earlierOps *appsv1alpha1.OpsRequest) bool {
-			return true
+		func(earlierOps *appsv1alpha1.OpsRequest) (bool, error) {
+			return true, nil
 		}); err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
 		opsRes *OpsResource,
-		pgRes progressResource,
+		pgRes *progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
 	}

@@ -334,7 +334,7 @@ var _ = Describe("Component Controller", func() {
 		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), compName)
 		Expect(itsList.Items).Should(HaveLen(1))
 		its := itsList.Items[0]
-		pods := testapps.MockInstanceSetPods(&testCtx, &its, clusterObj.Name, compName)
+		pods := testapps.MockInstanceSetPods(&testCtx, &its, clusterObj, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, &its, func() {
 			testk8s.MockInstanceSetReady(&its, pods...)
 		})).ShouldNot(HaveOccurred())
@@ -867,7 +867,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		By("mock pods of component are available")
-		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compName)
+		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
@@ -1679,7 +1679,7 @@ var _ = Describe("Component Controller", func() {
 		By("Checking instanceSet number")
 		itsList := testk8s.ListAndCheckInstanceSetItemsCount(&testCtx, clusterKey, 1)
 		its := &itsList.Items[0]
-		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compDefName)
+		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj, compDefName)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
@@ -1845,7 +1845,7 @@ var _ = Describe("Component Controller", func() {
 		itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
 		its := &itsList.Items[0]
 		By("mock pod are available and wait for component enter running phase")
-		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compName)
+		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())

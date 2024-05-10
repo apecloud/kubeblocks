@@ -87,13 +87,13 @@ type ConfigConstraintSpec struct {
 	//   to reflect the new role.
 	//
 	// +optional
-	DownwardAPITriggeredActions []DownwardAPITriggeredAction `json:"downwardAPITriggeredActions,omitempty"`
+	DownwardAPIChangeTriggeredActions []DownwardAPIChangeTriggeredAction `json:"downwardAPIChangeTriggeredActions,omitempty"`
 
 	// Defines a list of parameters including their names, default values, descriptions,
 	// types, and constraints (permissible values or the range of valid values).
 	//
 	// +optional
-	ConfigSchema *ConfigSchema `json:"configSchema,omitempty"`
+	ParametersSchema *ParametersSchema `json:"parametersSchema,omitempty"`
 
 	// List static parameters.
 	// Modifications to any of these parameters require a restart of the process to take effect.
@@ -115,17 +115,6 @@ type ConfigConstraintSpec struct {
 	// +listType=set
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
-
-	// Used to match labels on the pod to determine whether a dynamic reload should be performed.
-	//
-	// In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
-	// The `reloadedPodSelector` allows you to specify label selectors to target the desired pods for the reload process.
-	//
-	// If the `reloadedPodSelector` is not specified or is nil, all pods managed by the workload will be considered for the dynamic
-	// reload.
-	//
-	// +optional
-	ReloadedPodSelector *metav1.LabelSelector `json:"reloadedPodSelector,omitempty"`
 
 	// Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
 	// Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.
@@ -165,9 +154,9 @@ type ConfigConstraintStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-// ConfigSchema Defines a list of configuration items with their names, default values, descriptions,
+// ParametersSchema Defines a list of configuration items with their names, default values, descriptions,
 // types, and constraints.
-type ConfigSchema struct {
+type ParametersSchema struct {
 	// Specifies the top-level key in the 'configSchema.cue' that organizes the validation rules for parameters.
 	// This key must exist within the CUE script defined in 'configSchema.cue'.
 	//
@@ -219,6 +208,17 @@ type ReloadAction struct {
 	//
 	// +optional
 	AutoTrigger *AutoTrigger `json:"autoTrigger,omitempty"`
+
+	// Used to match labels on the pod to determine whether a dynamic reload should be performed.
+	//
+	// In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
+	// The `reloadedPodSelector` allows you to specify label selectors to target the desired pods for the reload process.
+	//
+	// If the `reloadedPodSelector` is not specified or is nil, all pods managed by the workload will be considered for the dynamic
+	// reload.
+	//
+	// +optional
+	TargetPodSelector *metav1.LabelSelector `json:"targetPodSelector,omitempty"`
 }
 
 // UnixSignalTrigger is used to trigger a reload by sending a specific Unix signal to the process.
@@ -343,9 +343,9 @@ type ToolConfig struct {
 	Command []string `json:"command,omitempty"`
 }
 
-// DownwardAPITriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
+// DownwardAPIChangeTriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
 // For example, a command might be executed when the 'role' label of the Pod is updated.
-type DownwardAPITriggeredAction struct {
+type DownwardAPIChangeTriggeredAction struct {
 	// Specifies the name of the field. It must be a string of maximum length 63.
 	// The name should match the regex pattern `^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`.
 	//

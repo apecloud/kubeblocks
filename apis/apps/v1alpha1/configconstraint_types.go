@@ -97,7 +97,7 @@ type ConfigConstraintSpec struct {
 	//   to reflect the new role.
 	//
 	// +optional
-	DownwardAPIOptions []appsv1beta1.DownwardAPITriggeredAction `json:"downwardAPIOptions,omitempty"`
+	DownwardAPIOptions []appsv1beta1.DownwardAPIChangeTriggeredAction `json:"downwardAPIOptions,omitempty"`
 
 	// A list of ScriptConfig Object.
 	//

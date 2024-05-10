@@ -44,7 +44,7 @@ import (
 )
 
 type ValidateConfigMap func(configTpl, ns string) (*corev1.ConfigMap, error)
-type ValidateConfigSchema func(tpl *appsv1beta1.ConfigSchema) (bool, error)
+type ValidateConfigSchema func(tpl *appsv1beta1.ParametersSchema) (bool, error)
 
 func checkConfigLabels(object client.Object, requiredLabs []string) bool {
 	labels := object.GetLabels()
@@ -85,7 +85,7 @@ func getConfigMapByTemplateName(cli client.Client, ctx intctrlutil.RequestCtx, t
 
 func checkConfigConstraint(ctx intctrlutil.RequestCtx, configConstraint *appsv1beta1.ConfigConstraint) (bool, error) {
 	// validate configuration template
-	validateConfigSchema := func(ccSchema *appsv1beta1.ConfigSchema) (bool, error) {
+	validateConfigSchema := func(ccSchema *appsv1beta1.ParametersSchema) (bool, error) {
 		if ccSchema == nil || len(ccSchema.CUE) == 0 {
 			return true, nil
 		}
@@ -95,8 +95,8 @@ func checkConfigConstraint(ctx intctrlutil.RequestCtx, configConstraint *appsv1b
 	}
 
 	// validate schema
-	if ok, err := validateConfigSchema(configConstraint.Spec.ConfigSchema); !ok || err != nil {
-		ctx.Log.Error(err, "failed to validate template schema!", "configMapName", fmt.Sprintf("%v", configConstraint.Spec.ConfigSchema))
+	if ok, err := validateConfigSchema(configConstraint.Spec.ParametersSchema); !ok || err != nil {
+		ctx.Log.Error(err, "failed to validate template schema!", "configMapName", fmt.Sprintf("%v", configConstraint.Spec.ParametersSchema))
 		return ok, err
 	}
 	return true, nil
@@ -397,7 +397,7 @@ func createConfigPatch(cfg *corev1.ConfigMap, formatter *appsv1beta1.FileFormatC
 }
 
 func updateConfigSchema(cc *appsv1beta1.ConfigConstraint, cli client.Client, ctx context.Context) error {
-	schema := cc.Spec.ConfigSchema
+	schema := cc.Spec.ParametersSchema
 	if schema == nil || schema.CUE == "" {
 		return nil
 	}
@@ -415,6 +415,6 @@ func updateConfigSchema(cc *appsv1beta1.ConfigConstraint, cli client.Client, ctx
 	}
 
 	ccPatch := client.MergeFrom(cc.DeepCopy())
-	cc.Spec.ConfigSchema.SchemaInJSON = openAPISchema
+	cc.Spec.ParametersSchema.SchemaInJSON = openAPISchema
 	return cli.Patch(ctx, cc, ccPatch)
 }

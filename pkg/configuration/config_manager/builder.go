@@ -299,7 +299,7 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	return nil
 }
 
-func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1beta1.DownwardAPITriggeredAction) {
+func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1beta1.DownwardAPIChangeTriggeredAction) {
 	manager.DownwardAPIVolumes = append(manager.DownwardAPIVolumes, corev1.VolumeMount{
 		Name:      fieldInfo.Name,
 		MountPath: fieldInfo.MountPoint,

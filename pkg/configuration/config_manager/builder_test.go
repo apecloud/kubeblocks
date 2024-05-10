@@ -181,8 +181,8 @@ formatterConfig:
 		mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 	}
 
-	newDownwardAPIVolumes := func() []appsv1beta1.DownwardAPITriggeredAction {
-		return []appsv1beta1.DownwardAPITriggeredAction{
+	newDownwardAPIVolumes := func() []appsv1beta1.DownwardAPIChangeTriggeredAction {
+		return []appsv1beta1.DownwardAPIChangeTriggeredAction{
 			{
 				Name:       "downward-api",
 				MountPoint: "/etc/podinfo",

@@ -330,6 +330,11 @@ var (
 				Votable:     false,
 			},
 		},
+		Exporter: &appsv1alpha1.Exporter{
+			ScrapePath:   "metrics",
+			ScrapePort:   "http-metric",
+			ScrapeScheme: appsv1alpha1.HTTPProtocol,
+		},
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
 			PostProvision: defaultLifecycleActionHandler,
 			PreTerminate:  defaultLifecycleActionHandler,

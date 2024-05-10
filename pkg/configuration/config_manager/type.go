@@ -41,7 +41,7 @@ type ConfigSpecInfo struct {
 	ConfigSpec      appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
 	FormatterConfig appsv1beta1.FileFormatConfig     `json:"formatterConfig"`
 
-	DownwardAPIOptions []appsv1beta1.DownwardAPITriggeredAction `json:"downwardAPIOptions"`
+	DownwardAPIOptions []appsv1beta1.DownwardAPIChangeTriggeredAction `json:"downwardAPIOptions"`
 
 	// config volume mount path
 	MountPoint string `json:"mountPoint"`

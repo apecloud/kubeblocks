@@ -20,8 +20,11 @@ package v1alpha1
 import (
 	"errors"
 
+	vmv1beta1 "github.com/VictoriaMetrics/operator/api/victoriametrics/v1beta1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -1267,15 +1270,15 @@ type MultipleClusterObjectValueFormatFlatten struct {
 	KeyValueDelimiter string `json:"keyValueDelimiter"`
 }
 
-// PrometheusProtocol defines the protocol of prometheus scrape metrics.
+// PrometheusScheme defines the protocol of prometheus scrape metrics.
 //
 // +enum
 // +kubebuilder:validation:Enum={http,https}
-type PrometheusProtocol string
+type PrometheusScheme string
 
 const (
-	HTTPProtocol  = "http"
-	HTTPSProtocol = "https"
+	HTTPProtocol  PrometheusScheme = "http"
+	HTTPSProtocol PrometheusScheme = "https"
 )
 
 // MonitorKind defines the kind of monitor.
@@ -1288,3 +1291,67 @@ const (
 	LogsKind    = "logs"
 	TracesKind  = "traces"
 )
+
+type ServiceMonitorTemplate struct {
+	// Standard k8s object's metadata.
+	//
+	// +optional
+	metav1.ObjectMeta `json:",inline"`
+
+	// ServiceMonitorSpec contains specification parameters for a ServiceMonitor
+	//
+	// +optional
+	ServiceMonitorSpec monitoringv1.ServiceMonitorSpec `json:"serviceMonitorSpec,omitempty"`
+}
+
+type VMMonitorTemplate struct {
+	// Standard k8s object's metadata.
+	//
+	// +optional
+	metav1.ObjectMeta `json:",inline"`
+
+	// VMServiceScrapeSpec defines the desired state of VMServiceScrape
+	//
+	// +optional
+	VMServiceScrapeSpec vmv1beta1.VMServiceScrapeSpec `json:"vmServiceScrapeSpec,omitempty"`
+}
+
+type MetricsStoreIntegration struct {
+	// Specifies the ServiceMonitor template used in the Component.
+	//
+	// Example usage:
+	// ```yaml
+	// name: prometheus-scrape
+	// namespace: default
+	// labels:
+	//   k8s-app: node-exporter
+	// serviceMonitorTemplate:
+	//   selector:
+	//     matchLabels:
+	//       app: app-exporter
+	//       k8s-app: app-exporter
+	//   endpoints:
+	//   - port: metrics_port
+	//   jobLabel: k8s-app
+	// ```
+	//
+	// +optional
+	ServiceMonitorTemplate *ServiceMonitorTemplate `json:"serviceMonitorTemplate,omitempty"`
+
+	// VictoriaMetrics is currently not supported yet.
+	// Specifies the VMServiceScrape template used in the Component.
+	//
+	// ```yaml
+	// name: vm-scrape
+	// namespace: default
+	// labels:
+	//   k8s-app: node-exporter
+	// vmServiceScrapeSpec:
+	//   selector:
+	//     matchLabels:
+	//       app: app-exporter
+	// ```
+	//
+	// +optional
+	VMMonitorTemplate *VMMonitorTemplate `json:"vmMonitorTemplate,omitempty"`
+}

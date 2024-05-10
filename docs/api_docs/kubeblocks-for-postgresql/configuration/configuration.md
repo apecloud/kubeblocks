@@ -91,7 +91,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
    kind: OpsRequest
    metadata:
      name: mycluster-configuring-demo
-     namespace: kb-system
+     namespace: demo
    spec:
      clusterName: mycluster
      reconfigure:

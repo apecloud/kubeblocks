@@ -20,52 +20,6 @@ But it's also important to note that the dynamic parameter configuration doesn't
 1. [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
 2. [Create a Kafka cluster](./../cluster-management/create-a-kafka-cluster.md).
 
-## Configure cluster parameters with OpsRequest
-
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
-
-   ```bash
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: mycluster-configuring-demo
-     namespace: kb-system
-   spec:
-     clusterName: mycluster
-     reconfigure:
-       componentName: kafka
-       configurations:
-       - keys:
-         - key: kafka.conf
-           parameters:
-           - key: log.cleanup.policy
-             value: "compact"
-         name: kafka-config
-     ttlSecondBeforeAbort: 0
-     type: Reconfiguring
-   EOF
-   ```
-
-   * `metadata.name` specifies the name of this OpsRequest.
-   * `metadata.namespace` specifies the namespace where this cluster is created.
-   * `spec.clusterName` specifies the cluster name.
-   * `spec.reconfigure` specifies the configuration information. `componentName`specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
-
-2. Apply the configuration opsRequest.
-
-   ```bash
-   kubectl apply -f mycluster-configuring-demo.yaml
-   ```
-
-3. Connect to this cluster to verify whether the configuration takes effect as expected.
-
-   ```bash
-   kbcli cluster describe-config mykafka --show-detail | grep log.cleanup.policy
-   >
-   log.cleanup.policy = compact
-   mykafka-reconfiguring-wvqns   mykafka   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        May 10,2024 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
-   ```
-
 ## Configure cluster parameters by configuration file
 
 1. Get the configuration file of this cluster.
@@ -94,6 +48,52 @@ But it's also important to note that the dynamic parameter configuration doesn't
        name: kafka-config
      - configSpec:
          defaultMode: 292
+   ```
+
+3. Connect to this cluster to verify whether the configuration takes effect as expected.
+
+   ```bash
+   kbcli cluster describe-config mykafka --show-detail | grep log.cleanup.policy
+   >
+   log.cleanup.policy = compact
+   mykafka-reconfiguring-wvqns   mykafka   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        May 10,2024 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
+   ```
+
+## Configure cluster parameters with OpsRequest
+
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+
+   ```bash
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-configuring-demo
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     reconfigure:
+       componentName: kafka
+       configurations:
+       - keys:
+         - key: kafka.conf
+           parameters:
+           - key: log.cleanup.policy
+             value: "compact"
+         name: kafka-config
+     ttlSecondBeforeAbort: 0
+     type: Reconfiguring
+   EOF
+   ```
+
+   * `metadata.name` specifies the name of this OpsRequest.
+   * `metadata.namespace` specifies the namespace where this cluster is created.
+   * `spec.clusterName` specifies the cluster name.
+   * `spec.reconfigure` specifies the configuration information. `componentName`specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
+
+2. Apply the configuration opsRequest.
+
+   ```bash
+   kubectl apply -f mycluster-configuring-demo.yaml
    ```
 
 3. Connect to this cluster to verify whether the configuration takes effect as expected.

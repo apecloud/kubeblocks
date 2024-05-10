@@ -79,7 +79,7 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
          - key: kafka.conf
            parameters:
            - key: log.cleanup.policy
-             value:"compact"
+             value: "compact"
          name: kafka-config
      ttlSecondBeforeAbort: 0
      type: Reconfiguring

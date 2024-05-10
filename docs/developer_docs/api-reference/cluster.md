@@ -20161,6 +20161,7 @@ Specifies the name of the target ClusterVersion for the upgrade.</p>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Lists components to be upgrade based on desired ComponentDefinition and ServiceVersion.
 From the perspective of cluster API, the reasonable combinations should be:
 1. (comp-def, service-ver) - upgrade to the specified service version and component definition, the user takes the responsibility to ensure that they are compatible.

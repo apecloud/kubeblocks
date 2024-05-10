@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -73,7 +74,10 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("Test the functions in ops_util.go")
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1, nil)
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				Replicas:     pointer.Int32(1),
+			})
 			Expect(patchValidateErrorCondition(ctx, k8sClient, opsRes, "validate error")).Should(Succeed())
 			Expect(PatchOpsHandlerNotSupported(ctx, k8sClient, opsRes)).Should(Succeed())
 			Expect(isOpsRequestFailedPhase(appsv1alpha1.OpsFailedPhase)).Should(BeTrue())
@@ -85,7 +89,10 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("Test the functions in ops_util.go")
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1, nil)
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				Replicas:     pointer.Int32(1),
+			})
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 
 			By("mock component failed")
@@ -97,17 +104,8 @@ var _ = Describe("OpsUtil functions", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
 
-			hs := horizontalScalingOpsHandler{}
-			handleComponentProgress := func(
-				reqCtx intctrlutil.RequestCtx,
-				cli client.Client,
-				opsRes *OpsResource,
-				pgRes progressResource,
-				compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-				return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, hs.getExpectReplicas)
-			}
 			opsPhase, _, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleComponentProgress)
+				"test", handleComponentProgressForScalingReplicas)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
@@ -115,7 +113,7 @@ var _ = Describe("OpsUtil functions", func() {
 			compStatus := opsRes.OpsRequest.Status.Components[consensusComp]
 			compStatus.LastFailedTime = metav1.Time{Time: compStatus.LastFailedTime.Add(-1 * componentFailedTimeout).Add(-1 * time.Second)}
 			opsRes.OpsRequest.Status.Components[consensusComp] = compStatus
-			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentProgress)
+			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentProgressForScalingReplicas)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsFailedPhase))
 		})
@@ -163,7 +161,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("mock restart ops to succeed and expect to enable ha")
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
-			_ = initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
+			_ = initInstanceSetPods(ctx, k8sClient, opsRes)
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
@@ -178,7 +176,10 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			runHscaleOps := func(expectPhase appsv1alpha1.OpsPhase) *appsv1alpha1.OpsRequest {
-				ops := createHorizontalScaling(clusterName, 1, nil)
+				ops := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					Replicas:     pointer.Int32(1),
+				})
 				opsRes.OpsRequest = ops
 				_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 				Expect(err).ShouldNot(HaveOccurred())

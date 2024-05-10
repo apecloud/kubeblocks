@@ -109,6 +109,8 @@ type progressResource struct {
 	componentDef        *appsv1alpha1.ComponentDefinition
 	// record which pods need to updated during this operation.
 	updatedPodSet map[string]string
+	createdPodSet map[string]string
+	deletedPodSet map[string]string
 	compOps       ComponentOpsInteface
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.

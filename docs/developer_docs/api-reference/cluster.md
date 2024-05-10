@@ -12056,46 +12056,40 @@ int32
 </em>
 </td>
 <td>
-<p>Specifies the number of total replicas.</p>
+<em>(Optional)</em>
+<p>Deprecated: since v0.9, use scaleOut and scaleIn instead.
+Specifies the number of replicas for the component. Cannot be used with &ldquo;scaleIn&rdquo; and &ldquo;scaleOut&rdquo;.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>instances</code><br/>
+<code>scaleOut</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
-[]InstanceTemplate
+<a href="#apps.kubeblocks.io/v1alpha1.ScaleOut">
+ScaleOut
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Contains a list of InstanceTemplate objects.
-Each InstanceTemplate object allows for modifying replica counts or specifying configurations for new instances during scaling.</p>
-<p>The field supports two main use cases:</p>
-<ul>
-<li>Modifying replica count:
-Specify the desired replica count for existing instances with a particular configuration using Name and Replicas fields.
-To modify the replica count, the Name and Replicas fields of the InstanceTemplate object should be provided.
-Only these fields are used for matching and adjusting replicas; other fields are ignored.
-The Replicas value overrides any existing count.</li>
-<li>Configuring new instances:
-Define the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
-New instances are created based on the provided InstanceTemplate.</li>
-</ul>
+<p>Specifies the replica changes for scaling out components and instance templates,
+and brings offline instances back online. Can be used in conjunction with the &ldquo;scaleIn&rdquo; operation.
+Note: Any configuration that deletes instances is considered invalid.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>offlineInstances</code><br/>
+<code>scaleIn</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.ScaleIn">
+ScaleIn
+</a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Specifies the names of instances to be scaled down.
-This provides control over which specific instances are targeted for termination when reducing the replica count.</p>
+<p>Specifies the replica changes for scaling in components and instance templates,
+and takes specified instances offline. Can be used in conjunction with the &ldquo;scaleOut&rdquo; operation.
+Note: Any configuration that creates instances is considered invalid.</p>
 </td>
 </tr>
 </tbody>
@@ -12292,6 +12286,46 @@ If not set, it will rebuild on a random node.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceReplicasTemplate">InstanceReplicasTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReplicaChanger">ReplicaChanger</a>)
+</p>
+<div>
+<p>InstanceReplicasTemplate defines the template for instance replicas.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the instance template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicaChanges</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Specifies the replica changes for the instance template.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceResourceTemplate">InstanceResourceTemplate
 </h3>
 <p>
@@ -12339,7 +12373,7 @@ Kubernetes core/v1.ResourceRequirements
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScaleOut">ScaleOut</a>)
 </p>
 <div>
 <p>InstanceTemplate allows customization of individual replica configurations in a Component.</p>
@@ -16577,6 +16611,49 @@ AutoTrigger
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ReplicaChanger">ReplicaChanger
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ScaleIn">ScaleIn</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScaleOut">ScaleOut</a>)
+</p>
+<div>
+<p>ReplicaChanger defines the parameters for changing the number of replicas.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicaChanges</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Specifies the replica changes for the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceReplicasTemplate">
+[]InstanceReplicasTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Modifies the desired replicas count for existing InstanceTemplate.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ReplicaRole">ReplicaRole
 </h3>
 <p>
@@ -17040,6 +17117,113 @@ string
 </td>
 <td>
 <p>Specifies the error or status message reported if the <code>expression</code> does not evaluate to <code>true</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ScaleIn">ScaleIn
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>)
+</p>
+<div>
+<p>ScaleIn defines the configuration for a scale-in operation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ReplicaChanger</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ReplicaChanger">
+ReplicaChanger
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ReplicaChanger</code> are embedded into this type.)
+</p>
+<p>Modifies the replicas of the component and instance templates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>onlineInstancesToOffline</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the instance names that need to be taken offline.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ScaleOut">ScaleOut
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>)
+</p>
+<div>
+<p>ScaleOut defines the configuration for a scale-out operation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ReplicaChanger</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ReplicaChanger">
+ReplicaChanger
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ReplicaChanger</code> are embedded into this type.)
+</p>
+<p>Modifies the replicas of the component and instance templates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>newInstances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
+New instances are created based on the provided instance templates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstancesToOnline</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the instances in the offline list to bring back online.</p>
 </td>
 </tr>
 </tbody>
@@ -19042,7 +19226,7 @@ Upgrade
 <td>
 <em>(Optional)</em>
 <p>Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
-including desired total replica counts, configurations for new instances, modifications for existing instances,
+including desired replica counts, configurations for new instances, modifications for existing instances,
 and instance downscaling options.</p>
 </td>
 </tr>

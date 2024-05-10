@@ -94,7 +94,7 @@ type SpecificOpsRequest struct {
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
 	// Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
-	// including desired total replica counts, configurations for new instances, modifications for existing instances,
+	// including desired replica counts, configurations for new instances, modifications for existing instances,
 	// and instance downscaling options.
 	//
 	// +optional
@@ -425,34 +425,75 @@ type HorizontalScaling struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
 
-	// Specifies the number of total replicas.
-	//
-	// +kubebuilder:validation:Required
+	// Deprecated: since v0.9, use scaleOut and scaleIn instead.
+	// Specifies the number of replicas for the component. Cannot be used with "scaleIn" and "scaleOut".
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +kubebuilder:validation:Minimum=0
-	Replicas int32 `json:"replicas"`
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
 
-	// Contains a list of InstanceTemplate objects.
-	// Each InstanceTemplate object allows for modifying replica counts or specifying configurations for new instances during scaling.
-	//
-	// The field supports two main use cases:
-	//
-	// - Modifying replica count:
-	//   Specify the desired replica count for existing instances with a particular configuration using Name and Replicas fields.
-	//   To modify the replica count, the Name and Replicas fields of the InstanceTemplate object should be provided.
-	//   Only these fields are used for matching and adjusting replicas; other fields are ignored.
-	//   The Replicas value overrides any existing count.
-	// - Configuring new instances:
-	//   Define the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
-	//   New instances are created based on the provided InstanceTemplate.
+	// Specifies the replica changes for scaling out components and instance templates,
+	// and brings offline instances back online. Can be used in conjunction with the "scaleIn" operation.
+	// Note: Any configuration that deletes instances is considered invalid.
 	//
 	// +optional
-	Instances []InstanceTemplate `json:"instances,omitempty"`
+	ScaleOut *ScaleOut `json:"scaleOut,omitempty"`
 
-	// Specifies the names of instances to be scaled down.
-	// This provides control over which specific instances are targeted for termination when reducing the replica count.
-	//
+	// Specifies the replica changes for scaling in components and instance templates,
+	// and takes specified instances offline. Can be used in conjunction with the "scaleOut" operation.
+	// Note: Any configuration that creates instances is considered invalid.
+	ScaleIn *ScaleIn `json:"scaleIn,omitempty"`
+}
+
+// ScaleOut defines the configuration for a scale-out operation.
+type ScaleOut struct {
+
+	// Modifies the replicas of the component and instance templates.
+	ReplicaChanger `json:",inline"`
+
+	// Defines the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
+	// New instances are created based on the provided instance templates.
 	// +optional
-	OfflineInstances []string `json:"offlineInstances,omitempty"`
+	NewInstances []InstanceTemplate `json:"newInstances,omitempty"`
+
+	// Specifies the instances in the offline list to bring back online.
+	// +optional
+	OfflineInstancesToOnline []string `json:"offlineInstancesToOnline,omitempty"`
+}
+
+// ScaleIn defines the configuration for a scale-in operation.
+type ScaleIn struct {
+
+	// Modifies the replicas of the component and instance templates.
+	ReplicaChanger `json:",inline"`
+
+	// Specifies the instance names that need to be taken offline.
+	// +optional
+	OnlineInstancesToOffline []string `json:"onlineInstancesToOffline,omitempty"`
+}
+
+// ReplicaChanger defines the parameters for changing the number of replicas.
+type ReplicaChanger struct {
+	// Specifies the replica changes for the component.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Required
+	ReplicaChanges int32 `json:"replicaChanges"`
+
+	// Modifies the desired replicas count for existing InstanceTemplate.
+	// +optional
+	Instances []InstanceReplicasTemplate `json:"instances,omitempty"`
+}
+
+// InstanceReplicasTemplate defines the template for instance replicas.
+type InstanceReplicasTemplate struct {
+	// Specifies the name of the instance template.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the replica changes for the instance template.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Required
+	ReplicaChanges int32 `json:"replicaChanges"`
 }
 
 // Reconfigure defines the parameters for updating a Component's configuration.
@@ -1363,3 +1404,20 @@ func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, messag
 	p.Message = message
 	p.Status = status
 }
+
+/*func (r ReplicasWrapper) OverwriteOP() bool {
+	return r.Replicas != nil
+}
+
+func (r ReplicasWrapper) AddOP() bool {
+	return r.ReplicasToAdd != nil
+}
+
+func (r ReplicasWrapper) DeleteOP() bool {
+	return r.ReplicasToDelete != nil
+}
+
+func (r ReplicasWrapper) NoneOP() bool {
+	return r.Replicas == nil && r.ReplicasToAdd == nil && r.ReplicasToDelete == nil
+}
+*/

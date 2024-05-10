@@ -72,8 +72,8 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	// abort earlier running vertical scaling opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.HorizontalScalingType,
 		appsv1alpha1.StartType, appsv1alpha1.RestartType, appsv1alpha1.VerticalScalingType},
-		func(earlierOps *appsv1alpha1.OpsRequest) bool {
-			return true
+		func(earlierOps *appsv1alpha1.OpsRequest) (bool, error) {
+			return true, nil
 		}); err != nil {
 		return err
 	}
@@ -110,15 +110,15 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for stop opsRequest.
 func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, compOps ComponentOpsInteface) *int32 {
-		return pointer.Int32(0)
-	}
 	handleComponentProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
 		opsRes *OpsResource,
-		pgRes progressResource,
+		pgRes *progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		expectProgressCount, completedCount, err := handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, getExpectReplicas)
+		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
+		pgRes.deletedPodSet = getPodSetForComponent(lastCompConfiguration.Instances,
+			pgRes.clusterComponent.OfflineInstances, opsRes.Cluster.Name, pgRes.fullComponentName, *lastCompConfiguration.Replicas)
+		expectProgressCount, completedCount, err := handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		if err != nil {
 			return expectProgressCount, completedCount, err
 		}

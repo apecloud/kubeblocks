@@ -27,6 +27,7 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -99,7 +100,7 @@ func MockInstanceSetComponent(
 func MockInstanceSetPods(
 	testCtx *testutil.TestContext,
 	its *workloads.InstanceSet,
-	clusterName,
+	cluster *appsv1alpha1.Cluster,
 	consensusCompName string) []*corev1.Pod {
 	getReplicas := func() int {
 		if its == nil || its.Spec.Replicas == nil {
@@ -132,8 +133,20 @@ func MockInstanceSetPods(
 	replicas := getReplicas()
 	replicasStr := strconv.Itoa(replicas)
 	podList := make([]*corev1.Pod, replicas)
-	for i := 0; i < replicas; i++ {
-		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
+	podNames := make([]string, 0)
+	insTPLReplicasCnt := int32(0)
+	workloadName := constant.GenerateWorkloadNamePattern(cluster.Name, consensusCompName)
+	compSpec := cluster.Spec.GetComponentByName(consensusCompName)
+	for _, insTpl := range compSpec.Instances {
+		insReplicas := *insTpl.Replicas
+		insTPLReplicasCnt += insReplicas
+		podNames = append(podNames, generateInstanceNames(workloadName, insTpl.Name, insReplicas, compSpec.OfflineInstances)...)
+	}
+	if insTPLReplicasCnt < compSpec.Replicas {
+		podNames = append(podNames, generateInstanceNames(workloadName, "",
+			compSpec.Replicas-insTPLReplicasCnt, compSpec.OfflineInstances)...)
+	}
+	for i, pName := range podNames {
 		var podRole, accessMode string
 		if its != nil && len(its.Spec.Roles) > 0 {
 			if i == 0 {
@@ -144,7 +157,7 @@ func MockInstanceSetPods(
 				accessMode = string(noneLeaderRole.AccessMode)
 			}
 		}
-		pod := MockInstanceSetPod(testCtx, its, clusterName, consensusCompName, podName, podRole, accessMode)
+		pod := MockInstanceSetPod(testCtx, its, cluster.Name, consensusCompName, pName, podRole, accessMode)
 		annotations := pod.Annotations
 		if annotations == nil {
 			annotations = make(map[string]string)
@@ -236,4 +249,27 @@ func MockInstanceSetPod(
 	}
 	gomega.Expect(testCtx.Cli.Status().Patch(context.Background(), pod, patch)).Should(gomega.Succeed())
 	return pod
+}
+
+func generateInstanceNames(parentName, templateName string,
+	replicas int32, offlineInstances []string) []string {
+	usedNames := sets.New(offlineInstances...)
+	var instanceNameList []string
+	ordinal := 0
+	for count := int32(0); count < replicas; count++ {
+		var name string
+		for {
+			if len(templateName) == 0 {
+				name = fmt.Sprintf("%s-%d", parentName, ordinal)
+			} else {
+				name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
+			}
+			ordinal++
+			if !usedNames.Has(name) {
+				instanceNameList = append(instanceNameList, name)
+				break
+			}
+		}
+	}
+	return instanceNameList
 }

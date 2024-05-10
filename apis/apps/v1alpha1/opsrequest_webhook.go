@@ -416,12 +416,147 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 	if len(horizontalScalingList) == 0 {
 		return notEmptyError("spec.horizontalScaling")
 	}
-
 	compOpsList := make([]ComponentOps, len(horizontalScalingList))
+	hScaleMap := map[string]HorizontalScaling{}
 	for i, v := range horizontalScalingList {
 		compOpsList[i] = v.ComponentOps
+		hScaleMap[v.ComponentName] = horizontalScalingList[i]
 	}
-	return r.checkComponentExistence(cluster, compOpsList)
+	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
+		return err
+	}
+	for _, comSpec := range cluster.Spec.ComponentSpecs {
+		if hScale, ok := hScaleMap[comSpec.Name]; ok {
+			if err := r.validateHorizontalScalingSpec(hScale, comSpec, cluster.Name, comSpec.Name); err != nil {
+				return err
+			}
+		}
+	}
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		if hScale, ok := hScaleMap[shardingSpec.Name]; ok {
+			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, cluster.Name, shardingSpec.Name); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec ClusterComponentSpec, clusterName, componentName string) error {
+	if hScale.Replicas != nil && (hScale.ScaleIn != nil || hScale.ScaleOut != nil) {
+		return fmt.Errorf(`"replicas" has been deprecated and cannot be used with "scaleOut" and "scaleIn"`)
+	}
+	if hScale.ScaleIn == nil && hScale.ScaleOut == nil {
+		return nil
+	}
+	compInsTplMap := map[string]int32{}
+	for _, v := range compSpec.Instances {
+		if v.Replicas == nil {
+			compInsTplMap[v.Name] = 1
+		} else {
+			compInsTplMap[v.Name] = *v.Replicas
+		}
+	}
+	checkInstances := func(compReplicaChanges int32, instances []InstanceReplicasTemplate, newInstances []InstanceTemplate, isScaleIn bool) (map[string]int32, error) {
+		msgPrefix := "ScaleIn:"
+		if !isScaleIn {
+			msgPrefix = "ScaleOut:"
+		}
+		insTplMap := map[string]int32{}
+		allInsReplicaChanges := int32(0)
+		for _, v := range instances {
+			compInsReplicas, ok := compInsTplMap[v.Name]
+			if !ok {
+				return nil, fmt.Errorf(`%s cannot find the instance template "%s" in component "%s"`,
+					msgPrefix, v.Name, componentName)
+			}
+			if isScaleIn && v.ReplicaChanges > compInsReplicas {
+				return nil, fmt.Errorf(`%s "replicaChanges" of instanceTemplate "%s" can't be greater than %d`,
+					msgPrefix, v.Name, compInsReplicas)
+			}
+			insTplMap[v.Name] = v.ReplicaChanges
+			allInsReplicaChanges += v.ReplicaChanges
+		}
+		if len(newInstances) > 0 {
+			for _, insTpl := range newInstances {
+				if _, ok := compInsTplMap[insTpl.Name]; ok {
+					return nil, fmt.Errorf(`new instance template "%s" already exists in component "%s"`, insTpl.Name, componentName)
+				}
+				if insTpl.Replicas == nil {
+					allInsReplicaChanges += 1
+				} else {
+					allInsReplicaChanges += *insTpl.Replicas
+				}
+			}
+		}
+		if allInsReplicaChanges > compReplicaChanges {
+			return nil, fmt.Errorf(`%s "replicaChanges" can't be less than the sum of "replicaChanges" for specified instance templates`, msgPrefix)
+		}
+		return insTplMap, nil
+	}
+
+	validateOfflineOrOnlineInstances := func(compReplicaChanges int32, insTplMap map[string]int32, hScaleInstanceNames []string, operationKey string) error {
+		if len(hScaleInstanceNames) > int(compReplicaChanges) {
+			return fmt.Errorf(`the length of "offlineInstancesToOnline" or "onlineInstancesToOffline" can't be greater than the "replicaChanges" for the component`)
+		}
+		hScaleInsMap := map[string]int32{}
+		workloadPrefix := fmt.Sprintf("%s-%s", clusterName, componentName)
+		for _, insName := range hScaleInstanceNames {
+			compInsKey := insName[:strings.LastIndex(insName, "-")]
+			if compInsKey == workloadPrefix {
+				continue
+			}
+			insTplName := strings.Replace(compInsKey, workloadPrefix+"-", "", 1)
+			if _, ok := insTplMap[insTplName]; !ok {
+				return fmt.Errorf(`"replicaChanges" of the instance temaplte "%s" were not specified when %s instance "%s"`,
+					insTplName, operationKey, insName)
+			}
+			hScaleInsMap[insTplName] = hScaleInsMap[insTplName] + 1
+		}
+		// check if replicaChanges of specified instance template is greater than the count of offline/online instances.
+		for insTplName, replicas := range hScaleInsMap {
+			if replicas > insTplMap[insTplName] {
+				return fmt.Errorf(`"replicaChanges" can't be less than %d when %d instances of the instance template "%s" are designated %s`,
+					replicas, replicas, insTplName, operationKey)
+			}
+		}
+		return nil
+	}
+
+	if hScale.ScaleIn != nil {
+		insTplMap, err := checkInstances(hScale.ScaleIn.ReplicaChanges, hScale.ScaleIn.Instances, nil, true)
+		if err != nil {
+			return err
+		}
+		if len(hScale.ScaleIn.OnlineInstancesToOffline) > 0 {
+			if err = validateOfflineOrOnlineInstances(hScale.ScaleIn.ReplicaChanges, insTplMap,
+				hScale.ScaleIn.OnlineInstancesToOffline, "offline"); err != nil {
+				return err
+			}
+		}
+		if hScale.ScaleIn.ReplicaChanges > compSpec.Replicas {
+			return fmt.Errorf(`"scaleIn.replicaChanges" can't be greater than %d for component "%s"`, compSpec.Replicas, componentName)
+		}
+	}
+	if hScale.ScaleOut != nil {
+		insTplMap, err := checkInstances(hScale.ScaleOut.ReplicaChanges, hScale.ScaleOut.Instances, hScale.ScaleOut.NewInstances, false)
+		if err != nil {
+			return err
+		}
+		if len(hScale.ScaleOut.OfflineInstancesToOnline) > 0 {
+			offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
+			for _, offlineInsName := range hScale.ScaleOut.OfflineInstancesToOnline {
+				if _, ok := offlineInstanceSet[offlineInsName]; !ok {
+					return fmt.Errorf(`cannot find the offline instance "%s" in component "%s" for scaleOut operation`, offlineInsName, componentName)
+				}
+			}
+			if err = validateOfflineOrOnlineInstances(hScale.ScaleOut.ReplicaChanges,
+				insTplMap, hScale.ScaleOut.OfflineInstancesToOnline, "online"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // validateVolumeExpansion validates volumeExpansion api when spec.type is VolumeExpansion

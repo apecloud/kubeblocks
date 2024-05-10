@@ -2430,7 +2430,7 @@ func (in *ConfigConstraintSpec) DeepCopyInto(out *ConfigConstraintSpec) {
 	}
 	if in.DownwardAPIOptions != nil {
 		in, out := &in.DownwardAPIOptions, &out.DownwardAPIOptions
-		*out = make([]v1beta1.DownwardAPITriggeredAction, len(*in))
+		*out = make([]v1beta1.DownwardAPIChangeTriggeredAction, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

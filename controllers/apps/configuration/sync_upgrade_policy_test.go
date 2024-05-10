@@ -135,7 +135,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}}))
 
 			// add selector
-			mockParam.ConfigConstraint.ReloadedPodSelector = &metav1.LabelSelector{
+			mockParam.ConfigConstraint.ReloadAction.TargetPodSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"primary": "true",
 				},

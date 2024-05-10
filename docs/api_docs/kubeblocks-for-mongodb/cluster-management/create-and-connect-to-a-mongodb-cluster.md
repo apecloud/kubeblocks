@@ -32,16 +32,16 @@ This tutorial shows how to create and connect to a MongoDB cluster.
   Make sure the `mongodb` cluster definition is installed with `kubectl get clusterdefinitions postgresql`.
 
   ```bash
-  kubectl get clusterdefinition postgresql
+  kubectl get clusterdefinition mongodb
   >
-  NAME         TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  postgresql                              Available   30m
+  NAME      TOPOLOGIES   SERVICEREFS   STATUS      AGE
+  mongodb                              Available   30m
   ```
 
   View all available versions for creating a cluster
 
   ```bash
-  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=postgresql
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=mongodb
   ```
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
@@ -77,7 +77,7 @@ spec:
   clusterVersionRef: mongodb-5.0
   componentSpecs:
   - componentDefRef: mongodb
-    monitor: false
+    monitorEnabled: false
     name: mongodb
     replicas: 1
     resources:

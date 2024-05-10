@@ -20,72 +20,6 @@ But it's also important to note that the dynamic parameter configuration doesn't
 1. [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
 2. [Create a PostgreSQL cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster).
 
-## Configure cluster parameters with OpsRequest
-
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
-
-   ```bash
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: mycluster-configuring-demo
-     namespace:demo
-   spec:
-     clusterName: mycluster
-     reconfigure:
-       componentName: postgresql
-       configurations:
-       - keys:
-         - key: my.cnf
-           parameters:
-           - key: max_connections
-             value:"600"
-         name: postgresql-configuration
-     ttlSecondBeforeAbort: 0
-     type: Reconfiguring
-   EOF
-   ```
-
-   * `metadata.name` specifies the name of this OpsRequest.
-   * `metadata.namespace` specifies the namespace where this cluster is created.
-   * `spec.clusterName` specifies the cluster name.
-   * `spec.reconfigure` specifies the configuration information. `componentName`specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
-
-2. Apply the configuration opsRequest.
-
-   ```bash
-   kubectl apply -f mycluster-configuring-demo.yaml
-   ```
-
-3. Connect to this cluster to verify whether the configuration takes effect.
-
-   1. Get the username and password.
-
-      ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
-      >
-      postgres
-
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
-      >
-      tf8fhsv2
-      ```
-
-   2. Connect to this cluster and verify whether the parameters are configured as expected.
-
-      ```bash
-      kubectl exec -ti -n demo mycluster-postgresql-0 -- bash
-
-      root@mycluster-postgresql-0:/home/postgres# psql -U postgres -W
-      Password: tf8fhsv2
-      >
-      postgres=# show max_connections;
-      max_connections
-      -----------------
-      600
-      (1 row)
-      ```
-
 ## Configure cluster parameters by configuration file
 
 1. Get the configuration file of this cluster.
@@ -131,6 +65,70 @@ But it's also important to note that the dynamic parameter configuration doesn't
       kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
       >
       2gvztbvz
+      ```
+
+   2. Connect to this cluster and verify whether the parameters are configured as expected.
+
+      ```bash
+      kubectl exec -ti -n demo mycluster-postgresql-0 -- bash
+
+      root@mycluster-postgresql-0:/home/postgres# psql -U postgres -W
+      Password: tf8fhsv2
+      >
+      postgres=# show max_connections;
+      max_connections
+      -----------------
+      600
+      (1 row)
+      ```
+
+## Configure cluster parameters with OpsRequest
+
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+
+   ```bash
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-configuring-demo
+     namespace: kb-system
+   spec:
+     clusterName: mycluster
+     reconfigure:
+       componentName: postgresql
+       configurations:
+       - keys:
+         - key: my.cnf
+           parameters:
+           - key: max_connections
+             value: "600"
+         name: postgresql-configuration
+     type: Reconfiguring
+   ```
+
+   * `metadata.name` specifies the name of this OpsRequest.
+   * `metadata.namespace` specifies the namespace where this cluster is created.
+   * `spec.clusterName` specifies the cluster name.
+   * `spec.reconfigure` specifies the configuration information. `componentName`specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
+
+2. Apply the configuration opsRequest.
+
+   ```bash
+   kubectl apply -f mycluster-configuring-demo.yaml
+   ```
+
+3. Connect to this cluster to verify whether the configuration takes effect.
+
+   1. Get the username and password.
+
+      ```bash
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      >
+      postgres
+
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      >
+      tf8fhsv2
       ```
 
    2. Connect to this cluster and verify whether the parameters are configured as expected.

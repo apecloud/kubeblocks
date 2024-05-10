@@ -7,9 +7,15 @@ sidebar_position: 4
 
 # Configure cluster parameters
 
-From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
+This guide shows how to configure cluster parameters by creating an opsRequest.
 
-There are 3 types of parameters:
+KubeBlocks supports dynamic configuration. When the specification of a database instance changes (e.g., a user vertically scales a cluster), KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is because different specifications of a database instance may require different optimal configurations to optimize performance and resource utilization. When you choose a different database instance specification, KubeBlocks automatically detects and determines the best database configuration for the new specification, ensuring optimal performance and configuration of the database under the new specifications.
+
+This feature simplifies the process ofconfiguring parameters, which saves you from manually configuring database parameters as KubeBlocks handles the updates and configurations automatically to adapt to the new specifications. This saves time and effort and reduces performance issues caused by incorrect configuration.
+
+But it's also important to note that the dynamic parameter configuration doesn't apply to all parameters. Some parameters may require manual configuration. Additionally, if you have manually modified database parameters before, KubeBlocks may overwrite your customized configurations when refreshing the database configuration template. Therefore, when using the dynamic configuration feature, it is recommended to back up and record your custom configuration so that you can restore them if needed.
+
+For Pulsar, there are 3 types of parameters:
 
 1. Environment parameters, such as GC-related parameters, `PULSAR_MEM`, and `PULSAR_GC`, changes will apply to all components;
 2. Configuration parameters, such as `zookeeper` or `bookies.conf` configuration files, can be changed through `env` and changes restart the pod;
@@ -23,164 +29,12 @@ There are 3 types of parameters:
 ).
 :::
 
-## View parameter information
+## Before you start
 
-View the current configuration file of a cluster.
+1. [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+2. [Create a Kafka cluster](./../cluster-management/create-a-kafka-cluster.md).
 
-```bash
-kbcli cluster describe-config pulsar  
-```
-
-* View the details of the current configuration file.
-
-  ```bash
-  kbcli cluster describe-config pulsar --show-detail
-  ```
-
-* View the parameter description.
-
-  ```bash
-  kbcli cluster explain-config pulsar | head -n 20
-  ```
-
-## Configure parameters
-
-### Configure parameters with configure command
-
-#### Configure environment parameters
-
-***Steps***
-
-1. You need to specify the component name to configure parameters. Get the pulsar cluster component name.
-
-  ```bash
-  kbcli cluster list-components pulsar 
-  ```
-
-  ***Example***
-
-  ```bash
-  kbcli cluster list-components pulsar 
-
-  NAME               NAMESPACE   CLUSTER   TYPE               IMAGE
-  proxy              default     pulsar    pulsar-proxy       docker.io/apecloud/pulsar:2.11.2
-  broker             default     pulsar    pulsar-broker      docker.io/apecloud/pulsar:2.11.2
-  bookies-recovery   default     pulsar    bookies-recovery   docker.io/apecloud/pulsar:2.11.2
-  bookies            default     pulsar    bookies            docker.io/apecloud/pulsar:2.11.2
-  zookeeper          default     pulsar    zookeeper          docker.io/apecloud/pulsar:2.11.2
-  ```
-
-2. Configure parameters.
-
-   We take `zookeeper` as an example.
-
-   ```bash
-   kbcli cluster configure pulsar --component=zookeeper --set PULSAR_MEM="-XX:MinRAMPercentage=50 -XX:MaxRAMPercentage=70" 
-   ```
-
-3. Verify the configuration.
-
-   a. Check the progress of configuration:
-
-   ```bash
-   kubectl get ops 
-   ```
-
-   b. Check whether the configuration is done.
-
-   ```bash
-   kubectl get pod -l app.kubernetes.io/name=pulsar
-   ```
-
-#### Configure other parameters
-
-The following steps take the configuration of dynamic parameter `brokerShutdownTimeoutMs` as an example.
-
-***Steps***
-
-1. Get configuration information.
-
-   ```bash
-   kbcli cluster desc-config pulsar --component=broker
-   
-   ConfigSpecs Meta:
-   CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER
-   agamotto-configuration   agamotto-config.yaml   false     pulsar-agamotto-conf-tpl                                pulsar-broker-agamotto-configuration   broker      pulsar
-   broker-env               conf                   true      pulsar-broker-env-tpl      pulsar-env-constraints       pulsar-broker-broker-env               broker      pulsar
-   broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
-   ```
-
-2. Configure parameters.
-
-   ```bash
-   kbcli cluster configure pulsar --component=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
-   >
-   Will updated configure file meta:
-     ConfigSpec: broker-config          ConfigFile: broker.conf        ComponentName: broker        ClusterName: pulsar
-   OpsRequest pulsar-reconfiguring-qxw8s created successfully, you can view the progress:
-           kbcli cluster describe-ops pulsar-reconfiguring-qxw8s -n default
-   ```
-
-3. Check the progress of configuration.
-
-   The ops name is printed with the command above.
-
-   ```bash
-   kbcli cluster describe-ops pulsar-reconfiguring-qxw8s -n default
-   >
-   Spec:
-     Name: pulsar-reconfiguring-qxw8s        NameSpace: default        Cluster: pulsar        Type: Reconfiguring
-
-   Command:
-     kbcli cluster configure pulsar --components=broker --config-spec=broker-config --config-file=broker.conf --set brokerShutdownTimeoutMs=66600 --namespace=default
-
-   Status:
-     Start Time:         Jul 20,2023 09:53 UTC+0800
-     Completion Time:    Jul 20,2023 09:53 UTC+0800
-     Duration:           1s
-     Status:             Succeed
-     Progress:           2/2
-                         OBJECT-KEY   STATUS   DURATION   MESSAGE
-   ```
-
-### Configure parameters with edit-config command
-
-For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visualized way.
-
-For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
-
-1. Edit the configuration file.
-
-   ```bash
-   kbcli cluster edit-config pulsar
-   ```
-
-   :::note
-
-   If there are multiple components in a cluster, use `--component` to specify a component.
-
-   :::
-
-2. View the status of the parameter configuration.
-
-   ```bash
-   kbcli cluster describe-ops xxx -n default
-   ```
-
-3. Connect to the database to verify whether the parameters are configured as expected.
-
-   ```bash
-   kbcli cluster connect pulsar
-   ```
-
-   :::note
-
-   1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
-   2. Deleting a parameter will be supported later.
-
-   :::
-
-### Configure parameters with kubectl
+## Configure cluster parameters by configuration file
 
 Using kubectl to configure pulsar cluster requires modifying the configuration file.
 
@@ -205,3 +59,107 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
     ```bash
     kubectl edit cm pulsar-broker-broker-config
     ```
+
+## Configure cluster parameters with OpsRequest
+
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+
+   ```bash
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-configuring-demo
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     reconfigure:
+       componentName: kafka
+       configurations:
+       - keys:
+         - key: kafka.conf
+           parameters:
+           - key: log.cleanup.policy
+             value:"compact"
+         name: kafka-config
+     ttlSecondBeforeAbort: 0
+     type: Reconfiguring
+   EOF
+   ```
+
+   * `metadata.name` specifies the name of this OpsRequest.
+   * `metadata.namespace` specifies the namespace where this cluster is created.
+   * `spec.clusterName` specifies the cluster name.
+   * `spec.reconfigure` specifies the configuration information. `componentName`specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
+
+2. Apply the configuration opsRequest.
+
+   ```bash
+   kubectl apply -f mycluster-configuring-demo.yaml
+   ```
+
+3. Connect to this cluster to verify whether the configuration takes effect as expected.
+
+   ```bash
+   kbcli cluster describe-config mykafka --show-detail | grep log.cleanup.policy
+   >
+   log.cleanup.policy = compact
+   mykafka-reconfiguring-wvqns   mykafka   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        May 10,2024 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
+   ```
+
+:::note
+
+Just in case you cannot find the configuration file of your cluster, you can use `kbcli` to view the current configuration file of a cluster.
+
+```bash
+kbcli cluster describe-config mycluster -n demo
+```
+
+From the meta information, the cluster `mycluster` has a configuration file named `my.cnf`.
+
+You can also view the details of this configuration file and parameters.
+
+* View the details of the current configuration file.
+
+   ```bash
+   kbcli cluster describe-config mycluster --show-detail -n demo
+   ```
+
+* View the parameter description.
+
+  ```bash
+  kbcli cluster explain-config mycluster -n demo | head -n 20
+  ```
+
+* View the user guide of a specified parameter.
+  
+  ```bash
+  kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-spec=mysql-consensusset-config -n demo
+  ```
+
+  `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+
+  <details>
+
+  <summary>Output</summary>
+
+  ```bash
+  template meta:
+    ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mycluster
+
+  Configure Constraint:
+    Parameter Name:     innodb_buffer_pool_size
+    Allowed Values:     [5242880-18446744073709552000]
+    Scope:              Global
+    Dynamic:            false
+    Type:               integer
+    Description:        The size in bytes of the memory buffer innodb uses to cache data and indexes of its tables  
+  ```
+  
+  </details>
+
+  * Allowed Values: It defines the valid value range of this parameter.
+  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
+    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online.
+    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make the configuration effective.
+  * Description: It describes the parameter definition.
+:::

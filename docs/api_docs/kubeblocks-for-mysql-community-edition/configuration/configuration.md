@@ -21,41 +21,34 @@ But it's also important to note that the dynamic parameter configuration doesn't
 1. [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
 2. [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
 
-## Configure cluster parameters with OpsRequest
+## Configure cluster parameters by configuration file
 
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+1. Get the configuration file of this cluster.
 
    ```bash
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: mycluster-configuring-demo
-     namespace:demo
-   spec:
-     clusterName: mycluster
-     reconfigure:
-       componentName: mysql
-       configurations:
-       - keys:
-         - key: my.cnf
-           parameters:
-           - key: max_connections
-             value:"600"
-         name: mysql-configuration
-     ttlSecondBeforeAbort: 0
-     type: Reconfiguring
-   EOF
+   kubectl edit configurations.apps.kubeblocks.io mycluster-mysql -n demo
    ```
 
-   * `metadata.name` specifies the name of this OpsRequest.
-   * `metadata.namespace` specifies the namespace where this cluster is created.
-   * `spec.clusterName` specifies the cluster name.
-   * `spec.reconfigure` specifies the configuration information. `componentName`specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
+2. Configure parameters according to your needs. The example below adds the `- configFileParams` part to configure `max_connections`.
 
-2. Apply the configuration opsRequest.
-
-   ```bash
-   kubectl apply -f mycluster-configuring-demo.yaml
+   ```yaml
+   spec:
+     clusterRef: mycluster
+     componentName: mysql
+     configItemDetails:
+     - configFileParams:
+         my.cnf:
+           parameters:
+             max_connections: "600"
+       configSpec:
+         constraintRef: oracle-mysql8.0-config-constraints
+         name: mysql-replication-config
+         namespace: kb-system
+         templateRef: oracle-mysql8.0-config-template
+         volumeName: mysql-config
+       name: mysql-replication-config
+     - configSpec:
+         defaultMode: 292
    ```
 
 3. Connect to this cluster to verify whether the configuration takes effect.
@@ -88,34 +81,41 @@ But it's also important to note that the dynamic parameter configuration doesn't
       1 row in set (0.00 sec)
       ```
 
-## Configure cluster parameters by configuration file
+## Configure cluster parameters with OpsRequest
 
-1. Get the configuration file of this cluster.
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
 
    ```bash
-   kubectl edit configurations.apps.kubeblocks.io mycluster-mysql -n demo
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-configuring-demo
+     namespace: kb-system
+   spec:
+     clusterName: mycluster
+     reconfigure:
+       componentName: mysql
+       configurations:
+       - keys:
+         - key: my.cnf
+           parameters:
+           - key: max_connections
+             value: "600"
+         name: mysql-configuration
+     ttlSecondBeforeAbort: 0
+     type: Reconfiguring
+   EOF
    ```
 
-2. Configure parameters according to your needs. The example below adds the `- configFileParams` part to configure `max_connections`.
+   * `metadata.name` specifies the name of this OpsRequest.
+   * `metadata.namespace` specifies the namespace where this cluster is created.
+   * `spec.clusterName` specifies the cluster name.
+   * `spec.reconfigure` specifies the configuration information. `componentName`specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
 
-   ```yaml
-   spec:
-     clusterRef: mycluster
-     componentName: mysql
-     configItemDetails:
-     - configFileParams:
-         my.cnf:
-           parameters:
-             max_connections: "600"
-       configSpec:
-         constraintRef: oracle-mysql8.0-config-constraints
-         name: mysql-replication-config
-         namespace: kb-system
-         templateRef: oracle-mysql8.0-config-template
-         volumeName: mysql-config
-       name: mysql-replication-config
-     - configSpec:
-         defaultMode: 292
+2. Apply the configuration opsRequest.
+
+   ```bash
+   kubectl apply -f mycluster-configuring-demo.yaml
    ```
 
 3. Connect to this cluster to verify whether the configuration takes effect.

@@ -30,7 +30,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
    kind: OpsRequest
    metadata:
      name: mycluster-configuring-demo
-     namespace:demo
+     namespace: kb-system
    spec:
      clusterName: mycluster
      reconfigure:
@@ -40,11 +40,9 @@ But it's also important to note that the dynamic parameter configuration doesn't
          - key: my.cnf
            parameters:
            - key: max_connections
-             value:"600"
+             value: "600"
          name: mysql-configuration
-     ttlSecondBeforeAbort: 0
      type: Reconfiguring
-   EOF
    ```
 
    * `metadata.name` specifies the name of this OpsRequest.

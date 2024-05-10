@@ -180,7 +180,7 @@ func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
 	r.reqCtx.UpdateCtxValue(operandValueKey, addon)
 
 	// CheckIfAddonUsedByCluster, if err, skip the deletion stage
-	if !addon.GetDeletionTimestamp().IsZero() || (addon.Spec.InstallSpec != nil && !addon.Spec.InstallSpec.GetEnabled()) {
+	if !addon.GetDeletionTimestamp().IsZero() || !addon.Spec.InstallSpec.GetEnabled() {
 		recordEvent := func() {
 			r.reconciler.Event(addon, corev1.EventTypeWarning, "Addon is used by some clusters",
 				"Addon is used by cluster, please check")

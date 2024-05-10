@@ -37,7 +37,13 @@ import (
 )
 
 var _ = Describe("ComponentVersion Controller", func() {
-	var compVersionObj *appsv1alpha1.ComponentVersion
+	var (
+		// compDefinitionObjs []*appsv1alpha1.ComponentDefinition
+		compVersionObj *appsv1alpha1.ComponentVersion
+
+		compDefNames    = []string{testapps.CompDefName("v1.0"), testapps.CompDefName("v1.1"), testapps.CompDefName("v2.0"), testapps.CompDefName("v3.0")}
+		serviceVersions = []string{testapps.ServiceVersion("v1"), testapps.ServiceVersion("v2"), testapps.ServiceVersion("v3")}
+	)
 
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
@@ -65,6 +71,108 @@ var _ = Describe("ComponentVersion Controller", func() {
 		cleanEnv()
 	})
 
+	createCompDefinitionObjs := func() []*appsv1alpha1.ComponentDefinition {
+		By("create default ComponentDefinition objs")
+		objs := make([]*appsv1alpha1.ComponentDefinition, 0)
+		for _, name := range compDefNames {
+			f := testapps.NewComponentDefinitionFactory(name).
+				SetServiceVersion(testapps.ServiceVersion("v0")) // use v0 as init service version
+			for _, app := range []string{testapps.AppName, testapps.AppNameSamePrefix} {
+				// use empty revision as init image tag
+				f = f.SetRuntime(&corev1.Container{Name: app, Image: testapps.AppImage(app, testapps.ReleaseID(""))})
+			}
+			objs = append(objs, f.Create(&testCtx).GetObject())
+		}
+		for _, obj := range objs {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(obj),
+				func(g Gomega, compDef *appsv1alpha1.ComponentDefinition) {
+					g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
+				})).Should(Succeed())
+		}
+		return objs
+	}
+
+	createCompVersionObj := func() *appsv1alpha1.ComponentVersion {
+		By("create a default ComponentVersion obj with multiple releases")
+		obj := testapps.NewComponentVersionFactory(testapps.CompVersionName).
+			SetSpec(appsv1alpha1.ComponentVersionSpec{
+				CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
+					{
+						// use prefix
+						CompDefs: []string{testapps.CompDefName("v1"), testapps.CompDefName("v2")},
+						Releases: []string{testapps.ReleaseID("r0"), testapps.ReleaseID("r1"), testapps.ReleaseID("r2"), testapps.ReleaseID("r3"), testapps.ReleaseID("r4")}, // sv: v1, v2
+					},
+					{
+						// use prefix
+						CompDefs: []string{testapps.CompDefName("v3")},
+						Releases: []string{testapps.ReleaseID("r5")}, // sv: v3
+					},
+				},
+				Releases: []appsv1alpha1.ComponentVersionRelease{
+					{
+						Name:           testapps.ReleaseID("r0"),
+						Changes:        "init release",
+						ServiceVersion: testapps.ServiceVersion("v1"),
+						Images: map[string]string{
+							testapps.AppName:           testapps.AppImage(testapps.AppName, testapps.ReleaseID("r0")),
+							testapps.AppNameSamePrefix: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID("r0")),
+						},
+					},
+					{
+						Name:           testapps.ReleaseID("r1"),
+						Changes:        "update app image",
+						ServiceVersion: testapps.ServiceVersion("v1"),
+						Images: map[string]string{
+							testapps.AppName: testapps.AppImage(testapps.AppName, testapps.ReleaseID("r1")),
+						},
+					},
+					{
+						Name:           testapps.ReleaseID("r2"),
+						Changes:        "publish a new service version",
+						ServiceVersion: testapps.ServiceVersion("v2"),
+						Images: map[string]string{
+							testapps.AppName:           testapps.AppImage(testapps.AppName, testapps.ReleaseID("r2")),
+							testapps.AppNameSamePrefix: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID("r2")),
+						},
+					},
+					{
+						Name:           testapps.ReleaseID("r3"),
+						Changes:        "update app image",
+						ServiceVersion: testapps.ServiceVersion("v2"),
+						Images: map[string]string{
+							testapps.AppName: testapps.AppImage(testapps.AppName, testapps.ReleaseID("r3")),
+						},
+					},
+					{
+						Name:           testapps.ReleaseID("r4"),
+						Changes:        "update all app images for previous service version",
+						ServiceVersion: testapps.ServiceVersion("v1"),
+						Images: map[string]string{
+							testapps.AppName:           testapps.AppImage(testapps.AppName, testapps.ReleaseID("r4")),
+							testapps.AppNameSamePrefix: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID("r4")),
+						},
+					},
+					{
+						Name:           testapps.ReleaseID("r5"),
+						Changes:        "publish a new service version",
+						ServiceVersion: testapps.ServiceVersion("v3"),
+						Images: map[string]string{
+							testapps.AppName:           testapps.AppImage(testapps.AppName, testapps.ReleaseID("r5")),
+							testapps.AppNameSamePrefix: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID("r5")),
+						},
+					},
+				},
+			}).
+			Create(&testCtx).
+			GetObject()
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(obj),
+			func(g Gomega, compVersion *appsv1alpha1.ComponentVersion) {
+				g.Expect(compVersion.Status.ObservedGeneration).Should(Equal(compVersion.Generation))
+			})).Should(Succeed())
+
+		return obj
+	}
+
 	updateNCheckCompDefinitionImages := func(compDef *appsv1alpha1.ComponentDefinition, serviceVersion string, r0, r1 string) {
 		Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(testapps.AppImage(compDef.Spec.Runtime.Containers[0].Name, testapps.ReleaseID(""))))
 		Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(testapps.AppImage(compDef.Spec.Runtime.Containers[1].Name, testapps.ReleaseID(""))))
@@ -76,8 +184,9 @@ var _ = Describe("ComponentVersion Controller", func() {
 
 	Context("reconcile component version", func() {
 		BeforeEach(func() {
-			testapps.CreateCompDefinitionObjs(&testCtx, true)
-			compVersionObj = testapps.CreateCompVersionObj(&testCtx, true)
+			// compDefinitionObjs = createCompDefinitionObjs()
+			createCompDefinitionObjs()
+			compVersionObj = createCompVersionObj()
 		})
 
 		AfterEach(func() {
@@ -91,9 +200,9 @@ var _ = Describe("ComponentVersion Controller", func() {
 					g.Expect(cmpv.Finalizers).ShouldNot(BeEmpty())
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(testapps.ServiceVersions, ",")))
-					for i := 0; i < len(testapps.CompDefNames); i++ {
-						g.Expect(cmpv.Labels).Should(HaveKeyWithValue(testapps.CompDefNames[i], testapps.CompDefNames[i]))
+					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(serviceVersions, ",")))
+					for i := 0; i < len(compDefNames); i++ {
+						g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
 					}
 				})).Should(Succeed())
 		})
@@ -139,18 +248,18 @@ var _ = Describe("ComponentVersion Controller", func() {
 				func(g Gomega, cmpv *appsv1alpha1.ComponentVersion) {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(testapps.ServiceVersions, ",")))
-					for i := 0; i < len(testapps.CompDefNames); i++ {
-						if strings.HasPrefix(testapps.CompDefNames[i], testapps.CompDefName("v1")) {
-							g.Expect(cmpv.Labels).ShouldNot(HaveKey(testapps.CompDefNames[i]))
+					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(serviceVersions, ",")))
+					for i := 0; i < len(compDefNames); i++ {
+						if strings.HasPrefix(compDefNames[i], testapps.CompDefName("v1")) {
+							g.Expect(cmpv.Labels).ShouldNot(HaveKey(compDefNames[i]))
 						} else {
-							g.Expect(cmpv.Labels).Should(HaveKeyWithValue(testapps.CompDefNames[i], testapps.CompDefNames[i]))
+							g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
 						}
 					}
 				})).Should(Succeed())
 
 			By("delete v1.* component definitions")
-			for _, name := range testapps.CompDefNames {
+			for _, name := range compDefNames {
 				if !strings.HasPrefix(name, testapps.CompDefName("v1")) {
 					continue
 				}
@@ -164,12 +273,12 @@ var _ = Describe("ComponentVersion Controller", func() {
 				func(g Gomega, cmpv *appsv1alpha1.ComponentVersion) {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(testapps.ServiceVersions, ",")))
-					for i := 0; i < len(testapps.CompDefNames); i++ {
-						if strings.HasPrefix(testapps.CompDefNames[i], testapps.CompDefName("v1")) {
-							g.Expect(cmpv.Labels).ShouldNot(HaveKey(testapps.CompDefNames[i]))
+					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(serviceVersions, ",")))
+					for i := 0; i < len(compDefNames); i++ {
+						if strings.HasPrefix(compDefNames[i], testapps.CompDefName("v1")) {
+							g.Expect(cmpv.Labels).ShouldNot(HaveKey(compDefNames[i]))
 						} else {
-							g.Expect(cmpv.Labels).Should(HaveKeyWithValue(testapps.CompDefNames[i], testapps.CompDefNames[i]))
+							g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
 						}
 					}
 				})).Should(Succeed())
@@ -188,9 +297,9 @@ var _ = Describe("ComponentVersion Controller", func() {
 				func(g Gomega, cmpv *appsv1alpha1.ComponentVersion) {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(testapps.ServiceVersions, ",")))
-					for i := 0; i < len(testapps.CompDefNames); i++ {
-						g.Expect(cmpv.Labels).Should(HaveKeyWithValue(testapps.CompDefNames[i], testapps.CompDefNames[i]))
+					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join(serviceVersions, ",")))
+					for i := 0; i < len(compDefNames); i++ {
+						g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
 					}
 				})).Should(Succeed())
 		})
@@ -228,8 +337,8 @@ var _ = Describe("ComponentVersion Controller", func() {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join([]string{testapps.ServiceVersion("v1"), testapps.ServiceVersion("v3")}, ",")))
-					for i := 0; i < len(testapps.CompDefNames); i++ {
-						g.Expect(cmpv.Labels).Should(HaveKeyWithValue(testapps.CompDefNames[i], testapps.CompDefNames[i]))
+					for i := 0; i < len(compDefNames); i++ {
+						g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
 					}
 				})).Should(Succeed())
 		})
@@ -237,8 +346,9 @@ var _ = Describe("ComponentVersion Controller", func() {
 
 	Context("resolve component definition, service version and images", func() {
 		BeforeEach(func() {
-			testapps.CreateCompDefinitionObjs(&testCtx, true)
-			compVersionObj = testapps.CreateCompVersionObj(&testCtx, true)
+			// compDefinitionObjs = createCompDefinitionObjs()
+			createCompDefinitionObjs()
+			compVersionObj = createCompVersionObj()
 		})
 
 		AfterEach(func() {
@@ -418,7 +528,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 					Images: map[string]string{
 						testapps.AppName: testapps.AppImage(testapps.AppName, testapps.ReleaseID("r6")),
 						// not provide image for this app
-						// appNameSamePrefix: testapps.AppImage(appNameSamePrefix, testapps.ReleaseID("r6")),
+						// testapps.AppNameSamePrefix: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID("r6")),
 					},
 				}
 				rule := appsv1alpha1.ComponentVersionCompatibilityRule{
@@ -439,6 +549,5 @@ var _ = Describe("ComponentVersion Controller", func() {
 			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v4")))
 			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r6", "") // app is r6 and another one is ""
 		})
-
 	})
 })

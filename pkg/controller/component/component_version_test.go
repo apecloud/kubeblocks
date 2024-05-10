@@ -51,10 +51,6 @@ var _ = Describe("Component Version", func() {
 			// namespaced
 		}
 
-		BeforeEach(func() {
-			testapps.CreateCompDefinitionObjs(&testCtx, false)
-		})
-
 		AfterEach(func() {
 			cleanEnv()
 		})
@@ -62,7 +58,9 @@ var _ = Describe("Component Version", func() {
 		It("resolve images before and after new release", func() {
 			By("create new definition v4.0 with service version v4")
 			compDefObj := testapps.NewComponentDefinitionFactory(testapps.CompDefName("v1")).
-				SetRuntime(&corev1.Container{Name: testapps.AppName}).
+				SetServiceVersion(testapps.ServiceVersion("v0")).
+				SetRuntime(&corev1.Container{Name: testapps.AppName,
+					Image: testapps.AppImage(testapps.AppName, testapps.ReleaseID(""))}).
 				GetObject()
 
 			releases := []appsv1alpha1.ComponentVersionRelease{

@@ -2054,8 +2054,8 @@ This ensures that the tools are available to the &lsquo;config-manager&rsquo; si
 <td>
 <code>downwardAPIOptions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -9716,8 +9716,8 @@ This ensures that the tools are available to the &lsquo;config-manager&rsquo; si
 <td>
 <code>downwardAPIOptions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -21123,10 +21123,10 @@ via SQL statements before they can take effect on restart.</li>
 </tr>
 <tr>
 <td>
-<code>downwardAPITriggeredActions</code><br/>
+<code>downwardAPIChangeTriggeredActions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -21146,10 +21146,10 @@ to reflect the new role.</li>
 </tr>
 <tr>
 <td>
-<code>configSchema</code><br/>
+<code>parametersSchema</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.ConfigSchema">
-ConfigSchema
+<a href="#apps.kubeblocks.io/v1beta1.ParametersSchema">
+ParametersSchema
 </a>
 </em>
 </td>
@@ -21196,24 +21196,6 @@ Modifications to these parameters trigger a configuration reload without requiri
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
 Attempting to change any of these parameters will be ignored.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reloadedPodSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
-<p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
-The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
-<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
-reload.</p>
 </td>
 </tr>
 <tr>
@@ -21433,10 +21415,10 @@ via SQL statements before they can take effect on restart.</li>
 </tr>
 <tr>
 <td>
-<code>downwardAPITriggeredActions</code><br/>
+<code>downwardAPIChangeTriggeredActions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -21456,10 +21438,10 @@ to reflect the new role.</li>
 </tr>
 <tr>
 <td>
-<code>configSchema</code><br/>
+<code>parametersSchema</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.ConfigSchema">
-ConfigSchema
+<a href="#apps.kubeblocks.io/v1beta1.ParametersSchema">
+ParametersSchema
 </a>
 </em>
 </td>
@@ -21506,24 +21488,6 @@ Modifications to these parameters trigger a configuration reload without requiri
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
 Attempting to change any of these parameters will be ignored.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reloadedPodSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
-<p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
-The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
-<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
-reload.</p>
 </td>
 </tr>
 <tr>
@@ -21607,77 +21571,13 @@ int64
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1beta1.ConfigSchema">ConfigSchema
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-<p>ConfigSchema Defines a list of configuration items with their names, default values, descriptions,
-types, and constraints.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>topLevelKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the top-level key in the &lsquo;configSchema.cue&rsquo; that organizes the validation rules for parameters.
-This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>cue</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Hold a string that contains a script written in CUE language that defines a list of configuration items.
-Each item is detailed with its name, default value, description, type (e.g. string, integer, float),
-and constraints (permissible values or the valid range of values).</p>
-<p>CUE (Configure, Unify, Execute) is a declarative language designed for defining and validating
-complex data configurations.
-It is particularly useful in environments like K8s where complex configurations and validation rules are common.</p>
-<p>This script functions as a validator for user-provided configurations, ensuring compliance with
-the established specifications and constraints.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>schemaInJSON</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
-Kubernetes api extensions v1.JSONSchemaProps
-</a>
-</em>
-</td>
-<td>
-<p>Generated from the &lsquo;cue&rsquo; field and transformed into a JSON format.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">DownwardAPITriggeredAction
+<h3 id="apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">DownwardAPIChangeTriggeredAction
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
 </p>
 <div>
-<p>DownwardAPITriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
+<p>DownwardAPIChangeTriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
 For example, a command might be executed when the &lsquo;role&rsquo; label of the Pod is updated.</p>
 </div>
 <table>
@@ -21923,6 +21823,70 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1beta1.ParametersSchema">ParametersSchema
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+<p>ParametersSchema Defines a list of configuration items with their names, default values, descriptions,
+types, and constraints.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>topLevelKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the top-level key in the &lsquo;configSchema.cue&rsquo; that organizes the validation rules for parameters.
+This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>cue</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Hold a string that contains a script written in CUE language that defines a list of configuration items.
+Each item is detailed with its name, default value, description, type (e.g. string, integer, float),
+and constraints (permissible values or the valid range of values).</p>
+<p>CUE (Configure, Unify, Execute) is a declarative language designed for defining and validating
+complex data configurations.
+It is particularly useful in environments like K8s where complex configurations and validation rules are common.</p>
+<p>This script functions as a validator for user-provided configurations, ensuring compliance with
+the established specifications and constraints.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schemaInJSON</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
+Kubernetes api extensions v1.JSONSchemaProps
+</a>
+</em>
+</td>
+<td>
+<p>Generated from the &lsquo;cue&rsquo; field and transformed into a JSON format.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1beta1.ReloadAction">ReloadAction
 </h3>
 <p>
@@ -21996,12 +21960,30 @@ AutoTrigger
 <p>Automatically perform the reload when specified conditions are met.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>targetPodSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
+<p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
+The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
+<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
+reload.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1beta1.ScriptConfig">ScriptConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">DownwardAPITriggeredAction</a>, <a href="#apps.kubeblocks.io/v1beta1.ShellTrigger">ShellTrigger</a>, <a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">DownwardAPIChangeTriggeredAction</a>, <a href="#apps.kubeblocks.io/v1beta1.ShellTrigger">ShellTrigger</a>, <a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger</a>)
 </p>
 <div>
 </div>

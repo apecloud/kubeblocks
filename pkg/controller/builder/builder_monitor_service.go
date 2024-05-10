@@ -19,7 +19,6 @@ package builder
 import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 )
 
@@ -38,7 +37,7 @@ func (builder *MonitorServiceBuilder) SetMonitorServiceSpec(spec monitoringv1.Se
 	return builder
 }
 
-func (builder *MonitorServiceBuilder) SetDefaultEndpoint(exporter *appsv1alpha1.Exporter) *MonitorServiceBuilder {
+func (builder *MonitorServiceBuilder) SetDefaultEndpoint(exporter *common.Exporter) *MonitorServiceBuilder {
 	if exporter == nil {
 		return builder
 	}
@@ -52,8 +51,8 @@ func (builder *MonitorServiceBuilder) SetDefaultEndpoint(exporter *appsv1alpha1.
 		// TODO: deprecated: use `port` instead.
 		// Compatible with previous versions of kb, the old addon supports int type port.
 		TargetPort: exporter.TargetPort,
-		Path:       common.FromScrapePath(*exporter),
-		Scheme:     common.FromScheme(*exporter),
+		Path:       common.FromScrapePath(exporter.Exporter),
+		Scheme:     common.FromScheme(exporter.Exporter),
 	}
 
 	builder.get().Spec.Endpoints = []monitoringv1.Endpoint{endpoint}

@@ -702,22 +702,6 @@ type ClusterComponentDefinition struct {
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 }
 
-func (r *ClusterComponentDefinition) GetPrometheusExporter() *Exporter {
-	if r.Exporter != nil {
-		return r.Exporter
-	}
-
-	// Compatible with previous versions of kb
-	if r.Monitor == nil || r.Monitor.Exporter == nil {
-		return nil
-	}
-
-	return &Exporter{
-		ScrapePath: r.Monitor.Exporter.ScrapePath,
-		TargetPort: &r.Monitor.Exporter.ScrapePort,
-	}
-}
-
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
 	switch r.WorkloadType {
 	case Stateless:

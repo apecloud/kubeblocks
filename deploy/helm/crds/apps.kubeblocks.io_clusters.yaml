@@ -3622,11 +3622,11 @@ spec:
                               type: object
                           type: object
                         vmMonitorTemplate:
-                          description: "TODO: vm is currently not supported yet. Specifies
-                            the VMServiceScrape template used in the Component. \n
-                            ```yaml name: vm-scrape namespace: default labels: k8s-app:
-                            node-exporter vmServiceScrapeSpec: selector: matchLabels:
-                            app: app-exporter ```"
+                          description: "VictoriaMetrics is currently not supported
+                            yet. Specifies the VMServiceScrape template used in the
+                            Component. \n ```yaml name: vm-scrape namespace: default
+                            labels: k8s-app: node-exporter vmServiceScrapeSpec: selector:
+                            matchLabels: app: app-exporter ```"
                           properties:
                             annotations:
                               additionalProperties:
@@ -11840,10 +11840,10 @@ spec:
                                   type: object
                               type: object
                             vmMonitorTemplate:
-                              description: "TODO: vm is currently not supported yet.
-                                Specifies the VMServiceScrape template used in the
-                                Component. \n ```yaml name: vm-scrape namespace: default
-                                labels: k8s-app: node-exporter vmServiceScrapeSpec:
+                              description: "VictoriaMetrics is currently not supported
+                                yet. Specifies the VMServiceScrape template used in
+                                the Component. \n ```yaml name: vm-scrape namespace:
+                                default labels: k8s-app: node-exporter vmServiceScrapeSpec:
                                 selector: matchLabels: app: app-exporter ```"
                               properties:
                                 annotations:

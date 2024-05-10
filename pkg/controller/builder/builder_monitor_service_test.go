@@ -22,6 +22,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 )
 
 var _ = Describe("monitor_service builder", func() {
@@ -39,7 +40,9 @@ var _ = Describe("monitor_service builder", func() {
 
 		ncs := NewMonitorServiceBuilder(ns, name).
 			SetMonitorServiceSpec(monitoringv1.ServiceMonitorSpec{}).
-			SetDefaultEndpoint(&exporter).
+			SetDefaultEndpoint(&common.Exporter{
+				Exporter: exporter,
+			}).
 			GetObject()
 
 		Expect(ncs.Name).Should(Equal(name))

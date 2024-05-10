@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -55,7 +54,7 @@ func (c componentMonitorContainerTransformer) Transform(ctx graph.TransformConte
 	return
 }
 
-func removeMonitorContainer(exporter *appsv1alpha1.Exporter, synthesizeComp *component.SynthesizedComponent) {
+func removeMonitorContainer(exporter *common.Exporter, synthesizeComp *component.SynthesizedComponent) {
 	if exporter == nil || exporter.ContainerName == "" {
 		return
 	}

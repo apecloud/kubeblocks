@@ -1338,7 +1338,7 @@ type MetricsStoreIntegration struct {
 	// +optional
 	ServiceMonitorTemplate *ServiceMonitorTemplate `json:"serviceMonitorTemplate,omitempty"`
 
-	// TODO: vm is currently not supported yet.
+	// VictoriaMetrics is currently not supported yet.
 	// Specifies the VMServiceScrape template used in the Component.
 	//
 	// ```yaml

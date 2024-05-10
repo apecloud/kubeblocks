@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -291,9 +292,9 @@ func GetHostNetworkRelatedComponents(podSpec *corev1.PodSpec, ctx context.Contex
 	return CheckAndGetClusterComponents(ctx, cli, cluster)
 }
 
-func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *appsv1alpha1.Exporter {
+func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *common.Exporter {
 	if componentDef.Exporter != nil {
-		return componentDef.Exporter
+		return &common.Exporter{Exporter: *componentDef.Exporter}
 	}
 
 	// Compatible with previous versions of kb
@@ -301,8 +302,10 @@ func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *appsv1alpha
 		return nil
 	}
 
-	return &appsv1alpha1.Exporter{
-		ScrapePath: componentDef.Monitor.Exporter.ScrapePath,
+	return &common.Exporter{
 		TargetPort: &componentDef.Monitor.Exporter.ScrapePort,
+		Exporter: appsv1alpha1.Exporter{
+			ScrapePath: componentDef.Monitor.Exporter.ScrapePath,
+		},
 	}
 }

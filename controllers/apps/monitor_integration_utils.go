@@ -85,6 +85,6 @@ func isOwnerRef(target, owner client.Object) bool {
 
 func deleteObjects[T intctrlutil.Object, PT intctrlutil.PObject[T]](objects []T, graphCli model.GraphClient, dag *graph.DAG) {
 	for _, object := range objects {
-		graphCli.Delete(dag, PT(&object))
+		graphCli.Delete(dag, PT(&object), inDataContext4G())
 	}
 }

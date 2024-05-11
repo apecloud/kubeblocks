@@ -160,8 +160,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentHostNetworkTransformer{},
 			// handle component services
 			&componentServiceTransformer{},
-			// integration prometheus and VictoriaMetrics
-			&componentPrometheusIntegrationTransformer{Client: r.Client},
 			// handle component system accounts
 			&componentAccountTransformer{},
 			// provision component system accounts

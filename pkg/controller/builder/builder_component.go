@@ -80,11 +80,6 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
-func (builder *ComponentBuilder) SetMetricsStoreIntegration(msi *appsv1alpha1.MetricsStoreIntegration) *ComponentBuilder {
-	builder.get().Spec.MetricsStoreIntegration = msi
-	return builder
-}
-
 func (builder *ComponentBuilder) DisableExporter(disableExporter *bool) *ComponentBuilder {
 	builder.get().Spec.DisableExporter = disableExporter
 	return builder

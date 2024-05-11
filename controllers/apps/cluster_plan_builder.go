@@ -24,11 +24,9 @@ import (
 	"fmt"
 	"reflect"
 
-	vmv1beta1 "github.com/VictoriaMetrics/operator/api/victoriametrics/v1beta1"
 	"github.com/go-logr/logr"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -125,8 +123,6 @@ func init() {
 	model.AddScheme(workloadsv1alpha1.AddToScheme)
 	model.AddScheme(storagev1alpha1.AddToScheme)
 	model.AddScheme(appsv1beta1.AddToScheme)
-	model.AddScheme(monitoringv1.AddToScheme)
-	model.AddScheme(vmv1beta1.AddToScheme)
 }
 
 // PlanBuilder implementation

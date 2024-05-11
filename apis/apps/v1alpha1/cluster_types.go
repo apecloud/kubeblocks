@@ -826,11 +826,6 @@ type ClusterComponentSpec struct {
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
-	// It supports prometheus/victoriametrics operator.
-	//
-	// +optional
-	MetricsStoreIntegration *MetricsStoreIntegration `json:"metricsStoreIntegration,omitempty"`
-
 	// Determines whether metrics exporter information is annotated on the Component's headless Service.
 	//
 	// If set to true, the following annotations will not be patched into the Service:

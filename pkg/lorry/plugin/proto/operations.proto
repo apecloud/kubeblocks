@@ -52,6 +52,14 @@ message GetRoleResponse {
 
 // DBPlugin service provides APIs to kubeblocks operator to exec component operation.
 service DBPlugin {
-  // GetRole take a specify operation to a component
+  // GetRole defines the mechanism to probe the role of replicas. The return role
+  // must be one of the names defined in the componentdefinition roles. 
   rpc GetRole(GetRoleRequest) returns (GetRoleResponse) {}
+
+  // MemberJoin defines how to add a new replica to the replication group. 
+  // This action is typically invoked when a new replica needs to be added, 
+  // such as during scale-out. It may involve updating configuration, 
+  // notifying other members, and ensuring data consistency.
+  rpc JoinMember(GetRoleRequest) returns (GetRoleResponse) {}
+
 }

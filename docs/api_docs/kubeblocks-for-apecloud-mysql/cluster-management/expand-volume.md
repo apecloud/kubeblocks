@@ -25,8 +25,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME             NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-mycluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        April 25,2024 17:29 UTC+0800
+NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
+mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   4m29s
 ```
 
 ## Steps
@@ -45,6 +45,7 @@ mycluster        default          apecloud-mysql            ac-mysql-8.0.30     
     kind: OpsRequest
     metadata:
       name: ops-volume-expansion
+      namespace: demo
     spec:
       clusterName: mycluster
       type: VolumeExpansion
@@ -109,3 +110,38 @@ mycluster        default          apecloud-mysql            ac-mysql-8.0.30     
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
+
+
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-volume-expansion
+  namespace: demo
+spec:
+  clusterName: mycluster
+  type: VolumeExpansion
+  volumeExpansion:
+  - componentName: mysql
+    volumeClaimTemplates:
+    - name: data
+      storage: "2Gi"
+EOF
+
+kubectl apply -f -<<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: mycluster-volumeexpansion
+  namespace: demo
+spec:
+  clusterName: mycluster
+  force: false
+  ttlSecondsAfterSucceed: 0
+  type: VolumeExpansion
+  volumeExpansion:
+  - componentName: mysql
+    volumeClaimTemplates:
+    - name: data
+      storage: 30Gi
+EOF

@@ -20,8 +20,8 @@ You can initiate a switchover for an ApeCloud MySQL RaftGroup by executing the k
    >
    probes:
      roleProbe:
-       failureThreshold: 3
-       periodSeconds: 2
+       failureThreshold: 2
+       periodSeconds: 1
        timeoutSeconds: 1
    ```
 
@@ -39,6 +39,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
   kind: OpsRequest
   metadata:
     name: mycluster-switchover-jhkgl
+    namespace: demo
   spec:
     clusterName: mycluster
     type: Switchover
@@ -56,6 +57,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
   kind: OpsRequest
   metadata:
     name: mycluster-switchover-jhkgl
+    namespace: demo
   spec:
     clusterName: mycluster
     type: Switchover

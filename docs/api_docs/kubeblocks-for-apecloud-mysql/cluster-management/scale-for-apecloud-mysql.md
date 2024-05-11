@@ -30,8 +30,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME             NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-mycluster        demo             apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        April 25,2024 17:30 UTC+0800
+NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
+mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running   47m
 ```
 
 ### Steps
@@ -50,17 +50,18 @@ mycluster        demo             apecloud-mysql            ac-mysql-8.0.30     
    kind: OpsRequest
    metadata:
      name: ops-vertical-scaling
+     namespace: demo
    spec:
      clusterName: mycluster
-     type: VerticalScaling 
+     type: VerticalScaling
      verticalScaling:
      - componentName: mysql
        requests:
          memory: "2Gi"
-         cpu: "1000m"
+         cpu: "1"
        limits:
          memory: "4Gi"
-         cpu: "2000m"
+         cpu: "2"
    EOF
    ```
 
@@ -77,7 +78,7 @@ mycluster        demo             apecloud-mysql            ac-mysql-8.0.30     
    kind: Cluster
    metadata:
      name: mycluster
-     namespace: default
+     namespace: demo
    spec:
      clusterDefinitionRef: apecloud-mysql
      clusterVersionRef: ac-mysql-8.0.30
@@ -88,10 +89,10 @@ mycluster        demo             apecloud-mysql            ac-mysql-8.0.30     
        resources: # Change the values of resources.
          requests:
            memory: "2Gi"
-           cpu: "1000m"
+           cpu: "1"
          limits:
            memory: "4Gi"
-           cpu: "2000m"
+           cpu: "2"
        volumeClaimTemplates:
        - name: data
          spec:
@@ -112,11 +113,11 @@ mycluster        demo             apecloud-mysql            ac-mysql-8.0.30     
     ```bash
     kubectl get cluster mycluster -n demo
     >
-    NAME             NAMESPACE     CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS                 CREATED-TIME
-    mycluster        demo          apecloud-mysql            ac-mysql-8.0.30        Delete                    VerticalScaling        April 25,2023 17:40 UTC+0800
+    NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     AGE
+    mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Updating   50m
     ```
 
-   - STATUS=VerticalScaling: it means the vertical scaling is in progress.
+   - STATUS=Updating: it means the vertical scaling is in progress.
    - STATUS=Running: it means the vertical scaling operation has been applied.
    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
      > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
@@ -144,8 +145,8 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME             NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-mycluster        demo             apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        April 25,2024 17:30 UTC+0800
+NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
+mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running   47m
 ```
 
 ### Steps
@@ -164,6 +165,7 @@ mycluster        demo             apecloud-mysql            ac-mysql-8.0.30     
    kind: OpsRequest
    metadata:
      name: ops-horizontal-scaling
+     namespace: demo
    spec:
      clusterName: mycluster
      type: HorizontalScaling
@@ -189,7 +191,7 @@ mycluster        demo             apecloud-mysql            ac-mysql-8.0.30     
    kind: Cluster
    metadata:
      name: mycluster
-     namespace: default
+     namespace: demo
    spec:
      clusterDefinitionRef: apecloud-mysql
      clusterVersionRef: ac-mysql-8.0.30

@@ -27,7 +27,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: mycluster
-  generateName: stop-
+  namespace: demo
 spec:
   # cluster ref
   clusterName: mycluster
@@ -83,8 +83,8 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mycluster
-  generateName: start-
+  name: ops-start
+  namespace: demo
 spec:
   # cluster ref
   clusterName: mycluster

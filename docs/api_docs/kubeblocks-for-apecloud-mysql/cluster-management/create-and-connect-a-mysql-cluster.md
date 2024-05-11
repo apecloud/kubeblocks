@@ -135,7 +135,7 @@ spec:
     enabledLogs:
     - slow
     - error
-    monitor: false
+    monitorEnabled: false
     name: mysql
     replicas: 3
     resources:
@@ -180,8 +180,8 @@ kind: Cluster
 metadata:
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mycluster","app.kubernetes.io/version":"8.0.30","helm.sh/chart":"apecloud-mysql-cluster-0.8.0"},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Required","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"apecloud-mysql","clusterVersionRef":"ac-mysql-8.0.30","componentSpecs":[{"componentDefRef":"mysql","enabledLogs":["slow","error"],"monitor":false,"name":"mysql","replicas":3,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":null,"services":null,"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
-  creationTimestamp: "2024-04-25T08:02:27Z"
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mycluster","app.kubernetes.io/version":"8.0.30","helm.sh/chart":"apecloud-mysql-cluster-0.8.0"},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Required","tenancy":"SharedNode","topologyKeys":null},"clusterDefinitionRef":"apecloud-mysql","clusterVersionRef":"ac-mysql-8.0.30","componentSpecs":[{"componentDefRef":"mysql","enabledLogs":["slow","error"],"monitorEnabled":false,"name":"mysql","replicas":3,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":null,"services":null,"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
+  creationTimestamp: "2024-05-11T02:12:03Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
   generation: 1
@@ -193,14 +193,12 @@ metadata:
     helm.sh/chart: apecloud-mysql-cluster-0.8.0
   name: mycluster
   namespace: demo
-  resourceVersion: "340662"
-  uid: 98ef3291-0657-4c7a-984c-171db5e7124f
+  resourceVersion: "752393"
+  uid: d3e64bca-b856-4a85-8edd-a5d14f489e5e
 spec:
   affinity:
     podAntiAffinity: Required
     tenancy: SharedNode
-    topologyKeys:
-    - kubernetes.io/hostname
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
   componentSpecs:
@@ -208,7 +206,7 @@ spec:
     enabledLogs:
     - slow
     - error
-    monitor: false
+    monitorEnabled: false
     name: mysql
     replicas: 3
     resources:
@@ -233,26 +231,26 @@ status:
     mysql:
       phase: Running
       podsReady: true
-      podsReadyTime: "2024-04-25T08:02:50Z"
+      podsReadyTime: "2024-05-11T02:12:40Z"
   conditions:
-  - lastTransitionTime: "2024-04-25T08:02:27Z"
+  - lastTransitionTime: "2024-05-11T02:12:03Z"
     message: 'The operator has started the provisioning of Cluster: mycluster'
     observedGeneration: 1
     reason: PreCheckSucceed
     status: "True"
     type: ProvisioningStarted
-  - lastTransitionTime: "2024-04-25T08:02:27Z"
+  - lastTransitionTime: "2024-05-11T02:12:03Z"
     message: Successfully applied for resources
     observedGeneration: 1
     reason: ApplyResourcesSucceed
     status: "True"
     type: ApplyResources
-  - lastTransitionTime: "2024-04-25T08:02:50Z"
+  - lastTransitionTime: "2024-05-11T02:12:40Z"
     message: all pods of components are ready, waiting for the probe detection successful
     reason: AllReplicasReady
     status: "True"
     type: ReplicasReady
-  - lastTransitionTime: "2024-04-25T08:02:50Z"
+  - lastTransitionTime: "2024-05-11T02:12:40Z"
     message: 'Cluster: mycluster is ready, current phase is Running'
     reason: ClusterReady
     status: "True"

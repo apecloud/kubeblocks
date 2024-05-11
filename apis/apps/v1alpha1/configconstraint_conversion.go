@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"errors"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -60,13 +61,12 @@ func convertToImpl(cc *ConfigConstraint, ccv1 *appsv1beta1.ConfigConstraint) err
 func convertToConstraintSpec(cc *ConfigConstraintSpec, ccv1 *appsv1beta1.ConfigConstraintSpec) {
 	ccv1.MergeReloadAndRestart = cc.DynamicActionCanBeMerged
 	ccv1.ReloadStaticParamsBeforeRestart = cc.ReloadStaticParamsBeforeRestart
-	ccv1.DownwardAPITriggeredActions = cc.DownwardAPIOptions
+	ccv1.DownwardAPIChangeTriggeredActions = cc.DownwardAPIOptions
 	ccv1.StaticParameters = cc.StaticParameters
 	ccv1.DynamicParameters = cc.DynamicParameters
 	ccv1.ImmutableParameters = cc.ImmutableParameters
-	ccv1.ReloadedPodSelector = cc.Selector
 	ccv1.FileFormatConfig = cc.FormatterConfig
-	convertDynamicReloadAction(cc.ReloadOptions, ccv1, cc.ToolsImageSpec, cc.ScriptConfigs)
+	convertDynamicReloadAction(cc.ReloadOptions, ccv1, cc.ToolsImageSpec, cc.ScriptConfigs, cc.Selector)
 	convertSchema(cc.ConfigurationSchema, cc.CfgSchemaTopLevelName, ccv1)
 }
 
@@ -74,14 +74,14 @@ func convertSchema(schema *CustomParametersValidation, topLevelKey string, ccv1 
 	if schema == nil {
 		return
 	}
-	ccv1.ConfigSchema = &appsv1beta1.ConfigSchema{
+	ccv1.ParametersSchema = &appsv1beta1.ParametersSchema{
 		TopLevelKey:  topLevelKey,
 		CUE:          schema.CUE,
 		SchemaInJSON: schema.Schema,
 	}
 }
 
-func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1beta1.ConfigConstraintSpec, toolsSetup *appsv1beta1.ToolsSetup, configs []appsv1beta1.ScriptConfig) {
+func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1beta1.ConfigConstraintSpec, toolsSetup *appsv1beta1.ToolsSetup, configs []appsv1beta1.ScriptConfig, selector *metav1.LabelSelector) {
 	if options == nil {
 		return
 	}
@@ -90,6 +90,7 @@ func convertDynamicReloadAction(options *ReloadOptions, ccv1 *appsv1beta1.Config
 		ShellTrigger:      options.ShellTrigger,
 		TPLScriptTrigger:  options.TPLScriptTrigger,
 		AutoTrigger:       options.AutoTrigger,
+		TargetPodSelector: selector,
 	}
 	if ccv1.ReloadAction.ShellTrigger != nil {
 		ccv1.ReloadAction.ShellTrigger.ToolsSetup = toolsSetup
@@ -120,12 +121,12 @@ func convertFromConstraintSpec(ccv1 *appsv1beta1.ConfigConstraintSpec, cc *Confi
 	cc.DynamicActionCanBeMerged = ccv1.MergeReloadAndRestart
 	cc.ReloadStaticParamsBeforeRestart = ccv1.ReloadStaticParamsBeforeRestart
 	cc.ToolsImageSpec = ccv1.GetToolsSetup()
-	cc.DownwardAPIOptions = ccv1.DownwardAPITriggeredActions
+	cc.DownwardAPIOptions = ccv1.DownwardAPIChangeTriggeredActions
 	cc.ScriptConfigs = ccv1.GetScriptConfigs()
 	cc.StaticParameters = ccv1.StaticParameters
 	cc.DynamicParameters = ccv1.DynamicParameters
 	cc.ImmutableParameters = ccv1.ImmutableParameters
-	cc.Selector = ccv1.ReloadedPodSelector
+	cc.Selector = ccv1.GetPodSelector()
 	cc.FormatterConfig = ccv1.FileFormatConfig
 
 	if ccv1.ReloadAction != nil {
@@ -136,11 +137,11 @@ func convertFromConstraintSpec(ccv1 *appsv1beta1.ConfigConstraintSpec, cc *Confi
 			AutoTrigger:       ccv1.ReloadAction.AutoTrigger,
 		}
 	}
-	if ccv1.ConfigSchema != nil {
+	if ccv1.ParametersSchema != nil {
 		cc.ConfigurationSchema = &CustomParametersValidation{
-			Schema: ccv1.ConfigSchema.SchemaInJSON,
-			CUE:    ccv1.ConfigSchema.CUE,
+			Schema: ccv1.ParametersSchema.SchemaInJSON,
+			CUE:    ccv1.ParametersSchema.CUE,
 		}
-		cc.CfgSchemaTopLevelName = ccv1.ConfigSchema.TopLevelKey
+		cc.CfgSchemaTopLevelName = ccv1.ParametersSchema.TopLevelKey
 	}
 }

@@ -328,6 +328,14 @@ spec:
                   - volumeName
                   type: object
                 type: array
+              disableExporter:
+                description: "Determines whether metrics exporter information is annotated
+                  on the Component's headless Service. \n If set to true, the following
+                  annotations will not be patched into the Service: \n - \"monitor.kubeblocks.io/path\"
+                  - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
+                  \n These annotations allow the Prometheus installed by KubeBlocks
+                  to discover and scrape metrics from the exporter."
+                type: boolean
               enabledLogs:
                 description: "Specifies which types of logs should be collected for
                   the Cluster. The log types are defined in the `componentDefinition.spec.logConfigs`
@@ -2463,14 +2471,6 @@ spec:
                   - name
                   type: object
                 type: array
-              monitorEnabled:
-                description: "Determines whether metrics exporter information is annotated
-                  on the Component's headless Service. \n If set to true, the following
-                  annotations will be patched into the Service: \n - \"monitor.kubeblocks.io/path\"
-                  - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
-                  \n These annotations allow the Prometheus installed by KubeBlocks
-                  to discover and scrape metrics from the exporter."
-                type: boolean
               offlineInstances:
                 description: "Specifies the names of instances to be transitioned
                   to offline status. \n Marking an instance as offline results in
@@ -3123,15 +3123,6 @@ spec:
                   - name
                   type: object
                 type: array
-              sidecars:
-                description: Defines the sidecar containers that will be attached
-                  to the Component's main container.
-                items:
-                  type: string
-                maxItems: 32
-                minItems: 1
-                type: array
-                x-kubernetes-list-type: set
               tlsConfig:
                 description: "Specifies the TLS configuration for the Component, including:
                   \n - A boolean flag that indicates whether the Component should

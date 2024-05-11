@@ -155,7 +155,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
 			// handle sidecar container
-			&componentSidecarContainerTransformer{},
+			&componentMonitorContainerTransformer{},
 			// allocate ports for host-network component
 			&componentHostNetworkTransformer{},
 			// handle component services

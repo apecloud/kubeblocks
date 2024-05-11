@@ -181,7 +181,7 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 				ReloadAction:       cc.Spec.ReloadAction,
 				ConfigSpec:         configSpec,
 				ReloadType:         FromReloadTypeConfig(reloadOptions),
-				DownwardAPIOptions: cc.Spec.DownwardAPITriggeredActions,
+				DownwardAPIOptions: cc.Spec.DownwardAPIChangeTriggeredActions,
 				FormatterConfig:    *cc.Spec.FileFormatConfig,
 			},
 		})

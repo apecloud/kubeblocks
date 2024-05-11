@@ -80,13 +80,8 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
-func (builder *ComponentBuilder) SetSidecarContainers(sidecars []string) *ComponentBuilder {
-	builder.get().Spec.Sidecars = sidecars
-	return builder
-}
-
-func (builder *ComponentBuilder) SetMonitor(monitorEnabled *bool) *ComponentBuilder {
-	builder.get().Spec.MonitorEnabled = monitorEnabled
+func (builder *ComponentBuilder) DisableExporter(disableExporter *bool) *ComponentBuilder {
+	builder.get().Spec.DisableExporter = disableExporter
 	return builder
 }
 

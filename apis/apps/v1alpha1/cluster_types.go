@@ -826,14 +826,20 @@ type ClusterComponentSpec struct {
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
-	// Defines the sidecar containers that will be attached to the Component's main container.
+	// Determines whether metrics exporter information is annotated on the Component's headless Service.
 	//
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=32
-	// +listType=set
+	// If set to true, the following annotations will not be patched into the Service:
+	//
+	// - "monitor.kubeblocks.io/path"
+	// - "monitor.kubeblocks.io/port"
+	// - "monitor.kubeblocks.io/scheme"
+	//
+	// These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.
+	//
 	// +optional
-	Sidecars []string `json:"sidecars,omitempty"`
+	DisableExporter *bool `json:"disableExporter,omitempty"`
 
+	// Deprecated since v0.9
 	// Determines whether metrics exporter information is annotated on the Component's headless Service.
 	//
 	// If set to true, the following annotations will be patched into the Service:
@@ -845,7 +851,8 @@ type ClusterComponentSpec struct {
 	// These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.
 	//
 	// +optional
-	MonitorEnabled *bool `json:"monitorEnabled,omitempty"`
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
+	Monitor *bool `json:"monitor,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -1540,6 +1547,23 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 		ts = append(ts, t.toVolumeClaimTemplate())
 	}
 	return ts
+}
+
+func (r *ClusterComponentSpec) GetDisableExporter() *bool {
+	if r.DisableExporter != nil {
+		return r.DisableExporter
+	}
+
+	toPointer := func(b bool) *bool {
+		p := b
+		return &p
+	}
+
+	// Compatible with previous versions of kb
+	if r.Monitor != nil {
+		return toPointer(!*r.Monitor)
+	}
+	return nil
 }
 
 func (t *InstanceTemplate) GetName() string {

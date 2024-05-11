@@ -1,0 +1,57 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+syntax = "proto3";
+package plugin.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/apecloud/kubeblocks/pkg/lorry/plugin/proto";
+
+
+message GetRoleRequest {
+  // The pod FQDN of the replica to check the role.
+  string fqdn = 1;
+
+  // The port on which the DB service listens.
+  string port = 2;
+
+  // The username used to access the DB service and retrieve the role information with sufficient privileges.
+  string user = 3;
+
+  // The password of the user used to access the DB service and retrieve the role information.
+  string password = 4;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 5;
+}
+
+message GetRoleResponse {
+  string role = 1;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 2;
+}
+
+// DBPlugin service provides APIs to kubeblocks operator to exec component operation.
+service DBPlugin {
+  // GetRole take a specify operation to a component
+  rpc GetRole(GetRoleRequest) returns (GetRoleResponse) {}
+}

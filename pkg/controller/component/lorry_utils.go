@@ -196,6 +196,19 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 	}
 
 	buildLorryEnvs(container, synthesizeComp, clusterCompSpec)
+
+	// set lorry container ports to host network
+	if synthesizeComp.HostNetwork != nil {
+		if synthesizeComp.HostNetwork.ContainerPorts == nil {
+			synthesizeComp.HostNetwork.ContainerPorts = make([]appsv1alpha1.HostNetworkContainerPort, 0)
+		}
+		synthesizeComp.HostNetwork.ContainerPorts = append(
+			synthesizeComp.HostNetwork.ContainerPorts,
+			appsv1alpha1.HostNetworkContainerPort{
+				Container: container.Name,
+				Ports:     []string{constant.LorryHTTPPortName, constant.LorryGRPCPortName},
+			})
+	}
 }
 
 func buildLorryInitContainer() *corev1.Container {

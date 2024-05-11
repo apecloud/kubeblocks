@@ -208,7 +208,6 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.OfflineInstances = compProto.Spec.OfflineInstances
 	compObjCopy.Spec.RuntimeClassName = compProto.Spec.RuntimeClassName
 	compObjCopy.Spec.DisableExporter = compProto.Spec.DisableExporter
-	compObjCopy.Spec.MetricsStoreIntegration = compProto.Spec.MetricsStoreIntegration
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&

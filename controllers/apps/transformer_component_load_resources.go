@@ -91,7 +91,7 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
-	if err = updateCompDefinitionImages4ServiceVersion(ctx, cli, compDef, comp.Spec.ServiceVersion); err != nil {
+	if err = component.UpdateCompDefinitionImages4ServiceVersion(ctx, cli, compDef, comp.Spec.ServiceVersion); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 	transCtx.CompDef = compDef

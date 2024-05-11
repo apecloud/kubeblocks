@@ -41,6 +41,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -390,7 +391,7 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 	}
 
 	checkedInsert := func(version string, compDef *appsv1alpha1.ComponentDefinition) error {
-		match, err := compareServiceVersion(serviceVersion, version)
+		match, err := component.CompareServiceVersion(serviceVersion, version)
 		if err == nil && match {
 			insert(version, compDef)
 		}
@@ -398,7 +399,7 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 	}
 
 	for _, compDef := range compDefs {
-		compVersions, err := compatibleCompVersions4Definition(ctx, cli, compDef)
+		compVersions, err := component.CompatibleCompVersions4Definition(ctx, cli, compDef)
 		if err != nil {
 			return nil, err
 		}
@@ -416,33 +417,6 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 		}
 	}
 	return result, nil
-}
-
-// compatibleCompVersions4Definition returns all component versions that are compatible with specified component definition.
-func compatibleCompVersions4Definition(ctx context.Context, cli client.Reader, compDef *appsv1alpha1.ComponentDefinition) ([]*appsv1alpha1.ComponentVersion, error) {
-	compVersionList := &appsv1alpha1.ComponentVersionList{}
-	labels := client.MatchingLabels{
-		compDef.Name: compDef.Name,
-	}
-	if err := cli.List(ctx, compVersionList, labels); err != nil {
-		return nil, err
-	}
-
-	if len(compVersionList.Items) == 0 {
-		return nil, nil
-	}
-
-	compVersions := make([]*appsv1alpha1.ComponentVersion, 0)
-	for i, compVersion := range compVersionList.Items {
-		if compVersion.Generation != compVersion.Status.ObservedGeneration {
-			return nil, fmt.Errorf("the matched ComponentVersion is not up to date: %s", compVersion.Name)
-		}
-		if compVersion.Status.Phase != appsv1alpha1.AvailablePhase {
-			return nil, fmt.Errorf("the matched ComponentVersion is unavailable: %s", compVersion.Name)
-		}
-		compVersions = append(compVersions, &compVersionList.Items[i])
-	}
-	return compVersions, nil
 }
 
 // compatibleServiceVersions4Definition returns all service versions that are compatible with specified component definition.
@@ -465,31 +439,6 @@ func compatibleServiceVersions4Definition(compDef *appsv1alpha1.ComponentDefinit
 		}
 	}
 	return serviceVersions
-}
-
-// compareServiceVersion compares whether two service version have the same major, minor and patch version.
-func compareServiceVersion(required, provided string) (bool, error) {
-	if len(required) == 0 {
-		return true, nil
-	}
-	rv, err1 := version.ParseSemantic(required)
-	if err1 != nil {
-		return false, err1
-	}
-	pv, err2 := version.ParseSemantic(provided)
-	if err2 != nil {
-		return false, err2
-	}
-	ret, _ := rv.WithPreRelease("").Compare(pv.WithPreRelease("").String())
-	if ret != 0 {
-		return false, nil
-	}
-	if len(rv.PreRelease()) == 0 {
-		return true, nil
-	}
-	// required version has specified the pre-release, so the provided version should match it exactly
-	ret, _ = rv.Compare(provided)
-	return ret == 0, nil
 }
 
 func serviceVersionComparator(a, b string) int {
@@ -517,134 +466,4 @@ func validateServiceVersion(v string) error {
 	}
 	_, err := version.ParseSemantic(v)
 	return err
-}
-
-// updateCompDefinitionImages4ServiceVersion resolves and updates images for the component definition.
-func updateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.Reader,
-	compDef *appsv1alpha1.ComponentDefinition, serviceVersion string) error {
-	compVersions, err := compatibleCompVersions4Definition(ctx, cli, compDef)
-	if err != nil {
-		return err
-	}
-	if len(compVersions) == 0 {
-		return nil
-	}
-	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
-}
-
-func resolveImagesWithCompVersions(compDef *appsv1alpha1.ComponentDefinition,
-	compVersions []*appsv1alpha1.ComponentVersion, serviceVersion string) error {
-	appsInDef := covertImagesFromCompDefinition(compDef)
-	appsByUser, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
-	if err != nil {
-		return err
-	}
-
-	apps := checkNMergeImages(serviceVersion, appsInDef, appsByUser)
-
-	checkNUpdateImage := func(c *corev1.Container) error {
-		var err error
-		app, ok := apps[c.Name]
-		switch {
-		case ok && app.err == nil:
-			c.Image = app.image
-		case ok:
-			err = app.err
-		default:
-			err = fmt.Errorf("no matched image found for container %s", c.Name)
-		}
-		return err
-	}
-
-	for i := range compDef.Spec.Runtime.InitContainers {
-		if err := checkNUpdateImage(&compDef.Spec.Runtime.InitContainers[i]); err != nil {
-			return err
-		}
-	}
-	for i := range compDef.Spec.Runtime.Containers {
-		if err := checkNUpdateImage(&compDef.Spec.Runtime.Containers[i]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func covertImagesFromCompDefinition(compDef *appsv1alpha1.ComponentDefinition) map[string]appNameVersionImage {
-	apps := make(map[string]appNameVersionImage)
-	checkNAdd := func(c *corev1.Container) {
-		if len(c.Image) > 0 {
-			apps[c.Name] = appNameVersionImage{
-				name:    c.Name,
-				version: compDef.Spec.ServiceVersion,
-				image:   c.Image,
-			}
-		}
-	}
-	for i := range compDef.Spec.Runtime.InitContainers {
-		checkNAdd(&compDef.Spec.Runtime.InitContainers[i])
-	}
-	for i := range compDef.Spec.Runtime.Containers {
-		checkNAdd(&compDef.Spec.Runtime.Containers[i])
-	}
-	return apps
-}
-
-func findMatchedImagesFromCompVersions(compVersions []*appsv1alpha1.ComponentVersion, serviceVersion string) (map[string]appNameVersionImage, error) {
-	appsWithReleases := make(map[string]map[string]appNameVersionImage)
-	for _, compVersion := range compVersions {
-		for _, release := range compVersion.Spec.Releases {
-			match, err := compareServiceVersion(serviceVersion, release.ServiceVersion)
-			if err != nil {
-				return nil, err
-			}
-			if match {
-				for name, image := range release.Images {
-					if _, ok := appsWithReleases[name]; !ok {
-						appsWithReleases[name] = make(map[string]appNameVersionImage)
-					}
-					appsWithReleases[name][release.Name] = appNameVersionImage{
-						name:    name,
-						version: release.ServiceVersion,
-						image:   image,
-					}
-				}
-			}
-		}
-	}
-	apps := make(map[string]appNameVersionImage)
-	for name, releases := range appsWithReleases {
-		names := maps.Keys(releases)
-		slices.Sort(names)
-		// use the latest release
-		apps[name] = releases[names[len(names)-1]]
-	}
-	return apps, nil
-}
-
-func checkNMergeImages(serviceVersion string, appsInDef, appsByUser map[string]appNameVersionImage) map[string]appNameVersionImage {
-	apps := make(map[string]appNameVersionImage)
-	merge := func(name string, def, user appNameVersionImage) appNameVersionImage {
-		if len(user.name) == 0 {
-			match, err := compareServiceVersion(serviceVersion, def.version)
-			if err != nil {
-				def.err = err
-			}
-			if !match {
-				def.err = fmt.Errorf("no matched image found for container %s with required version %s", name, serviceVersion)
-			}
-			return def
-		}
-		return user
-	}
-	for _, name := range append(maps.Keys(appsInDef), maps.Keys(appsByUser)...) {
-		apps[name] = merge(name, appsInDef[name], appsByUser[name])
-	}
-	return apps
-}
-
-type appNameVersionImage struct {
-	name    string
-	version string
-	image   string
-	err     error
 }

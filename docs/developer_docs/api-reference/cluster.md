@@ -8832,7 +8832,7 @@ and other administrative tasks.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentOps">ComponentOps
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.UpgradeComponent">UpgradeComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 <p>ComponentOps specifies the Component to be operated on.</p>
@@ -13191,6 +13191,30 @@ The &ldquo;pods&rdquo; key maps to a list of names of all Pods of the Component.
 <td>
 <em>(Optional)</em>
 <p>Records the offline instances of the Component prior to any changes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the version of the Service expected to be provisioned by this Component prior to any changes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the name of the ComponentDefinition prior to any changes.</p>
 </td>
 </tr>
 </tbody>
@@ -20895,8 +20919,87 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the target ClusterVersion for the upgrade.</p>
-<p>This field is deprecated since v0.9 because ClusterVersion is deprecated.</p>
+<p>Deprecated: since v0.9 because ClusterVersion is deprecated.
+Specifies the name of the target ClusterVersion for the upgrade.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.UpgradeComponent">
+[]UpgradeComponent
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists components to be upgrade based on desired ComponentDefinition and ServiceVersion.
+From the perspective of cluster API, the reasonable combinations should be:
+1. (comp-def, service-ver) - upgrade to the specified service version and component definition, the user takes the responsibility to ensure that they are compatible.
+2. (&ldquo;&rdquo;, service-ver) - upgrade to the specified service version, let the operator choose the latest compatible component definition.
+3. (comp-def, &ldquo;&rdquo;) - upgrade to the specified component definition, let the operator choose the latest compatible service version.
+4. (&ldquo;&rdquo;, &ldquo;&rdquo;) - upgrade to the latest service version and component definition, the operator will ensure the compatibility between the selected versions.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.UpgradeComponent">UpgradeComponent
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Upgrade">Upgrade</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ComponentOps</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
+ComponentOps
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentOps</code> are embedded into this type.)
+</p>
+<p>Specifies the name of the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the version of the Service expected to be provisioned by this Component.
+Referring to the ServiceVersion defined by the ComponentDefinition and ComponentVersion.
+And ServiceVersion in ClusterComponentSpec is optional, when no version is specified,
+use the latest available version in ComponentVersion.</p>
 </td>
 </tr>
 </tbody>
@@ -21244,7 +21347,7 @@ Typically used in scenarios such as updating application container images.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
-<p>VerticalScaling refers to the process of adjusting the compute resources (e.g., CPU, memory) allocated to a Component.
+<p>VerticalScaling refers to the process of adjusting compute resources (e.g., CPU, memory) allocated to a Component.
 It defines the parameters required for the operation.</p>
 </div>
 <table>

@@ -20,9 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"slices"
 	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -44,7 +42,7 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 		return nil
 	}
 
-	if !isHostNetworkEnabled(transCtx) {
+	if !component.IsHostNetworkEnabled(transCtx.SynthesizeComponent) {
 		return nil
 	}
 
@@ -54,26 +52,6 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 	return updateObjectsWithAllocatedPorts(synthesizedComp, ports)
-}
-
-func isHostNetworkEnabled(transCtx *componentTransformContext) bool {
-	synthesizedComp := transCtx.SynthesizeComponent
-	if synthesizedComp.HostNetwork == nil {
-		return false
-	}
-	// legacy definition, ignore the cluster annotations
-	if synthesizedComp.PodSpec.HostNetwork {
-		return true
-	}
-	comp := transCtx.Component
-	if comp.Annotations == nil {
-		return false
-	}
-	comps, ok := comp.Annotations[constant.HostNetworkAnnotationKey]
-	if !ok {
-		return false
-	}
-	return slices.Index(strings.Split(comps, ","), synthesizedComp.Name) >= 0
 }
 
 func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[string]map[string]int32, error) {
@@ -87,7 +65,7 @@ func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[str
 	}
 
 	pm := intctrlutil.GetPortManager()
-	needAllocate := func(c string, p string, _ int32) bool {
+	needAllocate := func(c string, p string) bool {
 		containerPorts, ok := ports[c]
 		if !ok {
 			return false
@@ -98,7 +76,7 @@ func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[str
 }
 
 func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *component.SynthesizedComponent,
-	needAllocate func(string, string, int32) bool) (map[string]map[string]int32, error) {
+	needAllocate func(string, string) bool) (map[string]map[string]int32, error) {
 	ports := map[string]map[string]int32{}
 	insert := func(c, pk string, pv int32) {
 		if _, ok := ports[c]; !ok {
@@ -109,7 +87,7 @@ func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *com
 	for _, c := range synthesizedComp.PodSpec.Containers {
 		for _, p := range c.Ports {
 			portKey := intctrlutil.BuildHostPortName(synthesizedComp.ClusterName, synthesizedComp.Name, c.Name, p.Name)
-			if needAllocate(c.Name, p.Name, p.ContainerPort) {
+			if needAllocate(c.Name, p.Name) {
 				port, err := pm.AllocatePort(portKey)
 				if err != nil {
 					return nil, err

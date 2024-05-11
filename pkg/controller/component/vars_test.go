@@ -404,6 +404,57 @@ var _ = Describe("vars", func() {
 			checkEnvVarWithValue(envVars, "pod-container-port", "3306")
 		})
 
+		It("host-network vars", func() {
+			vars := []appsv1alpha1.EnvVar{
+				{
+					Name: "host-network-port",
+					ValueFrom: &appsv1alpha1.VarSource{
+						HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Optional: required(),
+							},
+							HostNetworkVars: appsv1alpha1.HostNetworkVars{
+								Container: &appsv1alpha1.ContainerVars{
+									Name: "default",
+									Port: &appsv1alpha1.NamedVar{
+										Name:   "default",
+										Option: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			By("has no host-network capability")
+			_, _, err := ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(And(ContainSubstring("has no HostNetwork"), ContainSubstring("found when resolving vars")))
+
+			By("has no host-network enabled")
+			synthesizedComp.HostNetwork = &appsv1alpha1.HostNetwork{}
+			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(And(ContainSubstring("has no HostNetwork"), ContainSubstring("found when resolving vars")))
+
+			By("has no host-network port")
+			synthesizedComp.Annotations = map[string]string{
+				constant.HostNetworkAnnotationKey: synthesizedComp.Name,
+			}
+			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
+
+			By("ok")
+			ctx := mockHostNetworkPort(testCtx.Ctx, testCtx.Cli,
+				synthesizedComp.ClusterName, synthesizedComp.Name, "default", "default", 30001)
+			templateVars, envVars, err := ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
+			checkEnvVarWithValue(envVars, "host-network-port", "30001")
+		})
+
 		It("service vars", func() {
 			By("non-exist service with optional")
 			vars := []appsv1alpha1.EnvVar{
@@ -1875,7 +1926,7 @@ var _ = Describe("vars", func() {
 			}
 			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("not found when resolving vars"))
+			Expect(err.Error()).Should(And(ContainSubstring("has no"), ContainSubstring("found when resolving vars")))
 			// create service for comp3
 			reader.objs = append(reader.objs, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1960,7 +2011,7 @@ var _ = Describe("vars", func() {
 			}
 			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("not found when resolving vars"))
+			Expect(err.Error()).Should(And(ContainSubstring("has no"), ContainSubstring("found when resolving vars")))
 			// create service for comp3
 			reader.objs = append(reader.objs, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{

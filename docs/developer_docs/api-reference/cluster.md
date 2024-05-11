@@ -5780,7 +5780,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.</p>
@@ -10880,7 +10880,7 @@ ConsensusMember
 <h3 id="apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVars">PodVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVars">HostNetworkVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVars">PodVars</a>)
 </p>
 <div>
 <p>ContainerVars defines the vars that can be referenced from a Container.</p>
@@ -12092,6 +12092,86 @@ string
 <td>
 <p>Ports are named container ports within the specified container.
 These container ports must be defined in the container for proper port allocation.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>HostNetworkVarSelector selects a var from host-network resources.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The component to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>HostNetworkVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVars">
+HostNetworkVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>HostNetworkVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkVars">HostNetworkVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>)
+</p>
+<div>
+<p>HostNetworkVars defines the vars that can be referenced from host-network resources.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">
+ContainerVars
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 </td>
 </tr>
 </tbody>
@@ -20688,6 +20768,20 @@ PodVarSelector
 <td>
 <em>(Optional)</em>
 <p>Selects a defined var of a Pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostNetworkVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">
+HostNetworkVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of host-network resources.</p>
 </td>
 </tr>
 <tr>

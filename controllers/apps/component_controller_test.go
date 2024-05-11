@@ -32,7 +32,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -1519,46 +1518,6 @@ var _ = Describe("Component Controller", func() {
 	testCompConfiguration := func(compName, compDefName string) {
 	}
 
-	testMetricsStoreIntegration := func(compName, compDefName string) {
-		monitorserviceNS := "default"
-		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
-			f.SetPrometheusIntegration(true, "monitor-test", monitorserviceNS)
-		})
-
-		By("wait for restore created")
-		ml := client.MatchingLabels{
-			constant.AppInstanceLabelKey:    clusterKey.Name,
-			constant.KBAppComponentLabelKey: compObj.Name,
-		}
-		By("check prometheus MonitorService")
-		Eventually(testapps.List(&testCtx, generics.MonitorServiceSignature,
-			ml, client.InNamespace(monitorserviceNS))).Should(HaveLen(1))
-
-		var sms monitoringv1.ServiceMonitorList
-		Expect(testCtx.Cli.List(testCtx.Ctx, &sms, ml, client.InNamespace(monitorserviceNS))).Should(Succeed())
-		Expect(len(sms.Items)).Should(Equal(1))
-		sm := sms.Items[0]
-
-		By("update MonitorService")
-		Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(compDef *appsv1alpha1.Component) {
-			compDef.Spec.MetricsStoreIntegration.ServiceMonitorTemplate.ServiceMonitorSpec.JobLabel = "test_job"
-		})).Should(Succeed())
-
-		By("check MonitorService jobLabel")
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sm), func(g Gomega, ms *monitoringv1.ServiceMonitor) {
-			g.Expect(ms.Spec.JobLabel).Should(Equal("test_job"))
-		})).Should(Succeed())
-
-		By("disable MonitorService")
-		Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(compDef *appsv1alpha1.Component) {
-			compDef.Spec.MetricsStoreIntegration.ServiceMonitorTemplate = nil
-		})).Should(Succeed())
-
-		By("wait delete prometheus MonitorService")
-		Eventually(testapps.List(&testCtx, generics.MonitorServiceSignature,
-			ml, client.InNamespace(monitorserviceNS))).Should(HaveLen(0))
-	}
-
 	testCompAffinityNToleration := func(compName, compDefName string) {
 		const (
 			topologyKey     = "testTopologyKey"
@@ -2147,10 +2106,6 @@ var _ = Describe("Component Controller", func() {
 
 		It("create component with custom RBAC which is already exist created by User", func() {
 			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
-		})
-
-		It("create component with integration prometheus operator", func() {
-			testMetricsStoreIntegration(defaultCompName, compDefName)
 		})
 	})
 

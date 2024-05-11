@@ -1080,20 +1080,6 @@ string
 </tr>
 <tr>
 <td>
-<code>metricsStoreIntegration</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">
-MetricsStoreIntegration
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>It supports prometheus/victoriametrics operator.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>disableExporter</code><br/>
 <em>
 bool
@@ -5029,20 +5015,6 @@ The administrator must manually manage the cleanup and removal of these resource
 </tr>
 <tr>
 <td>
-<code>metricsStoreIntegration</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">
-MetricsStoreIntegration
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>It supports prometheus/victoriametrics operator.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>disableExporter</code><br/>
 <em>
 bool
@@ -8828,20 +8800,6 @@ string
 <td>
 <em>(Optional)</em>
 <p>Defines runtimeClassName for all Pods managed by this Component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>metricsStoreIntegration</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">
-MetricsStoreIntegration
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>It supports prometheus/victoriametrics operator.</p>
 </td>
 </tr>
 <tr>
@@ -13015,75 +12973,6 @@ for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">MetricsStoreIntegration
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>serviceMonitorTemplate</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ServiceMonitorTemplate">
-ServiceMonitorTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the ServiceMonitor template used in the Component.</p>
-<p>Example usage:</p>
-<pre><code class="language-yaml">name: prometheus-scrape
-namespace: default
-labels:
-  k8s-app: node-exporter
-serviceMonitorTemplate:
-  selector:
-    matchLabels:
-      app: app-exporter
-      k8s-app: app-exporter
-  endpoints:
-  - port: metrics_port
-  jobLabel: k8s-app
-</code></pre>
-</td>
-</tr>
-<tr>
-<td>
-<code>vmMonitorTemplate</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VMMonitorTemplate">
-VMMonitorTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>VictoriaMetrics is currently not supported yet.
-Specifies the VMServiceScrape template used in the Component.</p>
-<pre><code class="language-yaml">name: vm-scrape
-namespace: default
-labels:
-  k8s-app: node-exporter
-vmServiceScrapeSpec:
-  selector:
-    matchLabels:
-      app: app-exporter
-</code></pre>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
 </h3>
 <p>
@@ -13130,11 +13019,6 @@ exporterConfig is valid when builtIn is false.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorKind">MonitorKind
-(<code>string</code> alias)</h3>
-<div>
-<p>MonitorKind defines the kind of monitor.</p>
-</div>
 <h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
 </h3>
 <p>
@@ -18202,54 +18086,6 @@ int64
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ServiceMonitorTemplate">ServiceMonitorTemplate
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">MetricsStoreIntegration</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ObjectMeta</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ObjectMeta</code> are embedded into this type.)
-</p>
-<em>(Optional)</em>
-<p>Standard k8s object&rsquo;s metadata.</p>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceMonitorSpec</code><br/>
-<em>
-github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1.ServiceMonitorSpec
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServiceMonitorSpec contains specification parameters for a ServiceMonitor</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ServicePort">ServicePort
 </h3>
 <p>
@@ -20485,54 +20321,6 @@ use the latest available version in ComponentVersion.</p>
 <td>
 <em>(Optional)</em>
 <p>ConfigMapRefs defines the user-defined ConfigMaps.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.VMMonitorTemplate">VMMonitorTemplate
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">MetricsStoreIntegration</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ObjectMeta</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ObjectMeta</code> are embedded into this type.)
-</p>
-<em>(Optional)</em>
-<p>Standard k8s object&rsquo;s metadata.</p>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>vmServiceScrapeSpec</code><br/>
-<em>
-github.com/VictoriaMetrics/operator/api/victoriametrics/v1beta1.VMServiceScrapeSpec
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>VMServiceScrapeSpec defines the desired state of VMServiceScrape</p>
 </td>
 </tr>
 </tbody>

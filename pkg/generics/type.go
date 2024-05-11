@@ -22,9 +22,7 @@ package generics
 import (
 	"reflect"
 
-	vmv1beta1 "github.com/VictoriaMetrics/operator/api/victoriametrics/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -132,12 +130,6 @@ var ConfigurationSignature = func(_ appsv1alpha1.Configuration, _ *appsv1alpha1.
 }
 
 var ServiceDescriptorSignature = func(_ appsv1alpha1.ServiceDescriptor, _ *appsv1alpha1.ServiceDescriptor, _ appsv1alpha1.ServiceDescriptorList, _ *appsv1alpha1.ServiceDescriptorList) {
-}
-
-var MonitorServiceSignature = func(_ monitoringv1.ServiceMonitor, _ *monitoringv1.ServiceMonitor, _ monitoringv1.ServiceMonitorList, _ *monitoringv1.ServiceMonitorList) {
-}
-
-var VMServiceSignature = func(_ vmv1beta1.VMServiceScrape, _ *vmv1beta1.VMServiceScrape, _ vmv1beta1.VMServiceScrapeList, _ *vmv1beta1.VMServiceScrapeList) {
 }
 
 func ToGVK(object client.Object) schema.GroupVersionKind {

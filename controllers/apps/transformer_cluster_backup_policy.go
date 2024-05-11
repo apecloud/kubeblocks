@@ -185,12 +185,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 
 // transformBackupPolicy transforms backup policy template to backup policy.
 func (r *clusterBackupPolicyTransformer) transformBackupPolicy(comp *appsv1alpha1.ClusterComponentSpec) (*dpv1alpha1.BackupPolicy, *model.Action) {
-
 	cluster := r.OrigCluster
-	compDefName := comp.ComponentDefRef
-	if compDefName == "" {
-		compDefName = comp.ComponentDef
-	}
 	backupPolicyName := generateBackupPolicyName(cluster.Name, comp.Name, r.tplIdentifier)
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	if err := r.Client.Get(r.Context, client.ObjectKey{

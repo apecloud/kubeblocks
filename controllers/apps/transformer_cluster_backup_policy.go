@@ -88,11 +88,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 
 			r.backupPolicy = &tpl.Spec.BackupPolicies[i]
 
-			transformBackupPolicy := func() *dpv1alpha1.BackupPolicy {
-				comp := r.getClusterComponentSpec()
-				if comp == nil {
-					return nil
-				}
+			transformBackupPolicy := func(comp *appsv1alpha1.ClusterComponentSpec) *dpv1alpha1.BackupPolicy {
 				// build the data protection backup policy from the template.
 				dpBackupPolicy, action := r.transformBackupPolicy(comp)
 				if dpBackupPolicy == nil {
@@ -116,7 +112,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				return dpBackupPolicy
 			}
 
-			transformBackupSchedule := func(backupPolicy *dpv1alpha1.BackupPolicy) {
+			transformBackupSchedule := func(compSpec *appsv1alpha1.ClusterComponentSpec, backupPolicy *dpv1alpha1.BackupPolicy) {
 				// if backup policy is nil, it means that the backup policy template
 				// is invalid, backup schedule depends on backup policy, so we do
 				// not need to transform backup schedule.
@@ -131,7 +127,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				}
 
 				// build the data protection backup schedule from the template.
-				dpBackupSchedule, action := r.transformBackupSchedule(backupPolicy)
+				dpBackupSchedule, action := r.transformBackupSchedule(compSpec, backupPolicy)
 
 				// merge cluster backup configuration into the backup schedule.
 				// If the backup schedule is nil, create a new backup schedule
@@ -150,7 +146,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				// cluster object, so we need to merge the cluster backup configuration
 				// into the default backup schedule created by backup policy template
 				// if it exists.
-				dpBackupSchedule = r.mergeClusterBackup(backupPolicy, dpBackupSchedule)
+				dpBackupSchedule = r.mergeClusterBackup(compSpec, backupPolicy, dpBackupSchedule)
 				if dpBackupSchedule == nil {
 					return
 				}
@@ -174,8 +170,14 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 
 			// transform backup policy template to data protection backupPolicy
 			// and backupSchedule
-			policy := transformBackupPolicy()
-			transformBackupSchedule(policy)
+			compSpecs := r.getClusterComponentSpecs()
+			if len(compSpecs) == 0 {
+				continue
+			}
+			for _, v := range compSpecs {
+				policy := transformBackupPolicy(v)
+				transformBackupSchedule(v, policy)
+			}
 		}
 	}
 	return nil
@@ -189,7 +191,7 @@ func (r *clusterBackupPolicyTransformer) transformBackupPolicy(comp *appsv1alpha
 	if compDefName == "" {
 		compDefName = comp.ComponentDef
 	}
-	backupPolicyName := generateBackupPolicyName(cluster.Name, compDefName, r.tplIdentifier)
+	backupPolicyName := generateBackupPolicyName(cluster.Name, comp.Name, r.tplIdentifier)
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	if err := r.Client.Get(r.Context, client.ObjectKey{
 		Namespace: cluster.Namespace,
@@ -209,9 +211,10 @@ func (r *clusterBackupPolicyTransformer) transformBackupPolicy(comp *appsv1alpha
 }
 
 func (r *clusterBackupPolicyTransformer) transformBackupSchedule(
+	compSpec *appsv1alpha1.ClusterComponentSpec,
 	backupPolicy *dpv1alpha1.BackupPolicy) (*dpv1alpha1.BackupSchedule, *model.Action) {
 	cluster := r.OrigCluster
-	scheduleName := generateBackupScheduleName(cluster.Name, r.backupPolicy.ComponentDefRef, r.tplIdentifier)
+	scheduleName := generateBackupScheduleName(cluster.Name, compSpec.Name, r.tplIdentifier)
 	backupSchedule := &dpv1alpha1.BackupSchedule{}
 	if err := r.Client.Get(r.Context, client.ObjectKey{
 		Namespace: cluster.Namespace,
@@ -222,7 +225,7 @@ func (r *clusterBackupPolicyTransformer) transformBackupSchedule(
 
 	if len(backupSchedule.Name) == 0 {
 		// build a new backup schedule from the backup policy template.
-		return r.buildBackupSchedule(scheduleName, backupPolicy), model.ActionCreatePtr()
+		return r.buildBackupSchedule(compSpec, scheduleName, backupPolicy), model.ActionCreatePtr()
 	}
 	// sync backup schedule
 	r.syncBackupSchedule(backupSchedule)
@@ -230,6 +233,7 @@ func (r *clusterBackupPolicyTransformer) transformBackupSchedule(
 }
 
 func (r *clusterBackupPolicyTransformer) buildBackupSchedule(
+	compSpec *appsv1alpha1.ClusterComponentSpec,
 	name string,
 	backupPolicy *dpv1alpha1.BackupPolicy) *dpv1alpha1.BackupSchedule {
 	cluster := r.OrigCluster
@@ -237,7 +241,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupSchedule(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   cluster.Namespace,
-			Labels:      r.buildLabels(),
+			Labels:      r.buildLabels(compSpec.Name),
 			Annotations: r.buildAnnotations(),
 		},
 		Spec: dpv1alpha1.BackupScheduleSpec{
@@ -288,7 +292,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp *appsv1alpha1.Clu
 		backupPolicy.Labels = map[string]string{}
 	}
 	mergeMap(backupPolicy.Annotations, r.buildAnnotations())
-	mergeMap(backupPolicy.Labels, r.buildLabels())
+	mergeMap(backupPolicy.Labels, r.buildLabels(comp.Name))
 
 	// update backup repo of the backup policy.
 	if r.Cluster.Spec.Backup != nil && r.Cluster.Spec.Backup.RepoName != "" {
@@ -300,10 +304,10 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp *appsv1alpha1.Clu
 
 	// convert role labelSelector based on the replicas of the component automatically.
 	// TODO(ldm): need more review.
-	r.syncRoleLabelSelector(backupPolicy.Spec.Target, r.backupPolicy.Target.Role)
+	r.syncRoleLabelSelector(comp, backupPolicy.Spec.Target, r.backupPolicy.Target.Role)
 }
 
-func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(target *dpv1alpha1.BackupTarget, role string) {
+func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp *appsv1alpha1.ClusterComponentSpec, target *dpv1alpha1.BackupTarget, role string) {
 	if len(role) == 0 || target == nil {
 		return
 	}
@@ -311,16 +315,15 @@ func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(target *dpv1alpha
 	if podSelector.LabelSelector == nil || podSelector.LabelSelector.MatchLabels == nil {
 		podSelector.LabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
 	}
-	if r.getCompReplicas() == 1 {
+	if r.getCompReplicas(comp) == 1 {
 		delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
 	} else if podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
 		podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
 	}
 }
 
-func (r *clusterBackupPolicyTransformer) getCompReplicas() int32 {
+func (r *clusterBackupPolicyTransformer) getCompReplicas(compSpec *appsv1alpha1.ClusterComponentSpec) int32 {
 	rsm := &workloads.ReplicatedStateMachine{}
-	compSpec := r.getClusterComponentSpec()
 	rsmName := fmt.Sprintf("%s-%s", r.Cluster.Name, compSpec.Name)
 	if err := r.Client.Get(r.Context, client.ObjectKey{Name: rsmName, Namespace: r.Cluster.Namespace}, rsm); err != nil {
 		return compSpec.Replicas
@@ -335,7 +338,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupPolicy(comp *appsv1alpha1.Cl
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        backupPolicyName,
 			Namespace:   cluster.Namespace,
-			Labels:      r.buildLabels(),
+			Labels:      r.buildLabels(comp.Name),
 			Annotations: r.buildAnnotations(),
 		},
 	}
@@ -367,7 +370,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 			delete(oldBackupMethodMap, backupMethod.Name)
 		} else if v.Target != nil {
 			backupMethod.Target = r.buildBackupTarget(*v.Target, comp)
-			r.syncRoleLabelSelector(backupMethod.Target, v.Target.Role)
+			r.syncRoleLabelSelector(comp, backupMethod.Target, v.Target.Role)
 		}
 		mappingEnv := r.doEnvMapping(comp, v.EnvMapping)
 		backupMethod.Env = dputils.MergeEnv(backupMethod.Env, mappingEnv)
@@ -457,6 +460,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(targetTpl appsv1alpha
 }
 
 func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
+	compSpec *appsv1alpha1.ClusterComponentSpec,
 	backupPolicy *dpv1alpha1.BackupPolicy,
 	backupSchedule *dpv1alpha1.BackupSchedule) *dpv1alpha1.BackupSchedule {
 	cluster := r.OrigCluster
@@ -481,7 +485,7 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        generateBackupScheduleName(cluster.Name, r.backupPolicy.ComponentDefRef, r.tplIdentifier),
 				Namespace:   cluster.Namespace,
-				Labels:      r.buildLabels(),
+				Labels:      r.buildLabels(compSpec.Name),
 				Annotations: r.buildAnnotations(),
 			},
 			Spec: dpv1alpha1.BackupScheduleSpec{
@@ -515,13 +519,14 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 }
 
 // getClusterComponentSpec returns the first component name of the componentDefRef.
-func (r *clusterBackupPolicyTransformer) getClusterComponentSpec() *appsv1alpha1.ClusterComponentSpec {
-	for _, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {
+func (r *clusterBackupPolicyTransformer) getClusterComponentSpecs() []*appsv1alpha1.ClusterComponentSpec {
+	var compSpecs []*appsv1alpha1.ClusterComponentSpec
+	for i, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {
 		if v.ComponentDefRef == r.backupPolicy.ComponentDefRef || slices.Contains(r.backupPolicy.ComponentDefs, v.ComponentDef) {
-			return &v
+			compSpecs = append(compSpecs, &r.clusterTransformContext.Cluster.Spec.ComponentSpecs[i])
 		}
 	}
-	return nil
+	return compSpecs
 }
 
 func (r *clusterBackupPolicyTransformer) defaultPolicyAnnotationValue() string {
@@ -542,10 +547,11 @@ func (r *clusterBackupPolicyTransformer) buildAnnotations() map[string]string {
 	return annotations
 }
 
-func (r *clusterBackupPolicyTransformer) buildLabels() map[string]string {
+func (r *clusterBackupPolicyTransformer) buildLabels(componentName string) map[string]string {
 	return map[string]string{
 		constant.AppInstanceLabelKey:          r.OrigCluster.Name,
 		constant.KBAppComponentDefRefLabelKey: r.backupPolicy.ComponentDefRef,
+		constant.KBAppComponentLabelKey:       componentName,
 		constant.AppManagedByLabelKey:         constant.AppName,
 	}
 }
@@ -559,7 +565,7 @@ func (r *clusterBackupPolicyTransformer) buildTargetPodLabels(targetTpl appsv1al
 		constant.AppManagedByLabelKey:   constant.AppName,
 	}
 	// append label to filter specific role of the component.
-	if len(targetTpl.Role) > 0 && r.getCompReplicas() > 1 {
+	if len(targetTpl.Role) > 0 && r.getCompReplicas(comp) > 1 {
 		// the role only works when the component has multiple replicas.
 		labels[constant.RoleLabelKey] = targetTpl.Role
 	}

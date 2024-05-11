@@ -63,9 +63,9 @@ const (
 var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
 
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != readinessProbeEventFieldPath &&
+	if (event.InvolvedObject.FieldPath != readinessProbeEventFieldPath &&
 		event.InvolvedObject.FieldPath != legacyEventFieldPath &&
-		event.InvolvedObject.FieldPath != lorryEventFieldPath &&
+		event.InvolvedObject.FieldPath != lorryEventFieldPath) ||
 		event.Reason != checkRoleEventReason {
 		return nil
 	}

@@ -26,14 +26,15 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/assert"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -160,7 +161,7 @@ var _ = Describe("Handler Util Test", func() {
 	Context("TestValidateReloadOptions", func() {
 		It("Should succeed with no error", func() {
 			mockK8sCli.MockGetMethod(
-				testutil.WithFailed(cfgutil.MakeError("failed to get resource."), testutil.WithTimes(1)),
+				testutil.WithFailed(cfgcore.MakeError("failed to get resource."), testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithTimes(1)),
 			)
 
@@ -443,9 +444,10 @@ var _ = Describe("Handler Util Test", func() {
 })
 
 func TestFilterSubPathVolumeMount(t *testing.T) {
-	createConfigMeta := func(volumeName string, reloadType appsv1alpha1.CfgReloadType) ConfigSpecMeta {
+	createConfigMeta := func(volumeName string, reloadType appsv1alpha1.CfgReloadType, reloadAction *appsv1alpha1.ReloadOptions) ConfigSpecMeta {
 		return ConfigSpecMeta{ConfigSpecInfo: ConfigSpecInfo{
-			ReloadType: reloadType,
+			ReloadOptions: reloadAction,
+			ReloadType:    reloadType,
 			ConfigSpec: appsv1alpha1.ComponentConfigSpec{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 					VolumeName: volumeName,
@@ -464,9 +466,19 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 		name: "test1",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", appsv1alpha1.UnixSignalType),
-				createConfigMeta("test2", appsv1alpha1.ShellType),
-				createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+				createConfigMeta("test1", appsv1alpha1.UnixSignalType, &appsv1alpha1.ReloadOptions{
+					UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{},
+				}),
+				createConfigMeta("test2", appsv1alpha1.ShellType, &appsv1alpha1.ReloadOptions{
+					ShellTrigger: &appsv1alpha1.ShellTrigger{
+						Sync: cfgutil.ToPointer(true),
+					},
+				}),
+				createConfigMeta("test3", appsv1alpha1.TPLScriptType, &appsv1alpha1.ReloadOptions{
+					TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
+						Sync: cfgutil.ToPointer(true),
+					},
+				}),
 			},
 			volumes: []corev1.VolumeMount{
 				{Name: "test1", SubPath: "test1"},
@@ -475,15 +487,30 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 			},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+			createConfigMeta("test2", appsv1alpha1.ShellType, &appsv1alpha1.ReloadOptions{
+				ShellTrigger: &appsv1alpha1.ShellTrigger{
+					Sync: cfgutil.ToPointer(true),
+				},
+			}),
+			createConfigMeta("test3", appsv1alpha1.TPLScriptType, &appsv1alpha1.ReloadOptions{
+				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
+					Sync: cfgutil.ToPointer(true),
+				},
+			}),
 		},
 	}, {
 		name: "test2",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", appsv1alpha1.UnixSignalType),
-				createConfigMeta("test2", appsv1alpha1.ShellType),
-				createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+				createConfigMeta("test1", appsv1alpha1.UnixSignalType, &appsv1alpha1.ReloadOptions{
+					UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{},
+				}),
+				createConfigMeta("test2", appsv1alpha1.ShellType, &appsv1alpha1.ReloadOptions{
+					ShellTrigger: &appsv1alpha1.ShellTrigger{},
+				}),
+				createConfigMeta("test3", appsv1alpha1.TPLScriptType, &appsv1alpha1.ReloadOptions{
+					TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{},
+				}),
 			},
 			volumes: []corev1.VolumeMount{
 				{Name: "test1"},
@@ -492,29 +519,72 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 			},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test1", appsv1alpha1.UnixSignalType),
-			createConfigMeta("test2", appsv1alpha1.ShellType),
-			createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+			createConfigMeta("test1", appsv1alpha1.UnixSignalType, &appsv1alpha1.ReloadOptions{
+				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{},
+			}),
+			createConfigMeta("test2", appsv1alpha1.ShellType, &appsv1alpha1.ReloadOptions{
+				ShellTrigger: &appsv1alpha1.ShellTrigger{},
+			}),
+			createConfigMeta("test3", appsv1alpha1.TPLScriptType, &appsv1alpha1.ReloadOptions{
+				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{},
+			}),
 		},
 	}, {
 		name: "test3",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", appsv1alpha1.UnixSignalType),
-				createConfigMeta("test2", appsv1alpha1.ShellType),
-				createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+				createConfigMeta("test1", appsv1alpha1.UnixSignalType, &appsv1alpha1.ReloadOptions{
+					UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{},
+				}),
+				createConfigMeta("test2", appsv1alpha1.ShellType, &appsv1alpha1.ReloadOptions{
+					ShellTrigger: &appsv1alpha1.ShellTrigger{},
+				}),
+				createConfigMeta("test3", appsv1alpha1.TPLScriptType, &appsv1alpha1.ReloadOptions{
+					TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{},
+				}),
 			},
 			volumes: []corev1.VolumeMount{},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test1", appsv1alpha1.UnixSignalType),
-			createConfigMeta("test2", appsv1alpha1.ShellType),
-			createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+			createConfigMeta("test1", appsv1alpha1.UnixSignalType, &appsv1alpha1.ReloadOptions{
+				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{},
+			}),
+			createConfigMeta("test2", appsv1alpha1.ShellType, &appsv1alpha1.ReloadOptions{
+				ShellTrigger: &appsv1alpha1.ShellTrigger{},
+			}),
+			createConfigMeta("test3", appsv1alpha1.TPLScriptType, &appsv1alpha1.ReloadOptions{
+				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{},
+			}),
 		},
+	}, {
+		name: "test4",
+		args: args{
+			metas: []ConfigSpecMeta{
+				createConfigMeta("test1", appsv1alpha1.UnixSignalType, &appsv1alpha1.ReloadOptions{
+					UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{},
+				}),
+				createConfigMeta("test2", appsv1alpha1.ShellType, &appsv1alpha1.ReloadOptions{
+					ShellTrigger: &appsv1alpha1.ShellTrigger{
+						Sync: cfgutil.ToPointer(false),
+					},
+				}),
+				createConfigMeta("test3", appsv1alpha1.TPLScriptType, &appsv1alpha1.ReloadOptions{
+					TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
+						Sync: cfgutil.ToPointer(false),
+					},
+				}),
+			},
+			volumes: []corev1.VolumeMount{
+				{Name: "test1", SubPath: "test1"},
+				{Name: "test2", SubPath: "test2"},
+				{Name: "test3", SubPath: "test3"},
+			},
+		},
+		want: nil,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, FilterSubPathVolumeMount(tt.args.metas, tt.args.volumes), "FilterSubPathVolumeMount(%v, %v)", tt.args.metas, tt.args.volumes)
+			assert.Equalf(t, tt.want, FilterSupportReloadActionConfigSpecs(tt.args.metas, tt.args.volumes), "FilterSupportReloadActionConfigSpecs(%v, %v)", tt.args.metas, tt.args.volumes)
 		})
 	}
 }

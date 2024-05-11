@@ -122,7 +122,7 @@ func (mgr *Manager) InitComponentDefinitionActions() error {
 // - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
 // - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
-// - KB_NEW_MEMBER_POD_IP: The name of the new member's Pod.
+// - KB_NEW_MEMBER_POD_IP: The IP of the new member's Pod.
 func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	memberJoinCmd, ok := mgr.actionCommands[constant.MemberJoinAction]
 	if !ok || len(memberJoinCmd) == 0 {

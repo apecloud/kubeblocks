@@ -4020,7 +4020,6 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-<<<<<<< HEAD
                         classDefRef:
                           description: Records the class of the Component prior to
                             any changes. Deprecated since v0.9.
@@ -4037,12 +4036,10 @@ spec:
                           required:
                           - class
                           type: object
-=======
                         componentDefinitionName:
                           description: Records the name of the ComponentDefinition
                             prior to any changes.
                           type: string
->>>>>>> 3471ec2ec (chore: upgrade opsRequest is compatible with ComponentDefinition and ComponentVersion (#7285))
                         instances:
                           description: Records the InstanceTemplate list of the Component
                             prior to any changes.

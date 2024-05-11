@@ -148,35 +148,35 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
-		Namespace:          comp.Namespace,
-		ClusterName:        clusterName,
-		ClusterUID:         clusterUID,
-		Comp2CompDefs:      comp2CompDef,
-		Name:               compName,
-		FullCompName:       comp.Name,
-		CompDefName:        compDef.Name,
-		ServiceVersion:     comp.Spec.ServiceVersion,
-		ClusterGeneration:  clusterGeneration(cluster, comp),
-		PodSpec:            &compDef.Spec.Runtime,
-		HostNetwork:        compDefObj.Spec.HostNetwork,
-		LogConfigs:         compDefObj.Spec.LogConfigs,
-		ConfigTemplates:    compDefObj.Spec.Configs,
-		ScriptTemplates:    compDefObj.Spec.Scripts,
-		Roles:              compDefObj.Spec.Roles,
-		UpdateStrategy:     compDefObj.Spec.UpdateStrategy,
-		MinReadySeconds:    compDefObj.Spec.MinReadySeconds,
-		PolicyRules:        compDefObj.Spec.PolicyRules,
-		LifecycleActions:   compDefObj.Spec.LifecycleActions,
-		SystemAccounts:     compDefObj.Spec.SystemAccounts,
-		RoleArbitrator:     compDefObj.Spec.RoleArbitrator,
-		Replicas:           comp.Spec.Replicas,
-		Resources:          comp.Spec.Resources,
-		TLSConfig:          comp.Spec.TLSConfig,
-		ServiceAccountName: comp.Spec.ServiceAccountName,
-		Instances:          comp.Spec.Instances,
-		OfflineInstances:   comp.Spec.OfflineInstances,
-		Sidecars:           comp.Spec.Sidecars,
-		MonitorEnabled:     buildMonitorEnabled(comp),
+		Namespace:               comp.Namespace,
+		ClusterName:             clusterName,
+		ClusterUID:              clusterUID,
+		Comp2CompDefs:           comp2CompDef,
+		Name:                    compName,
+		FullCompName:            comp.Name,
+		CompDefName:             compDef.Name,
+		ServiceVersion:          comp.Spec.ServiceVersion,
+		ClusterGeneration:       clusterGeneration(cluster, comp),
+		PodSpec:                 &compDef.Spec.Runtime,
+		HostNetwork:             compDefObj.Spec.HostNetwork,
+		LogConfigs:              compDefObj.Spec.LogConfigs,
+		ConfigTemplates:         compDefObj.Spec.Configs,
+		ScriptTemplates:         compDefObj.Spec.Scripts,
+		Roles:                   compDefObj.Spec.Roles,
+		UpdateStrategy:          compDefObj.Spec.UpdateStrategy,
+		MinReadySeconds:         compDefObj.Spec.MinReadySeconds,
+		PolicyRules:             compDefObj.Spec.PolicyRules,
+		LifecycleActions:        compDefObj.Spec.LifecycleActions,
+		SystemAccounts:          compDefObj.Spec.SystemAccounts,
+		RoleArbitrator:          compDefObj.Spec.RoleArbitrator,
+		Replicas:                comp.Spec.Replicas,
+		Resources:               comp.Spec.Resources,
+		TLSConfig:               comp.Spec.TLSConfig,
+		ServiceAccountName:      comp.Spec.ServiceAccountName,
+		Instances:               comp.Spec.Instances,
+		OfflineInstances:        comp.Spec.OfflineInstances,
+		MetricsStoreIntegration: comp.Spec.MetricsStoreIntegration,
+		DisableExporter:         comp.Spec.DisableExporter,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -247,13 +247,6 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alp
 		return
 	}
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
-}
-
-func buildMonitorEnabled(comp *appsv1alpha1.Component) bool {
-	if comp.Spec.MonitorEnabled != nil {
-		return *comp.Spec.MonitorEnabled
-	}
-	return false
 }
 
 func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {

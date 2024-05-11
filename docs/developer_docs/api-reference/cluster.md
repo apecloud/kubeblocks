@@ -1070,19 +1070,21 @@ string
 </tr>
 <tr>
 <td>
-<code>sidecars</code><br/>
+<code>metricsStoreIntegration</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">
+MetricsStoreIntegration
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the Component&rsquo;s main container.</p>
+<p>It supports prometheus/victoriametrics operator.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>monitorEnabled</code><br/>
+<code>disableExporter</code><br/>
 <em>
 bool
 </em>
@@ -1090,7 +1092,7 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
-<p>If set to true, the following annotations will be patched into the Service:</p>
+<p>If set to true, the following annotations will not be patched into the Service:</p>
 <ul>
 <li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
 <li>&ldquo;monitor.kubeblocks.io/port&rdquo;</li>
@@ -1417,24 +1419,25 @@ These instance-specific overrides can be specified in <code>cluster.spec.compone
 </tr>
 <tr>
 <td>
-<code>sidecarContainerSpecs</code><br/>
+<code>monitor</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">
-[]SidecarContainerSpec
+<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
+MonitorConfig
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+<p>Deprecated since v0.9
+monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>builtinMonitorContainer</code><br/>
+<code>exporter</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">
-BuiltinMonitorContainerRef
+<a href="#apps.kubeblocks.io/v1alpha1.Exporter">
+Exporter
 </a>
 </em>
 </td>
@@ -2228,8 +2231,8 @@ This ensures that the tools are available to the &lsquo;config-manager&rsquo; si
 <td>
 <code>downwardAPIOptions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -4068,49 +4071,6 @@ RefNamespaceName
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">BuiltinMonitorContainerRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the built-in metrics exporter container.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>PrometheusScrapeConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">
-PrometheusScrapeConfig
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>PrometheusScrapeConfig</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CPUConstraint">CPUConstraint
 </h3>
 <p>
@@ -4720,30 +4680,31 @@ configmap and mounted to the current component.</p>
 </tr>
 <tr>
 <td>
-<code>sidecarContainerSpecs</code><br/>
+<code>exporter</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">
-[]SidecarContainerSpec
+<a href="#apps.kubeblocks.io/v1alpha1.Exporter">
+Exporter
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+<p>Defines the metrics exporter.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>builtinMonitorContainer</code><br/>
+<code>monitor</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">
-BuiltinMonitorContainerRef
+<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
+MonitorConfig
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the built-in metrics exporter container.</p>
+<p>Deprecated since v0.9
+monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 </tbody>
@@ -5280,19 +5241,21 @@ The administrator must manually manage the cleanup and removal of these resource
 </tr>
 <tr>
 <td>
-<code>sidecars</code><br/>
+<code>metricsStoreIntegration</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">
+MetricsStoreIntegration
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the Component&rsquo;s main container.</p>
+<p>It supports prometheus/victoriametrics operator.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>monitorEnabled</code><br/>
+<code>disableExporter</code><br/>
 <em>
 bool
 </em>
@@ -5300,6 +5263,26 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
+<p>If set to true, the following annotations will not be patched into the Service:</p>
+<ul>
+<li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
+<li>&ldquo;monitor.kubeblocks.io/port&rdquo;</li>
+<li>&ldquo;monitor.kubeblocks.io/scheme&rdquo;</li>
+</ul>
+<p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>monitor</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Deprecated since v0.9
+Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
 <p>If set to true, the following annotations will be patched into the Service:</p>
 <ul>
 <li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
@@ -7874,24 +7857,25 @@ These instance-specific overrides can be specified in <code>cluster.spec.compone
 </tr>
 <tr>
 <td>
-<code>sidecarContainerSpecs</code><br/>
+<code>monitor</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">
-[]SidecarContainerSpec
+<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
+MonitorConfig
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+<p>Deprecated since v0.9
+monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>builtinMonitorContainer</code><br/>
+<code>exporter</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">
-BuiltinMonitorContainerRef
+<a href="#apps.kubeblocks.io/v1alpha1.Exporter">
+Exporter
 </a>
 </em>
 </td>
@@ -9443,19 +9427,21 @@ string
 </tr>
 <tr>
 <td>
-<code>sidecars</code><br/>
+<code>metricsStoreIntegration</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">
+MetricsStoreIntegration
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the Component&rsquo;s main container.</p>
+<p>It supports prometheus/victoriametrics operator.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>monitorEnabled</code><br/>
+<code>disableExporter</code><br/>
 <em>
 bool
 </em>
@@ -9463,7 +9449,7 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
-<p>If set to true, the following annotations will be patched into the Service:</p>
+<p>If set to true, the following annotations will not be patched into the Service:</p>
 <ul>
 <li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
 <li>&ldquo;monitor.kubeblocks.io/port&rdquo;</li>
@@ -10326,8 +10312,8 @@ This ensures that the tools are available to the &lsquo;config-manager&rsquo; si
 <td>
 <code>downwardAPIOptions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -12096,6 +12082,118 @@ If the shell is required, it must be explicitly invoked in the command.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.Exporter">Exporter
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>containerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the built-in metrics exporter container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapePath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the http/https url path to scrape for metrics.
+If empty, Prometheus uses the default value (e.g. <code>/metrics</code>).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapePort</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the port name to scrape for metrics.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapeScheme</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PrometheusScheme">
+PrometheusScheme
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the schema to use for scraping.
+<code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
+If empty, Prometheus uses the default value <code>http</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ExporterConfig">ExporterConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>scrapePort</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<p>scrapePort is exporter port for Time Series Database to scrape metrics.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapePath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>scrapePath is exporter url path for Time Series Database to scrape metrics.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Expose">Expose
 </h3>
 <p>
@@ -13593,18 +13691,10 @@ Reference: <a href="https://cloud.google.com/compute/docs/general-purpose-machin
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorKind">MonitorKind
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource</a>)
-</p>
-<div>
-<p>MonitorKind defines the kind of monitor.</p>
-</div>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource
+<h3 id="apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">MetricsStoreIntegration
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSource">SidecarContainerSource</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
 </div>
@@ -13618,33 +13708,109 @@ Reference: <a href="https://cloud.google.com/compute/docs/general-purpose-machin
 <tbody>
 <tr>
 <td>
-<code>kind</code><br/>
+<code>serviceMonitorTemplate</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorKind">
-MonitorKind
-</a>
-</em>
-</td>
-<td>
-<p>Defines the kind of monitor, such as metrics or logs.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scrapeConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">
-PrometheusScrapeConfig
+<a href="#apps.kubeblocks.io/v1alpha1.ServiceMonitorTemplate">
+ServiceMonitorTemplate
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the scrape configuration for the prometheus.</p>
+<p>Specifies the ServiceMonitor template used in the Component.</p>
+<p>Example usage:</p>
+<pre><code class="language-yaml">name: prometheus-scrape
+namespace: default
+labels:
+  k8s-app: node-exporter
+serviceMonitorTemplate:
+  selector:
+    matchLabels:
+      app: app-exporter
+      k8s-app: app-exporter
+  endpoints:
+  - port: metrics_port
+  jobLabel: k8s-app
+</code></pre>
+</td>
+</tr>
+<tr>
+<td>
+<code>vmMonitorTemplate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VMMonitorTemplate">
+VMMonitorTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>VictoriaMetrics is currently not supported yet.
+Specifies the VMServiceScrape template used in the Component.</p>
+<pre><code class="language-yaml">name: vm-scrape
+namespace: default
+labels:
+  k8s-app: node-exporter
+vmServiceScrapeSpec:
+  selector:
+    matchLabels:
+      app: app-exporter
+</code></pre>
 </td>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>builtIn</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>builtIn is a switch to enable KubeBlocks builtIn monitoring.
+If BuiltIn is set to true, monitor metrics will be scraped automatically.
+If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>exporterConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ExporterConfig">
+ExporterConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>exporterConfig provided by provider, which specify necessary information to Time Series Database.
+exporterConfig is valid when builtIn is false.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MonitorKind">MonitorKind
+(<code>string</code> alias)</h3>
+<div>
+<p>MonitorKind defines the kind of monitor.</p>
+</div>
 <h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
 </h3>
 <p>
@@ -16360,71 +16526,26 @@ Kubernetes meta/v1.Time
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PrometheusProtocol">PrometheusProtocol
+<h3 id="apps.kubeblocks.io/v1alpha1.PrometheusScheme">PrometheusScheme
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">PrometheusScrapeConfig</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Exporter">Exporter</a>)
 </p>
 <div>
-<p>PrometheusProtocol defines the protocol of prometheus scrape metrics.</p>
-</div>
-<h3 id="apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">PrometheusScrapeConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">BuiltinMonitorContainerRef</a>, <a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource</a>)
-</p>
-<div>
+<p>PrometheusScheme defines the protocol of prometheus scrape metrics.</p>
 </div>
 <table>
 <thead>
 <tr>
-<th>Field</th>
+<th>Value</th>
 <th>Description</th>
 </tr>
 </thead>
-<tbody>
-<tr>
-<td>
-<code>metricsPath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the http/https url path to scrape for metrics.
-If empty, Prometheus uses the default value (e.g. <code>/metrics</code>).</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>metricsPort</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the port name to scrape for metrics.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>protocol</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PrometheusProtocol">
-PrometheusProtocol
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the schema to use for scraping.
-<code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
-If empty, Prometheus uses the default value <code>http</code>.</p>
-</td>
-</tr>
-</tbody>
+<tbody><tr><td><p>&#34;http&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;https&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ProtectedVolume">ProtectedVolume
 </h3>
@@ -18716,6 +18837,54 @@ int64
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ServiceMonitorTemplate">ServiceMonitorTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">MetricsStoreIntegration</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ObjectMeta</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ObjectMeta</code> are embedded into this type.)
+</p>
+<em>(Optional)</em>
+<p>Standard k8s object&rsquo;s metadata.</p>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceMonitorSpec</code><br/>
+<em>
+github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1.ServiceMonitorSpec
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceMonitorSpec contains specification parameters for a ServiceMonitor</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ServicePort">ServicePort
 </h3>
 <p>
@@ -19506,87 +19675,6 @@ This allows for custom actions to be performed after a new shard is provisioned.
 This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 Resources and data associated with the corresponding Component will also be deleted.</li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SidecarContainerSource">SidecarContainerSource
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">SidecarContainerSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">
-MonitorSource
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the function or purpose of the container, such as the monitor type sidecar.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">SidecarContainerSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>Container</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
-Kubernetes core/v1.Container
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>Container</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>SidecarContainerSource</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSource">
-SidecarContainerSource
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>SidecarContainerSource</code> are embedded into this type.)
-</p>
-<em>(Optional)</em>
-<p>Define the function or purpose of the container, such as the monitor type sidecar.
-In order to allow prometheus to scrape metrics from the sidecar container, the schema, port, and url will be injected into the annotation of the service.</p>
 </td>
 </tr>
 </tbody>
@@ -21081,6 +21169,54 @@ use the latest available version in ComponentVersion.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.VMMonitorTemplate">VMMonitorTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MetricsStoreIntegration">MetricsStoreIntegration</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ObjectMeta</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ObjectMeta</code> are embedded into this type.)
+</p>
+<em>(Optional)</em>
+<p>Standard k8s object&rsquo;s metadata.</p>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>vmServiceScrapeSpec</code><br/>
+<em>
+github.com/VictoriaMetrics/operator/api/victoriametrics/v1beta1.VMServiceScrapeSpec
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>VMServiceScrapeSpec defines the desired state of VMServiceScrape</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ValueFrom">ValueFrom
 </h3>
 <p>
@@ -21756,10 +21892,10 @@ via SQL statements before they can take effect on restart.</li>
 </tr>
 <tr>
 <td>
-<code>downwardAPITriggeredActions</code><br/>
+<code>downwardAPIChangeTriggeredActions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -21779,10 +21915,10 @@ to reflect the new role.</li>
 </tr>
 <tr>
 <td>
-<code>configSchema</code><br/>
+<code>parametersSchema</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.ConfigSchema">
-ConfigSchema
+<a href="#apps.kubeblocks.io/v1beta1.ParametersSchema">
+ParametersSchema
 </a>
 </em>
 </td>
@@ -21829,24 +21965,6 @@ Modifications to these parameters trigger a configuration reload without requiri
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
 Attempting to change any of these parameters will be ignored.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reloadedPodSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
-<p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
-The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
-<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
-reload.</p>
 </td>
 </tr>
 <tr>
@@ -22066,10 +22184,10 @@ via SQL statements before they can take effect on restart.</li>
 </tr>
 <tr>
 <td>
-<code>downwardAPITriggeredActions</code><br/>
+<code>downwardAPIChangeTriggeredActions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -22089,10 +22207,10 @@ to reflect the new role.</li>
 </tr>
 <tr>
 <td>
-<code>configSchema</code><br/>
+<code>parametersSchema</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.ConfigSchema">
-ConfigSchema
+<a href="#apps.kubeblocks.io/v1beta1.ParametersSchema">
+ParametersSchema
 </a>
 </em>
 </td>
@@ -22139,24 +22257,6 @@ Modifications to these parameters trigger a configuration reload without requiri
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
 Attempting to change any of these parameters will be ignored.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reloadedPodSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
-<p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
-The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
-<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
-reload.</p>
 </td>
 </tr>
 <tr>
@@ -22240,77 +22340,13 @@ int64
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1beta1.ConfigSchema">ConfigSchema
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-<p>ConfigSchema Defines a list of configuration items with their names, default values, descriptions,
-types, and constraints.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>topLevelKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the top-level key in the &lsquo;configSchema.cue&rsquo; that organizes the validation rules for parameters.
-This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>cue</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Hold a string that contains a script written in CUE language that defines a list of configuration items.
-Each item is detailed with its name, default value, description, type (e.g. string, integer, float),
-and constraints (permissible values or the valid range of values).</p>
-<p>CUE (Configure, Unify, Execute) is a declarative language designed for defining and validating
-complex data configurations.
-It is particularly useful in environments like K8s where complex configurations and validation rules are common.</p>
-<p>This script functions as a validator for user-provided configurations, ensuring compliance with
-the established specifications and constraints.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>schemaInJSON</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
-Kubernetes api extensions v1.JSONSchemaProps
-</a>
-</em>
-</td>
-<td>
-<p>Generated from the &lsquo;cue&rsquo; field and transformed into a JSON format.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">DownwardAPITriggeredAction
+<h3 id="apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">DownwardAPIChangeTriggeredAction
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
 </p>
 <div>
-<p>DownwardAPITriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
+<p>DownwardAPIChangeTriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
 For example, a command might be executed when the &lsquo;role&rsquo; label of the Pod is updated.</p>
 </div>
 <table>
@@ -22556,6 +22592,70 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1beta1.ParametersSchema">ParametersSchema
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+<p>ParametersSchema Defines a list of configuration items with their names, default values, descriptions,
+types, and constraints.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>topLevelKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the top-level key in the &lsquo;configSchema.cue&rsquo; that organizes the validation rules for parameters.
+This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>cue</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Hold a string that contains a script written in CUE language that defines a list of configuration items.
+Each item is detailed with its name, default value, description, type (e.g. string, integer, float),
+and constraints (permissible values or the valid range of values).</p>
+<p>CUE (Configure, Unify, Execute) is a declarative language designed for defining and validating
+complex data configurations.
+It is particularly useful in environments like K8s where complex configurations and validation rules are common.</p>
+<p>This script functions as a validator for user-provided configurations, ensuring compliance with
+the established specifications and constraints.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schemaInJSON</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
+Kubernetes api extensions v1.JSONSchemaProps
+</a>
+</em>
+</td>
+<td>
+<p>Generated from the &lsquo;cue&rsquo; field and transformed into a JSON format.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1beta1.ReloadAction">ReloadAction
 </h3>
 <p>
@@ -22629,12 +22729,30 @@ AutoTrigger
 <p>Automatically perform the reload when specified conditions are met.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>targetPodSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
+<p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
+The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
+<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
+reload.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1beta1.ScriptConfig">ScriptConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">DownwardAPITriggeredAction</a>, <a href="#apps.kubeblocks.io/v1beta1.ShellTrigger">ShellTrigger</a>, <a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">DownwardAPIChangeTriggeredAction</a>, <a href="#apps.kubeblocks.io/v1beta1.ShellTrigger">ShellTrigger</a>, <a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger</a>)
 </p>
 <div>
 </div>

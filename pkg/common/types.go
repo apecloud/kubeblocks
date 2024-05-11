@@ -19,6 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package common
 
+import (
+	"k8s.io/apimachinery/pkg/util/intstr"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+)
+
 // PodRoleNamePair defines a pod name and role name pair.
 type PodRoleNamePair struct {
 	PodName  string `json:"podName,omitempty"`
@@ -37,6 +43,12 @@ type PodRoleNamePair struct {
 type GlobalRoleSnapshot struct {
 	Version          string            `json:"term,omitempty"`
 	PodRoleNamePairs []PodRoleNamePair `json:"PodRoleNamePairs,omitempty"`
+}
+
+// Exporter defines the built-in metrics exporter.
+type Exporter struct {
+	appsv1alpha1.Exporter `json:",inline"`
+	TargetPort            *intstr.IntOrString `json:"targetPort,omitempty"`
 }
 
 // BuiltinHandler defines builtin role probe handler name.

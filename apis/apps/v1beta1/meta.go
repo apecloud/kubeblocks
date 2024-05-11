@@ -16,6 +16,8 @@ limitations under the License.
 
 package v1beta1
 
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
 	if in.MergeReloadAndRestart != nil {
 		return !*in.MergeReloadAndRestart
@@ -39,7 +41,7 @@ func (in *ConfigConstraintSpec) GetToolsSetup() *ToolsSetup {
 
 func (in *ConfigConstraintSpec) GetScriptConfigs() []ScriptConfig {
 	scriptConfigs := make([]ScriptConfig, 0)
-	for _, action := range in.DownwardAPITriggeredActions {
+	for _, action := range in.DownwardAPIChangeTriggeredActions {
 		if action.ScriptConfig != nil {
 			scriptConfigs = append(scriptConfigs, *action.ScriptConfig)
 		}
@@ -61,6 +63,13 @@ func (in *ConfigConstraintSpec) BatchReload() bool {
 	return in.ShellTrigger() &&
 		in.ReloadAction.ShellTrigger.BatchReload != nil &&
 		*in.ReloadAction.ShellTrigger.BatchReload
+}
+
+func (in *ConfigConstraintSpec) GetPodSelector() *metav1.LabelSelector {
+	if in.ReloadAction != nil {
+		return in.ReloadAction.TargetPodSelector
+	}
+	return nil
 }
 
 func (cs *ConfigConstraintStatus) ConfigConstraintTerminalPhases() bool {

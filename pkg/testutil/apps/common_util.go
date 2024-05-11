@@ -158,7 +158,19 @@ func List[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	return func(g gomega.Gomega) []T {
 		var objList L
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), opt...)).To(gomega.Succeed())
-		return reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+		value := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface()
+		switch v := value.(type) {
+		default:
+			return nil
+		case []T:
+			return v
+		case []*T:
+			var rets []T
+			for _, item := range v {
+				rets = append(rets, *item)
+			}
+			return rets
+		}
 	}
 }
 

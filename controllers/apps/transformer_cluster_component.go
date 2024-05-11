@@ -92,8 +92,12 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	}
 
 	// component objects to be updated
+	var delayedErr error
 	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
-		return err
+		if !ictrlutil.IsDelayedRequeueError(err) {
+			return err
+		}
+		delayedErr = err
 	}
 
 	// component objects to be created
@@ -101,7 +105,7 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 		return err
 	}
 
-	return nil
+	return delayedErr
 }
 
 func (t *clusterComponentTransformer) handleCompsCreate(transCtx *clusterTransformContext, dag *graph.DAG,

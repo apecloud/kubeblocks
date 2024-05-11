@@ -232,6 +232,13 @@ func createFileRegex(fileRegex string) (regexFilter, error) {
 func scanConfigFiles(dirs []string, filter regexFilter) ([]string, error) {
 	configs := make([]string, 0)
 	for _, dir := range dirs {
+		isDir, err := isDirectory(dir)
+		if err != nil {
+			return nil, err
+		}
+		if !isDir {
+			continue
+		}
 		files, err := os.ReadDir(dir)
 		if err != nil {
 			return nil, err
@@ -246,6 +253,14 @@ func scanConfigFiles(dirs []string, filter regexFilter) ([]string, error) {
 		}
 	}
 	return configs, nil
+}
+
+func isDirectory(path string) (bool, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	return fi.IsDir(), nil
 }
 
 func ScanConfigVolume(mountPoint string) ([]string, error) {

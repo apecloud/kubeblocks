@@ -398,7 +398,7 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 
 	var formatterConfig *appsv1beta1.FileFormatConfig
 	if backupPath != "" && configMeta != nil && configMeta.ReloadAction != nil {
-		if err := backupConfigFiles([]string{configMeta.MountPoint}, filter, backupPath); err != nil {
+		if err := checkAndBackup(*configMeta, []string{configMeta.MountPoint}, filter, backupPath); err != nil {
 			return nil, err
 		}
 		formatterConfig = &configMeta.FormatterConfig
@@ -422,6 +422,16 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		batchInputTemplate:     getBatchInputTemplate(configMeta),
 	}
 	return shellTrigger, nil
+}
+
+func checkAndBackup(configMeta ConfigSpecInfo, dirs []string, filter regexFilter, backupPath string) error {
+	if isSyncReloadAction(configMeta) {
+		return nil
+	}
+	if err := backupConfigFiles(dirs, filter, backupPath); err != nil {
+		return err
+	}
+	return nil
 }
 
 func fromConfigSpecInfo(meta *ConfigSpecInfo) string {

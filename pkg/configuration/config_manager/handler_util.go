@@ -193,9 +193,22 @@ func FilterSubPathVolumeMount(metas []ConfigSpecMeta, volumes []corev1.VolumeMou
 	var filtered []ConfigSpecMeta
 	for _, meta := range metas {
 		v := FindVolumeMount(volumes, meta.ConfigSpec.VolumeName)
-		if v == nil || v.SubPath == "" || meta.ReloadType == appsv1beta1.TPLScriptType {
+		if isSupportReloadAction(v, meta) {
 			filtered = append(filtered, meta)
 		}
 	}
 	return filtered
+}
+
+func isSupportReloadAction(v *corev1.VolumeMount, meta ConfigSpecMeta) bool {
+	if v == nil || v.SubPath == "" {
+		return true
+	}
+	return isSyncReloadAction(meta.ConfigSpecInfo)
+}
+
+func isSyncReloadAction(meta ConfigSpecInfo) bool {
+	// If synchronous reloadAction is supported, kubelet limitations can be ignored.
+	return meta.ReloadType == appsv1beta1.TPLScriptType && !core.IsWatchModuleForTplTrigger(meta.TPLScriptTrigger) ||
+		meta.ReloadType == appsv1beta1.ShellType && !core.IsWatchModuleForShellTrigger(meta.ShellTrigger)
 }

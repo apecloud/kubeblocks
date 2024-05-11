@@ -1391,7 +1391,7 @@ environment variables.</p>
 <ul>
 <li>ConfigMap: Select and extract a value from a specific key within a ConfigMap.</li>
 <li>Secret: Select and extract a value from a specific key within a Secret.</li>
-<li>Pod: Retrieves values (including ports) from a selected Pod.</li>
+<li>HostNetwork: Retrieves values (including ports) from host-network resources.</li>
 <li>Service: Retrieves values (including address, port, NodePort) from a selected Service.
 Intended to obtain the address of a ComponentService within the same Cluster.</li>
 <li>Credential: Retrieves account name and password from a SystemAccount variable.</li>
@@ -5780,7 +5780,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.</p>
@@ -7411,7 +7411,7 @@ environment variables.</p>
 <ul>
 <li>ConfigMap: Select and extract a value from a specific key within a ConfigMap.</li>
 <li>Secret: Select and extract a value from a specific key within a Secret.</li>
-<li>Pod: Retrieves values (including ports) from a selected Pod.</li>
+<li>HostNetwork: Retrieves values (including ports) from host-network resources.</li>
 <li>Service: Retrieves values (including address, port, NodePort) from a selected Service.
 Intended to obtain the address of a ComponentService within the same Cluster.</li>
 <li>Credential: Retrieves account name and password from a SystemAccount variable.</li>
@@ -10880,7 +10880,7 @@ ConsensusMember
 <h3 id="apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVars">HostNetworkVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVars">PodVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVars">HostNetworkVars</a>)
 </p>
 <div>
 <p>ContainerVars defines the vars that can be referenced from a Container.</p>
@@ -15452,86 +15452,6 @@ PodSelectionPolicy
 <p>Defines the policy for selecting the target pod when multiple pods match the podSelector.
 It can be either &lsquo;Any&rsquo; (select any one pod that matches the podSelector)
 or &lsquo;All&rsquo; (select all pods that match the podSelector).</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
-</p>
-<div>
-<p>PodVarSelector selects a var from a Pod.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ClusterObjectReference</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
-ClusterObjectReference
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ClusterObjectReference</code> are embedded into this type.)
-</p>
-<p>The pod to select from.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>PodVars</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PodVars">
-PodVars
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>PodVars</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PodVars">PodVars
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>)
-</p>
-<div>
-<p>PodVars defines the vars that can be referenced from a Pod.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>container</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">
-ContainerVars
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
 </td>
 </tr>
 </tbody>
@@ -20754,20 +20674,6 @@ Kubernetes core/v1.SecretKeySelector
 <td>
 <em>(Optional)</em>
 <p>Selects a key of a Secret.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>podVarRef</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">
-PodVarSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Selects a defined var of a Pod.</p>
 </td>
 </tr>
 <tr>

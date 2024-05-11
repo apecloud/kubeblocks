@@ -366,44 +366,6 @@ var _ = Describe("vars", func() {
 			})
 		})
 
-		It("pod vars", func() {
-			By("ok")
-			vars := []appsv1alpha1.EnvVar{
-				{
-					Name: "pod-container-port",
-					ValueFrom: &appsv1alpha1.VarSource{
-						PodVarRef: &appsv1alpha1.PodVarSelector{
-							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								Optional: required(),
-							},
-							PodVars: appsv1alpha1.PodVars{
-								Container: &appsv1alpha1.ContainerVars{
-									Name: "default",
-									Port: &appsv1alpha1.NamedVar{
-										Name:   "default",
-										Option: &appsv1alpha1.VarRequired,
-									},
-								},
-							},
-						},
-					},
-				},
-			}
-			synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, corev1.Container{
-				Name: "default",
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          "default",
-						ContainerPort: 3306,
-					},
-				},
-			})
-			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
-			Expect(err).Should(Succeed())
-			Expect(templateVars).Should(HaveKeyWithValue("pod-container-port", "3306"))
-			checkEnvVarWithValue(envVars, "pod-container-port", "3306")
-		})
-
 		It("host-network vars", func() {
 			vars := []appsv1alpha1.EnvVar{
 				{

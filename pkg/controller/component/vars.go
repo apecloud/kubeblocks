@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -406,8 +405,6 @@ func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesi
 		return resolveConfigMapKeyRef(ctx, cli, synthesizedComp, defineKey, *source.ConfigMapKeyRef)
 	case source.SecretKeyRef != nil:
 		return resolveSecretKeyRef(ctx, cli, synthesizedComp, defineKey, *source.SecretKeyRef)
-	case source.PodVarRef != nil:
-		return resolvePodVarRef(ctx, cli, synthesizedComp, defineKey, *source.PodVarRef)
 	case source.HostNetworkVarRef != nil:
 		return resolveHostNetworkVarRef(ctx, cli, synthesizedComp, defineKey, *source.HostNetworkVarRef)
 	case source.ServiceVarRef != nil:
@@ -497,39 +494,6 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 		return nil, nil, nil
 	}
 	return nil, nil, fmt.Errorf("the required var is not found in %s object %s", kind, objName)
-}
-
-func resolvePodVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	defineKey string, selector appsv1alpha1.PodVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
-	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.PodVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
-	switch {
-	case selector.Container != nil && selector.Container.Port != nil:
-		resolveFunc = resolveContainerPortRef
-	default:
-		return nil, nil, nil
-	}
-	return checkNBuildVars(resolveFunc(ctx, cli, synthesizedComp, defineKey, selector))
-}
-
-func resolveContainerPortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	defineKey string, selector appsv1alpha1.PodVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
-	resolveContainerPort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
-		podSpec := obj.(*corev1.PodSpec)
-		for _, c := range podSpec.Containers {
-			if c.Name == selector.Container.Name {
-				for _, p := range c.Ports {
-					if p.Name == selector.Container.Port.Name {
-						return &corev1.EnvVar{
-							Name:  defineKey,
-							Value: strconv.Itoa(int(p.ContainerPort)),
-						}, nil
-					}
-				}
-			}
-		}
-		return nil, nil
-	}
-	return resolvePodVarRefLow(ctx, cli, synthesizedComp, selector, selector.Container.Port.Option, resolveContainerPort)
 }
 
 func resolveHostNetworkVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -901,30 +865,6 @@ func resolveServiceRefPasswordRef(ctx context.Context, cli client.Reader, synthe
 		return nil, &corev1.EnvVar{Name: defineKey, Value: sd.Spec.Auth.Password.Value}
 	}
 	return resolveServiceRefVarRefLow(ctx, cli, synthesizedComp, selector, selector.Password, resolvePassword)
-}
-
-func resolvePodVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.PodVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar)) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
-	resolveObjs := func() (map[string]any, error) {
-		getter := func(compName string) (any, error) {
-			if compName == synthesizedComp.Name { // refer to self
-				return synthesizedComp.PodSpec, nil
-			} else {
-				key := types.NamespacedName{
-					Namespace: synthesizedComp.Namespace,
-					Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, compName),
-				}
-				its := &workloads.InstanceSet{}
-				err := cli.Get(ctx, key, its, inDataContext())
-				if err != nil {
-					return nil, err
-				}
-				return &its.Spec.Template.Spec, nil
-			}
-		}
-		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
-	}
-	return resolveClusterObjectVars("Pod", selector.ClusterObjectReference, option, resolveObjs, resolveVar)
 }
 
 func resolveHostNetworkVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

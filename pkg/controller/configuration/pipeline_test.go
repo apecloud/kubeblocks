@@ -169,7 +169,6 @@ max_connections = '1000'
 				Configuration().       // sync Configuration
 				CreateConfigTemplate().
 				UpdatePodVolumes().
-				BuildConfigManagerSidecar().
 				UpdateConfigRelatedObject().
 				UpdateConfigurationStatus().
 				Complete()

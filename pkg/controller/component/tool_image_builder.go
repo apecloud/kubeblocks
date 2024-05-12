@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package component
 
 import (
 	"path/filepath"
@@ -27,7 +27,6 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -79,11 +78,11 @@ func buildReloadToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 	if toolsPath != "" {
 		cfgManagerParams.ConfigManagerReloadPath = toolsPath
 	}
-	containers, err := factory.BuildCfgManagerToolsContainer(cfgManagerParams, toolContainers, toolsImageMap)
-	if err == nil {
-		cfgManagerParams.ToolsContainers = containers
-	}
-	return err
+	//containers, err := factory.BuildCfgManagerToolsContainer(cfgManagerParams, toolContainers, toolsImageMap)
+	//if err == nil {
+	//	cfgManagerParams.ToolsContainers = containers
+	//}
+	return nil
 }
 
 func checkAndInstallToolsImageVolume(toolContainers []appsv1beta1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta, useBuiltinSidecarImage bool) ([]appsv1beta1.ToolConfig, string) {

@@ -185,12 +185,6 @@ func (p *pipeline) UpdatePodVolumes() *pipeline {
 	})
 }
 
-func (p *pipeline) BuildConfigManagerSidecar() *pipeline {
-	return p.Wrap(func() error {
-		return buildConfigManagerWithComponent(p.ctx.PodSpec, p.ctx.SynthesizedComponent.ConfigTemplates, p.Context, p.Client, p.ctx.Cluster, p.ctx.SynthesizedComponent)
-	})
-}
-
 func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
 	updateMeta := func() error {
 		if err := injectTemplateEnvFrom(p.ctx.Cluster, p.ctx.SynthesizedComponent, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {

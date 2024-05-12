@@ -100,7 +100,7 @@ var _ = Describe("Lorry Utils", func() {
 					},
 				},
 			}
-			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
+			Expect(buildLorryContainers(reqCtx, component, nil, nil)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(1))
 			Expect(component.PodSpec.InitContainers).Should(HaveLen(0))
 			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.LorryContainerName))
@@ -125,7 +125,7 @@ var _ = Describe("Lorry Utils", func() {
 					BuiltinHandler: &defaultBuiltInHandler,
 				},
 			}
-			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
+			Expect(buildLorryContainers(reqCtx, component, nil, nil)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(1))
 			Expect(component.PodSpec.InitContainers).Should(HaveLen(0))
 			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.LorryContainerName))
@@ -148,7 +148,7 @@ var _ = Describe("Lorry Utils", func() {
 					},
 				},
 			}
-			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
+			Expect(buildLorryContainers(reqCtx, component, nil, nil)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(1))
 			Expect(component.PodSpec.InitContainers).Should(HaveLen(1))
 			Expect(component.PodSpec.Containers[0].Image).Should(Equal(image))
@@ -178,7 +178,7 @@ var _ = Describe("Lorry Utils", func() {
 					},
 				},
 			}
-			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
+			Expect(buildLorryContainers(reqCtx, component, nil, nil)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(2))
 			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.LorryContainerName))
 			Expect(component.PodSpec.Containers[1].Name).Should(Equal(constant.VolumeProtectionProbeContainerName))
@@ -208,7 +208,7 @@ var _ = Describe("Lorry Utils", func() {
 				},
 			}
 			viper.SetDefault(constant.EnableRBACManager, true)
-			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
+			Expect(buildLorryContainers(reqCtx, component, nil, nil)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(2))
 			spec := &appsv1alpha1.VolumeProtectionSpec{}
 			for _, e := range component.PodSpec.Containers[0].Env {

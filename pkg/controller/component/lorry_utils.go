@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -49,7 +50,7 @@ var (
 
 // buildLorryContainers builds lorry containers for component.
 // In the new ComponentDefinition API, StatusProbe and RunningProbe have been removed.
-func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) error {
+func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec, cli client.Reader) error {
 	// If it's not a built-in handler supported by Lorry, LorryContainers are not injected by default.
 	builtinHandler := getBuiltinActionHandler(synthesizeComp)
 	if builtinHandler == appsv1alpha1.UnknownBuiltinActionHandler {
@@ -98,13 +99,19 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	}
 
 	if len(lorryContainers) == 0 {
-		// need by other action handlers
+		// need other action handlers
 		lorryContainer := container.DeepCopy()
 		lorryContainers = append(lorryContainers, *lorryContainer)
 	}
 
 	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort), clusterCompSpec)
 	adaptLorryIfCustomHandlerDefined(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort))
+
+	// inject config manager into lorry if support reload
+	err = buildConfigManagerWithComponentIntoLorry(reqCtx.Ctx, &lorryContainers[0], synthesizeComp.PodSpec, synthesizeComp, cli)
+	if err != nil {
+		return err
+	}
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)

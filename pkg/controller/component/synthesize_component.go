@@ -227,7 +227,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 
 	// build lorryContainer
 	// TODO(xingran): buildLorryContainers relies on synthesizeComp.CharacterType and synthesizeComp.WorkloadType, which will be deprecated in the future.
-	if err := buildLorryContainers(reqCtx, synthesizeComp, clusterCompSpec); err != nil {
+	if err := buildLorryContainers(reqCtx, synthesizeComp, clusterCompSpec, cli); err != nil {
 		reqCtx.Log.Error(err, "build lorry containers failed.")
 		return nil, err
 	}

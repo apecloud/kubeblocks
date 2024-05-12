@@ -22,7 +22,6 @@ package component
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"slices"
 	"strings"
 
@@ -67,22 +66,19 @@ func buildConfigManagerWithComponentIntoLorry(ctx context.Context, lorryContaine
 		return nil
 	}
 
-	// This sidecar container will be able to view and signal processes from other containers
+	// config manager in lorry container will be able to view and signal processes from other containers
 	checkAndUpdateSharProcessNamespace(podSpec, buildParams, configSpecMetas)
-	container, err := factory.BuildCfgManagerContainer(buildParams, synthesizedComp)
-	if err != nil {
-		return err
-	}
-	updateEnvPath(lorryContainer, buildParams)
+
+	//
+	addEnvPathAndVolumeMount(lorryContainer, buildParams)
 	updateCfgManagerVolumes(podSpec, buildParams)
 
-	// Add sidecar to podTemplate
-	podSpec.Containers = append(podSpec.Containers, *container)
+	// Add toolsContainers to podTemplate
 	if len(buildParams.ToolsContainers) > 0 {
 		podSpec.InitContainers = append(podSpec.InitContainers, buildParams.ToolsContainers...)
 	}
 	filter := func(c *corev1.Container) bool {
-		names := []string{container.Name}
+		names := []string{lorryContainer.Name}
 		for _, cc := range buildParams.ToolsContainers {
 			names = append(names, cc.Name)
 		}
@@ -100,7 +96,62 @@ func checkAndUpdateSharProcessNamespace(podSpec *corev1.PodSpec, buildParams *cf
 	buildParams.ShareProcessNamespace = shared
 }
 
-func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildParams) {
+func addEnvPathAndVolumeMount(container *corev1.Container, params *cfgcm.CfgManagerBuildParams) {
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name: "CONFIG_MANAGER_POD_IP",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "status.podIP",
+			},
+		},
+	})
+	if len(params.CharacterType) > 0 {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "DB_TYPE",
+			Value: params.CharacterType,
+		})
+	}
+	// TODO: Remove hard coding when use lorry client
+	if params.CharacterType == "mysql" {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name: "MYSQL_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key:                  "username",
+					LocalObjectReference: corev1.LocalObjectReference{Name: params.SecreteName},
+				},
+			},
+		},
+			corev1.EnvVar{
+				Name: "MYSQL_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						Key:                  "password",
+						LocalObjectReference: corev1.LocalObjectReference{Name: params.SecreteName},
+					},
+				},
+			},
+			corev1.EnvVar{
+				Name:  "DATA_SOURCE_NAME",
+				Value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/",
+			},
+		)
+	}
+
+	if params.ShareProcessNamespace {
+		user := int64(0)
+		container.SecurityContext = &corev1.SecurityContext{
+			RunAsUser: &user,
+		}
+	}
+
+	for _, volumes := range params.Volumes {
+		if !slices.Contains(container.VolumeMounts, volumes) {
+			container.VolumeMounts = append(container.VolumeMounts, volumes)
+		}
+	}
+
 	if len(params.ScriptVolume) == 0 {
 		return
 	}

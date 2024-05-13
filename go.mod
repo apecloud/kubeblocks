@@ -1,8 +1,6 @@
 module github.com/apecloud/kubeblocks
 
-go 1.22.0
-
-toolchain go1.22.3
+go 1.21
 
 require (
 	cuelang.org/go v0.8.0
@@ -83,8 +81,8 @@ require (
 	k8s.io/cri-api v0.28.3
 	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01
 	k8s.io/klog v1.0.0
-	k8s.io/klog/v2 v2.120.1
-	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340
+	k8s.io/klog/v2 v2.110.1
+	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00
 	k8s.io/kubectl v0.28.2
 	k8s.io/kubelet v0.26.1
 	k8s.io/kubernetes v1.28.3
@@ -301,7 +299,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.0 // indirect
 	k8s.io/component-base v0.29.0 // indirect
-	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 // indirect
 	oras.land/oras-go v1.2.4 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3 // indirect

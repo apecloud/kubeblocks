@@ -217,7 +217,7 @@ type ComponentDefinitionSpec struct {
 	//
 	// - ConfigMap: Select and extract a value from a specific key within a ConfigMap.
 	// - Secret: Select and extract a value from a specific key within a Secret.
-	// - Pod: Retrieves values (including ports) from a selected Pod.
+	// - HostNetwork: Retrieves values (including ports) from host-network resources.
 	// - Service: Retrieves values (including address, port, NodePort) from a selected Service.
 	//   Intended to obtain the address of a ComponentService within the same Cluster.
 	// - Credential: Retrieves account name and password from a SystemAccount variable.

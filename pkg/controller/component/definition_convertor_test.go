@@ -380,11 +380,11 @@ var _ = Describe("Component Definition Convertor", func() {
 				expectedVar := appsv1alpha1.EnvVar{
 					Name: apiutil.HostNetworkDynamicPortVarName(container.Name, container.Ports[0].Name),
 					ValueFrom: &appsv1alpha1.VarSource{
-						PodVarRef: &appsv1alpha1.PodVarSelector{
+						HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
 								Optional: func() *bool { optional := false; return &optional }(),
 							},
-							PodVars: appsv1alpha1.PodVars{
+							HostNetworkVars: appsv1alpha1.HostNetworkVars{
 								Container: &appsv1alpha1.ContainerVars{
 									Name: container.Name,
 									Port: &appsv1alpha1.NamedVar{

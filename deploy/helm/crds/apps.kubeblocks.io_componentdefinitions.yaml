@@ -13371,17 +13371,17 @@ spec:
                   Pod if used as environment variables. \n Variable values can be
                   sourced from: \n - ConfigMap: Select and extract a value from a
                   specific key within a ConfigMap. - Secret: Select and extract a
-                  value from a specific key within a Secret. - Pod: Retrieves values
-                  (including ports) from a selected Pod. - Service: Retrieves values
-                  (including address, port, NodePort) from a selected Service. Intended
-                  to obtain the address of a ComponentService within the same Cluster.
-                  - Credential: Retrieves account name and password from a SystemAccount
-                  variable. - ServiceRef: Retrieves address, port, account name and
-                  password from a selected ServiceRefDeclaration. Designed to obtain
-                  the address bound to a ServiceRef, such as a ClusterService or ComponentService
-                  of another cluster or an external service. - Component: Retrieves
-                  values from a selected Component, including replicas and instance
-                  name list. \n This field is immutable."
+                  value from a specific key within a Secret. - HostNetwork: Retrieves
+                  values (including ports) from host-network resources. - Service:
+                  Retrieves values (including address, port, NodePort) from a selected
+                  Service. Intended to obtain the address of a ComponentService within
+                  the same Cluster. - Credential: Retrieves account name and password
+                  from a SystemAccount variable. - ServiceRef: Retrieves address,
+                  port, account name and password from a selected ServiceRefDeclaration.
+                  Designed to obtain the address bound to a ServiceRef, such as a
+                  ClusterService or ComponentService of another cluster or an external
+                  service. - Component: Retrieves values from a selected Component,
+                  including replicas and instance name list. \n This field is immutable."
                 items:
                   description: EnvVar represents a variable present in the env of
                     Pod/Action or the template of config/script.
@@ -13593,8 +13593,8 @@ spec:
                               - Optional
                               type: string
                           type: object
-                        podVarRef:
-                          description: Selects a defined var of a Pod.
+                        hostNetworkVarRef:
+                          description: Selects a defined var of host-network resources.
                           properties:
                             compDef:
                               description: CompDef specifies the definition used by

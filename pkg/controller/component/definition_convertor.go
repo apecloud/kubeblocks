@@ -145,11 +145,11 @@ func (c *compDefVarsConvertor) convertHostNetworkVars(clusterCompDef *appsv1alph
 			vars = append(vars, appsv1alpha1.EnvVar{
 				Name: apiutil.HostNetworkDynamicPortVarName(cc.Container, port),
 				ValueFrom: &appsv1alpha1.VarSource{
-					PodVarRef: &appsv1alpha1.PodVarSelector{
+					HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
 						ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
 							Optional: func() *bool { optional := false; return &optional }(),
 						},
-						PodVars: appsv1alpha1.PodVars{
+						HostNetworkVars: appsv1alpha1.HostNetworkVars{
 							Container: &appsv1alpha1.ContainerVars{
 								Name: cc.Container,
 								Port: &appsv1alpha1.NamedVar{

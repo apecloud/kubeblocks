@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type PodRoleEventHandler struct{}
@@ -63,10 +65,8 @@ const (
 var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
 
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != readinessProbeEventFieldPath &&
-		event.InvolvedObject.FieldPath != legacyEventFieldPath &&
-		event.InvolvedObject.FieldPath != lorryEventFieldPath &&
-		event.Reason != checkRoleEventReason {
+	filePaths := []string{readinessProbeEventFieldPath, util.LegacyEventFieldPath, util.LorryEventFieldPath}
+	if !slices.Contains(filePaths, event.InvolvedObject.FieldPath) || event.Reason != string(util.CheckRoleOperation) {
 		return nil
 	}
 	var (
@@ -93,7 +93,7 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 }
 
 // handleRoleChangedEvent handles role changed event and return role.
-func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (string, error) {
+func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, _ record.EventRecorder, event *corev1.Event) (string, error) {
 	// parse probe event message
 	message := parseProbeEventMessage(reqCtx, event)
 	if message == nil {

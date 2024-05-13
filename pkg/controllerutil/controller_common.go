@@ -517,6 +517,20 @@ func (pm *PortManager) delete(keys []string) error {
 	return nil
 }
 
+func (pm *PortManager) GetPort(key string) (int32, error) {
+	pm.Lock()
+	defer pm.Unlock()
+
+	if value, ok := pm.cm.Data[key]; ok {
+		port, err := pm.parsePort(value)
+		if err != nil {
+			return 0, err
+		}
+		return port, nil
+	}
+	return 0, nil
+}
+
 func (pm *PortManager) UsePort(key string, port int32) error {
 	pm.Lock()
 	defer pm.Unlock()

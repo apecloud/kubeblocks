@@ -250,7 +250,7 @@ var _ = Describe("plan builder test", func() {
 				pod := builder.NewPodBuilder(namespace, name).GetObject()
 				headlessSvc := builder.NewHeadlessServiceBuilder(namespace, name+"-headless").GetObject()
 				svc := builder.NewServiceBuilder(namespace, name).GetObject()
-				env := builder.NewConfigMapBuilder(namespace, name+"-its-env").GetObject()
+				env := builder.NewConfigMapBuilder(namespace, name+"-env").GetObject()
 
 				var verticesExpected []*model.ObjectVertex
 				verticesExpected = append(verticesExpected, newVertex(its.DeepCopy(), its, model.ActionStatusPtr()))

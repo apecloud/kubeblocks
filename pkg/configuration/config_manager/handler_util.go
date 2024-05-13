@@ -189,22 +189,21 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 	return reloadConfigSpecMeta, nil
 }
 
-func FilterSubPathVolumeMount(metas []ConfigSpecMeta, volumes []corev1.VolumeMount) []ConfigSpecMeta {
+func FilterSupportReloadActionConfigSpecs(metas []ConfigSpecMeta, volumes []corev1.VolumeMount) []ConfigSpecMeta {
 	var filtered []ConfigSpecMeta
 	for _, meta := range metas {
 		v := FindVolumeMount(volumes, meta.ConfigSpec.VolumeName)
-		if isSupportReloadAction(v, meta) {
+		if isSyncReloadAction(meta.ConfigSpecInfo) || !isSubPathMount(v) {
 			filtered = append(filtered, meta)
 		}
 	}
 	return filtered
 }
 
-func isSupportReloadAction(v *corev1.VolumeMount, meta ConfigSpecMeta) bool {
-	if v == nil || v.SubPath == "" {
-		return true
-	}
-	return isSyncReloadAction(meta.ConfigSpecInfo)
+func isSubPathMount(v *corev1.VolumeMount) bool {
+	// Configmap uses subPath case: https://github.com/kubernetes/kubernetes/issues/50345
+	// The files are being updated on the host VM, but can't be updated in the container.
+	return v != nil && v.SubPath != ""
 }
 
 func isSyncReloadAction(meta ConfigSpecInfo) bool {

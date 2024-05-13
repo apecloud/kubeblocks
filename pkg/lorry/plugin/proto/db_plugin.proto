@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 syntax = "proto3";
 package plugin.v1;
 
-import "google/protobuf/struct.proto";
-import "google/protobuf/timestamp.proto";
-
 option go_package = "github.com/apecloud/kubeblocks/pkg/lorry/plugin";
 
 

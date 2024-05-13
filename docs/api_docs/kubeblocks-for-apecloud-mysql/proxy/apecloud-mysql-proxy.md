@@ -6,43 +6,14 @@ sidebar_position: 2
 sidebar_label: ApeCloud MySQL Proxy Cluster
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # ApeCloud MySQL Proxy
 
 ## Before you start
 
-1. [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
-2. Install KubeBlocks.
-
-   You can run `kbcli playground init` to install a k3d cluster and KubeBlocks. For details, refer to [Try KubeBlocks on your laptop](./../../try-out-on-playground/try-kubeblocks-on-your-laptop.md) or [Try KubeBlocks on cloud](./../../try-out-on-playground/try-kubeblocks-on-cloud.md).
-
-   ```bash
-   kbcli playground init
-
-   # Use --version to specify a version
-   kbcli playground init --version='x.x.x'
-   ```
-
-   Or if you already have a Kubernetes cluster, you can choose install KubeBlocks by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm) or [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-3. Prepare an ApeCloud MySQL RaftGroup named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) for details.
+1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+2. Prepare an ApeCloud MySQL RaftGroup named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md) for details.
 
 ## Create a Proxy Cluster
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
-
-```bash
-kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none --proxy-enabled true
-```
-
-</TabItem>
-
-<TabItem value="Helm" label="Helm">
 
 1. Add the KubeBlocks repository.
 
@@ -90,49 +61,19 @@ helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mo
 
 :::
 
-</TabItem>
-
-</Tabs>
-
 ## Enable Proxy dynamically
 
 As its name suggests, ApeCloud MySQL Proxy in nature is a database proxy. An ApeCloud MySQL RaftGroup Cluster can be switched to an ApeCloud MySQL Proxy Cluster by setting `proxyEnabled=true`.
 
-<Tabs>
-<TabItem value="kbcli" label="kbcli" default>
-
-Coming soon...
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
 ```bash
 helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Connect Proxy Cluster
 
 ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the MySQL Server accesses `vtgate` is similar to the way of accessing `mysqld`. The external SQL access address provided by ApeCloud MySQL Proxy is the `vtgate` address and port. The `vtgate` address created by KubeBlocks by default is `myproxy-cluster-vtgate-headless`, and the port number is `15306`. You can visit ApeCloud MySQL Proxy through the MySQL Server in any pod under the same namespace as ApeCloud MySQL Proxy.
 
 ### Connect Proxy Cluster by VTGate
-
-<Tabs>
-<TabItem value="kbcli" label="kbcli" default>
-
-Run the command below to connect to the Proxy Cluster.
-
-```bash
-kbcli cluster connect myproxy --component vtgate
-```
-
-</TabItem>
-
-<TabItem value="port-forward" label="port-forward">
 
 1. Expose the port of VTGate to the localhost so that the localhost can access the Proxy.
 
@@ -146,24 +87,7 @@ kbcli cluster connect myproxy --component vtgate
    mysql -h 127.0.0.1 -P 15306
    ```
 
-</TabItem>
-</Tabs>
-
 ### Connect Proxy Cluster by MySQL Server
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-Run the command below to connect to the MySQL Server.
-
-```bash
-kbcli cluster connect myproxy
-```
-
-</TabItem>
-
-<TabItem value="port-forward" label="port-forward">
 
 1. Expose the port of the MySQL Server to the localhost so that the localhost can access the MySQL Server.
 
@@ -176,9 +100,6 @@ kbcli cluster connect myproxy
    ```bash
    mysql -h 127.0.0.1 -P 3306
    ```
-
-</TabItem>
-</Tabs>
 
 :::note
 

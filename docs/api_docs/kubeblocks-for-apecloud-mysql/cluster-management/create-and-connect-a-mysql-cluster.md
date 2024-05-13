@@ -14,7 +14,7 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 ### Before you start
 
-* [Install KubeBlocks by Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Install KubeBlocks by Helm](./../../installation/install-kubeblocks.md).
 * Make sure the ApeCloud MySQL addon is enabled.
 
   ```bash

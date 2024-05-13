@@ -26,10 +26,9 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mycluster
+  name: ops-stop
   namespace: demo
 spec:
-  # cluster ref
   clusterName: mycluster
   type: Stop
 EOF
@@ -63,7 +62,7 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 20Gi
 ```
 
 </TabItem>
@@ -86,7 +85,6 @@ metadata:
   name: ops-start
   namespace: demo
 spec:
-  # cluster ref
   clusterName: mycluster
   type: Start
 EOF 
@@ -120,7 +118,7 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 20Gi
 ```
 
 </TabItem>

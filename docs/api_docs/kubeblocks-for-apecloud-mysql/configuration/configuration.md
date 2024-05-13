@@ -18,7 +18,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
 
 ## Before you start
 
-1. [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 2. [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
 
 ## Configure cluster parameters by configuration file

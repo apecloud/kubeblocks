@@ -282,7 +282,12 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 			return false
 		}
 		oc := old.Spec.Containers[index]
-		if !equalField(oc.Resources.Requests, nc.Resources.Requests) {
+		realRequests := nc.Resources.Requests
+		// 'requests' defaults to Limits if that is explicitly specified, see: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#resources
+		if realRequests == nil {
+			realRequests = oc.Resources.Limits
+		}
+		if !equalField(oc.Resources.Requests, realRequests) {
 			return false
 		}
 		if !equalField(oc.Resources.Limits, nc.Resources.Limits) {

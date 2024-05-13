@@ -198,6 +198,19 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 	}
 
 	buildLorryEnvs(container, synthesizeComp, clusterCompSpec)
+
+	// set lorry container ports to host network
+	if synthesizeComp.HostNetwork != nil {
+		if synthesizeComp.HostNetwork.ContainerPorts == nil {
+			synthesizeComp.HostNetwork.ContainerPorts = make([]appsv1alpha1.HostNetworkContainerPort, 0)
+		}
+		synthesizeComp.HostNetwork.ContainerPorts = append(
+			synthesizeComp.HostNetwork.ContainerPorts,
+			appsv1alpha1.HostNetworkContainerPort{
+				Container: container.Name,
+				Ports:     []string{constant.LorryHTTPPortName, constant.LorryGRPCPortName},
+			})
+	}
 }
 
 func buildLorryInitContainer() *corev1.Container {
@@ -278,6 +291,10 @@ func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *
 	probe.TimeoutSeconds = roleProbe.TimeoutSeconds
 	probe.FailureThreshold = 3
 	roleChangedContainer.ReadinessProbe = probe
+	roleChangedContainer.Env = append(roleChangedContainer.Env, corev1.EnvVar{
+		Name:  constant.KBEnvRoleProbePeriod,
+		Value: strconv.Itoa(int(roleProbe.PeriodSeconds)),
+	})
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {

@@ -101,15 +101,6 @@ var _ = Describe("BackupRepo controller", func() {
 			_, err = clientGo.CoreV1().Namespaces().Finalize(testCtx.Ctx, namespaceObj, metav1.UpdateOptions{})
 			Expect(err).Should(Succeed())
 		}).Should(Succeed())
-
-		// By("deleting the Namespace to perform the tests")
-		// Eventually(func(g Gomega) {
-		// 	namespace := testCtx.GetNamespaceObj()
-		// 	err := testCtx.Cli.Delete(testCtx.Ctx, &namespace)
-		// 	g.Expect(client.IgnoreNotFound(err)).To(Not(HaveOccurred()))
-		// 	g.Expect(client.IgnoreNotFound(testCtx.Cli.Get(
-		// 		testCtx.Ctx, testCtx.GetNamespaceKey(), &namespace))).To(Not(HaveOccurred()))
-		// }).Should(Succeed())
 	}
 
 	ensureNamespace := func(name string) {

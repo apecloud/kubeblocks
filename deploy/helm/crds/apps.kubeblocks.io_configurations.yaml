@@ -256,7 +256,6 @@ spec:
                           type: string
                       required:
                       - name
-                      - templateRef
                       - volumeName
                       type: object
                     importTemplateRef:

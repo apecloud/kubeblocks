@@ -78,7 +78,7 @@ var _ = Describe("Config Builder Test", func() {
 				Name:      "pg_config",
 			}}
 	}
-	newReloadOptions := func(t appsv1beta1.DynamicReloadType, sync *bool) *appsv1beta1.DynamicReloadAction {
+	newReloadOptions := func(t appsv1beta1.DynamicReloadType, sync *bool) *appsv1beta1.ReloadAction {
 		signalHandle := &appsv1beta1.UnixSignalTrigger{
 			ProcessName: "postgres",
 			Signal:      appsv1beta1.SIGHUP,
@@ -101,16 +101,16 @@ var _ = Describe("Config Builder Test", func() {
 		default:
 			return nil
 		case appsv1beta1.UnixSignalType:
-			return &appsv1beta1.DynamicReloadAction{
+			return &appsv1beta1.ReloadAction{
 				UnixSignalTrigger: signalHandle}
 		case appsv1beta1.ShellType:
-			return &appsv1beta1.DynamicReloadAction{
+			return &appsv1beta1.ReloadAction{
 				ShellTrigger: shellHandle}
 		case appsv1beta1.TPLScriptType:
-			return &appsv1beta1.DynamicReloadAction{
+			return &appsv1beta1.ReloadAction{
 				TPLScriptTrigger: scriptHandle}
 		case appsv1beta1.AutoType:
-			return &appsv1beta1.DynamicReloadAction{
+			return &appsv1beta1.ReloadAction{
 				AutoTrigger: autoHandle}
 		}
 	}
@@ -181,8 +181,8 @@ formatterConfig:
 		mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 	}
 
-	newDownwardAPIVolumes := func() []appsv1beta1.DownwardAction {
-		return []appsv1beta1.DownwardAction{
+	newDownwardAPIVolumes := func() []appsv1beta1.DownwardAPIChangeTriggeredAction {
+		return []appsv1beta1.DownwardAPIChangeTriggeredAction{
 			{
 				Name:       "downward-api",
 				MountPoint: "/etc/podinfo",
@@ -206,7 +206,7 @@ formatterConfig:
 			reloadOptions := newReloadOptions(appsv1beta1.UnixSignalType, nil)
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.DynamicReloadAction = reloadOptions
+				buildParam.ReloadAction = reloadOptions
 				buildParam.ReloadType = appsv1beta1.UnixSignalType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), ctx, param, newVolumeMounts2())).Should(Succeed())
@@ -230,7 +230,7 @@ formatterConfig:
 			reloadOptions := newReloadOptions(appsv1beta1.ShellType, nil)
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.DynamicReloadAction = reloadOptions
+				buildParam.ReloadAction = reloadOptions
 				buildParam.ReloadType = appsv1beta1.ShellType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
@@ -245,7 +245,7 @@ formatterConfig:
 			reloadOptions := newReloadOptions(appsv1beta1.TPLScriptType, syncFn(true))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.DynamicReloadAction = reloadOptions
+				buildParam.ReloadAction = reloadOptions
 				buildParam.ReloadType = appsv1beta1.TPLScriptType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
@@ -260,7 +260,7 @@ formatterConfig:
 			reloadOptions := newReloadOptions(appsv1beta1.TPLScriptType, syncFn(false))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.DynamicReloadAction = reloadOptions
+				buildParam.ReloadAction = reloadOptions
 				buildParam.ReloadType = appsv1beta1.TPLScriptType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
@@ -275,7 +275,7 @@ formatterConfig:
 			reloadOptions := newReloadOptions(appsv1beta1.TPLScriptType, syncFn(false))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.DynamicReloadAction = reloadOptions
+				buildParam.ReloadAction = reloadOptions
 				buildParam.ReloadType = appsv1beta1.TPLScriptType
 				buildParam.ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
 					ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
@@ -295,7 +295,7 @@ formatterConfig:
 			param := newCMBuildParams(false)
 			buildParam := &param.ConfigSpecsBuildParams[0]
 			buildParam.DownwardAPIOptions = newDownwardAPIVolumes()
-			buildParam.DynamicReloadAction = newReloadOptions(appsv1beta1.TPLScriptType, syncFn(true))
+			buildParam.ReloadAction = newReloadOptions(appsv1beta1.TPLScriptType, syncFn(true))
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			Expect(FindVolumeMount(param.DownwardAPIVolumes, buildParam.DownwardAPIOptions[0].Name)).ShouldNot(BeNil())
 		})
@@ -326,7 +326,7 @@ func TestCheckAndUpdateReloadYaml(t *testing.T) {
 	type args struct {
 		data            map[string]string
 		reloadConfig    string
-		formatterConfig *appsv1beta1.FormatterConfig
+		formatterConfig *appsv1beta1.FileFormatConfig
 	}
 	tests := []struct {
 		name    string
@@ -341,7 +341,7 @@ fileRegex: my.cnf
 scripts: reload.tpl
 `},
 			reloadConfig: "reload.yaml",
-			formatterConfig: &appsv1beta1.FormatterConfig{
+			formatterConfig: &appsv1beta1.FileFormatConfig{
 				Format: appsv1beta1.Ini,
 			},
 		},
@@ -358,7 +358,7 @@ formatterConfig:
 		args: args{
 			data:            map[string]string{},
 			reloadConfig:    "reload.yaml",
-			formatterConfig: &appsv1beta1.FormatterConfig{Format: appsv1beta1.Ini},
+			formatterConfig: &appsv1beta1.FileFormatConfig{Format: appsv1beta1.Ini},
 		},
 		wantErr: true,
 		want:    map[string]string{},

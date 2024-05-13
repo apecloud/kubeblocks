@@ -597,8 +597,12 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 
 func (mgr *Manager) IsPromoted(ctx context.Context) bool {
 	isLeader, err := mgr.IsLeader(ctx, nil)
-	if err != nil || !isLeader {
+	if err != nil {
 		mgr.Logger.Info("Is leader check failed", "error", err.Error())
+		return false
+	}
+
+	if !isLeader {
 		return false
 	}
 

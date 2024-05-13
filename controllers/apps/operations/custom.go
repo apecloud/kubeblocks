@@ -219,7 +219,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 	opsRes *OpsResource) error {
 	customSpec := opsRes.OpsRequest.Spec.CustomOps
 	if customSpec == nil {
-		return intctrlutil.NewFatalError("spec.customSpec can not be empty if opsType is Custom.")
+		return intctrlutil.NewFatalError("spec.custom can not be empty if opsType is Custom.")
 	}
 	opsDef := &appsv1alpha1.OpsDefinition{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: customSpec.OpsDefinitionName}, opsDef); err != nil {
@@ -242,11 +242,12 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 
 		// 2. validate component and componentDef
 		if len(opsRes.OpsDef.Spec.ComponentInfos) > 0 {
-			comp := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
-			if comp == nil {
-				return intctrlutil.NewNotFound(`can not found component "%s" in cluster "%s"`, v.ComponentName, opsRes.Cluster.Name)
+			compObj, err := component.GetComponentByName(reqCtx, cli, constant.GenerateClusterComponentName(opsRes.Cluster.Name, v.ComponentName), opsRes.Cluster.Namespace)
+			if err != nil {
+				return err
 			}
-			compDef, err := component.GetCompDefinition(reqCtx, cli, opsRes.Cluster, v.ComponentName)
+			// get component definition
+			compDef, err := component.GetCompDefByName(reqCtx, cli, compObj.Spec.CompDef)
 			if err != nil {
 				return err
 			}

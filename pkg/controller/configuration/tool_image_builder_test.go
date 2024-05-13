@@ -72,9 +72,9 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 					ConfigSpecInfo: cfgcm.ConfigSpecInfo{
 						ConfigSpec:      clusterComponent.ConfigTemplates[0],
 						ReloadType:      appsv1beta1.TPLScriptType,
-						FormatterConfig: appsv1beta1.FormatterConfig{},
+						FormatterConfig: appsv1beta1.FileFormatConfig{},
 					},
-					ToolsImageSpec: &appsv1beta1.ReloadToolsImage{
+					ToolsImageSpec: &appsv1beta1.ToolsSetup{
 						MountPoint: "/opt/tools",
 						ToolConfigs: []appsv1beta1.ToolConfig{
 							{

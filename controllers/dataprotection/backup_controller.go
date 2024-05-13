@@ -152,7 +152,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *BackupReconciler) filterBackupPods(ctx context.Context, obj client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 	labels := obj.GetLabels()
-	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != dptypes.AppName {
 		return requests
 	}
 	backupName, ok := labels[dptypes.BackupNameLabelKey]

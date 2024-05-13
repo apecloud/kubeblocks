@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -85,12 +86,12 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetSchedulingPolicy(schedulingPolicy).
-		SetSidecarContainers(compSpec.Sidecars).
-		SetMonitor(compSpec.MonitorEnabled).
+		DisableExporter(compSpec.GetDisableExporter()).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
+		SetConfigs(compSpec.Configs).
 		SetEnabledLogs(compSpec.EnabledLogs).
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
@@ -216,25 +217,17 @@ func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, erro
 	return val, nil
 }
 
-// GetComponentDefName gets the name of referenced component definition.
-func GetComponentDefName(cluster *appsv1alpha1.Cluster, componentName string) string {
-	for _, component := range cluster.Spec.ComponentSpecs {
-		if componentName == component.Name {
-			return component.ComponentDef
-		}
+// GetComponentByName gets the component by component full name.
+func GetComponentByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compFullName, namespace string) (*appsv1alpha1.Component, error) {
+	comp := &appsv1alpha1.Component{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compFullName, Namespace: namespace}, comp); err != nil {
+		return nil, err
 	}
-	return ""
+	return comp, nil
 }
 
-// GetCompDefinition gets the component definition by component name.
-func GetCompDefinition(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	compName string) (*appsv1alpha1.ComponentDefinition, error) {
-	compDefName := GetComponentDefName(cluster, compName)
-	if len(compDefName) == 0 {
-		return nil, intctrlutil.NewNotFound(`can not found component definition by the component name "%s"`, compName)
-	}
+// GetCompDefByName gets the component definition by component definition name.
+func GetCompDefByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compDefName string) (*appsv1alpha1.ComponentDefinition, error) {
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
 		return nil, err
@@ -296,4 +289,22 @@ func GetHostNetworkRelatedComponents(podSpec *corev1.PodSpec, ctx context.Contex
 		return nil, nil
 	}
 	return CheckAndGetClusterComponents(ctx, cli, cluster)
+}
+
+func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *common.Exporter {
+	if componentDef.Exporter != nil {
+		return &common.Exporter{Exporter: *componentDef.Exporter}
+	}
+
+	// Compatible with previous versions of kb
+	if componentDef.Monitor == nil || componentDef.Monitor.Exporter == nil {
+		return nil
+	}
+
+	return &common.Exporter{
+		TargetPort: &componentDef.Monitor.Exporter.ScrapePort,
+		Exporter: appsv1alpha1.Exporter{
+			ScrapePath: componentDef.Monitor.Exporter.ScrapePath,
+		},
+	}
 }

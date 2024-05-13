@@ -95,10 +95,8 @@ type ComponentSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
-	// Reserved field for future use.
-	//
 	// +optional
-	Configs []ComponentConfigSpec `json:"configs,omitempty"`
+	Configs []ClusterComponentConfig `json:"configs,omitempty"`
 
 	// Specifies which types of logs should be collected for the Cluster.
 	// The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.
@@ -218,17 +216,9 @@ type ComponentSpec struct {
 	// +optional
 	RuntimeClassName *string `json:"runtimeClassName,omitempty"`
 
-	// Defines the sidecar containers that will be attached to the Component's main container.
-	//
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=32
-	// +listType=set
-	// +optional
-	Sidecars []string `json:"sidecars,omitempty"`
-
 	// Determines whether metrics exporter information is annotated on the Component's headless Service.
 	//
-	// If set to true, the following annotations will be patched into the Service:
+	// If set to true, the following annotations will not be patched into the Service:
 	//
 	// - "monitor.kubeblocks.io/path"
 	// - "monitor.kubeblocks.io/port"
@@ -237,7 +227,7 @@ type ComponentSpec struct {
 	// These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.
 	//
 	// +optional
-	MonitorEnabled *bool `json:"monitorEnabled,omitempty"`
+	DisableExporter *bool `json:"disableExporter,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

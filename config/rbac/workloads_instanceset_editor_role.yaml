@@ -1,4 +1,4 @@
-# permissions for end users to edit replicatedstatemachines.
+# permissions for end users to edit instancesets.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

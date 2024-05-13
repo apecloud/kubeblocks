@@ -125,7 +125,7 @@ func main() {
 
 	mergePolicy, err := configuration.NewTemplateMerger(configRenderMeta.LegacyRenderedConfigSpec.ConfigTemplateExtension,
 		context.TODO(), nil, nil, *configRenderMeta.ComponentConfigSpec, &appsv1beta1.ConfigConstraintSpec{
-			FormatterConfig: &configRenderMeta.FormatterConfig,
+			FileFormatConfig: &configRenderMeta.FormatterConfig,
 		})
 	if err != nil {
 		failed(err, "failed to create template merger")

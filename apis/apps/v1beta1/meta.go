@@ -16,28 +16,60 @@ limitations under the License.
 
 package v1beta1
 
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
-	if in.DynamicActionCanBeMerged != nil {
-		return !*in.DynamicActionCanBeMerged
+	if in.MergeReloadAndRestart != nil {
+		return !*in.MergeReloadAndRestart
 	}
 	return false
 }
 
-func (in *ConfigConstraintSpec) DynamicParametersPolicy() DynamicParameterSelectedPolicy {
-	if in.DynamicParameterSelectedPolicy != nil {
-		return *in.DynamicParameterSelectedPolicy
+func (in *ConfigConstraintSpec) ReloadStaticParameters() bool {
+	if in.ReloadStaticParamsBeforeRestart != nil {
+		return *in.ReloadStaticParamsBeforeRestart
 	}
-	return SelectedDynamicParameters
+	return false
+}
+
+func (in *ConfigConstraintSpec) GetToolsSetup() *ToolsSetup {
+	if in.ReloadAction != nil && in.ReloadAction.ShellTrigger != nil {
+		return in.ReloadAction.ShellTrigger.ToolsSetup
+	}
+	return nil
+}
+
+func (in *ConfigConstraintSpec) GetScriptConfigs() []ScriptConfig {
+	scriptConfigs := make([]ScriptConfig, 0)
+	for _, action := range in.DownwardAPIChangeTriggeredActions {
+		if action.ScriptConfig != nil {
+			scriptConfigs = append(scriptConfigs, *action.ScriptConfig)
+		}
+	}
+	if in.ReloadAction == nil {
+		return scriptConfigs
+	}
+	if in.ReloadAction.ShellTrigger != nil && in.ReloadAction.ShellTrigger.ScriptConfig != nil {
+		scriptConfigs = append(scriptConfigs, *in.ReloadAction.ShellTrigger.ScriptConfig)
+	}
+	return scriptConfigs
 }
 
 func (in *ConfigConstraintSpec) ShellTrigger() bool {
-	return in.DynamicReloadAction != nil && in.DynamicReloadAction.ShellTrigger != nil
+	return in.ReloadAction != nil && in.ReloadAction.ShellTrigger != nil
 }
 
 func (in *ConfigConstraintSpec) BatchReload() bool {
 	return in.ShellTrigger() &&
-		in.DynamicReloadAction.ShellTrigger.BatchReload != nil &&
-		*in.DynamicReloadAction.ShellTrigger.BatchReload
+		in.ReloadAction.ShellTrigger.BatchReload != nil &&
+		*in.ReloadAction.ShellTrigger.BatchReload
+}
+
+func (in *ConfigConstraintSpec) GetPodSelector() *metav1.LabelSelector {
+	if in.ReloadAction != nil {
+		return in.ReloadAction.TargetPodSelector
+	}
+	return nil
 }
 
 func (cs *ConfigConstraintStatus) ConfigConstraintTerminalPhases() bool {

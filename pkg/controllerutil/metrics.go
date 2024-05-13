@@ -20,63 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
-	corev1 "k8s.io/api/core/v1"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const FeatureGateEnableRuntimeMetrics = "ENABLED_RUNTIME_METRICS"
 
-const (
-	PrometheusScrapeAnnotationPath    = "monitor.kubeblocks.io/path"
-	PrometheusScrapeAnnotationPort    = "monitor.kubeblocks.io/port"
-	PrometheusScrapeAnnotationScheme  = "monitor.kubeblocks.io/scheme"
-	PrometheusScrapeAnnotationEnabled = "monitor.kubeblocks.io/scrape"
-)
-
-const (
-	defaultScrapePath   = "/metrics"
-	defaultScrapeScheme = string(appsv1alpha1.HTTPProtocol)
-)
-
 func EnabledRuntimeMetrics() bool {
 	return viper.GetBool(FeatureGateEnableRuntimeMetrics)
-}
-
-func GetScrapeAnnotations(scrapeConfig appsv1alpha1.PrometheusScrapeConfig, container *corev1.Container) map[string]string {
-	return map[string]string{
-		PrometheusScrapeAnnotationPath:   fromScrapePath(scrapeConfig),
-		PrometheusScrapeAnnotationPort:   fromContainerPort(scrapeConfig, container),
-		PrometheusScrapeAnnotationScheme: fromScheme(scrapeConfig),
-		// Compatible with previous versions of kubeblocks.
-		PrometheusScrapeAnnotationEnabled: "true",
-	}
-}
-
-func fromScrapePath(config appsv1alpha1.PrometheusScrapeConfig) string {
-	if config.MetricsPath != "" {
-		return config.MetricsPath
-	}
-	return defaultScrapePath
-}
-
-func fromContainerPort(config appsv1alpha1.PrometheusScrapeConfig, container *corev1.Container) string {
-	if config.MetricsPort != "" {
-		return config.MetricsPort
-	}
-
-	if config.MetricsPort == "" && len(container.Ports) > 0 {
-		return container.Ports[0].Name
-	}
-
-	// TODO: webhook should have already validated.
-	return ""
-}
-
-func fromScheme(config appsv1alpha1.PrometheusScrapeConfig) string {
-	if config.Protocol != "" {
-		return string(config.Protocol)
-	}
-	return defaultScrapeScheme
 }

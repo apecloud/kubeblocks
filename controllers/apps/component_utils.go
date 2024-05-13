@@ -24,7 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -113,13 +112,4 @@ func getImageName(image string) string {
 	default:
 		return ""
 	}
-}
-
-func hasSidecar(compDef *appsv1alpha1.ComponentDefinition, sidecar string) bool {
-	for _, spec := range compDef.Spec.SidecarContainerSpecs {
-		if spec.Name == sidecar {
-			return true
-		}
-	}
-	return false
 }

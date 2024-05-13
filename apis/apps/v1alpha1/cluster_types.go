@@ -208,7 +208,7 @@ type ClusterSpec struct {
 	// This field is maintained for backward compatibility and its use is discouraged.
 	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
 	//
-	//+kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
@@ -728,6 +728,9 @@ type ClusterComponentSpec struct {
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
+	// +optional
+	Configs []ClusterComponentConfig `json:"configs,omitempty"`
+
 	// Defines the strategy for switchover and failover when workloadType is Replication.
 	//
 	// Deprecated since v0.9.
@@ -838,14 +841,20 @@ type ClusterComponentSpec struct {
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
-	// Defines the sidecar containers that will be attached to the Component's main container.
+	// Determines whether metrics exporter information is annotated on the Component's headless Service.
 	//
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=32
-	// +listType=set
+	// If set to true, the following annotations will not be patched into the Service:
+	//
+	// - "monitor.kubeblocks.io/path"
+	// - "monitor.kubeblocks.io/port"
+	// - "monitor.kubeblocks.io/scheme"
+	//
+	// These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.
+	//
 	// +optional
-	Sidecars []string `json:"sidecars,omitempty"`
+	DisableExporter *bool `json:"disableExporter,omitempty"`
 
+	// Deprecated since v0.9
 	// Determines whether metrics exporter information is annotated on the Component's headless Service.
 	//
 	// If set to true, the following annotations will be patched into the Service:
@@ -857,7 +866,8 @@ type ClusterComponentSpec struct {
 	// These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.
 	//
 	// +optional
-	MonitorEnabled *bool `json:"monitorEnabled,omitempty"`
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
+	Monitor *bool `json:"monitor,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -1204,6 +1214,31 @@ type ClusterComponentService struct {
 	//
 	// +optional
 	PodService *bool `json:"podService,omitempty"`
+}
+
+// ClusterComponentConfig represents a config with its source bound.
+type ClusterComponentConfig struct {
+	// The name of the config.
+	//
+	// +optional
+	Name *string `json:"name,omitempty"`
+
+	// The source of the config.
+	ClusterComponentConfigSource `json:",inline"`
+}
+
+// ClusterComponentConfigSource represents the source of a config.
+type ClusterComponentConfigSource struct {
+	// ConfigMap source for the config.
+	//
+	// +optional
+	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty"`
+
+	// TODO: support more diverse sources:
+	// - Config template of other components within the same cluster
+	// - Config template of components from other clusters
+	// - Secret
+	// - Local file
 }
 
 // ClusterNetwork is deprecated since v0.9.
@@ -1584,6 +1619,23 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 		ts = append(ts, t.toVolumeClaimTemplate())
 	}
 	return ts
+}
+
+func (r *ClusterComponentSpec) GetDisableExporter() *bool {
+	if r.DisableExporter != nil {
+		return r.DisableExporter
+	}
+
+	toPointer := func(b bool) *bool {
+		p := b
+		return &p
+	}
+
+	// Compatible with previous versions of kb
+	if r.Monitor != nil {
+		return toPointer(!*r.Monitor)
+	}
+	return nil
 }
 
 func (t *InstanceTemplate) GetName() string {

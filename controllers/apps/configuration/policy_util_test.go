@@ -120,10 +120,10 @@ func withConfigSpec(configSpecName string, data map[string]string) ParamsOps {
 	}
 }
 
-func withConfigConstraintSpec(formatter *appsv1beta1.FormatterConfig) ParamsOps {
+func withConfigConstraintSpec(formatter *appsv1beta1.FileFormatConfig) ParamsOps {
 	return func(params *reconfigureParams) {
 		params.ConfigConstraint = &appsv1beta1.ConfigConstraintSpec{
-			FormatterConfig: formatter,
+			FileFormatConfig: formatter,
 		}
 	}
 }
@@ -149,7 +149,7 @@ func withConfigPatch(patch map[string]string) ParamsOps {
 			Key:           "for_test",
 			UpdatedParams: transKeyPair(patch),
 		}})
-		configPatch, _, _ := core.CreateConfigPatch(mockEmptyData(newConfigData), newConfigData, cc.FormatterConfig.Format, nil, false)
+		configPatch, _, _ := core.CreateConfigPatch(mockEmptyData(newConfigData), newConfigData, cc.FileFormatConfig.Format, nil, false)
 		params.ConfigPatch = configPatch
 	}
 }

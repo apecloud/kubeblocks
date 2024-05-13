@@ -297,7 +297,8 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
       <TabItem value="PVC" label="PVC">
 
       ```bash
-      kbcli backuprepo create --provider pvc \
+      kbcli backuprepo create my-repo \
+        --provider pvc \
         --storage-class-name "nfs-storage" \
         --access-mode "ReadWriteMany" \
         --volume-capacity "100Gi" \

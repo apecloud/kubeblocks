@@ -88,16 +88,17 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		ctx         = params.Ctx.Ctx
 		configKey   = params.getConfigKey()
 		versionHash = params.getTargetVersionHash()
+		selector    = params.ConfigConstraint.GetPodSelector()
 	)
 
-	if params.ConfigConstraint.DynamicReloadSelector != nil {
-		pods, err = matchLabel(pods, params.ConfigConstraint.DynamicReloadSelector)
+	if selector != nil {
+		pods, err = matchLabel(pods, selector)
 	}
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 	if len(pods) == 0 {
-		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %s", params.ConfigConstraint.DynamicReloadSelector.String()))
+		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %v", selector))
 		return makeReturnedStatus(ESRetry), nil
 	}
 
@@ -131,12 +132,12 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1beta1.ConfigConstraintSpec) map[string]string {
 	r := make(map[string]string)
 	dynamicAction := cc.NeedDynamicReloadAction()
-	selectedPolicy := cc.DynamicParametersPolicy()
-	parameters := core.GenerateVisualizedParamsList(configPatch, cc.FormatterConfig, nil)
+	needReloadStaticParameters := cc.ReloadStaticParameters()
+	parameters := core.GenerateVisualizedParamsList(configPatch, cc.FileFormatConfig, nil)
 	for _, key := range parameters {
 		if key.UpdateType == core.UpdatedType {
 			for _, p := range key.Parameters {
-				if dynamicAction && selectedPolicy == appsv1beta1.SelectedDynamicParameters && !core.IsDynamicParameter(p.Key, cc) {
+				if dynamicAction && !needReloadStaticParameters && !core.IsDynamicParameter(p.Key, cc) {
 					continue
 				}
 				if p.Value != nil {

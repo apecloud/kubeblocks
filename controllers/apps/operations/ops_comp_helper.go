@@ -206,7 +206,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 			continue
 		}
 		// handle the progress of the components of the sharding.
-		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, &shardingSpec)
+		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, shardingSpec.Name)
 		if err != nil {
 			return opsRequestPhase, 0, err
 		}

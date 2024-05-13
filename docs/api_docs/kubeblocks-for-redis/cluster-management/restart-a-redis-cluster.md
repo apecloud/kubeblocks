@@ -30,8 +30,9 @@ Restarting a Redis cluster triggers a concurrent restart and the leader may chan
    kind: OpsRequest
    metadata:
      name: ops-restart
+     namespace: demo
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: Restart 
      restart:
      - componentName: redis
@@ -45,9 +46,6 @@ Restarting a Redis cluster triggers a concurrent restart and the leader may chan
    ```bash
    kubectl get cluster mycluster -n demo
    ```
-
-   - STATUS=Restarting: it means the cluster restart is in progress.
-   - STATUS=Running: it means the cluster has been restarted.
 
    ***Example***
 

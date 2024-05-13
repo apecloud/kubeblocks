@@ -21,7 +21,7 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
 
 ### Before you start
 
-* [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * Make sure the Redis add-on is enabled.
 
   ```bash
@@ -36,7 +36,7 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
   Make sure the `redis` cluster definition is installed with `kubectl get clusterdefinitions redis`.
 
   ```bash
-  kubectl get clusterdefinition Redis
+  kubectl get clusterdefinition redis
   >
   NAME    TOPOLOGIES   SERVICEREFS   STATUS      AGE
   redis                              Available   16d
@@ -128,7 +128,7 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of
     componentSpecs:
       - name: redis
         componentDefRef: redis # ref clusterDefinition componentDefs.name      
-        monitor: false      
+        monitorEnabled: false      
         replicas: 1
         enabledLogs:
           - running
@@ -182,8 +182,8 @@ kind: Cluster
 metadata:
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mycluster","app.kubernetes.io/version":"7.0.6","helm.sh/chart":"redis-cluster-0.6.0-alpha.36"},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"redis","clusterVersionRef":"redis-7.0.6","componentSpecs":[{"componentDefRef":"redis","enabledLogs":["running"],"monitor":false,"name":"redis","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-redis","services":null,"switchPolicy":{"type":"Noop"},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
-  creationTimestamp: "2023-07-19T08:33:48Z"
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mycluster","app.kubernetes.io/version":"7.0.6","helm.sh/chart":"redis-cluster-0.6.0-alpha.36"},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"redis","clusterVersionRef":"redis-7.0.6","componentSpecs":[{"componentDefRef":"redis","enabledLogs":["running"],"monitorEnabled":false,"name":"redis","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-redis","services":null,"switchPolicy":{"type":"Noop"},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
+  creationTimestamp: "2024-05-11T03:04:27Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
   generation: 1
@@ -195,8 +195,8 @@ metadata:
     helm.sh/chart: redis-cluster-0.6.0-alpha.36
   name: mycluster
   namespace: demo
-  resourceVersion: "12967"
-  uid: 25ae9193-60ae-4521-88eb-70ea4c3d97ef
+  resourceVersion: "28223"
+  uid: 30744d02-61e4-4ccd-8dd7-94c6b14926ee
 spec:
   affinity:
     podAntiAffinity: Preferred
@@ -209,9 +209,8 @@ spec:
   - componentDefRef: redis
     enabledLogs:
     - running
-    monitor: false
+    monitorEnabled: false
     name: redis
-    noCreatePDB: false
     replicas: 1
     resources:
       limits:
@@ -238,29 +237,26 @@ status:
     redis:
       phase: Running
       podsReady: true
-      podsReadyTime: "2023-07-19T08:34:34Z"
-      replicationSetStatus:
-        primary:
-          pod: mycluster-redis-0
+      podsReadyTime: "2024-05-11T03:04:39Z"
   conditions:
-  - lastTransitionTime: "2023-07-19T08:33:48Z"
+  - lastTransitionTime: "2024-05-11T03:04:27Z"
     message: 'The operator has started the provisioning of Cluster: mycluster'
     observedGeneration: 1
     reason: PreCheckSucceed
     status: "True"
     type: ProvisioningStarted
-  - lastTransitionTime: "2023-07-19T08:33:48Z"
+  - lastTransitionTime: "2024-05-11T03:04:27Z"
     message: Successfully applied for resources
     observedGeneration: 1
     reason: ApplyResourcesSucceed
     status: "True"
     type: ApplyResources
-  - lastTransitionTime: "2023-07-19T08:34:34Z"
+  - lastTransitionTime: "2024-05-11T03:04:39Z"
     message: all pods of components are ready, waiting for the probe detection successful
     reason: AllReplicasReady
     status: "True"
     type: ReplicasReady
-  - lastTransitionTime: "2023-07-19T08:34:34Z"
+  - lastTransitionTime: "2024-05-11T03:04:39Z"
     message: 'Cluster: mycluster is ready, current phase is Running'
     reason: ClusterReady
     status: "True"
@@ -330,7 +326,7 @@ This tutorial takes creating a Redis cluster from the addon repository cloned fr
 
 You can use `kubectl exec` to exec into a Pod and connect to a database.
 
-KubeBlocks operator has created a new Secret called `redis-conn-credential` to store the connection credential of the Redis cluster. This secret contains the following keys:
+KubeBlocks operator has created a new Secret called `mycluster-conn-credential` to store the connection credential of the Redis cluster. This secret contains the following keys:
 
 * `username`: the root username of the Redis cluster.
 * `password`: the password of the root user.
@@ -341,13 +337,13 @@ KubeBlocks operator has created a new Secret called `redis-conn-credential` to s
 1. Get the `username` and `password` for the `kubectl exec` command.
 
    ```bash
-   kubectl get secrets -n demo redis-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
    >
    default
 
-   kubectl get secrets -n demo redis-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
    >
-   p7twmbrd
+   5bv7czc4
    ```
 
 2. Exec into the pod `mycluster-redis-0` and connect to the database using username and password.
@@ -355,7 +351,7 @@ KubeBlocks operator has created a new Secret called `redis-conn-credential` to s
    ```bash
    kubectl exec -ti -n demo mycluster-redis-0 -- bash
 
-   root@mycluster-redis-0:/# redis-cli -a p7twmbrd  --user default
+   root@mycluster-redis-0:/# redis-cli -a 5bv7czc4  --user default
    ```
 
 </TabItem>
@@ -367,13 +363,13 @@ You can also port forward the service to connect to the database from your local
 1. Run the following command to port forward the service.
   
    ```bash
-   kubectl port-forward -n demo svc/redis-redis 6379:6379
+   kubectl port-forward -n demo svc/mycluster-redis 6379:6379
    ```
 
 2. Open a new terminal and run the following command to connect to the database.
 
    ```bash
-   root@mycluster-redis-0:/# redis-cli -a p7twmbrd  --user default
+   root@mycluster-redis-0:/# redis-cli -a 5bv7czc4  --user default
    ```
 
 </TabItem>

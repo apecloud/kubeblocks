@@ -47,14 +47,15 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
    kind: OpsRequest
    metadata:
      name: ops-volume-expansion
+     namespace: demo
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: VolumeExpansion
      volumeExpansion:
      - componentName: redis
        volumeClaimTemplates:
        - name: data
-         storage: "2Gi"
+         storage: "20Gi"
    EOF
    ```
 
@@ -64,29 +65,41 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
 
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
-   ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: default
-   spec:
-     clusterDefinitionRef: redis
-     clusterVersionRef: redis-7.0.6
-     componentSpecs:
-     - componentDefRef: redis
-       name: redis
-       replicas: 2
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi # Change the volume storage size.
-     terminationPolicy: Delete
-   ```
+    ```yaml
+    spec:
+      affinity:
+        podAntiAffinity: Preferred
+        tenancy: SharedNode
+        topologyKeys:
+        - kubernetes.io/hostname
+      clusterDefinitionRef: redis
+      clusterVersionRef: redis-7.0.6
+      componentSpecs:
+      - componentDefRef: redis
+        enabledLogs:
+        - running
+        monitorEnabled: false
+        name: redis
+        replicas: 1
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: 0.5Gi
+          requests:
+            cpu: "0.5"
+            memory: 0.5Gi
+        serviceAccountName: kb-redis
+        switchPolicy:
+          type: Noop
+        volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: 40Gi # Change the volume storage size
+    ```
 
 2. Validate the volume expansion.
 
@@ -99,9 +112,6 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
    ```bash
    kubectl get cluster mycluster -n demo
    >
-   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS            AGE
-   mycluster   redis                redis-7.0.6    Delete               VolumeExpanding   4d18h
+   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+   mycluster   redis                redis-7.0.6    Delete               Running   4d18h
    ```
-
-   - STATUS=VolumeExpanding: it means the volume expansion is in progress.
-   - STATUS=Running: it means the volume expansion operation has been applied.

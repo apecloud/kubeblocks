@@ -52,8 +52,9 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
    kind: OpsRequest
    metadata:
      name: ops-vertical-scaling
+     namespace: demo
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: VerticalScaling 
      verticalScaling:
      - componentName: redis
@@ -79,7 +80,7 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
    kind: Cluster
    metadata:
      name: mycluster
-     namespace: default
+     namespace: demo
    spec:
      clusterDefinitionRef: redis
      clusterVersionRef: redis-7.0.6
@@ -119,7 +120,7 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
    kubectl get cluster mycluster -n demo
    >
    NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-   mycluster   redis                redis-7.0.6    Delete               Updating  4d18h
+   mycluster   redis                redis-7.0.6    Delete               Running  4d18h
    ```
 
     :::note
@@ -175,8 +176,9 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
    kind: OpsRequest
    metadata:
      name: ops-horizontal-scaling
+     namespace: demo
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
      - componentName: redis
@@ -195,14 +197,14 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
    kind: Cluster
    metadata:
      name: mycluster
-     namespace: default
+     namespace: demo
    spec:
      clusterDefinitionRef: redis
      clusterVersionRef: redis-7.0.6
      componentSpecs:
      - name: redis
        componentDefRef: redis
-       replicas: 2 # Change the pod amount.
+       replicas: 2 # Change the pod amount
        volumeClaimTemplates:
        - name: data
          spec:

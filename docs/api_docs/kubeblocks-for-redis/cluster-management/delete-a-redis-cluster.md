@@ -29,7 +29,7 @@ To check the termination policy, execute the following command.
 kubectl -n demo get cluster mycluster
 >
 NAME    CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
-redis   redis                redis-7.0.6   Delete               Running   10m
+mycluster   redis                redis-7.0.6   Delete               Running   10m
 ```
 
 ## Step

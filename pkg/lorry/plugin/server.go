@@ -23,14 +23,12 @@ import (
 
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
-
-	"github.com/container-storage-interface/spec/lib/go/csi"
 )
 
 // Defines Non blocking GRPC server interfaces
 type NonBlockingGRPCServer interface {
 	// Start services at the endpoint
-	Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer)
+	Start(endpoint string, dbPlugin DBPluginServer)
 	// Waits for the service to stop
 	Wait()
 	// Stops the service gracefully
@@ -49,11 +47,11 @@ type nonBlockingGRPCServer struct {
 	server *grpc.Server
 }
 
-func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
+func (s *nonBlockingGRPCServer) Start(endpoint string, dbPlugin DBPluginServer) {
 
 	s.wg.Add(1)
 
-	go s.serve(endpoint, ids, cs, ns)
+	go s.serve(endpoint, dbPlugin)
 
 	return
 }
@@ -70,7 +68,7 @@ func (s *nonBlockingGRPCServer) ForceStop() {
 	s.server.Stop()
 }
 
-func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
+func (s *nonBlockingGRPCServer) serve(endpoint string, dbPlugin DBPluginServer) {
 
 	proto, addr, err := ParseEndpoint(endpoint)
 	if err != nil {
@@ -95,15 +93,7 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 	server := grpc.NewServer(opts...)
 	s.server = server
 
-	if ids != nil {
-		csi.RegisterIdentityServer(server, ids)
-	}
-	if cs != nil {
-		csi.RegisterControllerServer(server, cs)
-	}
-	if ns != nil {
-		csi.RegisterNodeServer(server, ns)
-	}
+	RegisterDBPluginServer(server, dbPlugin)
 
 	glog.Infof("Listening for connections on address: %#v", listener.Addr())
 

@@ -22,6 +22,23 @@ package plugin.v1;
 
 option go_package = "github.com/apecloud/kubeblocks/pkg/lorry/plugin";
 
+message GetPluginInfoRequest {
+  map<string, string> metadata = 1;
+}
+
+message GetPluginInfoResponse {
+  // The name of the plugin. It MUST be 63
+  // characters or less, beginning and ending with an alphanumeric
+  // character ([a-z0-9A-Z]) with dashes (-), dots (.), and
+  // alphanumerics between. This field is REQUIRED.
+  string name = 1;
+
+  // This field is REQUIRED. 
+  string vendor_version = 2;
+
+  // This field is OPTIONAL. 
+  map<string, string> metadata = 3;
+}
 
 message DBInfo {
   // The pod FQDN of the replica.
@@ -151,6 +168,8 @@ message AccountProvisionResponse {
 
 // DBPlugin service provides APIs to kubeblocks operator to exec component operation.
 service DBPlugin {
+  rpc GetPluginInfo(GetPluginInfoRequest) returns (GetPluginInfoResponse) {}
+
   // GetRole defines the mechanism to probe the role of replicas. The return role
   // must be one of the names defined in the componentdefinition roles. 
   rpc GetRole(GetRoleRequest) returns (GetRoleResponse) {}

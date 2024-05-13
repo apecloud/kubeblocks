@@ -27,8 +27,6 @@ package plugin
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	_ "google.golang.org/protobuf/types/known/structpb"
-	_ "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 )
@@ -39,6 +37,122 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+type GetPluginInfoRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Metadata map[string]string `protobuf:"bytes,1,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+}
+
+func (x *GetPluginInfoRequest) Reset() {
+	*x = GetPluginInfoRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_db_plugin_proto_msgTypes[0]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetPluginInfoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPluginInfoRequest) ProtoMessage() {}
+
+func (x *GetPluginInfoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_db_plugin_proto_msgTypes[0]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPluginInfoRequest.ProtoReflect.Descriptor instead.
+func (*GetPluginInfoRequest) Descriptor() ([]byte, []int) {
+	return file_db_plugin_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *GetPluginInfoRequest) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type GetPluginInfoResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The name of the plugin. It MUST be 63
+	// characters or less, beginning and ending with an alphanumeric
+	// character ([a-z0-9A-Z]) with dashes (-), dots (.), and
+	// alphanumerics between. This field is REQUIRED.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// This field is REQUIRED.
+	VendorVersion string `protobuf:"bytes,2,opt,name=vendor_version,json=vendorVersion,proto3" json:"vendor_version,omitempty"`
+	// This field is OPTIONAL.
+	Metadata map[string]string `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+}
+
+func (x *GetPluginInfoResponse) Reset() {
+	*x = GetPluginInfoResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_db_plugin_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetPluginInfoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPluginInfoResponse) ProtoMessage() {}
+
+func (x *GetPluginInfoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_db_plugin_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPluginInfoResponse.ProtoReflect.Descriptor instead.
+func (*GetPluginInfoResponse) Descriptor() ([]byte, []int) {
+	return file_db_plugin_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetPluginInfoResponse) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *GetPluginInfoResponse) GetVendorVersion() string {
+	if x != nil {
+		return x.VendorVersion
+	}
+	return ""
+}
+
+func (x *GetPluginInfoResponse) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
 
 type DBInfo struct {
 	state         protoimpl.MessageState
@@ -58,7 +172,7 @@ type DBInfo struct {
 func (x *DBInfo) Reset() {
 	*x = DBInfo{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[0]
+		mi := &file_db_plugin_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -71,7 +185,7 @@ func (x *DBInfo) String() string {
 func (*DBInfo) ProtoMessage() {}
 
 func (x *DBInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[0]
+	mi := &file_db_plugin_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -84,7 +198,7 @@ func (x *DBInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DBInfo.ProtoReflect.Descriptor instead.
 func (*DBInfo) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{0}
+	return file_db_plugin_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DBInfo) GetFqdn() string {
@@ -128,7 +242,7 @@ type GetRoleRequest struct {
 func (x *GetRoleRequest) Reset() {
 	*x = GetRoleRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[1]
+		mi := &file_db_plugin_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -141,7 +255,7 @@ func (x *GetRoleRequest) String() string {
 func (*GetRoleRequest) ProtoMessage() {}
 
 func (x *GetRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[1]
+	mi := &file_db_plugin_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -154,7 +268,7 @@ func (x *GetRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoleRequest.ProtoReflect.Descriptor instead.
 func (*GetRoleRequest) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{1}
+	return file_db_plugin_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetRoleRequest) GetDbInfo() *DBInfo {
@@ -184,7 +298,7 @@ type GetRoleResponse struct {
 func (x *GetRoleResponse) Reset() {
 	*x = GetRoleResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[2]
+		mi := &file_db_plugin_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -197,7 +311,7 @@ func (x *GetRoleResponse) String() string {
 func (*GetRoleResponse) ProtoMessage() {}
 
 func (x *GetRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[2]
+	mi := &file_db_plugin_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -210,7 +324,7 @@ func (x *GetRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoleResponse.ProtoReflect.Descriptor instead.
 func (*GetRoleResponse) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{2}
+	return file_db_plugin_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetRoleResponse) GetRole() string {
@@ -250,7 +364,7 @@ type JoinMemberRequest struct {
 func (x *JoinMemberRequest) Reset() {
 	*x = JoinMemberRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[3]
+		mi := &file_db_plugin_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -263,7 +377,7 @@ func (x *JoinMemberRequest) String() string {
 func (*JoinMemberRequest) ProtoMessage() {}
 
 func (x *JoinMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[3]
+	mi := &file_db_plugin_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -276,7 +390,7 @@ func (x *JoinMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinMemberRequest.ProtoReflect.Descriptor instead.
 func (*JoinMemberRequest) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{3}
+	return file_db_plugin_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *JoinMemberRequest) GetDbInfo() *DBInfo {
@@ -340,7 +454,7 @@ type JoinMemberResponse struct {
 func (x *JoinMemberResponse) Reset() {
 	*x = JoinMemberResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[4]
+		mi := &file_db_plugin_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -353,7 +467,7 @@ func (x *JoinMemberResponse) String() string {
 func (*JoinMemberResponse) ProtoMessage() {}
 
 func (x *JoinMemberResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[4]
+	mi := &file_db_plugin_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -366,7 +480,7 @@ func (x *JoinMemberResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinMemberResponse.ProtoReflect.Descriptor instead.
 func (*JoinMemberResponse) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{4}
+	return file_db_plugin_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *JoinMemberResponse) GetMetadata() map[string]string {
@@ -399,7 +513,7 @@ type LeaveMemberRequest struct {
 func (x *LeaveMemberRequest) Reset() {
 	*x = LeaveMemberRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[5]
+		mi := &file_db_plugin_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -412,7 +526,7 @@ func (x *LeaveMemberRequest) String() string {
 func (*LeaveMemberRequest) ProtoMessage() {}
 
 func (x *LeaveMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[5]
+	mi := &file_db_plugin_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -425,7 +539,7 @@ func (x *LeaveMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaveMemberRequest.ProtoReflect.Descriptor instead.
 func (*LeaveMemberRequest) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{5}
+	return file_db_plugin_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *LeaveMemberRequest) GetDbInfo() *DBInfo {
@@ -489,7 +603,7 @@ type LeaveMemberResponse struct {
 func (x *LeaveMemberResponse) Reset() {
 	*x = LeaveMemberResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[6]
+		mi := &file_db_plugin_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -502,7 +616,7 @@ func (x *LeaveMemberResponse) String() string {
 func (*LeaveMemberResponse) ProtoMessage() {}
 
 func (x *LeaveMemberResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[6]
+	mi := &file_db_plugin_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -515,7 +629,7 @@ func (x *LeaveMemberResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaveMemberResponse.ProtoReflect.Descriptor instead.
 func (*LeaveMemberResponse) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{6}
+	return file_db_plugin_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *LeaveMemberResponse) GetMetadata() map[string]string {
@@ -538,7 +652,7 @@ type ReadonlyRequest struct {
 func (x *ReadonlyRequest) Reset() {
 	*x = ReadonlyRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[7]
+		mi := &file_db_plugin_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -551,7 +665,7 @@ func (x *ReadonlyRequest) String() string {
 func (*ReadonlyRequest) ProtoMessage() {}
 
 func (x *ReadonlyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[7]
+	mi := &file_db_plugin_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +678,7 @@ func (x *ReadonlyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadonlyRequest.ProtoReflect.Descriptor instead.
 func (*ReadonlyRequest) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{7}
+	return file_db_plugin_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ReadonlyRequest) GetDbInfo() *DBInfo {
@@ -593,7 +707,7 @@ type ReadonlyResponse struct {
 func (x *ReadonlyResponse) Reset() {
 	*x = ReadonlyResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[8]
+		mi := &file_db_plugin_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -606,7 +720,7 @@ func (x *ReadonlyResponse) String() string {
 func (*ReadonlyResponse) ProtoMessage() {}
 
 func (x *ReadonlyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[8]
+	mi := &file_db_plugin_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -619,7 +733,7 @@ func (x *ReadonlyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadonlyResponse.ProtoReflect.Descriptor instead.
 func (*ReadonlyResponse) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{8}
+	return file_db_plugin_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ReadonlyResponse) GetMetadata() map[string]string {
@@ -642,7 +756,7 @@ type ReadwriteRequest struct {
 func (x *ReadwriteRequest) Reset() {
 	*x = ReadwriteRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[9]
+		mi := &file_db_plugin_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -655,7 +769,7 @@ func (x *ReadwriteRequest) String() string {
 func (*ReadwriteRequest) ProtoMessage() {}
 
 func (x *ReadwriteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[9]
+	mi := &file_db_plugin_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -668,7 +782,7 @@ func (x *ReadwriteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadwriteRequest.ProtoReflect.Descriptor instead.
 func (*ReadwriteRequest) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{9}
+	return file_db_plugin_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ReadwriteRequest) GetDbInfo() *DBInfo {
@@ -697,7 +811,7 @@ type ReadwriteResponse struct {
 func (x *ReadwriteResponse) Reset() {
 	*x = ReadwriteResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[10]
+		mi := &file_db_plugin_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -710,7 +824,7 @@ func (x *ReadwriteResponse) String() string {
 func (*ReadwriteResponse) ProtoMessage() {}
 
 func (x *ReadwriteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[10]
+	mi := &file_db_plugin_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -723,7 +837,7 @@ func (x *ReadwriteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadwriteResponse.ProtoReflect.Descriptor instead.
 func (*ReadwriteResponse) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{10}
+	return file_db_plugin_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ReadwriteResponse) GetMetadata() map[string]string {
@@ -750,7 +864,7 @@ type AccountProvisionRequest struct {
 func (x *AccountProvisionRequest) Reset() {
 	*x = AccountProvisionRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[11]
+		mi := &file_db_plugin_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -763,7 +877,7 @@ func (x *AccountProvisionRequest) String() string {
 func (*AccountProvisionRequest) ProtoMessage() {}
 
 func (x *AccountProvisionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[11]
+	mi := &file_db_plugin_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -776,7 +890,7 @@ func (x *AccountProvisionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccountProvisionRequest.ProtoReflect.Descriptor instead.
 func (*AccountProvisionRequest) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{11}
+	return file_db_plugin_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AccountProvisionRequest) GetDbInfo() *DBInfo {
@@ -819,7 +933,7 @@ type AccountProvisionResponse struct {
 func (x *AccountProvisionResponse) Reset() {
 	*x = AccountProvisionResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_db_plugin_proto_msgTypes[12]
+		mi := &file_db_plugin_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -832,7 +946,7 @@ func (x *AccountProvisionResponse) String() string {
 func (*AccountProvisionResponse) ProtoMessage() {}
 
 func (x *AccountProvisionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_db_plugin_proto_msgTypes[12]
+	mi := &file_db_plugin_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -845,7 +959,7 @@ func (x *AccountProvisionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccountProvisionResponse.ProtoReflect.Descriptor instead.
 func (*AccountProvisionResponse) Descriptor() ([]byte, []int) {
-	return file_db_plugin_proto_rawDescGZIP(), []int{12}
+	return file_db_plugin_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AccountProvisionResponse) GetMetadata() map[string]string {
@@ -859,11 +973,31 @@ var File_db_plugin_proto protoreflect.FileDescriptor
 
 var file_db_plugin_proto_rawDesc = []byte{
 	0x0a, 0x0f, 0x64, 0x62, 0x5f, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x12, 0x09, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x1a, 0x1c, 0x67, 0x6f,
-	0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x73, 0x74,
-	0x72, 0x75, 0x63, 0x74, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x1f, 0x67, 0x6f, 0x6f, 0x67,
-	0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x74, 0x69, 0x6d, 0x65,
-	0x73, 0x74, 0x61, 0x6d, 0x70, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x76, 0x0a, 0x06, 0x44,
+	0x6f, 0x12, 0x09, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x22, 0x9e, 0x01, 0x0a,
+	0x14, 0x47, 0x65, 0x74, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x49, 0x0a, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74,
+	0x61, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2d, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e,
+	0x2e, 0x76, 0x31, 0x2e, 0x47, 0x65, 0x74, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x49, 0x6e, 0x66,
+	0x6f, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x2e, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74,
+	0x61, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61,
+	0x1a, 0x3b, 0x0a, 0x0d, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x45, 0x6e, 0x74, 0x72,
+	0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03,
+	0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0xdb, 0x01,
+	0x0a, 0x15, 0x47, 0x65, 0x74, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x49, 0x6e, 0x66, 0x6f, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x25, 0x0a, 0x0e, 0x76,
+	0x65, 0x6e, 0x64, 0x6f, 0x72, 0x5f, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0d, 0x76, 0x65, 0x6e, 0x64, 0x6f, 0x72, 0x56, 0x65, 0x72, 0x73, 0x69,
+	0x6f, 0x6e, 0x12, 0x4a, 0x0a, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x18, 0x03,
+	0x20, 0x03, 0x28, 0x0b, 0x32, 0x2e, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31,
+	0x2e, 0x47, 0x65, 0x74, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x45,
+	0x6e, 0x74, 0x72, 0x79, 0x52, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x1a, 0x3b,
+	0x0a, 0x0d, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12,
+	0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65,
+	0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x76, 0x0a, 0x06, 0x44,
 	0x42, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x12, 0x0a, 0x04, 0x66, 0x71, 0x64, 0x6e, 0x18, 0x01, 0x20,
 	0x01, 0x28, 0x09, 0x52, 0x04, 0x66, 0x71, 0x64, 0x6e, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x6f, 0x72,
 	0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x70, 0x6f, 0x72, 0x74, 0x12, 0x1d, 0x0a,
@@ -1023,40 +1157,46 @@ var file_db_plugin_proto_rawDesc = []byte{
 	0x74, 0x61, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01,
 	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c,
 	0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a,
-	0x02, 0x38, 0x01, 0x32, 0xdb, 0x03, 0x0a, 0x08, 0x44, 0x42, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e,
-	0x12, 0x42, 0x0a, 0x07, 0x47, 0x65, 0x74, 0x52, 0x6f, 0x6c, 0x65, 0x12, 0x19, 0x2e, 0x70, 0x6c,
-	0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x47, 0x65, 0x74, 0x52, 0x6f, 0x6c, 0x65, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1a, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e,
-	0x76, 0x31, 0x2e, 0x47, 0x65, 0x74, 0x52, 0x6f, 0x6c, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
-	0x73, 0x65, 0x22, 0x00, 0x12, 0x4b, 0x0a, 0x0a, 0x4a, 0x6f, 0x69, 0x6e, 0x4d, 0x65, 0x6d, 0x62,
-	0x65, 0x72, 0x12, 0x1c, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x4a,
-	0x6f, 0x69, 0x6e, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
-	0x1a, 0x1d, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x4a, 0x6f, 0x69,
-	0x6e, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22,
-	0x00, 0x12, 0x4e, 0x0a, 0x0b, 0x4c, 0x65, 0x61, 0x76, 0x65, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72,
-	0x12, 0x1d, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x4c, 0x65, 0x61,
-	0x76, 0x65, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
-	0x1e, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x4c, 0x65, 0x61, 0x76,
-	0x65, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22,
-	0x00, 0x12, 0x45, 0x0a, 0x08, 0x52, 0x65, 0x61, 0x64, 0x6f, 0x6e, 0x6c, 0x79, 0x12, 0x1a, 0x2e,
-	0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x61, 0x64, 0x6f, 0x6e,
-	0x6c, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1b, 0x2e, 0x70, 0x6c, 0x75, 0x67,
-	0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x61, 0x64, 0x6f, 0x6e, 0x6c, 0x79, 0x52, 0x65,
-	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x48, 0x0a, 0x09, 0x52, 0x65, 0x61, 0x64,
-	0x77, 0x72, 0x69, 0x74, 0x65, 0x12, 0x1b, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76,
-	0x31, 0x2e, 0x52, 0x65, 0x61, 0x64, 0x77, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65,
-	0x73, 0x74, 0x1a, 0x1c, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x52,
-	0x65, 0x61, 0x64, 0x77, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
-	0x22, 0x00, 0x12, 0x5d, 0x0a, 0x10, 0x41, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x50, 0x72, 0x6f,
-	0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x22, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e,
-	0x76, 0x31, 0x2e, 0x41, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x50, 0x72, 0x6f, 0x76, 0x69, 0x73,
-	0x69, 0x6f, 0x6e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x23, 0x2e, 0x70, 0x6c, 0x75,
-	0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x41, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x50, 0x72,
-	0x6f, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22,
-	0x00, 0x42, 0x31, 0x5a, 0x2f, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
-	0x61, 0x70, 0x65, 0x63, 0x6c, 0x6f, 0x75, 0x64, 0x2f, 0x6b, 0x75, 0x62, 0x65, 0x62, 0x6c, 0x6f,
-	0x63, 0x6b, 0x73, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x6c, 0x6f, 0x72, 0x72, 0x79, 0x2f, 0x70, 0x6c,
-	0x75, 0x67, 0x69, 0x6e, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x02, 0x38, 0x01, 0x32, 0xb1, 0x04, 0x0a, 0x08, 0x44, 0x42, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e,
+	0x12, 0x54, 0x0a, 0x0d, 0x47, 0x65, 0x74, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x49, 0x6e, 0x66,
+	0x6f, 0x12, 0x1f, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x47, 0x65,
+	0x74, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x1a, 0x20, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x47,
+	0x65, 0x74, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x42, 0x0a, 0x07, 0x47, 0x65, 0x74, 0x52, 0x6f, 0x6c,
+	0x65, 0x12, 0x19, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x47, 0x65,
+	0x74, 0x52, 0x6f, 0x6c, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1a, 0x2e, 0x70,
+	0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x47, 0x65, 0x74, 0x52, 0x6f, 0x6c, 0x65,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x4b, 0x0a, 0x0a, 0x4a, 0x6f,
+	0x69, 0x6e, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x1c, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69,
+	0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x4a, 0x6f, 0x69, 0x6e, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x52,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1d, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e,
+	0x76, 0x31, 0x2e, 0x4a, 0x6f, 0x69, 0x6e, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x52, 0x65, 0x73,
+	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x4e, 0x0a, 0x0b, 0x4c, 0x65, 0x61, 0x76, 0x65,
+	0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x1d, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e,
+	0x76, 0x31, 0x2e, 0x4c, 0x65, 0x61, 0x76, 0x65, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1e, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76,
+	0x31, 0x2e, 0x4c, 0x65, 0x61, 0x76, 0x65, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x52, 0x65, 0x73,
+	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x45, 0x0a, 0x08, 0x52, 0x65, 0x61, 0x64, 0x6f,
+	0x6e, 0x6c, 0x79, 0x12, 0x1a, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e,
+	0x52, 0x65, 0x61, 0x64, 0x6f, 0x6e, 0x6c, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
+	0x1b, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x61, 0x64,
+	0x6f, 0x6e, 0x6c, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x48,
+	0x0a, 0x09, 0x52, 0x65, 0x61, 0x64, 0x77, 0x72, 0x69, 0x74, 0x65, 0x12, 0x1b, 0x2e, 0x70, 0x6c,
+	0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x61, 0x64, 0x77, 0x72, 0x69, 0x74,
+	0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1c, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69,
+	0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x61, 0x64, 0x77, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x5d, 0x0a, 0x10, 0x41, 0x63, 0x63, 0x6f,
+	0x75, 0x6e, 0x74, 0x50, 0x72, 0x6f, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x22, 0x2e, 0x70,
+	0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x41, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74,
+	0x50, 0x72, 0x6f, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x1a, 0x23, 0x2e, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x41, 0x63, 0x63,
+	0x6f, 0x75, 0x6e, 0x74, 0x50, 0x72, 0x6f, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x73,
+	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x42, 0x31, 0x5a, 0x2f, 0x67, 0x69, 0x74, 0x68, 0x75,
+	0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x61, 0x70, 0x65, 0x63, 0x6c, 0x6f, 0x75, 0x64, 0x2f, 0x6b,
+	0x75, 0x62, 0x65, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x73, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x6c, 0x6f,
+	0x72, 0x72, 0x79, 0x2f, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x33,
 }
 
 var (
@@ -1071,68 +1211,76 @@ func file_db_plugin_proto_rawDescGZIP() []byte {
 	return file_db_plugin_proto_rawDescData
 }
 
-var file_db_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_db_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_db_plugin_proto_goTypes = []interface{}{
-	(*DBInfo)(nil),                   // 0: plugin.v1.DBInfo
-	(*GetRoleRequest)(nil),           // 1: plugin.v1.GetRoleRequest
-	(*GetRoleResponse)(nil),          // 2: plugin.v1.GetRoleResponse
-	(*JoinMemberRequest)(nil),        // 3: plugin.v1.JoinMemberRequest
-	(*JoinMemberResponse)(nil),       // 4: plugin.v1.JoinMemberResponse
-	(*LeaveMemberRequest)(nil),       // 5: plugin.v1.LeaveMemberRequest
-	(*LeaveMemberResponse)(nil),      // 6: plugin.v1.LeaveMemberResponse
-	(*ReadonlyRequest)(nil),          // 7: plugin.v1.ReadonlyRequest
-	(*ReadonlyResponse)(nil),         // 8: plugin.v1.ReadonlyResponse
-	(*ReadwriteRequest)(nil),         // 9: plugin.v1.ReadwriteRequest
-	(*ReadwriteResponse)(nil),        // 10: plugin.v1.ReadwriteResponse
-	(*AccountProvisionRequest)(nil),  // 11: plugin.v1.AccountProvisionRequest
-	(*AccountProvisionResponse)(nil), // 12: plugin.v1.AccountProvisionResponse
-	nil,                              // 13: plugin.v1.GetRoleRequest.MetadataEntry
-	nil,                              // 14: plugin.v1.GetRoleResponse.MetadataEntry
-	nil,                              // 15: plugin.v1.JoinMemberRequest.MetadataEntry
-	nil,                              // 16: plugin.v1.JoinMemberResponse.MetadataEntry
-	nil,                              // 17: plugin.v1.LeaveMemberRequest.MetadataEntry
-	nil,                              // 18: plugin.v1.LeaveMemberResponse.MetadataEntry
-	nil,                              // 19: plugin.v1.ReadonlyRequest.MetadataEntry
-	nil,                              // 20: plugin.v1.ReadonlyResponse.MetadataEntry
-	nil,                              // 21: plugin.v1.ReadwriteRequest.MetadataEntry
-	nil,                              // 22: plugin.v1.ReadwriteResponse.MetadataEntry
-	nil,                              // 23: plugin.v1.AccountProvisionResponse.MetadataEntry
+	(*GetPluginInfoRequest)(nil),     // 0: plugin.v1.GetPluginInfoRequest
+	(*GetPluginInfoResponse)(nil),    // 1: plugin.v1.GetPluginInfoResponse
+	(*DBInfo)(nil),                   // 2: plugin.v1.DBInfo
+	(*GetRoleRequest)(nil),           // 3: plugin.v1.GetRoleRequest
+	(*GetRoleResponse)(nil),          // 4: plugin.v1.GetRoleResponse
+	(*JoinMemberRequest)(nil),        // 5: plugin.v1.JoinMemberRequest
+	(*JoinMemberResponse)(nil),       // 6: plugin.v1.JoinMemberResponse
+	(*LeaveMemberRequest)(nil),       // 7: plugin.v1.LeaveMemberRequest
+	(*LeaveMemberResponse)(nil),      // 8: plugin.v1.LeaveMemberResponse
+	(*ReadonlyRequest)(nil),          // 9: plugin.v1.ReadonlyRequest
+	(*ReadonlyResponse)(nil),         // 10: plugin.v1.ReadonlyResponse
+	(*ReadwriteRequest)(nil),         // 11: plugin.v1.ReadwriteRequest
+	(*ReadwriteResponse)(nil),        // 12: plugin.v1.ReadwriteResponse
+	(*AccountProvisionRequest)(nil),  // 13: plugin.v1.AccountProvisionRequest
+	(*AccountProvisionResponse)(nil), // 14: plugin.v1.AccountProvisionResponse
+	nil,                              // 15: plugin.v1.GetPluginInfoRequest.MetadataEntry
+	nil,                              // 16: plugin.v1.GetPluginInfoResponse.MetadataEntry
+	nil,                              // 17: plugin.v1.GetRoleRequest.MetadataEntry
+	nil,                              // 18: plugin.v1.GetRoleResponse.MetadataEntry
+	nil,                              // 19: plugin.v1.JoinMemberRequest.MetadataEntry
+	nil,                              // 20: plugin.v1.JoinMemberResponse.MetadataEntry
+	nil,                              // 21: plugin.v1.LeaveMemberRequest.MetadataEntry
+	nil,                              // 22: plugin.v1.LeaveMemberResponse.MetadataEntry
+	nil,                              // 23: plugin.v1.ReadonlyRequest.MetadataEntry
+	nil,                              // 24: plugin.v1.ReadonlyResponse.MetadataEntry
+	nil,                              // 25: plugin.v1.ReadwriteRequest.MetadataEntry
+	nil,                              // 26: plugin.v1.ReadwriteResponse.MetadataEntry
+	nil,                              // 27: plugin.v1.AccountProvisionResponse.MetadataEntry
 }
 var file_db_plugin_proto_depIdxs = []int32{
-	0,  // 0: plugin.v1.GetRoleRequest.db_info:type_name -> plugin.v1.DBInfo
-	13, // 1: plugin.v1.GetRoleRequest.metadata:type_name -> plugin.v1.GetRoleRequest.MetadataEntry
-	14, // 2: plugin.v1.GetRoleResponse.metadata:type_name -> plugin.v1.GetRoleResponse.MetadataEntry
-	0,  // 3: plugin.v1.JoinMemberRequest.db_info:type_name -> plugin.v1.DBInfo
-	15, // 4: plugin.v1.JoinMemberRequest.metadata:type_name -> plugin.v1.JoinMemberRequest.MetadataEntry
-	16, // 5: plugin.v1.JoinMemberResponse.metadata:type_name -> plugin.v1.JoinMemberResponse.MetadataEntry
-	0,  // 6: plugin.v1.LeaveMemberRequest.db_info:type_name -> plugin.v1.DBInfo
-	17, // 7: plugin.v1.LeaveMemberRequest.metadata:type_name -> plugin.v1.LeaveMemberRequest.MetadataEntry
-	18, // 8: plugin.v1.LeaveMemberResponse.metadata:type_name -> plugin.v1.LeaveMemberResponse.MetadataEntry
-	0,  // 9: plugin.v1.ReadonlyRequest.db_info:type_name -> plugin.v1.DBInfo
-	19, // 10: plugin.v1.ReadonlyRequest.metadata:type_name -> plugin.v1.ReadonlyRequest.MetadataEntry
-	20, // 11: plugin.v1.ReadonlyResponse.metadata:type_name -> plugin.v1.ReadonlyResponse.MetadataEntry
-	0,  // 12: plugin.v1.ReadwriteRequest.db_info:type_name -> plugin.v1.DBInfo
-	21, // 13: plugin.v1.ReadwriteRequest.metadata:type_name -> plugin.v1.ReadwriteRequest.MetadataEntry
-	22, // 14: plugin.v1.ReadwriteResponse.metadata:type_name -> plugin.v1.ReadwriteResponse.MetadataEntry
-	0,  // 15: plugin.v1.AccountProvisionRequest.db_info:type_name -> plugin.v1.DBInfo
-	23, // 16: plugin.v1.AccountProvisionResponse.metadata:type_name -> plugin.v1.AccountProvisionResponse.MetadataEntry
-	1,  // 17: plugin.v1.DBPlugin.GetRole:input_type -> plugin.v1.GetRoleRequest
-	3,  // 18: plugin.v1.DBPlugin.JoinMember:input_type -> plugin.v1.JoinMemberRequest
-	5,  // 19: plugin.v1.DBPlugin.LeaveMember:input_type -> plugin.v1.LeaveMemberRequest
-	7,  // 20: plugin.v1.DBPlugin.Readonly:input_type -> plugin.v1.ReadonlyRequest
-	9,  // 21: plugin.v1.DBPlugin.Readwrite:input_type -> plugin.v1.ReadwriteRequest
-	11, // 22: plugin.v1.DBPlugin.AccountProvision:input_type -> plugin.v1.AccountProvisionRequest
-	2,  // 23: plugin.v1.DBPlugin.GetRole:output_type -> plugin.v1.GetRoleResponse
-	4,  // 24: plugin.v1.DBPlugin.JoinMember:output_type -> plugin.v1.JoinMemberResponse
-	6,  // 25: plugin.v1.DBPlugin.LeaveMember:output_type -> plugin.v1.LeaveMemberResponse
-	8,  // 26: plugin.v1.DBPlugin.Readonly:output_type -> plugin.v1.ReadonlyResponse
-	10, // 27: plugin.v1.DBPlugin.Readwrite:output_type -> plugin.v1.ReadwriteResponse
-	12, // 28: plugin.v1.DBPlugin.AccountProvision:output_type -> plugin.v1.AccountProvisionResponse
-	23, // [23:29] is the sub-list for method output_type
-	17, // [17:23] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	15, // 0: plugin.v1.GetPluginInfoRequest.metadata:type_name -> plugin.v1.GetPluginInfoRequest.MetadataEntry
+	16, // 1: plugin.v1.GetPluginInfoResponse.metadata:type_name -> plugin.v1.GetPluginInfoResponse.MetadataEntry
+	2,  // 2: plugin.v1.GetRoleRequest.db_info:type_name -> plugin.v1.DBInfo
+	17, // 3: plugin.v1.GetRoleRequest.metadata:type_name -> plugin.v1.GetRoleRequest.MetadataEntry
+	18, // 4: plugin.v1.GetRoleResponse.metadata:type_name -> plugin.v1.GetRoleResponse.MetadataEntry
+	2,  // 5: plugin.v1.JoinMemberRequest.db_info:type_name -> plugin.v1.DBInfo
+	19, // 6: plugin.v1.JoinMemberRequest.metadata:type_name -> plugin.v1.JoinMemberRequest.MetadataEntry
+	20, // 7: plugin.v1.JoinMemberResponse.metadata:type_name -> plugin.v1.JoinMemberResponse.MetadataEntry
+	2,  // 8: plugin.v1.LeaveMemberRequest.db_info:type_name -> plugin.v1.DBInfo
+	21, // 9: plugin.v1.LeaveMemberRequest.metadata:type_name -> plugin.v1.LeaveMemberRequest.MetadataEntry
+	22, // 10: plugin.v1.LeaveMemberResponse.metadata:type_name -> plugin.v1.LeaveMemberResponse.MetadataEntry
+	2,  // 11: plugin.v1.ReadonlyRequest.db_info:type_name -> plugin.v1.DBInfo
+	23, // 12: plugin.v1.ReadonlyRequest.metadata:type_name -> plugin.v1.ReadonlyRequest.MetadataEntry
+	24, // 13: plugin.v1.ReadonlyResponse.metadata:type_name -> plugin.v1.ReadonlyResponse.MetadataEntry
+	2,  // 14: plugin.v1.ReadwriteRequest.db_info:type_name -> plugin.v1.DBInfo
+	25, // 15: plugin.v1.ReadwriteRequest.metadata:type_name -> plugin.v1.ReadwriteRequest.MetadataEntry
+	26, // 16: plugin.v1.ReadwriteResponse.metadata:type_name -> plugin.v1.ReadwriteResponse.MetadataEntry
+	2,  // 17: plugin.v1.AccountProvisionRequest.db_info:type_name -> plugin.v1.DBInfo
+	27, // 18: plugin.v1.AccountProvisionResponse.metadata:type_name -> plugin.v1.AccountProvisionResponse.MetadataEntry
+	0,  // 19: plugin.v1.DBPlugin.GetPluginInfo:input_type -> plugin.v1.GetPluginInfoRequest
+	3,  // 20: plugin.v1.DBPlugin.GetRole:input_type -> plugin.v1.GetRoleRequest
+	5,  // 21: plugin.v1.DBPlugin.JoinMember:input_type -> plugin.v1.JoinMemberRequest
+	7,  // 22: plugin.v1.DBPlugin.LeaveMember:input_type -> plugin.v1.LeaveMemberRequest
+	9,  // 23: plugin.v1.DBPlugin.Readonly:input_type -> plugin.v1.ReadonlyRequest
+	11, // 24: plugin.v1.DBPlugin.Readwrite:input_type -> plugin.v1.ReadwriteRequest
+	13, // 25: plugin.v1.DBPlugin.AccountProvision:input_type -> plugin.v1.AccountProvisionRequest
+	1,  // 26: plugin.v1.DBPlugin.GetPluginInfo:output_type -> plugin.v1.GetPluginInfoResponse
+	4,  // 27: plugin.v1.DBPlugin.GetRole:output_type -> plugin.v1.GetRoleResponse
+	6,  // 28: plugin.v1.DBPlugin.JoinMember:output_type -> plugin.v1.JoinMemberResponse
+	8,  // 29: plugin.v1.DBPlugin.LeaveMember:output_type -> plugin.v1.LeaveMemberResponse
+	10, // 30: plugin.v1.DBPlugin.Readonly:output_type -> plugin.v1.ReadonlyResponse
+	12, // 31: plugin.v1.DBPlugin.Readwrite:output_type -> plugin.v1.ReadwriteResponse
+	14, // 32: plugin.v1.DBPlugin.AccountProvision:output_type -> plugin.v1.AccountProvisionResponse
+	26, // [26:33] is the sub-list for method output_type
+	19, // [19:26] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_db_plugin_proto_init() }
@@ -1142,7 +1290,7 @@ func file_db_plugin_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_db_plugin_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DBInfo); i {
+			switch v := v.(*GetPluginInfoRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1154,7 +1302,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetRoleRequest); i {
+			switch v := v.(*GetPluginInfoResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1166,7 +1314,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetRoleResponse); i {
+			switch v := v.(*DBInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1178,7 +1326,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*JoinMemberRequest); i {
+			switch v := v.(*GetRoleRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1190,7 +1338,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*JoinMemberResponse); i {
+			switch v := v.(*GetRoleResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1202,7 +1350,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*LeaveMemberRequest); i {
+			switch v := v.(*JoinMemberRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1214,7 +1362,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*LeaveMemberResponse); i {
+			switch v := v.(*JoinMemberResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1226,7 +1374,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReadonlyRequest); i {
+			switch v := v.(*LeaveMemberRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1238,7 +1386,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReadonlyResponse); i {
+			switch v := v.(*LeaveMemberResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1250,7 +1398,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReadwriteRequest); i {
+			switch v := v.(*ReadonlyRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1262,7 +1410,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReadwriteResponse); i {
+			switch v := v.(*ReadonlyResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1274,7 +1422,7 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*AccountProvisionRequest); i {
+			switch v := v.(*ReadwriteRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1286,6 +1434,30 @@ func file_db_plugin_proto_init() {
 			}
 		}
 		file_db_plugin_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ReadwriteResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_db_plugin_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*AccountProvisionRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_db_plugin_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*AccountProvisionResponse); i {
 			case 0:
 				return &v.state
@@ -1304,7 +1476,7 @@ func file_db_plugin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_db_plugin_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   24,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

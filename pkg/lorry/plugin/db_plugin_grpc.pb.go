@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DBPluginClient interface {
+	GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest, opts ...grpc.CallOption) (*GetPluginInfoResponse, error)
 	// GetRole defines the mechanism to probe the role of replicas. The return role
 	// must be one of the names defined in the componentdefinition roles.
 	GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*GetRoleResponse, error)
@@ -49,6 +50,15 @@ type dBPluginClient struct {
 
 func NewDBPluginClient(cc grpc.ClientConnInterface) DBPluginClient {
 	return &dBPluginClient{cc}
+}
+
+func (c *dBPluginClient) GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest, opts ...grpc.CallOption) (*GetPluginInfoResponse, error) {
+	out := new(GetPluginInfoResponse)
+	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/GetPluginInfo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *dBPluginClient) GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*GetRoleResponse, error) {
@@ -109,6 +119,7 @@ func (c *dBPluginClient) AccountProvision(ctx context.Context, in *AccountProvis
 // All implementations must embed UnimplementedDBPluginServer
 // for forward compatibility
 type DBPluginServer interface {
+	GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error)
 	// GetRole defines the mechanism to probe the role of replicas. The return role
 	// must be one of the names defined in the componentdefinition roles.
 	GetRole(context.Context, *GetRoleRequest) (*GetRoleResponse, error)
@@ -135,6 +146,9 @@ type DBPluginServer interface {
 type UnimplementedDBPluginServer struct {
 }
 
+func (UnimplementedDBPluginServer) GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPluginInfo not implemented")
+}
 func (UnimplementedDBPluginServer) GetRole(context.Context, *GetRoleRequest) (*GetRoleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRole not implemented")
 }
@@ -164,6 +178,24 @@ type UnsafeDBPluginServer interface {
 
 func RegisterDBPluginServer(s grpc.ServiceRegistrar, srv DBPluginServer) {
 	s.RegisterService(&DBPlugin_ServiceDesc, srv)
+}
+
+func _DBPlugin_GetPluginInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPluginInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DBPluginServer).GetPluginInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/plugin.v1.DBPlugin/GetPluginInfo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DBPluginServer).GetPluginInfo(ctx, req.(*GetPluginInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _DBPlugin_GetRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -281,6 +313,10 @@ var DBPlugin_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "plugin.v1.DBPlugin",
 	HandlerType: (*DBPluginServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetPluginInfo",
+			Handler:    _DBPlugin_GetPluginInfo_Handler,
+		},
 		{
 			MethodName: "GetRole",
 			Handler:    _DBPlugin_GetRole_Handler,

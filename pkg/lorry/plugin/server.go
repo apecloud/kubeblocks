@@ -28,7 +28,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Defines Non blocking GRPC server interfaces
+// NonBlockingGRPCServer Defines Non blocking GRPC server interfaces
 type NonBlockingGRPCServer interface {
 	// Start services at the endpoint
 	Start(endpoint string, dbPlugin DBPluginServer)
@@ -55,8 +55,6 @@ func (s *nonBlockingGRPCServer) Start(endpoint string, dbPlugin DBPluginServer) 
 	s.wg.Add(1)
 
 	go s.serve(endpoint, dbPlugin)
-
-	return
 }
 
 func (s *nonBlockingGRPCServer) Wait() {

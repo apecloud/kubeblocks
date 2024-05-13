@@ -1013,9 +1013,9 @@ type VarSource struct {
 	// +optional
 	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 
-	// Selects a defined var of a Pod.
+	// Selects a defined var of host-network resources.
 	// +optional
-	PodVarRef *PodVarSelector `json:"podVarRef,omitempty"`
+	HostNetworkVarRef *HostNetworkVarSelector `json:"hostNetworkVarRef,omitempty"`
 
 	// Selects a defined var of a Service.
 	// +optional
@@ -1052,12 +1052,6 @@ type NamedVar struct {
 	Option *VarOption `json:"option,omitempty"`
 }
 
-// PodVars defines the vars that can be referenced from a Pod.
-type PodVars struct {
-	// +optional
-	Container *ContainerVars `json:"container,omitempty"`
-}
-
 // ContainerVars defines the vars that can be referenced from a Container.
 type ContainerVars struct {
 	// The name of the container.
@@ -1067,6 +1061,12 @@ type ContainerVars struct {
 	// Container port to reference.
 	// +optional
 	Port *NamedVar `json:"port,omitempty"`
+}
+
+// HostNetworkVars defines the vars that can be referenced from host-network resources.
+type HostNetworkVars struct {
+	// +optional
+	Container *ContainerVars `json:"container,omitempty"`
 }
 
 // ServiceVars defines the vars that can be referenced from a Service.
@@ -1111,12 +1111,12 @@ type ServiceRefVars struct {
 	CredentialVars `json:",inline"`
 }
 
-// PodVarSelector selects a var from a Pod.
-type PodVarSelector struct {
-	// The pod to select from.
+// HostNetworkVarSelector selects a var from host-network resources.
+type HostNetworkVarSelector struct {
+	// The component to select from.
 	ClusterObjectReference `json:",inline"`
 
-	PodVars `json:",inline"`
+	HostNetworkVars `json:",inline"`
 }
 
 // ServiceVarSelector selects a var from a Service.

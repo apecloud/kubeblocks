@@ -2051,7 +2051,7 @@ var _ = Describe("Component Controller", func() {
 	Context("component resources provisioning", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj)
+			createBackupPolicyTpl(clusterDefObj, compDefName)
 		})
 
 		AfterEach(func() {
@@ -2115,7 +2115,7 @@ var _ = Describe("Component Controller", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj)
+			createBackupPolicyTpl(clusterDefObj, compDefName)
 		})
 
 		createNWaitClusterObj := func(components map[string]string,
@@ -2191,7 +2191,7 @@ var _ = Describe("Component Controller", func() {
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj)
+			createBackupPolicyTpl(clusterDefObj, compDefName)
 		})
 
 		AfterEach(func() {
@@ -2220,7 +2220,7 @@ var _ = Describe("Component Controller", func() {
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj)
+			createBackupPolicyTpl(clusterDefObj, compDefName)
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
@@ -2289,7 +2289,7 @@ var _ = Describe("Component Controller", func() {
 	When("creating cluster with workloadType=consensus component", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj)
+			createBackupPolicyTpl(clusterDefObj, compDefName)
 		})
 
 		AfterEach(func() {

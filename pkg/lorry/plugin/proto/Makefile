@@ -88,8 +88,8 @@ $(DB_PLUGIN_GO) $(DB_PLUGIN_GRPC): $(DB_PLUGIN_PROTO) $(PROTOC_ALL)
 build: $(DB_PLUGIN_GO) $(DB_PLUGIN_GRPC)
 
 clean:
-	go clean -i ./...
-	rm -rf DB_PLUGIN_GO DB_PLUGIN_GRPC
+	go clean -i ../...
+	rm -rf $(DB_PLUGIN_GO) $(DB_PLUGIN_GRPC)
 
 clobber: clean
 	rm -fr "$(PROTOC_TMP_DIR)"

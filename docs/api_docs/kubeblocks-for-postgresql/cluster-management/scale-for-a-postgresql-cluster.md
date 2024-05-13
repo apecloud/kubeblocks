@@ -49,7 +49,8 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-vertical-scaling
+     name: ops-vertical-scalin
+     namespace: demo
    spec:
      clusterName: mycluster
      type: VerticalScaling 
@@ -66,7 +67,7 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
   
    </TabItem>
 
-    <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
    Change the configuration of `spec.components.resources` in the YAML file. `spec.components.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
@@ -102,7 +103,18 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
 
    </Tabs>
 
-2. Validate the volume expansion.
+2. Check the operation status to validate the vertical scaling.
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -123,3 +135,9 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
         Cpu:     1
         Memory:  2Gi
    ```
+
+:::note
+
+Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+
+:::

@@ -25,10 +25,9 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mycluster
-  generateName: stop-
+  name: ops-stop
+  namesapce: demo
 spec:
-  # cluster ref
   clusterName: mycluster
   type: Stop
 EOF
@@ -44,7 +43,8 @@ Configure replicas as 0 to delete pods.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-    name: mycluster
+  name: mycluster
+  namespace: demo
 spec:
   clusterDefinitionRef: mongodb
   clusterVersionRef: mongodb-5.0
@@ -84,10 +84,9 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mycluster
-  generateName: start-
+  name:ops-start
+  namespace: demo
 spec:
-  # cluster ref
   clusterName: mycluster
   type: Start
 EOF 
@@ -103,7 +102,8 @@ Change replicas back to the original amount to start this cluster again.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-    name: mycluster
+  name: mycluster
+  namespace: demo
 spec:
   clusterDefinitionRef: mongodb
   clusterVersionRef: mongodb-5.0
@@ -112,7 +112,7 @@ spec:
   - name: mongodb
     componentDefRef: mongodb
     monitor: false  
-    replicas: 3
+    replicas: 1
     volumeClaimTemplates:
     - name: data
       spec:

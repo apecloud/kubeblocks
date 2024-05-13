@@ -77,7 +77,7 @@ spec:
     enabledLogs:
     - slow
     - error
-    monitor: false
+    monitorEnabled: false
     name: mysql
     replicas: 3
     resources:
@@ -135,7 +135,7 @@ spec:
     enabledLogs:
     - slow
     - error
-    monitorEnabled: false
+    monitor: false
     name: mysql
     replicas: 3
     resources:

@@ -27,6 +27,7 @@ Restarting a Kafka cluster triggers a concurrent restart and the leader may chan
   kind: OpsRequest
   metadata:
     name: ops-restart
+    namespace: demo
   spec:
     clusterName: 
     type: Restart 
@@ -35,14 +36,18 @@ Restarting a Kafka cluster triggers a concurrent restart and the leader may chan
   EOF
   ```
 
-2. Validate the restarting.
-
-   Run the command below to check the cluster status to check the restarting status.
+2. Check the pod and operation status to validate the restarting.
 
    ```bash
-   kubectl get cluster mycluster -n demo
+   kubectl get pod -n demo
+
+   kubectl get ops ops-restart -n demo
+   >
+   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
    ```
 
-   * STATUS=Restarting: it means the cluster restart is in progress.
-   * STATUS=Running: it means the cluster has been restarted.
+   During the restarting process, there are two status types for pods.
 
+   - STATUS=Terminating: it means the cluster restart is in progress.
+   - STATUS=Running: it means the cluster has been restarted.

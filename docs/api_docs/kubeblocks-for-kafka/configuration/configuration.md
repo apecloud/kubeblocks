@@ -11,7 +11,7 @@ This guide shows how to configure cluster parameters by creating an opsRequest.
 
 KubeBlocks supports dynamic configuration. When the specification of a database instance changes (e.g., a user vertically scales a cluster), KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is because different specifications of a database instance may require different optimal configurations to optimize performance and resource utilization. When you choose a different database instance specification, KubeBlocks automatically detects and determines the best database configuration for the new specification, ensuring optimal performance and configuration of the database under the new specifications.
 
-This feature simplifies the process ofconfiguring parameters, which saves you from manually configuring database parameters as KubeBlocks handles the updates and configurations automatically to adapt to the new specifications. This saves time and effort and reduces performance issues caused by incorrect configuration.
+This feature simplifies the process of configuring parameters, which saves you from manually configuring database parameters as KubeBlocks handles the updates and configurations automatically to adapt to the new specifications. This saves time and effort and reduces performance issues caused by incorrect configuration.
 
 But it's also important to note that the dynamic parameter configuration doesn't apply to all parameters. Some parameters may require manual configuration. Additionally, if you have manually modified database parameters before, KubeBlocks may overwrite your customized configurations when refreshing the database configuration template. Therefore, when using the dynamic configuration feature, it is recommended to back up and record your custom configuration so that you can restore them if needed.
 
@@ -53,10 +53,10 @@ But it's also important to note that the dynamic parameter configuration doesn't
 3. Connect to this cluster to verify whether the configuration takes effect as expected.
 
    ```bash
-   kbcli cluster describe-config mykafka --show-detail | grep log.cleanup.policy
+   kbcli cluster describe-config mycluster --show-detail | grep log.cleanup.policy
    >
    log.cleanup.policy = compact
-   mykafka-reconfiguring-wvqns   mykafka   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        May 10,2024 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
+   mycluster-reconfiguring-wvqns   mycluster   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        May 10,2024 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
    ```
 
 ## Configure cluster parameters with OpsRequest
@@ -88,7 +88,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
    * `metadata.name` specifies the name of this OpsRequest.
    * `metadata.namespace` specifies the namespace where this cluster is created.
    * `spec.clusterName` specifies the cluster name.
-   * `spec.reconfigure` specifies the configuration information. `componentName`specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
+   * `spec.reconfigure` specifies the configuration information. `componentName` specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
 
 2. Apply the configuration opsRequest.
 
@@ -132,7 +132,7 @@ You can also view the details of this configuration file and parameters.
 * View the user guide of a specified parameter.
   
   ```bash
-  kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-spec=mysql-consensusset-config -n demo
+  kbcli cluster explain-config mykafka --param=log.cleanup.policy
   ```
 
   `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
@@ -143,15 +143,15 @@ You can also view the details of this configuration file and parameters.
 
   ```bash
   template meta:
-    ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mycluster
+    ConfigSpec: kafka-configuration-tpl   ComponentName: broker   ClusterName: mykafka
 
   Configure Constraint:
-    Parameter Name:     innodb_buffer_pool_size
-    Allowed Values:     [5242880-18446744073709552000]
+    Parameter Name:     log.cleanup.policy
+    Allowed Values:     "compact","delete"
     Scope:              Global
     Dynamic:            false
-    Type:               integer
-    Description:        The size in bytes of the memory buffer innodb uses to cache data and indexes of its tables  
+    Type:               string
+    Description:        The default cleanup policy for segments beyond the retention window. A comma separated list of valid policies.   
   ```
   
   </details>

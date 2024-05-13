@@ -84,7 +84,7 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
              - ReadWriteOnce
            resources:
              requests:
-               storage: 30Gi # Change the volume storage size.
+               storage: 40Gi # Change the volume storage size.
      terminationPolicy: Delete
    ```
 
@@ -92,7 +92,16 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
 
    </Tabs>
 
-2. Validate the volume expansion.
+2. Validate the volume expansion operation.
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
+   ```
+
+3. Check whether the corresponding cluster resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -105,5 +114,5 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
           ReadWriteOnce
         Resources:
           Requests:
-            Storage:   30Gi
+            Storage:   40Gi
    ```

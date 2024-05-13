@@ -79,7 +79,16 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
      terminationPolicy: Halt
    ```
 
-2. Validate the volume expansion.
+2. Validate the volume expansion operation.
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
+   ```
+
+3. Check whether the corresponding cluster resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo

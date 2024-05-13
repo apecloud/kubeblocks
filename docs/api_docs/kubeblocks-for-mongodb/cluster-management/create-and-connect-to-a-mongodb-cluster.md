@@ -65,7 +65,7 @@ metadata:
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: 5.0.14
     helm.sh/chart: mongodb-cluster-0.8.0
-  name: mycluster
+  name: mydemo
   namespace: demo
 spec:
   affinity:
@@ -77,7 +77,7 @@ spec:
   clusterVersionRef: mongodb-5.0
   componentSpecs:
   - componentDefRef: mongodb
-    monitorEnabled: false
+    monitor: false
     name: mongodb
     replicas: 1
     resources:

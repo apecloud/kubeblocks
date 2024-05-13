@@ -47,8 +47,9 @@ kubectl get cluster mycluster -n demo
    kind: OpsRequest
    metadata:
      name: ops-vertical-scaling
+     namespace: demo
    spec:
-     clusterRef: ivy85
+     clusterRef: mycluster
      type: VerticalScaling 
      verticalScaling:
      - componentName: broker
@@ -67,14 +68,12 @@ kubectl get cluster mycluster -n demo
 
    Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
-   ***Example***
-
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: ivy85
-     namespace: default
+     name: mycluster
+     namespace: demo
    spec:
      clusterDefinitionRef: kafka
      clusterVersionRef: kafka-3.3.2
@@ -104,7 +103,18 @@ kubectl get cluster mycluster -n demo
 
    </Tabs>
   
-2. Validate the volume expansion.
+2. Check the operation status to validate the vertical scaling.
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -114,7 +124,7 @@ kubectl get cluster mycluster -n demo
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    Monitor:   false
+    MonitorEnabled:   false
     Name:      kafka
     Replicas:  2
     Resources:
@@ -125,6 +135,12 @@ kubectl get cluster mycluster -n demo
         Cpu:     1
         Memory:  2Gi
    ```
+
+:::note
+
+Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+
+:::
 
 ## Horizontal scaling
 
@@ -142,7 +158,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply horizontal scaling.
+1. Change configuration. There are 2 ways to apply horizontal scaling.
 
    <Tabs>
 
@@ -156,8 +172,9 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    kind: OpsRequest
    metadata:
      name: ops-horizontal-scaling
+     namespace: demo
    spec:
-     clusterRef: ivy85
+     clusterRef: mycluster
      type: HorizontalScaling
      horizontalScaling:
      - componentName: broker
@@ -171,8 +188,6 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
    Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
-   ***Example***
-
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
@@ -180,8 +195,8 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
     apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: ivy85
-     namespace: default
+     name: mycluster
+     namespace: demo
    spec:
      clusterDefinitionRef: kafka
      clusterVersionRef: kafka-3.3.2 
@@ -205,6 +220,25 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    </Tabs>
 
 2. Validate the horizontal scaling operation.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ......
+   Component Specs:
+    Component Def Ref:  kafka
+    Enabled Logs:
+      running
+    MonitorEnabled:   false
+    Name:      kafka
+    Replicas:  1
+    Resources:
+      Limits:
+        Cpu:     2
+        Memory:  4Gi
+      Requests:
+        Cpu:     1
+        Memory:  2Gi
+   ```
 
 ### Handle the snapshot exception
 
@@ -250,7 +284,6 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
    kubectl delete backup -l app.kubernetes.io/instance=ivy85
    
    kubectl delete volumesnapshot -l app.kubernetes.io/instance=ivy85
-
    ```
 
 ***Result***

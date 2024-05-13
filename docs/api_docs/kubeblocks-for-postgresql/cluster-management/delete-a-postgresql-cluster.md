@@ -34,6 +34,12 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
 
 ## Step
 
+Run the command below to delete the cluster.
+
+```bash
+kubectl delete cluster mycluster -n demo
+```
+
 If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, and then delete the cluster.
 
 ```bash

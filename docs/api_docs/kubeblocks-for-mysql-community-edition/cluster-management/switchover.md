@@ -42,6 +42,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
   kind: OpsRequest
   metadata:
     name: mycluster-switchover-demo
+    namespace: demo
   spec:
     clusterRef: mycluster
     type: Switchover
@@ -59,6 +60,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
   kind: OpsRequest
   metadata:
     name: mycluster-switchover-demo
+    namespace: demo
   spec:
     clusterRef: mycluster
     type: Switchover

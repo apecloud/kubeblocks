@@ -30,6 +30,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    kind: OpsRequest
    metadata:
      name: ops-restart
+     namespace: demo
    spec:
      clusterName: mycluster
      type: Restart 
@@ -38,14 +39,23 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    EOF
    ```
 
-2. Check the cluster status to validate the restarting.
+2. Check the pod and operation status to validate the restarting.
 
    ```bash
-   kubectl get cluster mycluster
+   kubectl get pod -n demo
    >
-   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-   mycluster   mysql                mysql-8.0.33   Delete               Running   4d19h
+   NAME                READY   STATUS        RESTARTS   AGE
+   mycluster-mysql-0   4/4     Running       0          5m32s
+   mycluster-mysql-1   4/4     Running       0          6m36s
+   mycluster-mysql-2   3/4     Terminating   0          7m37s
+
+   kubectl get ops ops-restart -n demo
+   >
+   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
    ```
 
-   - STATUS=Restarting: it means the cluster restart is in progress.
+   During the restarting process, there are two status types for pods.
+
+   - STATUS=Terminating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.

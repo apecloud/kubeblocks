@@ -45,6 +45,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
     kind: OpsRequest
     metadata:
       name: ops-volume-expansion
+      namespace: demo
     spec:
       clusterName: mycluster
       type: VolumeExpansion
@@ -69,7 +70,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
     kind: Cluster
     metadata:
       name: mycluster
-      namespace: default
+      namespace: demo
     spec:
       clusterDefinitionRef: mysql
       clusterVersionRef: mysql-8.0.33
@@ -84,7 +85,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
               - ReadWriteOnce
             resources:
               requests:
-                storage: 1Gi # Change the volume storage size.
+                storage: 40Gi # Change the volume storage size.
       terminationPolicy: Halt
     ```
 
@@ -92,7 +93,16 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
 
     </Tabs>
 
-2. Validate the volume expansion.
+2. Validate the volume expansion operation.
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
+   ```
+
+3. Check whether the corresponding cluster resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -105,5 +115,5 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
           ReadWriteOnce
         Resources:
           Requests:
-            Storage:   30Gi
+            Storage:   40Gi
    ```

@@ -44,7 +44,8 @@ kbcli cluster list pulsar
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     generateName: pulsar-vscale-
+     name: ops-vscale
+     namespace: demo
    spec:
      clusterRef: pulsar
      type: VerticalScaling
@@ -78,28 +79,28 @@ kbcli cluster list pulsar
 
    </Tabs>
 
-2. Check the cluster status to validate the vertical scaling.
+2. Check the operation status to validate the vertical scaling.
 
-    ```bash
-    kubectl get cluster mycluster -n demo
-    ```
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
 
-   - STATUS=VerticalScaling: it means the vertical scaling is in progress.
-   - STATUS=Running: it means the vertical scaling operation has been applied.
-   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
-     > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
-
-    :::note
-
-    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-    :::
+   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
+
+:::note
+
+Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+
+:::
 
 ## Horizontal scaling
 
@@ -125,7 +126,8 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
-      generateName: pulsar-horizontalscaling-
+      name: ops-horizontalscaling
+      namespace: demo
     spec:
       clusterRef: pulsar
       type: HorizontalScaling  

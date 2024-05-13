@@ -26,10 +26,10 @@ The termination policy determines how a cluster is deleted. Set the policy when 
 To check the termination policy, execute the following command.
 
 ```bash
-kubectl -n demo get cluster mongodb-cluster 
+kubectl -n demo get cluster mycluster 
 >
-NAME              CLUSTER-DEFINITION   VERSION          TERMINATION-POLICY   STATUS    AGE
-mongodb-cluster   mongodb              mongodb-5.0   Delete               Running   17m
+NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
+mycluster   mongodb              mongodb-5.0   Delete               Running   17m
 ```
 
 ## Steps

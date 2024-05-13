@@ -24,6 +24,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    kind: OpsRequest
    metadata:
      name: ops-restart
+     namespace: demo
    spec:
      clusterName: mycluster
      type: Restart 
@@ -32,14 +33,21 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    EOF
    ```
 
-2. Check the cluster status to validate the restarting.
+2. Check the pod and operation status to validate the restarting.
 
    ```bash
-   kubectl get cluster mycluster
+   kubectl get pod -n demo
    >
-   NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
-   mycluster   mongodb              mongodb-5.0   Delete               Running   27m
+   NAME                  READY   STATUS            RESTARTS   AGE
+   mycluster-mongodb-0   4/4     Terminating       0          5m32s
+
+   kubectl get ops ops-restart -n demo
+   >
+   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
    ```
 
-   - STATUS=Restarting: it means the cluster restart is in progress.
+   During the restarting process, there are two status types for pods.
+
+   - STATUS=Terminating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.

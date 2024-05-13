@@ -35,7 +35,8 @@ kbcli cluster list pulsar
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
-      generateName: pulsar-volume-expand-
+      name: ops-volume-expand
+      namespace: demo
     spec:
       clusterRef: mycluster
       type: VolumeExpansion
@@ -64,13 +65,13 @@ kbcli cluster list pulsar
 2. Validate the volume expansion operation.
 
    ```bash
-   kubectl get ops  
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
    ```
 
-   * STATUS=VolumeExpanding: it means the volume expansion is in progress.
-   * STATUS=Running: it means the volume expansion operation has been applied.
-
-3. Check whether the corresponding resources change.
+3. Check whether the corresponding cluster resources change.
 
     ```bash
     kubectl describe cluster mycluster -n demo

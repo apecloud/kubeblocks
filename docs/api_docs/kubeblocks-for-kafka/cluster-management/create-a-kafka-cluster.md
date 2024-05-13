@@ -21,16 +21,16 @@ This document shows how to create a Kafka cluster.
   Make sure the `mysql` cluster definition is installed with `kubectl get clusterdefinition mysql`.
 
   ```bash
-  kubectl get clusterdefinition mysql
+  kubectl get clusterdefinition kafka
   >
   NAME    TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  mysql                              Available   27m
+  kafka                              Available   27m
   ```
 
   View all available versions for creating a cluster.
 
   ```bash
-  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=mysql
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=kafka
   ```
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.

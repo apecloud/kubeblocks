@@ -28,56 +28,25 @@ The termination policy determines how you delete a cluster.
 
 To check the termination policy, execute the following command.
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
-kbcli cluster list mysql-cluster
+kubectl -n demo get cluster mycluster
 >
-NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mysql-cluster   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Feb 06,2023 18:27 UTC+0800
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+mycluster   mysql                mysql-8.0.30   Delete               Running   67m
 ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-```bash
-kubectl -n demo get cluster mysql-cluster
->
-NAME            CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mysql-cluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   67m
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Step
 
 Run the command below to delete a specified cluster.
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
-kbcli cluster delete mysql-cluster
+kubectl delete cluster mycluster -n demo
 ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
 
 ```bash
-kubectl patch -n demo cluster mysql-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
+kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
 
-kubectl delete -n demo cluster mysql-cluster
+kubectl delete -n demo cluster mycluster
 ```
-
-</TabItem>
-
-</Tabs>

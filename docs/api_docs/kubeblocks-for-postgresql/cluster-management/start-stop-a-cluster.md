@@ -26,10 +26,9 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mycluster
-  generateName: stop-
+  name: ops-stop
+  namespace: demo
 spec:
-  # cluster ref
   clusterName: mycluster
   type: Stop
 EOF
@@ -46,6 +45,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
     name: mycluster
+    namespace: demo
 spec:
   clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.8.0
@@ -83,11 +83,10 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mycluster
-  generateName: start-
+  name: ops-start
+  namespace: demo
 spec:
-  # cluster name
-  clusterName: pg-cluster
+  clusterName: mycluster
   type: Start
 EOF 
 ```
@@ -103,6 +102,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
     name: mycluster
+    namespace: demo
 spec:
   clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.8.0

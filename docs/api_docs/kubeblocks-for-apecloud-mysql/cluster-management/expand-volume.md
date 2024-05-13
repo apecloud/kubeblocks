@@ -70,7 +70,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
     kind: Cluster
     metadata:
       name: mycluster
-      namespace: default
+      namespace: demo
     spec:
       clusterDefinitionRef: apecloud-mysql
       clusterVersionRef: ac-mysql-8.0.30
@@ -96,16 +96,13 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 2. Validate the volume expansion operation.
 
    ```bash
-   kubectl get cluster mycluster -n demo
+   kubectl get ops -n demo
    >
-   NAME             NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   mycluster        default          apecloud-mysql            ac-mysql-8.0.30          Delete                    VolumeExpanding        April 25,2024 17:35 UTC+0800
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
    ```
 
-   * STATUS=VolumeExpanding: it means the volume expansion is in progress.
-   * STATUS=Running: it means the volume expansion operation has been applied.
-
-3. Check whether the corresponding resources change.
+3. Check whether the corresponding cluster resources change.
 
     ```bash
     kubectl describe cluster mycluster -n demo

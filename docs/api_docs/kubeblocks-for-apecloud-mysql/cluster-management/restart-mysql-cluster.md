@@ -35,7 +35,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    EOF
    ```
 
-2. Check the operation and pod status to validate the restarting.
+2. Check the pod and operation status to validate the restarting.
 
    ```bash
    kubectl get pod -n demo

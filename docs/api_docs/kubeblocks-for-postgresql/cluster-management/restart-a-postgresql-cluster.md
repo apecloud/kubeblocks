@@ -36,4 +36,22 @@ Restarting a PostgreSQL cluster triggers a concurrent restart and the leader may
    EOF
    ```
 
-2. Validate the restarting.
+2. Check the pod and operation status to validate the restarting.
+
+   ```bash
+   kubectl get pod -n demo
+   >
+   NAME                     READY   STATUS            RESTARTS   AGE
+   mycluster-postgresql-0   4/4     Terminating       0          5m32s
+   mycluster-postgresql-1   4/4     Running           0          6m36s
+
+   kubectl get ops ops-restart -n demo
+   >
+   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
+   ```
+
+   During the restarting process, there are two status types for pods.
+
+   - STATUS=Terminating: it means the cluster restart is in progress.
+   - STATUS=Running: it means the cluster has been restarted.

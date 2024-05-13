@@ -30,10 +30,10 @@ Within the same Kubernetes cluster, you can directly access the Kafka cluster wi
    *Example:*
 
    ```bash
-   NAME                    TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                               AGE
-   kubernetes              ClusterIP   10.43.0.1     <none>        443/TCP                               9d
-   ivy85-broker-headless   ClusterIP   None          <none>        9092/TCP,9093/TCP,9094/TCP,5556/TCP   7d16h
-   ivy85-broker            ClusterIP   10.43.8.124   <none>        9093/TCP,9092/TCP,5556/TCP            7d16h
+   NAME                        TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                               AGE
+   kubernetes                  ClusterIP   10.43.0.1     <none>        443/TCP                               9d
+   mycluster-broker-headless   ClusterIP   None          <none>        9092/TCP,9093/TCP,9094/TCP,5556/TCP   7d16h
+   mycluster-broker            ClusterIP   10.43.8.124   <none>        9093/TCP,9092/TCP,5556/TCP            7d16h
    ```
 
 2. Connect to the kafka cluster with the port No..
@@ -94,8 +94,8 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: Cluster
     metadata:
-      name: kafka
-      namespace: default
+      name: mycluster
+      namespace: demo
     spec:
       affinity:
         podAntiAffinity: Preferred
@@ -163,8 +163,8 @@ The current version only supports Kafka broker with a single replica (combined: 
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: Cluster
     metadata:
-      name: kafka
-      namespace: default
+      name: mycluster
+      namespace: demo
     spec:
       affinity:
         podAntiAffinity: Preferred

@@ -27,7 +27,7 @@ kubectl get cluster mycluster -n demo
    kind: Cluster
    metadata:
      name: mycluster
-     namespace: demo
+     namespace: demo 
    spec:
      clusterDefinitionRef: kafka
      clusterVersionRef: kafka-3.3.2
@@ -42,22 +42,31 @@ kubectl get cluster mycluster -n demo
              - ReadWriteOnce
            resources:
              requests:
-               storage: 1Gi # Change the volume storage size.
+               storage: 40Gi # Change the volume storage size.
      terminationPolicy: Halt
    ```
 
-2. Validate the volume expansion.
+2. Validate the volume expansion operation.
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
+   ```
+
+3. Check whether the corresponding cluster resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
    >
    ......
    Volume Claim Templates:
-      Name:  data
-      Spec:
-        Access Modes:
-          ReadWriteOnce
-        Resources:
-          Requests:
-            Storage:   1Gi
+     Name:  data
+     Spec:
+       Access Modes:
+         ReadWriteOnce
+       Resources:
+         Requests:
+           Storage:   40Gi
    ```

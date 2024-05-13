@@ -39,6 +39,7 @@ The value of `instanceName` decides whether a new primary instance is specified 
   kind: OpsRequest
   metadata:
     name: mycluster-switchover-jhkgl
+    namespace: demo
   spec:
     clusterName: mycluster
     type: Switchover
@@ -56,6 +57,7 @@ The value of `instanceName` decides whether a new primary instance is specified 
   kind: OpsRequest
   metadata:
     name: mycluster-switchover-jhkgl
+    namespace: demo
   spec:
     clusterName: mycluster
     type: Switchover

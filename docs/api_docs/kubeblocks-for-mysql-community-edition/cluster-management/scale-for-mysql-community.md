@@ -48,6 +48,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
    kind: OpsRequest
    metadata:
      name: ops-vertical-scaling
+     namespace: demo
    spec:
      clusterName: mycluster
      type: VerticalScaling 
@@ -68,14 +69,12 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
 
    Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
-   ***Example***
-
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
      name: mycluster
-     namespace: default
+     namespace: demo
    spec:
      clusterDefinitionRef: mysql
      clusterVersionRef: mysql-8.0.30
@@ -105,26 +104,28 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
 
    </Tabs>
 
-2. Check the cluster status to validate the vertical scaling.
+2. Check the operation status to validate the vertical scaling.
 
-    ```bash
-    kubectl get cluster mycluster
-    >
-    NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-    mycluster   mysql                mysql-8.0.33   Delete               Updating   4d18h
-    ```
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
 
-    :::note
-
-    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-    :::
+   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
     ```bash
     kubectl describe cluster mycluster
     ```
+
+:::note
+
+Vertical scaling does not synchronize the configuration related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+
+:::
 
 ## Horizontal scaling
 
@@ -164,6 +165,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
    kind: OpsRequest
    metadata:
      name: ops-horizontal-scaling
+     namespace: demo
    spec:
      clusterName: mycluster
      type: HorizontalScaling
@@ -179,8 +181,6 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
 
    Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
-   ***Example***
-
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
@@ -189,7 +189,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
    kind: Cluster
    metadata:
      name: mycluster
-     namespace: default
+     namespace: demo
    spec:
      clusterDefinitionRef: mysql
      clusterVersionRef: mysql-8.0.30
@@ -212,12 +212,10 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
   
   </Tabs>
 
-2. Validate the horizontal scaling operation.
-
-   Check the cluster STATUS to identify the horizontal scaling status.
+2. Check whether the corresponding resources change..
 
    ```bash
-   kubectl get cluster mycluster
+   kubectl describe cluster mycluster -n demo
    ```
 
 ### Handle the snapshot exception

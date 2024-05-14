@@ -31,6 +31,10 @@ import (
 
 func resolveServiceReferences(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent) error {
 	for _, serviceDescriptor := range synthesizedComp.ServiceReferences {
+		if serviceDescriptor == nil {
+			// ingore nil serviceDescriptor
+			continue
+		}
 		// Only support referencing endpoint and port in configuration
 		credentialVars := []*appsv1alpha1.CredentialVar{
 			serviceDescriptor.Spec.Endpoint,

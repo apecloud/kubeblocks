@@ -21,7 +21,7 @@ package plugin
 
 import (
 	"github.com/pkg/errors"
-	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 

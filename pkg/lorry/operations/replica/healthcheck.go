@@ -21,10 +21,8 @@ package replica
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,7 +43,6 @@ type CheckStatus struct {
 	dbManager                  engines.DBManager
 	checkFailedCount           int
 	failedEventReportFrequency int
-	logger                     logr.Logger
 }
 
 type FailoverManager interface {
@@ -75,26 +72,17 @@ func (s *CheckStatus) Init(ctx context.Context) error {
 	}
 
 	s.FailureThreshold = 3
-	s.logger = ctrl.Log.WithName("checkstatus")
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		healthyCheckCmd, ok := actionCommands[constant.HealthyCheckAction]
-		if ok && len(healthyCheckCmd) > 0 {
-			s.Command = healthyCheckCmd
-		}
+	s.Logger = ctrl.Log.WithName("CheckStatus")
+	s.Action = constant.HealthyCheckAction
+	err := s.Base.Init(ctx)
+	if err != nil {
+		return err
 	}
 	dbManager, err := register.GetDBManager(s.Command)
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}
 	s.dbManager = dbManager
-
 	return nil
 }
 
@@ -160,11 +148,11 @@ func (s *CheckStatus) handlerError(ctx context.Context, err error) (*operations.
 		Data: map[string]any{},
 	}
 	message := err.Error()
-	s.logger.Info("healthy checks failed", "error", message)
+	s.Logger.Info("healthy checks failed", "error", message)
 	resp.Data["event"] = util.OperationFailed
 	resp.Data["message"] = message
 	if s.checkFailedCount%s.failedEventReportFrequency == 0 {
-		s.logger.Info("healthy checks failed continuously", "times", s.checkFailedCount)
+		s.Logger.Info("healthy checks failed continuously", "times", s.checkFailedCount)
 		_ = util.SentEventForProbe(ctx, resp.Data)
 	}
 	s.checkFailedCount++

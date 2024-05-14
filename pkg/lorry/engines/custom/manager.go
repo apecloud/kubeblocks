@@ -104,7 +104,7 @@ func (mgr *Manager) InitInstanceSetActions() error {
 }
 
 func (mgr *Manager) InitComponentDefinitionActions() error {
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	actionJSON := viper.GetString(constant.KBEnvActionHandlers)
 	if actionJSON != "" {
 		err := json.Unmarshal([]byte(actionJSON), &mgr.actionCommands)
 		if err != nil {

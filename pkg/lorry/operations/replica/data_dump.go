@@ -21,11 +21,9 @@ package replica
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
-	"github.com/go-logr/logr"
-	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
@@ -34,8 +32,6 @@ import (
 
 type dataDump struct {
 	operations.Base
-	logger  logr.Logger
-	Command []string
 }
 
 func init() {
@@ -45,39 +41,12 @@ func init() {
 	}
 }
 
-func (s *dataDump) Init(_ context.Context) error {
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		cmd, ok := actionCommands[constant.DataDumpAction]
-		if ok && len(cmd) > 0 {
-			s.Command = cmd
-		}
-	}
-	return nil
-}
-
-func (s *dataDump) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
-	return nil
+func (s *dataDump) Init(ctx context.Context) error {
+	s.Logger = ctrl.Log.WithName("DataDump")
+	s.Action = constant.DataDumpAction
+	return s.Base.Init(ctx)
 }
 
 func (s *dataDump) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	return nil, doCommonAction(ctx, s.logger, "dataDump", s.Command)
-}
-
-func doCommonAction(ctx context.Context, logger logr.Logger, action string, commands []string) error {
-	envs, err := util.GetGlobalSharedEnvs()
-	if err != nil {
-		return err
-	}
-	output, err := util.ExecCommand(ctx, commands, envs)
-	if output != "" {
-		logger.Info(action, "output", output)
-	}
-	return err
+	return nil, s.ExecCommand(ctx)
 }

@@ -22,7 +22,6 @@ package replica
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -37,7 +36,6 @@ type GetLag struct {
 	operations.Base
 	dcsStore  dcs.DCS
 	dbManager engines.DBManager
-	logger    logr.Logger
 }
 
 var getlag operations.Operation = &GetLag{}
@@ -55,17 +53,17 @@ func (s *GetLag) Init(context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
+	s.Logger = ctrl.Log.WithName("GetLag")
 	dbManager, err := register.GetDBManager(nil)
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}
 	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("getlag")
 	return nil
 }
 
 func (s *GetLag) IsReadonly(context.Context) bool {
-	return false
+	return true
 }
 
 func (s *GetLag) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
@@ -83,7 +81,7 @@ func (s *GetLag) Do(ctx context.Context, req *operations.OpsRequest) (*operation
 
 	lag, err := s.dbManager.GetLag(ctx, cluster)
 	if err != nil {
-		s.logger.Info("executing getlag error", "error", err)
+		s.Logger.Info("executing getlag error", "error", err)
 		return resp, err
 	}
 

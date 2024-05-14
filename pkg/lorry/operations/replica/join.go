@@ -21,13 +21,11 @@ package replica
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
@@ -39,9 +37,7 @@ import (
 type Join struct {
 	operations.Base
 	dcsStore dcs.DCS
-	logger   logr.Logger
 	Timeout  time.Duration
-	Command  []string
 }
 
 var join operations.Operation = &Join{}
@@ -59,20 +55,9 @@ func (s *Join) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		memberJoinCmd, ok := actionCommands[constant.MemberJoinAction]
-		if ok && len(memberJoinCmd) > 0 {
-			s.Command = memberJoinCmd
-		}
-	}
-	return nil
+	s.Logger = ctrl.Log.WithName("MemberJoin")
+	s.Action = constant.MemberJoinAction
+	return s.Base.Init(ctx)
 }
 
 func (s *Join) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
@@ -83,14 +68,14 @@ func (s *Join) Do(ctx context.Context, req *operations.OpsRequest) (*operations.
 
 	cluster, err := s.dcsStore.GetCluster()
 	if err != nil {
-		s.logger.Error(err, "get cluster failed")
+		s.Logger.Error(err, "get cluster failed")
 		return nil, err
 	}
 
 	// join current member to db cluster
 	err = manager.JoinCurrentMemberToCluster(ctx, cluster)
 	if err != nil {
-		s.logger.Error(err, "join member to cluster failed")
+		s.Logger.Error(err, "join member to cluster failed")
 		return nil, err
 	}
 

@@ -407,7 +407,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			actions := map[string][]string{}
 			actions[constant.MemberJoinAction] = []string{"binary_not_exist"}
 			jsonStr, _ := json.Marshal(actions)
-			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
@@ -498,7 +498,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			actions := map[string][]string{}
 			actions[constant.MemberLeaveAction] = []string{"binary_not_exist"}
 			jsonStr, _ := json.Marshal(actions)
-			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
@@ -646,7 +646,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			actions := map[string][]string{}
 			actions[constant.ReadonlyAction] = []string{"binary_not_exist"}
 			jsonStr, _ := json.Marshal(actions)
-			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
@@ -703,7 +703,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			actions := map[string][]string{}
 			actions[constant.ReadWriteAction] = []string{"binary_not_exist"}
 			jsonStr, _ := json.Marshal(actions)
-			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
@@ -754,7 +754,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			actions := map[string][]string{}
 			actions[constant.PostProvisionAction] = []string{"binary_not_exist"}
 			jsonStr, _ := json.Marshal(actions)
-			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
@@ -805,7 +805,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			actions := map[string][]string{}
 			actions[constant.PreTerminateAction] = []string{"binary_not_exist"}
 			jsonStr, _ := json.Marshal(actions)
-			viperx.SetDefault(constant.KBEnvActionCommands, jsonStr)
+			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")

@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -44,14 +43,12 @@ type AccessMode string
 
 type CheckRole struct {
 	operations.Base
-	logger                     logr.Logger
 	dcsStore                   dcs.DCS
 	OriRole                    string
 	CheckRoleFailedCount       int
 	FailedEventReportFrequency int
 	Timeout                    time.Duration
 	DBRoles                    map[string]AccessMode
-	Command                    []string
 }
 
 var checkrole operations.Operation = &CheckRole{}
@@ -69,11 +66,11 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
-	s.logger = ctrl.Log.WithName("checkrole")
+	s.Logger = ctrl.Log.WithName("checkrole")
 	val := viper.GetString(constant.KBEnvServiceRoles)
 	if val != "" {
 		if err := json.Unmarshal([]byte(val), &s.DBRoles); err != nil {
-			s.logger.Info("KB_DB_ROLES env format error", "error", err)
+			s.Logger.Info("KB_DB_ROLES env format error", "error", err)
 		}
 	}
 
@@ -91,20 +88,8 @@ func (s *CheckRole) Init(ctx context.Context) error {
 	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
 	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
 	s.Timeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		roleProbeCmd, ok := actionCommands[constant.RoleProbeAction]
-		if ok && len(roleProbeCmd) > 0 {
-			s.Command = roleProbeCmd
-		}
-	}
-	return nil
+	s.Action = constant.RoleProbeAction
+	return s.Base.Init(ctx)
 }
 
 func (s *CheckRole) IsReadonly(ctx context.Context) bool {
@@ -137,11 +122,11 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 	role, err = manager.GetReplicaRole(ctx1, cluster)
 
 	if err != nil {
-		s.logger.Info("executing checkRole error", "error", err.Error())
+		s.Logger.Info("executing checkRole error", "error", err.Error())
 		// do not return err, as it will cause readinessprobe to fail
 		err = nil
 		if s.CheckRoleFailedCount%s.FailedEventReportFrequency == 0 {
-			s.logger.Info("role checks failed continuously", "times", s.CheckRoleFailedCount)
+			s.Logger.Info("role checks failed continuously", "times", s.CheckRoleFailedCount)
 			// if err is not nil, send event through kubelet readinessprobe
 			err = util.SentEventForProbe(ctx, resp.Data)
 		}

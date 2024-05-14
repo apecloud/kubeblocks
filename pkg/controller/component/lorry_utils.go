@@ -138,7 +138,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 	}
 	actionJSON, _ := json.Marshal(actionCommands)
 	lorryContainer.Env = append(lorryContainer.Env, corev1.EnvVar{
-		Name:  constant.KBEnvActionCommands,
+		Name:  constant.KBEnvActionHandlers,
 		Value: string(actionJSON),
 	})
 

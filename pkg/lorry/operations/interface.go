@@ -21,9 +21,18 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/lorry/plugin"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Operation interface {
@@ -35,11 +44,55 @@ type Operation interface {
 }
 
 type Base struct {
+	// the name of componentdefinition action
+	Action  string
 	Timeout time.Duration
-	Command []string
+
+	Command        []string
+	DBPluginClient plugin.DBPluginClient
+
+	Logger logr.Logger
+}
+
+type Handlers struct {
+	Command []string          `json:"commands"`
+	GPRC    map[string]string `json:"grpc"`
+}
+
+var actionHandlers = map[string]Handlers{}
+
+func init() {
+	actionJSON := viper.GetString(constant.KBEnvActionHandlers)
+	if actionJSON == "" {
+		return
+	}
+
+	err := json.Unmarshal([]byte(actionJSON), &actionHandlers)
+	if err != nil {
+		msg := fmt.Sprintf("unmarshal action handlers [%s] failed: %s", actionJSON, err.Error())
+		panic(msg)
+	}
 }
 
 func (b *Base) Init(ctx context.Context) error {
+	handlers := actionHandlers[b.Action]
+	if len(handlers.Command) != 0 {
+		b.Command = handlers.Command
+	} else if len(handlers.GPRC) != 0 {
+		host := "127.0.0.1"
+		if h, ok := handlers.GPRC["host"]; ok {
+			host = h
+		}
+		port, ok := handlers.GPRC["port"]
+		if !ok || port == "" {
+			return errors.New("grpc port is not set")
+		}
+		client, err := plugin.NewPluginClient(host + ":" + port)
+		if err != nil {
+			return errors.Wrap(err, "new grpc client failed")
+		}
+		b.DBPluginClient = client
+	}
 	return nil
 }
 
@@ -57,4 +110,12 @@ func (b *Base) PreCheck(ctx context.Context, request *OpsRequest) error {
 
 func (b *Base) Do(ctx context.Context, request *OpsRequest) (*OpsResponse, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (b *Base) ExecCommand(ctx context.Context) error {
+	output, err := util.ExecCommand(ctx, b.Command, os.Environ())
+	if output != "" {
+		b.Logger.Info(b.Action, "output", output)
+	}
+	return err
 }

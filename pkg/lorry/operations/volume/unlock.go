@@ -21,13 +21,11 @@ package volume
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
@@ -37,9 +35,7 @@ import (
 
 type Unlock struct {
 	operations.Base
-	logger  logr.Logger
 	Timeout time.Duration
-	Command []string
 }
 
 var unlock operations.Operation = &Unlock{}
@@ -52,20 +48,9 @@ func init() {
 }
 
 func (s *Unlock) Init(ctx context.Context) error {
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		readWriteCmd, ok := actionCommands[constant.ReadWriteAction]
-		if ok && len(readWriteCmd) > 0 {
-			s.Command = readWriteCmd
-		}
-	}
-	return nil
+	s.Logger = ctrl.Log.WithName("Unlock")
+	s.Action = constant.ReadWriteAction
+	return s.Base.Init(ctx)
 }
 
 func (s *Unlock) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {

@@ -112,7 +112,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				return dpBackupPolicy
 			}
 
-			transformBackupSchedule := func(compSpec *appsv1alpha1.ClusterComponentSpec, backupPolicy *dpv1alpha1.BackupPolicy) {
+			transformBackupSchedule := func(compSpec *appsv1alpha1.ClusterComponentSpec, backupPolicy *dpv1alpha1.BackupPolicy, needMergeClusterBackup bool) {
 				// if backup policy is nil, it means that the backup policy template
 				// is invalid, backup schedule depends on backup policy, so we do
 				// not need to transform backup schedule.
@@ -146,9 +146,11 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				// cluster object, so we need to merge the cluster backup configuration
 				// into the default backup schedule created by backup policy template
 				// if it exists.
-				dpBackupSchedule = r.mergeClusterBackup(compSpec, backupPolicy, dpBackupSchedule)
-				if dpBackupSchedule == nil {
-					return
+				if needMergeClusterBackup {
+					dpBackupSchedule = r.mergeClusterBackup(compSpec, backupPolicy, dpBackupSchedule)
+					if dpBackupSchedule == nil {
+						return
+					}
 				}
 
 				// if exist multiple backup policy templates and duplicate spec.identifier,
@@ -174,9 +176,10 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 			if len(compSpecs) == 0 {
 				continue
 			}
-			for _, v := range compSpecs {
+			for j, v := range compSpecs {
 				policy := transformBackupPolicy(v)
-				transformBackupSchedule(v, policy)
+				// only merge the first backupSchedule for the cluster backup.
+				transformBackupSchedule(v, policy, j == 0)
 			}
 		}
 	}

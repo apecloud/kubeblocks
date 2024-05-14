@@ -41,7 +41,6 @@ var _ = Describe("instance_set builder", func() {
 			selectorKey2, selectorValue2 = "foo-2", "bar-2"
 			selectorKey3, selectorValue3 = "foo-3", "bar-3"
 			selectorKey4, selectorValue4 = "foo-4", "bar-4"
-			serviceName                  = "foo"
 			replicas                     = int32(5)
 			minReadySeconds              = int32(11)
 			port                         = int32(12345)
@@ -176,7 +175,6 @@ var _ = Describe("instance_set builder", func() {
 			AddMatchLabel(selectorKey1, selectorValue1).
 			AddMatchLabels(selectorKey2, selectorValue2, selectorKey3, selectorValue3).
 			AddMatchLabelsInMap(selectors).
-			SetServiceName(serviceName).
 			SetRoles([]workloads.ReplicaRole{role}).
 			SetMembershipReconfiguration(&reconfiguration).
 			SetTemplate(template).
@@ -206,7 +204,6 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.Selector.MatchLabels[selectorKey2]).Should(Equal(selectorValue2))
 		Expect(its.Spec.Selector.MatchLabels[selectorKey3]).Should(Equal(selectorValue3))
 		Expect(its.Spec.Selector.MatchLabels[selectorKey4]).Should(Equal(selectorValue4))
-		Expect(its.Spec.ServiceName).Should(Equal(serviceName))
 		Expect(its.Spec.Roles).Should(HaveLen(1))
 		Expect(its.Spec.Roles[0]).Should(Equal(role))
 		Expect(its.Spec.MembershipReconfiguration).ShouldNot(BeNil())

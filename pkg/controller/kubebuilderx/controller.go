@@ -22,10 +22,10 @@ package kubebuilderx
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -133,7 +133,7 @@ func (c *controller) emitFailureEvent() {
 		return
 	}
 	// ignore object update optimistic lock conflict
-	if strings.Contains(c.err.Error(), "the object has been modified; please apply your changes to the latest version and try again") {
+	if apierrors.IsConflict(c.err) {
 		return
 	}
 	// TODO(free6om): make error message user-friendly

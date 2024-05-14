@@ -299,7 +299,7 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 
 	var formatterConfig *appsv1alpha1.FormatterConfig
 	if backupPath != "" && configMeta != nil && configMeta.ReloadOptions != nil {
-		if err := backupConfigFiles([]string{configMeta.MountPoint}, filter, backupPath); err != nil {
+		if err := checkAndBackup(*configMeta, []string{configMeta.MountPoint}, filter, backupPath); err != nil {
 			return nil, err
 		}
 		formatterConfig = &configMeta.FormatterConfig
@@ -321,6 +321,16 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		configVolumeHandleMeta: createConfigVolumeMeta(configMeta.ConfigSpec.Name, appsv1alpha1.ShellType, []string{mountPoint}, formatterConfig),
 	}
 	return shellTrigger, nil
+}
+
+func checkAndBackup(configMeta ConfigSpecInfo, dirs []string, filter regexFilter, backupPath string) error {
+	if isSyncReloadAction(configMeta) {
+		return nil
+	}
+	if err := backupConfigFiles(dirs, filter, backupPath); err != nil {
+		return err
+	}
+	return nil
 }
 
 func fromConfigSpecInfo(meta *ConfigSpecInfo) string {

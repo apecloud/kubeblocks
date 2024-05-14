@@ -22471,20 +22471,6 @@ More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-ob
 </tr>
 <tr>
 <td>
-<code>serviceName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Refers to the name of the service that governs this StatefulSet.
-This service must exist before the StatefulSet and is responsible for
-the network identity of the set. Pods get DNS/hostnames that follow a specific pattern.</p>
-<p>Note: This field will be removed in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>service</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
@@ -22982,20 +22968,6 @@ Kubernetes meta/v1.LabelSelector
 <p>Represents a label query over pods that should match the desired replica count indicated by the <code>replica</code> field.
 It must match the labels defined in the pod template.
 More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Refers to the name of the service that governs this StatefulSet.
-This service must exist before the StatefulSet and is responsible for
-the network identity of the set. Pods get DNS/hostnames that follow a specific pattern.</p>
-<p>Note: This field will be removed in future version.</p>
 </td>
 </tr>
 <tr>

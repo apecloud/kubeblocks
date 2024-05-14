@@ -84,7 +84,7 @@ func buildAlternativeSvs(its workloads.InstanceSet, svcLabels map[string]string)
 
 func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
 	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, its.Annotations)
-	hdlBuilder := builder.NewHeadlessServiceBuilder(its.Namespace, getHeadlessSvcName(its)).
+	hdlBuilder := builder.NewHeadlessServiceBuilder(its.Namespace, getHeadlessSvcName(its.Name)).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
 		AddAnnotationsInMap(annotations).
@@ -110,8 +110,8 @@ func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]st
 	return hdlBuilder.GetObject()
 }
 
-func getHeadlessSvcName(its workloads.InstanceSet) string {
-	return strings.Join([]string{its.Name, "headless"}, "-")
+func getHeadlessSvcName(itsName string) string {
+	return strings.Join([]string{itsName, "headless"}, "-")
 }
 
 func buildEnvConfigMap(its workloads.InstanceSet, labels map[string]string) *corev1.ConfigMap {
@@ -498,7 +498,7 @@ func injectCustomRoleProbeContainer(its *workloads.InstanceSet, template *corev1
 
 func buildEnvConfigData(its workloads.InstanceSet) map[string]string {
 	envData := map[string]string{}
-	svcName := getHeadlessSvcName(its)
+	svcName := getHeadlessSvcName(its.Name)
 	uid := string(its.UID)
 	strReplicas := strconv.Itoa(int(*its.Spec.Replicas))
 	generateReplicaEnv := func(prefix string, podNames []string) {

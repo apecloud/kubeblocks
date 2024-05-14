@@ -4148,13 +4148,6 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
-              serviceName:
-                description: "Refers to the name of the service that governs this
-                  StatefulSet. This service must exist before the StatefulSet and
-                  is responsible for the network identity of the set. Pods get DNS/hostnames
-                  that follow a specific pattern. \n Note: This field will be removed
-                  in future version."
-                type: string
               template:
                 description: PodTemplateSpec describes the data a pod should have
                   when created from a template
@@ -12155,7 +12148,6 @@ spec:
                 type: array
             required:
             - selector
-            - serviceName
             - template
             type: object
           status:

@@ -166,11 +166,7 @@ func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, m
 }
 
 func generateUniqueNameWithBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) string {
-	uniqueName := backupSchedule.Name
-	if len(backupSchedule.OwnerReferences) > 0 {
-		uniqueName = fmt.Sprintf("%s-%s", backupSchedule.OwnerReferences[0].UID[:8], backupSchedule.OwnerReferences[0].Name)
-	}
-	return uniqueName
+	return fmt.Sprintf("%s-%s", backupSchedule.UID[:8], backupSchedule.Name)
 }
 
 // BuildBaseBackupPath builds the path to storage backup data in backup repository.

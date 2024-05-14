@@ -34,7 +34,6 @@ And then you can reference it when installing or upgrading KubeBlocks.
 helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace 
     --set dataProtection.encryptionKeySecretKeyRef.name="dp-encryption-key" \
     --set dataProtection.encryptionKeySecretKeyRef.key="encryptionKey"
-    
 ```
 
 ### Create a new key
@@ -58,7 +57,7 @@ Remember to reference the key created before.
 
 Complete. Now you can perform backups and restores as usual.
 
-:::Note
+:::note
 
 The secret created in Step 1 should not be modified or deleted; otherwise, decryption of backups may fail.
 

@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -90,7 +91,12 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Do(instanceset.NewReplicasAlignmentReconciler()).
 		Do(instanceset.NewUpdateReconciler()).
 		Commit()
-	return ctrl.Result{}, err
+	requeue := false
+	if err != nil && apierrors.IsConflict(err) {
+		requeue = true
+		err = nil
+	}
+	return ctrl.Result{Requeue: requeue}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.

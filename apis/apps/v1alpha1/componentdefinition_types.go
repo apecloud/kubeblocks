@@ -696,9 +696,8 @@ const (
 // GRPCAction describes an Action that triggers HTTP requests.
 type GRPCAction struct {
 	// Specifies the target port for the GRPC request.
-	// It can be specified either as a numeric value in the range of 1 to 65535,
-	// or as a named port that meets the IANA_SVC_NAME specification.
-	Port intstr.IntOrString `json:"port"`
+	// It can be specified either as a numeric value in the range of 1 to 65535.
+	Port string `json:"port"`
 
 	// Indicates the server's domain name or IP address. Defaults to the Pod's IP.
 	//

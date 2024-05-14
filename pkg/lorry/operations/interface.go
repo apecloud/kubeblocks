@@ -54,12 +54,7 @@ type Base struct {
 	Logger logr.Logger
 }
 
-type Handlers struct {
-	Command []string          `json:"commands"`
-	GPRC    map[string]string `json:"grpc"`
-}
-
-var actionHandlers = map[string]Handlers{}
+var actionHandlers = map[string]util.Handlers{}
 
 func init() {
 	actionJSON := viper.GetString(constant.KBEnvActionHandlers)

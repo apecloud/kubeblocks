@@ -22,6 +22,7 @@ package component
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -114,29 +116,20 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 
 func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container,
 	lorryHTTPPort, lorryGRPCPort int) {
-	actionCommands, execImage, containerName := getActionCommandsWithExecImageOrContainerName(synthesizeComp)
-	if len(actionCommands) == 0 {
+	actions, execImage, execContainer := getActionsWithExecImageOrContainer(synthesizeComp)
+	if len(actions) == 0 {
 		return
 	}
 	initContainer := buildLorryInitContainer()
 	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
-	execContainer := getExecContainer(synthesizeComp.PodSpec.Containers, containerName)
-	if execImage == "" {
-		if execContainer == nil {
-			return
-		}
-		execImage = execContainer.Image
-	}
-
 	lorryContainer.Image = execImage
 	lorryContainer.VolumeMounts = append(lorryContainer.VolumeMounts, corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"})
-
 	lorryContainer.Command = []string{"/kubeblocks/lorry",
 		"--port", strconv.Itoa(lorryHTTPPort),
 		"--grpcport", strconv.Itoa(lorryGRPCPort),
 		"--config-path", "/kubeblocks/config/lorry/components/",
 	}
-	actionJSON, _ := json.Marshal(actionCommands)
+	actionJSON, _ := json.Marshal(actions)
 	lorryContainer.Env = append(lorryContainer.Env, corev1.EnvVar{
 		Name:  constant.KBEnvActionHandlers,
 		Value: string(actionJSON),
@@ -442,9 +435,9 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	return appsv1alpha1.UnknownBuiltinActionHandler
 }
 
-func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedComponent) (map[string][]string, string, string) {
+func getActionsWithExecImageOrContainer(synthesizeComp *SynthesizedComponent) (map[string]util.Handlers, string, *corev1.Container) {
 	if synthesizeComp.LifecycleActions == nil {
-		return nil, "", ""
+		return nil, "", nil
 	}
 
 	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
@@ -466,20 +459,50 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 
 	var toolImage string
 	var containerName string
-	actionCommands := map[string][]string{}
-	for action, handler := range actions {
-		if handler != nil && handler.CustomHandler != nil && handler.CustomHandler.Exec != nil {
-			actionCommands[action] = handler.CustomHandler.Exec.Command
+	actionNames := []string{}
+	for name := range actions {
+		actionNames = append(actionNames, name)
+	}
+	sort.Strings(actionNames)
+
+	hasCommand := false
+	actionHandlers := map[string]util.Handlers{}
+	for _, name := range actionNames {
+		handler := actions[name]
+		if handler == nil || handler.CustomHandler == nil {
+			continue
+		}
+
+		handlers := util.Handlers{}
+		if handler.CustomHandler.Exec != nil {
+			hasCommand = true
+			handlers.Command = handler.CustomHandler.Exec.Command
 			if handler.CustomHandler.Image != "" {
 				toolImage = handler.CustomHandler.Image
 			}
 			if handler.CustomHandler.Container != "" {
 				containerName = handler.CustomHandler.Container
 			}
+		} else if handler.CustomHandler.GRPC != nil {
+			handlers.GPRC = map[string]string{}
+			handlers.GPRC["host"] = handler.CustomHandler.GRPC.Host
+			handlers.GPRC["port"] = handler.CustomHandler.GRPC.Port
+			handlers.GPRC["service"] = handler.CustomHandler.GRPC.Service
 		}
+		actionHandlers[name] = handlers
+	}
+	if !hasCommand {
+		return actionHandlers, "", nil
 	}
 
-	return actionCommands, toolImage, containerName
+	execContainer := getExecContainer(synthesizeComp.PodSpec.Containers, containerName)
+	if toolImage == "" {
+		if execContainer == nil {
+			return actionHandlers, "", nil
+		}
+		toolImage = execContainer.Image
+	}
+	return actionHandlers, toolImage, execContainer
 }
 
 func getExecContainer(containers []corev1.Container, name string) *corev1.Container {

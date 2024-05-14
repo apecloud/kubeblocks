@@ -935,7 +935,7 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 	if err == nil {
 		return &resolvedServiceObj{service: obj}, nil
 	}
-	if err != nil && !apierrors.IsNotFound(err) {
+	if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 

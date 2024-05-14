@@ -60,7 +60,12 @@ func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag 
 
 	cluster := transCtx.Cluster
 	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, synthesizedComp.Replicas, 0)
-	needDoPostProvision, _ := component.NeedDoPostProvision(transCtx.Context, transCtx.Client, cluster, transCtx.Component, synthesizedComp)
+
+	actionCtx, err := component.NewActionContext(cluster, transCtx.Component, synthesizedComp.LifecycleActions, synthesizedComp.ScriptTemplates, component.PostProvisionAction)
+	if err != nil {
+		return err
+	}
+	needDoPostProvision, _ := component.NeedDoPostProvision(transCtx.Context, transCtx.Client, actionCtx)
 	if err := restoreMGR.DoRestore(synthesizedComp, transCtx.Component, needDoPostProvision); err != nil {
 		return commitError(err)
 	}

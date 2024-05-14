@@ -128,7 +128,10 @@ var _ = Describe("Component PostProvision Test", func() {
 
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
-			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, cluster, comp, synthesizeComp, dag)
+
+			actionCtx, err := NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)
+			Expect(err).Should(Succeed())
+			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, actionCtx, dag)
 			Expect(err).Should(Succeed())
 
 			By("build component with postProvision without PodList, do not need to do PostProvision action")
@@ -145,15 +148,18 @@ var _ = Describe("Component PostProvision Test", func() {
 				},
 			}
 			synthesizeComp.LifecycleActions.PostProvision = &postProvision
-			need, err := NeedDoPostProvision(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
+			actionCtx, err = NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)
+			Expect(err).Should(Succeed())
+			need, err := NeedDoPostProvision(testCtx.Ctx, k8sClient, actionCtx)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeFalse())
-			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, cluster, comp, synthesizeComp, dag)
+			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, actionCtx, dag)
 			Expect(err).Should(Succeed())
 
 			By("mock component status ready, should do postProvision action")
 			comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
-			need, err = NeedDoPostProvision(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
+			actionCtx.component = comp
+			need, err = NeedDoPostProvision(testCtx.Ctx, k8sClient, actionCtx)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeTrue())
 
@@ -167,11 +173,11 @@ var _ = Describe("Component PostProvision Test", func() {
 				}}
 				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 			}
-			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, cluster, comp, synthesizeComp, dag)
+			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, actionCtx, dag)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("job not exist, pls check"))
 
-			jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, PostProvisionAction)
+			jobName, _ := genActionJobName(synthesizeComp.FullCompName, PostProvisionAction)
 			err = job.CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("job not exist, pls check"))

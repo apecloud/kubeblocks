@@ -64,22 +64,20 @@ func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
-	synthesizedComp, err := BuildSynthesizedComponent(reqCtx, cli, cluster, compDef, comp)
+	actionCtx, err := NewActionContext(cluster, comp, compDef.Spec.LifecycleActions, compDef.Spec.Scripts, PreTerminateAction)
 	if err != nil {
 		return err
 	}
 
-	return reconcileCompPreTerminate(ctx, cli, graphCli, cluster, comp, synthesizedComp, dag)
+	return reconcileCompPreTerminate(ctx, cli, graphCli, actionCtx, dag)
 }
 
 func reconcileCompPreTerminate(ctx context.Context,
 	cli client.Reader,
 	graphCli model.GraphClient,
-	cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component,
-	synthesizedComp *SynthesizedComponent,
+	actionCtx *ActionContext,
 	dag *graph.DAG) error {
-	needPreTerminate, err := needDoPreTerminate(ctx, cli, cluster, comp, synthesizedComp)
+	needPreTerminate, err := needDoPreTerminate(ctx, cli, actionCtx)
 	if err != nil {
 		return err
 	}
@@ -87,7 +85,7 @@ func reconcileCompPreTerminate(ctx context.Context,
 		return nil
 	}
 
-	actionJob, err := createActionJobIfNotExist(ctx, cli, graphCli, dag, cluster, comp, synthesizedComp, PreTerminateAction)
+	actionJob, err := createActionJobIfNotExist(ctx, cli, graphCli, dag, actionCtx)
 	if err != nil {
 		return err
 	}
@@ -95,31 +93,29 @@ func reconcileCompPreTerminate(ctx context.Context,
 		return nil
 	}
 
-	err = job.CheckJobSucceed(ctx, cli, cluster, actionJob.Name)
+	err = job.CheckJobSucceed(ctx, cli, actionCtx.cluster, actionJob.Name)
 	if err != nil {
 		return err
 	}
 
 	// job executed successfully, add the annotation to indicate that the PreTerminate has been executed and delete the job
-	compOrig := comp.DeepCopy()
-	if err := setActionDoneAnnotation(graphCli, comp, dag, PreTerminateAction); err != nil {
+	if err := setActionDoneAnnotation(graphCli, actionCtx, dag); err != nil {
 		return err
 	}
 
-	if err := cleanActionJob(ctx, cli, dag, cluster, *compOrig, *synthesizedComp, PreTerminateAction, actionJob.Name); err != nil {
+	if err := cleanActionJob(ctx, cli, dag, actionCtx, actionJob.Name); err != nil {
 		return err
 	}
 
 	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for job %s to be cleaned.", actionJob.Name)
 }
 
-func needDoPreTerminate(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) (bool, error) {
+func needDoPreTerminate(ctx context.Context, cli client.Reader, actionCtx *ActionContext) (bool, error) {
 	// if the component does not have a custom PreTerminate action, skip it
-	actionExist, _ := checkLifeCycleAction(synthesizeComp, PreTerminateAction)
+	actionExist, _ := checkLifeCycleAction(actionCtx)
 	if !actionExist {
 		return false, nil
 	}
 
-	return needDoActionByCheckingJobNAnnotation(ctx, cli, cluster, comp, synthesizeComp, PreTerminateAction)
+	return needDoActionByCheckingJobNAnnotation(ctx, cli, actionCtx)
 }

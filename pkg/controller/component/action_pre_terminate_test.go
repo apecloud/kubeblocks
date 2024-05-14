@@ -129,10 +129,11 @@ var _ = Describe("Component PreTerminate Test", func() {
 			By("test component without preTerminate action and no need to do PreTerminate action")
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
-			need, err := needDoPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
+			actionCtx, err := NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PreTerminateAction)
+			need, err := needDoPreTerminate(testCtx.Ctx, testCtx.Cli, actionCtx)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeFalse())
-			err = reconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, graphCli, cluster, comp, synthesizeComp, dag)
+			err = reconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, graphCli, actionCtx, dag)
 			Expect(err).Should(Succeed())
 
 			By("build component with preTerminate action and should do PreTerminate action")
@@ -156,16 +157,17 @@ var _ = Describe("Component PreTerminate Test", func() {
 				},
 			}
 			synthesizeComp.LifecycleActions.PreTerminate = &PreTerminate
-			need, err = needDoPreTerminate(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
+			actionCtx, err = NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PreTerminateAction)
+			need, err = needDoPreTerminate(testCtx.Ctx, k8sClient, actionCtx)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeTrue())
 
-			err = reconcileCompPreTerminate(testCtx.Ctx, k8sClient, graphCli, cluster, comp, synthesizeComp, dag)
+			err = reconcileCompPreTerminate(testCtx.Ctx, k8sClient, graphCli, actionCtx, dag)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("job not exist, pls check"))
 
 			By("requeue to waiting for job")
-			jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, PreTerminateAction)
+			jobName, _ := genActionJobName(synthesizeComp.FullCompName, PreTerminateAction)
 			err = job.CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("job not exist, pls check"))

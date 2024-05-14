@@ -369,7 +369,8 @@ var _ = Describe("vars", func() {
 		It("host-network vars", func() {
 			vars := []appsv1alpha1.EnvVar{
 				{
-					Name: "host-network-port",
+					Name:  "host-network-port",
+					Value: "3306", // default value
 					ValueFrom: &appsv1alpha1.VarSource{
 						HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
@@ -415,6 +416,41 @@ var _ = Describe("vars", func() {
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
 			checkEnvVarWithValue(envVars, "host-network-port", "30001")
+
+			By("w/ default value - has host-network port")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name:  "host-network-port",
+					Value: "3306", // default value
+					ValueFrom: &appsv1alpha1.VarSource{
+						HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Optional: optional(), // optional
+							},
+							HostNetworkVars: appsv1alpha1.HostNetworkVars{
+								Container: &appsv1alpha1.ContainerVars{
+									Name: "default",
+									Port: &appsv1alpha1.NamedVar{
+										Name:   "default",
+										Option: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
+			checkEnvVarWithValue(envVars, "host-network-port", "30001")
+
+			By("w/ default value - back-off to default value")
+			synthesizedComp.Annotations = nil // disable the host-network
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "3306"))
+			checkEnvVarWithValue(envVars, "host-network-port", "3306")
 		})
 
 		It("service vars", func() {

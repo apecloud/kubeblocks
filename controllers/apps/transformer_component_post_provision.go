@@ -48,7 +48,12 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 		return nil
 	}
 
-	if err := component.ReconcileCompPostProvision(reqCtx.Ctx, transCtx.Client, graphCli, cluster, comp, synthesizeComp, dag); err != nil {
+	actionCtx, err := component.NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, component.PostProvisionAction)
+	if err != nil {
+		return err
+	}
+
+	if err := component.ReconcileCompPostProvision(reqCtx.Ctx, transCtx.Client, graphCli, actionCtx, dag); err != nil {
 		return err
 	}
 	return nil

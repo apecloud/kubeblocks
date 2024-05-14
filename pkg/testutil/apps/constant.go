@@ -58,8 +58,8 @@ const (
 	Class2c4gName                 = "general-2c4g"
 	DefaultResourceConstraintName = "kb-resource-constraint"
 
-	EnvKeyImageTag   = "IMAGE_TAG"
-	DefaultImageTag  = "test"
+	EnvKeyImageTag  = "IMAGE_TAG"
+	DefaultImageTag = "test"
 
 	DefaultConfigSpecName          = "config-cm"
 	DefaultConfigSpecTplRef        = "env-from-config-tpl"

@@ -364,16 +364,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return targetMap
 	}
 
-	copyAndMergeSts := func(oldSts, newSts *appsv1.StatefulSet) client.Object {
-		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
-		// if annotations exist and are replaced, the StatefulSet will be updated.
-		oldSts.Annotations = mergeMetadataMap(oldSts.Annotations, newSts.Annotations)
-		oldSts.Spec.Template = newSts.Spec.Template
-		oldSts.Spec.Replicas = newSts.Spec.Replicas
-		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
-		return oldSts
-	}
-
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
 		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
 		oldSvc.Spec = newSvc.Spec
@@ -405,8 +395,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
-	case *appsv1.StatefulSet:
-		return copyAndMergeSts(targetObj.(*appsv1.StatefulSet), o)
 	case *corev1.Service:
 		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
 	case *corev1.ConfigMap:

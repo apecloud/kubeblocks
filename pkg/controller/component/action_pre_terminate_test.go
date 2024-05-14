@@ -130,6 +130,7 @@ var _ = Describe("Component PreTerminate Test", func() {
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
 			actionCtx, err := NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PreTerminateAction)
+			Expect(err).Should(Succeed())
 			need, err := needDoPreTerminate(testCtx.Ctx, testCtx.Cli, actionCtx)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeFalse())
@@ -158,6 +159,7 @@ var _ = Describe("Component PreTerminate Test", func() {
 			}
 			synthesizeComp.LifecycleActions.PreTerminate = &PreTerminate
 			actionCtx, err = NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PreTerminateAction)
+			Expect(err).Should(Succeed())
 			need, err = needDoPreTerminate(testCtx.Ctx, k8sClient, actionCtx)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeTrue())

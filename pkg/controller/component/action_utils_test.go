@@ -130,6 +130,7 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
 			actionCtx, err := NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)
+			Expect(err).Should(Succeed())
 			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, graphCli, actionCtx, dag)
 			Expect(err).Should(Succeed())
 
@@ -157,6 +158,7 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 			}
 			actionCtx, err = NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PreTerminateAction)
+			Expect(err).Should(Succeed())
 			renderJob, err := renderActionCmdJob(testCtx.Ctx, testCtx.Cli, actionCtx)
 			Expect(err).Should(Succeed())
 			Expect(renderJob).ShouldNot(BeNil())

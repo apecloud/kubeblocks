@@ -75,27 +75,34 @@ const (
 	kbLifecycleActionClusterCompUndeletedList = "KB_CLUSTER_COMPONENT_UNDELETED_LIST"
 )
 
+// ActionContext represents the context for lifecycle action.
+type ActionContext struct {
+	compShortName    string
+	cluster          *appsv1alpha1.Cluster
+	component        *appsv1alpha1.Component
+	actionType       LifeCycleActionType
+	lifecycleActions *appsv1alpha1.ComponentLifecycleActions
+	scriptTemplates  []appsv1alpha1.ComponentTemplateSpec
+}
+
 // createActionJobIfNotExist creates a job to execute component-level custom lifecycle action command, each component only has a corresponding job.
 func createActionJobIfNotExist(ctx context.Context,
 	cli client.Reader,
 	graphCli model.GraphClient,
 	dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component,
-	synthesizeComp *SynthesizedComponent,
-	actionType LifeCycleActionType) (*batchv1.Job, error) {
+	actionCtx *ActionContext) (*batchv1.Job, error) {
 	// check if the lifecycle action definition exists
-	actionExist, _ := checkLifeCycleAction(synthesizeComp, actionType)
+	actionExist, _ := checkLifeCycleAction(actionCtx)
 	if !actionExist {
 		return nil, nil
 	}
 
-	renderJob, err := renderActionCmdJob(ctx, cli, cluster, synthesizeComp, actionType)
+	renderJob, err := renderActionCmdJob(ctx, cli, actionCtx)
 	if err != nil {
 		return nil, err
 	}
 
-	key := types.NamespacedName{Namespace: cluster.Namespace, Name: renderJob.Name}
+	key := types.NamespacedName{Namespace: actionCtx.cluster.Namespace, Name: renderJob.Name}
 	existJob := &batchv1.Job{}
 	exist, _ := intctrlutil.CheckResourceExists(ctx, cli, key, existJob)
 	if exist {
@@ -103,7 +110,7 @@ func createActionJobIfNotExist(ctx context.Context,
 	}
 
 	// set the controller reference
-	if err := intctrlutil.SetControllerReference(comp, renderJob); err != nil {
+	if err := intctrlutil.SetControllerReference(actionCtx.component, renderJob); err != nil {
 		return renderJob, err
 	}
 
@@ -113,21 +120,16 @@ func createActionJobIfNotExist(ctx context.Context,
 }
 
 // renderActionCmdJob renders and creates the action command job.
-func renderActionCmdJob(ctx context.Context,
-	cli client.Reader,
-	cluster *appsv1alpha1.Cluster,
-	synthesizeComp *SynthesizedComponent,
-	actionType LifeCycleActionType) (*batchv1.Job, error) {
-
-	exist, action := checkLifeCycleAction(synthesizeComp, actionType)
+func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *ActionContext) (*batchv1.Job, error) {
+	exist, action := checkLifeCycleAction(actionCtx)
 	if !exist {
-		return nil, fmt.Errorf("lifecycle action %s custom handler not found", actionType)
+		return nil, fmt.Errorf("lifecycle action %s custom handler not found", actionCtx.actionType)
 	}
 	if action.Exec == nil {
-		return nil, fmt.Errorf("lifecycle action %s custom handler only support exec command by now, please check your customHandler spec", actionType)
+		return nil, fmt.Errorf("lifecycle action %s custom handler only support exec command by now, please check your customHandler spec", actionCtx.actionType)
 	}
 
-	podList, err := GetComponentPodList(ctx, cli, *cluster, synthesizeComp.Name)
+	podList, err := GetComponentPodList(ctx, cli, *actionCtx.cluster, actionCtx.compShortName)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +153,7 @@ func renderActionCmdJob(ctx context.Context,
 			}
 		}
 
-		for _, scriptSpec := range synthesizeComp.ScriptTemplates {
+		for _, scriptSpec := range actionCtx.scriptTemplates {
 			findVolumes(scriptSpec)
 		}
 
@@ -172,21 +174,21 @@ func renderActionCmdJob(ctx context.Context,
 
 	renderJob := func(customAction *appsv1alpha1.Action, envs []corev1.EnvVar, envFroms []corev1.EnvFromSource) (*batchv1.Job, error) {
 		volumes, volumeMounts := renderJobPodVolumes()
-		jobName, err := genActionJobName(cluster.Name, synthesizeComp.Name, actionType)
+		jobName, err := genActionJobName(actionCtx.component.Name, actionCtx.actionType)
 		if err != nil {
 			return nil, err
 		}
-		job := &batchv1.Job{
+		jobObj := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: cluster.Namespace,
+				Namespace: actionCtx.cluster.Namespace,
 				Name:      jobName,
-				Labels:    getActionCmdJobLabels(cluster.Name, synthesizeComp.Name, actionType),
+				Labels:    getActionCmdJobLabels(actionCtx.cluster.Name, actionCtx.compShortName, actionCtx.actionType),
 			},
 			Spec: batchv1.JobSpec{
 				BackoffLimit: pointer.Int32(2),
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: cluster.Namespace,
+						Namespace: actionCtx.cluster.Namespace,
 						Name:      jobName,
 					},
 					Spec: corev1.PodSpec{
@@ -208,36 +210,35 @@ func renderActionCmdJob(ctx context.Context,
 				},
 			},
 		}
-		if len(cluster.Spec.Tolerations) > 0 {
-			job.Spec.Template.Spec.Tolerations = cluster.Spec.Tolerations
+		if len(actionCtx.cluster.Spec.Tolerations) > 0 {
+			jobObj.Spec.Template.Spec.Tolerations = actionCtx.cluster.Spec.Tolerations
 		}
-		for i := range job.Spec.Template.Spec.Containers {
-			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
+		for i := range jobObj.Spec.Template.Spec.Containers {
+			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&jobObj.Spec.Template.Spec.Containers[i])
 		}
 		if customAction.RetryPolicy != nil && customAction.RetryPolicy.MaxRetries > 0 {
-			job.Spec.BackoffLimit = pointer.Int32(int32(customAction.RetryPolicy.MaxRetries))
+			jobObj.Spec.BackoffLimit = pointer.Int32(int32(customAction.RetryPolicy.MaxRetries))
 		}
-		return job, nil
+		return jobObj, nil
 	}
 
-	envs, envFroms, err := buildLifecycleActionEnvs(ctx, cli, cluster, synthesizeComp, action, pods, &tplPod)
+	envs, envFroms, err := buildLifecycleActionEnvs(ctx, cli, actionCtx, action, pods, &tplPod)
 	if err != nil {
 		return nil, err
 	}
 
-	job, err := renderJob(action, envs, envFroms)
+	renderedJob, err := renderJob(action, envs, envFroms)
 	if err != nil {
 		return nil, err
 	}
 
-	return job, nil
+	return renderedJob, nil
 }
 
 // buildLifecycleActionEnvs builds the environment variables for lifecycle actions.
 func buildLifecycleActionEnvs(ctx context.Context,
 	cli client.Reader,
-	cluster *appsv1alpha1.Cluster,
-	synthesizeComp *SynthesizedComponent,
+	actionCtx *ActionContext,
 	action *appsv1alpha1.Action,
 	pods []corev1.Pod,
 	tplPod *corev1.Pod) ([]corev1.EnvVar, []corev1.EnvFromSource, error) {
@@ -255,7 +256,7 @@ func buildLifecycleActionEnvs(ctx context.Context,
 		workloadEnvFroms = append(workloadEnvFroms, tplPod.Spec.Containers[0].EnvFrom...)
 	}
 
-	genEnvs, err := genClusterNComponentEnvs(ctx, cli, cluster, synthesizeComp, pods)
+	genEnvs, err := genClusterNComponentEnvs(ctx, cli, actionCtx, pods)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -267,12 +268,8 @@ func buildLifecycleActionEnvs(ctx context.Context,
 }
 
 // genClusterNComponentEnvs generates the cluster and component relative envs.
-func genClusterNComponentEnvs(ctx context.Context,
-	cli client.Reader,
-	cluster *appsv1alpha1.Cluster,
-	synthesizeComp *SynthesizedComponent,
-	pods []corev1.Pod) ([]corev1.EnvVar, error) {
-	if cluster == nil || (cluster.Spec.ComponentSpecs == nil && cluster.Spec.ShardingSpecs == nil) {
+func genClusterNComponentEnvs(ctx context.Context, cli client.Reader, actionCtx *ActionContext, pods []corev1.Pod) ([]corev1.EnvVar, error) {
+	if actionCtx.cluster == nil || (actionCtx.cluster.Spec.ComponentSpecs == nil && actionCtx.cluster.Spec.ShardingSpecs == nil) {
 		return nil, nil
 	}
 
@@ -283,17 +280,17 @@ func genClusterNComponentEnvs(ctx context.Context,
 	}
 	envs = append(envs, podEnvs...)
 
-	compList, err := ListClusterComponents(ctx, cli, cluster)
+	compList, err := ListClusterComponents(ctx, cli, actionCtx.cluster)
 	if err != nil {
 		return nil, err
 	}
-	compEnvs, err := genComponentEnvs(synthesizeComp, compList)
+	compEnvs, err := genComponentEnvs(actionCtx.component, compList)
 	if err != nil {
 		return nil, err
 	}
 	envs = append(envs, compEnvs...)
 
-	clusterEnvs, err := genClusterEnvs(ctx, cli, cluster, compList)
+	clusterEnvs, err := genClusterEnvs(ctx, cli, actionCtx.cluster, compList)
 	if err != nil {
 		return nil, err
 	}
@@ -303,10 +300,10 @@ func genClusterNComponentEnvs(ctx context.Context,
 }
 
 // genComponentEnvs generates the component relative envs.
-func genComponentEnvs(synthesizeComp *SynthesizedComponent, components []appsv1alpha1.Component) ([]corev1.EnvVar, error) {
+func genComponentEnvs(component *appsv1alpha1.Component, components []appsv1alpha1.Component) ([]corev1.EnvVar, error) {
 	compEnvs := make([]corev1.EnvVar, 0)
 	for _, comp := range components {
-		if comp.Name == synthesizeComp.FullCompName {
+		if comp.Name == component.Name {
 			scaleInVal, ok := comp.Annotations[constant.ComponentScaleInAnnotationKey]
 			if ok {
 				compEnvs = append(compEnvs, corev1.EnvVar{
@@ -428,15 +425,14 @@ func genClusterEnvs(ctx context.Context, cli client.Reader, cluster *appsv1alpha
 }
 
 // needDoActionByCheckingJobNAnnotation checks if the action needs to be executed by checking the job and annotation.
-func needDoActionByCheckingJobNAnnotation(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent, actionType LifeCycleActionType) (bool, error) {
-	if comp.Annotations == nil {
+func needDoActionByCheckingJobNAnnotation(ctx context.Context, cli client.Reader, actionCtx *ActionContext) (bool, error) {
+	if actionCtx.component.Annotations == nil {
 		return true, nil
 	}
 	// determine whether the component has undergone action by checking the annotation and job
-	jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, actionType)
-	jobExist := checkActionJobExist(ctx, cli, cluster, jobName)
-	finishAnnotationExist := checkActionDoneAnnotationExist(*cluster, *comp, *synthesizeComp, actionType)
+	jobName, _ := genActionJobName(actionCtx.component.Name, actionCtx.actionType)
+	jobExist := checkActionJobExist(ctx, cli, actionCtx.cluster.Namespace, jobName)
+	finishAnnotationExist := checkActionDoneAnnotationExist(actionCtx)
 	if finishAnnotationExist && !jobExist {
 		// if the annotation has been set and the job does not exist, it means that the action has finished, so skip it
 		return false, nil
@@ -444,20 +440,20 @@ func needDoActionByCheckingJobNAnnotation(ctx context.Context, cli client.Reader
 	return true, nil
 }
 
-func checkActionJobExist(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, jobName string) bool {
-	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
+func checkActionJobExist(ctx context.Context, cli client.Reader, namespace, jobName string) bool {
+	key := types.NamespacedName{Namespace: namespace, Name: jobName}
 	existJob := &batchv1.Job{}
 	exist, _ := intctrlutil.CheckResourceExists(ctx, cli, key, existJob)
 	return exist
 }
 
 // setActionDoneAnnotation sets the action done annotation for the component.
-func setActionDoneAnnotation(graphCli model.GraphClient, comp *appsv1alpha1.Component, dag *graph.DAG, actionType LifeCycleActionType) error {
-	if comp.Annotations == nil {
-		comp.Annotations = make(map[string]string)
+func setActionDoneAnnotation(graphCli model.GraphClient, actionCtx *ActionContext, dag *graph.DAG) error {
+	if actionCtx.component.Annotations == nil {
+		actionCtx.component.Annotations = make(map[string]string)
 	}
 	var actionDoneKey string
-	switch actionType {
+	switch actionCtx.actionType {
 	case PostProvisionAction:
 		actionDoneKey = kbCompPostProvisionDoneKey
 	case PreTerminateAction:
@@ -465,14 +461,14 @@ func setActionDoneAnnotation(graphCli model.GraphClient, comp *appsv1alpha1.Comp
 	default:
 		return errors.New("unsupported lifecycle action type")
 	}
-	_, ok := comp.Annotations[actionDoneKey]
+	_, ok := actionCtx.component.Annotations[actionDoneKey]
 	if ok {
 		return nil
 	}
-	compObj := comp.DeepCopy()
+	compObj := actionCtx.component.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
-	comp.Annotations[actionDoneKey] = timeStr
-	graphCli.Update(dag, compObj, comp, &model.ReplaceIfExistingOption{})
+	actionCtx.component.Annotations[actionDoneKey] = timeStr
+	graphCli.Update(dag, compObj, actionCtx.component, &model.ReplaceIfExistingOption{})
 	return nil
 }
 
@@ -480,35 +476,29 @@ func setActionDoneAnnotation(graphCli model.GraphClient, comp *appsv1alpha1.Comp
 func cleanActionJob(ctx context.Context,
 	cli client.Reader,
 	dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster,
-	comp appsv1alpha1.Component,
-	synthesizeComp SynthesizedComponent,
-	actionType LifeCycleActionType,
+	actionCtx *ActionContext,
 	jobName string) error {
-	if cluster.Annotations == nil || comp.Annotations == nil {
+	if actionCtx.cluster.Annotations == nil || actionCtx.component.Annotations == nil {
 		return errors.New("cluster or component annotations not found")
 	}
 	// check action done annotation has been set
-	if !checkActionDoneAnnotationExist(*cluster, comp, synthesizeComp, actionType) {
-		return fmt.Errorf("cluster %s %s done annotation has not been set", cluster.Name, actionType)
+	if !checkActionDoneAnnotationExist(actionCtx) {
+		return fmt.Errorf("cluster %s %s done annotation has not been set", actionCtx.cluster.Name, actionCtx.actionType)
 	}
-	return CleanJobByNameWithDAG(ctx, cli, dag, cluster, jobName)
+	return CleanJobByNameWithDAG(ctx, cli, dag, actionCtx.cluster, jobName)
 }
 
 // checkActionDoneAnnotationExist checks if the action done annotation exists.
-func checkActionDoneAnnotationExist(cluster appsv1alpha1.Cluster,
-	comp appsv1alpha1.Component,
-	synthesizeComp SynthesizedComponent,
-	actionType LifeCycleActionType) bool {
-	if cluster.Annotations == nil || comp.Annotations == nil {
+func checkActionDoneAnnotationExist(actionCtx *ActionContext) bool {
+	if actionCtx.cluster.Annotations == nil || actionCtx.component.Annotations == nil {
 		return false
 	}
 	var actionDoneKey string
-	switch actionType {
+	switch actionCtx.actionType {
 	case PostProvisionAction:
 		// TODO(xingran): for backward compatibility before KubeBlocks v0.8.0, check the annotation of the cluster object first, it will be deprecated in the future
-		compPostStartDoneKey := fmt.Sprintf(kbCompPostStartDoneKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
-		_, ok := cluster.Annotations[compPostStartDoneKey]
+		compPostStartDoneKey := fmt.Sprintf(kbCompPostStartDoneKeyPattern, actionCtx.component.Name)
+		_, ok := actionCtx.cluster.Annotations[compPostStartDoneKey]
 		if ok {
 			return true
 		}
@@ -518,24 +508,24 @@ func checkActionDoneAnnotationExist(cluster appsv1alpha1.Cluster,
 	default:
 		return false
 	}
-	_, ok := comp.Annotations[actionDoneKey]
+	_, ok := actionCtx.component.Annotations[actionDoneKey]
 	return ok
 }
 
 // checkLifeCycleAction checks if the lifecycle action definition exists and returns the action.
-func checkLifeCycleAction(synthesizeComp *SynthesizedComponent, actionType LifeCycleActionType) (bool, *appsv1alpha1.Action) {
-	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil {
+func checkLifeCycleAction(actionCtx *ActionContext) (bool, *appsv1alpha1.Action) {
+	if actionCtx == nil || actionCtx.lifecycleActions == nil {
 		return false, nil
 	}
 
 	var action *appsv1alpha1.Action
-	switch actionType {
+	switch actionCtx.actionType {
 	case PostProvisionAction:
-		if actions := synthesizeComp.LifecycleActions.PostProvision; actions != nil {
+		if actions := actionCtx.lifecycleActions.PostProvision; actions != nil {
 			action = actions.CustomHandler
 		}
 	case PreTerminateAction:
-		if actions := synthesizeComp.LifecycleActions.PreTerminate; actions != nil {
+		if actions := actionCtx.lifecycleActions.PreTerminate; actions != nil {
 			action = actions.CustomHandler
 		}
 	default:
@@ -546,12 +536,12 @@ func checkLifeCycleAction(synthesizeComp *SynthesizedComponent, actionType LifeC
 }
 
 // genActionJobName generates the action job name.
-func genActionJobName(clusterName, componentName string, actionType LifeCycleActionType) (string, error) {
+func genActionJobName(componentFullName string, actionType LifeCycleActionType) (string, error) {
 	switch actionType {
 	case PostProvisionAction:
-		return fmt.Sprintf("%s-%s-%s", kbPostProvisionJobNamePrefix, clusterName, componentName), nil
+		return fmt.Sprintf("%s-%s", kbPostProvisionJobNamePrefix, componentFullName), nil
 	case PreTerminateAction:
-		return fmt.Sprintf("%s-%s-%s", kbPreTerminateJobNamePrefix, clusterName, componentName), nil
+		return fmt.Sprintf("%s-%s", kbPreTerminateJobNamePrefix, componentFullName), nil
 	}
 	return "", errors.New("unsupported lifecycle action type")
 }
@@ -570,4 +560,23 @@ func getActionCmdJobLabels(clusterName, componentName string, actionType LifeCyc
 		labels[kbPreTerminateJobLabelKey] = kbPreTerminateJobLabelValue
 	}
 	return labels
+}
+
+func NewActionContext(cluster *appsv1alpha1.Cluster,
+	component *appsv1alpha1.Component,
+	lifecycleActions *appsv1alpha1.ComponentLifecycleActions,
+	scriptTemplates []appsv1alpha1.ComponentTemplateSpec,
+	actionType LifeCycleActionType) (*ActionContext, error) {
+	compShortName, err := ShortName(cluster.Name, component.Name)
+	if err != nil {
+		return nil, nil
+	}
+	return &ActionContext{
+		compShortName:    compShortName,
+		cluster:          cluster,
+		component:        component,
+		lifecycleActions: lifecycleActions,
+		scriptTemplates:  scriptTemplates,
+		actionType:       actionType,
+	}, nil
 }

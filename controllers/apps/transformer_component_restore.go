@@ -42,6 +42,7 @@ var _ graph.Transformer = &componentRestoreTransformer{}
 func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	cluster := transCtx.Cluster
+	synthesizedComp := transCtx.SynthesizeComponent
 	if cluster.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
 		return nil
 	}
@@ -58,9 +59,13 @@ func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag 
 		return err
 	}
 
-	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, transCtx.SynthesizeComponent.Replicas, 0)
-	needDoPostProvision, _ := component.NeedDoPostProvision(transCtx.Context, transCtx.Client, cluster, transCtx.Component, transCtx.SynthesizeComponent)
-	if err := restoreMGR.DoRestore(transCtx.SynthesizeComponent, transCtx.Component, needDoPostProvision); err != nil {
+	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, synthesizedComp.Replicas, 0)
+	actionCtx, err := component.NewActionContext(cluster, transCtx.Component, synthesizedComp.LifecycleActions, synthesizedComp.ScriptTemplates, component.PostProvisionAction)
+	if err != nil {
+		return err
+	}
+	needDoPostProvision, _ := component.NeedDoPostProvision(transCtx.Context, transCtx.Client, actionCtx)
+	if err := restoreMGR.DoRestore(synthesizedComp, transCtx.Component, needDoPostProvision); err != nil {
 		return commitError(err)
 	}
 

@@ -129,8 +129,9 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
-			// graphCli := model.NewGraphClient(k8sClient)
-			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, graphCli, cluster, comp, synthesizeComp, dag)
+			actionCtx, err := NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)
+			Expect(err).Should(Succeed())
+			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, graphCli, actionCtx, dag)
 			Expect(err).Should(Succeed())
 
 			By("build component with preTerminate without PodList, check the built-in envs of cluster component available in action job")
@@ -156,7 +157,9 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 				}}
 				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 			}
-			renderJob, err := renderActionCmdJob(testCtx.Ctx, testCtx.Cli, cluster, synthesizeComp, PreTerminateAction)
+			actionCtx, err = NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PreTerminateAction)
+			Expect(err).Should(Succeed())
+			renderJob, err := renderActionCmdJob(testCtx.Ctx, testCtx.Cli, actionCtx)
 			Expect(err).Should(Succeed())
 			Expect(renderJob).ShouldNot(BeNil())
 			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 11).Should(BeTrue())

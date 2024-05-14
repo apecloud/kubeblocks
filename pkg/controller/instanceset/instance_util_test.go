@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/pointer"
@@ -233,21 +232,6 @@ var _ = Describe("instance util test", func() {
 
 	Context("copyAndMerge", func() {
 		It("should work well", func() {
-			By("merge sts")
-			oldSts := builder.NewStatefulSetBuilder(namespace, name).
-				AddAnnotations("foo", "foo").
-				AddLabels("foo", "foo").
-				GetObject()
-			newSts := builder.NewStatefulSetBuilder(namespace, name).
-				AddAnnotations("foo", "bar").
-				AddLabels("foo", "bar").
-				SetReplicas(3).
-				SetTemplate(template).
-				SetUpdateStrategyType(appsv1.OnDeleteStatefulSetStrategyType).
-				GetObject()
-			sts := copyAndMerge(oldSts, newSts)
-			Expect(sts).Should(Equal(newSts))
-
 			By("merge svc")
 			oldSvc := builder.NewServiceBuilder(namespace, name).
 				AddAnnotations("foo", "foo").

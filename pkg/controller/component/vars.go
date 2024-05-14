@@ -381,15 +381,15 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 	vars1, vars2 := make([]corev1.EnvVar, 0), make([]corev1.EnvVar, 0)
 	for _, v := range definedVars {
 		switch {
-		case len(v.Value) > 0:
-			vars1 = append(vars1, corev1.EnvVar{Name: v.Name, Value: v.Value})
 		case v.ValueFrom != nil:
-			var1, var2, err := resolveClusterObjectVarRef(ctx, cli, synthesizedComp, v.Name, *v.ValueFrom)
+			var1, var2, err := resolveClusterObjectVarRef(ctx, cli, synthesizedComp, v.Name, *v.ValueFrom, v)
 			if err != nil {
 				return nil, nil, err
 			}
 			vars1 = append(vars1, var1...)
 			vars2 = append(vars2, var2...)
+		case len(v.Value) > 0:
+			vars1 = append(vars1, corev1.EnvVar{Name: v.Name, Value: v.Value})
 		default:
 			vars1 = append(vars1, corev1.EnvVar{Name: v.Name, Value: ""})
 		}
@@ -399,14 +399,14 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 
 // resolveClusterObjectVarRef resolves vars referred from cluster objects, returns the resolved non-credential and credential vars respectively.
 func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	defineKey string, source appsv1alpha1.VarSource) ([]corev1.EnvVar, []corev1.EnvVar, error) {
+	defineKey string, source appsv1alpha1.VarSource, ext ...any) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	switch {
 	case source.ConfigMapKeyRef != nil:
 		return resolveConfigMapKeyRef(ctx, cli, synthesizedComp, defineKey, *source.ConfigMapKeyRef)
 	case source.SecretKeyRef != nil:
 		return resolveSecretKeyRef(ctx, cli, synthesizedComp, defineKey, *source.SecretKeyRef)
 	case source.HostNetworkVarRef != nil:
-		return resolveHostNetworkVarRef(ctx, cli, synthesizedComp, defineKey, *source.HostNetworkVarRef)
+		return resolveHostNetworkVarRef(ctx, cli, synthesizedComp, defineKey, *source.HostNetworkVarRef, ext...)
 	case source.ServiceVarRef != nil:
 		return resolveServiceVarRef(ctx, cli, synthesizedComp, defineKey, *source.ServiceVarRef)
 	case source.CredentialVarRef != nil:
@@ -497,7 +497,7 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 }
 
 func resolveHostNetworkVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	defineKey string, selector appsv1alpha1.HostNetworkVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
+	defineKey string, selector appsv1alpha1.HostNetworkVarSelector, ext ...any) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.HostNetworkVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
 	switch {
 	case selector.Container != nil && selector.Container.Port != nil:
@@ -505,7 +505,15 @@ func resolveHostNetworkVarRef(ctx context.Context, cli client.Reader, synthesize
 	default:
 		return nil, nil, nil
 	}
-	return checkNBuildVars(resolveFunc(ctx, cli, synthesizedComp, defineKey, selector))
+	v1, _, err := resolveFunc(ctx, cli, synthesizedComp, defineKey, selector)
+	// HACK: back-off to use v.Value if specified
+	if v1 == nil && err == nil && len(ext) > 0 {
+		v := ext[0].(appsv1alpha1.EnvVar)
+		if len(v.Value) > 0 {
+			v1 = []*corev1.EnvVar{{Name: v.Name, Value: v.Value}}
+		}
+	}
+	return checkNBuildVars(v1, nil, err)
 }
 
 func resolveHostNetworkPortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

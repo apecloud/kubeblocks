@@ -22,24 +22,24 @@ Execute `kbcli version` to check the current KubeBlocks version you are running,
 
 :::
 
-## Upgrade from KubeBlocks v0.6
+## Upgrade from KubeBlocks v0.8
 
-If you are currently running KubeBlocks v0.6, please upgrade to v0.7.2 first.
+If you are currently running KubeBlocks v0.8, please upgrade to v0.9 first.
 
 
-1. Download kbcli v0.7.2.
-
-    ```shell
-    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.7.2
-    ```
-
-2. Upgrade to KubeBlocks v0.7.2.
+1. Download kbcli v0.9.0.
 
     ```shell
-    kbcli kb upgrade --version 0.7.2
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.x
     ```
 
-## Upgrade from KubeBlocks v0.7
+2. Upgrade to KubeBlocks v0.9.x
+
+    ```shell
+    kbcli kb upgrade --version 0.9.x
+    ```
+
+## Upgrade from KubeBlocks v0.8
 
 <Tabs>
 

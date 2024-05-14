@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
@@ -42,7 +43,7 @@ import (
 type AccessMode string
 
 type CheckRole struct {
-	operations.Base
+	GetRole
 	dcsStore                   dcs.DCS
 	OriRole                    string
 	CheckRoleFailedCount       int
@@ -105,21 +106,26 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 	var role string
 	var err error
 
-	manager, err1 := register.GetDBManager(s.Command)
-	if err1 != nil {
-		return nil, errors.Wrap(err1, "get manager failed")
-	}
-
-	if !manager.IsDBStartupReady() {
-		resp.Data["message"] = "db not ready"
-		return resp, nil
-	}
-
-	cluster := s.dcsStore.GetClusterFromCache()
-
 	ctx1, cancel := context.WithTimeout(ctx, s.Timeout)
 	defer cancel()
-	role, err = manager.GetReplicaRole(ctx1, cluster)
+	switch {
+	case intctrlutil.IsNil(s.DBPluginClient):
+		role, err = s.GetRoleThroughGRPC(ctx1)
+	default:
+		manager, err1 := register.GetDBManager(s.Command)
+		if err1 != nil {
+			return nil, errors.Wrap(err1, "get manager failed")
+		}
+
+		if !manager.IsDBStartupReady() {
+			resp.Data["message"] = "db not ready"
+			return resp, nil
+		}
+
+		cluster := s.dcsStore.GetClusterFromCache()
+
+		role, err = manager.GetReplicaRole(ctx1, cluster)
+	}
 
 	if err != nil {
 		s.Logger.Info("executing checkRole error", "error", err.Error())
@@ -151,7 +157,7 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 }
 
 // Component may have some internal roles that needn't be exposed to end user,
-// and not configured in cluster definition, e.g. ETCD's Candidate.
+// and not configured in component definition, e.g. ETCD's Candidate.
 // roleValidate is used to filter the internal roles and decrease the number
 // of report events to reduce the possibility of event conflicts.
 func (s *CheckRole) roleValidate(role string) (bool, string) {

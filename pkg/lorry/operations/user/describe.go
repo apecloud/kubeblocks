@@ -28,17 +28,14 @@ import (
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type DescribeUser struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
+	Logger logr.Logger
 }
 
 var describeUser operations.Operation = &DescribeUser{}
@@ -51,12 +48,7 @@ func init() {
 }
 
 func (s *DescribeUser) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("describeUser")
+	s.Logger = ctrl.Log.WithName("describeUser")
 	return nil
 }
 
@@ -77,9 +69,13 @@ func (s *DescribeUser) Do(ctx context.Context, req *operations.OpsRequest) (*ope
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.DescribeUserOp)
 
-	result, err := s.dbManager.DescribeUser(ctx, userInfo.UserName)
+	dbManager, err := s.GetDBManager()
 	if err != nil {
-		s.logger.Info("executing describeUser error", "error", err)
+		return resp, errors.Wrap(err, "get manager failed")
+	}
+	result, err := dbManager.DescribeUser(ctx, userInfo.UserName)
+	if err != nil {
+		s.Logger.Info("executing describeUser error", "error", err)
 		return resp, err
 	}
 

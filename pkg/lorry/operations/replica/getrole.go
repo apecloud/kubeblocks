@@ -22,23 +22,20 @@ package replica
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
+	"github.com/apecloud/kubeblocks/pkg/lorry/plugin"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type GetRole struct {
 	operations.Base
-	dcsStore  dcs.DCS
-	dbManager engines.DBManager
-	logger    logr.Logger
+	dcsStore dcs.DCS
 }
 
 var getrole operations.Operation = &GetRole{}
@@ -56,18 +53,9 @@ func (s *GetRole) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
-	s.logger = ctrl.Log.WithName("GetRole")
+	s.Logger = ctrl.Log.WithName("GetRole")
 	s.Action = constant.RoleProbeAction
-	err := s.Base.Init(ctx)
-	if err != nil {
-		return err
-	}
-	dbManager, err := register.GetDBManager(s.Command)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	return nil
+	return s.Base.Init(ctx)
 }
 
 func (s *GetRole) IsReadonly(ctx context.Context) bool {
@@ -79,14 +67,39 @@ func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.GetRoleOperation
+	var role string
+	var err error
+	switch {
+	case intctrlutil.IsNil(s.DBPluginClient):
+		role, err = s.GetRoleThroughGRPC(ctx)
+	default:
+		dbManager, err1 := s.GetDBManager()
+		if err1 != nil {
+			return nil, errors.Wrap(err1, "get manager failed")
+		}
 
-	cluster := s.dcsStore.GetClusterFromCache()
-	role, err := s.dbManager.GetReplicaRole(ctx, cluster)
+		cluster := s.dcsStore.GetClusterFromCache()
+		role, err = dbManager.GetReplicaRole(ctx, cluster)
+	}
+
 	if err != nil {
-		s.logger.Info("executing getrole error", "error", err)
+		s.Logger.Info("executing getrole error", "error", err.Error())
 		return resp, err
 	}
 
 	resp.Data["role"] = role
 	return resp, err
+}
+
+func (s *GetRole) GetRoleThroughGRPC(ctx context.Context) (string, error) {
+	getRoleRequest := &plugin.GetRoleRequest{
+		DbInfo: plugin.GetDBInfo(),
+	}
+
+	resp, err := s.DBPluginClient.GetRole(ctx, getRoleRequest)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Role, nil
 }

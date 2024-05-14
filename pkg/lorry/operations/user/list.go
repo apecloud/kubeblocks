@@ -22,20 +22,15 @@ package user
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type ListUsers struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
 }
 
 var listusers operations.Operation = &ListUsers{}
@@ -48,12 +43,7 @@ func init() {
 }
 
 func (s *ListUsers) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("listusers")
+	s.Logger = ctrl.Log.WithName("listusers")
 	return nil
 }
 
@@ -64,9 +54,14 @@ func (s *ListUsers) IsReadonly(ctx context.Context) bool {
 func (s *ListUsers) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
 	resp := operations.NewOpsResponse(util.ListUsersOp)
 
-	result, err := s.dbManager.ListUsers(ctx)
+	dbManager, err := s.GetDBManager()
 	if err != nil {
-		s.logger.Info("executing listusers error", "error", err)
+		return resp, errors.Wrap(err, "get manager failed")
+	}
+
+	result, err := dbManager.ListUsers(ctx)
+	if err != nil {
+		s.Logger.Info("executing listusers error", "error", err)
 		return resp, err
 	}
 

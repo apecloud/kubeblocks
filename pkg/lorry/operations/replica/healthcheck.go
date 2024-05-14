@@ -30,7 +30,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -74,16 +73,7 @@ func (s *CheckStatus) Init(ctx context.Context) error {
 	s.FailureThreshold = 3
 	s.Logger = ctrl.Log.WithName("CheckStatus")
 	s.Action = constant.HealthyCheckAction
-	err := s.Base.Init(ctx)
-	if err != nil {
-		return err
-	}
-	dbManager, err := register.GetDBManager(s.Command)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	return nil
+	return s.Base.Init(ctx)
 }
 
 func (s *CheckStatus) IsReadonly(ctx context.Context) bool {
@@ -98,7 +88,13 @@ func (s *CheckStatus) Do(ctx context.Context, req *operations.OpsRequest) (*oper
 
 	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
 	cluster := k8sStore.GetClusterFromCache()
-	err := s.dbManager.CurrentMemberHealthyCheck(ctx, cluster)
+
+	dbManager, err := s.GetDBManager()
+	if err != nil {
+		return resp, errors.Wrap(err, "get manager failed")
+	}
+
+	err = dbManager.CurrentMemberHealthyCheck(ctx, cluster)
 	if err != nil {
 		return s.handlerError(ctx, err)
 	}

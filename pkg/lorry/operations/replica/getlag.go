@@ -26,16 +26,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type GetLag struct {
 	operations.Base
-	dcsStore  dcs.DCS
-	dbManager engines.DBManager
+	dcsStore dcs.DCS
 }
 
 var getlag operations.Operation = &GetLag{}
@@ -54,11 +51,6 @@ func (s *GetLag) Init(context.Context) error {
 	}
 
 	s.Logger = ctrl.Log.WithName("GetLag")
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
 	return nil
 }
 
@@ -79,7 +71,12 @@ func (s *GetLag) Do(ctx context.Context, req *operations.OpsRequest) (*operation
 	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
 	cluster := k8sStore.GetClusterFromCache()
 
-	lag, err := s.dbManager.GetLag(ctx, cluster)
+	dbManager, err := s.GetDBManager()
+	if err != nil {
+		return resp, errors.Wrap(err, "get manager failed")
+	}
+
+	lag, err := dbManager.GetLag(ctx, cluster)
 	if err != nil {
 		s.Logger.Info("executing getlag error", "error", err)
 		return resp, err

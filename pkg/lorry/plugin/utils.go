@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/golang/glog"
+	"github.com/spf13/viper"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -48,4 +50,13 @@ func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, h
 		glog.V(5).Infof("GRPC response: %s", StripSecrets(resp))
 	}
 	return resp, err
+}
+
+func GetDBInfo() *DBInfo {
+	return &DBInfo{
+		Fqdn:          viper.GetString(constant.KBEnvPodFQDN),
+		Port:          viper.GetString(constant.KBEnvServicePort),
+		AdminUser:     viper.GetString(constant.KBEnvServiceUser),
+		AdminPassword: viper.GetString(constant.KBEnvServicePassword),
+	}
 }

@@ -29,7 +29,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -61,7 +60,7 @@ func (s *Leave) Init(ctx context.Context) error {
 }
 
 func (s *Leave) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager(s.Command)
+	manager, err := s.GetDBManager()
 	if err != nil {
 		return nil, errors.Wrap(err, "get manager failed")
 	}

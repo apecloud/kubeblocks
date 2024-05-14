@@ -31,6 +31,9 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/plugin"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -50,6 +53,7 @@ type Base struct {
 
 	Command        []string
 	DBPluginClient plugin.DBPluginClient
+	DBManager      engines.DBManager
 
 	Logger logr.Logger
 }
@@ -113,4 +117,19 @@ func (b *Base) ExecCommand(ctx context.Context) error {
 		b.Logger.Info(b.Action, "output", output)
 	}
 	return err
+}
+
+func (b *Base) GetDBManager() (engines.DBManager, error) {
+	if !controllerutil.IsNil(b.DBManager) {
+		return b.DBManager, nil
+	}
+	dbManager, err := register.GetDBManager(b.Command)
+	if err != nil {
+		return nil, errors.Wrap(err, "get manager failed")
+	}
+	if controllerutil.IsNil(dbManager) {
+		return nil, errors.New("not implemented")
+	}
+	b.DBManager = dbManager
+	return dbManager, nil
 }

@@ -23,20 +23,15 @@ import (
 	"context"
 	"strings"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type RevokeRole struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
 }
 
 var revokeRole operations.Operation = &RevokeRole{}
@@ -49,12 +44,7 @@ func init() {
 }
 
 func (s *RevokeRole) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("revokeRole")
+	s.Logger = ctrl.Log.WithName("revokeRole")
 	return nil
 }
 
@@ -75,9 +65,14 @@ func (s *RevokeRole) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.RevokeUserRoleOp)
 
-	err := s.dbManager.RevokeUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+	dbManager, err := s.GetDBManager()
 	if err != nil {
-		s.logger.Info("executing RevokeRole error", "error", err)
+		return resp, errors.Wrap(err, "get manager failed")
+	}
+
+	err = dbManager.RevokeUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+	if err != nil {
+		s.Logger.Info("executing RevokeRole error", "error", err)
 		return resp, err
 	}
 

@@ -22,20 +22,15 @@ package sql
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Exec struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
 }
 
 var exec operations.Operation = &Exec{}
@@ -48,12 +43,7 @@ func init() {
 }
 
 func (s *Exec) Init(context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("exec")
+	s.Logger = ctrl.Log.WithName("exec")
 	return nil
 }
 
@@ -67,14 +57,18 @@ func (s *Exec) Do(ctx context.Context, req *operations.OpsRequest) (*operations.
 		return nil, errors.New("no sql provided")
 	}
 
+	dbManager, err := s.GetDBManager()
+	if err != nil {
+		return nil, errors.Wrap(err, "get manager failed")
+	}
 	resp := &operations.OpsResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.ExecOperation
 
-	count, err := s.dbManager.Exec(ctx, sql)
+	count, err := dbManager.Exec(ctx, sql)
 	if err != nil {
-		s.logger.Info("executing exec error", "error", err)
+		s.Logger.Info("executing exec error", "error", err)
 		return resp, err
 	}
 

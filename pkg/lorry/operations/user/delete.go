@@ -22,20 +22,15 @@ package user
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type DeleteUser struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
 }
 
 var deleteUser operations.Operation = &DeleteUser{}
@@ -48,12 +43,7 @@ func init() {
 }
 
 func (s *DeleteUser) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("DeleteUser")
+	s.Logger = ctrl.Log.WithName("DeleteUser")
 	return nil
 }
 
@@ -74,9 +64,13 @@ func (s *DeleteUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.DeleteUserOp)
 
-	err := s.dbManager.DeleteUser(ctx, userInfo.UserName)
+	dbManager, err := s.GetDBManager()
 	if err != nil {
-		s.logger.Info("executing DeleteUser error", "error", err)
+		return resp, errors.Wrap(err, "get manager failed")
+	}
+	err = dbManager.DeleteUser(ctx, userInfo.UserName)
+	if err != nil {
+		s.Logger.Info("executing DeleteUser error", "error", err)
 		return resp, err
 	}
 

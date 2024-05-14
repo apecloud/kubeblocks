@@ -61,10 +61,6 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	var lorryContainers []corev1.Container
 	lorryHTTPPort := viper.GetInt32(constant.KBEnvLorryHTTPPort)
 	lorryGRPCPort := viper.GetInt32(constant.KBEnvLorryGRPCPort)
-	if synthesizeComp.PodSpec.HostNetwork {
-		lorryHTTPPort = 51
-		lorryGRPCPort = 61
-	}
 	availablePorts, err := getAvailableContainerPorts(synthesizeComp.PodSpec.Containers, []int32{lorryHTTPPort, lorryGRPCPort})
 	if err != nil {
 		reqCtx.Log.Info("get lorry container port failed", "error", err)
@@ -72,13 +68,6 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	}
 	lorryHTTPPort = availablePorts[0]
 	lorryGRPCPort = availablePorts[1]
-	if synthesizeComp.PodSpec.HostNetwork {
-		if lorryGRPCPort >= 100 || lorryHTTPPort >= 100 {
-			return fmt.Errorf("port numbers need to be less than 100 when using the host network! "+
-				"lorry http port: %d, lorry grpc port: %d", lorryHTTPPort, lorryGRPCPort)
-		}
-	}
-
 	container := buildBasicContainer(int(lorryHTTPPort))
 	// inject role probe container
 	var compRoleProbe *appsv1alpha1.RoleProbe

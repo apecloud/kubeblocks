@@ -28,7 +28,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -54,12 +53,12 @@ func (s *Lock) Init(ctx context.Context) error {
 }
 
 func (s *Lock) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager(s.Command)
+	dbManager, err := s.GetDBManager()
 	if err != nil {
-		return nil, errors.Wrap(err, "Get DB manager failed")
+		return nil, errors.Wrap(err, "get manager failed")
 	}
 
-	err = manager.Lock(ctx, "disk full")
+	err = dbManager.Lock(ctx, "disk full")
 	if err != nil {
 		return nil, errors.Wrap(err, "Lock DB failed")
 	}

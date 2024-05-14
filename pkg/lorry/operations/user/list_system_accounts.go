@@ -22,20 +22,15 @@ package user
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type ListSystemAccounts struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
 }
 
 var listSystemAccounts operations.Operation = &ListSystemAccounts{}
@@ -48,12 +43,7 @@ func init() {
 }
 
 func (s *ListSystemAccounts) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("listSystemAccounts")
+	s.Logger = ctrl.Log.WithName("listSystemAccounts")
 	return nil
 }
 
@@ -64,9 +54,14 @@ func (s *ListSystemAccounts) IsReadonly(ctx context.Context) bool {
 func (s *ListSystemAccounts) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
 	resp := operations.NewOpsResponse(util.ListSystemAccountsOp)
 
-	result, err := s.dbManager.ListSystemAccounts(ctx)
+	dbManager, err := s.GetDBManager()
 	if err != nil {
-		s.logger.Info("executing ListSystemAccounts error", "error", err)
+		return resp, errors.Wrap(err, "get manager failed")
+	}
+
+	result, err := dbManager.ListSystemAccounts(ctx)
+	if err != nil {
+		s.Logger.Info("executing ListSystemAccounts error", "error", err)
 		return resp, err
 	}
 

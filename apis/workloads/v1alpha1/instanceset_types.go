@@ -139,13 +139,6 @@ type InstanceSetSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	Selector *metav1.LabelSelector `json:"selector"`
 
-	// Refers to the name of the service that governs this StatefulSet.
-	// This service must exist before the StatefulSet and is responsible for
-	// the network identity of the set. Pods get DNS/hostnames that follow a specific pattern.
-	//
-	// Note: This field will be removed in future version.
-	ServiceName string `json:"serviceName"`
-
 	// Defines the behavior of a service spec.
 	// Provides read-write service.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status

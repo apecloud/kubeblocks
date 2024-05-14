@@ -97,7 +97,6 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddLabelsInMap(mergeLabels).
 		AddAnnotationsInMap(mergeAnnotations).
 		AddMatchLabelsInMap(labels).
-		SetServiceName(constant.GenerateServiceNamePattern(itsName)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
 		SetTemplate(template)

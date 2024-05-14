@@ -292,7 +292,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 		GetObject()
 	// Set these immutable fields only on initial Pod creation, not updates.
 	pod.Spec.Hostname = pod.Name
-	pod.Spec.Subdomain = parent.Spec.ServiceName
+	pod.Spec.Subdomain = getHeadlessSvcName(parent.Name)
 
 	// 2. build pvcs from template
 	pvcMap := make(map[string]*corev1.PersistentVolumeClaim)

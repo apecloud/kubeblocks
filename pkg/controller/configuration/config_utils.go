@@ -76,7 +76,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	}
 	// Configmap uses subPath case: https://github.com/kubernetes/kubernetes/issues/50345
 	// The files are being updated on the host VM, but can't be updated in the container.
-	configSpecMetas = cfgcm.FilterSubPathVolumeMount(configSpecMetas, volumeDirs)
+	configSpecMetas = cfgcm.FilterSupportReloadActionConfigSpecs(configSpecMetas, volumeDirs)
 	if len(configSpecMetas) == 0 {
 		return nil
 	}

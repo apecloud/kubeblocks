@@ -15,13 +15,13 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
 
 ## Before you start
 
-* [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * [Create a Redis Replication Cluster](./../cluster-management/create-and-connect-a-redis-cluster.md#create-a-redis-cluster).
 * Check the Switch Policy and the role probe.
   * Check whether the switch policy is `Noop`.
 
     ```bash
-    kubectl get cluster mycluster -o yaml
+    kubectl get cluster mycluster -n demo -o yaml
     >
     spec:
       componentSpecs:
@@ -34,7 +34,7 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
   * Check whether the following role probe parameters exist to verify the role probe is enabled.
 
     ```bash
-    kubectl get cd redis -o yaml
+    kubectl get cd redis -n demo -o yaml
     >
     probes:
       roleProbe:
@@ -47,17 +47,36 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
 
 1. View the initial status of the Redis cluster.
 
-   ```bash
-   kubectl get pods
-   ```
+    ```bash
+    kubectl get pods -l kubeblocks.io/role=primary -n demo
+    >
+    NAME                READY   STATUS    RESTARTS   AGE
+    mycluster-redis-0   3/3     Running   0          24m
+
+    kubectl get pods -l kubeblocks.io/role=secondary -n demo
+    >
+    NAME                READY   STATUS    RESTARTS      AGE
+    mycluster-redis-1   3/3     Running   1 (24m ago)   24m
+    ```
 
    Currently, `mycluster-redis-0` is the primary pod and `mycluster-redis-1` is the secondary pod.
+
+   :::note
+
+   To fetch a more complete output, you can modify the `-o` parameter.
+
+   ```bash
+   kubectl get pods  -o custom-columns=NAME:.metadata.name,ROLE_LABEL:.metadata.labels."kubeblocks\.io/role"
+   ```
+   ![redis-high-availability-get-pod](./../../../img/redis-high-availability-get-pod.jpg)
+
+   :::
 
 2. Simulate a primary pod exception.
 
    ```bash
    # Enter the primary pod
-   kubectl exec -it mycluster-redis-0  -- bash
+   kubectl exec -ti -n demo mycluster-redis-0 -- bash
 
    # Execute the debug sleep command to simulate a primary pod exception
    root@mycluster-redis-0:/# redis-cli debug sleep 30
@@ -66,7 +85,7 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
 3. Open the Redis Sentinel log to view the failover.
 
    ```bash
-   kubectl logs mycluster-redis-sentinel-0
+   kubectl logs mycluster-redis-sentinel-0 -n demo
    ```
 
    In the logs, we can view when a high-availability switch occurs.
@@ -79,14 +98,17 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
 
 4. Connect to the Redis cluster to view the primary pod information after the exception simulation.
 
-   You can jump to [Connect to a Redis Cluster](./../cluster-management/create-and-connect-a-redis-cluster.md#connect-to-a-redis-cluster) for reference.
+    ```bash
+    127.0.0.1:6379> info replication
+    ```
 
-   From the output, `mycluster-redis-1` has been assigned as the primary's pod.
+   Now `mycluster-redis-1` has been assigned as the primary's pod.
 
 5. Describe the cluster and check the instance role.
 
    ```bash
-   kubectl get pods
+   kubectl get pods -l kubeblocks.io/role=primary -n demo
+   kubectl get pods -l kubeblocks.io/role=secondary -n demo
    ```
 
    After the failover, `mycluster-redis-0` becomes the secondary pod and `mycluster-redis-1` becomes the primary pod.

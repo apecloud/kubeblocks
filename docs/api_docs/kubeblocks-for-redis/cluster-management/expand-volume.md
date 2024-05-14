@@ -98,7 +98,7 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
             - ReadWriteOnce
             resources:
               requests:
-                storage: 40Gi # Change the volume storage size
+                storage: 40Gi # Change the volume storage size.
     ```
 
 2. Validate the volume expansion.

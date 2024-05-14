@@ -88,7 +88,7 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
      - name: redis
        componentDefRef: redis
        replicas: 1
-       resources: # Change values of resources
+       resources: # Change values of resources.
          requests:
            memory: "2Gi"
            cpu: "1"
@@ -204,7 +204,7 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
      componentSpecs:
      - name: redis
        componentDefRef: redis
-       replicas: 2 # Change the pod amount
+       replicas: 2 # Change the pod amount.
        volumeClaimTemplates:
        - name: data
          spec:

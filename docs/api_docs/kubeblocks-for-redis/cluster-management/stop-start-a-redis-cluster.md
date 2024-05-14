@@ -21,10 +21,10 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: stop-
+  name: ops-stop
+  namespace: demo
 spec:
-  # cluster ref
-  clusterRef: mycluster
+  clusterName: mycluster
   type: Stop
 EOF
 ```
@@ -34,41 +34,40 @@ EOF
 Configure replicas as 0 to delete pods.
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: mycluster
 spec:
+  affinity:
+    podAntiAffinity: Preferred
+    tenancy: SharedNode
+    topologyKeys:
+    - kubernetes.io/hostname
   clusterDefinitionRef: redis
   clusterVersionRef: redis-7.0.6
-  terminationPolicy: Delete
   componentSpecs:
-  - name: redis
-    componentDefRef: redis
-    monitor: true  
+  - componentDefRef: redis
+    enabledLogs:
+    - running
+    monitorEnabled: false
+    name: redis
     replicas: 0
+    resources:
+      limits:
+        cpu: "0.5"
+        memory: 0.5Gi
+      requests:
+        cpu: "0.5"
+        memory: 0.5Gi
+    serviceAccountName: kb-redis
+    switchPolicy:
+      type: Noop
     volumeClaimTemplates:
     - name: data
       spec:
-        storageClassName: standard
         accessModes:
         - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
-  - name: redis-sentinel
-    componentDefRef: redis-sentinel
-    monitor: true  
-    replicas: 0
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
+            storage: 20Gi
+  terminationPolicy: Delete
 ```
 
 ## Start a cluster
@@ -82,10 +81,10 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: start-
+  name: ops-start
+  namespace: demo
 spec:
-  # cluster ref
-  clusterRef: mycluster
+  clusterName: mycluster
   type: Start
 EOF 
 ```
@@ -95,39 +94,38 @@ EOF
 Change replicas back to the original amount to start this cluster again.
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-    name: mycluster
 spec:
+  affinity:
+    podAntiAffinity: Preferred
+    tenancy: SharedNode
+    topologyKeys:
+    - kubernetes.io/hostname
   clusterDefinitionRef: redis
   clusterVersionRef: redis-7.0.6
-  terminationPolicy: Delete
   componentSpecs:
-  - name: redis
-    componentDefRef: redis
-    monitor: true  
-    replicas: 2
+  - componentDefRef: redis
+    enabledLogs:
+    - running
+    monitorEnabled: false
+    name: redis
+    replicas: 1
+    resources:
+      limits:
+        cpu: "0.5"
+        memory: 0.5Gi
+      requests:
+        cpu: "0.5"
+        memory: 0.5Gi
+    serviceAccountName: kb-redis
+    switchPolicy:
+      type: Noop
     volumeClaimTemplates:
     - name: data
       spec:
-        storageClassName: standard
         accessModes:
         - ReadWriteOnce
         resources:
           requests:
             storage: 1Gi
-  - name: redis-sentinel
-    componentDefRef: redis-sentinel
-    monitor: true  
-    replicas: 3
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
+  terminationPolicy: Delete
 ```

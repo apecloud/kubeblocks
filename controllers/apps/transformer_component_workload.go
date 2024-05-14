@@ -44,7 +44,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 )
 
@@ -307,11 +306,11 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	}
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
-	DelayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
+	delayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
 
 	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
 	if isSpecUpdated {
-		UpdateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)
+		updateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)
 	}
 
 	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
@@ -530,8 +529,7 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
-	labels := constant.GetComponentWellKnownLabels(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.synthesizeComp.Namespace, labels, inDataContext4C())
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
 	if err != nil {
 		return err
 	}
@@ -866,11 +864,9 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 	return nil
 }
 
-// getRunningVolumes gets the running volumes of the ITS.
 func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
 	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
-	labels := constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)
-	pvcs, err := component.ListObjWithLabelsInNamespace(ctx, cli, generics.PersistentVolumeClaimSignature, synthesizedComp.Namespace, labels, inDataContext4C())
+	pvcs, err := component.ListOwnedPVCs(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil

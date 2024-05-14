@@ -52,24 +52,6 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 	return nil
 }
 
-// func validateSidecarContainers(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
-// 	if len(comp.Spec.Sidecars) == 0 {
-// 		return nil
-// 	}
-//
-// 	var notFoundSidecar []string
-// 	for _, sidecar := range comp.Spec.Sidecars {
-// 		if !HasSidecar(compDef, sidecar) {
-// 			notFoundSidecar = append(notFoundSidecar, sidecar)
-// 		}
-// 	}
-//
-// 	if len(notFoundSidecar) == 0 {
-// 		return nil
-// 	}
-// 	return errors.Errorf("sidecars %v are not found in the componentDefinition", notFoundSidecar)
-// }
-
 func validateEnabledLogs(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
 	invalidLogNames := validateEnabledLogConfigs(compDef, comp.Spec.EnabledLogs)
 	if len(invalidLogNames) > 0 {

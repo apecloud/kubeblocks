@@ -73,9 +73,9 @@ var _ = Describe("Ops ProgressDetails", func() {
 		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	}
 
-	testProgressDetailsWithStatefulPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, consensusPodList []corev1.Pod) {
+	testProgressDetailsWithStatefulPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, consensusPodList []*corev1.Pod) {
 		By("mock pod of InstanceSet updating by deleting the pod")
-		pod := &consensusPodList[0]
+		pod := consensusPodList[0]
 		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.ProcessingProgressStatus))
@@ -131,22 +131,21 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 			By("mock the pod is terminating, pod[1] is target pod to delete. and mock pod[2] is failed and deleted by stateful controller")
 			for i := 1; i < 3; i++ {
-				pod := &podList[i]
-				pod.Kind = constant.PodKind
+				pod := podList[i]
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 				Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.ProcessingProgressStatus))
 
 			}
 			By("mock the target pod is deleted and progressDetail status should be succeed")
-			targetPod := &podList[1]
+			targetPod := podList[1]
 			testk8s.RemovePodFinalizer(ctx, testCtx, targetPod)
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(getProgressDetailStatus(opsRes, consensusComp, targetPod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/2"))
 
 			By("delete the pod[2]")
-			pod := &podList[2]
+			pod := podList[2]
 			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 			// expect the progress is 2/2
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -172,7 +171,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test the progressDetails when scaling up replicas")
-			targetPod = &podList[2]
+			targetPod = podList[2]
 			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
 				targetPod.Name, "follower", "ReadWrite")
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetPod.Name, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())

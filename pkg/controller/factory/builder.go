@@ -265,7 +265,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	uuidHex := hex.EncodeToString(uuidBytes)
 	randomPassword := randomString(8)
 	strongRandomPasswd := strongRandomString(16)
-	restorePassword := GetRestorePassword(cluster, synthesizedComp)
+	restorePassword := GetRestorePassword(synthesizedComp)
 	// check if a connection password is specified during recovery.
 	// if exists, replace the random password
 	if restorePassword != "" {
@@ -300,8 +300,8 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 }
 
 // GetRestorePassword gets restore password if exists during recovery.
-func GetRestorePassword(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) string {
-	valueString := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
+func GetRestorePassword(synthesizedComp *component.SynthesizedComponent) string {
+	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return ""
 	}

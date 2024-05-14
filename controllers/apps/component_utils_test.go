@@ -22,38 +22,20 @@ package apps
 import (
 	"fmt"
 	"reflect"
-	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
-
-func TestIsProbeTimeout(t *testing.T) {
-	podsReadyTime := &metav1.Time{Time: time.Now().Add(-10 * time.Minute)}
-	compDef := &appsv1alpha1.ClusterComponentDefinition{
-		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleProbe:                      &appsv1alpha1.ClusterDefinitionProbe{},
-			RoleProbeTimeoutAfterPodsReady: appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady,
-		},
-	}
-	if !IsProbeTimeout(compDef.Probes, podsReadyTime) {
-		t.Error("probe timed out should be true")
-	}
-}
 
 var _ = Describe("Component Utils", func() {
 	var (
@@ -64,9 +46,8 @@ var _ = Describe("Component Utils", func() {
 	)
 
 	const (
-		consensusCompDefRef = "consensus"
-		consensusCompName   = "consensus"
-		statelessCompName   = "stateless"
+		consensusCompName = "consensus"
+		statelessCompName = "stateless"
 	)
 
 	cleanAll := func() {
@@ -98,23 +79,8 @@ var _ = Describe("Component Utils", func() {
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
 			_ = testapps.MockInstanceSetPods(&testCtx, its, clusterName, consensusCompName)
 
-			By("test GetClusterByObject function")
-			newCluster, _ := GetClusterByObject(ctx, k8sClient, its)
-			Expect(newCluster != nil).Should(BeTrue())
-
-			By("test getObjectListByComponentName function")
-			itsList := &workloads.InstanceSetList{}
-			_ = component.GetObjectListByComponentName(ctx, k8sClient, *cluster, itsList, consensusCompName)
-			Expect(len(itsList.Items) > 0).Should(BeTrue())
-
-			By("test getObjectListByCustomLabels function")
-			itsList = &workloads.InstanceSetList{}
-			matchLabel := constant.GetComponentWellKnownLabels(cluster.Name, consensusCompName)
-			_ = getObjectListByCustomLabels(ctx, k8sClient, *cluster, itsList, client.MatchingLabels(matchLabel))
-			Expect(len(itsList.Items) > 0).Should(BeTrue())
-
-			By("test GetComponentStsMinReadySeconds")
-			minReadySeconds, _ := component.GetComponentMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)
+			By("test GetMinReadySeconds function")
+			minReadySeconds, _ := component.GetMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
 		})
 	})

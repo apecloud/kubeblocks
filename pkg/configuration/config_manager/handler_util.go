@@ -189,13 +189,40 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 	return reloadConfigSpecMeta, nil
 }
 
-func FilterSubPathVolumeMount(metas []ConfigSpecMeta, volumes []corev1.VolumeMount) []ConfigSpecMeta {
+// FilterSupportReloadActionConfigSpecs filters the provided ConfigSpecMeta slices based on the reload action type and volume mount configuration.
+// It handles two types of updates to ConfigMaps:
+//
+// 1. Async mode: KubeBlocks controller is responsible for updating the ConfigMap, while kubelet synchronizes the ConfigMap to volumes.
+// The config-manager detects configuration changes using fsnotify and executes the reload action. This requires volume mounting the ConfigMap.
+// However, in async mode, if the volume mount is a subpath, kubelet does not synchronize the ConfigMap content to the container (see kubernetes/kubernetes#50345).
+// As a result, the config-manager cannot detect configuration changes and does not support dynamic parameter updates for such configurations.
+// Therefore, async-type ConfigSpecs with subpath volume mounts need to be removed.
+//
+// 2. Sync mode: For sync mode (regardless of the reload action type - TPLScriptType trigger or ShellType trigger), the controller directly watches
+// the ConfigMap changes and actively invokes the reload action.
+//
+// Both async and sync types need to pass the ConfigSpecs to the config-manager.
+//
+// The check logic is an OR condition: either it is the first type (sync mode) or the second type (async) with a non-subpath volume mount configuration.
+func FilterSupportReloadActionConfigSpecs(metas []ConfigSpecMeta, volumes []corev1.VolumeMount) []ConfigSpecMeta {
 	var filtered []ConfigSpecMeta
 	for _, meta := range metas {
 		v := FindVolumeMount(volumes, meta.ConfigSpec.VolumeName)
-		if v == nil || v.SubPath == "" || meta.ReloadType == appsv1beta1.TPLScriptType {
+		if isSyncReloadAction(meta.ConfigSpecInfo) || !isSubPathMount(v) {
 			filtered = append(filtered, meta)
 		}
 	}
 	return filtered
+}
+
+func isSubPathMount(v *corev1.VolumeMount) bool {
+	// Configmap uses subPath case: https://github.com/kubernetes/kubernetes/issues/50345
+	// The files are being updated on the host VM, but can't be updated in the container.
+	return v != nil && v.SubPath != ""
+}
+
+func isSyncReloadAction(meta ConfigSpecInfo) bool {
+	// If synchronous reloadAction is supported, kubelet limitations can be ignored.
+	return meta.ReloadType == appsv1beta1.TPLScriptType && !core.IsWatchModuleForTplTrigger(meta.TPLScriptTrigger) ||
+		meta.ReloadType == appsv1beta1.ShellType && !core.IsWatchModuleForShellTrigger(meta.ShellTrigger)
 }

@@ -257,17 +257,17 @@ func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
 	return !restart && policy == appsv1alpha1.NonePolicy
 }
 
-func enableSyncTrigger(options *appsv1beta1.ReloadAction) bool {
-	if options == nil {
+func enableSyncTrigger(reloadAction *appsv1beta1.ReloadAction) bool {
+	if reloadAction == nil {
 		return false
 	}
 
-	if options.TPLScriptTrigger != nil {
-		return !core.IsWatchModuleForTplTrigger(options.TPLScriptTrigger)
+	if reloadAction.TPLScriptTrigger != nil {
+		return !core.IsWatchModuleForTplTrigger(reloadAction.TPLScriptTrigger)
 	}
 
-	if options.ShellTrigger != nil {
-		return !core.IsWatchModuleForShellTrigger(options.ShellTrigger)
+	if reloadAction.ShellTrigger != nil {
+		return !core.IsWatchModuleForShellTrigger(reloadAction.ShellTrigger)
 	}
 	return false
 }

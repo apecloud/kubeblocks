@@ -22,7 +22,6 @@ package workloads
 import (
 	"context"
 
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -133,10 +132,6 @@ func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
 	multiClusterMgr multicluster.Manager, ctx *handler.FinderContext) error {
 	nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 	delegatorFinder := handler.NewDelegatorFinder(&workloads.InstanceSet{}, nameLabels)
-	ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
-	stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-	// pod owned by legacy StatefulSet
-	stsPodHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
 	// TODO: modify handler.getObjectFromKey to support running Job in data clusters
 	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 
@@ -146,9 +141,7 @@ func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		})
 
-	multiClusterMgr.Watch(b, &appsv1.StatefulSet{}, stsHandler).
-		Watch(b, &corev1.Pod{}, stsPodHandler).
-		Watch(b, &batchv1.Job{}, jobHandler).
+	multiClusterMgr.Watch(b, &batchv1.Job{}, jobHandler).
 		Own(b, &corev1.Pod{}, &workloads.InstanceSet{}).
 		Own(b, &corev1.PersistentVolumeClaim{}, &workloads.InstanceSet{})
 

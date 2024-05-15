@@ -347,25 +347,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return nil
 	}
 
-	// mergeMetadataMap keeps the original elements.
-	mergeMetadataMap := func(originalMap map[string]string, targetMap map[string]string) map[string]string {
-		if targetMap == nil && originalMap == nil {
-			return nil
-		}
-		if targetMap == nil {
-			targetMap = map[string]string{}
-		}
-		for k, v := range originalMap {
-			// if the element not exist in targetMap, copy it from original.
-			if _, ok := (targetMap)[k]; !ok {
-				(targetMap)[k] = v
-			}
-		}
-		return targetMap
-	}
-
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
-		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
+		mergeMap(&newSvc.Annotations, &oldSvc.Annotations)
 		mergeMap(&newSvc.Labels, &oldSvc.Labels)
 		mergeMap(&newSvc.Spec.Selector, &oldSvc.Spec.Selector)
 		oldSvc.Spec.Type = newSvc.Spec.Type

@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -50,36 +49,6 @@ func buildSvc(its workloads.InstanceSet, labels, selectors map[string]string) *c
 		AddPorts(its.Spec.Service.Spec.Ports...).
 		SetType(its.Spec.Service.Spec.Type).
 		GetObject()
-}
-
-func buildAlternativeSvs(its workloads.InstanceSet, svcLabels map[string]string) []*corev1.Service {
-	if its.Spec.Service == nil {
-		return nil
-	}
-	annotations := ParseAnnotationsOfScope(AlternativeServiceScope, its.Annotations)
-	var services []*corev1.Service
-	for i := range its.Spec.AlternativeServices {
-		service := its.Spec.AlternativeServices[i]
-		if len(service.Namespace) == 0 {
-			service.Namespace = its.Namespace
-		}
-		labels := service.Labels
-		if labels == nil {
-			labels = make(map[string]string, 0)
-		}
-		for k, v := range svcLabels {
-			labels[k] = v
-		}
-		service.Labels = labels
-		newAnnotations := make(map[string]string, 0)
-		maps.Copy(newAnnotations, service.Annotations)
-		maps.Copy(newAnnotations, annotations)
-		if len(newAnnotations) > 0 {
-			service.Annotations = newAnnotations
-		}
-		services = append(services, &service)
-	}
-	return services
 }
 
 func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {

@@ -22488,21 +22488,6 @@ Provides read-write service.
 </tr>
 <tr>
 <td>
-<code>alternativeServices</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-[]Kubernetes core/v1.Service
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines Alternative Services selector pattern specifier.</p>
-<p>Note: This field will be removed in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>template</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
@@ -22984,21 +22969,6 @@ Kubernetes core/v1.Service
 <p>Defines the behavior of a service spec.
 Provides read-write service.
 <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
-<p>Note: This field will be removed in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>alternativeServices</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-[]Kubernetes core/v1.Service
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines Alternative Services selector pattern specifier.</p>
 <p>Note: This field will be removed in future version.</p>
 </td>
 </tr>

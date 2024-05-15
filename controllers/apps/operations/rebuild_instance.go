@@ -51,6 +51,8 @@ const (
 
 	waitingForInstanceReadyMessage   = "Waiting for the rebuilding instance to be ready"
 	waitingForPostReadyRestorePrefix = "Waiting for postReady Restore"
+
+	ignoreRoleCheckAnnotationKey = "kubeblocks.io/ignore-role-check"
 )
 
 type rebuildInstanceOpsHandler struct{}
@@ -776,6 +778,9 @@ func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 	}
 	// If roleProbe is not defined, return true.
 	if synthesizedComp.Roles == nil && !slices.Contains([]appsv1alpha1.WorkloadType{appsv1alpha1.Consensus, appsv1alpha1.Replication}, synthesizedComp.WorkloadType) {
+		return true, nil
+	}
+	if opsRes.OpsRequest.Annotations[ignoreRoleCheckAnnotationKey] == "true" {
 		return true, nil
 	}
 	// check if the role detection is successfully.

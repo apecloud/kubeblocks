@@ -1,16 +1,16 @@
 ---
-title: Upgrade to KubeBlocks v0.8
-description: Upgrade to KubeBlocks v0.8, operation, tips and notes
-keywords: [upgrade, 0.8]
+title: Upgrade to KubeBlocks v0.9
+description: Upgrade to KubeBlocks v0.9, operation, tips and notes
+keywords: [upgrade, 0.9]
 sidebar_position: 1
-sidebar_label: Upgrade to KubeBlocks v0.8
+sidebar_label: Upgrade to KubeBlocks v0.9
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 
-# Upgrade to KubeBlocks v0.8
+# Upgrade to KubeBlocks v0.9
 
 In this tutorial, you will learn how to upgrade to KubeBlocks v0.8.
 
@@ -84,7 +84,7 @@ If you are currently running KubeBlocks v0.8, please upgrade to v0.9 first.
 3. Upgrade KubeBlocks.
 
     ```shell
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.8.1 --set dataProtection.image.datasafed.tag=0.1.0
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.0 --set dataProtection.image.datasafed.tag=0.1.0
     ```
 
     :::note
@@ -102,17 +102,17 @@ If you are currently running KubeBlocks v0.8, please upgrade to v0.9 first.
 
 <TabItem value="kbcli" label="kbcli" default>
 
-1. Download kbcli v0.8.
+1. Download kbcli v0.9.
 
     ```shell
-    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.8.1
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.0
     ```
 
 2. Upgrade KubeBlocks.
 
     ```shell
 
-    kbcli kb upgrade --version 0.8.1 --set dataProtection.image.datasafed.tag=0.1.0
+    kbcli kb upgrade --version 0.9.0 --set dataProtection.image.datasafed.tag=0.1.0
 
     ```
 

@@ -139,6 +139,6 @@ func NewProbeError(msg string) error {
 }
 
 type Handlers struct {
-	Command []string          `json:"command"`
-	GPRC    map[string]string `json:"grpc"`
+	Command []string          `json:"command,omitempty"`
+	GPRC    map[string]string `json:"grpc,omitempty"`
 }

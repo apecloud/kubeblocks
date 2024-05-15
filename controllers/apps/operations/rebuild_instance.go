@@ -254,6 +254,8 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 		return nil, err
 	}
 	synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, comp)
+	// TODO: remove after 0.9
+	synthesizedComp.CompDefName = comp.ComponentDef
 	if err != nil {
 		return nil, err
 	}

@@ -63,10 +63,13 @@ var _ = Describe("OpsUtil functions", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.RestoreSignature, inNS, ml)
 		// default GracePeriod is 30s
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -214,7 +217,7 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(reCreatePVCCount).Should(Equal(rebuildInstanceCount))
 		}
 
-		waitForInstanceToAvailable := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource) {
+		waitForInstanceToAvailable := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, ignoreRoleCheck bool) {
 			By("waiting for the rebuild instance to ready")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, ops *appsv1alpha1.OpsRequest) {
 				compStatus := ops.Status.Components[consensusComp]
@@ -224,7 +227,16 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("fake th rebuild pods to ready ")
 			// recreate the instances and fake it to ready.
-			_ = initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
+			pods := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
+			if ignoreRoleCheck {
+				for i := range pods {
+					Expect(testapps.ChangeObj(&testCtx, pods[i], func(pod *corev1.Pod) {
+						if pod.Labels != nil {
+							delete(pod.Labels, constant.RoleLabelKey)
+						}
+					})).Should(Succeed())
+				}
+			}
 		}
 
 		It("test rebuild instance with no backup", func() {
@@ -264,7 +276,7 @@ var _ = Describe("OpsUtil functions", func() {
 			sourcePVCsShouldRebindPVs(reqCtx, opsRes, pvcList)
 
 			By("expect the opsRequest to succeed")
-			waitForInstanceToAvailable(reqCtx, opsRes)
+			waitForInstanceToAvailable(reqCtx, opsRes, false)
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, ops *appsv1alpha1.OpsRequest) {
 				g.Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
@@ -275,7 +287,7 @@ var _ = Describe("OpsUtil functions", func() {
 			Eventually(testapps.List(&testCtx, generics.PodSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
 		})
 
-		It("test rebuild instance with backup", func() {
+		testRebuildInstanceWithBackup := func(ignoreRoleCheck bool) {
 			By("init operation resources and backup")
 			actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
 				&dpv1alpha1.ActionSet{}, testapps.WithName(testdp.ActionSetName))
@@ -297,8 +309,15 @@ var _ = Describe("OpsUtil functions", func() {
 					},
 				}
 			})).Should(Succeed())
-
 			opsRes := prepareOpsRes(backup.Name)
+			if ignoreRoleCheck {
+				Expect(testapps.ChangeObj(&testCtx, opsRes.OpsRequest, func(request *appsv1alpha1.OpsRequest) {
+					if request.Annotations == nil {
+						request.Annotations = map[string]string{}
+					}
+					request.Annotations[ignoreRoleCheckAnnotationKey] = "true"
+				})).Should(Succeed())
+			}
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 
@@ -330,7 +349,7 @@ var _ = Describe("OpsUtil functions", func() {
 			sourcePVCsShouldRebindPVs(reqCtx, opsRes, pvcList)
 
 			By("expect to create the postReady restore after the instances are available")
-			waitForInstanceToAvailable(reqCtx, opsRes)
+			waitForInstanceToAvailable(reqCtx, opsRes, ignoreRoleCheck)
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(k8sClient.List(ctx, restoreList, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
 			// The number of restores should be twice the number of instances that need to be restored.
@@ -342,7 +361,14 @@ var _ = Describe("OpsUtil functions", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, ops *appsv1alpha1.OpsRequest) {
 				g.Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 			}))
+		}
 
+		It("test rebuild instance with backup", func() {
+			testRebuildInstanceWithBackup(false)
+		})
+
+		It("test rebuild instance with backup and ignore role check", func() {
+			testRebuildInstanceWithBackup(true)
 		})
 
 	})

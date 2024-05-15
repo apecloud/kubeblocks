@@ -161,7 +161,17 @@ func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames s
 func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
 	var failureNames []string
 	for _, pod := range pods {
-		if !isTerminating(pod) && pod.Status.Phase == corev1.PodFailed {
+		if isTerminating(pod) {
+			continue
+		}
+		// Kubernetes says the Pod is 'Failed'
+		if pod.Status.Phase == corev1.PodFailed {
+			failureNames = append(failureNames, pod.Name)
+			continue
+		}
+		// KubeBlocks says the Pod is 'Failed'
+		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
+		if isFailed && isTimedOut {
 			failureNames = append(failureNames, pod.Name)
 		}
 	}

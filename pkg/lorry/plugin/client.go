@@ -20,12 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plugin
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func NewPluginClient(addr string) (DBPluginClient, error) {
+type DBClient struct {
+	dbPlugin DBPluginClient
+}
+
+func NewPluginClient(addr string) (*DBClient, error) {
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, errors.Wrap(err, "grpc: failed to dial")
@@ -33,5 +39,30 @@ func NewPluginClient(addr string) (DBPluginClient, error) {
 
 	client := NewDBPluginClient(conn)
 
-	return client, nil
+	dbClient := &DBClient{
+		dbPlugin: client,
+	}
+	return dbClient, nil
+}
+
+func (c *DBClient) IsDBStartupReady(ctx context.Context) bool {
+	req := &IsDBReadyRequest{}
+	resp, err := c.dbPlugin.IsDBReady(ctx, req)
+	if err != nil {
+		return false
+	}
+	return resp.Ready
+}
+
+func (c *DBClient) GetReplicaRole(ctx context.Context) (string, error) {
+	getRoleRequest := &GetRoleRequest{
+		DbInfo: GetDBInfo(),
+	}
+
+	resp, err := c.dbPlugin.GetRole(ctx, getRoleRequest)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Role, nil
 }

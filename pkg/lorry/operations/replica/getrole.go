@@ -29,7 +29,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/plugin"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
@@ -71,7 +70,7 @@ func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 	var err error
 	switch {
 	case intctrlutil.IsNil(s.DBPluginClient):
-		role, err = s.GetRoleThroughGRPC(ctx)
+		role, err = s.DBPluginClient.GetReplicaRole(ctx)
 	default:
 		dbManager, err1 := s.GetDBManager()
 		if err1 != nil {
@@ -89,17 +88,4 @@ func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 
 	resp.Data["role"] = role
 	return resp, err
-}
-
-func (s *GetRole) GetRoleThroughGRPC(ctx context.Context) (string, error) {
-	getRoleRequest := &plugin.GetRoleRequest{
-		DbInfo: plugin.GetDBInfo(),
-	}
-
-	resp, err := s.DBPluginClient.GetRole(ctx, getRoleRequest)
-	if err != nil {
-		return "", err
-	}
-
-	return resp.Role, nil
 }

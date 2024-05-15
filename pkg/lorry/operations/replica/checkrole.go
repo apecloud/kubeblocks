@@ -110,7 +110,12 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 	defer cancel()
 	switch {
 	case !intctrlutil.IsNil(s.DBPluginClient):
-		role, err = s.GetRoleThroughGRPC(ctx1)
+		if !s.DBPluginClient.IsDBStartupReady(ctx1) {
+			resp.Data["message"] = "db not ready"
+			return resp, nil
+		}
+
+		role, err = s.DBPluginClient.GetReplicaRole(ctx1)
 	default:
 		manager, err1 := register.GetDBManager(s.Command)
 		if err1 != nil {

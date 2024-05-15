@@ -52,7 +52,7 @@ type Base struct {
 	Timeout time.Duration
 
 	Command        []string
-	DBPluginClient plugin.DBPluginClient
+	DBPluginClient *plugin.DBClient
 	DBManager      engines.DBManager
 
 	Logger logr.Logger

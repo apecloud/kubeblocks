@@ -550,9 +550,11 @@ func GetPodContainer(pod *corev1.Pod, containerName string) *corev1.Container {
 }
 
 // IsPodFailedAndTimedOut checks if the pod is failed and timed out.
-func IsPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
-	if isFailed, isTimedOut, message := isPodScheduledFailedAndTimedOut(pod); isFailed {
-		return isFailed, isTimedOut, message
+func IsPodFailedAndTimedOut(pod *corev1.Pod, ignoreScheduledCheck bool) (bool, bool, string) {
+	if !ignoreScheduledCheck {
+		if isFailed, isTimedOut, message := isPodScheduledFailedAndTimedOut(pod); isFailed {
+			return isFailed, isTimedOut, message
+		}
 	}
 	initContainerFailed, message := isAnyContainerFailed(pod.Status.InitContainerStatuses)
 	if initContainerFailed {

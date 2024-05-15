@@ -169,13 +169,6 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 		*out = new(v1.Service)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.AlternativeServices != nil {
-		in, out := &in.AlternativeServices, &out.AlternativeServices
-		*out = make([]v1.Service, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	in.Template.DeepCopyInto(&out.Template)
 	if in.Instances != nil {
 		in, out := &in.Instances, &out.Instances

@@ -34,6 +34,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/job"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -69,7 +70,7 @@ func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestC
 		if err != nil {
 			return nil, err
 		}
-		pod, err := getServiceableNWritablePod(reqCtx.Ctx, cli, *opsRes.Cluster, *synthesizedComp)
+		pod, err := getServiceableNWritablePod(reqCtx.Ctx, cli, *synthesizedComp)
 		if err != nil {
 			return nil, err
 		}
@@ -132,7 +133,7 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 		if err != nil {
 			return err
 		}
-		needSwitchover, err := needDoSwitchover(reqCtx.Ctx, cli, opsRes.Cluster, synthesizedComp, &switchover)
+		needSwitchover, err := needDoSwitchover(reqCtx.Ctx, cli, synthesizedComp, &switchover)
 		if err != nil {
 			return err
 		}
@@ -197,7 +198,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			ObjectKey: getProgressObjectKey(KBSwitchoverCheckJobKey, jobName),
 			Status:    appsv1alpha1.ProcessingProgressStatus,
 		}
-		if err = component.CheckJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
+		if err = job.CheckJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is not succeed", jobName)
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkJobProcessDetail, switchover.ComponentName)
 			continue
@@ -221,7 +222,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
 			continue
 		}
-		consistency, err = checkPodRoleLabelConsistency(reqCtx.Ctx, cli, opsRes.Cluster, *synthesizedComp, &switchover, switchoverCondition)
+		consistency, err = checkPodRoleLabelConsistency(reqCtx.Ctx, cli, *synthesizedComp, &switchover, switchoverCondition)
 		if err != nil {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("waiting for component %s pod role label consistency after switchover", switchover.ComponentName)
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
@@ -263,7 +264,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 
 	if completedCount == expectCount {
 		for _, jobName := range succeedJobs {
-			if err := component.CleanJobByName(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
+			if err := job.CleanJobByName(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
 				reqCtx.Log.Error(err, "clean switchover job failed", "jobName", jobName)
 				return expectCount, completedCount, err
 			}

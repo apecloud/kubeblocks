@@ -27,11 +27,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -48,6 +52,13 @@ import (
 )
 
 var _ = Describe("Addon controller", func() {
+	const (
+		clusterDefName     = "test-clusterdef"
+		clusterVersionName = "test-clusterversion"
+		compDefName        = "test-compdef"
+		compVersionName    = "test-compversion"
+		clusterName        = "test-cluster"
+	)
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -93,6 +104,7 @@ var _ = Describe("Addon controller", func() {
 	Context("Addon controller test", func() {
 		var addon *extensionsv1alpha1.Addon
 		var key types.NamespacedName
+		var clusterKey types.NamespacedName
 		BeforeEach(func() {
 			cleanEnv()
 			const distro = "kubeblocks"
@@ -290,12 +302,36 @@ var _ = Describe("Addon controller", func() {
 			g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 		}
 
+		checkAddonNotDeleted := func(g Gomega) {
+			addon = &extensionsv1alpha1.Addon{}
+			err := testCtx.Cli.Get(ctx, key, addon)
+			g.Expect(err).To(Not(HaveOccurred()))
+		}
+
 		disableAddon := func(genID int) {
 			addon = &extensionsv1alpha1.Addon{}
 			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 			addon.Spec.InstallSpec.Enabled = false
 			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
 			disablingPhaseCheck(genID)
+		}
+
+		disableAddonFailedCheck := func(genID, obGenID int, expectPhase extensionsv1alpha1.AddonPhase) {
+			addon = &extensionsv1alpha1.Addon{}
+			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+			addon.Spec.InstallSpec.Enabled = false
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				Expect(err).To(Not(HaveOccurred()))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Generation).Should(BeEquivalentTo(genID))
+				g.Expect(addon.Spec.InstallSpec).ShouldNot(BeNil())
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(obGenID))
+				g.Expect(addon.Status.Phase).Should(Equal(expectPhase))
+			}).Should(Succeed())
 		}
 
 		fakeHelmRelease := func() {
@@ -312,6 +348,67 @@ var _ = Describe("Addon controller", func() {
 				Type: "helm.sh/release.v1",
 			}
 			Expect(testCtx.CreateObj(ctx, helmRelease)).Should(Succeed())
+		}
+
+		createTestNamespace := func(name string) {
+			namespace := corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+			}
+			Expect(client.IgnoreAlreadyExists(testCtx.Create(ctx, &namespace))).To(Succeed())
+		}
+
+		createTestDeployment := func() {
+			deploy := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kubeblocks",
+					Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+					Labels: map[string]string{
+						constant.AppComponentLabelKey: "apps",
+						constant.AppNameLabelKey:      "kubeblocks",
+						constant.AppVersionLabelKey:   "0.9.0-beta.5",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							constant.AppNameLabelKey: "kubeblocks",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								constant.AppNameLabelKey: "kubeblocks",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "test",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, deploy))).To(Succeed())
+		}
+
+		CheckKubernetesVersion := func() bool {
+			var serverVersion *version.Info
+			var isBeforeVersion bool
+			Eventually(func(g Gomega) {
+				clientset, err := kubernetes.NewForConfig(cfg)
+				g.Expect(err).NotTo(HaveOccurred())
+				discoveryClient := clientset.Discovery()
+				serverVersion, err = discoveryClient.ServerVersion()
+				g.Expect(err).NotTo(HaveOccurred())
+				isBeforeVersion = (version.CompareKubeAwareVersionStrings(serverVersion.String(), "v1.23.0") > 0)
+			}).Should(Succeed())
+			fmt.Printf("Kubernetes server version: %s\n", serverVersion.String())
+			return isBeforeVersion
 		}
 
 		It("should successfully reconcile a custom resource for Addon with spec.type=Helm", func() {
@@ -559,6 +656,29 @@ var _ = Describe("Addon controller", func() {
 			// "extensions.kubeblocks.io/skip-installable-check"
 		})
 
+		It("should failed reconcile a custom resource for Addon with missing spec helm of helm chartLocationURL", func() {
+			By("By check Kubernetes Version to decide if check")
+			// if k8s version > 1.23, it has kubebuilder X-Validation, no need to check again
+			if CheckKubernetesVersion() {
+				By("By create an addon with spec.helm = nil")
+				createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+					newOjb.Spec.Installable.AutoInstall = true
+					newOjb.Spec.Type = extensionsv1alpha1.HelmType
+					newOjb.Spec.Helm = nil
+				})
+
+				By("By check addon status")
+				Eventually(func(g Gomega) {
+					doReconcileOnce(g)
+					addon = &extensionsv1alpha1.Addon{}
+					g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+					g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+					g.Expect(addon.Spec.InstallSpec).Should(BeNil())
+					g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+				}).Should(Succeed())
+			}
+		})
+
 		It("should successfully reconcile a custom resource for Addon with CM and secret ref values", func() {
 			By("By create an addon with spec.helm.installValues.configMapRefs set")
 			cm := testapps.CreateCustomizedObj(&testCtx, "addon/cm-values.yaml",
@@ -629,6 +749,165 @@ var _ = Describe("Addon controller", func() {
 					})
 			})
 			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
+		})
+
+		It("should set status to failed when install an Addon with annotations mismatching", func() {
+			viper.Set(constant.CfgKeyCtrlrMgrNS, "kb-system")
+			By("By create a new namespace called kb-system")
+			createTestNamespace("kb-system")
+
+			By("By create a deployment called kubeblocks with labels")
+			createTestDeployment()
+
+			By("By create an addon with annotation of KubeBlocks Version")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+				newOjb.Annotations = map[string]string{
+					KBVersionValidate: ">=0.99.0",
+				}
+			})
+
+			By("By checking status.observedGeneration and status.phase=failed")
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				addon := &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+				g.Expect(addon.Status.Conditions).Should(HaveLen(1))
+				g.Expect(addon.Status.Conditions[0].Reason).Should(BeEquivalentTo(InstallableRequirementUnmatched))
+			}).Should(Succeed())
+			viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
+		})
+
+		It("should set status to failed when enable an Addon with annotations mismatching", func() {
+			viper.Set(constant.CfgKeyCtrlrMgrNS, "kb-system")
+			By("By create a new namespace called kb-system")
+			createTestNamespace("kb-system")
+
+			By("By create a deployment called kubeblocks with labels")
+			createTestDeployment()
+
+			By("By create an addon")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Type = extensionsv1alpha1.HelmType
+			})
+
+			By("By checking status.observedGeneration and status.phase=disabled")
+			Eventually(func(g Gomega) {
+				doReconcileOnce(g)
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
+			}).Should(Succeed())
+
+			By("By set the constraint in annotations of an addon")
+			defaultInstall := addon.Spec.DefaultInstallValues[0].AddonInstallSpec
+			addon.Spec.InstallSpec = defaultInstall.DeepCopy()
+			addon.Spec.InstallSpec.Enabled = true
+			addon.Annotations = map[string]string{
+				KBVersionValidate: ">=0.99.0",
+			}
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+
+			By("By failed to enable an addon with disabled status and the constraint is not met")
+			Eventually(func(g Gomega) {
+				addon := &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				doReconcileOnce(g)
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+				g.Expect(addon.Status.Conditions).Should(HaveLen(2))
+				g.Expect(addon.Status.Conditions[1].Reason).Should(BeEquivalentTo(InstallableRequirementUnmatched))
+			}).Should(Succeed())
+
+			By("remove the constraint in annotations of an addon")
+			addon := &extensionsv1alpha1.Addon{}
+			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+			addon.Annotations = map[string]string{}
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+
+			By("By enable an addon with status failed")
+			Eventually(func(g Gomega) {
+				addon := &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				enablingPhaseCheck(2)
+			}).Should(Succeed())
+			viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
+		})
+
+		It("should successfully reconcile a custom resource for Addon deleting with used by clusters", func() {
+			createAutoInstallAddon()
+
+			By("By enable addon with fake completed install job status")
+			fakeInstallationCompletedJob(2)
+
+			By("By creating cluster with addon")
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				"test-cd", "test-cv").
+				AddComponent(addon.Name, addon.Name).SetReplicas(1).
+				WithRandomName().
+				AddLabels(constant.ClusterDefLabelKey, addon.Name).
+				Create(&testCtx).
+				GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			cluster := &appsv1alpha1.Cluster{}
+			Eventually(func(g Gomega) {
+				err := testCtx.Cli.Get(ctx, clusterKey, cluster)
+				g.Expect(err).To(Not(HaveOccurred()))
+			}).Should(Succeed())
+
+			By("By delete addon with disabling status")
+			Expect(testCtx.Cli.Delete(ctx, addon)).To(Not(HaveOccurred()))
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				checkAddonNotDeleted(g)
+			}).Should(Succeed())
+
+			By("By deleting cluster")
+			Expect(testCtx.Cli.Delete(ctx, cluster)).To(Not(HaveOccurred()))
+
+			By("By checking addon with no used cluster")
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				checkAddonDeleted(g)
+			}).Should(Succeed())
+		})
+
+		It("should successfully reconcile a custom resource for Addon disabling with used by clusters", func() {
+			createAutoInstallAddon()
+
+			By("By enable addon with fake completed install job status")
+			fakeInstallationCompletedJob(2)
+
+			By("By creating cluster with addon")
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				"test-cd", "test-cv").
+				AddComponent(addon.Name, addon.Name).SetReplicas(1).
+				WithRandomName().
+				AddLabels(constant.ClusterDefLabelKey, addon.Name).
+				Create(&testCtx).
+				GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			cluster := &appsv1alpha1.Cluster{}
+			Eventually(func(g Gomega) {
+				err := testCtx.Cli.Get(ctx, clusterKey, cluster)
+				g.Expect(err).To(Not(HaveOccurred()))
+			}).Should(Succeed())
+
+			By("By disabling enabled addon")
+			fakeHelmRelease()
+			disableAddonFailedCheck(3, 2, extensionsv1alpha1.AddonEnabled)
+
+			By("By deleting cluster")
+			Expect(testCtx.Cli.Delete(ctx, cluster)).To(Not(HaveOccurred()))
+
+			By("By checking addon with no used cluster")
+			disablingPhaseCheck(3)
 		})
 
 		It("should have provider and version in spec for Addon with provider and version in label initially", func() {

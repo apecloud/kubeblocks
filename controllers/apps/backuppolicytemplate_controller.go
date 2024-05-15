@@ -55,7 +55,9 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 	}
 
 	// infer clusterDefRef from spec.clusterDefRef
-	backupPolicyTemplate.Labels[constant.ClusterDefLabelKey] = backupPolicyTemplate.Spec.ClusterDefRef
+	if backupPolicyTemplate.Spec.ClusterDefRef != "" {
+		backupPolicyTemplate.Labels[constant.ClusterDefLabelKey] = backupPolicyTemplate.Spec.ClusterDefRef
+	}
 
 	if err := r.Client.Update(reqCtx.Ctx, backupPolicyTemplate); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

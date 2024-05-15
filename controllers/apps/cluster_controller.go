@@ -154,7 +154,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// add our finalizer to all objects
 			&clusterOwnershipTransformer{},
 			// make all workload objects depending on credential secret
-			&secretTransformer{},
+			&clusterSecretTransformer{},
 			// update cluster status
 			&clusterStatusTransformer{},
 			// always safe to put your transformer below

@@ -14,7 +14,6 @@ spec:
   selector:
     matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: "dataprotection"
   {{- if .Values.updateStrategy }}
   strategy:
     {{ toYaml .Values.updateStrategy | nindent 4 | trim }}
@@ -27,7 +26,6 @@ spec:
       {{- end }}
       labels:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: "dataprotection"
     spec:
       priorityClassName: {{ template "kubeblocks.priorityClassName" . }}
       {{- with .Values.dataProtection.image.imagePullSecrets }}

@@ -48,7 +48,6 @@ var (
 
 func newMockInstanceSet(replicas int, name string, labels map[string]string) workloads.InstanceSet {
 	uid, _ := password.Generate(12, 12, 0, true, false)
-	serviceName, _ := password.Generate(12, 0, 0, true, false)
 	return workloads.InstanceSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       workloads.Kind,
@@ -79,7 +78,6 @@ func newMockInstanceSet(replicas int, name string, labels map[string]string) wor
 						}}},
 				},
 			},
-			ServiceName: serviceName,
 		},
 	}
 }

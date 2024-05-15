@@ -321,24 +321,30 @@ func getTargetPods(
 	podSelector appsv1alpha1.PodSelector,
 	compName string) ([]*corev1.Pod, error) {
 	var (
-		podList *corev1.PodList
-		err     error
+		pods []*corev1.Pod
+		err  error
 	)
 	if podSelector.Role != "" {
-		podList, err = component.GetComponentPodListWithRole(ctx, cli, *cluster, compName, podSelector.Role)
+		pods, err = component.ListOwnedPodsWithRole(ctx, cli, cluster.Namespace, cluster.Name, compName, podSelector.Role)
 	} else {
-		podList, err = component.GetComponentPodList(ctx, cli, *cluster, compName)
+		pods, err = component.ListOwnedPods(ctx, cli, cluster.Namespace, cluster.Name, compName)
 	}
 	if err != nil {
 		return nil, err
 	}
-	if len(podList.Items) == 0 {
+	if len(pods) == 0 {
 		return nil, intctrlutil.NewFatalError("can not find any pod which matches the podSelector for the component " + compName)
 	}
-	sort.Sort(intctrlutil.ByPodName(podList.Items))
+	sort.Sort(intctrlutil.ByPodName(func() []corev1.Pod {
+		l := make([]corev1.Pod, 0)
+		for i := range pods {
+			l = append(l, *pods[i])
+		}
+		return l
+	}()))
 	var targetPods []*corev1.Pod
-	for i := range podList.Items {
-		pod := &podList.Items[i]
+	for i := range pods {
+		pod := pods[i]
 		targetPods = append(targetPods, pod)
 		// Preferably select available pod.
 		if podSelector.MultiPodSelectionPolicy == appsv1alpha1.Any && intctrlutil.IsAvailable(pod, 0) {

@@ -25,7 +25,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -35,6 +34,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/klog/v2"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
@@ -97,7 +97,6 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddLabelsInMap(mergeLabels).
 		AddAnnotationsInMap(mergeAnnotations).
 		AddMatchLabelsInMap(labels).
-		SetServiceName(constant.GenerateServiceNamePattern(itsName)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
 		SetTemplate(template)
@@ -142,60 +141,32 @@ func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeC
 
 // getMonitorAnnotations returns the annotations for the monitor.
 func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) map[string]string {
-	if !synthesizedComp.MonitorEnabled || componentDef == nil || !isSupportedMonitor(componentDef, synthesizedComp) {
+	if synthesizedComp.DisableExporter == nil || *synthesizedComp.DisableExporter || componentDef == nil {
 		return nil
 	}
 
-	var container *corev1.Container
-	var monitor *appsv1alpha1.PrometheusScrapeConfig
-	if hasBuiltinMonitor(componentDef) {
-		monitor, container = getBuiltinContainer(synthesizedComp, componentDef.Spec.BuiltinMonitorContainer)
-	} else if hasMetricsSidecar(synthesizedComp) {
-		monitor, container = getMetricsSidecarContainer(synthesizedComp.Sidecars, componentDef.Spec.SidecarContainerSpecs)
-	}
-
-	if monitor == nil {
+	exporter := component.GetExporter(componentDef.Spec)
+	if exporter == nil {
 		return nil
 	}
-	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor, container))
-}
 
-func isSupportedMonitor(componentDef *appsv1alpha1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) bool {
-	return hasMetricsSidecar(synthesizedComp) || hasBuiltinMonitor(componentDef)
-}
-
-func hasBuiltinMonitor(componentDef *appsv1alpha1.ComponentDefinition) bool {
-	return componentDef.Spec.BuiltinMonitorContainer != nil
-}
-
-func hasMetricsSidecar(comp *component.SynthesizedComponent) bool {
-	return len(comp.Sidecars) > 0
-}
-
-func getMetricsSidecarContainer(sidecars []string, containerSpecs []appsv1alpha1.SidecarContainerSpec) (*appsv1alpha1.PrometheusScrapeConfig, *corev1.Container) {
-	for i := range containerSpecs {
-		spec := &containerSpecs[i]
-		if slices.Contains(sidecars, spec.Name) && isMetricsContainer(spec) {
-			return spec.Monitor.ScrapeConfig, &spec.Container
-		}
+	// Node: If it is an old addon, containerName may be empty.
+	container := getBuiltinContainer(synthesizedComp, exporter.ContainerName)
+	if container == nil && exporter.ScrapePort == "" && exporter.TargetPort == nil {
+		klog.Warningf("invalid exporter port and ignore for component: %s, componentDef: %s", synthesizedComp.Name, componentDef.Name)
+		return nil
 	}
-	return nil, nil
+	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, common.GetScrapeAnnotations(*exporter, container))
 }
 
-func getBuiltinContainer(synthesizedComp *component.SynthesizedComponent, builtinMonitorContainer *appsv1alpha1.BuiltinMonitorContainerRef) (*appsv1alpha1.PrometheusScrapeConfig, *corev1.Container) {
+func getBuiltinContainer(synthesizedComp *component.SynthesizedComponent, containerName string) *corev1.Container {
 	containers := synthesizedComp.PodSpec.Containers
 	for i := range containers {
-		if containers[i].Name == builtinMonitorContainer.Name {
-			return &builtinMonitorContainer.PrometheusScrapeConfig, &containers[i]
+		if containers[i].Name == containerName {
+			return &containers[i]
 		}
 	}
-	return nil, nil
-}
-
-func isMetricsContainer(sidecarContainer *appsv1alpha1.SidecarContainerSpec) bool {
-	return sidecarContainer.Monitor != nil &&
-		sidecarContainer.Monitor.SidecarKind == appsv1alpha1.MetricsKind &&
-		sidecarContainer.Monitor.ScrapeConfig != nil
+	return nil
 }
 
 func setDefaultResourceLimits(its *workloads.InstanceSet) {
@@ -293,7 +264,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	uuidHex := hex.EncodeToString(uuidBytes)
 	randomPassword := randomString(8)
 	strongRandomPasswd := strongRandomString(16)
-	restorePassword := GetRestorePassword(cluster, synthesizedComp)
+	restorePassword := GetRestorePassword(synthesizedComp)
 	// check if a connection password is specified during recovery.
 	// if exists, replace the random password
 	if restorePassword != "" {
@@ -328,8 +299,8 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 }
 
 // GetRestorePassword gets restore password if exists during recovery.
-func GetRestorePassword(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) string {
-	valueString := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
+func GetRestorePassword(synthesizedComp *component.SynthesizedComponent) string {
+	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return ""
 	}

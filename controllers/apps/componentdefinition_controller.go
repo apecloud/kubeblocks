@@ -461,5 +461,6 @@ func getBuiltinActionHandlers() []appsv1alpha1.BuiltinActionHandlerType {
 		appsv1alpha1.OfficialPostgresqlBuiltinActionHandler,
 		appsv1alpha1.ApeCloudPostgresqlBuiltinActionHandler,
 		appsv1alpha1.PolarDBXBuiltinActionHandler,
+		appsv1alpha1.CustomActionHandler,
 	}
 }

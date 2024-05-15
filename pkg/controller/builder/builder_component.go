@@ -55,6 +55,11 @@ func (builder *ComponentBuilder) SetReplicas(replicas int32) *ComponentBuilder {
 	return builder
 }
 
+func (builder *ComponentBuilder) SetConfigs(configs []appsv1alpha1.ClusterComponentConfig) *ComponentBuilder {
+	builder.get().Spec.Configs = configs
+	return builder
+}
+
 func (builder *ComponentBuilder) SetServiceAccountName(serviceAccountName string) *ComponentBuilder {
 	builder.get().Spec.ServiceAccountName = serviceAccountName
 	return builder
@@ -65,13 +70,8 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
-func (builder *ComponentBuilder) SetSidecarContainers(sidecars []string) *ComponentBuilder {
-	builder.get().Spec.Sidecars = sidecars
-	return builder
-}
-
-func (builder *ComponentBuilder) SetMonitor(monitorEnabled *bool) *ComponentBuilder {
-	builder.get().Spec.MonitorEnabled = monitorEnabled
+func (builder *ComponentBuilder) DisableExporter(disableExporter *bool) *ComponentBuilder {
+	builder.get().Spec.DisableExporter = disableExporter
 	return builder
 }
 

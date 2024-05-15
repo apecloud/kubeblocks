@@ -173,7 +173,7 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 }
 
 func GetEnvConfigMapName(itsName string) string {
-	return fmt.Sprintf("%s-its-env", itsName)
+	return fmt.Sprintf("%s-rsm-env", itsName)
 }
 
 func composeRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole {

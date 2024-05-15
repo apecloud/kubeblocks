@@ -70,7 +70,7 @@ type SynthesizedComponent struct {
 	ComponentServices   []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
 	MinReadySeconds     int32                               `json:"minReadySeconds,omitempty"`
 	Sidecars            []string                            `json:"sidecars,omitempty"`
-	MonitorEnabled      bool                                `json:"monitorEnabled,omitempty"`
+	DisableExporter     *bool                               `json:"disableExporter,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0
 	ClusterDefName        string                          `json:"clusterDefName,omitempty"`     // the name of the clusterDefinition

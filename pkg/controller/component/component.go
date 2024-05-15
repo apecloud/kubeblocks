@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -85,12 +86,12 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetSchedulingPolicy(schedulingPolicy).
-		SetSidecarContainers(compSpec.Sidecars).
-		SetMonitor(compSpec.MonitorEnabled).
+		DisableExporter(compSpec.GetDisableExporter()).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
+		SetConfigs(compSpec.Configs).
 		SetEnabledLogs(compSpec.EnabledLogs).
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
@@ -288,4 +289,22 @@ func GetHostNetworkRelatedComponents(podSpec *corev1.PodSpec, ctx context.Contex
 		return nil, nil
 	}
 	return CheckAndGetClusterComponents(ctx, cli, cluster)
+}
+
+func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *common.Exporter {
+	if componentDef.Exporter != nil {
+		return &common.Exporter{Exporter: *componentDef.Exporter}
+	}
+
+	// Compatible with previous versions of kb
+	if componentDef.Monitor == nil || componentDef.Monitor.Exporter == nil {
+		return nil
+	}
+
+	return &common.Exporter{
+		TargetPort: &componentDef.Monitor.Exporter.ScrapePort,
+		Exporter: appsv1alpha1.Exporter{
+			ScrapePath: componentDef.Monitor.Exporter.ScrapePath,
+		},
+	}
 }

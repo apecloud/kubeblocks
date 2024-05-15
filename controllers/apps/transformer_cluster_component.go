@@ -92,8 +92,12 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	}
 
 	// component objects to be updated
+	var delayedErr error
 	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
-		return err
+		if !ictrlutil.IsDelayedRequeueError(err) {
+			return err
+		}
+		delayedErr = err
 	}
 
 	// component objects to be created
@@ -101,7 +105,7 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 		return err
 	}
 
-	return nil
+	return delayedErr
 }
 
 func (t *clusterComponentTransformer) handleCompsCreate(transCtx *clusterTransformContext, dag *graph.DAG,
@@ -142,7 +146,7 @@ func (t *clusterComponentTransformer) handleComps(transCtx *clusterTransformCont
 		}
 	}
 	if len(unmatched) > 0 {
-		return fmt.Errorf("retry later: %s are not ready", strings.Join(unmatched, ","))
+		return ictrlutil.NewDelayedRequeueError(0, fmt.Sprintf("retry later: %s are not ready", strings.Join(unmatched, ",")))
 	}
 	return nil
 }
@@ -203,8 +207,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.Instances = compProto.Spec.Instances
 	compObjCopy.Spec.OfflineInstances = compProto.Spec.OfflineInstances
 	compObjCopy.Spec.RuntimeClassName = compProto.Spec.RuntimeClassName
-	compObjCopy.Spec.Sidecars = compProto.Spec.Sidecars
-	compObjCopy.Spec.MonitorEnabled = compProto.Spec.MonitorEnabled
+	compObjCopy.Spec.DisableExporter = compProto.Spec.DisableExporter
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&

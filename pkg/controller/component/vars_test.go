@@ -366,17 +366,17 @@ var _ = Describe("vars", func() {
 			})
 		})
 
-		It("pod vars", func() {
-			By("ok")
+		It("host-network vars", func() {
 			vars := []appsv1alpha1.EnvVar{
 				{
-					Name: "pod-container-port",
+					Name:  "host-network-port",
+					Value: "3306", // default value
 					ValueFrom: &appsv1alpha1.VarSource{
-						PodVarRef: &appsv1alpha1.PodVarSelector{
+						HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
 								Optional: required(),
 							},
-							PodVars: appsv1alpha1.PodVars{
+							HostNetworkVars: appsv1alpha1.HostNetworkVars{
 								Container: &appsv1alpha1.ContainerVars{
 									Name: "default",
 									Port: &appsv1alpha1.NamedVar{
@@ -389,19 +389,68 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-			synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, corev1.Container{
-				Name: "default",
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          "default",
-						ContainerPort: 3306,
+
+			By("has no host-network capability")
+			_, _, err := ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(And(ContainSubstring("has no HostNetwork"), ContainSubstring("found when resolving vars")))
+
+			By("has no host-network enabled")
+			synthesizedComp.HostNetwork = &appsv1alpha1.HostNetwork{}
+			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(And(ContainSubstring("has no HostNetwork"), ContainSubstring("found when resolving vars")))
+
+			By("has no host-network port")
+			synthesizedComp.Annotations = map[string]string{
+				constant.HostNetworkAnnotationKey: synthesizedComp.Name,
+			}
+			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
+
+			By("ok")
+			ctx := mockHostNetworkPort(testCtx.Ctx, testCtx.Cli,
+				synthesizedComp.ClusterName, synthesizedComp.Name, "default", "default", 30001)
+			templateVars, envVars, err := ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
+			checkEnvVarWithValue(envVars, "host-network-port", "30001")
+
+			By("w/ default value - has host-network port")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name:  "host-network-port",
+					Value: "3306", // default value
+					ValueFrom: &appsv1alpha1.VarSource{
+						HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Optional: optional(), // optional
+							},
+							HostNetworkVars: appsv1alpha1.HostNetworkVars{
+								Container: &appsv1alpha1.ContainerVars{
+									Name: "default",
+									Port: &appsv1alpha1.NamedVar{
+										Name:   "default",
+										Option: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
 					},
 				},
-			})
-			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
-			Expect(templateVars).Should(HaveKeyWithValue("pod-container-port", "3306"))
-			checkEnvVarWithValue(envVars, "pod-container-port", "3306")
+			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
+			checkEnvVarWithValue(envVars, "host-network-port", "30001")
+
+			By("w/ default value - back-off to default value")
+			synthesizedComp.Annotations = nil // disable the host-network
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "3306"))
+			checkEnvVarWithValue(envVars, "host-network-port", "3306")
 		})
 
 		It("service vars", func() {
@@ -540,6 +589,104 @@ var _ = Describe("vars", func() {
 			checkEnvVarWithValue(envVars, "service-host", svcName)
 			checkEnvVarWithValue(envVars, "service-port", strconv.Itoa(svcPort))
 			checkEnvVarWithValue(envVars, "service-port-wo-name", strconv.Itoa(svcPort+1))
+
+			By("node port")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-node-port",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "service",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Port: &appsv1alpha1.NamedVar{
+									Name:   "default",
+									Option: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+				},
+			}
+			nodePort := 30001
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      svcName,
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeNodePort,
+							Ports: []corev1.ServicePort{
+								{
+									Name:     "default",
+									Port:     int32(svcPort),
+									NodePort: int32(nodePort),
+								},
+							},
+						},
+					},
+				},
+			}
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("service-node-port", strconv.Itoa(nodePort)))
+			checkEnvVarWithValue(envVars, "service-node-port", strconv.Itoa(nodePort))
+
+			By("node port in provisioning")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-node-port",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "service",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Port: &appsv1alpha1.NamedVar{
+									Name:   "default",
+									Option: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+				},
+			}
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      svcName,
+						},
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeNodePort,
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+									// the node port is not assigned
+								},
+							},
+						},
+					},
+				},
+			}
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
+			// assign a node port to the service
+			reader.objs[0].(*corev1.Service).Spec.Ports[0].NodePort = int32(nodePort + 1)
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("service-node-port", strconv.Itoa(nodePort+1)))
+			checkEnvVarWithValue(envVars, "service-node-port", strconv.Itoa(nodePort+1))
 
 			By("pod service")
 			vars = []appsv1alpha1.EnvVar{
@@ -1777,7 +1924,7 @@ var _ = Describe("vars", func() {
 			}
 			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("not found when resolving vars"))
+			Expect(err.Error()).Should(And(ContainSubstring("has no"), ContainSubstring("found when resolving vars")))
 			// create service for comp3
 			reader.objs = append(reader.objs, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1862,7 +2009,7 @@ var _ = Describe("vars", func() {
 			}
 			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("not found when resolving vars"))
+			Expect(err.Error()).Should(And(ContainSubstring("has no"), ContainSubstring("found when resolving vars")))
 			// create service for comp3
 			reader.objs = append(reader.objs, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{

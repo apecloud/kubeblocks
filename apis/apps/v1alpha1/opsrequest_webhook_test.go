@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/utils/pointer"
 
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
@@ -140,12 +141,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, newClusterVersion)).Should(Succeed())
 
 		By("By testing when target cluster version not exist")
-		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName + "-not-exist"}
+		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: pointer.String(clusterVersionName + "-not-exist")}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
 
 		By("Test Cluster Phase")
 		opsRequest.Name = opsRequestName + "-upgrade-cluster-phase"
-		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
+		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: pointer.String(clusterVersionName)}
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
 			FromClusterPhases: []ClusterPhase{RunningClusterPhase},
 			ToClusterPhase:    UpdatingClusterPhase, // original VersionUpgradingPhase,
@@ -159,7 +160,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
 
 		By("By creating a upgrade opsRequest, it should be succeed")
-		opsRequest.Spec.Upgrade.ClusterVersionRef = newClusterVersion.Name
+		opsRequest.Spec.Upgrade.ClusterVersionRef = pointer.String(newClusterVersion.Name)
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
 			Namespace: opsRequest.Namespace}, opsRequest)).Should(Succeed())

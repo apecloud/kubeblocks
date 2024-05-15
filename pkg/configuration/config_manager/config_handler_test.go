@@ -103,8 +103,8 @@ var _ = Describe("Config Handler Test", func() {
 		}
 	}
 
-	newDownwardAPIOptions := func() []appsv1beta1.DownwardAPITriggeredAction {
-		return []appsv1beta1.DownwardAPITriggeredAction{
+	newDownwardAPIOptions := func() []appsv1beta1.DownwardAPIChangeTriggeredAction {
+		return []appsv1beta1.DownwardAPIChangeTriggeredAction{
 			{
 				Name:       "labels",
 				MountPoint: filepath.Join(tmpWorkDir, "labels"),

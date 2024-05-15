@@ -4,7 +4,7 @@ metadata:
   name: mysql-tree-node-template-8.0
 spec:
   # ConfigurationSchema that impose restrictions on engine parameter's rule
-  configSchema:
+  parametersSchema:
     # schema: auto generate from cue scripts
     # example: ../../pkg/configuration/testdata/mysql_openapi.json
     cue: |-

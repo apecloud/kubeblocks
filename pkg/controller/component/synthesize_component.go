@@ -176,8 +176,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		ServiceAccountName: comp.Spec.ServiceAccountName,
 		Instances:          comp.Spec.Instances,
 		OfflineInstances:   comp.Spec.OfflineInstances,
-		Sidecars:           comp.Spec.Sidecars,
-		MonitorEnabled:     buildMonitorEnabled(comp),
+		DisableExporter:    comp.Spec.DisableExporter,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -211,6 +210,10 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 
 	// build componentService
 	buildComponentServices(synthesizeComp, comp)
+
+	if err = overrideConfigTemplates(synthesizeComp, comp); err != nil {
+		return nil, err
+	}
 
 	// build monitor
 	// buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
@@ -246,13 +249,6 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alp
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
 }
 
-func buildMonitorEnabled(comp *appsv1alpha1.Component) bool {
-	if comp.Spec.MonitorEnabled != nil {
-		return *comp.Spec.MonitorEnabled
-	}
-	return false
-}
-
 func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
 	if comp != nil && comp.Annotations != nil {
 		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
@@ -284,7 +280,7 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1a
 
 	// Build from ShardingSpecs
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, &shardingSpec)
+		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, shardingSpec.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -438,6 +434,42 @@ func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1al
 	for i := range synthesizeComp.ComponentServices {
 		override(&synthesizeComp.ComponentServices[i])
 	}
+}
+
+func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	if comp == nil || len(comp.Spec.Configs) == 0 {
+		return nil
+	}
+
+	templates := make(map[string]*appsv1alpha1.ComponentConfigSpec)
+	for i, template := range synthesizedComp.ConfigTemplates {
+		templates[template.Name] = &synthesizedComp.ConfigTemplates[i]
+	}
+
+	for _, config := range comp.Spec.Configs {
+		if config.Name == nil || len(*config.Name) == 0 {
+			continue // not supported now
+		}
+		template := templates[*config.Name]
+		if template == nil {
+			return fmt.Errorf("the config template %s is not defined in definition", *config.Name)
+		}
+
+		specified := func() bool {
+			return config.ConfigMap != nil && len(config.ConfigMap.Name) > 0
+		}
+		switch {
+		case len(template.TemplateRef) == 0 && !specified():
+			return fmt.Errorf("there is no content provided for config template %s", *config.Name)
+		case len(template.TemplateRef) > 0 && specified():
+			return fmt.Errorf("partial overriding is not supported, config template: %s", *config.Name)
+		case specified():
+			template.TemplateRef = config.ConfigMap.Name
+		default:
+			// do nothing
+		}
+	}
+	return nil
 }
 
 // buildServiceAccountName builds serviceAccountName for component and podSpec.

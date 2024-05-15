@@ -149,13 +149,6 @@ type InstanceSetSpec struct {
 	// +optional
 	Service *corev1.Service `json:"service,omitempty"`
 
-	// Defines Alternative Services selector pattern specifier.
-	//
-	// Note: This field will be removed in future version.
-	//
-	// +optional
-	AlternativeServices []corev1.Service `json:"alternativeServices,omitempty"`
-
 	Template corev1.PodTemplateSpec `json:"template"`
 
 	// Overrides values in default Template.

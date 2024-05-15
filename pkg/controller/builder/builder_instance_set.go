@@ -149,11 +149,6 @@ func (builder *InstanceSetBuilder) SetService(service *corev1.Service) *Instance
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetAlternativeServices(services []corev1.Service) *InstanceSetBuilder {
-	builder.get().Spec.AlternativeServices = services
-	return builder
-}
-
 func (builder *InstanceSetBuilder) SetMembershipReconfiguration(reconfiguration *workloads.MembershipReconfiguration) *InstanceSetBuilder {
 	builder.get().Spec.MembershipReconfiguration = reconfiguration
 	return builder

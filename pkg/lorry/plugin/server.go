@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plugin
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"sync"
 
-	"github.com/golang/glog"
+	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 )
 
@@ -40,14 +41,17 @@ type NonBlockingGRPCServer interface {
 	ForceStop()
 }
 
-func NewNonBlockingGRPCServer() NonBlockingGRPCServer {
-	return &nonBlockingGRPCServer{}
+func NewNonBlockingGRPCServer(logger logr.Logger) NonBlockingGRPCServer {
+	return &nonBlockingGRPCServer{
+		logger: logger,
+	}
 }
 
 // NonBlocking server
 type nonBlockingGRPCServer struct {
 	wg     sync.WaitGroup
 	server *grpc.Server
+	logger logr.Logger
 }
 
 func (s *nonBlockingGRPCServer) Start(endpoint string, dbPlugin DBPluginServer) {
@@ -73,19 +77,19 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, dbPlugin DBPluginServer) 
 
 	proto, addr, err := ParseEndpoint(endpoint)
 	if err != nil {
-		glog.Fatal(err.Error())
+		panic(err.Error())
 	}
 
 	if proto == "unix" {
 		addr = "/" + addr
 		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
-			glog.Fatalf("Failed to remove %s, error: %s", addr, err.Error())
+			panic(fmt.Sprintf("Failed to remove %s, error: %s", addr, err.Error()))
 		}
 	}
 
 	listener, err := net.Listen(proto, addr)
 	if err != nil {
-		glog.Fatalf("Failed to listen: %v", err)
+		panic(fmt.Sprintf("Failed to listen: %v", err))
 	}
 
 	opts := []grpc.ServerOption{
@@ -96,7 +100,7 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, dbPlugin DBPluginServer) 
 
 	RegisterDBPluginServer(server, dbPlugin)
 
-	glog.Infof("Listening for connections on address: %#v", listener.Addr())
+	s.logger.Info("Listening for connections on address", "addr", listener.Addr())
 
 	server.Serve(listener)
 

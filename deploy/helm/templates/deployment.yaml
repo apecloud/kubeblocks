@@ -12,6 +12,9 @@ spec:
   selector:
     matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+      {{- with .Values.extraLables }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
   {{- if .Values.updateStrategy }}
   strategy:
     {{ toYaml .Values.updateStrategy | nindent 4 | trim }}
@@ -24,6 +27,9 @@ spec:
       {{- end }}
       labels:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
+        {{- with .Values.extraLables }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       priorityClassName: {{ template "kubeblocks.priorityClassName" . }}
       {{- with .Values.image.imagePullSecrets }}

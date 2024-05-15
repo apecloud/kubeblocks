@@ -23,6 +23,8 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DBPluginClient interface {
 	GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest, opts ...grpc.CallOption) (*GetPluginInfoResponse, error)
+	// IsDBReady defines the mechanism to probe the readiness of the database.
+	IsDBReady(ctx context.Context, in *IsDBReadyRequest, opts ...grpc.CallOption) (*IsDBReadyResponse, error)
 	// GetRole defines the mechanism to probe the role of replicas. The return role
 	// must be one of the names defined in the componentdefinition roles.
 	GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*GetRoleResponse, error)
@@ -55,6 +57,15 @@ func NewDBPluginClient(cc grpc.ClientConnInterface) DBPluginClient {
 func (c *dBPluginClient) GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest, opts ...grpc.CallOption) (*GetPluginInfoResponse, error) {
 	out := new(GetPluginInfoResponse)
 	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/GetPluginInfo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dBPluginClient) IsDBReady(ctx context.Context, in *IsDBReadyRequest, opts ...grpc.CallOption) (*IsDBReadyResponse, error) {
+	out := new(IsDBReadyResponse)
+	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/IsDBReady", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +131,8 @@ func (c *dBPluginClient) AccountProvision(ctx context.Context, in *AccountProvis
 // for forward compatibility
 type DBPluginServer interface {
 	GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error)
+	// IsDBReady defines the mechanism to probe the readiness of the database.
+	IsDBReady(context.Context, *IsDBReadyRequest) (*IsDBReadyResponse, error)
 	// GetRole defines the mechanism to probe the role of replicas. The return role
 	// must be one of the names defined in the componentdefinition roles.
 	GetRole(context.Context, *GetRoleRequest) (*GetRoleResponse, error)
@@ -148,6 +161,9 @@ type UnimplementedDBPluginServer struct {
 
 func (UnimplementedDBPluginServer) GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPluginInfo not implemented")
+}
+func (UnimplementedDBPluginServer) IsDBReady(context.Context, *IsDBReadyRequest) (*IsDBReadyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsDBReady not implemented")
 }
 func (UnimplementedDBPluginServer) GetRole(context.Context, *GetRoleRequest) (*GetRoleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRole not implemented")
@@ -194,6 +210,24 @@ func _DBPlugin_GetPluginInfo_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DBPluginServer).GetPluginInfo(ctx, req.(*GetPluginInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DBPlugin_IsDBReady_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IsDBReadyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DBPluginServer).IsDBReady(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/plugin.v1.DBPlugin/IsDBReady",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DBPluginServer).IsDBReady(ctx, req.(*IsDBReadyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -316,6 +350,10 @@ var DBPlugin_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPluginInfo",
 			Handler:    _DBPlugin_GetPluginInfo_Handler,
+		},
+		{
+			MethodName: "IsDBReady",
+			Handler:    _DBPlugin_IsDBReady_Handler,
 		},
 		{
 			MethodName: "GetRole",

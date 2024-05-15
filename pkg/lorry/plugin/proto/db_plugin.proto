@@ -40,6 +40,18 @@ message GetPluginInfoResponse {
   map<string, string> metadata = 3;
 }
 
+message IsDBReadyRequest {
+  map<string, string> metadata = 1;
+}
+
+message IsDBReadyResponse {
+  // true if the DB is ready, false otherwise.
+  bool ready = 1;
+
+  // This field is OPTIONAL. 
+  map<string, string> metadata = 3;
+}
+
 message DBInfo {
   // The pod FQDN of the replica.
   string fqdn = 1;
@@ -169,6 +181,9 @@ message AccountProvisionResponse {
 // DBPlugin service provides APIs to kubeblocks operator to exec component operation.
 service DBPlugin {
   rpc GetPluginInfo(GetPluginInfoRequest) returns (GetPluginInfoResponse) {}
+
+  // IsDBReady defines the mechanism to probe the readiness of the database.
+  rpc IsDBReady(IsDBReadyRequest) returns (IsDBReadyResponse) {}
 
   // GetRole defines the mechanism to probe the role of replicas. The return role
   // must be one of the names defined in the componentdefinition roles. 

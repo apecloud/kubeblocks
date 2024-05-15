@@ -388,10 +388,10 @@ func (r rebuildInstanceOpsHandler) rebuildInstancePVByPod(reqCtx intctrlutil.Req
 }
 
 func (r rebuildInstanceOpsHandler) getWellKnownLabels(synthesizedComp *component.SynthesizedComponent) map[string]string {
-	if synthesizedComp.ClusterDefName != "" {
-		return constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if synthesizedComp.CompDefName != "" {
+		return constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
 	}
-	return constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
+	return constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
 }
 
 // getPVCMapAndVolumes gets the pvc map and the volume infos.

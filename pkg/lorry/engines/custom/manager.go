@@ -106,9 +106,16 @@ func (mgr *Manager) InitInstanceSetActions() error {
 func (mgr *Manager) InitComponentDefinitionActions() error {
 	actionJSON := viper.GetString(constant.KBEnvActionHandlers)
 	if actionJSON != "" {
-		err := json.Unmarshal([]byte(actionJSON), &mgr.actionCommands)
+		var actionHandlers = map[string]util.Handlers{}
+		err := json.Unmarshal([]byte(actionJSON), &actionHandlers)
 		if err != nil {
 			return err
+		}
+
+		for action, handlers := range actionHandlers {
+			if len(handlers.Command) > 0 {
+				mgr.actionCommands[action] = handlers.Command
+			}
 		}
 	}
 	return nil

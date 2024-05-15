@@ -109,7 +109,7 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 	ctx1, cancel := context.WithTimeout(ctx, s.Timeout)
 	defer cancel()
 	switch {
-	case intctrlutil.IsNil(s.DBPluginClient):
+	case !intctrlutil.IsNil(s.DBPluginClient):
 		role, err = s.GetRoleThroughGRPC(ctx1)
 	default:
 		manager, err1 := register.GetDBManager(s.Command)

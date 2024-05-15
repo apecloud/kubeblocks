@@ -52,14 +52,14 @@ If you don't have an object storage service from a cloud provider, you can deplo
 
    Once you are logged in to the dashboard, you can generate an `access key` and `secret key`.
 
-   ![backup-and-restore-backup-repo-1](./../../../img/backup-and-restore-backup-repo-1.png)
+   ![backup-and-restore-backup-repo-1](./../../../../img/backup-and-restore-backup-repo-1.png)
 
 3. Create a bucket.
 
    Create a bucket named `test-minio` for the test.
 
-   ![backup-and-restore-backup-repo-2](./../../../img/backup-and-restore-backup-repo-2.png)
-   ![backup-and-restore-backup-repo3](./../../../img/backup-and-restore-backup-repo-3.png)
+   ![backup-and-restore-backup-repo-2](./../../../../img/backup-and-restore-backup-repo-2.png)
+   ![backup-and-restore-backup-repo3](./../../../../img/backup-and-restore-backup-repo-3.png)
 
   :::note
 

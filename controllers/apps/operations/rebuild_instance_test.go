@@ -230,7 +230,7 @@ var _ = Describe("OpsUtil functions", func() {
 			pods := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
 			if ignoreRoleCheck {
 				for i := range pods {
-					Expect(testapps.ChangeObj(&testCtx, pods[i], func(pod *corev1.Pod) {
+					Expect(testapps.ChangeObj(&testCtx, &pods[i], func(pod *corev1.Pod) {
 						if pod.Labels != nil {
 							delete(pod.Labels, constant.RoleLabelKey)
 						}

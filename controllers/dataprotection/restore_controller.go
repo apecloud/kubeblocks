@@ -206,16 +206,20 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 	repoName, err := CheckBackupRepoForRestore(reqCtx, r.Client, restore)
 	switch {
 	case intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal):
+		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonCheckBackupRepoFailed, err.Error())
+		r.Recorder.Event(restore, corev1.EventTypeWarning, dprestore.ReasonCheckBackupRepoFailed, err.Error())
 		restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
 		restore.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		r.Recorder.Event(restore, corev1.EventTypeWarning, dprestore.ReasonRestoreFailed, err.Error())
 	case intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForBackupRepoPreparation):
+		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonWaitForBackupRepo, err.Error())
 		waitBackupRepo = true
 		restore.Labels[dataProtectionBackupRepoKey] = repoName
 		restore.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
 	case err != nil:
 		return RecorderEventAndRequeue(reqCtx, r.Recorder, restore, err)
 	default:
+		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonCheckBackupRepoSuccessfully, "")
 		// no error, fallthrough
 	}
 	if !reflect.DeepEqual(restore.ObjectMeta, oldRestore.ObjectMeta) {
@@ -238,7 +242,8 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 		restore.Status.Phase = dpv1alpha1.RestorePhaseAsDataSource
 	} else {
 		// check if restore CR is legal
-		err := dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme))
+		// err := dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme))
+		err := r.validateAndBuildMGR(reqCtx,dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme))
 		switch {
 		case intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal):
 			restore.Status.Phase = dpv1alpha1.RestorePhaseFailed

@@ -28,11 +28,14 @@ const (
 	ConditionTypeRestorePreparedData     = "PrepareData"
 	ConditionTypeReadinessProbe          = "ReadinessProbe"
 	ConditionTypeRestorePostReady        = "PostReady"
-
+	ConditionTypeRestoreCheckBackupRepo	 = "CheckBackupRepo"
 	// condition reasons
 	ReasonRestoreStarting      = "RestoreStarting"
 	ReasonRestoreCompleted     = "RestoreCompleted"
 	ReasonRestoreFailed        = "RestoreFailed"
+	ReasonCheckBackupRepoFailed= "CheckBackupRepoFailed"
+	ReasonWaitForBackupRepo    = "WaitForBackupRepo"
+	ReasonCheckBackupRepoSuccessfully    = "CheckBackupRepoSuccessfully"
 	ReasonValidateFailed       = "ValidateFailed"
 	ReasonValidateSuccessfully = "ValidateSuccessfully"
 	ReasonProcessing           = "Processing"

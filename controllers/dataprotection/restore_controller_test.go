@@ -245,6 +245,40 @@ var _ = Describe("Restore Controller test", func() {
 					}, nil)
 			})
 
+			It("test restore is failed when check failed in new action", func() {
+				By("expect for restore is Failed and BackupRepoFailed message")
+				restore := initResourcesAndWaitRestore(true, false, true, dpv1alpha1.RestorePhaseFailed,
+					func(f *testdp.MockRestoreFactory) {
+						f.Get().Spec.Backup.Name = "wrongBackup"
+					}, nil)
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					exist := false
+					for _, v := range r.Status.Conditions {
+						if v.Type == dprestore.ConditionTypeRestoreCheckBackupRepo && v.Reason == dprestore.ReasonCheckBackupRepoFailed {
+							exist = true
+						}
+					}
+					g.Expect(exist).Should(BeTrue())
+				})).Should(Succeed())
+			})
+
+			It("test restore is failed when validate failed in new phase", func() {
+				By("expect for restore is Failed and ValidateFailed message")
+				restore := initResourcesAndWaitRestore(false, false, true, dpv1alpha1.RestorePhaseFailed,func(f *testdp.MockRestoreFactory) {
+						f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
+							testdp.DataVolumeMountPath, "", int32(3), int32(0), nil)
+					},nil)
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					exist := false
+					for _, v := range r.Status.Conditions {
+						if v.Type == dprestore.ConditionTypeRestoreValidationPassed && v.Reason == dprestore.ReasonValidateFailed {
+							exist = true
+						}
+					}
+					g.Expect(exist).Should(BeTrue())
+				})).Should(Succeed())
+			})
+
 			It("test restore is Failed when restore job is not Failed", func() {
 				By("expect for restore is Failed ")
 				restore := initResourcesAndWaitRestore(true, false, true, dpv1alpha1.RestorePhaseRunning,

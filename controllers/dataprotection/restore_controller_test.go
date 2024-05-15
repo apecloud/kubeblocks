@@ -264,10 +264,10 @@ var _ = Describe("Restore Controller test", func() {
 
 			It("test restore is failed when validate failed in new phase", func() {
 				By("expect for restore is Failed and ValidateFailed message")
-				restore := initResourcesAndWaitRestore(false, false, true, dpv1alpha1.RestorePhaseFailed,func(f *testdp.MockRestoreFactory) {
-						f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-							testdp.DataVolumeMountPath, "", int32(3), int32(0), nil)
-					},nil)
+				restore := initResourcesAndWaitRestore(false, false, true, dpv1alpha1.RestorePhaseFailed, func(f *testdp.MockRestoreFactory) {
+					f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
+						testdp.DataVolumeMountPath, "", int32(3), int32(0), nil)
+				}, nil)
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
 					exist := false
 					for _, v := range r.Status.Conditions {

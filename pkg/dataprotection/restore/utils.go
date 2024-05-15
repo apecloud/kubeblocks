@@ -57,6 +57,7 @@ func SetRestoreCheckBackupRepoCondition(restore *dpv1alpha1.Restore, reason, mes
 	}
 	SetRestoreCondition(restore, status, ConditionTypeRestoreCheckBackupRepo, reason, message)
 }
+
 // SetRestoreValidationCondition sets restore condition which type is ConditionTypeRestoreValidationPassed.
 func SetRestoreValidationCondition(restore *dpv1alpha1.Restore, reason, message string) {
 	status := metav1.ConditionFalse

@@ -242,7 +242,7 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 		restore.Status.Phase = dpv1alpha1.RestorePhaseAsDataSource
 	} else {
 		// check if restore CR is legal
-		err := r.validateAndBuildMGR(reqCtx,dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme))
+		err := r.validateAndBuildMGR(reqCtx, dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme))
 		switch {
 		case intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal):
 			restore.Status.Phase = dpv1alpha1.RestorePhaseFailed

@@ -868,6 +868,32 @@ type ClusterComponentSpec struct {
 	// +optional
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	Monitor *bool `json:"monitor,omitempty"`
+
+	// Overrides the way to generate the SystemAccount password defined in the ComponentDefinition SystemAccount.
+	//
+	// +optional
+	SystemAccount *ComponentSystemAccount `json:"systemAccount,omitempty"`
+}
+
+type ComponentSystemAccount struct {
+	// Reference to the SystemAccount name defined in the ComponentDefinition SystemAccount.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the policy for generating the account's password.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy"`
+
+	// Refers to the secret from which data will be copied to create the new account.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

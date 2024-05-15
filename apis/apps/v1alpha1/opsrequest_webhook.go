@@ -238,6 +238,8 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 		return r.validateDataScript(ctx, k8sClient, cluster)
 	case ExposeType:
 		return r.validateExpose(ctx, cluster)
+	case RebuildInstanceType:
+		return r.validateRebuildInstance(cluster)
 	}
 	return nil
 }
@@ -272,13 +274,24 @@ func (r *OpsRequest) validateExpose(_ context.Context, cluster *Cluster) error {
 	return r.checkComponentExistence(cluster, compOpsList)
 }
 
+func (r *OpsRequest) validateRebuildInstance(cluster *Cluster) error {
+	rebuildFrom := r.Spec.RebuildFrom
+	if len(rebuildFrom) == 0 {
+		return notEmptyError("spec.rebuildFrom")
+	}
+	var compOpsList []ComponentOps
+	for _, v := range rebuildFrom {
+		compOpsList = append(compOpsList, v.ComponentOps)
+	}
+	return r.checkComponentExistence(cluster, compOpsList)
+}
+
 // validateUpgrade validates spec.restart
 func (r *OpsRequest) validateRestart(cluster *Cluster) error {
 	restartList := r.Spec.RestartList
 	if len(restartList) == 0 {
 		return notEmptyError("spec.restart")
 	}
-
 	return r.checkComponentExistence(cluster, restartList)
 }
 

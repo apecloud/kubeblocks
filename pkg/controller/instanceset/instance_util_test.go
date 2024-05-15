@@ -260,7 +260,7 @@ var _ = Describe("instance util test", func() {
 						{
 							Port:     1234,
 							Protocol: corev1.ProtocolUDP,
-							Name:     "bar",
+							Name:     "foo",
 						},
 					},
 				}).

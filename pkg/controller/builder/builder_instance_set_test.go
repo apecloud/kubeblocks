@@ -138,22 +138,6 @@ var _ = Describe("instance_set builder", func() {
 				},
 			},
 		}
-		alternativeServices := []corev1.Service{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "bar",
-				},
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{
-							Name:     "bar",
-							Protocol: corev1.ProtocolTCP,
-							Port:     port,
-						},
-					},
-				},
-			},
-		}
 		paused := true
 		credential := workloads.Credential{
 			Username: workloads.CredentialVar{Value: "foo"},
@@ -188,7 +172,6 @@ var _ = Describe("instance_set builder", func() {
 			AddCustomHandler(action).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetService(service).
-			SetAlternativeServices(alternativeServices).
 			SetPaused(paused).
 			SetCredential(credential).
 			SetInstances(instances).
@@ -228,8 +211,6 @@ var _ = Describe("instance_set builder", func() {
 		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(its.Spec.Service).ShouldNot(BeNil())
 		Expect(its.Spec.Service).Should(BeEquivalentTo(service))
-		Expect(its.Spec.AlternativeServices).ShouldNot(BeNil())
-		Expect(its.Spec.AlternativeServices).Should(Equal(alternativeServices))
 		Expect(its.Spec.Paused).Should(Equal(paused))
 		Expect(its.Spec.Credential).ShouldNot(BeNil())
 		Expect(*its.Spec.Credential).Should(Equal(credential))

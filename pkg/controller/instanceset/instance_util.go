@@ -366,7 +366,15 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
 		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
-		oldSvc.Spec = newSvc.Spec
+		mergeMap(&newSvc.Labels, &oldSvc.Labels)
+		mergeMap(&newSvc.Spec.Selector, &oldSvc.Spec.Selector)
+		oldSvc.Spec.Type = newSvc.Spec.Type
+		oldSvc.Spec.PublishNotReadyAddresses = newSvc.Spec.PublishNotReadyAddresses
+		intctrlutil.MergeList(&newSvc.Spec.Ports, &oldSvc.Spec.Ports, func(port corev1.ServicePort) func(corev1.ServicePort) bool {
+			return func(item corev1.ServicePort) bool {
+				return item.Name == port.Name
+			}
+		})
 		return oldSvc
 	}
 

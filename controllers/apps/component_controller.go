@@ -226,8 +226,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&dpv1alpha1.Restore{}).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&batchv1.Job{}).
-		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler)).
-		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
+		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
 	if viper.GetBool(constant.EnableRBACManager) {
 		b.Owns(&rbacv1.ClusterRoleBinding{}).
@@ -261,8 +260,7 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		Watch(b, &batchv1.Job{}, eventHandler).
 		Watch(b, &corev1.ServiceAccount{}, eventHandler).
 		Watch(b, &rbacv1.RoleBinding{}, eventHandler).
-		Watch(b, &rbacv1.ClusterRoleBinding{}, eventHandler).
-		Watch(b, &corev1.Pod{}, eventHandler)
+		Watch(b, &rbacv1.ClusterRoleBinding{}, eventHandler)
 
 	return b.Complete(r)
 }

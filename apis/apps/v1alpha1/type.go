@@ -916,7 +916,6 @@ type Service struct {
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=25
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// ServiceName defines the name of the underlying service object.
@@ -927,6 +926,9 @@ type Service struct {
 	//
 	// Only one default service name is allowed.
 	// Cannot be updated.
+	//
+	// +kubebuilder:validation:MaxLength=25
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	//
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`

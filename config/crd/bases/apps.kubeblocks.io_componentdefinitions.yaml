@@ -12852,7 +12852,6 @@ spec:
                         this service by its name. (e.g., connection credential) Cannot
                         be updated.
                       maxLength: 25
-                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     podService:
                       default: false
@@ -12897,6 +12896,8 @@ spec:
                         cluster-level services - CLUSTER_NAME-COMPONENT_NAME: for
                         component-level services \n Only one default service name
                         is allowed. Cannot be updated."
+                      maxLength: 25
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     spec:
                       description: Spec defines the behavior of a service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status

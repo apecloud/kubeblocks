@@ -520,7 +520,7 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 func (r *clusterBackupPolicyTransformer) getClusterComponentSpecs() []*appsv1alpha1.ClusterComponentSpec {
 	var compSpecs []*appsv1alpha1.ClusterComponentSpec
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {
-		if v.ComponentDefRef == r.backupPolicy.ComponentDefRef || slices.Contains(r.backupPolicy.ComponentDefs, v.ComponentDef) {
+		if (v.ComponentDefRef != "" && v.ComponentDefRef == r.backupPolicy.ComponentDefRef) || slices.Contains(r.backupPolicy.ComponentDefs, v.ComponentDef) {
 			compSpecs = append(compSpecs, &r.clusterTransformContext.Cluster.Spec.ComponentSpecs[i])
 		}
 	}

@@ -198,8 +198,11 @@ message SwitchoverRequest {
   // The Name of the new primary replica.
   string candidate = 5;
 
+  // Force the switchover to happen even if the primary is not ready.
+  bool force = 6;
+
   // Common metadata property for extention
-  map<string, string> metadata = 6;
+  map<string, string> metadata = 7;
 }
 
 message SwitchoverResponse {

@@ -1,4 +1,4 @@
-name: CICD-PUSH
+name: CICD Push
 
 on:
   push:

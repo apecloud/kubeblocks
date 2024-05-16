@@ -33,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -117,7 +116,7 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 
 		role, err = s.DBPluginClient.GetReplicaRole(ctx1)
 	default:
-		manager, err1 := register.GetDBManager(s.Command)
+		manager, err1 := s.GetDBManager()
 		if err1 != nil {
 			return nil, errors.Wrap(err1, "get manager failed")
 		}

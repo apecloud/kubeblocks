@@ -225,7 +225,7 @@ var _ = Describe("utils test", func() {
 					ReplicaRole: &roles[1],
 				},
 				{
-					PodName:     name + "-1",
+					PodName:     name + "-2",
 					ReplicaRole: &roles[2],
 				},
 			}
